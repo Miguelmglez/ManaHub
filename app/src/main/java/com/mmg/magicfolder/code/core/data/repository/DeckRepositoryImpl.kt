@@ -1,0 +1,38 @@
+package com.mmg.magicfolder.code.core.data.repository
+
+
+import com.mmg.magicfolder.code.core.data.local.dao.DeckDao
+import com.mmg.magicfolder.code.core.data.local.entity.DeckCardCrossRef
+import com.mmg.magicfolder.code.core.data.local.mapper.toDomain
+import com.mmg.magicfolder.code.core.data.local.mapper.toEntity
+import com.mmg.magicfolder.code.core.domain.model.Deck
+import com.mmg.magicfolder.code.core.domain.model.DeckWithCards
+import com.mmg.magicfolder.code.core.domain.repository.DeckRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class DeckRepositoryImpl @Inject constructor(private val deckDao: DeckDao) : DeckRepository {
+
+    override fun observeAllDecks(): Flow> =
+    deckDao.observeAllDecks().map { it.map { d -> d.toDomain() } }
+
+    override fun observeDeckWithCards(deckId: Long): Flow =
+        deckDao.observeDeckWithCards(deckId).map { it?.toDomain() }
+
+    override suspend fun createDeck(deck: Deck): Long  = deckDao.insertDeck(deck.toEntity())
+    override suspend fun updateDeck(deck: Deck)        = deckDao.updateDeck(deck.toEntity())
+    override suspend fun deleteDeck(deckId: Long)      = deckDao.deleteDeck(deckId)
+
+    override suspend fun addCardToDeck(
+        deckId: Long, scryfallId: String, quantity: Int, isSideboard: Boolean,
+    ) = deckDao.upsertDeckCard(DeckCardCrossRef(deckId, scryfallId, quantity, isSideboard))
+
+    override suspend fun removeCardFromDeck(
+        deckId: Long, scryfallId: String, isSideboard: Boolean,
+    ) = deckDao.removeDeckCard(deckId, scryfallId, isSideboard)
+
+    override suspend fun clearDeck(deckId: Long) = deckDao.clearDeck(deckId)
+}
