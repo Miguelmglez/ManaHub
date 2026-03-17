@@ -3,8 +3,8 @@ package com.mmg.magicfolder.code.core.data.repository
 
 import com.mmg.magicfolder.code.core.data.local.dao.DeckDao
 import com.mmg.magicfolder.code.core.data.local.entity.DeckCardCrossRef
-import com.mmg.magicfolder.code.core.data.remote.mapper.toDomain
-import com.mmg.magicfolder.code.core.data.remote.mapper.toEntity
+import com.mmg.magicfolder.code.core.data.local.mapper.toDomain
+import com.mmg.magicfolder.code.core.data.local.mapper.toEntity
 import com.mmg.magicfolder.code.core.domain.model.Deck
 import com.mmg.magicfolder.code.core.domain.model.DeckWithCards
 import com.mmg.magicfolder.code.core.domain.repository.DeckRepository
