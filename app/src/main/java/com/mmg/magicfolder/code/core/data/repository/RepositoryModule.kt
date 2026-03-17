@@ -5,7 +5,6 @@ import com.mmg.magicfolder.code.core.domain.repository.CardRepository
 import com.mmg.magicfolder.code.core.domain.repository.DeckRepository
 import com.mmg.magicfolder.code.core.domain.repository.StatsRepository
 import com.mmg.magicfolder.code.core.domain.repository.UserCardRepository
-import com.mmg.magicfolder.core.domain.repository.*
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

@@ -1,5 +1,4 @@
-package com.mmg.magicfolder.code.core.data.remote.mapper
-
+package com.mmg.magicfolder.code.core.data.local.mapper
 
 import com.mmg.magicfolder.code.core.data.local.entity.DeckEntity
 import com.mmg.magicfolder.code.core.data.local.dao.DeckWithCards as DeckWithCardsEntity

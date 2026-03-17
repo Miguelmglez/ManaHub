@@ -2,9 +2,8 @@ package com.mmg.magicfolder.code.core.data.repository
 
 import com.mmg.magicfolder.code.core.data.local.dao.CardDao
 import com.mmg.magicfolder.code.core.data.local.dao.UserCardDao
-import com.mmg.magicfolder.code.core.data.local.mapper.toDomain
-import com.mmg.magicfolder.code.core.data.local.mapper.toEntity
 import com.mmg.magicfolder.code.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.magicfolder.code.core.data.remote.mapper.toDomain
 import com.mmg.magicfolder.code.core.data.remote.mapper.toEntity
 import com.mmg.magicfolder.code.core.domain.model.Card
 import com.mmg.magicfolder.code.core.domain.model.DataResult

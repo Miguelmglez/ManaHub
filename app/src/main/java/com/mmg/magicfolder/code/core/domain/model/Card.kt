@@ -5,11 +5,11 @@ data class Card(
     val name:             String,
     val manaCost:         String?,
     val cmc:              Double,
-    val colors:           List,
-    val colorIdentity:    List,
+    val colors:           List<String>,
+    val colorIdentity:    List<String>,
     val typeLine:         String,
     val oracleText:       String?,
-    val keywords:         List,
+    val keywords:         List<String>,
     val power:            String?,
     val toughness:        String?,
     val loyalty:          String?,
@@ -18,8 +18,8 @@ data class Card(
     val collectorNumber:  String,
     val rarity:           String,
     val releasedAt:       String,
-    val frameEffects:     List,  // e.g. ["showcase"], ["extendedart"]
-    val promoTypes:       List,  // e.g. ["boosterfun"]
+    val frameEffects:     List<String>,  // e.g. ["showcase"], ["extendedart"]
+    val promoTypes:       List<String>,  // e.g. ["boosterfun"]
     val lang:             String,
     val imageNormal:      String?,
     val imageArtCrop:     String?,
@@ -67,5 +67,5 @@ data class Deck(
     val updatedAt:   Long    = System.currentTimeMillis(),
 )
 
-data class DeckWithCards(val deck: Deck, val mainboard: List, val sideboard: List)
+data class DeckWithCards(val deck: Deck, val mainboard: List<DeckSlot>, val sideboard: List<DeckSlot>)
 data class DeckSlot(val scryfallId: String, val quantity: Int)

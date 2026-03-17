@@ -2,7 +2,6 @@ package com.mmg.magicfolder.code.core.data.remote.mapper
 
 
 import com.mmg.magicfolder.code.core.data.local.entity.CardEntity
-import com.mmg.magicfolder.code.core.data.local.mapper.toEntity
 import com.mmg.magicfolder.code.core.data.remote.dto.CardDto
 import com.mmg.magicfolder.code.core.domain.model.Card
 

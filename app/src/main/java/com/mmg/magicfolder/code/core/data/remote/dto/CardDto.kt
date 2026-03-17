@@ -8,11 +8,11 @@ data class CardDto(
     @SerializedName("lang")             val lang:            String,
     @SerializedName("mana_cost")        val manaCost:        String?,
     @SerializedName("cmc")              val cmc:             Double,
-    @SerializedName("colors")           val colors:          List?,
-    @SerializedName("color_identity")   val colorIdentity:   List,
+    @SerializedName("colors")           val colors:          List<String>?,
+    @SerializedName("color_identity")   val colorIdentity:   List<String>,
     @SerializedName("type_line")        val typeLine:        String,
     @SerializedName("oracle_text")      val oracleText:      String?,
-    @SerializedName("keywords")         val keywords:        List,
+    @SerializedName("keywords")         val keywords:        List<String>,
     @SerializedName("power")            val power:           String?,
     @SerializedName("toughness")        val toughness:       String?,
     @SerializedName("loyalty")          val loyalty:         String?,
@@ -22,11 +22,11 @@ data class CardDto(
     @SerializedName("rarity")           val rarity:          String,
     @SerializedName("released_at")      val releasedAt:      String,
     // Alternate art — e.g. ["showcase"], ["extendedart"], ["borderless"]
-    @SerializedName("frame_effects")    val frameEffects:    List? = null,
+    @SerializedName("frame_effects")    val frameEffects:    List<String>? = null,
     // Promo markers — e.g. ["boosterfun"], ["stamped"]
-    @SerializedName("promo_types")      val promoTypes:      List? = null,
+    @SerializedName("promo_types")      val promoTypes:      List<String>? = null,
     @SerializedName("image_uris")       val imageUris:       ImageUrisDto?,
-    @SerializedName("card_faces")       val cardFaces:       List?,
+    @SerializedName("card_faces")       val cardFaces:       List<CardFaceDto>?,
     @SerializedName("prices")           val prices:          PricesDto,
     @SerializedName("legalities")       val legalities:      LegalitiesDto,
     @SerializedName("scryfall_uri")     val scryfallUri:     String,
@@ -74,11 +74,11 @@ data class SearchResultDto(
     @SerializedName("total_cards") val totalCards: Int,
     @SerializedName("has_more")    val hasMore:    Boolean,
     @SerializedName("next_page")   val nextPage:   String?,
-    @SerializedName("data")        val data:       List,
+    @SerializedName("data")        val data:       List<CardDto>,
 )
 
 data class CardCollectionRequestDto(
-    @SerializedName("identifiers") val identifiers: List
+    @SerializedName("identifiers") val identifiers: List<CardIdentifierDto>
 )
 
 data class CardIdentifierDto(
@@ -89,6 +89,6 @@ data class CardIdentifierDto(
 )
 
 data class CardCollectionResponseDto(
-    @SerializedName("data")      val data:     List,
-    @SerializedName("not_found") val notFound: List,
+    @SerializedName("data")      val data:     List<CardDto>,
+    @SerializedName("not_found") val notFound: List<CardIdentifierDto>,
 )

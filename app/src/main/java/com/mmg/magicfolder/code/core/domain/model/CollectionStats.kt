@@ -6,12 +6,12 @@ data class CollectionStats(
     val totalDecks:        Int,
     val totalValueUsd:     Double,
     val totalValueEur:     Double,
-    val mostValuableCards: List,
-    val byColor:           Map,
-    val byRarity:          Map,
-    val byType:            Map,
-    val cmcDistribution:   Map,
-    val bySet:             Map,
+    val mostValuableCards: List<CardValue>,
+    val byColor:           Map<MtgColor, Int>,
+    val byRarity:          Map<Rarity, Int>,
+    val byType:            Map<CardType, Int>,
+    val cmcDistribution:   Map<Int, Int>,
+    val bySet:             Map<String, Int>,
 )
 
 data class CardValue(

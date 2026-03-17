@@ -1,8 +1,8 @@
 [versions]
 kotlin               = "2.0.0"
-agp                  = "8.13.2"
+agp                  = "8.7.3"
 compose-bom          = "2024.06.00"
-hilt                 = "2.51.1"
+hilt                 = "2.52"
 room                 = "2.6.1"
 retrofit             = "2.11.0"
 okhttp               = "4.12.0"

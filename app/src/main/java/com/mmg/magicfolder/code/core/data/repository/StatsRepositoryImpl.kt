@@ -17,7 +17,7 @@ class StatsRepositoryImpl @Inject constructor(
     private val deckDao:  DeckDao,
 ) : StatsRepository {
 
-    override fun observeCollectionStats(): Flow = combine(
+    override fun observeCollectionStats(): Flow<CollectionStats> = combine(
         statsDao.observeTotals(),
         statsDao.observeTotalValueUsd(),
         statsDao.observeTotalValueEur(),
@@ -28,7 +28,18 @@ class StatsRepositoryImpl @Inject constructor(
         statsDao.observeManaCurve(),
         statsDao.observeCountBySet(),
         deckDao.observeDeckCount(),
-    ) { totals, valueUsd, valueEur, topCards, colors, rarities, types, curve, sets, deckCount ->
+    ) { args: Array<Any?> ->
+        val totals    = args[0] as TotalsProjection
+        val valueUsd  = args[1] as Double
+        val valueEur  = args[2] as Double
+        val topCards  = args[3] as List<CardValueProjection>
+        val colors    = args[4] as List<ColorCountProjection>
+        val rarities  = args[5] as List<RarityCountProjection>
+        val types     = args[6] as List<TypeCountProjection>
+        val curve     = args[7] as List<CmcCountProjection>
+        val sets      = args[8] as List<SetCountProjection>
+        val deckCount = args[9] as Int
+
         CollectionStats(
             totalCards        = totals.totalCards,
             uniqueCards       = totals.uniqueCards,
@@ -44,8 +55,8 @@ class StatsRepositoryImpl @Inject constructor(
         )
     }
 
-    private fun List.toColorMap(): Map {
-        val result = mutableMapOf()
+    private fun List<ColorCountProjection>.toColorMap(): Map<MtgColor, Int> {
+        val result = mutableMapOf<MtgColor, Int>()
         for (row in this) {
             val parsed = row.colorIdentity
                 .removeSurrounding("[", "]").split(",")
@@ -64,7 +75,7 @@ class StatsRepositoryImpl @Inject constructor(
         return result
     }
 
-    private fun List.toRarityMap(): Map =
+    private fun List<RarityCountProjection>.toRarityMap(): Map<Rarity, Int> =
         associate { row ->
             val r = when (row.rarity.lowercase()) {
                 "common"   -> Rarity.COMMON;   "uncommon" -> Rarity.UNCOMMON
@@ -74,8 +85,8 @@ class StatsRepositoryImpl @Inject constructor(
             r to row.count
         }
 
-    private fun List.toTypeMap(): Map {
-        val result = mutableMapOf()
+    private fun List<TypeCountProjection>.toTypeMap(): Map<CardType, Int> {
+        val result = mutableMapOf<CardType, Int>()
         for (row in this) {
             val t = when {
                 "Creature"     in row.typeLine -> CardType.CREATURE
