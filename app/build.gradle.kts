@@ -32,6 +32,7 @@ android {
 
 dependencies {
     implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.foundation)
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.compose.ui)
@@ -67,5 +68,9 @@ dependencies {
     testImplementation(libs.coroutines.test)
 
     // Gson — needed directly by RoomConverters and CardEntityMapper
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.gson)
+
+    implementation(libs.accompanist.permissions)
+    implementation(libs.material.icons.extended)
+
 }
