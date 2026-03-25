@@ -16,6 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.components.CardGridItem
 import com.mmg.magicfolder.core.ui.components.CardListItem
+import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.ui.components.StaleWarningBanner
 import com.mmg.magicfolder.core.ui.theme.MagicColors
@@ -275,11 +276,20 @@ private fun ColorFilterRow(
         modifier              = Modifier.padding(vertical = 4.dp),
     ) {
         items(ColorFilter.entries) { filter ->
+            val manaCode  = filter.manaCode()
             val manaColor = filter.manaColor(mc)
+            val isColor   = manaCode != null
             FilterChip(
                 selected = filter == activeFilter,
                 onClick  = { onFilterChange(filter) },
-                label    = { Text(filter.displayName, style = MaterialTheme.magicTypography.labelSmall) },
+                label    = {
+                    if (isColor) {
+                        ManaSymbolImage(token = manaCode!!, size = 22.dp)
+                    } else {
+                        Text(filter.displayName, style = MaterialTheme.magicTypography.labelSmall)
+                    }
+                },
+                modifier = if (isColor) Modifier.size(40.dp) else Modifier,
                 colors   = FilterChipDefaults.filterChipColors(
                     selectedContainerColor     = (manaColor ?: mc.primaryAccent).copy(alpha = 0.20f),
                     selectedLabelColor         = manaColor ?: mc.primaryAccent,
@@ -287,12 +297,12 @@ private fun ColorFilterRow(
                     labelColor                 = mc.textSecondary,
                 ),
                 border   = FilterChipDefaults.filterChipBorder(
-                    enabled              = true,
-                    selected             = filter == activeFilter,
-                    selectedBorderColor  = (manaColor ?: mc.primaryAccent).copy(alpha = 0.60f),
-                    selectedBorderWidth  = 1.dp,
-                    borderColor          = mc.surfaceVariant,
-                    borderWidth          = 0.5.dp,
+                    enabled             = true,
+                    selected            = filter == activeFilter,
+                    selectedBorderColor = (manaColor ?: mc.primaryAccent).copy(alpha = 0.60f),
+                    selectedBorderWidth = 1.dp,
+                    borderColor         = mc.surfaceVariant,
+                    borderWidth         = 0.5.dp,
                 ),
             )
         }
@@ -392,6 +402,17 @@ val ColorFilter.displayName get() = when (this) {
     ColorFilter.G          -> "Green"
     ColorFilter.COLORLESS  -> "Colorless"
     ColorFilter.MULTICOLOR -> "Multi"
+}
+
+/** Returns the Scryfall card-symbol token for mana filters, null for non-mana filters. */
+private fun ColorFilter.manaCode(): String? = when (this) {
+    ColorFilter.W          -> "W"
+    ColorFilter.U          -> "U"
+    ColorFilter.B          -> "B"
+    ColorFilter.R          -> "R"
+    ColorFilter.G          -> "G"
+    ColorFilter.MULTICOLOR -> "M"
+    else                   -> null
 }
 
 private fun ColorFilter.manaColor(mc: MagicColors) = when (this) {

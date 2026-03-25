@@ -38,7 +38,7 @@ class AddCardViewModel @Inject constructor(
                         return@collectLatest
                     }
                     _uiState.update { it.copy(isSearching = true) }
-                    val lang = langPref.languageFlow.first()
+                    val lang = runCatching { langPref.languageFlow.first() }.getOrDefault("en")
                     val effectiveQuery = if (lang != "en") "$query lang:$lang" else query
                     when (val result = searchCards(effectiveQuery)) {
                         is DataResult.Success -> _uiState.update {

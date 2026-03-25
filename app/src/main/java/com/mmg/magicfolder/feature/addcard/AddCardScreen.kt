@@ -23,7 +23,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.ui.components.CardRarity
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
+import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
@@ -262,10 +264,10 @@ private fun CardSearchItem(card: Card, onClick: () -> Unit) {
                 card.manaCost?.let {
                     ManaCostImages(manaCost = it, symbolSize = 16.dp)
                 }
-                Text(
-                    text  = card.setCode.uppercase(),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = colors.textDisabled,
+                SetSymbol(
+                    setCode = card.setCode,
+                    rarity  = CardRarity.fromString(card.rarity),
+                    size    = 14.dp,
                 )
             }
         }
@@ -293,7 +295,7 @@ private fun AddCardConfirmSheet(
     onDismiss: () -> Unit,
 ) {
     val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    val languages  = listOf("en", "ja", "de", "fr", "es", "pt", "it", "ko", "ru")
+    val languages  = listOf("en", "es", "de")
     var isFoil    by remember { mutableStateOf(false) }
     var condition by remember { mutableStateOf("NM") }
     var language  by remember { mutableStateOf("en") }

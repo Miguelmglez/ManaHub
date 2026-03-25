@@ -284,14 +284,6 @@ private fun LanguageSection(
         "en" to "English",
         "es" to "Español",
         "de" to "Deutsch",
-        "fr" to "Français",
-        "it" to "Italiano",
-        "pt" to "Português",
-        "ja" to "日本語",
-        "ko" to "한국어",
-        "ru" to "Русский",
-        "zhs" to "简体中文",
-        "zht" to "繁體中文",
     )
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionTitle("Card Language")
