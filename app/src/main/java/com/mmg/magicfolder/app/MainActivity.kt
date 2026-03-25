@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.mmg.magicfolder.app.navigation.AppNavGraph
-import com.mmg.magicfolder.core.ui.theme.MtgCollectionTheme
+import com.mmg.magicfolder.core.ui.theme.MagicTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MtgCollectionTheme {
+            MagicTheme {
                 AppNavGraph()
             }
         }

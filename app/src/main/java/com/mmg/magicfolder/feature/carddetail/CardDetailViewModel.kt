@@ -3,6 +3,7 @@ package com.mmg.magicfolder.feature.carddetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.domain.model.CardTag
 import com.mmg.magicfolder.core.domain.model.DataResult
 import com.mmg.magicfolder.core.domain.model.UserCard
 import com.mmg.magicfolder.core.domain.repository.CardRepository
@@ -73,10 +74,29 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
-    fun onShowEditDialog()    = _uiState.update { it.copy(showEditDialog = true) }
-    fun onDismissEditDialog() = _uiState.update { it.copy(showEditDialog = false) }
-    fun onShowDeleteConfirm() = _uiState.update { it.copy(showDeleteConfirm = true) }
+    fun onShowEditDialog()       = _uiState.update { it.copy(showEditDialog = true) }
+    fun onDismissEditDialog()    = _uiState.update { it.copy(showEditDialog = false) }
+    fun onShowDeleteConfirm()    = _uiState.update { it.copy(showDeleteConfirm = true) }
     fun onDismissDeleteConfirm() = _uiState.update { it.copy(showDeleteConfirm = false) }
+    fun onShowTagPicker()        = _uiState.update { it.copy(showTagPicker = true) }
+    fun onDismissTagPicker()     = _uiState.update { it.copy(showTagPicker = false) }
+
+    fun onAddTag(tag: CardTag) {
+        val current = _uiState.value.card?.tags ?: return
+        if (tag in current) return
+        viewModelScope.launch {
+            runCatching { cardRepo.updateCardTags(scryfallId, current + tag) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
+    fun onRemoveTag(tag: CardTag) {
+        val current = _uiState.value.card?.tags ?: return
+        viewModelScope.launch {
+            runCatching { cardRepo.updateCardTags(scryfallId, current - tag) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
 
     fun onDeleteCard(userCardId: Long) {
         viewModelScope.launch {

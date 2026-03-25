@@ -4,12 +4,17 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.magicfolder.core.data.local.entity.CardEntity
 import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.domain.model.CardTag
 
 private val gson = Gson()
 private val listType = object : TypeToken<List<String>>() {}.type
 
 internal fun String.toStringList(): List<String> = gson.fromJson(this, listType) ?: emptyList()
-internal fun List<String>.toJsonString(): String = gson.toJson(this)
+internal fun List<String>.toJsonString(): String  = gson.toJson(this)
+
+internal fun String.toTagList(): List<CardTag> =
+    toStringList().mapNotNull { name -> runCatching { CardTag.valueOf(name) }.getOrNull() }
+internal fun List<CardTag>.toTagsJson(): String = map { it.name }.toJsonString()
 
 fun CardEntity.toDomainCard(): Card = Card(
     scryfallId        = scryfallId,
@@ -49,6 +54,7 @@ fun CardEntity.toDomainCard(): Card = Card(
     isStale           = isStale,
     staleReason       = staleReason,
     cachedAt          = cachedAt,
+    tags              = tags.toTagList(),
 )
 
 fun Card.toEntityCard(): CardEntity = CardEntity(
@@ -89,6 +95,7 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     isStale           = isStale,
     staleReason       = staleReason,
     cachedAt          = cachedAt,
+    tags              = tags.toTagsJson(),
 )
 
 fun List<CardEntity>.toDomainCardList(): List<Card> = map { it.toDomainCard() }

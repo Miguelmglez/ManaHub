@@ -17,98 +17,159 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.components.CardGridItem
 import com.mmg.magicfolder.core.ui.components.CardListItem
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
-import com.mmg.magicfolder.core.ui.components.CardGridItem
-import com.mmg.magicfolder.core.ui.components.CardListItem
 import com.mmg.magicfolder.core.ui.components.StaleWarningBanner
+import com.mmg.magicfolder.core.ui.theme.MagicColors
+import com.mmg.magicfolder.core.ui.theme.magicColors
+import com.mmg.magicfolder.core.ui.theme.magicTypography
+import com.mmg.magicfolder.feature.decks.DeckListScreen
+
+// ── Sub-tab index constants ───────────────────────────────────────────────────
+private const val TAB_CARDS = 0
+private const val TAB_DECKS = 1
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionScreen(
-    onCardClick:    (scryfallId: String) -> Unit,
-    onAddCardClick: () -> Unit,
-    viewModel:      CollectionViewModel = hiltViewModel(),
+    onCardClick:       (scryfallId: String) -> Unit,
+    onScannerClick:    () -> Unit,
+    onDeckClick:       (deckId: Long) -> Unit,
+    onCreateDeckClick: () -> Unit,
+    viewModel:         CollectionViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableIntStateOf(TAB_CARDS) }
+    val mc = MaterialTheme.magicColors
 
     Scaffold(
         topBar = {
             CollectionTopBar(
-                viewMode        = uiState.viewMode,
+                viewMode         = uiState.viewMode,
                 onViewModeToggle = viewModel::onViewModeToggle,
-                onSortChange    = viewModel::onSortChange,
-                currentSort     = uiState.sortOrder,
+                onSortChange     = viewModel::onSortChange,
+                currentSort      = uiState.sortOrder,
+                onScannerClick   = onScannerClick,
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onAddCardClick) {
-                Icon(Icons.Default.Add, contentDescription = "Add card")
-            }
         },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(padding),
         ) {
-            // Stale data warning
-            AnimatedVisibility(visible = uiState.hasStaleCards) {
-                StaleWarningBanner()
-            }
-
-            // Search bar
-            SearchBar(
-                query    = uiState.searchQuery,
-                onQueryChange = viewModel::onSearchQueryChange,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            // Color filter chips
-            ColorFilterRow(
-                activeFilter = uiState.activeFilter,
-                onFilterChange = viewModel::onFilterChange,
-            )
-
-            // Card count
-            Text(
-                text     = "${uiState.cards.size} cards",
-                style    = MaterialTheme.typography.labelSmall,
-                color    = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-
-            // Loading
-            if (uiState.isLoading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                return@Column
-            }
-
-            // Empty state
-            if (uiState.cards.isEmpty() && !uiState.isLoading) {
-                EmptyCollectionState(onAddCardClick = onAddCardClick)
-                return@Column
-            }
-
-            // Grid or list
-            when (uiState.viewMode) {
-                ViewMode.GRID -> CardGrid(
-                    cards       = uiState.cards,
-                    onCardClick = onCardClick,
+            // ── Cards / Decks sub-tabs ────────────────────────────────────────
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor   = mc.backgroundSecondary,
+                contentColor     = mc.primaryAccent,
+            ) {
+                Tab(
+                    selected = selectedTab == TAB_CARDS,
+                    onClick  = { selectedTab = TAB_CARDS },
+                    text     = {
+                        Text(
+                            text  = "CARDS",
+                            style = MaterialTheme.magicTypography.labelSmall,
+                        )
+                    },
                 )
-                ViewMode.LIST -> CardList(
-                    cards       = uiState.cards,
-                    onCardClick = onCardClick,
-                    onDelete    = viewModel::onDeleteCard,
+                Tab(
+                    selected = selectedTab == TAB_DECKS,
+                    onClick  = { selectedTab = TAB_DECKS },
+                    text     = {
+                        Text(
+                            text  = "DECKS",
+                            style = MaterialTheme.magicTypography.labelSmall,
+                        )
+                    },
+                )
+            }
+
+            // ── Tab content ───────────────────────────────────────────────────
+            when (selectedTab) {
+                TAB_CARDS -> CardsTabContent(
+                    uiState        = uiState,
+                    onCardClick    = onCardClick,
+                    onScannerClick = onScannerClick,
+                    viewModel      = viewModel,
+                )
+                TAB_DECKS -> DeckListScreen(
+                    onDeckClick       = onDeckClick,
+                    onCreateDeckClick = onCreateDeckClick,
                 )
             }
         }
 
-        // Error snackbar
-        uiState.error?.let { error ->
-            LaunchedEffect(error) {
-                viewModel.onErrorDismissed()
+        // Error dismissal
+        uiState.error?.let {
+            LaunchedEffect(it) { viewModel.onErrorDismissed() }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Cards tab content
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CardsTabContent(
+    uiState:        CollectionUiState,
+    onCardClick:    (String) -> Unit,
+    onScannerClick: () -> Unit,
+    viewModel:      CollectionViewModel,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Stale data warning
+        AnimatedVisibility(visible = uiState.hasStaleCards) {
+            StaleWarningBanner()
+        }
+
+        // Search bar
+        SearchBar(
+            query         = uiState.searchQuery,
+            onQueryChange = viewModel::onSearchQueryChange,
+            modifier      = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+
+        // Color filter chips
+        ColorFilterRow(
+            activeFilter   = uiState.activeFilter,
+            onFilterChange = viewModel::onFilterChange,
+        )
+
+        // Card count
+        Text(
+            text     = "${uiState.cards.size} cards",
+            style    = MaterialTheme.magicTypography.labelSmall,
+            color    = mc.textSecondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+
+        // Loading
+        if (uiState.isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = mc.primaryAccent)
             }
+            return@Column
+        }
+
+        // Empty state
+        if (uiState.cards.isEmpty()) {
+            EmptyCollectionState(onAddCardClick = onScannerClick)
+            return@Column
+        }
+
+        // Grid or list
+        when (uiState.viewMode) {
+            ViewMode.GRID -> CardGrid(
+                cards       = uiState.cards,
+                onCardClick = onCardClick,
+            )
+            ViewMode.LIST -> CardList(
+                cards       = uiState.cards,
+                onCardClick = onCardClick,
+                onDelete    = viewModel::onDeleteCard,
+            )
         }
     }
 }
@@ -116,25 +177,38 @@ fun CollectionScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CollectionTopBar(
-    viewMode:        ViewMode,
+    viewMode:         ViewMode,
     onViewModeToggle: () -> Unit,
-    onSortChange:    (SortOrder) -> Unit,
-    currentSort:     SortOrder,
+    onSortChange:     (SortOrder) -> Unit,
+    currentSort:      SortOrder,
+    onScannerClick:   () -> Unit,
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
+    val mc = MaterialTheme.magicColors
 
     TopAppBar(
-        title = { Text("Magic Folder") },
+        title = {
+            Text(
+                text  = "Magic Folder",
+                style = MaterialTheme.magicTypography.titleLarge,
+                color = mc.textPrimary,
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = mc.backgroundSecondary,
+            actionIconContentColor = mc.textSecondary,
+        ),
         actions = {
-            // View mode toggle
+            IconButton(onClick = onScannerClick) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan card")
+            }
             IconButton(onClick = onViewModeToggle) {
                 Icon(
-                    imageVector = if (viewMode == ViewMode.GRID)
+                    imageVector        = if (viewMode == ViewMode.GRID)
                         Icons.Default.List else Icons.Default.GridView,
                     contentDescription = "Toggle view mode",
                 )
             }
-            // Sort menu
             IconButton(onClick = { showSortMenu = true }) {
                 Icon(Icons.Default.Sort, contentDescription = "Sort")
             }
@@ -165,37 +239,61 @@ private fun SearchBar(
     onQueryChange: (String) -> Unit,
     modifier:     Modifier = Modifier,
 ) {
+    val mc = MaterialTheme.magicColors
     OutlinedTextField(
         value         = query,
         onValueChange = onQueryChange,
         modifier      = modifier.fillMaxWidth(),
-        placeholder   = { Text("Search in collection…") },
-        leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null) },
+        placeholder   = { Text("Search in collection…", color = mc.textDisabled) },
+        leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
         trailingIcon  = if (query.isNotEmpty()) {{
             IconButton(onClick = { onQueryChange("") }) {
-                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = mc.textSecondary)
             }
         }} else null,
         singleLine    = true,
         shape         = MaterialTheme.shapes.medium,
+        colors        = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = mc.primaryAccent,
+            unfocusedBorderColor = mc.surfaceVariant,
+            focusedTextColor     = mc.textPrimary,
+            unfocusedTextColor   = mc.textPrimary,
+            cursorColor          = mc.primaryAccent,
+        ),
     )
 }
 
 @Composable
 private fun ColorFilterRow(
-    activeFilter:  ColorFilter,
+    activeFilter:   ColorFilter,
     onFilterChange: (ColorFilter) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
     LazyRow(
-        contentPadding    = PaddingValues(horizontal = 16.dp),
+        contentPadding        = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier          = Modifier.padding(vertical = 4.dp),
+        modifier              = Modifier.padding(vertical = 4.dp),
     ) {
         items(ColorFilter.entries) { filter ->
+            val manaColor = filter.manaColor(mc)
             FilterChip(
                 selected = filter == activeFilter,
                 onClick  = { onFilterChange(filter) },
-                label    = { Text(filter.displayName) },
+                label    = { Text(filter.displayName, style = MaterialTheme.magicTypography.labelSmall) },
+                colors   = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor     = (manaColor ?: mc.primaryAccent).copy(alpha = 0.20f),
+                    selectedLabelColor         = manaColor ?: mc.primaryAccent,
+                    containerColor             = mc.surface,
+                    labelColor                 = mc.textSecondary,
+                ),
+                border   = FilterChipDefaults.filterChipBorder(
+                    enabled              = true,
+                    selected             = filter == activeFilter,
+                    selectedBorderColor  = (manaColor ?: mc.primaryAccent).copy(alpha = 0.60f),
+                    selectedBorderWidth  = 1.dp,
+                    borderColor          = mc.surfaceVariant,
+                    borderWidth          = 0.5.dp,
+                ),
             )
         }
     }
@@ -207,9 +305,9 @@ private fun CardGrid(
     onCardClick: (String) -> Unit,
 ) {
     LazyVerticalGrid(
-        columns             = GridCells.Adaptive(minSize = 110.dp),
-        contentPadding      = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        columns               = GridCells.Adaptive(minSize = 110.dp),
+        contentPadding        = PaddingValues(12.dp),
+        verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(cards, key = { it.userCard.id }) { item ->
@@ -230,42 +328,53 @@ private fun CardList(
     ) {
         items(cards, key = { it.userCard.id }) { item ->
             CardListItem(
-                item      = item,
-                onClick   = { onCardClick(item.card.scryfallId) },
-                onDelete  = { onDelete(item.userCard.id) },
+                item     = item,
+                onClick  = { onCardClick(item.card.scryfallId) },
+                onDelete = { onDelete(item.userCard.id) },
             )
-            HorizontalDivider(thickness = 0.5.dp)
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
         }
     }
 }
 
 @Composable
 private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
     Column(
         modifier            = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            imageVector         = Icons.Default.CollectionsBookmark,
-            contentDescription  = null,
-            tint                = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier            = Modifier.size(64.dp),
+            imageVector        = Icons.Default.CollectionsBookmark,
+            contentDescription = null,
+            tint               = mc.textDisabled,
+            modifier           = Modifier.size(64.dp),
         )
         Spacer(Modifier.height(16.dp))
-        Text("Your collection is empty", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Your collection is empty",
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             "Add your first card by tapping +",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.magicTypography.bodyMedium,
+            color = mc.textSecondary,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onAddCardClick) { Text("Add a card") }
+        Button(
+            onClick = onAddCardClick,
+            colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+        ) { Text("Add a card", color = mc.background) }
     }
 }
 
-// Display name extensions
+// ─────────────────────────────────────────────────────────────────────────────
+//  Display name / mana color extensions
+// ─────────────────────────────────────────────────────────────────────────────
+
 val SortOrder.displayName get() = when (this) {
     SortOrder.DATE_ADDED -> "Date added"
     SortOrder.NAME       -> "Name"
@@ -283,4 +392,14 @@ val ColorFilter.displayName get() = when (this) {
     ColorFilter.G          -> "Green"
     ColorFilter.COLORLESS  -> "Colorless"
     ColorFilter.MULTICOLOR -> "Multi"
+}
+
+private fun ColorFilter.manaColor(mc: MagicColors) = when (this) {
+    ColorFilter.W         -> mc.manaW
+    ColorFilter.U         -> mc.manaU
+    ColorFilter.B         -> mc.manaB
+    ColorFilter.R         -> mc.manaR
+    ColorFilter.G         -> mc.manaG
+    ColorFilter.COLORLESS -> mc.manaC
+    else                  -> null
 }

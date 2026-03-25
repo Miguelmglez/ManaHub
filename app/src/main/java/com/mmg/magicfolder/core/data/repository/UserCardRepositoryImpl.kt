@@ -1,8 +1,8 @@
 package com.mmg.magicfolder.core.data.repository
 
 import com.mmg.magicfolder.core.data.local.dao.UserCardDao
-import com.mmg.magicfolder.core.data.remote.mapper.toDomain
-import com.mmg.magicfolder.core.data.remote.mapper.toEntity
+import com.mmg.magicfolder.core.data.local.mapper.toDomain
+import com.mmg.magicfolder.core.data.local.mapper.toEntity
 import com.mmg.magicfolder.core.domain.model.UserCard
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository

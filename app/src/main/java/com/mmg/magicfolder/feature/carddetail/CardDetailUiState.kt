@@ -11,6 +11,7 @@ data class CardDetailUiState(
     val error:        String?   = null,
     val isStale:      Boolean   = false,
     // Dialog state
-    val showEditDialog: Boolean = false,
+    val showEditDialog:    Boolean = false,
     val showDeleteConfirm: Boolean = false,
+    val showTagPicker:     Boolean = false,
 )

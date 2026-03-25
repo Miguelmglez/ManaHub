@@ -1,10 +1,9 @@
-package com.mmg.magicfolder.core.data.remote.mapper
+package com.mmg.magicfolder.core.data.local.mapper
 
 import com.mmg.magicfolder.core.data.local.entity.UserCardEntity
 import com.mmg.magicfolder.core.domain.model.UserCard
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.data.local.dao.UserCardWithCard as UserCardWithCardEntity
-import com.mmg.magicfolder.core.data.local.mapper.toDomainCard as cardToDomain
 
 fun UserCardEntity.toDomain(): UserCard = UserCard(
     id = id, scryfallId = scryfallId, quantity = quantity, isFoil = isFoil,
@@ -15,7 +14,7 @@ fun UserCardEntity.toDomain(): UserCard = UserCard(
 
 fun UserCardWithCardEntity.toDomain(): UserCardWithCard = UserCardWithCard(
     userCard = userCard.toDomain(),
-    card     = card.cardToDomain(),
+    card     = card.toDomainCard(),
 )
 
 fun UserCard.toEntity(): UserCardEntity = UserCardEntity(

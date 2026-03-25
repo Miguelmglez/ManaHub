@@ -1,13 +1,40 @@
 package com.mmg.magicfolder.app.navigation
 
 sealed class Screen(val route: String) {
-    data object Collection  : Screen("collection")
-    data object Scanner     : Screen("scanner")
-    data object Stats       : Screen("stats")
-    data object Synergy     : Screen("synergy")
-    data object DeckBuilder : Screen("deck_builder")
 
-    data object CardDetail : Screen("card_detail/{scryfallId}") {
-        fun createRoute(scryfallId: String) = "card_detail/$scryfallId"
+    // ── Root ─────────────────────────────────────────────────────────────────
+    object Splash : Screen("splash")
+
+    // ── Collection (bottom tab 1) ────────────────────────────────────────────
+    /** Bottom-tab root — also hosts the Cards/Decks sub-tab row. */
+    object Collection : Screen("collection")
+    object CollectionAddCard  : Screen("collection/add")
+    object CollectionScanner  : Screen("collection/scanner")
+    object CollectionCardDetail : Screen("collection/detail/{scryfallId}") {
+        fun createRoute(scryfallId: String) = "collection/detail/$scryfallId"
     }
+
+    // ── Decks (sub-section of Collection) ────────────────────────────────────
+    object DeckList    : Screen("collection/decks")
+    object DeckDetail  : Screen("collection/decks/{deckId}") {
+        fun createRoute(deckId: Long) = "collection/decks/$deckId"
+    }
+    object DeckBuilder : Screen("collection/decks/builder")
+
+    // ── Stats (bottom tab 2) ─────────────────────────────────────────────────
+    object Stats : Screen("stats")
+
+    // ── Profile (bottom tab 4) ───────────────────────────────────────────────
+    object Profile : Screen("profile")
+
+    // ── Game flow (central FAB) ───────────────────────────────────────────────
+    object GameSetup  : Screen("game/setup")
+    object GamePlay   : Screen("game/play/{mode}/{playerCount}") {
+        fun createRoute(mode: String, playerCount: Int) = "game/play/$mode/$playerCount"
+    }
+    object GameResult : Screen("game/result")
+
+    // ── v2 stubs ─────────────────────────────────────────────────────────────
+    object Draft  : Screen("draft")
+    object Puzzle : Screen("puzzle")
 }

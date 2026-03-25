@@ -33,6 +33,7 @@ android {
 dependencies {
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.foundation)
+    implementation(libs.material3)
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.compose.ui)
@@ -57,6 +58,7 @@ dependencies {
     implementation(libs.okhttp.logging)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
 
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
@@ -72,5 +74,7 @@ dependencies {
 
     implementation(libs.accompanist.permissions)
     implementation(libs.material.icons.extended)
+    implementation(libs.compose.googlefonts)
+    implementation(libs.datastore.preferences)
 
 }

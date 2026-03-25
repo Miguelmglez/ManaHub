@@ -30,4 +30,7 @@ interface ScryfallApi {
 
     @POST("cards/collection")
     suspend fun getCardCollection(@Body request: CardCollectionRequestDto): CardCollectionResponseDto
+
+    @GET("symbology")
+    suspend fun getAllSymbols(): SymbologyListDto
 }

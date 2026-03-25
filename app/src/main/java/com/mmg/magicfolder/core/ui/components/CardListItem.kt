@@ -14,20 +14,24 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.mmg.magicfolder.core.ui.theme.magicColors
+import com.mmg.magicfolder.core.ui.theme.magicTypography
 
 @Composable
 fun CardListItem(
-    item: UserCardWithCard,
+    item:     UserCardWithCard,
     onClick:  () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val card     = item.card
     val userCard = item.userCard
+    val mc       = MaterialTheme.magicColors
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     ListItem(
         modifier = modifier.clickable(onClick = onClick),
+        colors   = ListItemDefaults.colors(containerColor = mc.background),
         leadingContent = {
             AsyncImage(
                 model              = card.imageArtCrop,
@@ -40,7 +44,12 @@ fun CardListItem(
         },
         headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(card.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text     = card.name,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color    = mc.textPrimary,
+                )
                 if (userCard.isFoil) {
                     Spacer(Modifier.width(4.dp))
                     FoilBadge()
@@ -56,18 +65,22 @@ fun CardListItem(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment     = Alignment.CenterVertically,
             ) {
-                RarityDot(rarity = card.rarity)
+                SetSymbol(
+                    setCode  = card.setCode,
+                    rarity   = CardRarity.fromString(card.rarity),
+                    size     = 14.dp,
+                )
                 Text(
-                    text  = "${card.setCode.uppercase()} · ${card.typeLine.substringBefore(" —").trim()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text     = "${card.setCode.uppercase()} · ${card.typeLine.substringBefore(" —").trim()}",
+                    style    = MaterialTheme.magicTypography.bodySmall,
+                    color    = mc.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text  = "· ${userCard.condition}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textDisabled,
                 )
             }
         },
@@ -77,14 +90,14 @@ fun CardListItem(
                 if (price != null) {
                     Text(
                         text  = "$${String.format("%.2f", price)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.goldMtg,
                     )
                 }
                 Text(
                     text  = "×${userCard.quantity}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
                 )
                 IconButton(
                     onClick  = { showDeleteDialog = true },
@@ -94,7 +107,7 @@ fun CardListItem(
                         Icons.Default.Delete,
                         contentDescription = "Delete",
                         modifier           = Modifier.size(16.dp),
-                        tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint               = mc.textDisabled,
                     )
                 }
             }
@@ -104,11 +117,11 @@ fun CardListItem(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title   = { Text("Remove card") },
-            text    = { Text("Remove ${card.name} from your collection?") },
-            confirmButton = {
+            title            = { Text("Remove card") },
+            text             = { Text("Remove ${card.name} from your collection?") },
+            confirmButton    = {
                 TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text("Remove", color = mc.lifeNegative)
                 }
             },
             dismissButton = {

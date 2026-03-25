@@ -23,8 +23,11 @@ object NetworkModule {
     fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor { chain ->
-                Thread.sleep(100) // respect Scryfall's 50-100 ms rate limit guideline
-                chain.proceed(chain.request())
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", "MagicFolder/1.0 Android")
+                    .header("Accept", "application/json;q=0.9,*/*;q=0.8")
+                    .build()
+                chain.proceed(request)
             }
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY

@@ -35,9 +35,11 @@ data class Card(
     val flavorText:       String?,
     val artist:           String?,
     val scryfallUri:      String,
-    val isStale:          Boolean = false,
-    val staleReason:      String? = null,
-    val cachedAt:         Long    = 0L,
+    val isStale:          Boolean      = false,
+    val staleReason:      String?      = null,
+    val cachedAt:         Long         = 0L,
+    /** Auto- and manually-assigned strategy tags. Persisted in Room as JSON. */
+    val tags:             List<CardTag> = emptyList(),
 )
 
 data class UserCard(
@@ -56,16 +58,3 @@ data class UserCard(
 )
 
 data class UserCardWithCard(val userCard: UserCard, val card: Card)
-
-data class Deck(
-    val id:          Long    = 0,
-    val name:        String,
-    val description: String? = null,
-    val format:      String  = "casual",
-    val coverCardId: String? = null,
-    val createdAt:   Long    = System.currentTimeMillis(),
-    val updatedAt:   Long    = System.currentTimeMillis(),
-)
-
-data class DeckWithCards(val deck: Deck, val mainboard: List<DeckSlot>, val sideboard: List<DeckSlot>)
-data class DeckSlot(val scryfallId: String, val quantity: Int)

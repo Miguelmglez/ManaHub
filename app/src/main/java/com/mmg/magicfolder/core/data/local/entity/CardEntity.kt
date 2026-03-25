@@ -56,4 +56,8 @@ data class CardEntity(
     // Reset to false on every successful Scryfall refresh.
     @ColumnInfo(name = "is_stale")     val isStale:     Boolean = false,
     @ColumnInfo(name = "stale_reason") val staleReason: String? = null,
+
+    /** JSON array of [CardTag] names, e.g. ["MANA_ROCK","DRAW_ENGINE"]. */
+    @ColumnInfo(name = "tags", defaultValue = "[]")
+    val tags: String = "[]",
 )

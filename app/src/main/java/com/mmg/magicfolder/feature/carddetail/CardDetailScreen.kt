@@ -3,6 +3,8 @@ package com.mmg.magicfolder.feature.carddetail
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,9 +20,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.domain.model.CardTag
+import com.mmg.magicfolder.core.domain.model.TagCategory
 import com.mmg.magicfolder.core.domain.model.UserCard
+import com.mmg.magicfolder.core.ui.components.CardRarity
 import com.mmg.magicfolder.core.ui.components.FoilBadge
-import com.mmg.magicfolder.core.ui.components.RarityDot
+import com.mmg.magicfolder.core.ui.components.ManaCostImages
+import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.components.StaleBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,12 +67,25 @@ fun CardDetailScreen(
             ) { CircularProgressIndicator() }
 
             uiState.card != null -> CardDetailContent(
-                card     = uiState.card!!,
-                userCard = uiState.userCard,
-                isStale  = uiState.isStale,
-                modifier = Modifier.padding(padding),
+                card          = uiState.card!!,
+                userCard      = uiState.userCard,
+                isStale       = uiState.isStale,
+                onAddTag      = viewModel::onAddTag,
+                onRemoveTag   = viewModel::onRemoveTag,
+                onShowTagPicker = viewModel::onShowTagPicker,
+                modifier      = Modifier.padding(padding),
             )
         }
+    }
+
+    // Tag picker sheet
+    if (uiState.showTagPicker) {
+        val currentTags = uiState.card?.tags ?: emptyList()
+        TagPickerSheet(
+            currentTags = currentTags,
+            onAddTag    = viewModel::onAddTag,
+            onDismiss   = viewModel::onDismissTagPicker,
+        )
     }
 
     // Edit bottom sheet
@@ -101,10 +120,13 @@ fun CardDetailScreen(
 
 @Composable
 private fun CardDetailContent(
-    card:     Card,
-    userCard: UserCard?,
-    isStale:  Boolean,
-    modifier: Modifier = Modifier,
+    card:            Card,
+    userCard:        UserCard?,
+    isStale:         Boolean,
+    onAddTag:        (CardTag) -> Unit,
+    onRemoveTag:     (CardTag) -> Unit,
+    onShowTagPicker: () -> Unit,
+    modifier:        Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
     var showBackFace by remember { mutableStateOf(false) }
@@ -159,7 +181,11 @@ private fun CardDetailContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            RarityDot(rarity = card.rarity)
+            SetSymbol(
+                setCode = card.setCode,
+                rarity  = CardRarity.fromString(card.rarity),
+                size    = 20.dp,
+            )
             Text(card.name, style = MaterialTheme.typography.headlineSmall)
             if (userCard?.isFoil == true) FoilBadge()
             if (isStale) StaleBadge()
@@ -168,8 +194,7 @@ private fun CardDetailContent(
         // Mana cost + type
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             card.manaCost?.let {
-                Text(it, style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
             Text(card.typeLine, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -224,6 +249,15 @@ private fun CardDetailContent(
 
         // Legalities
         LegalitySection(card = card)
+
+        HorizontalDivider()
+
+        // Tags
+        TagsSection(
+            tags            = card.tags,
+            onRemoveTag     = onRemoveTag,
+            onShowTagPicker = onShowTagPicker,
+        )
 
         // Scryfall link
         TextButton(onClick = { uriHandler.openUri(card.scryfallUri) }) {
@@ -318,6 +352,133 @@ private fun LegalityChip(format: String, legality: String) {
                 color = if (isLegal) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Tags section (expandable) in CardDetailContent
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun TagsSection(
+    tags:            List<CardTag>,
+    onRemoveTag:     (CardTag) -> Unit,
+    onShowTagPicker: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(true) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Header row
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text     = "Tags",
+                style    = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+            )
+        }
+
+        if (expanded) {
+            if (tags.isEmpty()) {
+                Text(
+                    text  = "Sin etiquetas — toca + para añadir",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                // Wrap chips using a simple flow-like column of rows
+                tags.chunked(3).forEach { rowTags ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        rowTags.forEach { tag ->
+                            InputChip(
+                                selected        = true,
+                                onClick         = { onRemoveTag(tag) },
+                                label           = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                                trailingIcon    = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Quitar ${tag.label}",
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick  = onShowTagPicker,
+                modifier = Modifier.height(32.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Añadir etiqueta", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Tag picker bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TagPickerSheet(
+    currentTags: List<CardTag>,
+    onAddTag:    (CardTag) -> Unit,
+    onDismiss:   () -> Unit,
+) {
+    val categories = TagCategory.entries
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text("Añadir etiqueta", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(12.dp))
+
+            LazyColumn(
+                contentPadding      = PaddingValues(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                categories.forEach { category ->
+                    val tagsInCategory = CardTag.entries.filter {
+                        it.category == category && it !in currentTags
+                    }
+                    if (tagsInCategory.isNotEmpty()) {
+                        item(key = category.name) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text  = category.name,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                tagsInCategory.chunked(3).forEach { rowTags ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        rowTags.forEach { tag ->
+                                            SuggestionChip(
+                                                onClick = { onAddTag(tag); onDismiss() },
+                                                label   = {
+                                                    Text(tag.label, style = MaterialTheme.typography.labelSmall)
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.mmg.magicfolder.core.domain.repository
 
 import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.domain.model.CardTag
 import com.mmg.magicfolder.core.domain.model.DataResult
 import kotlinx.coroutines.flow.Flow
 
@@ -11,4 +12,6 @@ interface CardRepository {
     fun observeCard(scryfallId: String): Flow<Card?>
     suspend fun refreshCollectionPrices()
     suspend fun evictStaleCache()
+    /** Replace the tag list for a card already in the local cache. */
+    suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>)
 }

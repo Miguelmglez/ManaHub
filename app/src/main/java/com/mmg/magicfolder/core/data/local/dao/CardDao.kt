@@ -44,4 +44,7 @@ interface CardDao {
 
     @Query("SELECT * FROM cards WHERE is_stale = 1")
     fun observeStaleCards(): Flow<List<CardEntity>>
+
+    @Query("UPDATE cards SET tags = :tagsJson WHERE scryfall_id = :scryfallId")
+    suspend fun updateTags(scryfallId: String, tagsJson: String)
 }

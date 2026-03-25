@@ -1,12 +1,15 @@
 package com.mmg.magicfolder.core.data.repository
 
+import com.google.gson.Gson
 import com.mmg.magicfolder.core.data.local.dao.CardDao
 import com.mmg.magicfolder.core.data.local.dao.UserCardDao
 import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.magicfolder.core.data.remote.mapper.toDomain
 import com.mmg.magicfolder.core.data.remote.mapper.toEntity
 import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.domain.model.CardTag
 import com.mmg.magicfolder.core.domain.model.DataResult
+import com.mmg.magicfolder.core.domain.model.computeAutoTags
 import com.mmg.magicfolder.core.domain.repository.CardRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,6 +17,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private val gson = Gson()
 
 @Singleton
 class CardRepositoryImpl @Inject constructor(
@@ -53,9 +58,13 @@ class CardRepositoryImpl @Inject constructor(
         return when {
             result.isSuccess -> {
                 val card = result.getOrThrow()
-                cardDao.upsert(card.toEntity())
+                // Preserve existing (possibly manual) tags; auto-tag on first cache.
+                val tagsJson = if (cached != null && cached.tags != "[]") cached.tags
+                               else gson.toJson(card.computeAutoTags().map { it.name })
+                cardDao.upsert(card.toEntity().copy(tags = tagsJson))
                 cardDao.clearStale(scryfallId)
-                DataResult.Success(card)
+                // Read back so the returned Card matches what's in the DB.
+                DataResult.Success(cardDao.getById(scryfallId)!!.toDomain())
             }
             cached != null -> {
                 if (CachePolicy.isStale(cached.cachedAt))
@@ -85,7 +94,13 @@ class CardRepositoryImpl @Inject constructor(
         val result = remote.getCardsBatch(staleIds)
         if (result.isSuccess) {
             val cards = result.getOrThrow()
-            cardDao.upsertAll(cards.map { it.toEntity() })
+            // Preserve existing tags on refresh.
+            cards.forEach { card ->
+                val existingTags = cardDao.getById(card.scryfallId)?.tags ?: "[]"
+                val tagsJson = if (existingTags != "[]") existingTags
+                               else gson.toJson(card.computeAutoTags().map { it.name })
+                cardDao.upsert(card.toEntity().copy(tags = tagsJson))
+            }
             cards.forEach { cardDao.clearStale(it.scryfallId) }
             val refreshed = cards.map { it.scryfallId }.toSet()
             (staleIds - refreshed).forEach { id ->
@@ -104,6 +119,10 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun evictStaleCache() =
         cardDao.evictStaleCache(System.currentTimeMillis() - CachePolicy.EVICT_MS)
+
+    override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) {
+        cardDao.updateTags(scryfallId, gson.toJson(tags.map { it.name }))
+    }
 
     private fun buildStaleReason(e: Throwable?): String {
         val date = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())

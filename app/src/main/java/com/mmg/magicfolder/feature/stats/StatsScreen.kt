@@ -1,6 +1,5 @@
 package com.mmg.magicfolder.feature.stats
 
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,10 +8,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.domain.model.*
+import com.mmg.magicfolder.core.ui.theme.MagicColors
+import com.mmg.magicfolder.core.ui.theme.magicColors
+import com.mmg.magicfolder.core.ui.theme.magicTypography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -21,10 +24,20 @@ fun StatsScreen(
     viewModel:   StatsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mc = MaterialTheme.magicColors
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Collection stats") })
+            TopAppBar(
+                title = {
+                    Text(
+                        text  = "Statistics",
+                        style = MaterialTheme.magicTypography.titleLarge,
+                        color = mc.textPrimary,
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
+            )
         },
     ) { padding ->
         val stats = uiState.stats
@@ -32,14 +45,14 @@ fun StatsScreen(
             uiState.isLoading -> Box(
                 Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
+            ) { CircularProgressIndicator(color = mc.primaryAccent) }
 
             stats != null -> StatsContent(
-                stats      = stats,
-                currency   = uiState.currency,
+                stats            = stats,
+                currency         = uiState.currency,
                 onCurrencyToggle = viewModel::onCurrencyToggle,
-                onCardClick = onCardClick,
-                modifier   = Modifier.padding(padding),
+                onCardClick      = onCardClick,
+                modifier         = Modifier.padding(padding),
             )
         }
     }
@@ -47,11 +60,11 @@ fun StatsScreen(
 
 @Composable
 private fun StatsContent(
-    stats:           CollectionStats,
-    currency:        Currency,
+    stats:            CollectionStats,
+    currency:         Currency,
     onCurrencyToggle: () -> Unit,
-    onCardClick:     (String) -> Unit,
-    modifier:        Modifier = Modifier,
+    onCardClick:      (String) -> Unit,
+    modifier:         Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
@@ -60,65 +73,84 @@ private fun StatsContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        // Summary KPIs
         SummarySection(stats = stats, currency = currency, onCurrencyToggle = onCurrencyToggle)
-
-        // Most valuable cards
         MostValuableSection(cards = stats.mostValuableCards, currency = currency, onCardClick = onCardClick)
-
-        // Color distribution
         DistributionSection(title = "By color", data = stats.byColor.entries.associate {
             it.key.displayName to it.value
         })
-
-        // Type distribution
         DistributionSection(title = "By type", data = stats.byType.entries.associate {
             it.key.name.lowercase().replaceFirstChar { c -> c.uppercase() } to it.value
         })
-
-        // Rarity distribution
         DistributionSection(title = "By rarity", data = stats.byRarity.entries.associate {
             it.key.name.lowercase().replaceFirstChar { c -> c.uppercase() } to it.value
         })
-
-        // Mana curve
         ManaCurveSection(curve = stats.cmcDistribution)
     }
 }
 
 @Composable
 private fun SummarySection(
-    stats:           CollectionStats,
-    currency:        Currency,
+    stats:            CollectionStats,
+    currency:         Currency,
     onCurrencyToggle: () -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Overview", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Overview",
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatCard(label = "Total cards", value = stats.totalCards.toString(), modifier = Modifier.weight(1f))
+            StatCard(label = "Total cards",  value = stats.totalCards.toString(),  modifier = Modifier.weight(1f))
             StatCard(label = "Unique cards", value = stats.uniqueCards.toString(), modifier = Modifier.weight(1f))
-            StatCard(label = "Decks saved", value = stats.totalDecks.toString(), modifier = Modifier.weight(1f))
+            StatCard(label = "Decks saved",  value = stats.totalDecks.toString(),  modifier = Modifier.weight(1f))
         }
-        // Value card with currency toggle
-        Card(modifier = Modifier.fillMaxWidth()) {
+        // Collection value card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors   = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
+        ) {
             Row(
                 modifier              = Modifier.padding(16.dp).fillMaxWidth(),
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
-                    Text("Collection value", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    val value = if (currency == Currency.USD) stats.totalValueUsd else stats.totalValueEur
+                    Text(
+                        "Collection value",
+                        style = MaterialTheme.magicTypography.labelMedium,
+                        color = mc.textSecondary,
+                    )
+                    val value  = if (currency == Currency.USD) stats.totalValueUsd else stats.totalValueEur
                     val symbol = if (currency == Currency.USD) "$" else "€"
                     Text(
                         text  = "$symbol${String.format("%.2f", value)}",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.magicTypography.displayMedium,
+                        color = mc.goldMtg,
                     )
                 }
-                TextButton(onClick = onCurrencyToggle) {
-                    Text(if (currency == Currency.USD) "Switch to EUR" else "Switch to USD")
+                // Currency toggle chips
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(Currency.USD to "$", Currency.EUR to "€").forEach { (c, label) ->
+                        val selected = currency == c
+                        Surface(
+                            color  = if (selected) mc.goldMtg.copy(alpha = 0.18f) else mc.surface,
+                            shape  = MaterialTheme.shapes.extraSmall,
+                            border = if (selected)
+                                androidx.compose.foundation.BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.60f))
+                            else
+                                androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
+                            modifier = Modifier.clickable { if (!selected) onCurrencyToggle() },
+                        ) {
+                            Text(
+                                text     = label,
+                                style    = MaterialTheme.magicTypography.labelSmall,
+                                color    = if (selected) mc.goldMtg else mc.textSecondary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -127,56 +159,56 @@ private fun SummarySection(
 
 @Composable
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
     Card(
         modifier = modifier,
-        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors   = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
     ) {
         Column(
             modifier            = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(value, style = MaterialTheme.typography.titleLarge)
-            Text(label, style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
+            Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
         }
     }
 }
 
 @Composable
 private fun MostValuableSection(
-    cards:      List<CardValue>,
-    currency:   Currency,
+    cards:       List<CardValue>,
+    currency:    Currency,
     onCardClick: (String) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Most valuable cards", style = MaterialTheme.typography.titleMedium)
+        Text("Most valuable cards", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         cards.forEachIndexed { index, card ->
             ListItem(
                 modifier        = Modifier.clickable { onCardClick(card.scryfallId) },
-                headlineContent = { Text(card.name) },
+                colors          = ListItemDefaults.colors(containerColor = mc.surface),
+                headlineContent = { Text(card.name, color = mc.textPrimary) },
                 leadingContent  = {
                     Text(
                         text  = "#${index + 1}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.primaryAccent,
                     )
                 },
                 trailingContent = {
                     val symbol = if (currency == Currency.USD) "$" else "€"
+                    val price  = if (currency == Currency.USD) card.priceUsd else card.priceUsd
                     Text(
-                        text  = "$symbol${String.format("%.2f", card.priceUsd)}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        text  = "$symbol${String.format("%.2f", price)}",
+                        style = MaterialTheme.magicTypography.bodyLarge,
+                        color = mc.goldMtg,
                     )
                 },
                 supportingContent = if (card.isFoil) {
-                    {
-                        Text("Foil", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    { Text("Foil", style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
                 } else null,
             )
-            if (index < cards.size - 1) HorizontalDivider(thickness = 0.5.dp)
+            if (index < cards.size - 1) HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
         }
     }
 }
@@ -185,24 +217,30 @@ private fun MostValuableSection(
 private fun DistributionSection(title: String, data: Map<String, Int>) {
     if (data.isEmpty()) return
     val total = data.values.sum().toFloat().coerceAtLeast(1f)
+    val mc    = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         data.entries.sortedByDescending { it.value }.forEach { (label, count) ->
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(label, style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.width(80.dp))
+                Text(
+                    label,
+                    style    = MaterialTheme.magicTypography.bodySmall,
+                    color    = mc.textSecondary,
+                    modifier = Modifier.width(80.dp),
+                )
                 LinearProgressIndicator(
-                    progress = { count / total },
-                    modifier = Modifier.weight(1f).height(8.dp),
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    progress     = { count / total },
+                    modifier     = Modifier.weight(1f).height(8.dp),
+                    color        = mc.primaryAccent,
+                    trackColor   = mc.surfaceVariant,
                 )
                 Text(
-                    text  = count.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text     = count.toString(),
+                    style    = MaterialTheme.magicTypography.labelSmall,
+                    color    = mc.textDisabled,
                     modifier = Modifier.width(32.dp),
                 )
             }
@@ -214,38 +252,53 @@ private fun DistributionSection(title: String, data: Map<String, Int>) {
 private fun ManaCurveSection(curve: Map<Int, Int>) {
     if (curve.isEmpty()) return
     val maxCount = curve.values.maxOrNull()?.toFloat() ?: 1f
+    val mc       = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Mana curve", style = MaterialTheme.typography.titleMedium)
+        Text("Mana curve", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         Row(
             modifier              = Modifier.fillMaxWidth().height(120.dp),
             verticalAlignment     = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             (0..7).forEach { cmc ->
-                val count = curve[cmc] ?: 0
+                val count    = curve[cmc] ?: 0
                 val fraction = if (maxCount > 0) count / maxCount else 0f
+                val barColor = cmcBarColor(cmc, mc)
                 Column(
                     modifier            = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Bottom,
                 ) {
-                    if (count > 0) Text(count.toString(), style = MaterialTheme.typography.labelSmall)
+                    if (count > 0) {
+                        Text(
+                            count.toString(),
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.textSecondary,
+                        )
+                    }
                     Spacer(Modifier.height(2.dp))
                     Surface(
                         modifier = Modifier.fillMaxWidth().fillMaxHeight(fraction.coerceAtLeast(0.02f)),
-                        color    = MaterialTheme.colorScheme.primary,
+                        color    = barColor,
                         shape    = MaterialTheme.shapes.extraSmall,
                     ) {}
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text  = if (cmc == 7) "7+" else cmc.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textDisabled,
                     )
                 }
             }
         }
     }
+}
+
+private fun cmcBarColor(cmc: Int, mc: MagicColors): Color = when {
+    cmc <= 1 -> mc.lifePositive
+    cmc <= 3 -> mc.goldMtg
+    cmc <= 5 -> mc.lifeNegative
+    else     -> mc.primaryAccent
 }
 
 val MtgColor.displayName get() = when (this) {

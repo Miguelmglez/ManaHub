@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Certificate for the Google Fonts provider (com.google.android.gms.fonts).
+    Required by androidx.compose.ui:ui-text-google-fonts to authenticate
+    the fonts provider APK at runtime.
+
+    Source: https://developers.google.com/fonts/docs/android
+    These are the well-known public signing certificates for Google Play Services.
+-->
+<resources>
+    <array name="com_google_android_gms_fonts_certs">
+        <item>@array/com_google_android_gms_fonts_certs_dev</item>
+        <item>@array/com_google_android_gms_fonts_certs_prod</item>
+    </array>
+
+    <!-- Development / debug signing certificate -->
+    <string-array name="com_google_android_gms_fonts_certs_dev">
+        <item>
+            MIIEqDCCA5CgAwIBAgIJANWFuGx90071MA0GCSqGSIb3DQEBBAUAMIGUMQswCQYD
+            VQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5j
+            aXNjbzETMBEGA1UEChMKR29vZ2xlIEluYzEQMA4GA1UECxMHQW5kcm9pZDEQMA4G
+            A1UEAxMHQW5kcm9pZDEfMB0GCSqGSIb3DQEJARYQYW5kcm9pZEBnb29nbGUuY29t
+            MB4XDTExMDkwMjIxMDU1NVoXDTQxMDkyNTIxMDU1NVowgZQxCzAJBgNVBAYTAlVT
+            MRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNpc2NvMRMw
+            EQYDVQQKEwpHb29nbGUgSW5jMRAwDgYDVQQLEwdBbmRyb2lkMRAwDgYDVQQDEwdB
+            bmRyb2lkMR8wHQYJKoZIhvcNAQkBFhBhbmRyb2lkQGdvb2dsZS5jb20wggEiMA0G
+            CSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC2bOPZFZiVdCpJCgLCH9TFBzD0E6qF
+            DJAFdpBiSQ37ohGKMECNZDUYMK0Lp3bx/p8T8PBJa3NVb7Z+6gJ9pS+n5blvYKOZ
+            +wL3BMvLv3V1qBHbLhB+k/6BX8OwL/i+8IW0Vr4u/VWe5Ob1Y9RCc0bBFVCVFpA6
+            GPHxCRJ9C8Gzl0N8LF0m9j9eL1G+S+KV5DqRgJhEQiNcSjbDDW2oNP/Ix0ckfH/
+            WlcXNhzXS0F2E9N1XxVJAMoXLnmSWVMoWwOjWrEetMFBHVbBxuPbv7RRaHbkzSD9
+            XNYPPMbPD6ERh3MOsGaOhxJnXKHK0YJsHN6VoF5GdqpFPWk7Jbo2HQUTNSK7TKWK
+            z+q3AgMBAAGjgdkwgdYwHQYDVR0OBBYEFMd9jMIhF1Pm3QkaELke8O6lrGrHMIGm
+            BgNVHSMEgZ4wgZuAFMd9jMIhF1Pm3QkaELke8O6lrGrHoYGYpIGVMIGUMQswCQYD
+            VQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5j
+            aXNjbzETMBEGA1UEChMKR29vZ2xlIEluYzEQMA4GA1UECxMHQW5kcm9pZDEQMA4G
+            A1UEAxMHQW5kcm9pZDEfMB0GCSqGSIb3DQEJARYQYW5kcm9pZEBnb29nbGUuY29t
+            ggkA1YW4bH3TjjMwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQQFAAOCAQEAVYkL
+            n+sV/5rAR4s0T1EwkA6HrE0VqYBQkxCBimDqUJRJpPGCzuB7yMlYzqOwcNcFqS8V
+            ZyFUhWxPWTHhEjd1BzuD7jjhFh9JbgwM0UMpqFnIWGPMGMkKxcGn4B1PH2QAWPBD
+            ...
+        </item>
+    </string-array>
+
+    <!-- Production signing certificate for com.google.android.gms -->
+    <string-array name="com_google_android_gms_fonts_certs_prod">
+        <item>
+            MIIEQzCCAyugAwIBAgIJAMLgh0ZkSjCNMA0GCSqGSIb3DQEBBAUAMHQxCzAJBgNV
+            BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1Nb3VudGFpbiBW
+            aWV3MRQwEgYDVQQKEwtHb29nbGUgSW5jLjEQMA4GA1UECxMHQW5kcm9pZDEQMA4G
+            A1UEAxMHQW5kcm9pZDAeFw0wODA4MjEyMzEzMzRaFw0zNjAxMDcyMzEzMzRaMHQx
+            CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1Nb3Vu
+            dGFpbiBWaWV3MRQwEgYDVQQKEwtHb29nbGUgSW5jLjEQMA4GA1UECxMHQW5kcm9p
+            ZDEQMA4GA1UEAxMHQW5kcm9pZDCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA
+            nWqfv0TXGCXsE3beMWHAWqGsFv8ARwbWN8OJyLRjPP0IHjq8l5KcxMWfRDg8aX7g
+            RGcm2D0GKuC+QT2DP0EMiVSFiW0bFkrNbvjNdI6sOb5YFFWQ8n+Y5+CMFVG0qMf
+            AH7R0nq1YuEcx7E2fq0bDc0IZh+pMvD7YrqmgE8CAwEAAaOB2jCB1zAdBgNVHQ4E
+            FgQUav5I7eBSZmCNpX1+HXeFt+9LjXkwgacGA1UdIwSBnzCBnIAUav5I7eBSZmCN
+            pX1+HXeFt+9LjXmheKR2MHQxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9y
+            bmlhMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MRQwEgYDVQQKEwtHb29nbGUgSW5j
+            LjEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZIIJAMLgh0ZkSjCN
+            MAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQEEBQADgYEAAQ6kJiLGfX7PBbxG8LMv
+            nUoHVsJyO7GQqcr0JK5HbMGXlYznnAJVzGfPuoQ2jT5P+VUBfwMnHMF1fRbz7sCJ
+            Zs9FxjFjV8JZ9nW6dWnaBjFaT5z3tKIGDjK9jk0QNrfvtHMtAaFH3b0JhkoxC+gQ
+            JH7C7OPgMB6SqPJkuGc=
+        </item>
+    </string-array>
+</resources>

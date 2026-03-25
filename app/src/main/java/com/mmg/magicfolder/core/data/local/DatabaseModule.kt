@@ -17,11 +17,13 @@ object DatabaseModule {
     @Provides @Singleton
     fun provideMtgDatabase(@ApplicationContext context: Context): MtgDatabase =
         Room.databaseBuilder(context, MtgDatabase::class.java, "mtg_collection.db")
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
 
-    @Provides fun provideCardDao(db: MtgDatabase):     CardDao     = db.cardDao()
-    @Provides fun provideUserCardDao(db: MtgDatabase): UserCardDao = db.userCardDao()
-    @Provides fun provideDeckDao(db: MtgDatabase):     DeckDao     = db.deckDao()
-    @Provides fun provideStatsDao(db: MtgDatabase):    StatsDao    = db.statsDao()
+    @Provides fun provideCardDao(db: MtgDatabase):         CardDao         = db.cardDao()
+    @Provides fun provideUserCardDao(db: MtgDatabase):     UserCardDao     = db.userCardDao()
+    @Provides fun provideDeckDao(db: MtgDatabase):         DeckDao         = db.deckDao()
+    @Provides fun provideStatsDao(db: MtgDatabase):        StatsDao        = db.statsDao()
+    @Provides fun provideManaSymbolDao(db: MtgDatabase):   ManaSymbolDao   = db.manaSymbolDao()
 }
