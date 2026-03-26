@@ -8,19 +8,15 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
+import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.magicfolder.core.data.local.LanguagePreference
 import com.mmg.magicfolder.core.domain.model.CollectionStats
+import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
 import com.mmg.magicfolder.core.domain.repository.StatsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -40,18 +36,29 @@ enum class AppTheme(val displayName: String, val isUnlocked: Boolean) {
 }
 
 data class ProfileUiState(
+    // Collection
     val stats:            CollectionStats? = null,
     val selectedTheme:    AppTheme         = AppTheme.NEON_VOID,
     val selectedLanguage: String           = "en",
     val isLoading:        Boolean          = true,
-)
+    // Game stats
+    val totalGames:       Int              = 0,
+    val totalWins:        Int              = 0,
+    val avgLifeOnWin:     Double           = 0.0,
+    val avgLifeOnLoss:    Double           = 0.0,
+    val recentSessions:   List<GameSessionWithPlayers> = emptyList(),
+    val deckStats:        List<DeckStatsRow>           = emptyList(),
+) {
+    val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
+}
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val statsRepo:    StatsRepository,
-    private val langPref:     LanguagePreference,
+    private val statsRepo:       StatsRepository,
+    private val gameSessionRepo: GameSessionRepository,
+    private val langPref:        LanguagePreference,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -59,7 +66,7 @@ class ProfileViewModel @Inject constructor(
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
 
     init {
-        // Observe collection stats
+        // Collection stats
         statsRepo.observeCollectionStats()
             .onEach { stats -> _state.update { it.copy(stats = stats, isLoading = false) } }
             .catch   { _state.update { it.copy(isLoading = false) } }
@@ -75,6 +82,37 @@ class ProfileViewModel @Inject constructor(
         // Observe persisted language
         langPref.languageFlow
             .onEach { lang -> _state.update { it.copy(selectedLanguage = lang) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        // Game stats
+        gameSessionRepo.observeTotalGames()
+            .onEach { total -> _state.update { it.copy(totalGames = total) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        gameSessionRepo.observeWins("Player 1")
+            .onEach { wins -> _state.update { it.copy(totalWins = wins) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        gameSessionRepo.observeAvgLifeOnWin()
+            .onEach { avg -> _state.update { it.copy(avgLifeOnWin = avg ?: 0.0) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        gameSessionRepo.observeAvgLifeOnLoss()
+            .onEach { avg -> _state.update { it.copy(avgLifeOnLoss = avg ?: 0.0) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        gameSessionRepo.observeRecentSessions(5)
+            .onEach { sessions -> _state.update { it.copy(recentSessions = sessions) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        gameSessionRepo.observeDeckStats()
+            .onEach { ds -> _state.update { it.copy(deckStats = ds) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
     }
