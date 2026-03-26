@@ -17,11 +17,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
+import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.magicfolder.core.domain.model.CollectionStats
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +75,21 @@ fun ProfileScreen(
                 StatsSection(stats = state.stats)
             }
 
+            // ── Game stats ─────────────────────────────────────────────────────
+            if (state.totalGames > 0) {
+                GameStatsSection(state = state)
+            }
+
+            // ── Recent games ───────────────────────────────────────────────────
+            if (state.recentSessions.isNotEmpty()) {
+                RecentGamesSection(sessions = state.recentSessions)
+            }
+
+            // ── Deck performance ───────────────────────────────────────────────
+            if (state.deckStats.isNotEmpty()) {
+                DeckPerformanceSection(deckStats = state.deckStats)
+            }
+
             // ── Theme selector ─────────────────────────────────────────────────
             ThemeSection(
                 selected = state.selectedTheme,
@@ -90,6 +111,8 @@ fun ProfileScreen(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Profile header
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ProfileHeader() {
@@ -99,7 +122,6 @@ private fun ProfileHeader() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Avatar circle
         Box(
             contentAlignment = Alignment.Center,
             modifier         = Modifier
@@ -109,13 +131,13 @@ private fun ProfileHeader() {
                 .border(2.dp, mc.primaryAccent.copy(alpha = 0.5f), CircleShape),
         ) {
             Text(
-                "✦",
+                "\u2726",
                 style = MaterialTheme.magicTypography.displayMedium,
                 color = mc.primaryAccent,
             )
         }
         Text(
-            "Æther Tracker",
+            "\u00c6ther Tracker",
             style     = MaterialTheme.magicTypography.titleLarge,
             color     = mc.goldMtg,
             textAlign = TextAlign.Center,
@@ -128,6 +150,10 @@ private fun ProfileHeader() {
         )
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Collection stats
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StatsSection(stats: CollectionStats?) {
@@ -145,19 +171,187 @@ private fun StatsSection(stats: CollectionStats?) {
                 modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                StatCell("Cards", stats.totalCards.toString(), Modifier.weight(1f))
-                StatCell("Unique", stats.uniqueCards.toString(), Modifier.weight(1f))
-                StatCell("Decks", stats.totalDecks.toString(), Modifier.weight(1f))
-                StatCell(
-                    label = "Value",
-                    value = "$${String.format("%.0f", stats.totalValueUsd)}",
-                    modifier = Modifier.weight(1f),
-                    valueColor = true,
+                StatCell("Cards",  stats.totalCards.toString(),                     Modifier.weight(1f))
+                StatCell("Unique", stats.uniqueCards.toString(),                    Modifier.weight(1f))
+                StatCell("Decks",  stats.totalDecks.toString(),                     Modifier.weight(1f))
+                StatCell("Value",  "$${String.format("%.0f", stats.totalValueUsd)}", Modifier.weight(1f), valueColor = true)
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Game stats
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun GameStatsSection(state: ProfileUiState) {
+    val mc = MaterialTheme.magicColors
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle("Game Stats")
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            StatCell("Games",     state.totalGames.toString(),                    Modifier.weight(1f))
+            StatCell("Wins",      state.totalWins.toString(),                     Modifier.weight(1f))
+            StatCell("Win %",     "${(state.winRate * 100).roundToInt()}%",        Modifier.weight(1f))
+        }
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            StatCell(
+                label    = "Avg life\non win",
+                value    = state.avgLifeOnWin.roundToInt().toString(),
+                modifier = Modifier.weight(1f),
+                valueColor = true,
+            )
+            StatCell(
+                label    = "Avg life\non loss",
+                value    = state.avgLifeOnLoss.roundToInt().toString(),
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Recent games
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun RecentGamesSection(sessions: List<GameSessionWithPlayers>) {
+    val mc = MaterialTheme.magicColors
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Recent Games")
+        sessions.forEach { session ->
+            RecentGameRow(session = session)
+        }
+    }
+}
+
+@Composable
+private fun RecentGameRow(session: GameSessionWithPlayers) {
+    val mc      = MaterialTheme.magicColors
+    val s       = session.session
+    val winner  = session.players.find { it.isWinner }
+    val isWin   = winner?.playerName == "Player 1"
+    val players = session.players.joinToString(", ") { it.playerName }
+
+    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // W/L badge
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = if (isWin) mc.lifePositive.copy(alpha = 0.2f)
+                        else mc.lifeNegative.copy(alpha = 0.2f),
+            ) {
+                Text(
+                    text     = if (isWin) "W" else "L",
+                    style    = MaterialTheme.magicTypography.labelMedium,
+                    color    = if (isWin) mc.lifePositive else mc.lifeNegative,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text     = s.mode,
+                    style    = MaterialTheme.magicTypography.labelSmall,
+                    color    = mc.goldMtg,
+                )
+                Text(
+                    text     = players,
+                    style    = MaterialTheme.magicTypography.bodySmall,
+                    color    = mc.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text  = formatDate(s.playedAt),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textDisabled,
+                )
+                Text(
+                    text  = formatDuration(s.durationMs),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textDisabled,
                 )
             }
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Deck performance
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DeckPerformanceSection(deckStats: List<DeckStatsRow>) {
+    val mc = MaterialTheme.magicColors
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Deck Performance")
+        deckStats.forEach { row ->
+            DeckStatRow(row = row)
+        }
+    }
+}
+
+@Composable
+private fun DeckStatRow(row: DeckStatsRow) {
+    val mc      = MaterialTheme.magicColors
+    val winRate = if (row.totalGames > 0) row.wins.toFloat() / row.totalGames else 0f
+
+    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text     = row.deckName ?: "Unknown Deck",
+                    style    = MaterialTheme.magicTypography.bodyMedium,
+                    color    = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text  = "${row.totalGames} games  •  ${(winRate * 100).roundToInt()}%",
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
+                )
+            }
+            LinearProgressIndicator(
+                progress   = { winRate },
+                modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                color      = mc.primaryAccent,
+                trackColor = mc.surfaceVariant,
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Common cells
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StatCell(
@@ -189,11 +383,12 @@ private fun StatCell(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Theme + Language + Footer (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun ThemeSection(
-    selected: AppTheme,
-    onSelect: (AppTheme) -> Unit,
-) {
+private fun ThemeSection(selected: AppTheme, onSelect: (AppTheme) -> Unit) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionTitle("Theme")
@@ -220,24 +415,15 @@ private fun ThemeTile(
     onClick:  () -> Unit,
     modifier: Modifier,
 ) {
-    val mc        = MaterialTheme.magicColors
-    val isLocked  = !theme.isUnlocked
-    val borderCol = when {
-        selected -> mc.primaryAccent
-        isLocked -> mc.surfaceVariant
-        else     -> mc.surfaceVariant
-    }
-
+    val mc       = MaterialTheme.magicColors
+    val isLocked = !theme.isUnlocked
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (selected) mc.primaryAccent.copy(alpha = 0.12f)
-                else mc.surface
-            )
+            .background(if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface)
             .border(
                 width = if (selected) 1.5.dp else 0.5.dp,
-                color = borderCol,
+                color = if (selected) mc.primaryAccent else mc.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
             )
             .clickable(enabled = !isLocked, onClick = onClick)
@@ -245,7 +431,6 @@ private fun ThemeTile(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        // Swatch
         Box(
             modifier = Modifier
                 .size(36.dp)
@@ -260,25 +445,15 @@ private fun ThemeTile(
             maxLines  = 1,
         )
         if (isLocked) {
-            Text(
-                "🔒",
-                style = MaterialTheme.magicTypography.labelSmall,
-            )
+            Text("\uD83D\uDD12", style = MaterialTheme.magicTypography.labelSmall)
         } else if (selected) {
-            Text(
-                "Active",
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.primaryAccent,
-            )
+            Text("Active", style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
         }
     }
 }
 
 @Composable
-private fun LanguageSection(
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
+private fun LanguageSection(selected: String, onSelect: (String) -> Unit) {
     val mc = MaterialTheme.magicColors
     val languages = listOf(
         "en" to "English",
@@ -325,10 +500,10 @@ private fun AppInfoFooter() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        InfoRow("App", "MagicFolder")
-        InfoRow("Version", "1.0.0")
-        InfoRow("Data", "Scryfall API")
-        InfoRow("Engine", "Æther Tracker v1")
+        InfoRow("App",    "MagicFolder")
+        InfoRow("Version","1.0.0")
+        InfoRow("Data",   "Scryfall API")
+        InfoRow("Engine", "\u00c6ther Tracker v1")
     }
 }
 
@@ -344,7 +519,9 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SectionTitle(text: String) {
@@ -356,11 +533,22 @@ private fun SectionTitle(text: String) {
 }
 
 private fun themeSwatchColor(
-    theme:    AppTheme,
-    active:   androidx.compose.ui.graphics.Color,
-    locked:   androidx.compose.ui.graphics.Color,
+    theme:  AppTheme,
+    active: androidx.compose.ui.graphics.Color,
+    locked: androidx.compose.ui.graphics.Color,
 ): androidx.compose.ui.graphics.Color = when (theme) {
     AppTheme.NEON_VOID   -> active
-    AppTheme.DAWN_REALM  -> locked  // placeholder — will get real color when unlocked
+    AppTheme.DAWN_REALM  -> locked
     AppTheme.ARCANE_GRAY -> locked
+}
+
+private fun formatDuration(ms: Long): String {
+    val minutes = ms / 60_000L
+    val hours   = minutes / 60
+    val mins    = minutes % 60
+    return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+}
+
+private fun formatDate(timestamp: Long): String {
+    return SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
 }

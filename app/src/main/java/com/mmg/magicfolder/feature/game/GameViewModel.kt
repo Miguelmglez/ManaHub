@@ -3,8 +3,10 @@ package com.mmg.magicfolder.feature.game
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
 import com.mmg.magicfolder.feature.game.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -39,7 +41,8 @@ data class GameUiState(
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    savedStateHandle:            SavedStateHandle,
+    private val gameSessionRepo: GameSessionRepository,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -53,6 +56,20 @@ class GameViewModel @Inject constructor(
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
     private val deltaJobs = mutableMapOf<Int, Job>()
+
+    init {
+        // Persist each unique game result to Room as soon as it appears
+        viewModelScope.launch {
+            uiState
+                .mapNotNull { it.gameResult }
+                .distinctUntilChanged()
+                .collect { result ->
+                    launch(Dispatchers.IO) {
+                        runCatching { gameSessionRepo.saveGameSession(result) }
+                    }
+                }
+        }
+    }
 
     // ── Life ──────────────────────────────────────────────────────────────────
 
@@ -128,7 +145,7 @@ class GameViewModel @Inject constructor(
             s.copy(
                 players = s.players.map { p ->
                     if (p.id != targetId) p else {
-                        val prev  = p.commanderDamage[sourceId] ?: 0
+                        val prev   = p.commanderDamage[sourceId] ?: 0
                         val newDmg = (prev + delta).coerceAtLeast(0)
                         p.copy(commanderDamage = p.commanderDamage + (sourceId to newDmg))
                     }
@@ -141,11 +158,11 @@ class GameViewModel @Inject constructor(
 
     fun advancePhase() {
         _uiState.update { s ->
-            val phases     = GamePhase.entries
-            val nextIndex  = (phases.indexOf(s.currentPhase) + 1) % phases.size
-            val nextPhase  = phases[nextIndex]
-            val newTurn    = if (nextIndex == 0) s.turnNumber + 1 else s.turnNumber
-            val newActive  = if (nextIndex == 0) nextActivePlayer(s) else s.activePlayerId
+            val phases    = GamePhase.entries
+            val nextIndex = (phases.indexOf(s.currentPhase) + 1) % phases.size
+            val nextPhase = phases[nextIndex]
+            val newTurn   = if (nextIndex == 0) s.turnNumber + 1 else s.turnNumber
+            val newActive = if (nextIndex == 0) nextActivePlayer(s) else s.activePlayerId
             s.copy(currentPhase = nextPhase, turnNumber = newTurn, activePlayerId = newActive)
         }
     }
@@ -208,10 +225,10 @@ class GameViewModel @Inject constructor(
 
     // ── UI state toggles ──────────────────────────────────────────────────────
 
-    fun showPhasePanel(show: Boolean)       = _uiState.update { it.copy(showPhasePanel = show) }
-    fun showCmdPanel(playerId: Int?)        = _uiState.update { it.copy(showCmdPanelForPlayerId = playerId) }
-    fun showCounterPanel(playerId: Int?)    = _uiState.update { it.copy(showCounterPanelForPlayerId = playerId) }
-    fun showEditName(playerId: Int?)        = _uiState.update { it.copy(editingNameForPlayerId = playerId) }
+    fun showPhasePanel(show: Boolean)    = _uiState.update { it.copy(showPhasePanel = show) }
+    fun showCmdPanel(playerId: Int?)     = _uiState.update { it.copy(showCmdPanelForPlayerId = playerId) }
+    fun showCounterPanel(playerId: Int?) = _uiState.update { it.copy(showCounterPanelForPlayerId = playerId) }
+    fun showEditName(playerId: Int?)     = _uiState.update { it.copy(editingNameForPlayerId = playerId) }
 
     fun resetGame() {
         deltaJobs.values.forEach { it.cancel() }
