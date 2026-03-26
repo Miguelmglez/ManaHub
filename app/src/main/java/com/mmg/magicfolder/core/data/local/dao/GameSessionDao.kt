@@ -63,7 +63,7 @@ interface GameSessionDao {
     @Query("""
         SELECT ps.deckId, ps.deckName,
                COUNT(*) AS totalGames,
-               SUM(CASE WHEN ps.isWinner = 1 THEN 1 ELSE 0 END) AS wins
+               COALESCE(SUM(CASE WHEN ps.isWinner = 1 THEN 1 ELSE 0 END), 0) AS wins
         FROM player_sessions ps
         WHERE ps.deckId IS NOT NULL
         GROUP BY ps.deckId
