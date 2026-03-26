@@ -45,6 +45,9 @@ class GameSessionRepositoryImpl @Inject constructor(
         return sessionId
     }
 
+    override suspend fun getSessionById(sessionId: Long): GameSessionWithPlayers? =
+        dao.getSessionById(sessionId)
+
     override fun observeRecentSessions(limit: Int): Flow<List<GameSessionWithPlayers>> =
         dao.observeRecentSessions(limit)
 

@@ -16,8 +16,9 @@ import com.mmg.magicfolder.core.data.local.entity.*
         ManaSymbolEntity::class,
         GameSessionEntity::class,
         PlayerSessionEntity::class,
+        SurveyAnswerEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -28,6 +29,7 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun statsDao():          StatsDao
     abstract fun manaSymbolDao():     ManaSymbolDao
     abstract fun gameSessionDao():    GameSessionDao
+    abstract fun surveyAnswerDao():   SurveyAnswerDao
 }
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -96,6 +98,29 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
             """
             CREATE INDEX IF NOT EXISTS index_player_sessions_sessionId
             ON player_sessions(sessionId)
+            """.trimIndent()
+        )
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS survey_answers (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                sessionId   INTEGER NOT NULL,
+                questionKey TEXT    NOT NULL,
+                answerJson  TEXT    NOT NULL,
+                answeredAt  INTEGER NOT NULL,
+                FOREIGN KEY(sessionId) REFERENCES game_sessions(id) ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
+        database.execSQL(
+            """
+            CREATE INDEX IF NOT EXISTS index_survey_answers_sessionId
+            ON survey_answers(sessionId)
             """.trimIndent()
         )
     }

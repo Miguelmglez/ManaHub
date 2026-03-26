@@ -33,6 +33,9 @@ sealed class Screen(val route: String) {
         fun createRoute(mode: String, playerCount: Int) = "game/play/$mode/$playerCount"
     }
     object GameResult : Screen("game/result")
+    object GameSurvey : Screen("game/survey/{sessionId}") {
+        fun createRoute(sessionId: Long) = "game/survey/$sessionId"
+    }
 
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Draft  : Screen("draft")

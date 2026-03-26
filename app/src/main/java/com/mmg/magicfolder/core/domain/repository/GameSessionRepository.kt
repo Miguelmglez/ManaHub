@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface GameSessionRepository {
     suspend fun saveGameSession(result: GameResult): Long
+    suspend fun getSessionById(sessionId: Long): GameSessionWithPlayers?
     fun observeRecentSessions(limit: Int = 10): Flow<List<GameSessionWithPlayers>>
     fun observeTotalGames(): Flow<Int>
     fun observeWins(playerName: String): Flow<Int>

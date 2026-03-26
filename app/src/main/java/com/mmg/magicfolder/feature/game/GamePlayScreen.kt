@@ -45,6 +45,7 @@ import com.mmg.magicfolder.feature.game.model.*
 fun GamePlayScreen(
     onNewGame:  () -> Unit,
     onBackHome: () -> Unit,
+    onSurvey:   (sessionId: Long) -> Unit = {},
     viewModel:  GameViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -128,6 +129,7 @@ fun GamePlayScreen(
                 gameResult = result,
                 onNewGame  = { viewModel.resetGame(); onNewGame() },
                 onBackHome = onBackHome,
+                onSurvey   = { onSurvey(uiState.lastSessionId ?: 0L) },
             )
         }
     }

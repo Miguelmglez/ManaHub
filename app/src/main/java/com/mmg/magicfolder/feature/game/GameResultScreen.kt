@@ -21,6 +21,7 @@ fun GameResultScreen(
     gameResult: GameResult,
     onNewGame:  () -> Unit,
     onBackHome: () -> Unit,
+    onSurvey:   () -> Unit = {},
 ) {
     val mc          = MaterialTheme.magicColors
     val winnerTheme = mc.playerColors.getOrNull(gameResult.winner.themeIndex % 10)
@@ -47,26 +48,41 @@ fun GameResultScreen(
             item { StandingsSection(gameResult = gameResult) }
             item { HighlightsSection(gameResult = gameResult) }
             item {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(
-                        onClick  = onBackHome,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Back to Home", style = MaterialTheme.magicTypography.labelLarge)
-                    }
-                    Button(
-                        onClick  = onNewGame,
-                        modifier = Modifier.weight(1f),
-                        colors   = ButtonDefaults.buttonColors(containerColor = winnerTheme.accent),
+                        onClick  = onSurvey,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = OutlinedButtonDefaults.outlinedButtonColors(
+                            contentColor = mc.goldMtg,
+                        ),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, mc.goldMtg),
                     ) {
                         Text(
-                            "Play Again",
+                            "\u2756 Review this game",
                             style = MaterialTheme.magicTypography.labelLarge,
-                            color = mc.background,
                         )
+                    }
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick  = onBackHome,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Back to Home", style = MaterialTheme.magicTypography.labelLarge)
+                        }
+                        Button(
+                            onClick  = onNewGame,
+                            modifier = Modifier.weight(1f),
+                            colors   = ButtonDefaults.buttonColors(containerColor = winnerTheme.accent),
+                        ) {
+                            Text(
+                                "Play Again",
+                                style = MaterialTheme.magicTypography.labelLarge,
+                                color = mc.background,
+                            )
+                        }
                     }
                 }
             }

@@ -20,6 +20,7 @@ import com.mmg.magicfolder.feature.decks.DeckBuilderScreen
 import com.mmg.magicfolder.feature.decks.DeckDetailScreen
 import com.mmg.magicfolder.feature.game.GamePlayScreen
 import com.mmg.magicfolder.feature.game.GameSetupScreen
+import com.mmg.magicfolder.feature.survey.SurveyScreen
 import com.mmg.magicfolder.feature.profile.ProfileScreen
 import com.mmg.magicfolder.feature.scanner.ScannerScreen
 import com.mmg.magicfolder.feature.stats.StatsScreen
@@ -143,6 +144,23 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                         }
                     },
                     onBackHome = {
+                        navController.navigate(Screen.Collection.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onSurvey   = { sessionId ->
+                        navController.navigate(Screen.GameSurvey.createRoute(sessionId))
+                    },
+                )
+            }
+            // ── Post-game survey ──────────────────────────────────────────────
+            composable(
+                route     = Screen.GameSurvey.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),
+            ) {
+                SurveyScreen(
+                    onBack   = { navController.popBackStack() },
+                    onFinish = {
                         navController.navigate(Screen.Collection.route) {
                             popUpTo(0) { inclusive = true }
                         }
