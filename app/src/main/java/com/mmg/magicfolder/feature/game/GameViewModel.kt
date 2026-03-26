@@ -26,6 +26,7 @@ data class GameUiState(
     val phaseStops:       List<PhaseStop>   = emptyList(),
     val winner:           Player?           = null,
     val gameResult:       GameResult?       = null,
+    val lastSessionId:    Long?             = null,
     val gameStartTime:    Long              = System.currentTimeMillis(),
     // UI visibility
     val showPhasePanel:              Boolean         = false,
@@ -66,6 +67,7 @@ class GameViewModel @Inject constructor(
                 .collect { result ->
                     launch(Dispatchers.IO) {
                         runCatching { gameSessionRepo.saveGameSession(result) }
+                            .onSuccess { id -> _uiState.update { it.copy(lastSessionId = id) } }
                     }
                 }
         }

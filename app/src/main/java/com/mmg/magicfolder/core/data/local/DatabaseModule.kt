@@ -17,7 +17,7 @@ object DatabaseModule {
     @Provides @Singleton
     fun provideMtgDatabase(@ApplicationContext context: Context): MtgDatabase =
         Room.databaseBuilder(context, MtgDatabase::class.java, "mtg_collection.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -27,4 +27,5 @@ object DatabaseModule {
     @Provides fun provideStatsDao(db: MtgDatabase):        StatsDao        = db.statsDao()
     @Provides fun provideManaSymbolDao(db: MtgDatabase):   ManaSymbolDao   = db.manaSymbolDao()
     @Provides fun provideGameSessionDao(db: MtgDatabase):  GameSessionDao  = db.gameSessionDao()
+    @Provides fun provideSurveyAnswerDao(db: MtgDatabase): SurveyAnswerDao = db.surveyAnswerDao()
 }
