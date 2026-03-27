@@ -15,12 +15,17 @@ import androidx.room.PrimaryKey
             onDelete      = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index("sessionId")],
+    indices = [
+        Index("sessionId"),
+        Index("cardReference"),
+    ],
 )
 data class SurveyAnswerEntity(
-    @PrimaryKey(autoGenerate = true) val id:          Long   = 0,
-    val sessionId:   Long,
-    val questionKey: String,   // e.g. "overall_rating", "game_pace"
-    val answerJson:  String,   // serialized answer (plain value or JSON array for multi-choice)
-    val answeredAt:  Long      = System.currentTimeMillis(),
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val sessionId:     Long,
+    val questionId:    String,
+    val questionType:  String,
+    val answer:        String,
+    val cardReference: String? = null,
+    val answeredAt:    Long    = System.currentTimeMillis(),
 )

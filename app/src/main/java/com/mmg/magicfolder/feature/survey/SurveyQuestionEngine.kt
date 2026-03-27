@@ -1,131 +1,146 @@
 package com.mmg.magicfolder.feature.survey
 
-import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
+import com.mmg.magicfolder.feature.game.model.EliminationReason
+import com.mmg.magicfolder.feature.game.model.GameMode
+import com.mmg.magicfolder.feature.game.model.GameResult
 
-// ── Answer option ─────────────────────────────────────────────────────────────
+// ── Answer options ────────────────────────────────────────────────────────────
 
-data class AnswerOption(val id: String, val label: String)
+data class SurveyChoice(
+    val id:    String,
+    val label: String,
+    val emoji: String = "",
+)
 
-// ── Question types ────────────────────────────────────────────────────────────
-
-sealed class SurveyQuestion {
-    abstract val key: String
-    abstract val prompt: String
-
-    data class SingleChoice(
-        override val key:     String,
-        override val prompt:  String,
-        val options:          List<AnswerOption>,
-    ) : SurveyQuestion()
-
-    data class MultiChoice(
-        override val key:     String,
-        override val prompt:  String,
-        val options:          List<AnswerOption>,
-    ) : SurveyQuestion()
-
-    data class StarRating(
-        override val key:     String,
-        override val prompt:  String,
-        val maxStars:         Int = 5,
-    ) : SurveyQuestion()
-
-    data class FreeText(
-        override val key:     String,
-        override val prompt:  String,
-        val hint:             String = "",
-    ) : SurveyQuestion()
+sealed class AnswerOption {
+    data class SingleChoice(val options: List<SurveyChoice>) : AnswerOption()
+    data class MultiChoice(val options: List<SurveyChoice>)  : AnswerOption()
+    data class StarRating(val maxStars: Int = 5)             : AnswerOption()
+    object FreeText                                          : AnswerOption()
 }
+
+// ── Question model ────────────────────────────────────────────────────────────
+
+data class SurveyQuestion(
+    val id:            String,
+    val type:          String,
+    val text:          String,
+    val contextBadge:  String?      = null,
+    val answerOption:  AnswerOption,
+    val cardReference: String?      = null,
+)
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 object SurveyQuestionEngine {
 
-    fun buildQuestions(session: GameSessionWithPlayers): List<SurveyQuestion> {
-        val q       = mutableListOf<SurveyQuestion>()
-        val players = session.players
-        val mode    = session.session.mode          // "COMMANDER" / "STANDARD" / …
-        val duration = session.session.durationMs
+    fun buildQuestions(result: GameResult): List<SurveyQuestion> {
+        val questions   = mutableListOf<SurveyQuestion>()
+        val localPlayer = result.playerResults.firstOrNull()
+        val isWinner    = localPlayer?.player?.id == result.winner.id
 
-        // 1. Always: overall star rating
-        q += SurveyQuestion.StarRating(
-            key    = "overall_rating",
-            prompt = "How would you rate this game overall?",
-        )
-
-        // 2. Game pace — always
-        q += SurveyQuestion.SingleChoice(
-            key    = "game_pace",
-            prompt = "How was the game pace?",
-            options = listOf(
-                AnswerOption("too_slow",   "Too slow"),
-                AnswerOption("just_right", "Just right"),
-                AnswerOption("too_fast",   "Too fast"),
+        // Q1 — always: subjective outcome
+        questions += SurveyQuestion(
+            id   = "result_feel",
+            type = "RESULT_FEEL",
+            text = if (isWinner) "How did the win feel?" else "What cost you the game?",
+            answerOption = AnswerOption.SingleChoice(
+                if (isWinner) listOf(
+                    SurveyChoice("DOMINANT",  "Dominant",    "\uD83D\uDCAA"),
+                    SurveyChoice("CLOSE",     "Close call",  "\uD83D\uDE05"),
+                    SurveyChoice("LUCKY",     "Lucky draw",  "\uD83C\uDF40"),
+                    SurveyChoice("SKILLFUL",  "Outplayed",   "\uD83E\uDDE0"),
+                ) else listOf(
+                    SurveyChoice("OVERWHELMED", "Overwhelmed", "\u26A1"),
+                    SurveyChoice("MANA",        "Mana issues", "\uD83C\uDFD4"),
+                    SurveyChoice("NO_ANSWERS",  "No answers",  "\uD83D\uDEAB"),
+                    SurveyChoice("TOO_SLOW",    "Too slow",    "\uD83D\uDC22"),
+                )
             ),
         )
 
-        // 3. Biggest threat — if Commander and 3+ players
-        if (mode == "COMMANDER" && players.size >= 3) {
-            q += SurveyQuestion.SingleChoice(
-                key    = "biggest_threat",
-                prompt = "Who was the biggest threat at the table?",
-                options = players.map { AnswerOption(it.playerId.toString(), it.playerName) },
+        // Q2 — always: mana health
+        questions += SurveyQuestion(
+            id   = "mana_health",
+            type = "MANA",
+            text = "How was your mana?",
+            answerOption = AnswerOption.MultiChoice(listOf(
+                SurveyChoice("SMOOTH",  "Smooth",       "\u2705"),
+                SurveyChoice("FLOODED", "Land flooded", "\uD83C\uDF0A"),
+                SurveyChoice("SCREWED", "Mana screwed", "\uD83C\uDFDC"),
+                SurveyChoice("COLORS",  "Wrong colors", "\uD83C\uDFA8"),
+                SurveyChoice("NONE",    "No issues",    "\uD83D\uDC4D"),
+            )),
+        )
+
+        // Q3 — always: opening hand
+        questions += SurveyQuestion(
+            id           = "hand_quality",
+            type         = "HAND",
+            text         = "How was your opening hand?",
+            answerOption = AnswerOption.StarRating(maxStars = 5),
+        )
+
+        // Q4 — contextual: commander damage decisive
+        val commanderWin = result.playerResults.any {
+            it.eliminationReason == EliminationReason.COMMANDER_DAMAGE
+        }
+        if (commanderWin && result.gameMode == GameMode.COMMANDER) {
+            questions += SurveyQuestion(
+                id           = "commander_plan",
+                type         = "COMMANDER_DAMAGE",
+                text         = "Commander damage was decisive.\nWas that your plan?",
+                contextBadge = "\u2694 Commander damage win",
+                answerOption = AnswerOption.SingleChoice(listOf(
+                    SurveyChoice("PLANNED",   "Planned it",          "\uD83C\uDFAF"),
+                    SurveyChoice("DEVELOPED", "Developed naturally", "\uD83C\uDF31"),
+                    SurveyChoice("SURPRISE",  "Surprised me too",    "\uD83D\uDE2E"),
+                )),
             )
         }
 
-        // 4. MVP — if 3+ players
-        if (players.size >= 3) {
-            q += SurveyQuestion.SingleChoice(
-                key    = "mvp",
-                prompt = "Who played the best this game?",
-                options = players.map { AnswerOption(it.playerId.toString(), it.playerName) },
+        // Q5 — contextual: loss reason
+        if (!isWinner) {
+            questions += SurveyQuestion(
+                id   = "loss_reason",
+                type = "LOSS_REASON",
+                text = "What would have changed the outcome?",
+                answerOption = AnswerOption.SingleChoice(listOf(
+                    SurveyChoice("REMOVAL",     "More removal",        "\u2694"),
+                    SurveyChoice("CURVE",       "Better mana curve",   "\uD83D\uDCCA"),
+                    SurveyChoice("INTERACTION", "More interaction",    "\uD83D\uDEE1"),
+                    SurveyChoice("NOTHING",     "Opponent was better", "\uD83E\uDD1D"),
+                )),
             )
         }
 
-        // 5. Game felt too long — only if > 45 min
-        if (duration > 45 * 60 * 1000L) {
-            q += SurveyQuestion.SingleChoice(
-                key    = "too_long",
-                prompt = "Did the game feel too long?",
-                options = listOf(
-                    AnswerOption("yes",      "Yes"),
-                    AnswerOption("somewhat", "Somewhat"),
-                    AnswerOption("no",       "No"),
-                ),
-            )
-        }
-
-        // 6. Highlights — multi-choice, always
-        q += SurveyQuestion.MultiChoice(
-            key    = "highlights",
-            prompt = "What did you enjoy most? (pick all that apply)",
-            options = listOf(
-                AnswerOption("close_finish",  "Close finish"),
-                AnswerOption("big_plays",     "Big plays"),
-                AnswerOption("comebacks",     "Comeback moments"),
-                AnswerOption("strategy",      "Strategic decisions"),
-                AnswerOption("social",        "Playing with friends"),
-            ),
+        // Q6 — always last: free notes
+        questions += SurveyQuestion(
+            id           = "free_notes",
+            type         = "FREE_TEXT",
+            text         = "Anything to note about this game?",
+            contextBadge = "Optional",
+            answerOption = AnswerOption.FreeText,
         )
 
-        // 7. Rematch? — always
-        q += SurveyQuestion.SingleChoice(
-            key    = "rematch",
-            prompt = "Would you like a rematch?",
-            options = listOf(
-                AnswerOption("yes",   "Yes, immediately!"),
-                AnswerOption("later", "Maybe later"),
-                AnswerOption("no",    "No thanks"),
-            ),
-        )
-
-        // 8. Free-text notes — always last
-        q += SurveyQuestion.FreeText(
-            key    = "notes",
-            prompt = "Any notes about this game?",
-            hint   = "Interesting moments, house rules, memorable plays…",
-        )
-
-        return q
+        return questions.take(8)
     }
+
+    // For future use when deck cards are available
+    fun buildCardImpactQuestion(
+        cardName:     String,
+        scryfallId:   String,
+        contextBadge: String? = null,
+    ) = SurveyQuestion(
+        id            = "card_impact_$scryfallId",
+        type          = "CARD_IMPACT",
+        text          = "How did $cardName perform?",
+        contextBadge  = contextBadge,
+        cardReference = scryfallId,
+        answerOption  = AnswerOption.SingleChoice(listOf(
+            SurveyChoice("KEY_CARD", "Key card", "\uD83D\uDD25"),
+            SurveyChoice("AVERAGE",  "Average",  "\uD83D\uDE10"),
+            SurveyChoice("WEAK",     "Weak",     "\uD83D\uDE34"),
+        )),
+    )
 }

@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -20,6 +23,7 @@ import com.mmg.magicfolder.feature.decks.DeckBuilderScreen
 import com.mmg.magicfolder.feature.decks.DeckDetailScreen
 import com.mmg.magicfolder.feature.game.GamePlayScreen
 import com.mmg.magicfolder.feature.game.GameSetupScreen
+import com.mmg.magicfolder.feature.game.GameViewModel
 import com.mmg.magicfolder.feature.survey.SurveyScreen
 import com.mmg.magicfolder.feature.profile.ProfileScreen
 import com.mmg.magicfolder.feature.scanner.ScannerScreen
@@ -157,15 +161,26 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             composable(
                 route     = Screen.GameSurvey.route,
                 arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),
-            ) {
-                SurveyScreen(
-                    onBack   = { navController.popBackStack() },
-                    onFinish = {
-                        navController.navigate(Screen.Collection.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    },
-                )
+            ) { backStack ->
+                val sessionId  = backStack.arguments?.getLong("sessionId") ?: 0L
+                val gameEntry  = remember(backStack) {
+                    navController.getBackStackEntry(Screen.GamePlay.route)
+                }
+                val gameVm: GameViewModel = hiltViewModel(gameEntry)
+                val gameUiState by gameVm.uiState.collectAsStateWithLifecycle()
+                val gameResult = gameUiState.gameResult
+
+                if (gameResult != null) {
+                    SurveyScreen(
+                        sessionId  = sessionId,
+                        gameResult = gameResult,
+                        onComplete = {
+                            navController.navigate(Screen.Collection.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                    )
+                }
             }
         }
     }

@@ -40,6 +40,7 @@ data class ProfileUiState(
     val stats:            CollectionStats? = null,
     val selectedTheme:    AppTheme         = AppTheme.NEON_VOID,
     val selectedLanguage: String           = "en",
+    val playerName:       String           = "Player 1",
     val isLoading:        Boolean          = true,
     // Game stats
     val totalGames:       Int              = 0,
@@ -85,13 +86,21 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
+        // Observe persisted player name
+        langPref.playerNameFlow
+            .onEach { name -> _state.update { it.copy(playerName = name) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
         // Game stats
         gameSessionRepo.observeTotalGames()
             .onEach { total -> _state.update { it.copy(totalGames = total) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        gameSessionRepo.observeWins("Player 1")
+        // Wins — re-subscribe automatically when player name changes
+        langPref.playerNameFlow
+            .flatMapLatest { name -> gameSessionRepo.observeWins(name) }
             .onEach { wins -> _state.update { it.copy(totalWins = wins) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
@@ -119,6 +128,11 @@ class ProfileViewModel @Inject constructor(
 
     fun selectLanguage(lang: String) {
         viewModelScope.launch { langPref.set(lang) }
+    }
+
+    fun savePlayerName(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { langPref.savePlayerName(name.trim()) }
     }
 
     fun selectTheme(theme: AppTheme) {

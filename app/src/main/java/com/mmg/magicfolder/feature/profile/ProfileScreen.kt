@@ -10,9 +10,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,7 +67,10 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
             // ── Avatar + title ─────────────────────────────────────────────────
-            ProfileHeader()
+            ProfileHeader(
+                playerName  = state.playerName,
+                onNameSaved = viewModel::savePlayerName,
+            )
 
             // ── Collection stats ───────────────────────────────────────────────
             if (state.isLoading) {
@@ -115,8 +124,13 @@ fun ProfileScreen(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ProfileHeader() {
+private fun ProfileHeader(
+    playerName:  String,
+    onNameSaved: (String) -> Unit,
+) {
     val mc = MaterialTheme.magicColors
+    var editedName by remember(playerName) { mutableStateOf(playerName) }
+
     Column(
         modifier            = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -142,11 +156,29 @@ private fun ProfileHeader() {
             color     = mc.goldMtg,
             textAlign = TextAlign.Center,
         )
-        Text(
-            "Commander",
-            style     = MaterialTheme.magicTypography.labelLarge,
-            color     = mc.textSecondary,
-            textAlign = TextAlign.Center,
+        OutlinedTextField(
+            value         = editedName,
+            onValueChange = { editedName = it },
+            singleLine    = true,
+            label         = {
+                Text(
+                    "Your name",
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
+                )
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(
+                onDone = { if (editedName.isNotBlank()) onNameSaved(editedName) }
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor   = mc.primaryAccent,
+                unfocusedBorderColor = mc.textSecondary,
+                focusedTextColor     = mc.textPrimary,
+                unfocusedTextColor   = mc.textPrimary,
+                cursorColor          = mc.primaryAccent,
+            ),
+            modifier = Modifier.width(220.dp),
         )
     }
 }

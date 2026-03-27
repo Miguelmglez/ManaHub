@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.data.local.dao.SurveyAnswerDao
 import com.mmg.magicfolder.core.data.local.entity.SurveyAnswerEntity
-import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
+import com.mmg.magicfolder.feature.game.model.GameResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,70 +18,79 @@ import javax.inject.Inject
 // ── UiState ───────────────────────────────────────────────────────────────────
 
 data class SurveyUiState(
-    val questions:     List<SurveyQuestion> = emptyList(),
-    val currentIndex:  Int                  = 0,
-    val answers:       Map<String, String>  = emptyMap(),   // questionKey → answerJson
-    val isLoading:     Boolean              = true,
-    val isComplete:    Boolean              = false,
-) {
-    val currentQuestion: SurveyQuestion? get() = questions.getOrNull(currentIndex)
-    val progress: Float get() = if (questions.isEmpty()) 0f
-        else currentIndex.toFloat() / questions.size
-}
+    val questions:    List<SurveyQuestion> = emptyList(),
+    val currentIndex: Int                  = 0,
+    val answers:      Map<String, String>  = emptyMap(),
+    val isComplete:   Boolean              = false,
+    val isSaving:     Boolean              = false,
+)
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class SurveyViewModel @Inject constructor(
-    savedStateHandle:        SavedStateHandle,
-    private val sessionRepo: GameSessionRepository,
-    private val answerDao:   SurveyAnswerDao,
+    private val surveyAnswerDao: SurveyAnswerDao,
+    savedStateHandle:            SavedStateHandle,
 ) : ViewModel() {
 
-    val sessionId: Long = savedStateHandle.get<Long>("sessionId") ?: 0L
+    private val sessionId: Long = savedStateHandle.get<Long>("sessionId") ?: 0L
 
-    private val _state = MutableStateFlow(SurveyUiState())
-    val state: StateFlow<SurveyUiState> = _state.asStateFlow()
+    private val _uiState = MutableStateFlow(SurveyUiState())
+    val uiState: StateFlow<SurveyUiState> = _uiState.asStateFlow()
 
-    init {
-        viewModelScope.launch(Dispatchers.IO) {
-            val session = sessionRepo.getSessionById(sessionId)
-            if (session != null) {
-                val questions = SurveyQuestionEngine.buildQuestions(session)
-                _state.update { it.copy(questions = questions, isLoading = false) }
-            } else {
-                _state.update { it.copy(isLoading = false, isComplete = true) }
-            }
+    val progress: Float
+        get() {
+            val total = _uiState.value.questions.size
+            return if (total == 0) 0f
+                   else _uiState.value.currentIndex.toFloat() / total
         }
+
+    val currentQuestion: SurveyQuestion?
+        get() = _uiState.value.questions.getOrNull(_uiState.value.currentIndex)
+
+    fun initWithResult(result: GameResult) {
+        if (_uiState.value.questions.isNotEmpty()) return
+        _uiState.update { it.copy(questions = SurveyQuestionEngine.buildQuestions(result)) }
     }
 
-    fun answerAndAdvance(questionKey: String, answerJson: String) {
-        _state.update { it.copy(answers = it.answers + (questionKey to answerJson)) }
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching {
-                answerDao.insertAnswer(
-                    SurveyAnswerEntity(
-                        sessionId   = sessionId,
-                        questionKey = questionKey,
-                        answerJson  = answerJson,
-                    )
-                )
-            }
+    fun answerAndAdvance(questionId: String, answer: String) {
+        _uiState.update { state ->
+            val newAnswers = state.answers + (questionId to answer)
+            val nextIndex  = state.currentIndex + 1
+            val complete   = nextIndex >= state.questions.size
+            state.copy(answers = newAnswers, currentIndex = nextIndex, isComplete = complete)
         }
-        advance()
+        if (_uiState.value.isComplete) persistAnswers()
     }
 
-    fun skipQuestion() = advance()
+    fun skipQuestion() {
+        _uiState.update { state ->
+            val nextIndex = state.currentIndex + 1
+            state.copy(currentIndex = nextIndex, isComplete = nextIndex >= state.questions.size)
+        }
+        if (_uiState.value.isComplete) persistAnswers()
+    }
 
     fun skipAll() {
-        _state.update { it.copy(isComplete = true) }
+        persistAnswers()
+        _uiState.update { it.copy(isComplete = true) }
     }
 
-    private fun advance() {
-        _state.update { s ->
-            val next = s.currentIndex + 1
-            if (next >= s.questions.size) s.copy(isComplete = true)
-            else s.copy(currentIndex = next)
+    private fun persistAnswers() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val entities = _uiState.value.answers.map { (qId, answer) ->
+                val question = _uiState.value.questions.find { it.id == qId }
+                SurveyAnswerEntity(
+                    sessionId     = sessionId,
+                    questionId    = qId,
+                    questionType  = question?.type ?: "UNKNOWN",
+                    answer        = answer,
+                    cardReference = question?.cardReference,
+                )
+            }
+            if (entities.isNotEmpty()) {
+                runCatching { surveyAnswerDao.insertAnswers(entities) }
+            }
         }
     }
 }

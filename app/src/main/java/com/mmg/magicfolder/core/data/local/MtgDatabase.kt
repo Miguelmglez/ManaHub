@@ -18,7 +18,7 @@ import com.mmg.magicfolder.core.data.local.entity.*
         PlayerSessionEntity::class,
         SurveyAnswerEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -112,16 +112,40 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
                 sessionId   INTEGER NOT NULL,
                 questionKey TEXT    NOT NULL,
                 answerJson  TEXT    NOT NULL,
-                answeredAt  INTEGER NOT NULL,
+                answeredAt  INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY(sessionId) REFERENCES game_sessions(id) ON DELETE CASCADE
             )
             """.trimIndent()
         )
         database.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_survey_answers_sessionId ON survey_answers(sessionId)"
+        )
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // Drop old schema (questionKey / answerJson) and recreate with new columns
+        database.execSQL("DROP TABLE IF EXISTS survey_answers")
+        database.execSQL(
             """
-            CREATE INDEX IF NOT EXISTS index_survey_answers_sessionId
-            ON survey_answers(sessionId)
+            CREATE TABLE IF NOT EXISTS survey_answers (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                sessionId     INTEGER NOT NULL,
+                questionId    TEXT    NOT NULL,
+                questionType  TEXT    NOT NULL,
+                answer        TEXT    NOT NULL,
+                cardReference TEXT,
+                answeredAt    INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(sessionId) REFERENCES game_sessions(id) ON DELETE CASCADE
+            )
             """.trimIndent()
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_survey_sessionId ON survey_answers(sessionId)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_survey_cardRef ON survey_answers(cardReference)"
         )
     }
 }

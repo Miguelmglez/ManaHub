@@ -2,33 +2,38 @@ package com.mmg.magicfolder.feature.survey
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
+import com.mmg.magicfolder.feature.game.model.GameResult
+import kotlinx.coroutines.delay
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Entry point
@@ -36,179 +41,142 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 
 @Composable
 fun SurveyScreen(
-    onBack:    () -> Unit,
-    onFinish:  () -> Unit,
-    viewModel: SurveyViewModel = hiltViewModel(),
+    sessionId:  Long,
+    gameResult: GameResult,
+    onComplete: () -> Unit,
+    viewModel:  SurveyViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.state.collectAsStateWithLifecycle()
-    val mc = MaterialTheme.magicColors
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.initWithResult(gameResult)
+    }
 
     LaunchedEffect(uiState.isComplete) {
-        if (uiState.isComplete) onFinish()
+        if (uiState.isComplete) onComplete()
     }
 
-    Scaffold(
-        topBar = {
-            SurveyTopBar(
-                currentIndex   = uiState.currentIndex,
-                totalQuestions = uiState.questions.size,
-                progress       = uiState.progress,
-                onClose        = onBack,
-                onSkipAll      = viewModel::skipAll,
-            )
-        },
-        containerColor = mc.background,
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color    = mc.goldMtg,
-                    )
-                }
-                uiState.currentQuestion == null -> Unit  // handled by LaunchedEffect
-                else -> {
-                    AnimatedContent(
-                        targetState  = uiState.currentIndex,
-                        transitionSpec = {
-                            (slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)))
-                                .togetherWith(slideOutHorizontally(tween(300)) { -it } + fadeOut(tween(300)))
-                        },
-                        label = "survey_question",
-                    ) { index ->
-                        val question = uiState.questions.getOrNull(index) ?: return@AnimatedContent
-                        QuestionCard(
-                            question   = question,
-                            onAnswer   = { key, json -> viewModel.answerAndAdvance(key, json) },
-                            onSkip     = viewModel::skipQuestion,
-                            modifier   = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Top bar
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SurveyTopBar(
-    currentIndex:   Int,
-    totalQuestions: Int,
-    progress:       Float,
-    onClose:        () -> Unit,
-    onSkipAll:      () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    Column {
-        TopAppBar(
-            title  = {
-                Text(
-                    text  = "Game Review",
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.textPrimary,
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = mc.textSecondary)
-                }
-            },
-            actions = {
-                TextButton(onClick = onSkipAll) {
-                    Text(
-                        text  = "Skip all",
-                        style = MaterialTheme.magicTypography.labelMedium,
-                        color = mc.textSecondary,
-                    )
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.background),
-        )
-        if (totalQuestions > 0) {
-            LinearProgressIndicator(
-                progress        = { progress },
-                modifier        = Modifier.fillMaxWidth(),
-                color           = mc.goldMtg,
-                trackColor      = mc.surface,
-            )
-            Text(
-                text      = "${currentIndex + 1} / $totalQuestions",
-                style     = MaterialTheme.magicTypography.labelSmall,
-                color     = mc.textSecondary,
-                textAlign = TextAlign.End,
-                modifier  = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-            )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Question dispatcher
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun QuestionCard(
-    question: SurveyQuestion,
-    onAnswer: (key: String, json: String) -> Unit,
-    onSkip:   () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LazyColumn(
-        modifier            = modifier,
-        contentPadding      = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.magicColors.background)
+            .statusBarsPadding(),
     ) {
-        item {
+        // ── Top bar ───────────────────────────────────────────────────────────
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
             Text(
-                text  = question.prompt,
-                style = MaterialTheme.magicTypography.displaySmall,
+                text  = "Game Review",
+                style = MaterialTheme.magicTypography.titleMedium,
                 color = MaterialTheme.magicColors.textPrimary,
             )
-        }
-        item {
-            when (question) {
-                is SurveyQuestion.SingleChoice -> SingleChoiceGrid(
-                    question = question,
-                    onAnswer = onAnswer,
-                )
-                is SurveyQuestion.MultiChoice  -> MultiChoiceList(
-                    question = question,
-                    onAnswer = onAnswer,
-                )
-                is SurveyQuestion.StarRating   -> StarRatingInput(
-                    question = question,
-                    onAnswer = onAnswer,
-                )
-                is SurveyQuestion.FreeText     -> FreeTextInput(
-                    question = question,
-                    onAnswer = onAnswer,
+            IconButton(onClick = { viewModel.skipAll() }) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Skip all",
+                    tint               = MaterialTheme.magicColors.textSecondary,
                 )
             }
         }
-        item {
-            TextButton(
-                onClick  = onSkip,
-                modifier = Modifier.fillMaxWidth(),
+
+        // ── Progress bar ──────────────────────────────────────────────────────
+        LinearProgressIndicator(
+            progress   = { viewModel.progress },
+            modifier   = Modifier.fillMaxWidth().height(3.dp),
+            color      = MaterialTheme.magicColors.primaryAccent,
+            trackColor = MaterialTheme.magicColors.surfaceVariant,
+        )
+        if (uiState.questions.isNotEmpty()) {
+            Text(
+                text      = "${uiState.currentIndex + 1} / ${uiState.questions.size}",
+                modifier  = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                textAlign = TextAlign.End,
+                style     = MaterialTheme.magicTypography.labelSmall,
+                color     = MaterialTheme.magicColors.textDisabled,
+            )
+        }
+
+        // ── Current question with slide animation ─────────────────────────────
+        val question = viewModel.currentQuestion
+        if (question != null) {
+            AnimatedContent(
+                targetState  = question,
+                transitionSpec = {
+                    (slideInHorizontally(tween(300)) { it } + fadeIn(tween(200)))
+                        .togetherWith(slideOutHorizontally(tween(300)) { -it } + fadeOut(tween(200)))
+                },
+                label = "survey_question",
+            ) { q ->
+                QuestionContent(
+                    question = q,
+                    onAnswer = { answer -> viewModel.answerAndAdvance(q.id, answer) },
+                    onSkip   = { viewModel.skipQuestion() },
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Question content dispatcher
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun QuestionContent(
+    question: SurveyQuestion,
+    onAnswer: (String) -> Unit,
+    onSkip:   () -> Unit,
+) {
+    Column(
+        modifier            = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Spacer(Modifier.height(8.dp))
+
+        // Context badge
+        question.contextBadge?.let { badge ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.magicColors.goldMtg.copy(alpha = 0.15f))
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
             ) {
                 Text(
-                    text  = "Skip this question",
-                    style = MaterialTheme.magicTypography.labelMedium,
-                    color = MaterialTheme.magicColors.textSecondary,
+                    text  = badge,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = MaterialTheme.magicColors.goldMtg,
                 )
             }
         }
+
+        Text(
+            text  = question.text,
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = MaterialTheme.magicColors.textPrimary,
+        )
+
+        when (val opt = question.answerOption) {
+            is AnswerOption.SingleChoice -> SingleChoiceGrid(opt.options, onAnswer)
+            is AnswerOption.MultiChoice  -> MultiChoiceList(
+                choices   = opt.options,
+                onConfirm = { ids -> onAnswer(ids.joinToString(",")) },
+                onSkip    = onSkip,
+            )
+            is AnswerOption.StarRating   -> StarRatingInput(opt.maxStars, onAnswer, onSkip)
+            is AnswerOption.FreeText     -> FreeTextInput(onAnswer, onSkip)
+        }
+
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -218,31 +186,40 @@ private fun QuestionCard(
 
 @Composable
 private fun SingleChoiceGrid(
-    question: SurveyQuestion.SingleChoice,
-    onAnswer: (key: String, json: String) -> Unit,
+    choices:  List<SurveyChoice>,
+    onSelect: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     LazyVerticalGrid(
-        columns             = GridCells.Fixed(2),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        columns               = GridCells.Fixed(2),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier            = Modifier.heightIn(max = 400.dp),
+        verticalArrangement   = Arrangement.spacedBy(10.dp),
+        modifier              = Modifier.heightIn(max = 420.dp),
     ) {
-        items(question.options) { option ->
+        items(choices) { choice ->
             Surface(
-                shape    = RoundedCornerShape(12.dp),
-                color    = mc.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onAnswer(question.key, option.id) },
+                onClick = { onSelect(choice.id) },
+                shape   = RoundedCornerShape(16.dp),
+                color   = mc.surface,
+                border  = BorderStroke(1.dp, mc.surfaceVariant),
+                modifier = Modifier.fillMaxWidth().aspectRatio(1.2f),
             ) {
-                Text(
-                    text      = option.label,
-                    style     = MaterialTheme.magicTypography.bodyLarge,
-                    color     = mc.textPrimary,
-                    textAlign = TextAlign.Center,
-                    modifier  = Modifier.padding(vertical = 16.dp, horizontal = 8.dp),
-                )
+                Column(
+                    modifier            = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    if (choice.emoji.isNotEmpty()) {
+                        Text(text = choice.emoji, fontSize = 32.sp)
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    Text(
+                        text      = choice.label,
+                        style     = MaterialTheme.magicTypography.bodyMedium,
+                        color     = mc.textPrimary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }
@@ -254,68 +231,70 @@ private fun SingleChoiceGrid(
 
 @Composable
 private fun MultiChoiceList(
-    question: SurveyQuestion.MultiChoice,
-    onAnswer: (key: String, json: String) -> Unit,
+    choices:   List<SurveyChoice>,
+    onConfirm: (List<String>) -> Unit,
+    onSkip:    () -> Unit,
 ) {
     val mc       = MaterialTheme.magicColors
-    val selected = remember { mutableStateListOf<String>() }
+    var selected by remember { mutableStateOf(setOf<String>()) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        question.options.forEach { option ->
-            val isChecked = option.id in selected
+        choices.forEach { choice ->
+            val isSelected = choice.id in selected
             Surface(
-                shape    = RoundedCornerShape(10.dp),
-                color    = if (isChecked) mc.goldMtg.copy(alpha = 0.15f) else mc.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = if (isChecked) 1.dp else 0.dp,
-                        color = if (isChecked) mc.goldMtg else Color.Transparent,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .clickable {
-                        if (isChecked) selected.remove(option.id) else selected.add(option.id)
-                    },
+                onClick = {
+                    selected = if (isSelected) selected - choice.id else selected + choice.id
+                },
+                shape  = RoundedCornerShape(12.dp),
+                color  = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
+                border = BorderStroke(
+                    width = if (isSelected) 1.5.dp else 1.dp,
+                    color = if (isSelected) mc.primaryAccent.copy(alpha = 0.6f) else mc.surfaceVariant,
+                ),
             ) {
                 Row(
                     modifier              = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(14.dp),
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Checkbox(
-                        checked         = isChecked,
-                        onCheckedChange = null,
-                        colors          = CheckboxDefaults.colors(
-                            checkedColor   = mc.goldMtg,
-                            uncheckedColor = mc.textSecondary,
-                        ),
-                    )
+                    if (choice.emoji.isNotEmpty()) Text(text = choice.emoji, fontSize = 20.sp)
                     Text(
-                        text  = option.label,
-                        style = MaterialTheme.magicTypography.bodyLarge,
-                        color = mc.textPrimary,
+                        text     = choice.label,
+                        style    = MaterialTheme.magicTypography.bodyMedium,
+                        color    = mc.textPrimary,
+                        modifier = Modifier.weight(1f),
                     )
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint               = mc.primaryAccent,
+                            modifier           = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
 
         Spacer(Modifier.height(8.dp))
-        Button(
-            onClick  = {
-                val json = "[${selected.joinToString(",") { "\"$it\"" }}]"
-                onAnswer(question.key, json)
-            },
-            enabled  = selected.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth(),
-            colors   = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text  = "Confirm",
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.background,
-            )
+            OutlinedButton(
+                onClick  = onSkip,
+                modifier = Modifier.weight(1f),
+                shape    = RoundedCornerShape(12.dp),
+            ) { Text("Skip") }
+            Button(
+                onClick  = { onConfirm(selected.toList()) },
+                modifier = Modifier.weight(2f),
+                shape    = RoundedCornerShape(12.dp),
+                enabled  = selected.isNotEmpty(),
+                colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+            ) { Text("Confirm \u2192") }
         }
     }
 }
@@ -326,44 +305,58 @@ private fun MultiChoiceList(
 
 @Composable
 private fun StarRatingInput(
-    question: SurveyQuestion.StarRating,
-    onAnswer: (key: String, json: String) -> Unit,
+    maxStars:  Int,
+    onConfirm: (String) -> Unit,
+    onSkip:    () -> Unit,
 ) {
-    val mc      = MaterialTheme.magicColors
-    var rating  by remember { mutableIntStateOf(0) }
+    val mc     = MaterialTheme.magicColors
+    var rating by remember { mutableIntStateOf(0) }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier            = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier              = Modifier.padding(vertical = 8.dp),
-        ) {
-            for (i in 1..question.maxStars) {
-                val filled = i <= rating
-                Icon(
-                    imageVector         = if (filled) Icons.Default.Star else Icons.Outlined.StarOutline,
-                    contentDescription  = "Star $i",
-                    tint                = if (filled) mc.goldMtg else mc.textSecondary,
-                    modifier            = Modifier
-                        .size(44.dp)
-                        .clickable { rating = i },
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(maxStars) { index ->
+                Text(
+                    text     = if (index < rating) "\u2605" else "\u2606",
+                    fontSize = 40.sp,
+                    color    = if (index < rating) mc.goldMtg else mc.textDisabled,
+                    modifier = Modifier.clickable { rating = index + 1 },
                 )
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick  = { onAnswer(question.key, rating.toString()) },
-            enabled  = rating > 0,
-            modifier = Modifier.fillMaxWidth(),
-            colors   = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
-        ) {
+
+        if (rating > 0) {
             Text(
-                text  = "Confirm",
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.background,
+                text  = when (rating) {
+                    1 -> "Very poor hand"
+                    2 -> "Weak hand"
+                    3 -> "Playable hand"
+                    4 -> "Good hand"
+                    else -> "Perfect hand"
+                },
+                style = MaterialTheme.magicTypography.bodySmall,
+                color = mc.textSecondary,
             )
+        }
+
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedButton(
+                onClick  = onSkip,
+                modifier = Modifier.weight(1f),
+                shape    = RoundedCornerShape(12.dp),
+            ) { Text("Skip") }
+            Button(
+                onClick  = { onConfirm("$rating") },
+                modifier = Modifier.weight(2f),
+                shape    = RoundedCornerShape(12.dp),
+                enabled  = rating > 0,
+                colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+            ) { Text("Next \u2192") }
         }
     }
 }
@@ -374,46 +367,59 @@ private fun StarRatingInput(
 
 @Composable
 private fun FreeTextInput(
-    question: SurveyQuestion.FreeText,
-    onAnswer: (key: String, json: String) -> Unit,
+    onConfirm: (String) -> Unit,
+    onSkip:    () -> Unit,
 ) {
-    val mc   = MaterialTheme.magicColors
-    var text by remember { mutableStateOf("") }
+    val mc            = MaterialTheme.magicColors
+    var text          by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(300)
+        runCatching { focusRequester.requestFocus() }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
             value         = text,
             onValueChange = { text = it },
-            placeholder   = {
-                Text(
-                    text  = question.hint,
-                    style = MaterialTheme.magicTypography.bodyMedium,
-                    color = mc.textSecondary,
-                )
-            },
             modifier      = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 120.dp),
-            maxLines      = 6,
-            colors        = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor   = mc.goldMtg,
-                unfocusedBorderColor = mc.textSecondary,
+                .height(120.dp)
+                .focusRequester(focusRequester),
+            placeholder   = {
+                Text(
+                    "Optional notes about this game...",
+                    color = mc.textDisabled,
+                )
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onConfirm(text) }),
+            shape  = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor   = mc.primaryAccent,
+                unfocusedBorderColor = mc.surfaceVariant,
+                cursorColor          = mc.primaryAccent,
                 focusedTextColor     = mc.textPrimary,
                 unfocusedTextColor   = mc.textPrimary,
-                cursorColor          = mc.goldMtg,
             ),
         )
-        Button(
-            onClick  = { onAnswer(question.key, "\"${text.replace("\"", "\\\"")}\"") },
-            enabled  = text.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-            colors   = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
+
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text  = "Save note",
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.background,
-            )
+            OutlinedButton(
+                onClick  = onSkip,
+                modifier = Modifier.weight(1f),
+                shape    = RoundedCornerShape(12.dp),
+            ) { Text("Skip") }
+            Button(
+                onClick  = { onConfirm(text) },
+                modifier = Modifier.weight(2f),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+            ) { Text(if (text.isBlank()) "Skip \u2192" else "Save \u2192") }
         }
     }
 }
