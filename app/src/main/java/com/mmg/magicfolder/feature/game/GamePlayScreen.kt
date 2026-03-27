@@ -14,8 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -285,21 +283,6 @@ private fun PlayerCard(
             color    = theme.accent.copy(alpha = 0.04f),
             hexSize  = 18f,
         )
-        // 2. Radial gradient overlay from top
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            theme.glow.copy(alpha = 0.18f),
-                            Color.Transparent,
-                        ),
-                        center = Offset(0.5f, 0f),
-                        radius = 400f,
-                    )
-                )
-        )
         // Active turn indicator
         if (isActive) {
             Box(
@@ -347,14 +330,11 @@ private fun PlayerCard(
 
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text       = player.life.toString(),
-                            color      = mc.textPrimary,
-                            fontSize   = 80.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = CinzelFontFamily,
-                            lineHeight = 80.sp,
-                            maxLines   = 1,
-                            textAlign  = TextAlign.Center,
+                            text      = player.life.toString(),
+                            style     = MaterialTheme.magicTypography.lifeNumber,
+                            color     = mc.textPrimary,
+                            maxLines  = 1,
+                            textAlign = TextAlign.Center,
                         )
                         FloatingDelta(
                             delta         = delta,
@@ -425,12 +405,12 @@ private fun LifeButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(theme.accent.copy(alpha = 0.12f))
             .border(
                 width = 1.dp,
                 color = theme.accent.copy(alpha = 0.30f),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(10.dp),
             )
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -860,69 +840,4 @@ private fun RenameDialog(
     )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Winner overlay
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun WinnerOverlay(
-    winner:     Player,
-    turnNumber: Int,
-    onNewGame:  () -> Unit,
-    onBackHome: () -> Unit,
-) {
-    val mc    = MaterialTheme.magicColors
-    val theme = mc.playerColors.getOrNull(winner.themeIndex % 10) ?: mc.playerColors[0]
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier         = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.85f)),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier            = Modifier.padding(32.dp),
-        ) {
-            Text(
-                "VICTORY",
-                color         = Color.White.copy(alpha = 0.4f),
-                letterSpacing = 6.sp,
-                fontSize      = 11.sp,
-                fontFamily    = CinzelFontFamily,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                winner.name,
-                color      = theme.accent,
-                fontSize   = 48.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = CinzelFontFamily,
-                textAlign  = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "${winner.life} life remaining · Turn $turnNumber",
-                color    = Color.White.copy(alpha = 0.4f),
-                fontSize = 14.sp,
-            )
-            Spacer(Modifier.height(32.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onNewGame,
-                    colors  = ButtonDefaults.buttonColors(containerColor = theme.accent),
-                    shape   = RoundedCornerShape(12.dp),
-                ) {
-                    Text("Play Again", color = Color.Black)
-                }
-                OutlinedButton(
-                    onClick = onBackHome,
-                    shape   = RoundedCornerShape(12.dp),
-                ) {
-                    Text("Exit")
-                }
-            }
-        }
-    }
-}
 
