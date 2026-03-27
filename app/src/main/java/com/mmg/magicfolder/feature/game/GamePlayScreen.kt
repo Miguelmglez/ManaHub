@@ -5,8 +5,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,7 +59,6 @@ fun GamePlayScreen(
                 mode         = uiState.mode,
                 turnNumber   = uiState.turnNumber,
                 activePlayer = uiState.players.find { it.id == uiState.activePlayerId },
-                onPhases     = { viewModel.showPhasePanel(true) },
                 onReset      = viewModel::resetGame,
                 onExit       = onBackHome,
             )
@@ -70,22 +67,6 @@ fun GamePlayScreen(
                 uiState    = uiState,
                 viewModel  = viewModel,
                 modifier   = Modifier.weight(1f),
-            )
-        }
-
-        // ── Phase panel (ModalBottomSheet) ────────────────────────────────────
-        if (uiState.showPhasePanel) {
-            PhasePanel(
-                currentPhase   = uiState.currentPhase,
-                activePlayerId = uiState.activePlayerId,
-                players        = uiState.players,
-                phaseStops     = uiState.phaseStops,
-                turnNumber     = uiState.turnNumber,
-                onAdvance      = viewModel::advancePhase,
-                onNextTurn     = viewModel::nextTurn,
-                onSetStop      = { phase -> viewModel.setPhaseStop(uiState.activePlayerId, phase, uiState.activePlayerId) },
-                onRemoveStop   = { phase -> viewModel.removePhaseStop(uiState.activePlayerId, phase) },
-                onDismiss      = { viewModel.showPhasePanel(false) },
             )
         }
 
@@ -145,7 +126,6 @@ private fun GameTopBar(
     mode:         GameMode,
     turnNumber:   Int,
     activePlayer: Player?,
-    onPhases:     () -> Unit,
     onReset:      () -> Unit,
     onExit:       () -> Unit,
 ) {
@@ -188,9 +168,6 @@ private fun GameTopBar(
             }
         },
         actions = {
-            IconButton(onClick = onPhases) {
-                Icon(Icons.Default.AccountTree, contentDescription = "Phases", tint = mc.textSecondary)
-            }
             IconButton(onClick = onReset) {
                 Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = mc.textSecondary)
             }
@@ -841,139 +818,6 @@ private fun CounterRow(
                 .clickable(onClick = onIncrement),
         ) {
             Text("+", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Phase panel
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PhasePanel(
-    currentPhase:   GamePhase,
-    activePlayerId: Int,
-    players:        List<Player>,
-    phaseStops:     List<PhaseStop>,
-    turnNumber:     Int,
-    onAdvance:      () -> Unit,
-    onNextTurn:     () -> Unit,
-    onSetStop:      (GamePhase) -> Unit,
-    onRemoveStop:   (GamePhase) -> Unit,
-    onDismiss:      () -> Unit,
-) {
-    val mc     = MaterialTheme.magicColors
-    val phases = GamePhase.entries
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor   = mc.backgroundSecondary,
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Phase Tracker — Turn $turnNumber",
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.textPrimary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onNextTurn,
-                        colors  = ButtonDefaults.outlinedButtonColors(contentColor = mc.goldMtg),
-                        border  = BorderStroke(1.dp, mc.goldMtg),
-                    ) {
-                        Text("Next Turn", style = MaterialTheme.magicTypography.labelSmall)
-                    }
-                    Button(
-                        onClick = onAdvance,
-                        colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                    ) {
-                        Text("Advance ▶", style = MaterialTheme.magicTypography.labelSmall, color = mc.background)
-                    }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(phases) { phase ->
-                    val isActive   = phase == currentPhase
-                    val isPast     = phases.indexOf(phase) < phases.indexOf(currentPhase)
-                    val stopActive = phaseStops.any { it.phase == phase && it.forTurnOf == activePlayerId }
-
-                    val bgColor    = when {
-                        isActive -> mc.primaryAccent.copy(alpha = 0.15f)
-                        isPast   -> mc.surfaceVariant.copy(alpha = 0.40f)
-                        else     -> mc.surface
-                    }
-                    val textColor  = when {
-                        isActive -> mc.primaryAccent
-                        isPast   -> mc.textDisabled
-                        else     -> mc.textSecondary
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier          = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(bgColor)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    ) {
-                        // Status icon
-                        Text(
-                            when { isActive -> "▶"; isPast -> "✓"; else -> "○" },
-                            style    = MaterialTheme.magicTypography.labelSmall,
-                            color    = textColor,
-                            modifier = Modifier.width(20.dp),
-                        )
-                        Text(
-                            phase.displayName,
-                            style    = MaterialTheme.magicTypography.bodyMedium,
-                            color    = textColor,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (stopActive) {
-                            Text(
-                                "⚑ STOP",
-                                style = MaterialTheme.magicTypography.labelSmall,
-                                color = mc.lifeNegative,
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(mc.lifeNegative.copy(alpha = 0.15f))
-                                    .clickable { onRemoveStop(phase) },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text("×", style = MaterialTheme.magicTypography.labelSmall, color = mc.lifeNegative)
-                            }
-                        } else if (!isPast) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(mc.surfaceVariant)
-                                    .clickable { onSetStop(phase) }
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                            ) {
-                                Text(
-                                    "+ STOP",
-                                    style = MaterialTheme.magicTypography.labelSmall,
-                                    color = mc.textDisabled,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
         }
     }
 }
