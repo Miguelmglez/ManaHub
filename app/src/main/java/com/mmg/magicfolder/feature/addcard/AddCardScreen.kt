@@ -1,11 +1,12 @@
 package com.mmg.magicfolder.feature.addcard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,6 +19,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,89 +35,86 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 // ─────────────────────────────────────────────────────────────────────────────
 //  AddCardScreen — tabbed entry point for adding cards to the collection.
 //
-//  Tab 0 "BUSCAR":  text search with debounce → results list → confirm sheet
-//  Tab 1 "ESCANEAR": triggers navigation to the existing ScannerScreen
+//  Tab 0 "Search":  text search with debounce → results list → confirm sheet
+//  Tab 1 "Scanner": navigates to the existing ScannerScreen
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddCardScreen(
-    onBack:         () -> Unit,
-    onScannerClick: () -> Unit,
-    viewModel:      AddCardViewModel = hiltViewModel(),
+    onNavigateBack:      () -> Unit,
+    onNavigateToScanner: () -> Unit,
+    viewModel:           AddCardViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val colors     = MaterialTheme.magicColors
-    val typography = MaterialTheme.magicTypography
+    val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs         = listOf("Search", "Scanner")
+    val mc           = MaterialTheme.magicColors
+    val ty           = MaterialTheme.magicTypography
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add card", style = typography.titleLarge) },
+                title = {
+                    Text(
+                        "Add Card",
+                        style = ty.titleLarge,
+                        color = mc.textPrimary,
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = mc.textPrimary,
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.background,
-                    titleContentColor = colors.textPrimary,
-                    navigationIconContentColor = colors.textPrimary,
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
             )
         },
-        containerColor = colors.background,
+        containerColor = mc.background,
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            // ── Mode tabs ─────────────────────────────────────────────────────
+            // ── Tab row ───────────────────────────────────────────────────────
             TabRow(
-                selectedTabIndex = 0,  // always visually on "Buscar"
-                containerColor   = colors.background,
-                contentColor     = colors.primaryAccent,
+                selectedTabIndex = selectedTab,
+                containerColor   = mc.backgroundSecondary,
+                contentColor     = mc.primaryAccent,
             ) {
-                Tab(
-                    selected = true,
-                    onClick  = { /* already here */ },
-                    text     = {
-                        Text("BUSCAR", style = typography.labelSmall, color = colors.primaryAccent)
-                    },
-                )
-                Tab(
-                    selected = false,
-                    onClick  = onScannerClick,
-                    text     = {
-                        Text("ESCANEAR", style = typography.labelSmall, color = colors.textDisabled)
-                    },
-                )
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick  = { selectedTab = index },
+                        text = {
+                            Text(
+                                title,
+                                style = ty.labelMedium,
+                                color = if (selectedTab == index) mc.primaryAccent else mc.textDisabled,
+                            )
+                        },
+                    )
+                }
             }
 
-            // ── Search tab content ────────────────────────────────────────────
-            SearchTabContent(
-                uiState        = uiState,
-                onQueryChange  = viewModel::onQueryChange,
-                onCardSelected = viewModel::onCardSelected,
-            )
-        }
-
-        // ── Error snackbar ────────────────────────────────────────────────────
-        uiState.error?.let { err ->
-            LaunchedEffect(err) { viewModel.onErrorDismissed() }
-        }
-
-        // ── Success feedback ──────────────────────────────────────────────────
-        if (uiState.addedSuccessfully) {
-            LaunchedEffect(Unit) {
-                kotlinx.coroutines.delay(1500)
-                viewModel.onSuccessDismissed()
+            // ── Tab content ───────────────────────────────────────────────────
+            when (selectedTab) {
+                0 -> SearchTab(
+                    uiState        = uiState,
+                    onQueryChange  = viewModel::onQueryChange,
+                    onCardSelected = viewModel::onCardSelected,
+                )
+                1 -> ScannerTab(onNavigateToScanner = onNavigateToScanner)
             }
         }
     }
 
-    // ── Confirm sheet (shown after tapping a card result) ─────────────────────
+    // ── Confirm sheet (overlays full screen) ──────────────────────────────────
     if (uiState.showConfirmSheet && uiState.selectedCard != null) {
         AddCardConfirmSheet(
             card      = uiState.selectedCard!!,
@@ -130,94 +130,131 @@ fun AddCardScreen(
             onDismiss = viewModel::onDismissConfirmSheet,
         )
     }
+
+    // ── Side effects ──────────────────────────────────────────────────────────
+    if (uiState.addedSuccessfully) {
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(1500)
+            viewModel.onSuccessDismissed()
+        }
+    }
+    uiState.error?.let { err ->
+        LaunchedEffect(err) { viewModel.onErrorDismissed() }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Search tab content
+//  Tab 0 — Text search
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun SearchTabContent(
+private fun SearchTab(
     uiState:        AddCardUiState,
     onQueryChange:  (String) -> Unit,
     onCardSelected: (Card) -> Unit,
 ) {
-    val colors        = MaterialTheme.magicColors
+    val mc             = MaterialTheme.magicColors
+    val ty             = MaterialTheme.magicTypography
     val focusRequester = remember { FocusRequester() }
-
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Search field
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(Modifier.height(12.dp))
+
+        // ── Search field ──────────────────────────────────────────────────────
         OutlinedTextField(
             value         = uiState.query,
             onValueChange = onQueryChange,
             modifier      = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .focusRequester(focusRequester),
-            placeholder   = {
-                Text(
-                    text  = "Nombre de la carta...",
-                    style = MaterialTheme.magicTypography.bodyMedium,
-                    color = colors.textDisabled,
-                )
+            placeholder = {
+                Text("Card name...", color = mc.textDisabled)
             },
-            leadingIcon   = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = colors.textDisabled)
+            leadingIcon = {
+                Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
             },
-            trailingIcon  = if (uiState.query.isNotEmpty()) {{
+            trailingIcon = if (uiState.query.isNotEmpty()) {{
                 IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Clear, contentDescription = "Borrar", tint = colors.textSecondary)
+                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = mc.textDisabled)
                 }
             }} else null,
-            singleLine    = true,
+            singleLine      = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            colors        = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor   = colors.surface,
-                unfocusedContainerColor = colors.surface,
-                focusedTextColor        = colors.textPrimary,
-                unfocusedTextColor      = colors.textPrimary,
-                focusedBorderColor      = colors.primaryAccent,
-                unfocusedBorderColor    = colors.primaryAccent.copy(alpha = 0.25f),
-                cursorColor             = colors.primaryAccent,
+            keyboardActions = KeyboardActions(onSearch = { onQueryChange(uiState.query) }),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor      = mc.primaryAccent,
+                unfocusedBorderColor    = mc.primaryAccent.copy(alpha = 0.25f),
+                cursorColor             = mc.primaryAccent,
+                focusedTextColor        = mc.textPrimary,
+                unfocusedTextColor      = mc.textPrimary,
+                focusedContainerColor   = mc.surface,
+                unfocusedContainerColor = mc.surface,
             ),
             shape = RoundedCornerShape(12.dp),
         )
 
-        // Loading
-        if (uiState.isSearching) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                color    = colors.primaryAccent,
-            )
-        }
+        Spacer(Modifier.height(8.dp))
 
-        // Results
-        LazyColumn(
-            modifier       = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 4.dp),
-        ) {
-            items(uiState.results, key = { it.scryfallId }) { card ->
-                CardSearchItem(card = card, onClick = { onCardSelected(card) })
-                HorizontalDivider(
-                    thickness = 0.5.dp,
-                    color     = MaterialTheme.magicColors.surfaceVariant,
+        // ── Content states ────────────────────────────────────────────────────
+        when {
+            uiState.isSearching -> {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color    = mc.primaryAccent,
                 )
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        color       = mc.primaryAccent,
+                        modifier    = Modifier.size(32.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
             }
 
-            // Empty state (only after typing)
-            if (uiState.results.isEmpty() && uiState.query.length >= 2 && !uiState.isSearching) {
-                item {
-                    Box(
-                        modifier         = Modifier.fillParentMaxWidth().padding(32.dp),
-                        contentAlignment = Alignment.Center,
+            uiState.query.length >= 2 && uiState.results.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text  = "No se encontraron cartas",
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = colors.textDisabled,
+                            "No cards found",
+                            style = ty.titleMedium,
+                            color = mc.textSecondary,
                         )
+                        Text(
+                            "Try another spelling or search in another language",
+                            style     = ty.bodySmall,
+                            color     = mc.textDisabled,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+
+            uiState.query.length < 2 && uiState.results.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        "Type at least 2 characters to search",
+                        style     = ty.bodyMedium,
+                        color     = mc.textDisabled,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding      = PaddingValues(vertical = 4.dp),
+                ) {
+                    items(uiState.results, key = { it.scryfallId }) { card ->
+                        SearchResultItem(card = card, onClick = { onCardSelected(card) })
                     }
                 }
             }
@@ -226,59 +263,152 @@ private fun SearchTabContent(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Individual card row in results
+//  Search result row
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun CardSearchItem(card: Card, onClick: () -> Unit) {
-    val colors = MaterialTheme.magicColors
+private fun SearchResultItem(card: Card, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment     = Alignment.CenterVertically,
+    Surface(
+        onClick = onClick,
+        shape   = RoundedCornerShape(12.dp),
+        color   = mc.surface,
+        border  = BorderStroke(0.5.dp, mc.surfaceVariant),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        // Art thumbnail
-        AsyncImage(
-            model              = card.imageArtCrop ?: card.imageNormal,
-            contentDescription = card.name,
-            contentScale       = ContentScale.Crop,
-            modifier           = Modifier
-                .size(width = 64.dp, height = 44.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(colors.surface),
-        )
-
-        // Name + mana cost
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text  = card.name,
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = colors.textPrimary,
-                maxLines = 1,
+        Row(
+            modifier              = Modifier.padding(10.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Art thumbnail
+            AsyncImage(
+                model              = card.imageNormal,
+                contentDescription = card.name,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier
+                    .size(width = 44.dp, height = 60.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(mc.surfaceVariant),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                card.manaCost?.let {
-                    ManaCostImages(manaCost = it, symbolSize = 16.dp)
-                }
-                SetSymbol(
-                    setCode = card.setCode,
-                    rarity  = CardRarity.fromString(card.rarity),
-                    size    = 14.dp,
+
+            // Name / type / set
+            Column(
+                modifier            = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text     = card.name,
+                    style    = ty.bodyMedium,
+                    color    = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                Text(
+                    text     = card.typeLine,
+                    style    = ty.bodySmall,
+                    color    = mc.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    SetSymbol(
+                        setCode = card.setCode,
+                        rarity  = CardRarity.fromString(card.rarity),
+                        size    = 14.dp,
+                    )
+                    Text(
+                        text  = card.setCode.uppercase(),
+                        style = ty.labelSmall,
+                        color = mc.textDisabled,
+                    )
+                }
+            }
+
+            // Mana cost + price
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                card.manaCost?.let {
+                    ManaCostImages(manaCost = it, symbolSize = 14.dp)
+                }
+                val price = card.priceEur ?: card.priceUsd
+                if (price != null && price > 0) {
+                    Text(
+                        text  = if (card.priceEur != null)
+                            "€${"%.2f".format(price)}"
+                        else
+                            "${"$"}${"%.2f".format(price)}",
+                        style = ty.bodySmall,
+                        color = mc.goldMtg,
+                    )
+                }
             }
         }
+    }
+}
 
-        // Price
-        card.priceUsd?.let {
-            Text(
-                text  = "$${String.format("%.2f", it)}",
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = colors.goldMtg,
+// ─────────────────────────────────────────────────────────────────────────────
+//  Tab 1 — Scanner entry point
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ScannerTab(onNavigateToScanner: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Box(
+        modifier         = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier            = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(
+                imageVector       = Icons.Default.QrCodeScanner,
+                contentDescription = null,
+                modifier          = Modifier.size(64.dp),
+                tint              = mc.primaryAccent,
             )
+            Text(
+                "Scan card barcode",
+                style = ty.titleMedium,
+                color = mc.textPrimary,
+            )
+            Text(
+                "Point the camera at the barcode\non the back of the card",
+                style     = ty.bodySmall,
+                color     = mc.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick  = onNavigateToScanner,
+                shape    = RoundedCornerShape(14.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    Icons.Default.CameraAlt,
+                    contentDescription = null,
+                    modifier           = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Open Scanner",
+                    style = ty.labelLarge,
+                    color = mc.background,
+                )
+            }
         }
     }
 }
@@ -334,8 +464,8 @@ private fun AddCardConfirmSheet(
                     checked         = isFoil,
                     onCheckedChange = { isFoil = it },
                     colors          = SwitchDefaults.colors(
-                        checkedThumbColor  = mc.background,
-                        checkedTrackColor  = mc.primaryAccent,
+                        checkedThumbColor   = mc.background,
+                        checkedTrackColor   = mc.primaryAccent,
                         uncheckedThumbColor = mc.textDisabled,
                         uncheckedTrackColor = mc.surfaceVariant,
                     ),
@@ -363,14 +493,14 @@ private fun AddCardConfirmSheet(
                         onClick  = { condition = c },
                         label    = { Text(c, style = ty.labelMedium) },
                         colors   = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor     = mc.primaryAccent.copy(alpha = 0.18f),
-                            selectedLabelColor         = mc.primaryAccent,
-                            containerColor             = mc.surface,
-                            labelColor                 = mc.textSecondary,
+                            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.18f),
+                            selectedLabelColor     = mc.primaryAccent,
+                            containerColor         = mc.surface,
+                            labelColor             = mc.textSecondary,
                         ),
                         border = FilterChipDefaults.filterChipBorder(
-                            enabled          = true,
-                            selected         = c == condition,
+                            enabled             = true,
+                            selected            = c == condition,
                             selectedBorderColor = mc.primaryAccent,
                             borderColor         = mc.surfaceVariant,
                         ),
@@ -420,7 +550,7 @@ private fun AddCardConfirmSheet(
                 Button(
                     onClick = { onConfirm(isFoil, condition, language, qty) },
                     colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                    shape   = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    shape   = RoundedCornerShape(8.dp),
                 ) {
                     Text("Add to collection", style = ty.labelLarge, color = mc.background)
                 }

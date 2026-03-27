@@ -78,8 +78,8 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // Add card (tabbed: text search + scanner link)
             composable(Screen.CollectionAddCard.route) {
                 AddCardScreen(
-                    onBack         = { navController.popBackStack() },
-                    onScannerClick = { navController.navigate(Screen.CollectionScanner.route) },
+                    onNavigateBack      = { navController.popBackStack() },
+                    onNavigateToScanner = { navController.navigate(Screen.CollectionScanner.route) },
                 )
             }
 
