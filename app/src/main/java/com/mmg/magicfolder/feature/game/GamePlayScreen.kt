@@ -50,7 +50,6 @@ fun GamePlayScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
-    var showLayoutEditor by remember { mutableStateOf(false) }
     var showGameResult   by remember { mutableStateOf(false) }
     var showExitDialog   by remember { mutableStateOf(false) }
     var showResetDialog  by remember { mutableStateOf(false) }
@@ -72,13 +71,15 @@ fun GamePlayScreen(
                 activePlayer   = uiState.players.find { it.id == uiState.activePlayerId },
                 onReset        = { showResetDialog = true },
                 onExit         = { showExitDialog  = true },
-                onLayoutEdit   = { showLayoutEditor = true },
+                onLayoutEdit   = { viewModel.showLayoutEditor(true) },
             )
-            PlayerGrid(
-                players    = uiState.players,
-                uiState    = uiState,
-                viewModel  = viewModel,
-                modifier   = Modifier.weight(1f),
+            GamePlayerGrid(
+                players         = uiState.players,
+                uiState         = uiState,
+                viewModel       = viewModel,
+                activeLayout    = uiState.activeLayout,
+                playerRotations = uiState.playerRotations,
+                modifier        = Modifier.weight(1f),
             )
         }
 
@@ -117,11 +118,15 @@ fun GamePlayScreen(
         }
 
         // ── Layout editor sheet ───────────────────────────────────────────────
-        if (showLayoutEditor) {
+        if (uiState.showLayoutEditor) {
             LayoutEditorSheet(
                 players         = uiState.players,
+                activeLayout    = uiState.activeLayout,
+                playerRotations = uiState.playerRotations,
+                onSelectLayout  = viewModel::selectLayout,
+                onRotatePlayer  = viewModel::rotatePlayerClockwise,
                 onSwapPositions = viewModel::swapPlayerPositions,
-                onDismiss       = { showLayoutEditor = false },
+                onDismiss       = { viewModel.showLayoutEditor(false) },
             )
         }
 
@@ -274,39 +279,36 @@ private fun ModeBadge(mode: GameMode) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Player grid  (dynamic layout)
+//  Player grid  (template-driven layout)
 // ─────────────────────────────────────────────────────────────────────────────
 
-private fun gridConfig(count: Int): Pair<Int, Int> = when (count) {
-    2    -> Pair(1, 2)
-    3    -> Pair(1, 3)
-    4    -> Pair(2, 2)
-    5, 6 -> Pair(2, 3)
-    7, 8 -> Pair(4, 2)
-    else -> Pair(5, 2)  // 9-10
-}
-
 @Composable
-private fun PlayerGrid(
-    players:   List<Player>,
-    uiState:   GameUiState,
-    viewModel: GameViewModel,
-    modifier:  Modifier = Modifier,
+private fun GamePlayerGrid(
+    players:         List<Player>,
+    uiState:         GameUiState,
+    viewModel:       GameViewModel,
+    activeLayout:    com.mmg.magicfolder.feature.game.model.LayoutTemplate,
+    playerRotations: Map<Int, Int>,
+    modifier:        Modifier = Modifier,
 ) {
-    val (cols, rows) = gridConfig(players.size)
+    // Pre-compute (row, slotInRow, globalIndex) for each slot
+    val indexedSlots = activeLayout.gridRows.mapIndexed { rowIdx, rowSlots ->
+        var offset = 0
+        for (i in 0 until rowIdx) offset += activeLayout.gridRows[i].size
+        rowSlots.mapIndexed { colIdx, slot -> Triple(slot, offset + colIdx, rowIdx) }
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
-        repeat(rows) { row ->
+        indexedSlots.forEach { rowEntries ->
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                repeat(cols) { col ->
-                    val index  = row * cols + col
-                    val player = players.getOrNull(index)
+                rowEntries.forEach { (slot, globalIndex, _) ->
+                    val player = players.getOrNull(globalIndex)
                     if (player != null) {
-                        // Rotate the top card 180° in 2-player layout
-                        val rotated = players.size == 2 && row == 0
+                        val rotation = playerRotations[player.id] ?: slot.defaultRotation
                         PlayerCard(
                             player      = player,
                             uiState     = uiState,
-                            rotated     = rotated,
+                            rotation    = rotation,
                             onLife      = { d -> viewModel.changeLife(player.id, d) },
                             onCounter   = { t, d -> viewModel.changeCounter(player.id, t, d) },
                             onRoll      = { viewModel.rollDice(player.id) },
@@ -333,7 +335,7 @@ private fun PlayerGrid(
 private fun PlayerCard(
     player:     Player,
     uiState:    GameUiState,
-    rotated:    Boolean,
+    rotation:   Int,
     onLife:     (Int) -> Unit,
     onCounter:  (CounterType, Int) -> Unit,
     onRoll:     () -> Unit,
@@ -352,7 +354,7 @@ private fun PlayerCard(
 
     Box(
         modifier = modifier
-            .graphicsLayer { if (rotated) rotationZ = 180f }
+            .graphicsLayer { rotationZ = rotation.toFloat() }
             .coloredShadow(
                 color        = theme.accent.copy(alpha = 0.25f),
                 blurRadius   = 20.dp,
@@ -1013,27 +1015,29 @@ private fun RenameDialog(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Layout editor bottom sheet (FIX 5)
+//  Layout editor bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LayoutEditorSheet(
     players:         List<Player>,
+    activeLayout:    com.mmg.magicfolder.feature.game.model.LayoutTemplate,
+    playerRotations: Map<Int, Int>,
+    onSelectLayout:  (com.mmg.magicfolder.feature.game.model.LayoutTemplate) -> Unit,
+    onRotatePlayer:  (Int) -> Unit,
     onSwapPositions: (Int, Int) -> Unit,
     onDismiss:       () -> Unit,
 ) {
-    val mc           = MaterialTheme.magicColors
-    // Convert Player list to PlayerConfig-like objects for MiniGridPreview
-    val playerConfigs = players.mapIndexed { index, p ->
-        PlayerConfig(
-            id           = index,
-            name         = p.name,
-            theme        = p.theme,
-            gridPosition = index,
-        )
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val mc = MaterialTheme.magicColors
+    val availableTemplates = listOf(
+        com.mmg.magicfolder.feature.game.model.LayoutTemplates.forPlayerCount(players.size)
+    ) // Only one template per player count for now — extend later
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor   = mc.backgroundSecondary,
+    ) {
         Column(
             modifier = Modifier
                 .padding(horizontal = 20.dp)
@@ -1050,6 +1054,71 @@ private fun LayoutEditorSheet(
                 style = MaterialTheme.magicTypography.bodySmall,
                 color = mc.textSecondary,
             )
+
+            // ── Template selection ────────────────────────────────────────
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                availableTemplates.forEach { template ->
+                    val isSelected = template.name == activeLayout.name
+                    Surface(
+                        onClick      = { onSelectLayout(template) },
+                        shape        = MaterialTheme.shapes.medium,
+                        color        = if (isSelected) mc.primaryAccent.copy(alpha = 0.20f) else mc.surface,
+                        border       = if (isSelected)
+                            androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent)
+                        else
+                            androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
+                        modifier     = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text     = template.name,
+                            style    = MaterialTheme.magicTypography.labelSmall,
+                            color    = if (isSelected) mc.primaryAccent else mc.textSecondary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+            }
+
+            // ── Per-player rotation ───────────────────────────────────────
+            Text(
+                stringResource(R.string.game_layout_editor_rotation),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textSecondary,
+            )
+            players.forEach { player ->
+                val rotation = playerRotations[player.id] ?: player.rotation
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(player.theme.accent)
+                        )
+                        Text(player.name, style = MaterialTheme.magicTypography.bodyMedium, color = mc.textPrimary)
+                    }
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text("${rotation}°", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                        IconButton(onClick = { onRotatePlayer(player.id) }) {
+                            Icon(
+                                imageVector        = Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.game_layout_editor_rotate),
+                                tint               = mc.primaryAccent,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

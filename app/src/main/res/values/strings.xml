@@ -283,7 +283,9 @@
     <string name="game_exit_confirm">Leave</string>
     <string name="game_exit_cancel">Stay</string>
     <string name="game_layout_editor_title">Edit player layout</string>
-    <string name="game_layout_editor_subtitle">Tap a player to swap with the next position</string>
+    <string name="game_layout_editor_subtitle">Select a template or adjust rotations</string>
+    <string name="game_layout_editor_rotation">Player rotation</string>
+    <string name="game_layout_editor_rotate">Rotate clockwise</string>
     <string name="game_rename_player">Rename Player</string>
     <string name="game_cmd_damage_title">Commander Damage → %1$s</string>
     <string name="game_counters_title">%1$s — Counters</string>
