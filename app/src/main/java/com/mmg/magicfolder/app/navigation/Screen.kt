@@ -38,6 +38,13 @@ sealed class Screen(val route: String) {
         fun createRoute(sessionId: Long) = "game/survey/$sessionId"
     }
 
+    // ── Tournament flow ───────────────────────────────────────────────────────
+    object TournamentList   : Screen("tournament/list")
+    object TournamentSetup  : Screen("tournament/setup")
+    object TournamentDetail : Screen("tournament/{tournamentId}") {
+        fun route(id: Long) = "tournament/$id"
+    }
+
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Draft  : Screen("draft")
     object Puzzle : Screen("puzzle")

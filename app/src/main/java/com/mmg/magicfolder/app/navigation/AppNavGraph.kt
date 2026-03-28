@@ -29,6 +29,9 @@ import com.mmg.magicfolder.feature.profile.ProfileScreen
 import com.mmg.magicfolder.feature.scanner.ScannerScreen
 import com.mmg.magicfolder.feature.settings.SettingsScreen
 import com.mmg.magicfolder.feature.stats.StatsScreen
+import com.mmg.magicfolder.feature.tournament.TournamentListScreen
+import com.mmg.magicfolder.feature.tournament.TournamentScreen
+import com.mmg.magicfolder.feature.tournament.TournamentSetupScreen
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Bottom-bar visibility rules
@@ -129,15 +132,49 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 ProfileScreen()
             }
 
+            // ── Tournament flow ────────────────────────────────────────────────
+            composable(Screen.TournamentList.route) {
+                TournamentListScreen(
+                    onNavigateBack     = { navController.popBackStack() },
+                    onCreateTournament = { navController.navigate(Screen.TournamentSetup.route) },
+                    onOpenTournament   = { id -> navController.navigate(Screen.TournamentDetail.route(id)) },
+                )
+            }
+
+            composable(Screen.TournamentSetup.route) {
+                TournamentSetupScreen(
+                    onNavigateBack      = { navController.popBackStack() },
+                    onTournamentCreated = { id ->
+                        navController.navigate(Screen.TournamentDetail.route(id)) {
+                            popUpTo(Screen.TournamentSetup.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            composable(
+                route     = Screen.TournamentDetail.route,
+                arguments = listOf(navArgument("tournamentId") { type = NavType.LongType }),
+            ) { entry ->
+                TournamentScreen(
+                    tournamentId   = entry.arguments?.getLong("tournamentId") ?: 0L,
+                    onNavigateBack = { navController.popBackStack() },
+                    onStartMatch   = { matchId, tId ->
+                        navController.navigate(Screen.GameSetup.route)
+                    },
+                )
+            }
+
             // ── Game flow ─────────────────────────────────────────────────────
             composable(Screen.GameSetup.route) {
                 GameSetupScreen(
-                    onBack      = { navController.popBackStack() },
-                    onStartGame = { mode, count ->
+                    onBack               = { navController.popBackStack() },
+                    onStartGame          = { mode, count ->
                         navController.navigate(Screen.GamePlay.createRoute(mode.name, count)) {
                             popUpTo(Screen.GameSetup.route) { inclusive = true }
                         }
                     },
+                    onNavigateToTournament = { navController.navigate(Screen.TournamentSetup.route) },
                 )
             }
 

@@ -17,8 +17,11 @@ import com.mmg.magicfolder.core.data.local.entity.*
         GameSessionEntity::class,
         PlayerSessionEntity::class,
         SurveyAnswerEntity::class,
+        TournamentEntity::class,
+        TournamentPlayerEntity::class,
+        TournamentMatchEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -30,6 +33,7 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun manaSymbolDao():     ManaSymbolDao
     abstract fun gameSessionDao():    GameSessionDao
     abstract fun surveyAnswerDao():   SurveyAnswerDao
+    abstract fun tournamentDao():     TournamentDao
 }
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -120,6 +124,51 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         database.execSQL(
             "CREATE INDEX IF NOT EXISTS index_survey_answers_sessionId ON survey_answers(sessionId)"
         )
+    }
+}
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS tournaments (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name             TEXT    NOT NULL,
+                format           TEXT    NOT NULL,
+                structure        TEXT    NOT NULL,
+                status           TEXT    NOT NULL DEFAULT 'SETUP',
+                matchesPerPairing INTEGER NOT NULL DEFAULT 1,
+                isRandomPairings INTEGER NOT NULL DEFAULT 1,
+                createdAt        INTEGER NOT NULL,
+                finishedAt       INTEGER
+            )
+        """.trimIndent())
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS tournament_players (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                tournamentId  INTEGER NOT NULL,
+                playerName    TEXT    NOT NULL,
+                playerColor   TEXT    NOT NULL,
+                deckId        INTEGER,
+                seed          INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS tournament_matches (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                tournamentId    INTEGER NOT NULL,
+                round           INTEGER NOT NULL,
+                playerIds       TEXT    NOT NULL,
+                winnerId        INTEGER,
+                status          TEXT    NOT NULL DEFAULT 'PENDING',
+                gameSessionId   INTEGER,
+                scheduledOrder  INTEGER NOT NULL DEFAULT 0,
+                finalLifeTotals TEXT    NOT NULL DEFAULT '',
+                FOREIGN KEY(tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        database.execSQL("CREATE INDEX IF NOT EXISTS idx_tm_tournamentId ON tournament_matches(tournamentId)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS idx_tp_tournamentId ON tournament_players(tournamentId)")
     }
 }
 
