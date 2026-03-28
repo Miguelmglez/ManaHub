@@ -1,140 +1,121 @@
 package com.mmg.magicfolder.feature.game
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mmg.magicfolder.core.ui.theme.CinzelFontFamily
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  State
 // ─────────────────────────────────────────────────────────────────────────────
 
 data class GlobalToolsState(
-    val expanded:    Boolean  = false,
-    val diceResult:  Int?     = null,   // last d20 roll, null = never rolled
-    val coinResult:  Boolean? = null,   // last flip, null = never flipped
-    val diceSpinning: Boolean = false,
-    val coinFlipping: Boolean = false,
+    val isExpanded:     Boolean  = false,
+    val lastDiceResult: Int?     = null,    // null = never rolled
+    val lastCoinResult: Boolean? = null,    // null = never flipped
+    val isRollingDice:  Boolean  = false,
+    val isFlippingCoin: Boolean  = false,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Public overlay composable
+//  Public overlay composable — state driven from outside (ViewModel)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 fun GlobalToolsOverlay(
-    modifier: Modifier = Modifier,
+    state:       GlobalToolsState,
+    onToggle:    () -> Unit,
+    onRollDice:  () -> Unit,
+    onFlipCoin:  () -> Unit,
+    modifier:    Modifier = Modifier,
 ) {
-    var state by remember { mutableStateOf(GlobalToolsState()) }
-    val scope = rememberCoroutineScope()
+    val mc = MaterialTheme.magicColors
 
     Box(
         contentAlignment = Alignment.Center,
         modifier         = modifier,
     ) {
-        if (state.expanded) {
-            // Dimmed backdrop to dismiss
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.40f))
-                    .clickable { state = state.copy(expanded = false) }
-            )
+        // ── Central button — always visible ───────────────────────────────────
+        val buttonLabel = when {
+            state.isExpanded              -> "✕"
+            state.lastDiceResult != null  -> "${state.lastDiceResult}"
+            state.lastCoinResult == true  -> "H"
+            state.lastCoinResult == false -> "T"
+            else                          -> "✦"
         }
 
-        // Floating panel
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier         = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            mc.primaryAccent.copy(alpha = 0.35f),
+                            mc.primaryAccent.copy(alpha = 0.10f),
+                        )
+                    )
+                )
+                .border(1.5.dp, mc.primaryAccent.copy(alpha = 0.60f), CircleShape)
+                .clickable(onClick = onToggle),
         ) {
-            if (state.expanded) {
-                // ── Dice (d20) ────────────────────────────────────────────
-                AnimatedDice(
-                    result   = state.diceResult,
-                    spinning = state.diceSpinning,
-                    onClick  = {
-                        if (!state.diceSpinning) {
-                            state = state.copy(diceSpinning = true)
-                            scope.launch {
-                                delay(600L)
-                                val roll = (1..20).random()
-                                state = state.copy(diceResult = roll, diceSpinning = false)
-                            }
-                        }
-                    },
-                )
-
-                // ── Coin ──────────────────────────────────────────────────
-                AnimatedCoin(
-                    result   = state.coinResult,
-                    flipping = state.coinFlipping,
-                    onClick  = {
-                        if (!state.coinFlipping) {
-                            state = state.copy(coinFlipping = true)
-                            scope.launch {
-                                delay(600L)
-                                val heads = listOf(true, false).random()
-                                state = state.copy(coinResult = heads, coinFlipping = false)
-                            }
-                        }
-                    },
-                )
-            }
-
-            // ── Central ✦ toggle button ───────────────────────────────────
-            CentralButton(
-                expanded = state.expanded,
-                onClick  = { state = state.copy(expanded = !state.expanded) },
+            Text(
+                text       = buttonLabel,
+                fontSize   = 13.sp,
+                color      = mc.primaryAccent,
+                fontFamily = CinzelFontFamily,
+                fontWeight = FontWeight.Bold,
             )
         }
-    }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Central toggle button
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun CentralButton(expanded: Boolean, onClick: () -> Unit) {
-    val mc       = MaterialTheme.magicColors
-    val rotation by animateFloatAsState(
-        targetValue   = if (expanded) 45f else 0f,
-        animationSpec = tween(200),
-        label         = "central_rotation",
-    )
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier         = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(mc.surface)
-            .clickable(onClick = onClick)
-            .graphicsLayer { rotationZ = rotation },
-    ) {
-        Text(
-            text       = "✦",
-            fontSize   = 18.sp,
-            color      = mc.goldMtg,
-            fontWeight = FontWeight.Bold,
-        )
+        // ── Expanded panel ────────────────────────────────────────────────────
+        AnimatedVisibility(
+            visible = state.isExpanded,
+            enter   = scaleIn(tween(250), initialScale = 0.3f, transformOrigin = TransformOrigin.Center) + fadeIn(tween(200)),
+            exit    = scaleOut(tween(200), targetScale = 0.3f) + fadeOut(tween(150)),
+        ) {
+            Surface(
+                shape           = RoundedCornerShape(20.dp),
+                color           = mc.backgroundSecondary,
+                border          = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.30f)),
+                shadowElevation = 8.dp,
+                modifier        = Modifier
+                    .widthIn(min = 180.dp)
+                    .offset(y = (-72).dp),   // float above the central button
+            ) {
+                Column(
+                    modifier            = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("d20", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    AnimatedDice(result = state.lastDiceResult, isRolling = state.isRollingDice, onClick = onRollDice)
+                    HorizontalDivider(color = mc.surfaceVariant)
+                    Text("coin", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    AnimatedCoin(result = state.lastCoinResult, isFlipping = state.isFlippingCoin, onClick = onFlipCoin)
+                }
+            }
+        }
     }
 }
 
@@ -143,56 +124,51 @@ private fun CentralButton(expanded: Boolean, onClick: () -> Unit) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun AnimatedDice(
-    result:  Int?,
-    spinning: Boolean,
-    onClick: () -> Unit,
+fun AnimatedDice(
+    result:    Int?,
+    isRolling: Boolean,
+    onClick:   () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-
     val infiniteTransition = rememberInfiniteTransition(label = "dice_spin")
     val spinAngle by infiniteTransition.animateFloat(
-        initialValue   = 0f,
-        targetValue    = 360f,
-        animationSpec  = infiniteRepeatable(tween(400, easing = LinearEasing)),
-        label          = "dice_angle",
+        initialValue  = 0f,
+        targetValue   = 360f,
+        animationSpec = infiniteRepeatable(tween(300, easing = LinearEasing)),
+        label         = "dice_angle",
     )
-
-    val isNat20    = result == 20
-    val isCritFail = result == 1
-    val resultColor = when {
-        isNat20    -> mc.goldMtg
-        isCritFail -> mc.lifeNegative
-        else       -> mc.textPrimary
-    }
 
     Box(
         contentAlignment = Alignment.Center,
         modifier         = Modifier
-            .size(56.dp)
+            .size(64.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(mc.surface)
-            .clickable(onClick = onClick)
-            .graphicsLayer { if (spinning) rotationZ = spinAngle },
+            .border(1.5.dp, mc.primaryAccent.copy(alpha = 0.50f), RoundedCornerShape(12.dp))
+            .graphicsLayer { if (isRolling) rotationZ = spinAngle }
+            .clickable(enabled = !isRolling, onClick = onClick),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text       = if (spinning) "⬡" else (result?.toString() ?: "d20"),
-                fontSize   = if (result != null && !spinning) 22.sp else 14.sp,
-                color      = if (spinning) mc.textSecondary else resultColor,
-                fontWeight = if (isNat20 || isCritFail) FontWeight.Black else FontWeight.Normal,
-            )
-            if (!spinning && result != null) {
+        if (isRolling) {
+            Text("?", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text     = when {
-                        isNat20    -> "NAT 20!"
-                        isCritFail -> "CRIT FAIL"
-                        else       -> ""
+                    text  = result?.toString() ?: "⚄",
+                    style = if (result != null) MaterialTheme.magicTypography.titleLarge
+                            else MaterialTheme.magicTypography.titleMedium,
+                    color = when (result) {
+                        20   -> mc.goldMtg
+                        1    -> mc.lifeNegative
+                        null -> mc.textDisabled
+                        else -> mc.textPrimary
                     },
-                    fontSize = 8.sp,
-                    color    = resultColor,
-                    fontWeight = FontWeight.Bold,
                 )
+                when (result) {
+                    20   -> Text("NAT 20",   fontSize = 7.sp, color = mc.goldMtg,       letterSpacing = 1.sp)
+                    1    -> Text("CRIT FAIL", fontSize = 7.sp, color = mc.lifeNegative, letterSpacing = 1.sp)
+                    null -> Text("tap",       fontSize = 9.sp, color = mc.textDisabled)
+                    else -> {}
+                }
             }
         }
     }
@@ -203,49 +179,49 @@ private fun AnimatedDice(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun AnimatedCoin(
-    result:   Boolean?,
-    flipping: Boolean,
-    onClick:  () -> Unit,
+fun AnimatedCoin(
+    result:    Boolean?,
+    isFlipping: Boolean,
+    onClick:   () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-
     val infiniteTransition = rememberInfiniteTransition(label = "coin_flip")
-    val scaleX by infiniteTransition.animateFloat(
-        initialValue  = 1f,
-        targetValue   = -1f,
-        animationSpec = infiniteRepeatable(
-            tween(300, easing = LinearEasing),
-            RepeatMode.Reverse,
-        ),
-        label = "coin_scale",
+    val flipScale by infiniteTransition.animateFloat(
+        initialValue  = -1f,
+        targetValue   = 1f,
+        animationSpec = infiniteRepeatable(tween(200, easing = LinearEasing), RepeatMode.Reverse),
+        label         = "coin_scale",
     )
 
-    val bgColor = when (result) {
-        true  -> mc.goldMtg.copy(alpha = 0.25f)
-        false -> mc.surface
-        null  -> mc.surface
-    }
+    val bgBrush = if (!isFlipping && result != null)
+        Brush.radialGradient(listOf(mc.goldMtg, mc.goldMtg.copy(alpha = 0.60f)))
+    else
+        Brush.radialGradient(listOf(mc.surface, mc.surfaceVariant))
 
     Box(
         contentAlignment = Alignment.Center,
         modifier         = Modifier
-            .size(56.dp)
+            .size(64.dp)
             .clip(CircleShape)
-            .background(bgColor)
-            .clickable(onClick = onClick)
-            .graphicsLayer { if (flipping) scaleX = this@graphicsLayer.scaleX * scaleX },
+            .background(bgBrush)
+            .border(2.dp, mc.goldMtg.copy(alpha = 0.70f), CircleShape)
+            .graphicsLayer { if (isFlipping) scaleX = flipScale }
+            .clickable(enabled = !isFlipping, onClick = onClick),
     ) {
-        Text(
-            text       = when {
-                flipping      -> "●"
-                result == true  -> "H"
-                result == false -> "T"
-                else            -> "¢"
-            },
-            fontSize   = if (!flipping && result != null) 22.sp else 18.sp,
-            color      = if (result == true && !flipping) mc.goldMtg else mc.textPrimary,
-            fontWeight = FontWeight.Bold,
-        )
+        when {
+            isFlipping      -> Text("✦", fontSize = 22.sp, color = mc.goldMtg)
+            result == true  -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("H", style = MaterialTheme.magicTypography.titleLarge, color = Color(0xFF1A1200))
+                Text("HEADS", fontSize = 7.sp, color = Color(0xFF1A1200), letterSpacing = 1.sp)
+            }
+            result == false -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("T", style = MaterialTheme.magicTypography.titleLarge, color = Color(0xFF1A1200))
+                Text("TAILS", fontSize = 7.sp, color = Color(0xFF1A1200), letterSpacing = 1.sp)
+            }
+            else            -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("○", fontSize = 28.sp, color = mc.goldMtg.copy(alpha = 0.50f))
+                Text("tap", fontSize = 9.sp, color = mc.textDisabled)
+            }
+        }
     }
 }

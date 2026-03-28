@@ -25,6 +25,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mmg.magicfolder.feature.game.GameSetupViewModel
 import com.mmg.magicfolder.feature.game.PlayerConfig
+import com.mmg.magicfolder.feature.game.model.LayoutTemplate
+import com.mmg.magicfolder.feature.game.model.LayoutTemplates
 import com.mmg.magicfolder.core.ui.components.MagicBottomBar
 import com.mmg.magicfolder.feature.addcard.AddCardScreen
 import com.mmg.magicfolder.feature.carddetail.CardDetailScreen
@@ -59,6 +61,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
+    var pendingLayout        by remember { mutableStateOf<LayoutTemplate?>(null) }
 
     Scaffold(
         bottomBar = {
@@ -183,8 +186,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 val setupVm: GameSetupViewModel = hiltViewModel()
                 GameSetupScreen(
                     viewModel = setupVm,onBack               = { navController.popBackStack() },
-                    onStartGame          = { mode, configs ->
+                    onStartGame          = { mode, configs, layout ->
                         pendingPlayerConfigs = configs
+                        pendingLayout        = layout
                         navController.navigate(Screen.GamePlay.createRoute(mode.name, configs.size)) {
                             popUpTo(Screen.GameSetup.route) { inclusive = true }
                         }
@@ -202,10 +206,12 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             ) {
                 val gameVm: GameViewModel = hiltViewModel()
                 val configs = pendingPlayerConfigs
+                val layout  = pendingLayout
                 LaunchedEffect(Unit) {
                     if (configs != null) {
-                        gameVm.initFromConfigs(configs)
+                        gameVm.initFromConfigs(configs, layout)
                         pendingPlayerConfigs = null
+                        pendingLayout        = null
                     }
                 }
                 GamePlayScreen(

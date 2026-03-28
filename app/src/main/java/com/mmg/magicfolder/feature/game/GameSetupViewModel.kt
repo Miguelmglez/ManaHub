@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.feature.game.model.GameMode
+import com.mmg.magicfolder.feature.game.model.LayoutTemplate
+import com.mmg.magicfolder.feature.game.model.LayoutTemplates
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,14 +25,11 @@ data class PlayerConfig(
 )
 
 data class GameSetupUiState(
-    val selectedMode:  GameMode          = GameMode.STANDARD,
-    val playerCount:   Int               = 2,
-    val playerConfigs: List<PlayerConfig> = emptyList(),
-) {
-    init {
-        // Ensure configs always match playerCount on construction
-    }
-}
+    val selectedMode:   GameMode          = GameMode.STANDARD,
+    val playerCount:    Int               = 2,
+    val playerConfigs:  List<PlayerConfig> = emptyList(),
+    val selectedLayout: LayoutTemplate    = LayoutTemplates.getDefaultLayout(2),
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ViewModel
@@ -57,7 +56,15 @@ class GameSetupViewModel @Inject constructor() : ViewModel() {
                 gridPosition = i,
             )
         }
-        _uiState.update { it.copy(playerCount = clampedCount, playerConfigs = configs) }
+        _uiState.update { it.copy(
+            playerCount    = clampedCount,
+            playerConfigs  = configs,
+            selectedLayout = LayoutTemplates.getDefaultLayout(clampedCount),
+        )}
+    }
+
+    fun selectLayout(template: LayoutTemplate) {
+        _uiState.update { it.copy(selectedLayout = template) }
     }
 
     fun updatePlayerName(index: Int, name: String) {
@@ -86,6 +93,11 @@ class GameSetupViewModel @Inject constructor() : ViewModel() {
                 gridPosition = i,
             )
         }
-        return GameSetupUiState(selectedMode = mode, playerCount = count, playerConfigs = configs)
+        return GameSetupUiState(
+            selectedMode   = mode,
+            playerCount    = count,
+            playerConfigs  = configs,
+            selectedLayout = LayoutTemplates.getDefaultLayout(count),
+        )
     }
 }
