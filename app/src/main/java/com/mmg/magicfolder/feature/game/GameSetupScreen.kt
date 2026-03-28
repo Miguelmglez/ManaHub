@@ -33,7 +33,6 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.game.model.GameMode
 import kotlin.math.ceil
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameSetupScreen(
     viewModel:   GameSetupViewModel,
@@ -47,29 +46,39 @@ fun GameSetupScreen(
     Scaffold(
         containerColor = mc.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.gamesetup_title),
-                        style = MaterialTheme.magicTypography.titleLarge,
-                        color = mc.textPrimary,
-                    )
-                },
-                navigationIcon = {
+            Surface(
+                color    = mc.backgroundSecondary,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textSecondary)
+                        Icon(
+                            imageVector        = Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            tint               = mc.textSecondary
+                        )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
+                    Text(
+                        text     = stringResource(R.string.gamesetup_title),
+                        style    = MaterialTheme.magicTypography.titleLarge,
+                        color    = mc.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
-            verticalArrangement   = Arrangement.spacedBy(28.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            verticalArrangement   = Arrangement.spacedBy(24.dp),
             horizontalAlignment   = Alignment.CenterHorizontally,
         ) {
             // ── Title ─────────────────────────────────────────────────────────
@@ -81,7 +90,7 @@ fun GameSetupScreen(
             )
 
             // ── Mode selector ─────────────────────────────────────────────────
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     stringResource(R.string.gamesetup_mode_label),
                     style = MaterialTheme.magicTypography.labelLarge,
@@ -100,17 +109,15 @@ fun GameSetupScreen(
             }
 
             // ── Player count stepper ──────────────────────────────────────────
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PlayerCountStepper(
-                    playerCount       = uiState.playerCount,
-                    onPlayerCountChange = viewModel::onPlayerCountChange,
-                )
-            }
+            PlayerCountStepper(
+                playerCount       = uiState.playerCount,
+                onPlayerCountChange = viewModel::onPlayerCountChange,
+            )
 
             // ── Player config list ────────────────────────────────────────────
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.heightIn(max = 360.dp),
+                modifier = Modifier.heightIn(max = 300.dp),
             ) {
                 itemsIndexed(uiState.playerConfigs) { index, config ->
                     PlayerConfigRow(
@@ -126,7 +133,7 @@ fun GameSetupScreen(
 
             // ── Mini grid preview ─────────────────────────────────────────────
             if (uiState.playerConfigs.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         stringResource(R.string.gamesetup_layout_label),
                         style = MaterialTheme.magicTypography.bodySmall,
@@ -467,7 +474,7 @@ private fun ModeTile(
                 shape = RoundedCornerShape(12.dp),
             )
             .clickable(onClick = onClick)
-            .padding(vertical = 20.dp, horizontal = 12.dp),
+            .padding(vertical = 16.dp, horizontal = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
