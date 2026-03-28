@@ -47,8 +47,9 @@ class GameSetupViewModel @Inject constructor() : ViewModel() {
     }
 
     fun onPlayerCountChange(count: Int) {
+        val clampedCount = count.coerceIn(2, 6)
         val current = _uiState.value.playerConfigs
-        val configs = List(count) { i ->
+        val configs = List(clampedCount) { i ->
             current.getOrNull(i) ?: PlayerConfig(
                 id           = i,
                 name         = "",
@@ -56,7 +57,7 @@ class GameSetupViewModel @Inject constructor() : ViewModel() {
                 gridPosition = i,
             )
         }
-        _uiState.update { it.copy(playerCount = count, playerConfigs = configs) }
+        _uiState.update { it.copy(playerCount = clampedCount, playerConfigs = configs) }
     }
 
     fun updatePlayerName(index: Int, name: String) {

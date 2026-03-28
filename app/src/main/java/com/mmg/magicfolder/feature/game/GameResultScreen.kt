@@ -26,8 +26,7 @@ fun GameResultScreen(
     onSurvey:   () -> Unit = {},
 ) {
     val mc          = MaterialTheme.magicColors
-    val winnerTheme = mc.playerColors.getOrNull(gameResult.winner.themeIndex % 10)
-        ?: mc.playerColors[0]
+    val winnerTheme = gameResult.winner.theme
 
     Box(
         modifier = Modifier
@@ -159,7 +158,7 @@ private fun StandingsSection(gameResult: GameResult) {
         )
         ordered.forEachIndexed { index, player ->
             val result = gameResult.playerResults.find { it.player.id == player.id }
-            val theme  = mc.playerColors.getOrNull(player.themeIndex % 10) ?: mc.playerColors[0]
+            val theme  = player.theme
             StandingRow(
                 position    = index + 1,
                 player      = player,
