@@ -230,7 +230,7 @@ private fun PlayerCountStepper(
                 .size(44.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(mc.surface)
-                .clickable(enabled = playerCount < 10) {
+                .clickable(enabled = playerCount < 6) {
                     onPlayerCountChange(playerCount + 1)
                 },
             contentAlignment = Alignment.Center,
@@ -238,7 +238,7 @@ private fun PlayerCountStepper(
             Text(
                 "+",
                 style = MaterialTheme.magicTypography.titleLarge,
-                color = if (playerCount < 10) mc.textPrimary else mc.textDisabled,
+                color = if (playerCount < 6) mc.textPrimary else mc.textDisabled,
             )
         }
     }

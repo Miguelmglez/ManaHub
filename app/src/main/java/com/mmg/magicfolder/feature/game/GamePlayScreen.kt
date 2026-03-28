@@ -223,8 +223,8 @@ private fun GameTopBar(
                 )
                 ModeBadge(mode)
                 if (activePlayer != null) {
-                    val theme = MaterialTheme.magicColors.playerColors.getOrNull(activePlayer.themeIndex % 10)
-                    theme?.let {
+                    val theme = activePlayer.theme
+                    theme.let {
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
@@ -344,7 +344,7 @@ private fun PlayerCard(
     modifier:   Modifier = Modifier,
 ) {
     val mc       = MaterialTheme.magicColors
-    val theme    = mc.playerColors.getOrNull(player.themeIndex % 10) ?: mc.playerColors[0]
+    val theme    = player.theme
     val delta    = uiState.lifeDeltas[player.id]
     val dice     = uiState.diceResults[player.id]
     val coin     = uiState.coinResults[player.id]
@@ -468,7 +468,7 @@ private fun PlayerCard(
 
         // ── Eliminated overlay (animated) ────────────────────────────────
         AnimatedVisibility(
-            visible = player.eliminated,
+            visible = player.defeated,
             enter   = fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.85f),
         ) {
             EliminatedOverlay(player = player, mode = uiState.mode)
@@ -694,7 +694,7 @@ private fun WinnerOverlay(
     onPlayAgain:   () -> Unit,
 ) {
     val mc    = MaterialTheme.magicColors
-    val theme = mc.playerColors.getOrNull(winner.themeIndex % 10) ?: mc.playerColors[0]
+    val theme = winner.theme
     Box(
         contentAlignment = Alignment.Center,
         modifier         = Modifier
@@ -772,10 +772,10 @@ private fun CmdDamagePanel(
                 color = mc.textPrimary,
             )
             allPlayers
-                .filter { it.id != target.id && !it.eliminated }
+                .filter { it.id != target.id && !it.defeated }
                 .forEach { source ->
                     val damage = target.commanderDamage[source.id] ?: 0
-                    val srcTheme = mc.playerColors.getOrNull(source.themeIndex % 10) ?: mc.playerColors[0]
+                    val srcTheme = source.theme
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier          = Modifier.fillMaxWidth(),
@@ -825,7 +825,7 @@ private fun CountersPanel(
     onDismiss:      () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val theme = mc.playerColors.getOrNull(player.themeIndex % 10) ?: mc.playerColors[0]
+    val theme = player.theme
     var newCounterName by remember { mutableStateOf("") }
 
     ModalBottomSheet(
@@ -1024,13 +1024,12 @@ private fun LayoutEditorSheet(
     onDismiss:       () -> Unit,
 ) {
     val mc           = MaterialTheme.magicColors
-    val playerColors = mc.playerColors
     // Convert Player list to PlayerConfig-like objects for MiniGridPreview
     val playerConfigs = players.mapIndexed { index, p ->
         PlayerConfig(
             id           = index,
             name         = p.name,
-            theme        = playerColors.getOrNull(p.themeIndex % 10) ?: playerColors.first(),
+            theme        = p.theme,
             gridPosition = index,
         )
     }
