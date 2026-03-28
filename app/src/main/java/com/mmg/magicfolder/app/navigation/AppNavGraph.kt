@@ -3,8 +3,11 @@ package com.mmg.magicfolder.app.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -15,6 +18,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mmg.magicfolder.feature.game.GameSetupViewModel
+import com.mmg.magicfolder.feature.game.PlayerConfig
 import com.mmg.magicfolder.core.ui.components.MagicBottomBar
 import com.mmg.magicfolder.feature.addcard.AddCardScreen
 import com.mmg.magicfolder.feature.carddetail.CardDetailScreen
@@ -36,7 +41,6 @@ import com.mmg.magicfolder.feature.stats.StatsScreen
 
 private val bottomBarRoutes = setOf(
     Screen.Collection.route,
-    Screen.Stats.route,
     Screen.Profile.route,
 )
 
@@ -45,6 +49,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+    var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
 
     Scaffold(
         bottomBar = {
@@ -52,7 +57,6 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 MagicBottomBar(
                     currentRoute      = currentRoute,
                     onCollectionClick = { navController.navigateTab(Screen.Collection.route) },
-                    onStatsClick      = { navController.navigateTab(Screen.Stats.route) },
                     onPlayClick       = { navController.navigate(Screen.GameSetup.route) },
                     onProfileClick    = { navController.navigateTab(Screen.Profile.route) },
                 )
@@ -124,10 +128,13 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
 
             // ── Game flow ─────────────────────────────────────────────────────
             composable(Screen.GameSetup.route) {
+                val setupVm: GameSetupViewModel = hiltViewModel()
                 GameSetupScreen(
-                    onBack      = { navController.popBackStack() },
-                    onStartGame = { mode, count ->
-                        navController.navigate(Screen.GamePlay.createRoute(mode.name, count)) {
+                    viewModel = setupVm,
+                    onBack    = { navController.popBackStack() },
+                    onStartGame = { mode, configs ->
+                        pendingPlayerConfigs = configs
+                        navController.navigate(Screen.GamePlay.createRoute(mode.name, configs.size)) {
                             popUpTo(Screen.GameSetup.route) { inclusive = true }
                         }
                     },
@@ -141,7 +148,16 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     navArgument("playerCount") { type = NavType.IntType    },
                 ),
             ) {
+                val gameVm: GameViewModel = hiltViewModel()
+                val configs = pendingPlayerConfigs
+                LaunchedEffect(Unit) {
+                    if (configs != null) {
+                        gameVm.initFromConfigs(configs)
+                        pendingPlayerConfigs = null
+                    }
+                }
                 GamePlayScreen(
+                    viewModel  = gameVm,
                     onNewGame  = {
                         navController.navigate(Screen.GameSetup.route) {
                             popUpTo(Screen.GamePlay.route) { inclusive = true }

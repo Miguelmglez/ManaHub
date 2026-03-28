@@ -28,7 +28,6 @@ import com.mmg.magicfolder.feature.decks.DeckListScreen
 private const val TAB_CARDS = 0
 private const val TAB_DECKS = 1
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionScreen(
     onCardClick:       (scryfallId: String) -> Unit,
@@ -175,7 +174,6 @@ private fun CardsTabContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CollectionTopBar(
     viewMode:         ViewMode,
@@ -187,51 +185,64 @@ private fun CollectionTopBar(
     var showSortMenu by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors
 
-    TopAppBar(
-        title = {
+    Surface(
+        color    = mc.backgroundSecondary,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text  = "Magic Folder",
-                style = MaterialTheme.magicTypography.titleLarge,
-                color = mc.textPrimary,
+                text     = "Magic Folder",
+                style    = MaterialTheme.magicTypography.titleLarge,
+                color    = mc.textPrimary,
+                modifier = Modifier.weight(1f)
             )
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = mc.backgroundSecondary,
-            actionIconContentColor = mc.textSecondary,
-        ),
-        actions = {
             IconButton(onClick = onScannerClick) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan card")
+                Icon(
+                    imageVector        = Icons.Default.QrCodeScanner,
+                    contentDescription = "Scan card",
+                    tint               = mc.textSecondary
+                )
             }
             IconButton(onClick = onViewModeToggle) {
                 Icon(
-                    imageVector        = if (viewMode == ViewMode.GRID)
-                        Icons.Default.List else Icons.Default.GridView,
+                    imageVector        = if (viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
                     contentDescription = "Toggle view mode",
+                    tint               = mc.textSecondary
                 )
             }
-            IconButton(onClick = { showSortMenu = true }) {
-                Icon(Icons.Default.Sort, contentDescription = "Sort")
-            }
-            DropdownMenu(
-                expanded         = showSortMenu,
-                onDismissRequest = { showSortMenu = false },
-            ) {
-                SortOrder.entries.forEach { sort ->
-                    DropdownMenuItem(
-                        text = { Text(sort.displayName) },
-                        onClick = {
-                            onSortChange(sort)
-                            showSortMenu = false
-                        },
-                        leadingIcon = if (sort == currentSort) {{
-                            Icon(Icons.Default.Check, contentDescription = null)
-                        }} else null,
+            Box {
+                IconButton(onClick = { showSortMenu = true }) {
+                    Icon(
+                        imageVector        = Icons.Default.Sort,
+                        contentDescription = "Sort",
+                        tint               = mc.textSecondary
                     )
                 }
+                DropdownMenu(
+                    expanded         = showSortMenu,
+                    onDismissRequest = { showSortMenu = false },
+                ) {
+                    SortOrder.entries.forEach { sort ->
+                        DropdownMenuItem(
+                            text = { Text(sort.displayName) },
+                            onClick = {
+                                onSortChange(sort)
+                                showSortMenu = false
+                            },
+                            leadingIcon = if (sort == currentSort) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null,
+                        )
+                    }
+                }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -284,12 +295,12 @@ private fun ColorFilterRow(
                 onClick  = { onFilterChange(filter) },
                 label    = {
                     if (isColor) {
-                        ManaSymbolImage(token = manaCode!!, size = 22.dp)
+                        ManaSymbolImage(token = manaCode!!, size = 32.dp)
                     } else {
-                        Text(filter.displayName, style = MaterialTheme.magicTypography.labelSmall)
+                        Text(filter.displayName, style = MaterialTheme.magicTypography.labelMedium)
                     }
                 },
-                modifier = if (isColor) Modifier.size(40.dp) else Modifier,
+                modifier = if (isColor) Modifier.size(48.dp) else Modifier.widthIn(min = 56.dp),
                 colors   = FilterChipDefaults.filterChipColors(
                     selectedContainerColor     = (manaColor ?: mc.primaryAccent).copy(alpha = 0.20f),
                     selectedLabelColor         = manaColor ?: mc.primaryAccent,

@@ -99,11 +99,8 @@ fun ProfileScreen(
                 DeckPerformanceSection(deckStats = state.deckStats)
             }
 
-            // ── Theme selector ─────────────────────────────────────────────────
-            ThemeSection(
-                selected = state.selectedTheme,
-                onSelect = viewModel::selectTheme,
-            )
+            // ── Theme selector — hidden in v1, will be re-enabled in v2 ──────────
+            // ThemeSection(selected = state.selectedTheme, onSelect = viewModel::selectTheme)
 
             // ── Language selector ──────────────────────────────────────────────
             LanguageSection(

@@ -47,6 +47,8 @@ fun GamePlayScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
+    var showLayoutEditor by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -54,11 +56,12 @@ fun GamePlayScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             GameTopBar(
-                mode         = uiState.mode,
-                turnNumber   = uiState.turnNumber,
-                activePlayer = uiState.players.find { it.id == uiState.activePlayerId },
-                onReset      = viewModel::resetGame,
-                onExit       = onBackHome,
+                mode           = uiState.mode,
+                turnNumber     = uiState.turnNumber,
+                activePlayer   = uiState.players.find { it.id == uiState.activePlayerId },
+                onReset        = viewModel::resetGame,
+                onExit         = onBackHome,
+                onLayoutEdit   = { showLayoutEditor = true },
             )
             PlayerGrid(
                 players    = uiState.players,
@@ -102,6 +105,15 @@ fun GamePlayScreen(
             )
         }
 
+        // ── Layout editor sheet ───────────────────────────────────────────────
+        if (showLayoutEditor) {
+            LayoutEditorSheet(
+                players         = uiState.players,
+                onSwapPositions = viewModel::swapPlayerPositions,
+                onDismiss       = { showLayoutEditor = false },
+            )
+        }
+
         // ── Game result screen ────────────────────────────────────────────────
         uiState.gameResult?.let { result ->
             GameResultScreen(
@@ -126,6 +138,7 @@ private fun GameTopBar(
     activePlayer: Player?,
     onReset:      () -> Unit,
     onExit:       () -> Unit,
+    onLayoutEdit: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     TopAppBar(
@@ -166,6 +179,9 @@ private fun GameTopBar(
             }
         },
         actions = {
+            IconButton(onClick = onLayoutEdit) {
+                Icon(Icons.Default.GridView, contentDescription = "Edit layout", tint = mc.textSecondary)
+            }
             IconButton(onClick = onReset) {
                 Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = mc.textSecondary)
             }
@@ -838,6 +854,53 @@ private fun RenameDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Layout editor bottom sheet (FIX 5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LayoutEditorSheet(
+    players:         List<Player>,
+    onSwapPositions: (Int, Int) -> Unit,
+    onDismiss:       () -> Unit,
+) {
+    val mc           = MaterialTheme.magicColors
+    val playerColors = mc.playerColors
+    // Convert Player list to PlayerConfig-like objects for MiniGridPreview
+    val playerConfigs = players.mapIndexed { index, p ->
+        PlayerConfig(
+            id           = index,
+            name         = p.name,
+            theme        = playerColors.getOrNull(p.themeIndex % 10) ?: playerColors.first(),
+            gridPosition = index,
+        )
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                "Edit player layout",
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textPrimary,
+            )
+            Text(
+                "Tap a player to swap with the next position",
+                style = MaterialTheme.magicTypography.bodySmall,
+                color = mc.textSecondary,
+            )
+            MiniGridPreview(
+                playerConfigs   = playerConfigs,
+                onSwapPositions = onSwapPositions,
+            )
+        }
+    }
 }
 
 

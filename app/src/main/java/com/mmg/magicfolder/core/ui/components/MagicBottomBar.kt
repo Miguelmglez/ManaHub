@@ -5,8 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -32,11 +33,11 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MagicBottomBar
-//  Custom 4-slot bottom bar with a gradient FAB in the centre slot.
+//  Custom 3-slot bottom bar with a gradient FAB in the centre slot.
 //
-//  Slot layout:  [Collection]  [Stats]  [⚔ PLAY]  [Profile]
+//  Slot layout:  [Collection]  [⚔ PLAY FAB]  [Profile]
 //
-//  The FAB overflows the top of the bar by 10 dp.
+//  The FAB overflows the top of the bar by 8 dp.
 //  The outer Box does NOT clip, so the overflow is visible.
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -44,7 +45,6 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 fun MagicBottomBar(
     currentRoute:      String?,
     onCollectionClick: () -> Unit,
-    onStatsClick:      () -> Unit,
     onPlayClick:       () -> Unit,
     onProfileClick:    () -> Unit,
     modifier:          Modifier = Modifier,
@@ -52,8 +52,7 @@ fun MagicBottomBar(
     val colors     = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
 
-    // Total visible height of the bar (not counting gesture-nav insets)
-    val barHeight = 64.dp
+    val barHeight = 80.dp
 
     Box(
         modifier = modifier
@@ -84,7 +83,8 @@ fun MagicBottomBar(
                 .fillMaxWidth()
                 .height(barHeight)
                 .align(Alignment.BottomCenter),
-            verticalAlignment = Alignment.Bottom,
+            verticalAlignment    = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             // Slot 1 — Collection
             BottomBarTab(
@@ -95,29 +95,20 @@ fun MagicBottomBar(
                 modifier = Modifier.weight(1f),
             )
 
-            // Slot 2 — Stats
-            BottomBarTab(
-                label    = "STATS",
-                icon     = Icons.Default.BarChart,
-                selected = currentRoute == Screen.Stats.route,
-                onClick  = onStatsClick,
-                modifier = Modifier.weight(1f),
-            )
-
-            // Slot 3 — Play FAB (overflows upward by 10 dp)
+            // Slot 2 — Play FAB (overflows upward by 8 dp)
             Box(
-                modifier          = Modifier
+                modifier         = Modifier
                     .weight(1f)
                     .height(barHeight),
-                contentAlignment  = Alignment.Center,
+                contentAlignment = Alignment.Center,
             ) {
                 PlayFab(
                     onClick  = onPlayClick,
-                    modifier = Modifier.offset(y = (-10).dp),
+                    modifier = Modifier.offset(y = (-8).dp),
                 )
             }
 
-            // Slot 4 — Profile
+            // Slot 3 — Profile
             BottomBarTab(
                 label    = "PROFILE",
                 icon     = Icons.Default.Person,
@@ -162,9 +153,9 @@ private fun BottomBarTab(
             imageVector        = icon,
             contentDescription = label,
             tint               = contentColor,
-            modifier           = Modifier.size(20.dp),
+            modifier           = Modifier.size(24.dp),
         )
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             text      = label,
             style     = typography.labelSmall,
@@ -178,13 +169,14 @@ private fun BottomBarTab(
             modifier = Modifier
                 .width(24.dp)
                 .height(if (selected) 2.dp else 0.dp)
+                .clip(RoundedCornerShape(1.dp))
                 .background(contentColor),
         )
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Central gradient Play FAB
+//  Central gradient Play FAB — crossed swords icon
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -192,10 +184,10 @@ private fun PlayFab(
     onClick:  () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors     = MaterialTheme.magicColors
-    val glowColor  = colors.primaryAccent.copy(alpha = 0.35f)
-    val gradient   = Brush.linearGradient(
-        colors = listOf(colors.lifeNegative, colors.primaryAccent),
+    val colors    = MaterialTheme.magicColors
+    val glowColor = colors.primaryAccent.copy(alpha = 0.35f)
+    val gradient  = Brush.linearGradient(
+        colors = listOf(Color(0xFFE63946), Color(0xFFC77DFF)),
         start  = Offset(0f, Float.POSITIVE_INFINITY),
         end    = Offset(Float.POSITIVE_INFINITY, 0f),
     )
@@ -205,7 +197,6 @@ private fun PlayFab(
         modifier = modifier
             .size(60.dp)
             .drawBehind {
-                // Soft glow ring
                 drawCircle(
                     color  = glowColor,
                     radius = size.minDimension / 2f + 10.dp.toPx(),
@@ -221,10 +212,10 @@ private fun PlayFab(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter            = painterResource(R.drawable.ic_sword),
+            painter            = painterResource(R.drawable.ic_crossed_swords),
             contentDescription = "Play Game",
-            tint               = MaterialTheme.colorScheme.onPrimary,
-            modifier           = Modifier.size(24.dp),
+            tint               = Color.White,
+            modifier           = Modifier.size(28.dp),
         )
     }
 }

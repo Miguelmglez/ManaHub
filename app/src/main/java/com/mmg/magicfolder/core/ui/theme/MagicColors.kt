@@ -86,6 +86,14 @@ data class MagicColors(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  PlayerTheme — static list of all available player color identities
+// ═══════════════════════════════════════════════════════════════════════════════
+
+object PlayerTheme {
+    val ALL: List<PlayerThemeColors> get() = NeonVoidColors.playerColors
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  NeonVoid instance
 // ═══════════════════════════════════════════════════════════════════════════════
 

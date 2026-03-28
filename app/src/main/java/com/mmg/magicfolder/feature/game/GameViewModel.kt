@@ -225,6 +225,34 @@ class GameViewModel @Inject constructor(
         _uiState.update { it.copy(coinResults = it.coinResults + (playerId to listOf(true, false).random())) }
     }
 
+    // ── Setup init from PlayerConfig ──────────────────────────────────────────
+
+    fun initFromConfigs(configs: List<PlayerConfig>) {
+        val mode = _uiState.value.mode
+        val players = configs.mapIndexed { i, config ->
+            com.mmg.magicfolder.feature.game.model.Player(
+                id         = i,
+                name       = config.name.ifEmpty { "Player ${i + 1}" },
+                life       = mode.startingLife,
+                themeIndex = com.mmg.magicfolder.core.ui.theme.PlayerTheme.ALL.indexOf(config.theme)
+                    .coerceAtLeast(i % 10),
+            )
+        }
+        _uiState.update { it.copy(players = players, activePlayerId = players.first().id) }
+    }
+
+    // ── Layout editor ─────────────────────────────────────────────────────────
+
+    fun swapPlayerPositions(indexA: Int, indexB: Int) {
+        val players = _uiState.value.players.toMutableList()
+        if (indexA in players.indices && indexB in players.indices) {
+            val temp = players[indexA]
+            players[indexA] = players[indexB]
+            players[indexB] = temp
+            _uiState.update { it.copy(players = players) }
+        }
+    }
+
     // ── UI state toggles ──────────────────────────────────────────────────────
 
     fun showPhasePanel(show: Boolean)    = _uiState.update { it.copy(showPhasePanel = show) }
