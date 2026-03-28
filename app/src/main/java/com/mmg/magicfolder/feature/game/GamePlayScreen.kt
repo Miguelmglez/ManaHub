@@ -47,7 +47,8 @@ fun GamePlayScreen(
     onSurvey:   (sessionId: Long) -> Unit = {},
     viewModel:  GameViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState    by viewModel.uiState.collectAsStateWithLifecycle()
+    val toolsState by viewModel.toolsState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
     var showGameResult   by remember { mutableStateOf(false) }
@@ -76,17 +77,22 @@ fun GamePlayScreen(
             Box(modifier = Modifier.weight(1f)) {
                 GamePlayerGrid(
                     players         = uiState.players,
-                    uiState         = uiState,
-                    viewModel       = viewModel,
+                    gameMode        = uiState.mode,
                     activeLayout    = uiState.activeLayout,
                     playerRotations = uiState.playerRotations,
+                    lifeDeltas      = uiState.lifeDeltas,
+                    onLifeChange    = viewModel::changeLife,
+                    onPoison        = viewModel::changePoison,
+                    onCmdPanel      = viewModel::showCmdPanel,
+                    onCtrPanel      = viewModel::showCounterPanel,
+                    onEditName      = viewModel::showEditName,
+                    onConfirmDefeat = viewModel::confirmDefeat,
+                    onRevokeDefeat  = viewModel::revokeDefeat,
+                    toolsState      = toolsState,
+                    onToggleTools   = viewModel::toggleTools,
+                    onRollDice      = viewModel::rollDice,
+                    onFlipCoin      = viewModel::flipCoin,
                     modifier        = Modifier.fillMaxSize(),
-                )
-                // Global tools overlay (dice, coin) centered over grid
-                GlobalToolsOverlay(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .wrapContentSize(),
                 )
             }
         }
@@ -293,47 +299,67 @@ private fun ModeBadge(mode: GameMode) {
 @Composable
 private fun GamePlayerGrid(
     players:         List<Player>,
-    uiState:         GameUiState,
-    viewModel:       GameViewModel,
-    activeLayout:    com.mmg.magicfolder.feature.game.model.LayoutTemplate,
+    gameMode:        GameMode,
+    activeLayout:    LayoutTemplate,
     playerRotations: Map<Int, Int>,
+    lifeDeltas:      Map<Int, Int>,
+    onLifeChange:    (playerId: Int, delta: Int) -> Unit,
+    onPoison:        (playerId: Int, delta: Int) -> Unit,
+    onCmdPanel:      (playerId: Int) -> Unit,
+    onCtrPanel:      (playerId: Int) -> Unit,
+    onEditName:      (playerId: Int) -> Unit,
+    onConfirmDefeat: (playerId: Int) -> Unit,
+    onRevokeDefeat:  (playerId: Int) -> Unit,
+    toolsState:      GlobalToolsState,
+    onToggleTools:   () -> Unit,
+    onRollDice:      () -> Unit,
+    onFlipCoin:      () -> Unit,
     modifier:        Modifier = Modifier,
 ) {
-    // Pre-compute (row, slotInRow, globalIndex) for each slot
-    val indexedSlots = activeLayout.gridRows.mapIndexed { rowIdx, rowSlots ->
-        var offset = 0
-        for (i in 0 until rowIdx) offset += activeLayout.gridRows[i].size
-        rowSlots.mapIndexed { colIdx, slot -> Triple(slot, offset + colIdx, rowIdx) }
-    }
-
-    Column(modifier = modifier.fillMaxWidth()) {
-        indexedSlots.forEach { rowEntries ->
-            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                rowEntries.forEach { (slot, globalIndex, _) ->
-                    val player = players.getOrNull(globalIndex)
-                    if (player != null) {
-                        val rotation = playerRotations[player.id] ?: slot.defaultRotation
-                        PlayerCard(
-                            player          = player,
-                            uiState         = uiState,
-                            rotation        = rotation,
-                            onLife          = { d -> viewModel.changeLife(player.id, d) },
-                            onCounter       = { t, d -> viewModel.changeCounter(player.id, t, d) },
-                            onRoll          = { viewModel.rollDice(player.id) },
-                            onFlip          = { viewModel.flipCoin(player.id) },
-                            onCmdPanel      = { viewModel.showCmdPanel(player.id) },
-                            onCtrPanel      = { viewModel.showCounterPanel(player.id) },
-                            onEditName      = { viewModel.showEditName(player.id) },
-                            onConfirmDefeat = { viewModel.confirmDefeat(player.id) },
-                            onRevokeDefeat  = { viewModel.revokeDefeat(player.id) },
-                            modifier        = Modifier.weight(1f).fillMaxHeight(),
-                        )
-                    } else {
-                        Spacer(Modifier.weight(1f))
+    Box(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            activeLayout.gridRows.forEach { rowSlotIndices ->
+                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    rowSlotIndices.forEach { slotIndex ->
+                        if (slotIndex == null) {
+                            Spacer(Modifier.weight(1f))
+                        } else {
+                            val slot   = activeLayout.slots[slotIndex]
+                            val player = players.find { it.id == slot.playerId }
+                            if (player != null) {
+                                val rotation = playerRotations[player.id]
+                                    ?: slot.position.toDefaultDegrees()
+                                PlayerCard(
+                                    player          = player,
+                                    gameMode        = gameMode,
+                                    rotation        = rotation,
+                                    lifeDelta       = lifeDeltas[player.id],
+                                    onLife          = { d -> onLifeChange(player.id, d) },
+                                    onPoison        = { d -> onPoison(player.id, d) },
+                                    onCmdPanel      = { onCmdPanel(player.id) },
+                                    onCtrPanel      = { onCtrPanel(player.id) },
+                                    onEditName      = { onEditName(player.id) },
+                                    onConfirmDefeat = { onConfirmDefeat(player.id) },
+                                    onRevokeDefeat  = { onRevokeDefeat(player.id) },
+                                    modifier        = Modifier.weight(1f).fillMaxHeight(),
+                                )
+                            } else {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }
         }
+        GlobalToolsOverlay(
+            state      = toolsState,
+            onToggle   = onToggleTools,
+            onRollDice = onRollDice,
+            onFlipCoin = onFlipCoin,
+            modifier   = Modifier
+                .align(Alignment.Center)
+                .wrapContentSize(),
+        )
     }
 }
 
@@ -344,12 +370,11 @@ private fun GamePlayerGrid(
 @Composable
 private fun PlayerCard(
     player:          Player,
-    uiState:         GameUiState,
+    gameMode:        GameMode,
     rotation:        Int,
+    lifeDelta:       Int?,
     onLife:          (Int) -> Unit,
-    onCounter:       (CounterType, Int) -> Unit,
-    onRoll:          () -> Unit,
-    onFlip:          () -> Unit,
+    onPoison:        (Int) -> Unit,
     onCmdPanel:      () -> Unit,
     onCtrPanel:      () -> Unit,
     onEditName:      () -> Unit,
@@ -359,11 +384,8 @@ private fun PlayerCard(
 ) {
     val mc       = MaterialTheme.magicColors
     val theme    = player.theme
-    val delta    = uiState.lifeDeltas[player.id]
-    val dice     = uiState.diceResults[player.id]
-    val coin     = uiState.coinResults[player.id]
-    val isActive = player.id == uiState.activePlayerId
-    val startingLife = uiState.mode.startingLife
+    val delta    = lifeDelta
+    val startingLife = gameMode.startingLife
 
     // Life color coding: red when ≤ 0, green when above starting, neutral otherwise
     val lifeColor = when {
@@ -398,17 +420,6 @@ private fun PlayerCard(
                     )
                 )
         )
-
-        // Active turn indicator
-        if (isActive) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .width(3.dp)
-                    .fillMaxHeight()
-                    .background(theme.accent.copy(alpha = 0.70f))
-            )
-        }
 
         Column(
             modifier            = Modifier
@@ -506,13 +517,10 @@ private fun PlayerCard(
                 PoisonPips(
                     count    = player.poison,
                     theme    = theme,
-                    onSet    = { newVal ->
-                        val d = newVal - player.poison
-                        onCounter(CounterType.POISON, d)
-                    },
+                    onSet    = { newVal -> onPoison(newVal - player.poison) },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (uiState.mode == GameMode.COMMANDER) {
+                    if (gameMode == GameMode.COMMANDER) {
                         CardActionButton(
                             label   = "⚔",
                             theme   = theme,
@@ -521,7 +529,6 @@ private fun PlayerCard(
                         )
                     }
                     CardActionButton(label = "◆", theme = theme, onClick = onCtrPanel)
-                    DiceCoinsRow(dice = dice, coin = coin, theme = theme, onRoll = onRoll, onFlip = onFlip)
                 }
             }
         }
@@ -573,7 +580,7 @@ private fun PlayerCard(
             visible = player.defeated,
             enter   = fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.85f),
         ) {
-            EliminatedOverlay(player = player, mode = uiState.mode)
+            EliminatedOverlay(player = player, mode = gameMode)
         }
     }
 }
@@ -692,52 +699,6 @@ private fun CardActionButton(
             .clickable(onClick = onClick),
     ) {
         Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textPrimary)
-    }
-}
-
-@Composable
-private fun DiceCoinsRow(
-    dice:   Int?,
-    coin:   Boolean?,
-    theme:  PlayerThemeColors,
-    onRoll: () -> Unit,
-    onFlip: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-    ) {
-        // d20
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier            = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(theme.accent.copy(alpha = 0.08f))
-                .clickable(onClick = onRoll)
-                .padding(4.dp),
-        ) {
-            Text(
-                text  = dice?.toString() ?: "d20",
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = if (dice == 20) mc.goldMtg else if (dice == 1) mc.lifeNegative else mc.textSecondary,
-            )
-        }
-        // Coin
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier            = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(theme.accent.copy(alpha = 0.08f))
-                .clickable(onClick = onFlip)
-                .padding(4.dp),
-        ) {
-            Text(
-                text  = when (coin) { true -> "H"; false -> "T"; null -> "¢" },
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary,
-            )
-        }
     }
 }
 
