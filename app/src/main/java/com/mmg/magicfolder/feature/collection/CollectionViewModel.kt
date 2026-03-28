@@ -59,8 +59,35 @@ class CollectionViewModel @Inject constructor(
         applyFilters()
     }
 
-    fun onFilterChange(filter: ColorFilter) {
-        _uiState.update { it.copy(activeFilter = filter) }
+    fun toggleColorFilter(filter: ColorFilter) {
+        val current = _uiState.value.activeFilters.toMutableSet()
+        when (filter) {
+            ColorFilter.ALL -> current.clear()
+            ColorFilter.COLORLESS -> {
+                if (current.contains(ColorFilter.COLORLESS)) current.remove(ColorFilter.COLORLESS)
+                else { current.clear(); current.add(ColorFilter.COLORLESS) }
+            }
+            ColorFilter.MULTICOLOR -> {
+                if (current.contains(ColorFilter.MULTICOLOR)) current.remove(ColorFilter.MULTICOLOR)
+                else {
+                    current.removeAll(setOf(
+                        ColorFilter.W, ColorFilter.U, ColorFilter.B,
+                        ColorFilter.R, ColorFilter.G, ColorFilter.COLORLESS,
+                    ))
+                    current.add(ColorFilter.MULTICOLOR)
+                }
+            }
+            else -> {
+                // WUBRG — multi-selectable, exclusive with COLORLESS and MULTICOLOR
+                if (current.contains(filter)) current.remove(filter)
+                else {
+                    current.remove(ColorFilter.COLORLESS)
+                    current.remove(ColorFilter.MULTICOLOR)
+                    current.add(filter)
+                }
+            }
+        }
+        _uiState.update { it.copy(activeFilters = current) }
         applyFilters()
     }
 
@@ -98,13 +125,18 @@ class CollectionViewModel @Inject constructor(
         }
 
         // Color filter
-        if (state.activeFilter != ColorFilter.ALL) {
+        val filters = state.activeFilters
+        if (filters.isNotEmpty()) {
             result = result.filter { item ->
                 val colors = item.card.colorIdentity
-                when (state.activeFilter) {
-                    ColorFilter.COLORLESS  -> colors.isEmpty()
-                    ColorFilter.MULTICOLOR -> colors.size > 1
-                    else                   -> colors.size == 1 && colors.firstOrNull() == state.activeFilter.name
+                when {
+                    filters.contains(ColorFilter.COLORLESS)  -> colors.isEmpty()
+                    filters.contains(ColorFilter.MULTICOLOR) -> colors.size >= 2
+                    else -> {
+                        // AND logic: card must contain ALL selected WUBRG colors
+                        val selectedColors = filters.map { it.name }.toSet()
+                        selectedColors.all { colors.contains(it) }
+                    }
                 }
             }
         }

@@ -66,8 +66,8 @@ fun CollectionScreen(
 
             // Color filter chips
             ColorFilterRow(
-                activeFilter = uiState.activeFilter,
-                onFilterChange = viewModel::onFilterChange,
+                activeFilters  = uiState.activeFilters,
+                onToggleFilter = viewModel::toggleColorFilter,
             )
 
             // Card count
@@ -188,18 +188,21 @@ private fun SearchBar(
 
 @Composable
 private fun ColorFilterRow(
-    activeFilter:  ColorFilter,
-    onFilterChange: (ColorFilter) -> Unit,
+    activeFilters:  Set<ColorFilter>,
+    onToggleFilter: (ColorFilter) -> Unit,
 ) {
+    val isAllActive = activeFilters.isEmpty()
     LazyRow(
-        contentPadding    = PaddingValues(horizontal = 16.dp),
+        contentPadding        = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier          = Modifier.padding(vertical = 4.dp),
+        modifier              = Modifier.padding(vertical = 4.dp),
     ) {
         items(ColorFilter.entries) { filter ->
+            val isSelected = if (filter == ColorFilter.ALL) isAllActive
+                             else activeFilters.contains(filter)
             FilterChip(
-                selected = filter == activeFilter,
-                onClick  = { onFilterChange(filter) },
+                selected = isSelected,
+                onClick  = { onToggleFilter(filter) },
                 label    = { Text(filter.displayName) },
             )
         }

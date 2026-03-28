@@ -58,6 +58,9 @@
     <string name="collection_filter_red">Red</string>
     <string name="collection_filter_green">Green</string>
     <string name="collection_filter_multicolor">Multicolor</string>
+    <string name="collection_filter_active">Showing:</string>
+    <string name="collection_filter_all_colors">(all colors)</string>
+    <string name="collection_filter_clear">Clear</string>
     <string name="collection_card_count">%1$d cards</string>
     <string name="collection_empty_title">Your collection is empty</string>
     <string name="collection_empty_subtitle">Add your first card by tapping +</string>

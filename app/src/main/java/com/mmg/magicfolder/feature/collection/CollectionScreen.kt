@@ -54,7 +54,7 @@ fun CollectionScreen(
         onViewModeToggle    = viewModel::onViewModeToggle,
         onSortChange        = viewModel::onSortChange,
         onSearchQueryChange = viewModel::onSearchQueryChange,
-        onFilterChange      = viewModel::onFilterChange,
+        onToggleFilter      = viewModel::toggleColorFilter,
         onDeleteCard        = viewModel::onDeleteCard,
         onErrorDismissed    = viewModel::onErrorDismissed,
     )
@@ -70,7 +70,7 @@ private fun CollectionContent(
     onViewModeToggle:    () -> Unit,
     onSortChange:        (SortOrder) -> Unit,
     onSearchQueryChange: (String) -> Unit,
-    onFilterChange:      (ColorFilter) -> Unit,
+    onToggleFilter:      (ColorFilter) -> Unit,
     onDeleteCard:        (Long) -> Unit,
     onErrorDismissed:    () -> Unit,
 ) {
@@ -128,7 +128,7 @@ private fun CollectionContent(
                     onCardClick         = onCardClick,
                     onScannerClick      = onScannerClick,
                     onSearchQueryChange = onSearchQueryChange,
-                    onFilterChange      = onFilterChange,
+                    onToggleFilter      = onToggleFilter,
                     onDeleteCard        = onDeleteCard,
                 )
                 TAB_DECKS -> DeckListScreen(
@@ -155,7 +155,7 @@ private fun CardsTabContent(
     onCardClick:         (String) -> Unit,
     onScannerClick:      () -> Unit,
     onSearchQueryChange: (String) -> Unit,
-    onFilterChange:      (ColorFilter) -> Unit,
+    onToggleFilter:      (ColorFilter) -> Unit,
     onDeleteCard:        (Long) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -174,8 +174,14 @@ private fun CardsTabContent(
 
         // Color filter chips
         ColorFilterRow(
-            activeFilter   = uiState.activeFilter,
-            onFilterChange = onFilterChange,
+            activeFilters  = uiState.activeFilters,
+            onToggleFilter = onToggleFilter,
+        )
+
+        // Active filter indicator
+        ActiveFiltersIndicator(
+            activeFilters  = uiState.activeFilters,
+            onClear        = { onToggleFilter(ColorFilter.ALL) },
         )
 
         // Card count
@@ -318,10 +324,11 @@ private fun SearchBar(
 
 @Composable
 private fun ColorFilterRow(
-    activeFilter:   ColorFilter,
-    onFilterChange: (ColorFilter) -> Unit,
+    activeFilters:  Set<ColorFilter>,
+    onToggleFilter: (ColorFilter) -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
+    val mc      = MaterialTheme.magicColors
+    val isAllActive = activeFilters.isEmpty()
     LazyRow(
         contentPadding        = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -331,32 +338,87 @@ private fun ColorFilterRow(
             val manaCode  = filter.manaCode()
             val manaColor = filter.manaColor(mc)
             val isColor   = manaCode != null
+            val isSelected = if (filter == ColorFilter.ALL) isAllActive
+                             else activeFilters.contains(filter)
             FilterChip(
-                selected = filter == activeFilter,
-                onClick  = { onFilterChange(filter) },
+                selected = isSelected,
+                onClick  = { onToggleFilter(filter) },
                 label    = {
                     if (isColor) {
-                        ManaSymbolImage(token = manaCode, size = 32.dp)
+                        ManaSymbolImage(token = manaCode!!, size = 32.dp)
                     } else {
                         Text(filter.displayName, style = MaterialTheme.magicTypography.labelMedium)
                     }
                 },
                 modifier = if (isColor) Modifier.size(48.dp) else Modifier.height(48.dp),
                 colors   = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor     = (manaColor ?: mc.primaryAccent).copy(alpha = 0.20f),
-                    selectedLabelColor         = manaColor ?: mc.primaryAccent,
-                    containerColor             = mc.surface,
-                    labelColor                 = mc.textSecondary,
+                    selectedContainerColor = (manaColor ?: mc.primaryAccent).copy(alpha = 0.20f),
+                    selectedLabelColor     = manaColor ?: mc.primaryAccent,
+                    containerColor         = mc.surface,
+                    labelColor             = mc.textSecondary,
                 ),
                 border   = FilterChipDefaults.filterChipBorder(
                     enabled             = true,
-                    selected            = filter == activeFilter,
+                    selected            = isSelected,
                     selectedBorderColor = (manaColor ?: mc.primaryAccent).copy(alpha = 0.60f),
-                    selectedBorderWidth = 1.dp,
+                    selectedBorderWidth = 2.dp,
                     borderColor         = mc.surfaceVariant,
                     borderWidth         = 0.5.dp,
                 ),
             )
+        }
+    }
+}
+
+@Composable
+private fun ActiveFiltersIndicator(
+    activeFilters: Set<ColorFilter>,
+    onClear:       () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    AnimatedVisibility(visible = activeFilters.isNotEmpty()) {
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.collection_filter_active),
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textDisabled,
+                )
+                activeFilters.forEach { filter ->
+                    filter.manaCode()?.let { code ->
+                        ManaSymbolImage(token = code, size = 16.dp)
+                    }
+                }
+                if (activeFilters.size > 1 &&
+                    !activeFilters.contains(ColorFilter.MULTICOLOR) &&
+                    !activeFilters.contains(ColorFilter.COLORLESS)
+                ) {
+                    Text(
+                        stringResource(R.string.collection_filter_all_colors),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textDisabled,
+                    )
+                }
+            }
+            TextButton(
+                onClick         = onClear,
+                contentPadding  = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            ) {
+                Text(
+                    stringResource(R.string.collection_filter_clear),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.primaryAccent,
+                )
+            }
         }
     }
 }
@@ -465,23 +527,25 @@ val ColorFilter.displayName get() = when (this) {
     ColorFilter.MULTICOLOR -> "Multi"
 }
 
-/** Returns the Scryfall card-symbol token for mana filters, null for non-mana filters. */
+/** Returns the Scryfall card-symbol token for mana filters, null for ALL. */
 private fun ColorFilter.manaCode(): String? = when (this) {
     ColorFilter.W          -> "W"
     ColorFilter.U          -> "U"
     ColorFilter.B          -> "B"
     ColorFilter.R          -> "R"
     ColorFilter.G          -> "G"
+    ColorFilter.COLORLESS  -> "C"
     ColorFilter.MULTICOLOR -> "M"
     else                   -> null
 }
 
 private fun ColorFilter.manaColor(mc: MagicColors) = when (this) {
-    ColorFilter.W         -> mc.manaW
-    ColorFilter.U         -> mc.manaU
-    ColorFilter.B         -> mc.manaB
-    ColorFilter.R         -> mc.manaR
-    ColorFilter.G         -> mc.manaG
-    ColorFilter.COLORLESS -> mc.manaC
-    else                  -> null
+    ColorFilter.W          -> mc.manaW
+    ColorFilter.U          -> mc.manaU
+    ColorFilter.B          -> mc.manaB
+    ColorFilter.R          -> mc.manaR
+    ColorFilter.G          -> mc.manaG
+    ColorFilter.COLORLESS  -> mc.manaC
+    ColorFilter.MULTICOLOR -> mc.goldMtg
+    else                   -> null
 }
