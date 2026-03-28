@@ -73,14 +73,22 @@ fun GamePlayScreen(
                 onExit         = { showExitDialog  = true },
                 onLayoutEdit   = { viewModel.showLayoutEditor(true) },
             )
-            GamePlayerGrid(
-                players         = uiState.players,
-                uiState         = uiState,
-                viewModel       = viewModel,
-                activeLayout    = uiState.activeLayout,
-                playerRotations = uiState.playerRotations,
-                modifier        = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                GamePlayerGrid(
+                    players         = uiState.players,
+                    uiState         = uiState,
+                    viewModel       = viewModel,
+                    activeLayout    = uiState.activeLayout,
+                    playerRotations = uiState.playerRotations,
+                    modifier        = Modifier.fillMaxSize(),
+                )
+                // Global tools overlay (dice, coin) centered over grid
+                GlobalToolsOverlay(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .wrapContentSize(),
+                )
+            }
         }
 
         // ── Commander damage panel ─────────────────────────────────────────────
