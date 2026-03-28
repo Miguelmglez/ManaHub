@@ -22,7 +22,8 @@ sealed class Screen(val route: String) {
     object DeckBuilder : Screen("collection/decks/builder")
 
     // ── Stats (bottom tab 2) ─────────────────────────────────────────────────
-    object Stats : Screen("stats")
+    object Stats    : Screen("stats")
+    object Settings : Screen("settings")
 
     // ── Profile (bottom tab 4) ───────────────────────────────────────────────
     object Profile : Screen("profile")

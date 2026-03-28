@@ -27,6 +27,15 @@ class ScryfallRemoteDataSource @Inject constructor(
     suspend fun getCardBySetAndNumber(set: String, number: String): Result<Card> =
         safeCall { requestQueue.execute { api.getCardBySetAndNumber(set, number) }.toDomain() }
 
+    suspend fun getCardCollection(
+        scryfallIds: List<String>,
+    ): CardCollectionResponseDto {
+        val identifiers = scryfallIds.map { CardIdentifierDto(id = it) }
+        return requestQueue.execute {
+            api.getCardCollection(CardCollectionRequestDto(identifiers))
+        }
+    }
+
     suspend fun getCardsBatch(scryfallIds: List<String>): Result<List<Card>> =
         safeCall {
             val allCards = mutableListOf<CardDto>()

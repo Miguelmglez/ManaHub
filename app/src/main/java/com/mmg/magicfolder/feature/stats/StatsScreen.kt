@@ -1,13 +1,20 @@
 package com.mmg.magicfolder.feature.stats
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -20,11 +27,26 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(
-    onCardClick: (scryfallId: String) -> Unit,
-    viewModel:   StatsViewModel = hiltViewModel(),
+    onCardClick:     (scryfallId: String) -> Unit,
+    onSettingsClick: () -> Unit = {},
+    viewModel:       StatsViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val mc = MaterialTheme.magicColors
+    val uiState         by viewModel.uiState.collectAsStateWithLifecycle()
+    val mc               = MaterialTheme.magicColors
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.refreshResult) {
+        uiState.refreshResult?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearRefreshMessage()
+        }
+    }
+    LaunchedEffect(uiState.refreshError) {
+        uiState.refreshError?.let {
+            snackbarHostState.showSnackbar("Error: $it")
+            viewModel.clearRefreshMessage()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -36,9 +58,15 @@ fun StatsScreen(
                         color = mc.textPrimary,
                     )
                 },
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = mc.textSecondary)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         val stats = uiState.stats
         when {
@@ -48,11 +76,15 @@ fun StatsScreen(
             ) { CircularProgressIndicator(color = mc.primaryAccent) }
 
             stats != null -> StatsContent(
-                stats            = stats,
-                currency         = uiState.currency,
-                onCurrencyToggle = viewModel::onCurrencyToggle,
-                onCardClick      = onCardClick,
-                modifier         = Modifier.padding(padding),
+                stats              = stats,
+                currency           = uiState.currency,
+                onCurrencyToggle   = viewModel::onCurrencyToggle,
+                onCardClick        = onCardClick,
+                isRefreshingPrices = uiState.isRefreshingPrices,
+                refreshProgress    = uiState.refreshProgress,
+                lastRefreshedAt    = uiState.lastRefreshedAt,
+                onRefreshPrices    = viewModel::refreshPrices,
+                modifier           = Modifier.padding(padding),
             )
         }
     }
@@ -60,11 +92,15 @@ fun StatsScreen(
 
 @Composable
 private fun StatsContent(
-    stats:            CollectionStats,
-    currency:         Currency,
-    onCurrencyToggle: () -> Unit,
-    onCardClick:      (String) -> Unit,
-    modifier:         Modifier = Modifier,
+    stats:              CollectionStats,
+    currency:           Currency,
+    onCurrencyToggle:   () -> Unit,
+    onCardClick:        (String) -> Unit,
+    isRefreshingPrices: Boolean,
+    refreshProgress:    Pair<Int, Int>?,
+    lastRefreshedAt:    Long?,
+    onRefreshPrices:    () -> Unit,
+    modifier:           Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
@@ -73,7 +109,15 @@ private fun StatsContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        SummarySection(stats = stats, currency = currency, onCurrencyToggle = onCurrencyToggle)
+        SummarySection(
+            stats              = stats,
+            currency           = currency,
+            onCurrencyToggle   = onCurrencyToggle,
+            isRefreshingPrices = isRefreshingPrices,
+            refreshProgress    = refreshProgress,
+            lastRefreshedAt    = lastRefreshedAt,
+            onRefreshPrices    = onRefreshPrices,
+        )
         MostValuableSection(cards = stats.mostValuableCards, currency = currency, onCardClick = onCardClick)
         DistributionSection(title = "By color", data = stats.byColor.entries.associate {
             it.key.displayName to it.value
@@ -90,9 +134,13 @@ private fun StatsContent(
 
 @Composable
 private fun SummarySection(
-    stats:            CollectionStats,
-    currency:         Currency,
-    onCurrencyToggle: () -> Unit,
+    stats:              CollectionStats,
+    currency:           Currency,
+    onCurrencyToggle:   () -> Unit,
+    isRefreshingPrices: Boolean,
+    refreshProgress:    Pair<Int, Int>?,
+    lastRefreshedAt:    Long?,
+    onRefreshPrices:    () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -129,25 +177,80 @@ private fun SummarySection(
                         style = MaterialTheme.magicTypography.displayMedium,
                         color = mc.goldMtg,
                     )
+                    if (lastRefreshedAt != null) {
+                        Text(
+                            text  = "Updated ${formatRelativeTime(lastRefreshedAt)}",
+                            style = MaterialTheme.magicTypography.bodySmall,
+                            color = mc.textDisabled,
+                        )
+                    } else {
+                        Text(
+                            text  = "Prices may be outdated",
+                            style = MaterialTheme.magicTypography.bodySmall,
+                            color = mc.lifeNegative.copy(alpha = 0.7f),
+                        )
+                    }
                 }
-                // Currency toggle chips
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(Currency.USD to "$", Currency.EUR to "€").forEach { (c, label) ->
-                        val selected = currency == c
-                        Surface(
-                            color  = if (selected) mc.goldMtg.copy(alpha = 0.18f) else mc.surface,
-                            shape  = MaterialTheme.shapes.extraSmall,
-                            border = if (selected)
-                                androidx.compose.foundation.BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.60f))
-                            else
-                                androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
-                            modifier = Modifier.clickable { if (!selected) onCurrencyToggle() },
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    // Currency toggle chips
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(Currency.USD to "$", Currency.EUR to "€").forEach { (c, label) ->
+                            val selected = currency == c
+                            Surface(
+                                color  = if (selected) mc.goldMtg.copy(alpha = 0.18f) else mc.surface,
+                                shape  = MaterialTheme.shapes.extraSmall,
+                                border = if (selected)
+                                    BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.60f))
+                                else
+                                    BorderStroke(0.5.dp, mc.surfaceVariant),
+                                modifier = Modifier.clickable { if (!selected) onCurrencyToggle() },
+                            ) {
+                                Text(
+                                    text     = label,
+                                    style    = MaterialTheme.magicTypography.labelSmall,
+                                    color    = if (selected) mc.goldMtg else mc.textSecondary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    // Refresh button / spinner
+                    if (isRefreshingPrices) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Text(
-                                text     = label,
-                                style    = MaterialTheme.magicTypography.labelSmall,
-                                color    = if (selected) mc.goldMtg else mc.textSecondary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(28.dp),
+                                color       = mc.primaryAccent,
+                                strokeWidth = 2.5.dp,
+                            )
+                            refreshProgress?.let { (current, total) ->
+                                Text(
+                                    text  = "$current/$total",
+                                    style = MaterialTheme.magicTypography.labelSmall,
+                                    color = mc.textDisabled,
+                                )
+                            }
+                        }
+                    } else {
+                        IconButton(
+                            onClick  = onRefreshPrices,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                        ) {
+                            Icon(
+                                imageVector        = Icons.Default.Refresh,
+                                contentDescription = "Refresh prices",
+                                tint               = mc.primaryAccent,
+                                modifier           = Modifier.size(20.dp),
                             )
                         }
                     }
@@ -299,6 +402,16 @@ private fun cmcBarColor(cmc: Int, mc: MagicColors): Color = when {
     cmc <= 3 -> mc.goldMtg
     cmc <= 5 -> mc.lifeNegative
     else     -> mc.primaryAccent
+}
+
+fun formatRelativeTime(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    return when {
+        diff < 60_000L      -> "just now"
+        diff < 3_600_000L   -> "${diff / 60_000} min ago"
+        diff < 86_400_000L  -> "${diff / 3_600_000}h ago"
+        else                -> "${diff / 86_400_000}d ago"
+    }
 }
 
 val MtgColor.displayName get() = when (this) {

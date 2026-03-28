@@ -14,4 +14,5 @@ interface UserCardRepository {
     suspend fun deleteCard(id: Long)
     suspend fun incrementQuantity(id: Long)
     suspend fun updateQuantity(id: Long, quantity: Int)
+    suspend fun getScryfallIds(): List<String>
 }

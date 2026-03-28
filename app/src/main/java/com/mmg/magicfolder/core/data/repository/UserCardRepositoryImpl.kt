@@ -49,4 +49,6 @@ class UserCardRepositoryImpl @Inject constructor(
         if (quantity == 0) userCardDao.deleteById(id)
         else userCardDao.updateQuantity(id, quantity)
     }
+
+    override suspend fun getScryfallIds(): List<String> = userCardDao.getAllScryfallIds()
 }

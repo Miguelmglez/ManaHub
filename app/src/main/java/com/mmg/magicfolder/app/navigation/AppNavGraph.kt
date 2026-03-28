@@ -27,6 +27,7 @@ import com.mmg.magicfolder.feature.game.GameViewModel
 import com.mmg.magicfolder.feature.survey.SurveyScreen
 import com.mmg.magicfolder.feature.profile.ProfileScreen
 import com.mmg.magicfolder.feature.scanner.ScannerScreen
+import com.mmg.magicfolder.feature.settings.SettingsScreen
 import com.mmg.magicfolder.feature.stats.StatsScreen
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -113,8 +114,14 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // ── Stats ─────────────────────────────────────────────────────────
             composable(Screen.Stats.route) {
                 StatsScreen(
-                    onCardClick = { id -> navController.navigate(Screen.CollectionCardDetail.createRoute(id)) },
+                    onCardClick      = { id -> navController.navigate(Screen.CollectionCardDetail.createRoute(id)) },
+                    onSettingsClick  = { navController.navigate(Screen.Settings.route) },
                 )
+            }
+
+            // ── Settings ──────────────────────────────────────────────────────
+            composable(Screen.Settings.route) {
+                SettingsScreen(onBack = { navController.popBackStack() })
             }
 
             // ── Profile ───────────────────────────────────────────────────────

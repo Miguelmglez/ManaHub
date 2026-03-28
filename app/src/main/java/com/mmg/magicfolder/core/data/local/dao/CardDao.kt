@@ -47,4 +47,22 @@ interface CardDao {
 
     @Query("UPDATE cards SET tags = :tagsJson WHERE scryfall_id = :scryfallId")
     suspend fun updateTags(scryfallId: String, tagsJson: String)
+
+    @Query("""
+        UPDATE cards SET
+            price_usd      = :priceUsd,
+            price_usd_foil = :priceUsdFoil,
+            price_eur      = :priceEur,
+            price_eur_foil = :priceEurFoil,
+            cached_at      = :updatedAt
+        WHERE scryfall_id = :scryfallId
+    """)
+    suspend fun updatePrices(
+        scryfallId:   String,
+        priceUsd:     Double?,
+        priceUsdFoil: Double?,
+        priceEur:     Double?,
+        priceEurFoil: Double?,
+        updatedAt:    Long = System.currentTimeMillis(),
+    )
 }

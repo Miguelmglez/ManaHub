@@ -117,6 +117,22 @@ class CardRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updatePrices(
+        scryfallId:   String,
+        priceUsd:     Double?,
+        priceUsdFoil: Double?,
+        priceEur:     Double?,
+        priceEurFoil: Double?,
+    ) {
+        cardDao.updatePrices(
+            scryfallId   = scryfallId,
+            priceUsd     = priceUsd,
+            priceUsdFoil = priceUsdFoil,
+            priceEur     = priceEur,
+            priceEurFoil = priceEurFoil,
+        )
+    }
+
     override suspend fun evictStaleCache() =
         cardDao.evictStaleCache(System.currentTimeMillis() - CachePolicy.EVICT_MS)
 

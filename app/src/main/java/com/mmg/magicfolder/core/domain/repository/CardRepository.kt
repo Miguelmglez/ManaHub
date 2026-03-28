@@ -11,6 +11,13 @@ interface CardRepository {
     suspend fun getCardById(scryfallId: String): DataResult<Card>
     fun observeCard(scryfallId: String): Flow<Card?>
     suspend fun refreshCollectionPrices()
+    suspend fun updatePrices(
+        scryfallId:   String,
+        priceUsd:     Double?,
+        priceUsdFoil: Double?,
+        priceEur:     Double?,
+        priceEurFoil: Double?,
+    )
     suspend fun evictStaleCache()
     /** Replace the tag list for a card already in the local cache. */
     suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>)
