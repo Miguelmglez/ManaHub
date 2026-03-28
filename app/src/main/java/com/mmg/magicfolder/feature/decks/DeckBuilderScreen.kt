@@ -22,9 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.mmg.magicfolder.core.ui.theme.magicColors
@@ -65,13 +67,13 @@ fun DeckBuilderScreen(
                         if (state.step == DeckBuilderStep.SETUP) onBack()
                         else viewModel.goBack()
                     }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = mc.textSecondary)
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textSecondary)
                     }
                 },
                 actions = {
                     if (state.step == DeckBuilderStep.BUILDING && state.mainboardCount > 0) {
                         TextButton(onClick = viewModel::goToReview) {
-                            Text("Review", color = mc.primaryAccent,
+                            Text(stringResource(R.string.deckbuilder_step_review), color = mc.primaryAccent,
                                 style = MaterialTheme.magicTypography.labelLarge)
                         }
                     }
@@ -352,7 +354,7 @@ private fun BuildingStep(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text("All cards reviewed", style = MaterialTheme.magicTypography.titleMedium,
+                        Text(stringResource(R.string.deckbuilder_all_reviewed), style = MaterialTheme.magicTypography.titleMedium,
                             color = mc.textSecondary)
                         Text("${state.mainboardCount} cards in deck",
                             style = MaterialTheme.magicTypography.bodyMedium, color = mc.textDisabled)
@@ -361,7 +363,7 @@ private fun BuildingStep(
                             colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                             shape   = RoundedCornerShape(8.dp),
                         ) {
-                            Text("Review Deck", color = mc.background,
+                            Text(stringResource(R.string.deckbuilder_review_deck), color = mc.background,
                                 style = MaterialTheme.magicTypography.titleMedium)
                         }
                     }
@@ -542,7 +544,7 @@ private fun DecisionRow(onDecide: (PathDecision) -> Unit) {
             Icon(Icons.Default.Close, contentDescription = null, tint = mc.textSecondary,
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
-            Text("Skip", style = MaterialTheme.magicTypography.labelLarge, color = mc.textSecondary)
+            Text(stringResource(R.string.action_skip), style = MaterialTheme.magicTypography.labelLarge, color = mc.textSecondary)
         }
 
         // Add
@@ -555,7 +557,7 @@ private fun DecisionRow(onDecide: (PathDecision) -> Unit) {
             Icon(Icons.Default.Check, contentDescription = null, tint = mc.background,
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
-            Text("Add to Deck", style = MaterialTheme.magicTypography.labelLarge, color = mc.background)
+            Text(stringResource(R.string.deckbuilder_add_to_deck), style = MaterialTheme.magicTypography.labelLarge, color = mc.background)
         }
 
         // Sideboard
@@ -672,7 +674,7 @@ private fun ReviewStep(
             Snackbar(
                 action = {
                     TextButton(onClick = onClearError) {
-                        Text("Dismiss", color = mc.primaryAccent)
+                        Text(stringResource(R.string.action_close), color = mc.primaryAccent)
                     }
                 },
                 modifier         = Modifier.align(Alignment.BottomCenter).padding(16.dp),

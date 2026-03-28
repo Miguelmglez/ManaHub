@@ -1,5 +1,6 @@
 package com.mmg.magicfolder.feature.survey
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +8,7 @@ import com.mmg.magicfolder.core.data.local.dao.SurveyAnswerDao
 import com.mmg.magicfolder.core.data.local.entity.SurveyAnswerEntity
 import com.mmg.magicfolder.feature.game.model.GameResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +33,7 @@ data class SurveyUiState(
 class SurveyViewModel @Inject constructor(
     private val surveyAnswerDao: SurveyAnswerDao,
     savedStateHandle:            SavedStateHandle,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val sessionId: Long = savedStateHandle.get<Long>("sessionId") ?: 0L
@@ -50,7 +53,7 @@ class SurveyViewModel @Inject constructor(
 
     fun initWithResult(result: GameResult) {
         if (_uiState.value.questions.isNotEmpty()) return
-        _uiState.update { it.copy(questions = SurveyQuestionEngine.buildQuestions(result)) }
+        _uiState.update { it.copy(questions = SurveyQuestionEngine.buildQuestions(result, context)) }
     }
 
     fun answerAndAdvance(questionId: String, answer: String) {

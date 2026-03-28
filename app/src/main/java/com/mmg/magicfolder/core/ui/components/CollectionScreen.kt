@@ -12,7 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.feature.collection.CollectionViewModel
@@ -41,7 +43,7 @@ fun CollectionScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddCardClick) {
-                Icon(Icons.Default.Add, contentDescription = "Add card")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.collection_empty_action))
             }
         },
     ) { padding ->
@@ -125,19 +127,19 @@ private fun CollectionTopBar(
     var showSortMenu by remember { mutableStateOf(false) }
 
     TopAppBar(
-        title = { Text("ManaHub") },
+        title = { Text(stringResource(R.string.collection_title)) },
         actions = {
             // View mode toggle
             IconButton(onClick = onViewModeToggle) {
                 Icon(
                     imageVector = if (viewMode == ViewMode.GRID)
                         Icons.Default.List else Icons.Default.GridView,
-                    contentDescription = "Toggle view mode",
+                    contentDescription = stringResource(R.string.collection_view_grid),
                 )
             }
             // Sort menu
             IconButton(onClick = { showSortMenu = true }) {
-                Icon(Icons.Default.Sort, contentDescription = "Sort")
+                Icon(Icons.Default.Sort, contentDescription = stringResource(R.string.action_refresh))
             }
             DropdownMenu(
                 expanded         = showSortMenu,
@@ -170,12 +172,12 @@ private fun SearchBar(
         value         = query,
         onValueChange = onQueryChange,
         modifier      = modifier.fillMaxWidth(),
-        placeholder   = { Text("Search in collection…") },
+        placeholder   = { Text(stringResource(R.string.collection_search_hint)) },
         leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null) },
         trailingIcon  = if (query.isNotEmpty()) {
             {
                 IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Clear, contentDescription = "Clear")
+                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_close))
                 }
             }
         } else null,
@@ -256,15 +258,15 @@ private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
             modifier            = Modifier.size(64.dp),
         )
         Spacer(Modifier.height(16.dp))
-        Text("Your collection is empty", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.collection_empty_title), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Add your first card by tapping +",
+            stringResource(R.string.collection_empty_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onAddCardClick) { Text("Add a card") }
+        Button(onClick = onAddCardClick) { Text(stringResource(R.string.collection_empty_action)) }
     }
 }
 

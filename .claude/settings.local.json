@@ -26,7 +26,21 @@
       "Bash(ls \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\\\\app\\\\src\\\\main\\\\java\\\\com\\\\mmg\\\\magicfolder\\\\feature\"\" 2>/dev/null && find \"C:UsersMiguelAndroidStudioProjectsMagic_Folderappsrcmainjavacommmgmagicfolder\" -name \"*.kt\" | grep -v \"theme)",
       "Bash(data)",
       "Bash(domain)",
-      "Bash(network \")"
+      "Bash(network \")",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(export JAVA_HOME=\"C:/Users/Miguel/.jdks/jbr-17.0.14\")",
+      "Bash(./gradlew :app:compileDebugKotlin)",
+      "Bash(./gradlew :app:kspDebugKotlin)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android_Studio/jbr\" PATH=\"/c/Program Files/Android_Studio/jbr/bin:$PATH\" ./gradlew compileDebugKotlin)",
+      "Bash(find /c/Users/Miguel/AndroidStudioProjects/Magic_Folder -name *.toml -o -name build.gradle.kts)",
+      "Bash(find \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder\" -name \"*.kt\" -path \"*/feature/*\" -exec grep -l \"DFC\\\\|flip\\\\|double\" {})",
+      "Bash(find /c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/res -name ic_launcher* -type f)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(grep -v \"//.*\"\"\")"
     ]
   }
 }

@@ -12,8 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.domain.model.Deck
@@ -129,7 +131,7 @@ private fun DeckItem(
             IconButton(onClick = { showDeleteDialog = true }) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Delete deck",
+                    contentDescription = stringResource(R.string.action_delete),
                     tint               = mc.textDisabled,
                     modifier           = Modifier.size(18.dp),
                 )
@@ -140,15 +142,15 @@ private fun DeckItem(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title   = { Text("Delete deck") },
-            text    = { Text("Delete \"${deck.name}\"? This cannot be undone.") },
+            title   = { Text(stringResource(R.string.decklist_delete_title)) },
+            text    = { Text(stringResource(R.string.decklist_delete_message, deck.name)) },
             confirmButton = {
                 TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
-                    Text("Delete", color = mc.lifeNegative)
+                    Text(stringResource(R.string.action_delete), color = mc.lifeNegative)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -188,12 +190,12 @@ private fun EmptyDecksState(
             modifier           = Modifier.size(64.dp),
         )
         Text(
-            "No decks yet",
+            stringResource(R.string.decklist_empty_title),
             style = MaterialTheme.magicTypography.titleMedium,
             color = mc.textPrimary,
         )
         Text(
-            "Build your first deck to start playing",
+            stringResource(R.string.decklist_empty_subtitle),
             style = MaterialTheme.magicTypography.bodyMedium,
             color = mc.textSecondary,
         )
@@ -203,7 +205,7 @@ private fun EmptyDecksState(
             colors  = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
             border  = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent),
         ) {
-            Text("Create your first deck", style = MaterialTheme.magicTypography.labelLarge)
+            Text(stringResource(R.string.decklist_empty_action), style = MaterialTheme.magicTypography.labelLarge)
         }
     }
 }
@@ -225,7 +227,7 @@ private fun CreateDeckDialog(
                 OutlinedTextField(
                     value         = name,
                     onValueChange = { name = it },
-                    label         = { Text("Deck name") },
+                    label         = { Text(stringResource(R.string.deckbuilder_name_hint)) },
                     singleLine    = true,
                     colors        = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor   = mc.primaryAccent,
@@ -243,11 +245,11 @@ private fun CreateDeckDialog(
                 onClick  = { onCreate(name, format) },
                 enabled  = name.isNotBlank(),
             ) {
-                Text("Create", color = if (name.isNotBlank()) mc.primaryAccent else mc.textDisabled)
+                Text(stringResource(R.string.action_confirm), color = if (name.isNotBlank()) mc.primaryAccent else mc.textDisabled)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

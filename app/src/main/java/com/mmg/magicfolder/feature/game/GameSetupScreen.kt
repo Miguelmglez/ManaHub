@@ -20,9 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
@@ -48,14 +50,14 @@ fun GameSetupScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "New Game",
+                        stringResource(R.string.gamesetup_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = mc.textSecondary)
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
@@ -72,7 +74,7 @@ fun GameSetupScreen(
         ) {
             // ── Title ─────────────────────────────────────────────────────────
             Text(
-                text      = "ManaHub",
+                text      = stringResource(R.string.gamesetup_app_title),
                 style     = MaterialTheme.magicTypography.displayMedium,
                 color     = mc.goldMtg,
                 textAlign = TextAlign.Center,
@@ -81,7 +83,7 @@ fun GameSetupScreen(
             // ── Mode selector ─────────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "Game Mode",
+                    stringResource(R.string.gamesetup_mode_label),
                     style = MaterialTheme.magicTypography.labelLarge,
                     color = mc.textSecondary,
                 )
@@ -126,7 +128,7 @@ fun GameSetupScreen(
             if (uiState.playerConfigs.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Tap a player to change position",
+                        stringResource(R.string.gamesetup_layout_label),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textSecondary,
                     )
@@ -147,7 +149,7 @@ fun GameSetupScreen(
                 shape    = RoundedCornerShape(8.dp),
             ) {
                 Text(
-                    "Begin the Game",
+                    stringResource(R.string.gamesetup_begin_button),
                     style = MaterialTheme.magicTypography.titleMedium,
                     color = mc.background,
                 )
@@ -155,7 +157,7 @@ fun GameSetupScreen(
 
             TextButton(onClick = onNavigateToTournament) {
                 Text(
-                    "Create a tournament instead →",
+                    stringResource(R.string.gamesetup_tournament_link),
                     color = mc.textSecondary,
                     style = MaterialTheme.magicTypography.bodySmall,
                 )
@@ -180,7 +182,7 @@ private fun PlayerCountStepper(
         modifier              = Modifier.fillMaxWidth(),
     ) {
         Text(
-            "Players",
+            stringResource(R.string.gamesetup_players_label),
             style    = MaterialTheme.magicTypography.labelLarge,
             color    = mc.textSecondary,
             modifier = Modifier.weight(1f),
@@ -274,7 +276,7 @@ private fun PlayerConfigRow(
                 Box {
                     if (config.name.isEmpty()) {
                         Text(
-                            "Player ${config.id + 1}",
+                            stringResource(R.string.gamesetup_player_name_hint, config.id + 1),
                             style = MaterialTheme.magicTypography.bodyLarge,
                             color = mc.textDisabled,
                         )
@@ -319,7 +321,7 @@ private fun ColorPickerSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                "Choose color",
+                stringResource(R.string.gamesetup_choose_color),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )

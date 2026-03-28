@@ -19,9 +19,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -66,7 +68,7 @@ fun AddCardScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.Default.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
                     }
@@ -173,14 +175,14 @@ private fun SearchTab(
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
             placeholder = {
-                Text("Card name...", color = mc.textDisabled)
+                Text(stringResource(R.string.addcard_search_hint), color = mc.textDisabled)
             },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
             },
             trailingIcon = if (uiState.query.isNotEmpty()) {{
                 IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = mc.textDisabled)
+                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_close), tint = mc.textDisabled)
                 }
             }} else null,
             singleLine      = true,
@@ -459,7 +461,7 @@ private fun AddCardConfirmSheet(
 
             // Foil toggle
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Foil", Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
+                Text(stringResource(R.string.addcard_confirm_foil), Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
                 Switch(
                     checked         = isFoil,
                     onCheckedChange = { isFoil = it },
@@ -474,18 +476,18 @@ private fun AddCardConfirmSheet(
 
             // Quantity stepper
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Quantity", Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
+                Text(stringResource(R.string.addcard_confirm_quantity), Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
                 IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = mc.textSecondary)
+                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove), tint = mc.textSecondary)
                 }
                 Text("$qty", style = ty.titleMedium, color = mc.primaryAccent)
                 IconButton(onClick = { qty++ }) {
-                    Icon(Icons.Default.Add, contentDescription = "Increase", tint = mc.textSecondary)
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add), tint = mc.textSecondary)
                 }
             }
 
             // Condition chips
-            Text("Condition", style = ty.labelLarge, color = mc.textSecondary)
+            Text(stringResource(R.string.addcard_confirm_condition), style = ty.labelLarge, color = mc.textSecondary)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 conditions.forEach { c ->
                     FilterChip(
@@ -515,7 +517,7 @@ private fun AddCardConfirmSheet(
                     value         = language.uppercase(),
                     onValueChange = {},
                     readOnly      = true,
-                    label         = { Text("Language", style = ty.labelMedium, color = mc.textSecondary) },
+                    label         = { Text(stringResource(R.string.addcard_confirm_language), style = ty.labelMedium, color = mc.textSecondary) },
                     trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                     modifier      = Modifier.menuAnchor().fillMaxWidth(),
                     textStyle     = ty.bodyMedium,
@@ -545,14 +547,14 @@ private fun AddCardConfirmSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel", style = ty.labelLarge, color = mc.textSecondary)
+                    Text(stringResource(R.string.action_cancel), style = ty.labelLarge, color = mc.textSecondary)
                 }
                 Button(
                     onClick = { onConfirm(isFoil, condition, language, qty) },
                     colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                     shape   = RoundedCornerShape(8.dp),
                 ) {
-                    Text("Add to collection", style = ty.labelLarge, color = mc.background)
+                    Text(stringResource(R.string.addcard_confirm_button), style = ty.labelLarge, color = mc.background)
                 }
             }
             Spacer(Modifier.height(16.dp))

@@ -27,9 +27,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mmg.magicfolder.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
 import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
@@ -55,7 +57,7 @@ fun ProfileScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Profile",
+                        stringResource(R.string.profile_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
@@ -735,10 +737,10 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        InfoRow("App",     "ManaHub")
-        InfoRow("Version", "1.0.0")
-        InfoRow("Data",    "Scryfall API")
-        InfoRow("Engine",  "ManaHub v1")
+        InfoRow(stringResource(R.string.settings_app_name_label),    stringResource(R.string.app_name))
+        InfoRow(stringResource(R.string.settings_version_label),     "1.0.0")
+        InfoRow(stringResource(R.string.settings_data_source_label), stringResource(R.string.settings_data_source_value))
+        InfoRow("Engine",  stringResource(R.string.app_name) + " v1")
     }
 }
 

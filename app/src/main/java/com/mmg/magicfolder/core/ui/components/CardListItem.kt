@@ -1,6 +1,8 @@
 package com.mmg.magicfolder.core.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.res.stringResource
+import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -105,7 +107,7 @@ fun CardListItem(
                 ) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Delete",
+                        contentDescription = stringResource(R.string.action_delete),
                         modifier           = Modifier.size(16.dp),
                         tint               = mc.textDisabled,
                     )
@@ -117,15 +119,15 @@ fun CardListItem(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title            = { Text("Remove card") },
-            text             = { Text("Remove ${card.name} from your collection?") },
+            title            = { Text(stringResource(R.string.carddetail_delete_title)) },
+            text             = { Text(stringResource(R.string.carddetail_delete_message, card.name)) },
             confirmButton    = {
                 TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
-                    Text("Remove", color = mc.lifeNegative)
+                    Text(stringResource(R.string.action_remove), color = mc.lifeNegative)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }

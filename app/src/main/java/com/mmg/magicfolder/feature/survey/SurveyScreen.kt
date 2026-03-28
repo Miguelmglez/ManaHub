@@ -27,9 +27,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mmg.magicfolder.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
@@ -72,14 +74,14 @@ fun SurveyScreen(
             verticalAlignment     = Alignment.CenterVertically,
         ) {
             Text(
-                text  = "Game Review",
+                text  = stringResource(R.string.survey_title),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = MaterialTheme.magicColors.textPrimary,
             )
             IconButton(onClick = { viewModel.skipAll() }) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Skip all",
+                    contentDescription = stringResource(R.string.survey_skip_all_description),
                     tint               = MaterialTheme.magicColors.textSecondary,
                 )
             }
@@ -293,14 +295,14 @@ private fun MultiChoiceList(
                 onClick  = onSkip,
                 modifier = Modifier.weight(1f),
                 shape    = RoundedCornerShape(12.dp),
-            ) { Text("Skip") }
+            ) { Text(stringResource(R.string.action_skip)) }
             Button(
                 onClick  = { onConfirm(selected.toList()) },
                 modifier = Modifier.weight(2f),
                 shape    = RoundedCornerShape(12.dp),
                 enabled  = selected.isNotEmpty(),
                 colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            ) { Text("Confirm \u2192") }
+            ) { Text(stringResource(R.string.survey_confirm_button)) }
         }
     }
 }
@@ -355,14 +357,14 @@ private fun StarRatingInput(
                 onClick  = onSkip,
                 modifier = Modifier.weight(1f),
                 shape    = RoundedCornerShape(12.dp),
-            ) { Text("Skip") }
+            ) { Text(stringResource(R.string.action_skip)) }
             Button(
                 onClick  = { onConfirm("$rating") },
                 modifier = Modifier.weight(2f),
                 shape    = RoundedCornerShape(12.dp),
                 enabled  = rating > 0,
                 colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            ) { Text("Next \u2192") }
+            ) { Text(stringResource(R.string.survey_next_button)) }
         }
     }
 }
@@ -419,13 +421,13 @@ private fun FreeTextInput(
                 onClick  = onSkip,
                 modifier = Modifier.weight(1f),
                 shape    = RoundedCornerShape(12.dp),
-            ) { Text("Skip") }
+            ) { Text(stringResource(R.string.action_skip)) }
             Button(
                 onClick  = { onConfirm(text) },
                 modifier = Modifier.weight(2f),
                 shape    = RoundedCornerShape(12.dp),
                 colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            ) { Text(if (text.isBlank()) "Skip \u2192" else "Save \u2192") }
+            ) { Text(if (text.isBlank()) stringResource(R.string.action_skip) else stringResource(R.string.survey_save_button)) }
         }
     }
 }

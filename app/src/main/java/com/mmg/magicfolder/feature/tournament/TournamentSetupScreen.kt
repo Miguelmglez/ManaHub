@@ -18,9 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
@@ -45,7 +47,7 @@ fun TournamentSetupScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "New Tournament",
+                        stringResource(R.string.tournament_setup_title),
                         style = MaterialTheme.magicTypography.titleMedium,
                         color = mc.textPrimary,
                     )
@@ -54,7 +56,7 @@ fun TournamentSetupScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
                     }
@@ -112,22 +114,22 @@ fun TournamentSetupScreen(
                 SectionLabel("Structure")
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StructureOption(
-                        title       = "Round Robin",
-                        description = "Everyone plays against everyone",
+                        title       = stringResource(R.string.tournament_structure_round_robin),
+                        description = stringResource(R.string.tournament_structure_round_robin_desc),
                         icon        = "⟳",
                         selected    = uiState.structure == "ROUND_ROBIN",
                         onClick     = { viewModel.onStructureChange("ROUND_ROBIN") },
                     )
                     StructureOption(
-                        title       = "Swiss",
-                        description = "Paired by similar record each round",
+                        title       = stringResource(R.string.tournament_structure_swiss),
+                        description = stringResource(R.string.tournament_structure_swiss_desc),
                         icon        = "♟",
                         selected    = uiState.structure == "SWISS",
                         onClick     = { viewModel.onStructureChange("SWISS") },
                     )
                     StructureOption(
-                        title       = "Single Elimination",
-                        description = "Lose and you're out",
+                        title       = stringResource(R.string.tournament_structure_elimination),
+                        description = stringResource(R.string.tournament_structure_elimination_desc),
                         icon        = "⚔",
                         selected    = uiState.structure == "SINGLE_ELIM",
                         onClick     = { viewModel.onStructureChange("SINGLE_ELIM") },
@@ -184,13 +186,13 @@ fun TournamentSetupScreen(
                 ) {
                     Column {
                         Text(
-                            text  = if (uiState.isRandomPairings) "Random pairings" else "Manual pairings",
+                            text  = if (uiState.isRandomPairings) stringResource(R.string.tournament_pairings_random) else stringResource(R.string.tournament_pairings_manual),
                             style = MaterialTheme.magicTypography.bodyMedium,
                             color = mc.textPrimary,
                         )
                         Text(
-                            text  = if (uiState.isRandomPairings) "Matchups generated automatically"
-                                    else "You choose the order of matches",
+                            text  = if (uiState.isRandomPairings) stringResource(R.string.tournament_pairings_random_desc)
+                                    else stringResource(R.string.tournament_pairings_manual_desc),
                             style = MaterialTheme.magicTypography.bodySmall,
                             color = mc.textSecondary,
                         )
@@ -216,7 +218,7 @@ fun TournamentSetupScreen(
                     SectionLabel("Players (${uiState.players.size})")
                     TextButton(onClick = { viewModel.addPlayer() }) {
                         Text(
-                            "+ Add player",
+                            stringResource(R.string.tournament_add_player),
                             color = mc.primaryAccent,
                             style = MaterialTheme.magicTypography.labelMedium,
                         )
@@ -258,7 +260,7 @@ fun TournamentSetupScreen(
                         )
                     } else {
                         Text(
-                            "Create Tournament ⚔",
+                            stringResource(R.string.tournament_create_button),
                             style = MaterialTheme.magicTypography.labelLarge,
                         )
                     }
@@ -389,7 +391,7 @@ private fun PlayerConfigRow(
             onValueChange = onNameChange,
             placeholder   = {
                 Text(
-                    "Player ${config.id + 1}",
+                    stringResource(R.string.gamesetup_player_name_hint, config.id + 1),
                     style = MaterialTheme.magicTypography.bodySmall,
                     color = mc.textDisabled,
                 )

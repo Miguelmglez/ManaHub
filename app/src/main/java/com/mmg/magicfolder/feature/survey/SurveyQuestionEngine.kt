@@ -1,5 +1,7 @@
 package com.mmg.magicfolder.feature.survey
 
+import android.content.Context
+import com.mmg.magicfolder.R
 import com.mmg.magicfolder.feature.game.model.EliminationReason
 import com.mmg.magicfolder.feature.game.model.GameMode
 import com.mmg.magicfolder.feature.game.model.GameResult
@@ -34,7 +36,7 @@ data class SurveyQuestion(
 
 object SurveyQuestionEngine {
 
-    fun buildQuestions(result: GameResult): List<SurveyQuestion> {
+    fun buildQuestions(result: GameResult, context: Context): List<SurveyQuestion> {
         val questions   = mutableListOf<SurveyQuestion>()
         val localPlayer = result.playerResults.firstOrNull()
         val isWinner    = localPlayer?.player?.id == result.winner.id
@@ -43,18 +45,18 @@ object SurveyQuestionEngine {
         questions += SurveyQuestion(
             id   = "result_feel",
             type = "RESULT_FEEL",
-            text = if (isWinner) "How did the win feel?" else "What cost you the game?",
+            text = if (isWinner) context.getString(R.string.survey_q_result_win) else context.getString(R.string.survey_q_result_loss),
             answerOption = AnswerOption.SingleChoice(
                 if (isWinner) listOf(
-                    SurveyChoice("DOMINANT",  "Dominant",    "\uD83D\uDCAA"),
-                    SurveyChoice("CLOSE",     "Close call",  "\uD83D\uDE05"),
-                    SurveyChoice("LUCKY",     "Lucky draw",  "\uD83C\uDF40"),
-                    SurveyChoice("SKILLFUL",  "Outplayed",   "\uD83E\uDDE0"),
+                    SurveyChoice("DOMINANT",  context.getString(R.string.survey_a_dominant),    "\uD83D\uDCAA"),
+                    SurveyChoice("CLOSE",     context.getString(R.string.survey_a_close),       "\uD83D\uDE05"),
+                    SurveyChoice("LUCKY",     context.getString(R.string.survey_a_lucky),       "\uD83C\uDF40"),
+                    SurveyChoice("SKILLFUL",  context.getString(R.string.survey_a_skillful),    "\uD83E\uDDE0"),
                 ) else listOf(
-                    SurveyChoice("OVERWHELMED", "Overwhelmed", "\u26A1"),
-                    SurveyChoice("MANA",        "Mana issues", "\uD83C\uDFD4"),
-                    SurveyChoice("NO_ANSWERS",  "No answers",  "\uD83D\uDEAB"),
-                    SurveyChoice("TOO_SLOW",    "Too slow",    "\uD83D\uDC22"),
+                    SurveyChoice("OVERWHELMED", context.getString(R.string.survey_a_overwhelmed), "\u26A1"),
+                    SurveyChoice("MANA",        context.getString(R.string.survey_a_mana_issues), "\uD83C\uDFD4"),
+                    SurveyChoice("NO_ANSWERS",  context.getString(R.string.survey_a_no_answers),  "\uD83D\uDEAB"),
+                    SurveyChoice("TOO_SLOW",    context.getString(R.string.survey_a_too_slow),    "\uD83D\uDC22"),
                 )
             ),
         )
@@ -63,13 +65,13 @@ object SurveyQuestionEngine {
         questions += SurveyQuestion(
             id   = "mana_health",
             type = "MANA",
-            text = "How was your mana?",
+            text = context.getString(R.string.survey_q_mana),
             answerOption = AnswerOption.MultiChoice(listOf(
-                SurveyChoice("SMOOTH",  "Smooth",       "\u2705"),
-                SurveyChoice("FLOODED", "Land flooded", "\uD83C\uDF0A"),
-                SurveyChoice("SCREWED", "Mana screwed", "\uD83C\uDFDC"),
-                SurveyChoice("COLORS",  "Wrong colors", "\uD83C\uDFA8"),
-                SurveyChoice("NONE",    "No issues",    "\uD83D\uDC4D"),
+                SurveyChoice("SMOOTH",  context.getString(R.string.survey_a_mana_smooth),   "\u2705"),
+                SurveyChoice("FLOODED", context.getString(R.string.survey_a_mana_flooded),  "\uD83C\uDF0A"),
+                SurveyChoice("SCREWED", context.getString(R.string.survey_a_mana_screwed),  "\uD83C\uDFDC"),
+                SurveyChoice("COLORS",  context.getString(R.string.survey_a_mana_colors),   "\uD83C\uDFA8"),
+                SurveyChoice("NONE",    context.getString(R.string.survey_a_mana_none),     "\uD83D\uDC4D"),
             )),
         )
 
@@ -77,7 +79,7 @@ object SurveyQuestionEngine {
         questions += SurveyQuestion(
             id           = "hand_quality",
             type         = "HAND",
-            text         = "How was your opening hand?",
+            text         = context.getString(R.string.survey_q_hand),
             answerOption = AnswerOption.StarRating(maxStars = 5),
         )
 
@@ -89,12 +91,12 @@ object SurveyQuestionEngine {
             questions += SurveyQuestion(
                 id           = "commander_plan",
                 type         = "COMMANDER_DAMAGE",
-                text         = "Commander damage was decisive.\nWas that your plan?",
-                contextBadge = "\u2694 Commander damage win",
+                text         = context.getString(R.string.survey_q_commander_plan),
+                contextBadge = context.getString(R.string.survey_q_commander_badge),
                 answerOption = AnswerOption.SingleChoice(listOf(
-                    SurveyChoice("PLANNED",   "Planned it",          "\uD83C\uDFAF"),
-                    SurveyChoice("DEVELOPED", "Developed naturally", "\uD83C\uDF31"),
-                    SurveyChoice("SURPRISE",  "Surprised me too",    "\uD83D\uDE2E"),
+                    SurveyChoice("PLANNED",   context.getString(R.string.survey_a_planned),    "\uD83C\uDFAF"),
+                    SurveyChoice("DEVELOPED", context.getString(R.string.survey_a_developed),  "\uD83C\uDF31"),
+                    SurveyChoice("SURPRISE",  context.getString(R.string.survey_a_surprise),   "\uD83D\uDE2E"),
                 )),
             )
         }
@@ -104,12 +106,12 @@ object SurveyQuestionEngine {
             questions += SurveyQuestion(
                 id   = "loss_reason",
                 type = "LOSS_REASON",
-                text = "What would have changed the outcome?",
+                text = context.getString(R.string.survey_q_loss_reason),
                 answerOption = AnswerOption.SingleChoice(listOf(
-                    SurveyChoice("REMOVAL",     "More removal",        "\u2694"),
-                    SurveyChoice("CURVE",       "Better mana curve",   "\uD83D\uDCCA"),
-                    SurveyChoice("INTERACTION", "More interaction",    "\uD83D\uDEE1"),
-                    SurveyChoice("NOTHING",     "Opponent was better", "\uD83E\uDD1D"),
+                    SurveyChoice("REMOVAL",     context.getString(R.string.survey_a_more_removal),    "\u2694"),
+                    SurveyChoice("CURVE",       context.getString(R.string.survey_a_better_curve),    "\uD83D\uDCCA"),
+                    SurveyChoice("INTERACTION", context.getString(R.string.survey_a_more_interaction), "\uD83D\uDEE1"),
+                    SurveyChoice("NOTHING",     context.getString(R.string.survey_a_nothing),          "\uD83E\uDD1D"),
                 )),
             )
         }
@@ -118,8 +120,8 @@ object SurveyQuestionEngine {
         questions += SurveyQuestion(
             id           = "free_notes",
             type         = "FREE_TEXT",
-            text         = "Anything to note about this game?",
-            contextBadge = "Optional",
+            text         = context.getString(R.string.survey_q_free_text),
+            contextBadge = context.getString(R.string.survey_q_free_text_badge),
             answerOption = AnswerOption.FreeText,
         )
 

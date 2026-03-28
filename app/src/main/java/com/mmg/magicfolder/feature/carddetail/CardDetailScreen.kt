@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
+import com.mmg.magicfolder.R
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -43,16 +45,16 @@ fun CardDetailScreen(
                 title = { Text(uiState.card?.name ?: "") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     uiState.userCard?.let {
                         IconButton(onClick = viewModel::onShowEditDialog) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit))
                         }
                         IconButton(onClick = viewModel::onShowDeleteConfirm) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete",
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete),
                                 tint = MaterialTheme.colorScheme.error)
                         }
                     }
@@ -104,15 +106,15 @@ fun CardDetailScreen(
     if (uiState.showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = viewModel::onDismissDeleteConfirm,
-            title   = { Text("Remove card") },
-            text    = { Text("Remove ${uiState.card?.name} from your collection?") },
+            title   = { Text(stringResource(R.string.carddetail_delete_title)) },
+            text    = { Text(stringResource(R.string.carddetail_delete_message, uiState.card?.name ?: "")) },
             confirmButton = {
                 TextButton(onClick = { viewModel.onDeleteCard(uiState.userCard!!.id) }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::onDismissDeleteConfirm) { Text("Cancel") }
+                TextButton(onClick = viewModel::onDismissDeleteConfirm) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -264,7 +266,7 @@ private fun CardDetailContent(
             Icon(Icons.Default.OpenInBrowser, contentDescription = null,
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
-            Text("View on Scryfall")
+            Text(stringResource(R.string.carddetail_view_scryfall))
         }
     }
 }
@@ -272,11 +274,11 @@ private fun CardDetailContent(
 @Composable
 private fun PriceSection(card: Card, userCard: UserCard?) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Market prices", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.carddetail_market_prices), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            PricePill(label = "Regular", price = card.priceUsd, currency = "$")
-            PricePill(label = "Foil",    price = card.priceUsdFoil, currency = "$")
-            PricePill(label = "EUR",     price = card.priceEur, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_regular), price = card.priceUsd, currency = "$")
+            PricePill(label = stringResource(R.string.carddetail_price_foil),    price = card.priceUsdFoil, currency = "$")
+            PricePill(label = stringResource(R.string.carddetail_price_eur),     price = card.priceEur, currency = "€")
         }
     }
 }
@@ -297,11 +299,11 @@ private fun PricePill(label: String, price: Double?, currency: String) {
 @Composable
 private fun CollectionInfoSection(userCard: UserCard) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("In your collection", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.carddetail_in_collection), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            InfoPill(label = "Quantity",  value = "×${userCard.quantity}")
-            InfoPill(label = "Condition", value = userCard.condition)
-            InfoPill(label = "Language",  value = userCard.language.uppercase())
+            InfoPill(label = stringResource(R.string.carddetail_quantity_label),  value = "×${userCard.quantity}")
+            InfoPill(label = stringResource(R.string.carddetail_condition), value = userCard.condition)
+            InfoPill(label = stringResource(R.string.carddetail_language),  value = userCard.language.uppercase())
         }
     }
 }
@@ -318,7 +320,7 @@ private fun InfoPill(label: String, value: String) {
 @Composable
 private fun LegalitySection(card: Card) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Legality", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.carddetail_legality), style = MaterialTheme.typography.titleSmall)
         val formats = listOf(
             "Standard"  to card.legalityStandard,
             "Pioneer"   to card.legalityPioneer,
@@ -500,24 +502,24 @@ private fun EditCardSheet(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Edit card", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.carddetail_edit_title), style = MaterialTheme.typography.titleMedium)
 
             // Quantity stepper
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Quantity", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.carddetail_quantity_label), style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Decrease")
+                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove))
                 }
                 Text("$qty", style = MaterialTheme.typography.titleMedium)
                 IconButton(onClick = { qty++ }) {
-                    Icon(Icons.Default.Add, contentDescription = "Increase")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
                 }
             }
 
             // Condition selector
-            Text("Condition", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.carddetail_condition), style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 conditions.forEach { c ->
                     FilterChip(
@@ -532,12 +534,12 @@ private fun EditCardSheet(
                 modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                 Button(onClick = {
                     onUpdateQty(qty)
                     onUpdateCond(cond)
                     onDismiss()
-                }) { Text("Save") }
+                }) { Text(stringResource(R.string.action_save)) }
             }
             Spacer(Modifier.height(16.dp))
         }

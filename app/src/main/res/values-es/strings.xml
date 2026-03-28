@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ManaHub — Spanish translations
+    TODO: Translate all strings from values/strings.xml
+
+    Priority strings to translate first:
+    - All UI labels (nav, buttons, titles)
+    - Error messages
+    - Survey questions and answers
+-->
+<resources>
+    <string name="app_name">ManaHub</string>
+    <!-- TODO: Add Spanish translations -->
+</resources>

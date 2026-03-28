@@ -16,10 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.data.local.entity.TournamentMatchEntity
@@ -54,7 +56,7 @@ fun TournamentScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
                     }
@@ -82,7 +84,7 @@ fun TournamentScreen(
                     )
                 },
             ) {
-                listOf("Standings", "Matches").forEachIndexed { i, title ->
+                listOf(stringResource(R.string.tournament_tab_standings), stringResource(R.string.tournament_tab_matches)).forEachIndexed { i, title ->
                     Tab(
                         selected = selectedTab == i,
                         onClick  = { selectedTab = i },
@@ -153,7 +155,7 @@ private fun StandingsTab(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            "🏆 Tournament Winner",
+                            stringResource(R.string.tournament_winner_label),
                             style = MaterialTheme.magicTypography.labelLarge,
                             color = mc.goldMtg,
                         )
@@ -181,7 +183,7 @@ private fun StandingsTab(
                     shape    = RoundedCornerShape(14.dp),
                     colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                 ) {
-                    Text("▶ Start Next Match", style = MaterialTheme.magicTypography.labelLarge)
+                    Text(stringResource(R.string.tournament_start_next), style = MaterialTheme.magicTypography.labelLarge)
                 }
             }
         }
@@ -192,9 +194,9 @@ private fun StandingsTab(
                 modifier              = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("#  Player", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+                Text(stringResource(R.string.tournament_standings_header_player), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    listOf("W", "L", "Pts", "Life").forEach { col ->
+                    listOf(stringResource(R.string.tournament_standings_w), stringResource(R.string.tournament_standings_l), stringResource(R.string.tournament_standings_pts), stringResource(R.string.tournament_standings_life)).forEach { col ->
                         Text(col, style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
                     }
                 }
@@ -284,7 +286,7 @@ private fun MatchesTab(
         byRound.forEach { (round, roundMatches) ->
             item {
                 Text(
-                    "Round $round",
+                    stringResource(R.string.tournament_round_label, round),
                     style    = MaterialTheme.magicTypography.labelLarge,
                     color    = MaterialTheme.magicColors.textSecondary,
                     modifier = Modifier.padding(vertical = 4.dp),
@@ -340,7 +342,7 @@ private fun MatchRow(
                 modifier            = Modifier.padding(horizontal = 12.dp),
             ) {
                 Text(
-                    text  = when (match.status) { "FINISHED" -> "✓"; "ACTIVE" -> "●"; else -> "VS" },
+                    text  = when (match.status) { "FINISHED" -> "✓"; "ACTIVE" -> "●"; else -> stringResource(R.string.tournament_match_vs) },
                     style = MaterialTheme.magicTypography.titleMedium,
                     color = when (match.status) {
                         "FINISHED" -> mc.lifePositive.copy(alpha = 0.6f)
@@ -354,7 +356,7 @@ private fun MatchRow(
                         onClick        = onStart,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     ) {
-                        Text("Play", style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                        Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
                     }
                 }
             }

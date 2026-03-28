@@ -1,3 +1,529 @@
 <resources>
+
+    <!-- ══════════════════════════════════════════
+         APP GLOBAL
+    ═══════════════════════════════════════════ -->
     <string name="app_name">ManaHub</string>
+    <string name="app_tagline">Your Magic companion</string>
+
+    <!-- Acciones comunes -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_add">Add</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_search">Search</string>
+    <string name="action_close">Close</string>
+    <string name="action_back">Back</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_next">Next →</string>
+    <string name="action_done">Done</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_exit">Exit</string>
+    <string name="action_apply">Apply</string>
+    <string name="action_move">Move</string>
+    <string name="action_share">Share</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_play_again">Play Again</string>
+
+    <!-- Estados genéricos -->
+    <string name="state_loading">Loading…</string>
+    <string name="state_error">Something went wrong</string>
+    <string name="state_empty">Nothing here yet</string>
+    <string name="state_coming_soon">Coming soon</string>
+    <string name="state_optional">Optional</string>
+
+    <!-- Navegación -->
+    <string name="nav_collection">Collection</string>
+    <string name="nav_play">Play</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_stats">Stats</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- ══════════════════════════════════════════
+         COLLECTION SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="collection_title">ManaHub</string>
+    <string name="collection_search_hint">Search in collection…</string>
+    <string name="collection_tab_cards">Cards</string>
+    <string name="collection_tab_decks">Decks</string>
+    <string name="collection_filter_all">All</string>
+    <string name="collection_filter_white">White</string>
+    <string name="collection_filter_blue">Blue</string>
+    <string name="collection_filter_black">Black</string>
+    <string name="collection_filter_red">Red</string>
+    <string name="collection_filter_green">Green</string>
+    <string name="collection_filter_multicolor">Multicolor</string>
+    <string name="collection_card_count">%1$d cards</string>
+    <string name="collection_empty_title">Your collection is empty</string>
+    <string name="collection_empty_subtitle">Add your first card by tapping +</string>
+    <string name="collection_empty_action">Add a card</string>
+    <string name="collection_stale_banner">Prices may be outdated. Tap to refresh.</string>
+    <string name="collection_sort_name">Name</string>
+    <string name="collection_sort_price">Price</string>
+    <string name="collection_sort_rarity">Rarity</string>
+    <string name="collection_sort_cmc">Mana cost</string>
+    <string name="collection_view_grid">Grid view</string>
+    <string name="collection_view_list">List view</string>
+
+    <!-- ══════════════════════════════════════════
+         ADD CARD SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="addcard_title">Add Card</string>
+    <string name="addcard_tab_search">Search</string>
+    <string name="addcard_tab_scanner">Scanner</string>
+    <string name="addcard_search_hint">Card name…</string>
+    <string name="addcard_search_min_chars">Type at least 2 characters to search</string>
+    <string name="addcard_no_results">No cards found</string>
+    <string name="addcard_no_results_subtitle">Try searching in another language\nor check the spelling</string>
+    <string name="addcard_scanner_title">Scan card barcode</string>
+    <string name="addcard_scanner_subtitle">Point the camera at the barcode\non the back of the card</string>
+    <string name="addcard_scanner_button">Open Scanner</string>
+    <string name="addcard_confirm_title">Add to collection</string>
+    <string name="addcard_confirm_quantity">Quantity</string>
+    <string name="addcard_confirm_foil">Foil</string>
+    <string name="addcard_confirm_condition">Condition</string>
+    <string name="addcard_confirm_language">Language</string>
+    <string name="addcard_confirm_button">Add to collection</string>
+    <string name="addcard_condition_nm">Near Mint</string>
+    <string name="addcard_condition_lp">Lightly Played</string>
+    <string name="addcard_condition_mp">Moderately Played</string>
+    <string name="addcard_condition_hp">Heavily Played</string>
+    <string name="addcard_condition_dmg">Damaged</string>
+    <string name="addcard_added_success">%1$s added to collection</string>
+
+    <!-- ══════════════════════════════════════════
+         CARD DETAIL SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="carddetail_title">Card Detail</string>
+    <string name="carddetail_oracle_text">Oracle Text</string>
+    <string name="carddetail_flavor_text">Flavour Text</string>
+    <string name="carddetail_legalities">Legalities</string>
+    <string name="carddetail_legality_legal">Legal</string>
+    <string name="carddetail_legality_banned">Banned</string>
+    <string name="carddetail_legality_restricted">Restricted</string>
+    <string name="carddetail_legality_not_legal">Not Legal</string>
+    <string name="carddetail_price_usd">USD</string>
+    <string name="carddetail_price_eur">EUR</string>
+    <string name="carddetail_price_foil">Foil</string>
+    <string name="carddetail_view_scryfall">View on Scryfall</string>
+    <string name="carddetail_tags_section">Tags</string>
+    <string name="carddetail_edit_title">Edit card</string>
+    <string name="carddetail_delete_title">Remove card</string>
+    <string name="carddetail_delete_message">Remove %1$s from your collection?</string>
+    <string name="carddetail_flip_card">Flip card</string>
+    <string name="carddetail_in_decks">In %1$d deck(s)</string>
+    <string name="carddetail_quantity">%1$d in collection</string>
+    <string name="carddetail_market_prices">Market prices</string>
+    <string name="carddetail_in_collection">In your collection</string>
+    <string name="carddetail_legality">Legality</string>
+    <string name="carddetail_price_regular">Regular</string>
+    <string name="carddetail_condition">Condition</string>
+    <string name="carddetail_language">Language</string>
+    <string name="carddetail_quantity_label">Quantity</string>
+
+    <!-- ══════════════════════════════════════════
+         STATS SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="stats_title">Statistics</string>
+    <string name="stats_overview">Overview</string>
+    <string name="stats_total_cards">Total cards</string>
+    <string name="stats_unique_cards">Unique cards</string>
+    <string name="stats_decks_saved">Decks saved</string>
+    <string name="stats_collection_value">Collection value</string>
+    <string name="stats_most_valuable">Most valuable cards</string>
+    <string name="stats_color_distribution">Color distribution</string>
+    <string name="stats_mana_curve">Mana curve</string>
+    <string name="stats_by_type">By type</string>
+    <string name="stats_by_rarity">By rarity</string>
+    <string name="stats_refresh_prices">Refresh prices</string>
+    <string name="stats_updated_just_now">Updated just now</string>
+    <string name="stats_updated_ago">Updated %1$s ago</string>
+    <string name="stats_prices_outdated">Prices may be outdated</string>
+    <string name="stats_refreshing">Updating prices…</string>
+    <string name="stats_refresh_progress">%1$d / %2$d batches</string>
+    <string name="stats_refresh_success">Updated %1$d prices</string>
+    <string name="stats_refresh_error">Error refreshing prices</string>
+    <string name="stats_empty_collection">Add cards to see your stats</string>
+    <string name="stats_currency_usd">USD</string>
+    <string name="stats_currency_eur">EUR</string>
+    <string name="stats_rarity_common">Common</string>
+    <string name="stats_rarity_uncommon">Uncommon</string>
+    <string name="stats_rarity_rare">Rare</string>
+    <string name="stats_rarity_mythic">Mythic</string>
+
+    <!-- ══════════════════════════════════════════
+         DECK LIST SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="decklist_title">Decks</string>
+    <string name="decklist_create_button">Create new deck</string>
+    <string name="decklist_empty_title">No decks yet</string>
+    <string name="decklist_empty_subtitle">Create your first deck with the help of our smart builder</string>
+    <string name="decklist_empty_action">Create my first deck</string>
+    <string name="decklist_delete_title">Delete deck</string>
+    <string name="decklist_delete_message">Delete %1$s? This cannot be undone.</string>
+    <string name="decklist_format_commander">Commander</string>
+    <string name="decklist_format_standard">Standard</string>
+    <string name="decklist_format_modern">Modern</string>
+    <string name="decklist_format_draft">Draft</string>
+    <string name="decklist_card_count">%1$d cards</string>
+    <string name="decklist_win_rate">%1$d%% win rate</string>
+
+    <!-- ══════════════════════════════════════════
+         DECK DETAIL SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="deckdetail_tab_mainboard">Mainboard (%1$d)</string>
+    <string name="deckdetail_tab_sideboard">Sideboard (%1$d)</string>
+    <string name="deckdetail_move_to_side">↓ Move to side</string>
+    <string name="deckdetail_move_to_main">↑ Move to main</string>
+    <string name="deckdetail_sideboard_empty_title">No sideboard cards yet</string>
+    <string name="deckdetail_sideboard_empty_subtitle">Add cards that could help in specific matchups</string>
+    <string name="deckdetail_sideboard_add">Add sideboard cards</string>
+    <string name="deckdetail_group_creatures">Creatures</string>
+    <string name="deckdetail_group_instants">Instants</string>
+    <string name="deckdetail_group_sorceries">Sorceries</string>
+    <string name="deckdetail_group_enchantments">Enchantments</string>
+    <string name="deckdetail_group_artifacts">Artifacts</string>
+    <string name="deckdetail_group_planeswalkers">Planeswalkers</string>
+    <string name="deckdetail_group_lands">Lands</string>
+    <string name="deckdetail_incomplete_banner">%1$d cards of %2$d</string>
+    <string name="deckdetail_menu_rename">Rename</string>
+    <string name="deckdetail_menu_export">Export</string>
+    <string name="deckdetail_menu_delete">Delete deck</string>
+
+    <!-- ══════════════════════════════════════════
+         DECK BUILDER SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="deckbuilder_title">Deck Builder</string>
+    <string name="deckbuilder_step_setup">Setup</string>
+    <string name="deckbuilder_step_building">Building</string>
+    <string name="deckbuilder_step_review">Review</string>
+    <string name="deckbuilder_name_hint">Deck name…</string>
+    <string name="deckbuilder_format_label">Format</string>
+    <string name="deckbuilder_colors_label">Colors</string>
+    <string name="deckbuilder_strategy_label">Starting strategy</string>
+    <string name="deckbuilder_strategy_custom">Start with a specific card</string>
+    <string name="deckbuilder_begin_button">Start building →</string>
+    <string name="deckbuilder_synergy_score">Synergy %1$d%%</string>
+    <string name="deckbuilder_why_card">Why this card?</string>
+    <string name="deckbuilder_owned_badge">In your collection</string>
+    <string name="deckbuilder_not_owned_badge">Not in collection</string>
+    <string name="deckbuilder_action_add">✓ Add to deck</string>
+    <string name="deckbuilder_action_skip">✕ Skip</string>
+    <string name="deckbuilder_action_alternatives">⋯ Alternatives</string>
+    <string name="deckbuilder_cards_progress">%1$d / %2$d cards</string>
+    <string name="deckbuilder_too_many_cards">%1$d cards over limit — make cuts</string>
+    <string name="deckbuilder_save_button">Save deck</string>
+    <string name="deckbuilder_sideboard_section">Sideboard suggestions</string>
+    <string name="deckbuilder_sideboard_subtitle">Cards that could help against specific matchups</string>
+    <string name="deckbuilder_filter_title">Filters</string>
+    <string name="deckbuilder_filter_acquisition">Acquisition</string>
+    <string name="deckbuilder_filter_owned_only">Only cards I own</string>
+    <string name="deckbuilder_filter_include_missing">Include cards to acquire</string>
+    <string name="deckbuilder_filter_wishlist">Only my wishlist</string>
+    <string name="deckbuilder_filter_rarity">Rarity</string>
+    <string name="deckbuilder_filter_max_price">Max price per card</string>
+    <string name="deckbuilder_filter_budget">Total budget</string>
+    <string name="deckbuilder_filter_no_limit">No limit</string>
+    <string name="deckbuilder_review_deck">Review Deck</string>
+    <string name="deckbuilder_all_reviewed">All cards reviewed</string>
+    <string name="deckbuilder_add_to_deck">Add to Deck</string>
+
+    <!-- ══════════════════════════════════════════
+         GAME SETUP SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="gamesetup_title">New Game</string>
+    <string name="gamesetup_app_title">ManaHub</string>
+    <string name="gamesetup_mode_label">Game Mode</string>
+    <string name="gamesetup_mode_standard">Standard</string>
+    <string name="gamesetup_mode_standard_life">20 life</string>
+    <string name="gamesetup_mode_commander">Commander</string>
+    <string name="gamesetup_mode_commander_life">40 life</string>
+    <string name="gamesetup_players_label">Players</string>
+    <string name="gamesetup_player_name_hint">Player %1$d</string>
+    <string name="gamesetup_choose_color">Choose color</string>
+    <string name="gamesetup_layout_label">Tap a player to change position</string>
+    <string name="gamesetup_deck_label">Your Deck</string>
+    <string name="gamesetup_deck_no_tracking">Play without tracking deck</string>
+    <string name="gamesetup_commander_label">Commander</string>
+    <string name="gamesetup_commander_hint">Search commander…</string>
+    <string name="gamesetup_begin_button">Begin the Game</string>
+    <string name="gamesetup_tournament_link">Create a tournament instead →</string>
+
+    <!-- ══════════════════════════════════════════
+         GAME SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="game_title">ManaHub</string>
+    <string name="game_mode_standard">STANDARD</string>
+    <string name="game_mode_commander">COMMANDER</string>
+    <string name="game_fallen_label">FALLEN</string>
+    <string name="game_fallen_life">Ran out of life</string>
+    <string name="game_fallen_poison">Poison</string>
+    <string name="game_fallen_commander">Commander damage</string>
+    <string name="game_commander_button">⚔ Commander damage</string>
+    <string name="game_counters_button">◆ Counters</string>
+    <string name="game_dice_label">d20</string>
+    <string name="game_coin_label">¢</string>
+    <string name="game_poison_label">☠ Poison</string>
+    <string name="game_experience_label">✦ Experience</string>
+    <string name="game_energy_label">⚡ Energy</string>
+    <string name="game_custom_counter_hint">Counter name…</string>
+    <string name="game_reset_title">Reset game?</string>
+    <string name="game_reset_message">All life totals and counters will reset.</string>
+    <string name="game_reset_confirm">Reset</string>
+    <string name="game_exit_title">Leave game?</string>
+    <string name="game_exit_message">Game progress will be lost.</string>
+    <string name="game_exit_confirm">Leave</string>
+    <string name="game_exit_cancel">Stay</string>
+    <string name="game_layout_editor_title">Edit player layout</string>
+    <string name="game_layout_editor_subtitle">Tap a player to swap with the next position</string>
+    <string name="game_rename_player">Rename Player</string>
+    <string name="game_cmd_damage_title">Commander Damage → %1$s</string>
+    <string name="game_counters_title">%1$s — Counters</string>
+
+    <!-- Victory overlay -->
+    <string name="game_wins_label">WINS!</string>
+    <string name="game_victory_life_remaining">%1$d life remaining</string>
+    <string name="game_victory_view_results">View Results</string>
+
+    <!-- ══════════════════════════════════════════
+         GAME RESULT SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="gameresult_title">Game Result</string>
+    <string name="gameresult_winner_label">VICTORY</string>
+    <string name="gameresult_standings_title">Final Standings</string>
+    <string name="gameresult_highlights_title">Highlights</string>
+    <string name="gameresult_most_damage">Most damage dealt</string>
+    <string name="gameresult_closest_match">Closest match</string>
+    <string name="gameresult_duration_label">Duration</string>
+    <string name="gameresult_turns_label">Turns</string>
+    <string name="gameresult_review_button">✦ Review this game</string>
+    <string name="gameresult_review_subtitle">~2 min · helps improve your deck</string>
+    <string name="gameresult_elimination_life">0 life</string>
+    <string name="gameresult_elimination_poison">☠ 10 poison</string>
+    <string name="gameresult_elimination_commander">⚔ 21 cmd dmg</string>
+
+    <!-- ══════════════════════════════════════════
+         SURVEY SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="survey_title">Game Review</string>
+    <string name="survey_progress">%1$d / %2$d</string>
+    <string name="survey_skip_all_description">Skip survey</string>
+    <string name="survey_skip_question">Skip</string>
+    <string name="survey_confirm_button">Confirm →</string>
+    <string name="survey_next_button">Next →</string>
+    <string name="survey_save_button">Save →</string>
+    <string name="survey_free_text_hint">Optional notes about this game…</string>
+
+    <!-- Survey questions -->
+    <string name="survey_q_result_win">How did the win feel?</string>
+    <string name="survey_q_result_loss">What cost you the game?</string>
+    <string name="survey_q_mana">How was your mana?</string>
+    <string name="survey_q_hand">How was your opening hand?</string>
+    <string name="survey_q_commander_plan">Commander damage was decisive.\nWas that your plan?</string>
+    <string name="survey_q_commander_badge">⚔ Commander damage win</string>
+    <string name="survey_q_loss_reason">What would have changed the outcome?</string>
+    <string name="survey_q_sideboard">Did you swap any sideboard cards?</string>
+    <string name="survey_q_free_text">Anything to note about this game?</string>
+    <string name="survey_q_free_text_badge">Optional</string>
+
+    <!-- Survey answers -->
+    <string name="survey_a_dominant">Dominant</string>
+    <string name="survey_a_close">Close call</string>
+    <string name="survey_a_lucky">Lucky draw</string>
+    <string name="survey_a_skillful">Outplayed</string>
+    <string name="survey_a_overwhelmed">Overwhelmed</string>
+    <string name="survey_a_mana_issues">Mana issues</string>
+    <string name="survey_a_no_answers">No answers</string>
+    <string name="survey_a_too_slow">Too slow</string>
+    <string name="survey_a_mana_smooth">Smooth</string>
+    <string name="survey_a_mana_flooded">Land flooded</string>
+    <string name="survey_a_mana_screwed">Mana screwed</string>
+    <string name="survey_a_mana_colors">Wrong colors</string>
+    <string name="survey_a_mana_none">No issues</string>
+    <string name="survey_a_planned">Planned it</string>
+    <string name="survey_a_developed">Developed naturally</string>
+    <string name="survey_a_surprise">Surprised me too</string>
+    <string name="survey_a_more_removal">More removal</string>
+    <string name="survey_a_better_curve">Better mana curve</string>
+    <string name="survey_a_more_interaction">More interaction</string>
+    <string name="survey_a_nothing">Opponent was better</string>
+    <string name="survey_a_side_helped">Yes, it helped</string>
+    <string name="survey_a_side_no_help">Yes, but no change</string>
+    <string name="survey_a_side_no_swaps">No swaps</string>
+    <string name="survey_a_side_forgot">Forgot about it</string>
+
+    <!-- Hand rating labels -->
+    <string name="survey_hand_1">Very poor hand</string>
+    <string name="survey_hand_2">Weak hand</string>
+    <string name="survey_hand_3">Playable hand</string>
+    <string name="survey_hand_4">Good hand</string>
+    <string name="survey_hand_5">Perfect hand</string>
+
+    <!-- ══════════════════════════════════════════
+         TOURNAMENT SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="tournament_setup_title">New Tournament</string>
+    <string name="tournament_name_hint">Tournament name…</string>
+    <string name="tournament_format_label">Format</string>
+    <string name="tournament_structure_label">Structure</string>
+    <string name="tournament_structure_round_robin">Round Robin</string>
+    <string name="tournament_structure_round_robin_desc">Everyone plays against everyone</string>
+    <string name="tournament_structure_swiss">Swiss</string>
+    <string name="tournament_structure_swiss_desc">Paired by similar record each round</string>
+    <string name="tournament_structure_elimination">Single Elimination</string>
+    <string name="tournament_structure_elimination_desc">Lose and you\'re out</string>
+    <string name="tournament_matches_per_pairing">Matches per pairing</string>
+    <string name="tournament_matches_per_pairing_single">per pairing</string>
+    <string name="tournament_matches_per_pairing_multi">per pairing (best of %1$d)</string>
+    <string name="tournament_pairings_label">Pairings</string>
+    <string name="tournament_pairings_random">Random pairings</string>
+    <string name="tournament_pairings_random_desc">Matchups generated automatically</string>
+    <string name="tournament_pairings_manual">Manual pairings</string>
+    <string name="tournament_pairings_manual_desc">You choose the order of matches</string>
+    <string name="tournament_players_label">Players (%1$d)</string>
+    <string name="tournament_add_player">+ Add player</string>
+    <string name="tournament_create_button">Create Tournament ⚔</string>
+    <string name="tournament_tab_standings">Standings</string>
+    <string name="tournament_tab_matches">Matches</string>
+    <string name="tournament_winner_label">🏆 Tournament Winner</string>
+    <string name="tournament_start_next">▶ Start Next Match</string>
+    <string name="tournament_standings_header_player">#  Player</string>
+    <string name="tournament_standings_w">W</string>
+    <string name="tournament_standings_l">L</string>
+    <string name="tournament_standings_pts">Pts</string>
+    <string name="tournament_standings_life">Life</string>
+    <string name="tournament_match_vs">VS</string>
+    <string name="tournament_match_play">Play</string>
+    <string name="tournament_round_label">Round %1$d</string>
+    <string name="tournament_finished_label">Tournament finished</string>
+
+    <!-- ══════════════════════════════════════════
+         PROFILE SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_name_hint">Your name…</string>
+    <string name="profile_name_edit_description">Edit name</string>
+    <string name="profile_play_since">Planeswalker since %1$s</string>
+    <string name="profile_no_games_yet">Play your first game to unlock stats</string>
+    <string name="profile_section_game_stats">Game Stats</string>
+    <string name="profile_stat_games">Games</string>
+    <string name="profile_stat_win_rate">Win Rate</string>
+    <string name="profile_stat_streak">Streak</string>
+    <string name="profile_stat_avg_life_won">Avg life won</string>
+    <string name="profile_stat_avg_duration">Avg duration</string>
+    <string name="profile_stat_avg_win_turn">Avg win turn</string>
+    <string name="profile_stat_turn_format">T%1$d</string>
+    <string name="profile_favourite_format">Favourite format</string>
+    <string name="profile_section_best_deck">Best Deck</string>
+    <string name="profile_deck_games">%1$d games played</string>
+    <string name="profile_deck_win_rate">win rate</string>
+    <string name="profile_section_insights">Game Insights</string>
+    <string name="profile_insights_based_on">Based on %1$d game reviews</string>
+    <string name="profile_insight_hand">Opening hand</string>
+    <string name="profile_insight_mana">Mana issues</string>
+    <string name="profile_insight_mana_value">%1$d%% of games</string>
+    <string name="profile_insight_win_style">How you win</string>
+    <string name="profile_section_achievements">Achievements (%1$d/%2$d)</string>
+    <string name="profile_section_recent_games">Recent Games</string>
+    <string name="profile_section_collection">Collection</string>
+    <string name="profile_win_badge">W</string>
+    <string name="profile_loss_badge">L</string>
+
+    <!-- Play styles -->
+    <string name="playstyle_aggro">Aggro</string>
+    <string name="playstyle_aggro_desc">You end games fast and hit hard</string>
+    <string name="playstyle_control">Control</string>
+    <string name="playstyle_control_desc">You outlast opponents and win late</string>
+    <string name="playstyle_commander">Commander</string>
+    <string name="playstyle_commander_desc">The multiplayer battlefield is your home</string>
+    <string name="playstyle_consistent">Consistent</string>
+    <string name="playstyle_consistent_desc">You play tight, efficient Magic</string>
+    <string name="playstyle_midrange">Midrange</string>
+    <string name="playstyle_midrange_desc">Flexible and adaptable in any game</string>
+
+    <!-- Achievements -->
+    <string name="achievement_first_blood">First Blood</string>
+    <string name="achievement_first_blood_desc">Win your first game</string>
+    <string name="achievement_dominant">Dominant</string>
+    <string name="achievement_dominant_desc">Win a game with more than 30 life</string>
+    <string name="achievement_poison_master">Poison Master</string>
+    <string name="achievement_poison_master_desc">Eliminate a player with poison counters</string>
+    <string name="achievement_commander_wrath">Commander\'s Wrath</string>
+    <string name="achievement_commander_wrath_desc">Eliminate a player with commander damage</string>
+    <string name="achievement_on_fire">On Fire</string>
+    <string name="achievement_on_fire_desc">Win 3 games in a row</string>
+    <string name="achievement_champion">Champion</string>
+    <string name="achievement_champion_desc">Win a tournament</string>
+    <string name="achievement_collector_1">Collector I</string>
+    <string name="achievement_collector_1_desc">Add 50 cards to your collection</string>
+    <string name="achievement_collector_2">Collector II</string>
+    <string name="achievement_collector_2_desc">Add 200 cards to your collection</string>
+    <string name="achievement_collector_3">Collector III</string>
+    <string name="achievement_collector_3_desc">Add 500 cards to your collection</string>
+    <string name="achievement_mythic_hunter">Mythic Hunter</string>
+    <string name="achievement_mythic_hunter_desc">Own a mythic rare card</string>
+    <string name="achievement_high_roller">High Roller</string>
+    <string name="achievement_high_roller_desc">Own a card worth more than €50</string>
+    <string name="achievement_five_colors">Five Colors</string>
+    <string name="achievement_five_colors_desc">Have cards of all 5 colors</string>
+    <string name="achievement_deck_builder">Deck Builder</string>
+    <string name="achievement_deck_builder_desc">Create your first deck</string>
+    <string name="achievement_aggro_master">Aggro Master</string>
+    <string name="achievement_aggro_master_desc">Win a game in less than 8 turns</string>
+    <string name="achievement_control_freak">Control Freak</string>
+    <string name="achievement_control_freak_desc">Win a game that lasts more than 20 turns</string>
+
+    <!-- ══════════════════════════════════════════
+         SETTINGS SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_currency">Currency</string>
+    <string name="settings_currency_usd">USD ($)</string>
+    <string name="settings_currency_eur">EUR (€)</string>
+    <string name="settings_section_collection">Collection</string>
+    <string name="settings_default_view">Default view</string>
+    <string name="settings_default_view_grid">Grid</string>
+    <string name="settings_default_view_list">List</string>
+    <string name="settings_section_prices">Prices &amp; cache</string>
+    <string name="settings_auto_refresh">Auto-refresh prices</string>
+    <string name="settings_auto_refresh_subtitle">Update prices when opening the app</string>
+    <string name="settings_clear_cache">Clear image cache</string>
+    <string name="settings_clear_cache_subtitle">Free up storage space</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_app_name_label">App</string>
+    <string name="settings_version_label">Version</string>
+    <string name="settings_data_source_label">Data</string>
+    <string name="settings_data_source_value">Scryfall API</string>
+    <string name="settings_open_scryfall">Open Scryfall website</string>
+
+    <!-- ══════════════════════════════════════════
+         SIDEBOARD RECOMMENDATIONS
+    ═══════════════════════════════════════════ -->
+    <string name="sideboard_rec_title">Sideboard suggestions</string>
+    <string name="sideboard_rec_subtitle">Based on your game review</string>
+    <string name="sideboard_rec_add_to_main">↑ Add to main</string>
+    <string name="sideboard_rec_move_to_side">↓ Move to side</string>
+    <string name="sideboard_rec_apply">Apply changes</string>
+    <string name="sideboard_rec_reason_removal">You reported lacking answers.</string>
+    <string name="sideboard_rec_reason_mana">You had mana issues.</string>
+
+    <!-- ══════════════════════════════════════════
+         ERRORS Y MENSAJES GENÉRICOS
+    ═══════════════════════════════════════════ -->
+    <string name="error_network">Connection error. Check your internet.</string>
+    <string name="error_scryfall">Could not reach Scryfall. Try again.</string>
+    <string name="error_card_not_found">Card not found</string>
+    <string name="error_save_failed">Could not save. Try again.</string>
+    <string name="error_unknown">An unexpected error occurred</string>
+
 </resources>

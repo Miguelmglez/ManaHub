@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ManaHub — German translations
+    TODO: Translate all strings from values/strings.xml
+-->
+<resources>
+    <string name="app_name">ManaHub</string>
+    <!-- TODO: Add German translations -->
+</resources>

@@ -19,9 +19,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -127,16 +129,16 @@ fun GamePlayScreen(
         if (showExitDialog) {
             AlertDialog(
                 onDismissRequest = { showExitDialog = false },
-                title   = { Text("Leave game?", color = mc.textPrimary) },
-                text    = { Text("Game progress will be lost.", color = mc.textSecondary) },
+                title   = { Text(stringResource(R.string.game_exit_title), color = mc.textPrimary) },
+                text    = { Text(stringResource(R.string.game_exit_message), color = mc.textSecondary) },
                 confirmButton = {
                     TextButton(onClick = { viewModel.resetGame(); onBackHome() }) {
-                        Text("Leave", color = mc.lifeNegative)
+                        Text(stringResource(R.string.game_exit_confirm), color = mc.lifeNegative)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showExitDialog = false }) {
-                        Text("Stay", color = mc.primaryAccent)
+                        Text(stringResource(R.string.game_exit_cancel), color = mc.primaryAccent)
                     }
                 },
                 containerColor = mc.surface,
@@ -147,16 +149,16 @@ fun GamePlayScreen(
         if (showResetDialog) {
             AlertDialog(
                 onDismissRequest = { showResetDialog = false },
-                title   = { Text("Reset game?", color = mc.textPrimary) },
-                text    = { Text("All life totals and counters will reset.", color = mc.textSecondary) },
+                title   = { Text(stringResource(R.string.game_reset_title), color = mc.textPrimary) },
+                text    = { Text(stringResource(R.string.game_reset_message), color = mc.textSecondary) },
                 confirmButton = {
                     TextButton(onClick = { viewModel.resetGame(); showResetDialog = false }) {
-                        Text("Reset", color = mc.lifeNegative)
+                        Text(stringResource(R.string.game_reset_confirm), color = mc.lifeNegative)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showResetDialog = false }) {
-                        Text("Cancel", color = mc.primaryAccent)
+                        Text(stringResource(R.string.action_cancel), color = mc.primaryAccent)
                     }
                 },
                 containerColor = mc.surface,
@@ -214,7 +216,7 @@ private fun GameTopBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "ManaHub",
+                    stringResource(R.string.game_title),
                     style = MaterialTheme.magicTypography.titleMedium,
                     color = mc.goldMtg,
                     maxLines = 1,
@@ -240,15 +242,15 @@ private fun GameTopBar(
         },
         navigationIcon = {
             IconButton(onClick = onExit) {
-                Icon(Icons.Default.ExitToApp, contentDescription = "Exit", tint = mc.textSecondary)
+                Icon(Icons.Default.ExitToApp, contentDescription = stringResource(R.string.action_exit), tint = mc.textSecondary)
             }
         },
         actions = {
             IconButton(onClick = onLayoutEdit) {
-                Icon(Icons.Default.GridView, contentDescription = "Edit layout", tint = mc.textSecondary)
+                Icon(Icons.Default.GridView, contentDescription = stringResource(R.string.game_layout_editor_title), tint = mc.textSecondary)
             }
             IconButton(onClick = onReset) {
-                Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = mc.textSecondary)
+                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_reset), tint = mc.textSecondary)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
@@ -648,9 +650,9 @@ private fun DiceCoinsRow(
 @Composable
 private fun EliminatedOverlay(player: Player, mode: GameMode) {
     val reason = when {
-        player.life <= 0    -> "Ran out of life"
-        player.poison >= 10 -> "Poison"
-        mode == GameMode.COMMANDER && player.commanderDamage.values.any { it >= 21 } -> "Commander damage"
+        player.life <= 0    -> stringResource(R.string.game_fallen_life)
+        player.poison >= 10 -> stringResource(R.string.game_fallen_poison)
+        mode == GameMode.COMMANDER && player.commanderDamage.values.any { it >= 21 } -> stringResource(R.string.game_fallen_commander)
         else                -> null
     }
     Box(
@@ -665,7 +667,7 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
         ) {
             Text(text = "💀", fontSize = 20.sp, textAlign = TextAlign.Center)
             Text(
-                text          = "FALLEN",
+                text          = stringResource(R.string.game_fallen_label),
                 color         = Color(0xFFE63946),
                 fontSize      = 24.sp,
                 fontWeight    = FontWeight.Black,
@@ -719,7 +721,7 @@ private fun WinnerOverlay(
                 textAlign     = TextAlign.Center,
             )
             Text(
-                text          = "WINS!",
+                text          = stringResource(R.string.game_wins_label),
                 color         = mc.goldMtg,
                 fontSize      = 20.sp,
                 fontWeight    = FontWeight.Bold,
@@ -728,7 +730,7 @@ private fun WinnerOverlay(
                 textAlign     = TextAlign.Center,
             )
             Text(
-                text  = "${winner.life} life remaining",
+                text  = stringResource(R.string.game_victory_life_remaining, winner.life),
                 color = mc.textSecondary,
                 style = MaterialTheme.magicTypography.bodyMedium,
             )
@@ -738,10 +740,10 @@ private fun WinnerOverlay(
                 colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("View Results", color = mc.background)
+                Text(stringResource(R.string.game_victory_view_results), color = mc.background)
             }
             TextButton(onClick = onPlayAgain) {
-                Text("Play Again", color = mc.textSecondary)
+                Text(stringResource(R.string.action_play_again), color = mc.textSecondary)
             }
         }
     }
@@ -769,7 +771,7 @@ private fun CmdDamagePanel(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Commander Damage → ${target.name}",
+                stringResource(R.string.game_cmd_damage_title, target.name),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
@@ -839,16 +841,16 @@ private fun CountersPanel(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "${player.name} — Counters",
+                stringResource(R.string.game_counters_title, player.name),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
 
             // Standard counters
-            CounterRowItem("☠ Poison",     player.poison,     theme) { onCounter(CounterType.POISON,     it) }
+            CounterRowItem(stringResource(R.string.game_poison_label),     player.poison,     theme) { onCounter(CounterType.POISON,     it) }
             if (mode == GameMode.COMMANDER) {
-                CounterRowItem("✦ Experience", player.experience, theme) { onCounter(CounterType.EXPERIENCE, it) }
-                CounterRowItem("⚡ Energy",    player.energy,     theme) { onCounter(CounterType.ENERGY,     it) }
+                CounterRowItem(stringResource(R.string.game_experience_label), player.experience, theme) { onCounter(CounterType.EXPERIENCE, it) }
+                CounterRowItem(stringResource(R.string.game_energy_label),    player.energy,     theme) { onCounter(CounterType.ENERGY,     it) }
             }
 
             // Custom counters
@@ -891,7 +893,7 @@ private fun CountersPanel(
                 OutlinedTextField(
                     value         = newCounterName,
                     onValueChange = { newCounterName = it },
-                    placeholder   = { Text("Counter name…", color = mc.textDisabled) },
+                    placeholder   = { Text(stringResource(R.string.game_custom_counter_hint), color = mc.textDisabled) },
                     singleLine    = true,
                     colors        = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor   = mc.primaryAccent,
@@ -990,7 +992,7 @@ private fun RenameDialog(
     var text by remember { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title   = { Text("Rename Player") },
+        title   = { Text(stringResource(R.string.game_rename_player)) },
         text    = {
             OutlinedTextField(
                 value         = text,
@@ -1005,11 +1007,11 @@ private fun RenameDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(text) }) {
-                Text("OK", color = mc.primaryAccent)
+                Text(stringResource(R.string.action_confirm), color = mc.primaryAccent)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -1044,12 +1046,12 @@ private fun LayoutEditorSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Edit player layout",
+                stringResource(R.string.game_layout_editor_title),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
             Text(
-                "Tap a player to swap with the next position",
+                stringResource(R.string.game_layout_editor_subtitle),
                 style = MaterialTheme.magicTypography.bodySmall,
                 color = mc.textSecondary,
             )

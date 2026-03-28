@@ -15,8 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -65,7 +67,7 @@ fun DeckDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector        = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             tint               = mc.textSecondary,
                         )
                     }
@@ -335,7 +337,7 @@ private fun CardRow(
             ) {
                 Icon(
                     imageVector        = Icons.Default.Close,
-                    contentDescription = "Remove",
+                    contentDescription = stringResource(R.string.action_remove),
                     tint               = mc.textDisabled,
                     modifier           = Modifier.size(16.dp),
                 )

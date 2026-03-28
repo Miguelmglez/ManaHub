@@ -8,7 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.theme.magicColors
@@ -28,7 +30,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text  = "Settings",
+                        text  = stringResource(R.string.settings_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
@@ -37,7 +39,7 @@ fun SettingsScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
                     }
@@ -54,14 +56,14 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                "Prices & cache",
+                stringResource(R.string.settings_section_prices),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
 
             SettingsToggleItem(
-                title    = "Auto-refresh prices",
-                subtitle = "Update prices when opening the app (once every 24 h)",
+                title    = stringResource(R.string.settings_auto_refresh),
+                subtitle = stringResource(R.string.settings_auto_refresh_subtitle),
                 checked  = uiState.autoRefreshPrices,
                 onCheckedChange = viewModel::onAutoRefreshChanged,
             )

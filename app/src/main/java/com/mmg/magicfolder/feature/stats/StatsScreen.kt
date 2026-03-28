@@ -16,8 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mmg.magicfolder.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.domain.model.*
 import com.mmg.magicfolder.core.ui.theme.MagicColors
@@ -285,7 +287,7 @@ private fun MostValuableSection(
 ) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Most valuable cards", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+        Text(stringResource(R.string.stats_most_valuable), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         cards.forEachIndexed { index, card ->
             ListItem(
                 modifier        = Modifier.clickable { onCardClick(card.scryfallId) },
@@ -308,7 +310,7 @@ private fun MostValuableSection(
                     )
                 },
                 supportingContent = if (card.isFoil) {
-                    { Text("Foil", style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
+                    { Text(stringResource(R.string.carddetail_price_foil), style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
                 } else null,
             )
             if (index < cards.size - 1) HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
@@ -357,7 +359,7 @@ private fun ManaCurveSection(curve: Map<Int, Int>) {
     val maxCount = curve.values.maxOrNull()?.toFloat() ?: 1f
     val mc       = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Mana curve", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+        Text(stringResource(R.string.stats_mana_curve), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         Row(
             modifier              = Modifier.fillMaxWidth().height(120.dp),
             verticalAlignment     = Alignment.Bottom,

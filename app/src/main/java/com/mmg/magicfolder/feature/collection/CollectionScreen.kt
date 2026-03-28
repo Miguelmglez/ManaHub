@@ -14,7 +14,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.ui.components.CardGridItem
@@ -70,7 +72,7 @@ fun CollectionScreen(
                     onClick  = { selectedTab = TAB_CARDS },
                     text     = {
                         Text(
-                            text  = "CARDS",
+                            text  = stringResource(R.string.collection_tab_cards),
                             style = MaterialTheme.magicTypography.labelSmall,
                         )
                     },
@@ -80,7 +82,7 @@ fun CollectionScreen(
                     onClick  = { selectedTab = TAB_DECKS },
                     text     = {
                         Text(
-                            text  = "DECKS",
+                            text  = stringResource(R.string.collection_tab_decks),
                             style = MaterialTheme.magicTypography.labelSmall,
                         )
                     },
@@ -199,7 +201,7 @@ private fun CollectionTopBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text     = "ManaHub",
+                text     = stringResource(R.string.collection_title),
                 style    = MaterialTheme.magicTypography.titleLarge,
                 color    = mc.textPrimary,
                 modifier = Modifier.weight(1f)
@@ -207,14 +209,14 @@ private fun CollectionTopBar(
             IconButton(onClick = onScannerClick) {
                 Icon(
                     imageVector        = Icons.Default.QrCodeScanner,
-                    contentDescription = "Scan card",
+                    contentDescription = stringResource(R.string.action_search),
                     tint               = mc.textSecondary
                 )
             }
             IconButton(onClick = onViewModeToggle) {
                 Icon(
                     imageVector        = if (viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
-                    contentDescription = "Toggle view mode",
+                    contentDescription = stringResource(R.string.collection_view_grid),
                     tint               = mc.textSecondary
                 )
             }
@@ -222,7 +224,7 @@ private fun CollectionTopBar(
                 IconButton(onClick = { showSortMenu = true }) {
                     Icon(
                         imageVector        = Icons.Default.Sort,
-                        contentDescription = "Sort",
+                        contentDescription = stringResource(R.string.action_refresh),
                         tint               = mc.textSecondary
                     )
                 }
@@ -259,11 +261,11 @@ private fun SearchBar(
         value         = query,
         onValueChange = onQueryChange,
         modifier      = modifier.fillMaxWidth(),
-        placeholder   = { Text("Search in collection…", color = mc.textDisabled) },
+        placeholder   = { Text(stringResource(R.string.collection_search_hint), color = mc.textDisabled) },
         leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
         trailingIcon  = if (query.isNotEmpty()) {{
             IconButton(onClick = { onQueryChange("") }) {
-                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = mc.textSecondary)
+                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_close), tint = mc.textSecondary)
             }
         }} else null,
         singleLine    = true,
@@ -386,13 +388,13 @@ private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "Your collection is empty",
+            stringResource(R.string.collection_empty_title),
             style = MaterialTheme.magicTypography.titleMedium,
             color = mc.textPrimary,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Add your first card by tapping +",
+            stringResource(R.string.collection_empty_subtitle),
             style = MaterialTheme.magicTypography.bodyMedium,
             color = mc.textSecondary,
         )
@@ -400,7 +402,7 @@ private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
         Button(
             onClick = onAddCardClick,
             colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-        ) { Text("Add a card", color = mc.background) }
+        ) { Text(stringResource(R.string.collection_empty_action), color = mc.background) }
     }
 }
 
