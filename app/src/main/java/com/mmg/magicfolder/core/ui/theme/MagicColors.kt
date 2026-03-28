@@ -28,7 +28,7 @@ data class PlayerThemeColors(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Semantic color tokens for the MagicFolder design system.
+ * Semantic color tokens for the ManaHub design system.
  *
  * Access via `MaterialTheme.magicColors.xxx` inside any `@Composable`.
  * Hard-coded `Color(0xFF…)` values are FORBIDDEN in composables.

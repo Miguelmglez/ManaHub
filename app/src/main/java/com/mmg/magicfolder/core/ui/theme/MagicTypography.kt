@@ -32,7 +32,7 @@ val ManaFontFamily = FontFamily(
 // ── Escala tipográfica ────────────────────────────────────────────────────────
 
 /**
- * Typography scale for the MagicFolder design system.
+ * Typography scale for the ManaHub design system.
  *
  * Hierarchy:
  *  displayLarge / displayMedium — CinzelFontFamily Black, section titles, victory screen

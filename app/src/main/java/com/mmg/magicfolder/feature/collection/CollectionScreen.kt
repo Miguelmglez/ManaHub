@@ -199,7 +199,7 @@ private fun CollectionTopBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text     = "Magic Folder",
+                text     = "ManaHub",
                 style    = MaterialTheme.magicTypography.titleLarge,
                 color    = mc.textPrimary,
                 modifier = Modifier.weight(1f)

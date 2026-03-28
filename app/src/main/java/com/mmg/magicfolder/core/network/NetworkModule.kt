@@ -24,7 +24,7 @@ object NetworkModule {
         OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .header("User-Agent", "MagicFolder/1.0 Android")
+                    .header("User-Agent", "ManaHub/1.0 Android")
                     .header("Accept", "application/json;q=0.9,*/*;q=0.8")
                     .build()
                 chain.proceed(request)

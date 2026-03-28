@@ -125,7 +125,7 @@ private fun CollectionTopBar(
     var showSortMenu by remember { mutableStateOf(false) }
 
     TopAppBar(
-        title = { Text("Magic Folder") },
+        title = { Text("ManaHub") },
         actions = {
             // View mode toggle
             IconButton(onClick = onViewModeToggle) {

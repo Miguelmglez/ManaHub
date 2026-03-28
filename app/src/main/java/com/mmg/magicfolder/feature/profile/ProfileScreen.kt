@@ -735,10 +735,10 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        InfoRow("App",     "MagicFolder")
+        InfoRow("App",     "ManaHub")
         InfoRow("Version", "1.0.0")
         InfoRow("Data",    "Scryfall API")
-        InfoRow("Engine",  "Æther Tracker v1")
+        InfoRow("Engine",  "ManaHub v1")
     }
 }
 

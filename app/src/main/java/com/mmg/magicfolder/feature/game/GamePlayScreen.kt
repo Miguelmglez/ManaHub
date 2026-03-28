@@ -214,7 +214,7 @@ private fun GameTopBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "Æther Tracker",
+                    "ManaHub",
                     style = MaterialTheme.magicTypography.titleMedium,
                     color = mc.goldMtg,
                     maxLines = 1,

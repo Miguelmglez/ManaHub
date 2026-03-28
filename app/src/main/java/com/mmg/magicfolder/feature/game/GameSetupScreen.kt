@@ -72,7 +72,7 @@ fun GameSetupScreen(
         ) {
             // ── Title ─────────────────────────────────────────────────────────
             Text(
-                text      = "Æther Tracker",
+                text      = "ManaHub",
                 style     = MaterialTheme.magicTypography.displayMedium,
                 color     = mc.goldMtg,
                 textAlign = TextAlign.Center,
