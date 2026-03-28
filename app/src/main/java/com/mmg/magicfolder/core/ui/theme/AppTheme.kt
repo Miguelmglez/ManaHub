@@ -15,12 +15,11 @@ sealed class AppTheme {
     /** Dark neon sci-fi aesthetic — fully implemented. */
     object NeonVoid         : AppTheme()
 
-    /** Aged parchment and illuminated-manuscript aesthetic — stub. */
+    /** Aged parchment and illuminated-manuscript aesthetic. */
     object MedievalGrimoire : AppTheme()
 
-    /** Deep-space star-chart aesthetic — stub. */
+    /** Deep-space star-chart aesthetic. */
     object ArcaneCosmos     : AppTheme()
 
-    /** Industrial oil-slick Phyrexian horror aesthetic — stub. */
-    object PhyrexianOil     : AppTheme()
+    // PhyrexianOil — industrial oil-slick Phyrexian horror — reserved for v3
 }

@@ -406,6 +406,7 @@
          PROFILE SCREEN
     ═══════════════════════════════════════════ -->
     <string name="profile_title">Profile</string>
+    <string name="profile_section_themes">Visual Theme</string>
     <string name="profile_name_hint">Your name…</string>
     <string name="profile_name_edit_description">Edit name</string>
     <string name="profile_play_since">Planeswalker since %1$s</string>

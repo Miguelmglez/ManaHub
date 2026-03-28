@@ -7,8 +7,13 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.mmg.magicfolder.core.ui.components.ArcaneCosmosBackground
+import com.mmg.magicfolder.core.ui.components.HexGridBackground
+import com.mmg.magicfolder.core.ui.components.MedievalGrimoireBackground
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  CompositionLocals
@@ -16,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 
 val LocalMagicColors     = staticCompositionLocalOf<MagicColors>     { NeonVoidColors }
 val LocalMagicTypography = staticCompositionLocalOf<MagicTypography> { NeonVoidTypography }
+val LocalAppTheme        = compositionLocalOf<AppTheme>              { AppTheme.NeonVoid }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MaterialTheme extension properties
@@ -53,21 +59,20 @@ fun MagicTheme(
 ) {
     val magicColors = when (theme) {
         is AppTheme.NeonVoid         -> NeonVoidColors
-        is AppTheme.MedievalGrimoire -> NeonVoidColors   // stub — implement palette to unlock
-        is AppTheme.ArcaneCosmos     -> NeonVoidColors   // stub
-        is AppTheme.PhyrexianOil     -> NeonVoidColors   // stub
+        is AppTheme.MedievalGrimoire -> MedievalGrimoireColors
+        is AppTheme.ArcaneCosmos     -> ArcaneCosmosColors
     }
 
     val magicTypography = when (theme) {
         is AppTheme.NeonVoid         -> NeonVoidTypography
-        is AppTheme.MedievalGrimoire -> NeonVoidTypography  // stub
-        is AppTheme.ArcaneCosmos     -> NeonVoidTypography  // stub
-        is AppTheme.PhyrexianOil     -> NeonVoidTypography  // stub
+        is AppTheme.MedievalGrimoire -> NeonVoidTypography
+        is AppTheme.ArcaneCosmos     -> NeonVoidTypography
     }
 
     CompositionLocalProvider(
         LocalMagicColors     provides magicColors,
         LocalMagicTypography provides magicTypography,
+        LocalAppTheme        provides theme,
     ) {
         MaterialTheme(
             colorScheme = magicColors.toMaterial3ColorScheme(),
@@ -137,3 +142,19 @@ private fun magicMaterial3Shapes() = Shapes(
     large      = CardShape,
     extraLarge = BottomSheetShape,
 )
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ThemeBackground — draws the correct decorative background for the active theme
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+fun ThemeBackground(
+    modifier: Modifier = Modifier,
+    theme: AppTheme = LocalAppTheme.current,
+) {
+    when (theme) {
+        is AppTheme.NeonVoid         -> HexGridBackground(modifier = modifier)
+        is AppTheme.MedievalGrimoire -> MedievalGrimoireBackground(modifier = modifier)
+        is AppTheme.ArcaneCosmos     -> ArcaneCosmosBackground(modifier = modifier)
+    }
+}

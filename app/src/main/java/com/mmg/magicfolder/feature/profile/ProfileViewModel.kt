@@ -1,11 +1,5 @@
 package com.mmg.magicfolder.feature.profile
 
-import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.data.local.LanguagePreference
@@ -20,28 +14,15 @@ import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
 import com.mmg.magicfolder.core.domain.repository.StatsRepository
 import com.mmg.magicfolder.core.domain.usecase.achievements.AchievementStats
 import com.mmg.magicfolder.core.domain.usecase.achievements.CheckAchievementsUseCase
+import com.mmg.magicfolder.core.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
-// ── DataStore ─────────────────────────────────────────────────────────────────
-
-private val Context.themeDataStore: DataStore<Preferences>
-        by preferencesDataStore(name = "magic_prefs")
-
-private val KEY_THEME = stringPreferencesKey("selected_theme")
-
 // ── Enums ─────────────────────────────────────────────────────────────────────
-
-enum class AppTheme(val displayName: String, val isUnlocked: Boolean) {
-    NEON_VOID("Neon Void",   isUnlocked = true),
-    DAWN_REALM("Dawn Realm", isUnlocked = false),
-    ARCANE_GRAY("Arcane",    isUnlocked = false),
-}
 
 enum class PlayStyle(val label: String, val icon: String) {
     AGGRO("Aggressor",  "⚔"),
@@ -60,12 +41,11 @@ class ProfileViewModel @Inject constructor(
     private val surveyAnswerDao:       SurveyAnswerDao,
     private val langPref:              LanguagePreference,
     private val checkAchievementsUseCase: CheckAchievementsUseCase,
-    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     data class UiState(
         val playerName:              String     = "Player 1",
-        val selectedTheme:           AppTheme   = AppTheme.NEON_VOID,
+        val currentTheme:            AppTheme   = AppTheme.NeonVoid,
         val selectedLanguage:        String     = "en",
         val playStyle:               PlayStyle  = PlayStyle.BALANCED,
         val isLoading:               Boolean    = true,
@@ -110,9 +90,8 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        context.themeDataStore.data
-            .map { prefs -> prefs[KEY_THEME]?.let { runCatching { AppTheme.valueOf(it) }.getOrNull() } }
-            .onEach { theme -> if (theme != null) _uiState.update { it.copy(selectedTheme = theme) } }
+        langPref.themeFlow
+            .onEach { theme -> _uiState.update { it.copy(currentTheme = theme) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
@@ -233,10 +212,8 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun selectTheme(theme: AppTheme) {
-        if (!theme.isUnlocked) return
-        _uiState.update { it.copy(selectedTheme = theme) }
         viewModelScope.launch {
-            context.themeDataStore.edit { it[KEY_THEME] = theme.name }
+            langPref.saveTheme(theme)
         }
     }
 

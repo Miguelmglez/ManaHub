@@ -28,7 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import com.mmg.magicfolder.core.ui.components.FloatingDelta
-import com.mmg.magicfolder.core.ui.components.HexGridBackground
+import com.mmg.magicfolder.core.ui.theme.ThemeBackground
 import com.mmg.magicfolder.core.ui.theme.CinzelFontFamily
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.core.ui.theme.coloredShadow
@@ -360,12 +360,8 @@ private fun PlayerCard(
             .background(theme.background)
             .border(width = 0.5.dp, color = theme.accent.copy(alpha = 0.40f))
     ) {
-        // 1. Hex grid background
-        HexGridBackground(
-            modifier = Modifier.matchParentSize(),
-            color    = theme.accent.copy(alpha = 0.04f),
-            hexSize  = 18f,
-        )
+        // 1. Theme background pattern
+        ThemeBackground(modifier = Modifier.matchParentSize())
         // Active turn indicator
         if (isActive) {
             Box(

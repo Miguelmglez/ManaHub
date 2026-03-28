@@ -37,6 +37,7 @@ import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
 import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.magicfolder.core.domain.model.Achievement
 import com.mmg.magicfolder.core.domain.model.CollectionStats
+import com.mmg.magicfolder.core.ui.theme.AppTheme
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import java.text.SimpleDateFormat
@@ -153,14 +154,11 @@ fun ProfileScreen(
 
             // ── Theme selector ────────────────────────────────────────────────
             item {
-                ThemeSection(
-                    selected = uiState.selectedTheme,
-                    onSelect = viewModel::selectTheme,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ThemeSelectorSection(
+                    currentTheme     = uiState.currentTheme,
+                    onThemeSelected  = viewModel::selectTheme,
                 )
             }
-            // ── Theme selector — hidden in v1, will be re-enabled in v2 ──────────
-            // ThemeSection(selected = state.selectedTheme, onSelect = viewModel::selectTheme)
 
             // ── Language selector ─────────────────────────────────────────────
             item {
@@ -621,70 +619,108 @@ private fun CollectionSummarySection(
 // ── Theme + Language + Footer ─────────────────────────────────────────────────
 
 @Composable
-private fun ThemeSection(
-    selected: AppTheme,
-    onSelect: (AppTheme) -> Unit,
-    modifier: Modifier = Modifier,
+private fun ThemeSelectorSection(
+    currentTheme:    AppTheme,
+    onThemeSelected: (AppTheme) -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("Theme")
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        SectionTitle(stringResource(R.string.profile_section_themes))
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AppTheme.entries.forEach { theme ->
-                ThemeTile(
-                    theme    = theme,
-                    selected = theme == selected,
-                    onClick  = { onSelect(theme) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            ThemeTile(
+                name          = "Neon Void",
+                emoji         = "⚡",
+                previewColors = listOf(Color(0xFF030508), Color(0xFFC77DFF), Color(0xFF4CC9F0)),
+                isSelected    = currentTheme is AppTheme.NeonVoid,
+                onClick       = { onThemeSelected(AppTheme.NeonVoid) },
+                modifier      = Modifier.weight(1f),
+            )
+            ThemeTile(
+                name          = "Grimoire",
+                emoji         = "📜",
+                previewColors = listOf(Color(0xFF1A1208), Color(0xFFC9A84C), Color(0xFF7AB648)),
+                isSelected    = currentTheme is AppTheme.MedievalGrimoire,
+                onClick       = { onThemeSelected(AppTheme.MedievalGrimoire) },
+                modifier      = Modifier.weight(1f),
+            )
+            ThemeTile(
+                name          = "Cosmos",
+                emoji         = "✨",
+                previewColors = listOf(Color(0xFF040812), Color(0xFF7B61FF), Color(0xFFFF61DC)),
+                isSelected    = currentTheme is AppTheme.ArcaneCosmos,
+                onClick       = { onThemeSelected(AppTheme.ArcaneCosmos) },
+                modifier      = Modifier.weight(1f),
+            )
         }
     }
 }
 
 @Composable
 private fun ThemeTile(
-    theme:    AppTheme,
-    selected: Boolean,
-    onClick:  () -> Unit,
-    modifier: Modifier,
+    name:          String,
+    emoji:         String,
+    previewColors: List<Color>,
+    isSelected:    Boolean,
+    onClick:       () -> Unit,
+    modifier:      Modifier = Modifier,
 ) {
-    val mc       = MaterialTheme.magicColors
-    val isLocked = !theme.isUnlocked
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface)
-            .border(
-                width = if (selected) 1.5.dp else 0.5.dp,
-                color = if (selected) mc.primaryAccent else mc.surfaceVariant,
-                shape = RoundedCornerShape(12.dp),
-            )
-            .clickable(enabled = !isLocked, onClick = onClick)
-            .padding(vertical = 16.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+    val mc = MaterialTheme.magicColors
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape    = RoundedCornerShape(14.dp),
+        color    = if (isSelected) mc.primaryAccent.copy(0.1f) else mc.surface,
+        border   = BorderStroke(
+            width = if (isSelected) 2.dp else 0.5.dp,
+            color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+        ),
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(themeSwatchColor(theme, mc.primaryAccent, mc.surfaceVariant)),
-        )
-        Text(
-            theme.displayName,
-            style     = MaterialTheme.magicTypography.labelMedium,
-            color     = if (selected) mc.primaryAccent else mc.textSecondary,
-            textAlign = TextAlign.Center,
-            maxLines  = 1,
-        )
-        if (isLocked) {
-            Text("🔒", style = MaterialTheme.magicTypography.labelSmall)
-        } else if (selected) {
-            Text("Active", style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+        Column(
+            modifier            = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                previewColors.forEachIndexed { index, color ->
+                    Box(
+                        modifier = Modifier
+                            .size(if (index == 0) 28.dp else 18.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .then(
+                                if (index == 0)
+                                    Modifier.border(
+                                        1.5.dp,
+                                        previewColors.getOrElse(1) { Color.White }.copy(0.5f),
+                                        CircleShape,
+                                    )
+                                else Modifier
+                            ),
+                    )
+                }
+            }
+            Text(
+                text      = name,
+                style     = MaterialTheme.magicTypography.labelSmall,
+                color     = if (isSelected) mc.primaryAccent else mc.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(mc.primaryAccent),
+                )
+            }
         }
     }
 }
@@ -766,16 +802,6 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
         color    = MaterialTheme.magicColors.textSecondary,
         modifier = modifier,
     )
-}
-
-private fun themeSwatchColor(
-    theme:  AppTheme,
-    active: androidx.compose.ui.graphics.Color,
-    locked: androidx.compose.ui.graphics.Color,
-): androidx.compose.ui.graphics.Color = when (theme) {
-    AppTheme.NEON_VOID   -> active
-    AppTheme.DAWN_REALM  -> locked
-    AppTheme.ARCANE_GRAY -> locked
 }
 
 private fun formatDuration(ms: Long): String {
