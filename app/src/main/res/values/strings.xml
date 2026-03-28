@@ -267,6 +267,9 @@
     <string name="game_fallen_life">Ran out of life</string>
     <string name="game_fallen_poison">Poison</string>
     <string name="game_fallen_commander">Commander damage</string>
+    <string name="game_pending_defeat_title">Defeat condition met</string>
+    <string name="game_pending_defeat_confirm">Confirm defeat</string>
+    <string name="game_pending_defeat_revoke">Still alive!</string>
     <string name="game_commander_button">⚔ Commander damage</string>
     <string name="game_counters_button">◆ Counters</string>
     <string name="game_dice_label">d20</string>
