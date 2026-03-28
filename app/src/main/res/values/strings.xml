@@ -267,6 +267,9 @@
     <string name="game_fallen_life">Ran out of life</string>
     <string name="game_fallen_poison">Poison</string>
     <string name="game_fallen_commander">Commander damage</string>
+    <string name="game_pending_defeat_title">Defeat condition met</string>
+    <string name="game_pending_defeat_confirm">Confirm defeat</string>
+    <string name="game_pending_defeat_revoke">Still alive!</string>
     <string name="game_commander_button">⚔ Commander damage</string>
     <string name="game_counters_button">◆ Counters</string>
     <string name="game_dice_label">d20</string>
@@ -283,7 +286,9 @@
     <string name="game_exit_confirm">Leave</string>
     <string name="game_exit_cancel">Stay</string>
     <string name="game_layout_editor_title">Edit player layout</string>
-    <string name="game_layout_editor_subtitle">Tap a player to swap with the next position</string>
+    <string name="game_layout_editor_subtitle">Select a template or adjust rotations</string>
+    <string name="game_layout_editor_rotation">Player rotation</string>
+    <string name="game_layout_editor_rotate">Rotate clockwise</string>
     <string name="game_rename_player">Rename Player</string>
     <string name="game_cmd_damage_title">Commander Damage → %1$s</string>
     <string name="game_counters_title">%1$s — Counters</string>

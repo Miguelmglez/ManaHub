@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
+import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.feature.game.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -28,16 +29,17 @@ data class GameUiState(
     val gameResult:       GameResult?       = null,
     val lastSessionId:    Long?             = null,
     val gameStartTime:    Long              = System.currentTimeMillis(),
+    // Layout
+    val activeLayout:     LayoutTemplate    = LayoutTemplates.getDefaultLayout(4),
+    val playerRotations:  Map<Int, Int>     = emptyMap(),  // playerId → rotation degrees override
     // UI visibility
-    val showPhasePanel:              Boolean         = false,
-    val editingNameForPlayerId:      Int?            = null,
-    val showCmdPanelForPlayerId:     Int?            = null,
-    val showCounterPanelForPlayerId: Int?            = null,
+    val showPhasePanel:              Boolean = false,
+    val editingNameForPlayerId:      Int?    = null,
+    val showCmdPanelForPlayerId:     Int?    = null,
+    val showCounterPanelForPlayerId: Int?    = null,
+    val showLayoutEditor:            Boolean = false,
     // Per-player accumulated life deltas (cleared after 1.5s of inactivity)
     val lifeDeltas:   Map<Int, Int>     = emptyMap(),
-    // Dice / coin results
-    val diceResults:  Map<Int, Int>     = emptyMap(),  // playerId → last d20 roll
-    val coinResults:  Map<Int, Boolean> = emptyMap(),  // playerId → last flip (true=heads)
 )
 
 @HiltViewModel
@@ -51,10 +53,13 @@ class GameViewModel @Inject constructor(
     }.getOrDefault(GameMode.COMMANDER)
 
     private val initPlayerCount: Int =
-        savedStateHandle.get<Int>("playerCount")?.coerceIn(2, 10) ?: 4
+        savedStateHandle.get<Int>("playerCount")?.coerceIn(2, 6) ?: 4
 
     private val _uiState = MutableStateFlow(buildInitialState(initMode, initPlayerCount))
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
+
+    private val _toolsState = MutableStateFlow(GlobalToolsState())
+    val toolsState: StateFlow<GlobalToolsState> = _toolsState.asStateFlow()
 
     private val deltaJobs = mutableMapOf<Int, Job>()
 
@@ -82,9 +87,19 @@ class GameViewModel @Inject constructor(
                     if (p.id == playerId) p.copy(life = p.life + delta) else p
                 },
                 lifeDeltas = s.lifeDeltas + (playerId to ((s.lifeDeltas[playerId] ?: 0) + delta)),
-            ).checkEliminations()
+            )
         }
+        checkPendingDefeat()
         scheduleDeltaClear(playerId)
+    }
+
+    fun changePoison(playerId: Int, delta: Int) {
+        _uiState.update { s ->
+            s.copy(players = s.players.map { p ->
+                if (p.id == playerId) p.copy(poison = (p.poison + delta).coerceAtLeast(0)) else p
+            })
+        }
+        checkPendingDefeat()
     }
 
     // ── Counters ──────────────────────────────────────────────────────────────
@@ -99,8 +114,9 @@ class GameViewModel @Inject constructor(
                         CounterType.ENERGY     -> p.copy(energy     = (p.energy     + delta).coerceAtLeast(0))
                     }
                 },
-            ).checkEliminations()
+            )
         }
+        checkPendingDefeat()
     }
 
     fun addCustomCounter(playerId: Int, name: String) {
@@ -152,8 +168,9 @@ class GameViewModel @Inject constructor(
                         p.copy(commanderDamage = p.commanderDamage + (sourceId to newDmg))
                     }
                 },
-            ).checkEliminations()
+            )
         }
+        checkPendingDefeat()
     }
 
     // ── Phase tracker ─────────────────────────────────────────────────────────
@@ -207,38 +224,84 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    fun eliminatePlayer(playerId: Int) {
+    /** Marks players meeting elimination conditions as pendingDefeat (not yet defeated). */
+    fun checkPendingDefeat() {
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
-                if (p.id == playerId) p.copy(eliminated = true) else p
-            }).checkEliminations()
+                if (p.defeated || p.pendingDefeat) p
+                else if (shouldEliminate(p, s.mode)) p.copy(pendingDefeat = true)
+                else p
+            })
+        }
+        // NO automatic winner — only confirmDefeat can trigger that
+    }
+
+    /** Player (or host) confirms the defeat. */
+    fun confirmDefeat(playerId: Int) {
+        _uiState.update { s ->
+            s.copy(players = s.players.map { p ->
+                if (p.id == playerId) p.copy(defeated = true, pendingDefeat = false) else p
+            })
+        }
+        checkWinner()
+    }
+
+    /** Player disputes and continues playing with negative life. */
+    fun revokeDefeat(playerId: Int) {
+        _uiState.update { s ->
+            s.copy(players = s.players.map { p ->
+                if (p.id == playerId) p.copy(pendingDefeat = false, defeated = false) else p
+            })
         }
     }
 
-    // ── Dice / coin ───────────────────────────────────────────────────────────
+    // ── Layout ────────────────────────────────────────────────────────────────
 
-    fun rollDice(playerId: Int) {
-        _uiState.update { it.copy(diceResults = it.diceResults + (playerId to (1..20).random())) }
+    fun selectLayout(template: LayoutTemplate) {
+        _uiState.update { it.copy(activeLayout = template) }
     }
 
-    fun flipCoin(playerId: Int) {
-        _uiState.update { it.copy(coinResults = it.coinResults + (playerId to listOf(true, false).random())) }
-    }
-
-    // ── Setup init from PlayerConfig ──────────────────────────────────────────
-
-    fun initFromConfigs(configs: List<PlayerConfig>) {
-        val mode = _uiState.value.mode
-        val players = configs.mapIndexed { i, config ->
-            com.mmg.magicfolder.feature.game.model.Player(
-                id         = i,
-                name       = config.name.ifEmpty { "Player ${i + 1}" },
-                life       = mode.startingLife,
-                themeIndex = com.mmg.magicfolder.core.ui.theme.PlayerTheme.ALL.indexOf(config.theme)
-                    .coerceAtLeast(i % 10),
-            )
+    fun setPlayerRotation(playerId: Int, degrees: Int) {
+        _uiState.update { s ->
+            s.copy(playerRotations = s.playerRotations + (playerId to degrees % 360))
         }
-        _uiState.update { it.copy(players = players, activePlayerId = players.first().id) }
+    }
+
+    fun rotatePlayerClockwise(playerId: Int) {
+        val s       = _uiState.value
+        val slotPos = s.activeLayout.slots.find { it.playerId == playerId }?.position
+        val current = s.playerRotations[playerId] ?: slotPos.toDefaultDegrees()
+        setPlayerRotation(playerId, (current + 90) % 360)
+    }
+
+    // ── Global tools (dice / coin) ────────────────────────────────────────────
+
+    fun toggleTools() {
+        _toolsState.update { it.copy(isExpanded = !it.isExpanded) }
+    }
+
+    fun rollDice() {
+        viewModelScope.launch {
+            _toolsState.update { it.copy(isRollingDice = true) }
+            delay(800L)
+            _toolsState.update { it.copy(
+                isRollingDice   = false,
+                lastDiceResult  = (1..20).random(),
+                lastCoinResult  = null,   // clear coin
+            )}
+        }
+    }
+
+    fun flipCoin() {
+        viewModelScope.launch {
+            _toolsState.update { it.copy(isFlippingCoin = true) }
+            delay(1_000L)
+            _toolsState.update { it.copy(
+                isFlippingCoin  = false,
+                lastCoinResult  = (0..1).random() == 1,
+                lastDiceResult  = null,   // clear dice
+            )}
+        }
     }
 
     // ── Layout editor ─────────────────────────────────────────────────────────
@@ -259,11 +322,13 @@ class GameViewModel @Inject constructor(
     fun showCmdPanel(playerId: Int?)     = _uiState.update { it.copy(showCmdPanelForPlayerId = playerId) }
     fun showCounterPanel(playerId: Int?) = _uiState.update { it.copy(showCounterPanelForPlayerId = playerId) }
     fun showEditName(playerId: Int?)     = _uiState.update { it.copy(editingNameForPlayerId = playerId) }
+    fun showLayoutEditor(show: Boolean)  = _uiState.update { it.copy(showLayoutEditor = show) }
 
     fun resetGame() {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
         _uiState.value = buildInitialState(initMode, initPlayerCount)
+        _toolsState.value = GlobalToolsState()
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -276,30 +341,25 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    private fun GameUiState.checkEliminations(): GameUiState {
-        val withEliminations = copy(
-            players = players.map { p ->
-                if (!p.eliminated && shouldEliminate(p, mode)) p.copy(eliminated = true) else p
-            }
-        )
-        val alive = withEliminations.players.filter { !it.eliminated }
-        val newWinner = if (alive.size == 1 && players.size > 1) alive.first()
-                        else withEliminations.winner
-        val newGameResult = if (newWinner != null && winner == null) {
-            val duration = System.currentTimeMillis() - withEliminations.gameStartTime
-            GameResult(
-                winner        = newWinner,
-                allPlayers    = withEliminations.players,
-                gameMode      = withEliminations.mode,
-                totalTurns    = withEliminations.turnNumber,
+    private fun checkWinner() {
+        val s     = _uiState.value
+        val alive = s.players.filter { !it.defeated }
+        if (alive.size == 1 && s.players.size > 1) {
+            val winner = alive.first()
+            val duration = System.currentTimeMillis() - s.gameStartTime
+            val result = GameResult(
+                winner        = winner,
+                allPlayers    = s.players,
+                gameMode      = s.mode,
+                totalTurns    = s.turnNumber,
                 durationMs    = duration,
-                playerResults = withEliminations.players.map { p ->
+                playerResults = s.players.map { p ->
                     PlayerResult(
                         player                       = p,
                         finalLife                    = p.life,
                         finalPoison                  = p.poison,
                         totalCommanderDamageDealt    = p.commanderDamage.values.sum(),
-                        totalCommanderDamageReceived = withEliminations.players
+                        totalCommanderDamageReceived = s.players
                             .filter { it.id != p.id }
                             .sumOf { it.commanderDamage[p.id] ?: 0 },
                         eliminationReason = when {
@@ -312,26 +372,49 @@ class GameViewModel @Inject constructor(
                     )
                 }
             )
-        } else withEliminations.gameResult
-        return withEliminations.copy(winner = newWinner, gameResult = newGameResult)
+            _uiState.update { it.copy(winner = winner, gameResult = result) }
+        }
     }
 
     private fun nextActivePlayer(s: GameUiState): Int {
-        val alive = s.players.filter { !it.eliminated }
+        val alive = s.players.filter { !it.defeated }
         if (alive.isEmpty()) return s.activePlayerId
         val idx = alive.indexOfFirst { it.id == s.activePlayerId }
         return alive[(idx + 1) % alive.size].id
     }
 
+    // ── Setup init from PlayerConfig ──────────────────────────────────────────
+
+    fun initFromConfigs(configs: List<PlayerConfig>, selectedLayout: LayoutTemplate? = null) {
+        val mode    = _uiState.value.mode
+        val players = configs.mapIndexed { i, config ->
+            Player(
+                id    = i,
+                name  = config.name.ifEmpty { "Player ${i + 1}" },
+                life  = mode.startingLife,
+                theme = config.theme,
+            )
+        }
+        val layout = selectedLayout ?: LayoutTemplates.getDefaultLayout(players.size)
+        _uiState.update { it.copy(players = players, activePlayerId = players.first().id, activeLayout = layout) }
+    }
+
     companion object {
         fun buildInitialState(mode: GameMode, playerCount: Int): GameUiState {
-            val players = (0 until playerCount).map { i ->
-                Player(id = i, name = "Player ${i + 1}", life = mode.startingLife, themeIndex = i)
+            val clampedCount = playerCount.coerceIn(2, 6)
+            val players = (0 until clampedCount).map { i ->
+                Player(
+                    id    = i,
+                    name  = "Player ${i + 1}",
+                    life  = mode.startingLife,
+                    theme = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                )
             }
             return GameUiState(
                 players        = players,
                 mode           = mode,
                 activePlayerId = players.first().id,
+                activeLayout   = LayoutTemplates.getDefaultLayout(clampedCount),
                 gameStartTime  = System.currentTimeMillis(),
             )
         }
