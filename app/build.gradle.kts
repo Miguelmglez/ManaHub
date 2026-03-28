@@ -34,6 +34,7 @@ dependencies {
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.foundation)
     implementation(libs.material3)
+    implementation(libs.tv.material)
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.compose.ui)

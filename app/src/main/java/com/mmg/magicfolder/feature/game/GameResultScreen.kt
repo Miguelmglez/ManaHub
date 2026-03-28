@@ -52,7 +52,7 @@ fun GameResultScreen(
                     OutlinedButton(
                         onClick  = onSurvey,
                         modifier = Modifier.fillMaxWidth(),
-                        colors   = OutlinedButtonDefaults.outlinedButtonColors(
+                        colors   = ButtonDefaults.outlinedButtonColors(
                             contentColor = mc.goldMtg,
                         ),
                         border   = androidx.compose.foundation.BorderStroke(1.dp, mc.goldMtg),
