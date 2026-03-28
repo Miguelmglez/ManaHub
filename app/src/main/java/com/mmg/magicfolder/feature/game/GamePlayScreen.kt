@@ -1051,10 +1051,6 @@ private fun LayoutEditorSheet(
                 style = MaterialTheme.magicTypography.bodySmall,
                 color = mc.textSecondary,
             )
-            MiniGridPreview(
-                playerConfigs   = playerConfigs,
-                onSwapPositions = onSwapPositions,
-            )
         }
     }
 }

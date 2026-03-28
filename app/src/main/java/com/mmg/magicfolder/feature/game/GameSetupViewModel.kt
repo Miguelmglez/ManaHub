@@ -23,8 +23,8 @@ data class PlayerConfig(
 )
 
 data class GameSetupUiState(
-    val selectedMode:  GameMode          = GameMode.COMMANDER,
-    val playerCount:   Int               = 4,
+    val selectedMode:  GameMode          = GameMode.STANDARD,
+    val playerCount:   Int               = 2,
     val playerConfigs: List<PlayerConfig> = emptyList(),
 ) {
     init {
@@ -39,7 +39,7 @@ data class GameSetupUiState(
 @HiltViewModel
 class GameSetupViewModel @Inject constructor() : ViewModel() {
 
-    private val _uiState = MutableStateFlow(buildInitialState(GameMode.COMMANDER, 4))
+    private val _uiState = MutableStateFlow(buildInitialState(GameMode.STANDARD, 2))
     val uiState: StateFlow<GameSetupUiState> = _uiState.asStateFlow()
 
     fun onModeChange(mode: GameMode) {
@@ -75,15 +75,6 @@ class GameSetupViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    fun swapPlayerPositions(indexA: Int, indexB: Int) {
-        val configs = _uiState.value.playerConfigs.toMutableList()
-        if (indexA in configs.indices && indexB in configs.indices) {
-            val temp = configs[indexA]
-            configs[indexA] = configs[indexB]
-            configs[indexB] = temp
-            _uiState.update { it.copy(playerConfigs = configs) }
-        }
-    }
 
     private fun buildInitialState(mode: GameMode, count: Int): GameSetupUiState {
         val configs = List(count) { i ->

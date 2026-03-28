@@ -40,7 +40,14 @@
       "Bash(find \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder\" -name \"*.kt\" -path \"*/feature/*\" -exec grep -l \"DFC\\\\|flip\\\\|double\" {})",
       "Bash(find /c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/res -name ic_launcher* -type f)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(grep -v \"//.*\"\"\")"
+      "Bash(grep -v \"//.*\"\"\")",
+      "Read(//c/Program Files/Android/Android Studio//**)",
+      "Read(//c/Users/Miguel/AppData/Local/Programs/**)",
+      "Bash(find /c -name java.exe -path */jbr/*)",
+      "Bash(export JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\")",
+      "Bash(where java:*)",
+      "Read(//c/Users/Miguel/.gradle/wrapper/dists//**)",
+      "Bash(export JAVA_HOME=\"/c/Users/Miguel/.gradle/jdks/jetbrains_s_r_o_-21-amd64-windows.2\")"
     ]
   }
 }

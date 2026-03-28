@@ -21,8 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mmg.magicfolder.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,7 +34,6 @@ import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.game.model.GameMode
-import kotlin.math.ceil
 
 @Composable
 fun GameSetupScreen(
@@ -41,6 +43,30 @@ fun GameSetupScreen(
     onNavigateToTournament: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    GameSetupScreenContent(
+        uiState = uiState,
+        onBack = onBack,
+        onStartGame = onStartGame,
+        onNavigateToTournament = onNavigateToTournament,
+        onModeChange = viewModel::onModeChange,
+        onPlayerCountChange = viewModel::onPlayerCountChange,
+        onUpdatePlayerName = viewModel::updatePlayerName,
+        onUpdatePlayerTheme = viewModel::updatePlayerTheme,
+    )
+}
+
+@Composable
+private fun GameSetupScreenContent(
+    uiState: GameSetupUiState,
+    onBack: () -> Unit,
+    onStartGame: (GameMode, List<PlayerConfig>) -> Unit,
+    onNavigateToTournament: () -> Unit,
+    onModeChange: (GameMode) -> Unit,
+    onPlayerCountChange: (Int) -> Unit,
+    onUpdatePlayerName: (Int, String) -> Unit,
+    onUpdatePlayerTheme: (Int, PlayerThemeColors) -> Unit,
+) {
     val mc = MaterialTheme.magicColors
 
     Scaffold(
@@ -81,14 +107,6 @@ fun GameSetupScreen(
             verticalArrangement   = Arrangement.spacedBy(24.dp),
             horizontalAlignment   = Alignment.CenterHorizontally,
         ) {
-            // ── Title ─────────────────────────────────────────────────────────
-            Text(
-                text      = stringResource(R.string.gamesetup_app_title),
-                style     = MaterialTheme.magicTypography.displayMedium,
-                color     = mc.goldMtg,
-                textAlign = TextAlign.Center,
-            )
-
             // ── Mode selector ─────────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
@@ -101,7 +119,7 @@ fun GameSetupScreen(
                         ModeTile(
                             mode     = mode,
                             selected = mode == uiState.selectedMode,
-                            onClick  = { viewModel.onModeChange(mode) },
+                            onClick  = { onModeChange(mode) },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -111,7 +129,7 @@ fun GameSetupScreen(
             // ── Player count stepper ──────────────────────────────────────────
             PlayerCountStepper(
                 playerCount       = uiState.playerCount,
-                onPlayerCountChange = viewModel::onPlayerCountChange,
+                onPlayerCountChange = onPlayerCountChange,
             )
 
             // ── Player config list ────────────────────────────────────────────
@@ -125,23 +143,8 @@ fun GameSetupScreen(
                         usedThemes  = uiState.playerConfigs
                             .filter { it.id != config.id }
                             .map { it.theme },
-                        onNameChange  = { name -> viewModel.updatePlayerName(index, name) },
-                        onThemeChange = { theme -> viewModel.updatePlayerTheme(index, theme) },
-                    )
-                }
-            }
-
-            // ── Mini grid preview ─────────────────────────────────────────────
-            if (uiState.playerConfigs.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        stringResource(R.string.gamesetup_layout_label),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.textSecondary,
-                    )
-                    MiniGridPreview(
-                        playerConfigs    = uiState.playerConfigs,
-                        onSwapPositions  = viewModel::swapPlayerPositions,
+                        onNameChange  = { name -> onUpdatePlayerName(index, name) },
+                        onThemeChange = { theme -> onUpdatePlayerTheme(index, theme) },
                     )
                 }
             }
@@ -157,8 +160,9 @@ fun GameSetupScreen(
             ) {
                 Text(
                     stringResource(R.string.gamesetup_begin_button),
-                    style = MaterialTheme.magicTypography.titleMedium,
+                    style = MaterialTheme.magicTypography.titleLarge,
                     color = mc.background,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -167,6 +171,7 @@ fun GameSetupScreen(
                     stringResource(R.string.gamesetup_tournament_link),
                     color = mc.textSecondary,
                     style = MaterialTheme.magicTypography.bodySmall,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -293,12 +298,6 @@ private fun PlayerConfigRow(
             },
         )
 
-        // Position badge
-        Text(
-            text  = "P${config.id + 1}",
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = config.theme.accent.copy(alpha = 0.6f),
-        )
     }
 
     if (showColorPicker) {
@@ -367,87 +366,6 @@ private fun ColorPickerSheet(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Mini grid preview — shows player layout, tap to swap positions
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun MiniGridPreview(
-    playerConfigs:   List<PlayerConfig>,
-    onSwapPositions: (Int, Int) -> Unit,
-    modifier:        Modifier = Modifier,
-) {
-    val columns = when (playerConfigs.size) {
-        2    -> 1
-        3    -> 1
-        4    -> 2
-        5, 6 -> 2
-        else -> 4
-    }
-    val rows = ceil(playerConfigs.size.toDouble() / columns).toInt()
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(if (columns == 1) 2f else 1.5f),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        for (row in 0 until rows) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                for (col in 0 until columns) {
-                    val index  = row * columns + col
-                    val config = playerConfigs.getOrNull(index)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                config?.theme?.accent?.copy(alpha = 0.3f)
-                                    ?: Color.Transparent
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = config?.theme?.accent?.copy(alpha = 0.5f)
-                                    ?: Color.Transparent,
-                                shape = RoundedCornerShape(8.dp),
-                            )
-                            .clickable {
-                                if (config != null) {
-                                    val nextIndex = (index + 1).coerceAtMost(playerConfigs.size - 1)
-                                    onSwapPositions(index, nextIndex)
-                                }
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (config != null) {
-                            Text(
-                                text     = config.name.ifEmpty { "P${config.id + 1}" },
-                                style    = MaterialTheme.magicTypography.labelSmall,
-                                color    = config.theme.accent,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(4.dp),
-                            )
-                        }
-                    }
-                }
-                // Empty filler cell for odd player counts
-                if (columns > 1 &&
-                    row == rows - 1 &&
-                    playerConfigs.size % columns != 0
-                ) {
-                    Box(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Mode tile
