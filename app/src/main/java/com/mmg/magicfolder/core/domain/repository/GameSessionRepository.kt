@@ -1,6 +1,8 @@
 package com.mmg.magicfolder.core.domain.repository
 
 import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
+import com.mmg.magicfolder.core.data.local.dao.EliminationCount
+import com.mmg.magicfolder.core.data.local.dao.ModeCount
 import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.magicfolder.feature.game.model.GameResult
 import kotlinx.coroutines.flow.Flow
@@ -14,4 +16,10 @@ interface GameSessionRepository {
     fun observeAvgLifeOnWin(): Flow<Double?>
     fun observeAvgLifeOnLoss(): Flow<Double?>
     fun observeDeckStats(): Flow<List<DeckStatsRow>>
+    // Profile stats
+    fun observeFavoriteMode(): Flow<ModeCount?>
+    fun observeAvgDurationMs(): Flow<Double?>
+    fun observeMostFrequentElimination(): Flow<EliminationCount?>
+    fun observeAvgWinTurn(playerName: String): Flow<Double?>
+    fun observeCurrentStreak(playerName: String): Flow<Int>
 }

@@ -17,6 +17,18 @@ data class DeckStatsRow(
     val wins:       Int,
 )
 
+data class ModeCount(val mode: String, val count: Int)
+
+data class EliminationCount(val eliminationReason: String, val count: Int)
+
+data class SessionSummary(
+    val id:         Long,
+    val playedAt:   Long,
+    val mode:       String,
+    val durationMs: Long,
+    val winnerName: String,
+)
+
 @Dao
 interface GameSessionDao {
 
@@ -72,4 +84,39 @@ interface GameSessionDao {
 
     @Query("DELETE FROM game_sessions WHERE id = :sessionId")
     suspend fun deleteSession(sessionId: Long)
+
+    // ── Profile statistics ─────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT mode, COUNT(*) AS count
+        FROM game_sessions
+        GROUP BY mode
+        ORDER BY count DESC
+        LIMIT 1
+    """)
+    fun observeFavoriteMode(): Flow<ModeCount?>
+
+    @Query("SELECT AVG(durationMs) FROM game_sessions")
+    fun observeAvgDurationMs(): Flow<Double?>
+
+    @Query("""
+        SELECT eliminationReason, COUNT(*) AS count
+        FROM player_sessions
+        WHERE eliminationReason IS NOT NULL
+        GROUP BY eliminationReason
+        ORDER BY count DESC
+        LIMIT 1
+    """)
+    fun observeMostFrequentElimination(): Flow<EliminationCount?>
+
+    @Query("""
+        SELECT AVG(gs.totalTurns)
+        FROM game_sessions gs
+        INNER JOIN player_sessions ps ON ps.sessionId = gs.id
+        WHERE ps.isWinner = 1 AND ps.playerName = :playerName
+    """)
+    fun observeAvgWinTurn(playerName: String): Flow<Double?>
+
+    @Query("SELECT id, playedAt, mode, durationMs, winnerName FROM game_sessions ORDER BY playedAt DESC")
+    fun observeAllSessionSummaries(): Flow<List<SessionSummary>>
 }

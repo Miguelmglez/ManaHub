@@ -12,6 +12,8 @@ data class CardScoreRow(
     val avgScore:      Double,
 )
 
+data class AnswerCount(val answer: String, val count: Int)
+
 @Dao
 interface SurveyAnswerDao {
 
@@ -55,4 +57,34 @@ interface SurveyAnswerDao {
         LIMIT :limit
     """)
     fun observeWeakestCards(limit: Int = 5): Flow<List<CardScoreRow>>
+
+    // ── Profile insights ───────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT COUNT(*) FROM survey_answers
+        WHERE questionType = 'MANA'
+        AND answer NOT IN ('SMOOTH', 'NONE')
+    """)
+    fun observeManaIssueCount(): Flow<Int>
+
+    @Query("SELECT COUNT(DISTINCT sessionId) FROM survey_answers")
+    fun observeSurveyCount(): Flow<Int>
+
+    @Query("""
+        SELECT AVG(CAST(answer AS REAL))
+        FROM survey_answers
+        WHERE questionType = 'HAND'
+    """)
+    fun observeAvgHandRating(): Flow<Double?>
+
+    @Query("""
+        SELECT answer, COUNT(*) AS count
+        FROM survey_answers
+        WHERE questionType = 'RESULT_FEEL'
+        AND answer IN ('DOMINANT', 'CLOSE', 'LUCKY', 'SKILLFUL')
+        GROUP BY answer
+        ORDER BY count DESC
+        LIMIT 1
+    """)
+    fun observeFavoriteWinStyle(): Flow<AnswerCount?>
 }

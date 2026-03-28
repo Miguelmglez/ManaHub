@@ -5,29 +5,30 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
 import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
+import com.mmg.magicfolder.core.domain.model.Achievement
 import com.mmg.magicfolder.core.domain.model.CollectionStats
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
@@ -40,8 +41,8 @@ import kotlin.math.roundToInt
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsState()
-    val mc    = MaterialTheme.magicColors
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mc = MaterialTheme.magicColors
 
     Scaffold(
         containerColor = mc.background,
@@ -58,229 +59,476 @@ fun ProfileScreen(
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
+        LazyColumn(
+            modifier       = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 32.dp),
         ) {
-            // ── Avatar + title ─────────────────────────────────────────────────
-            ProfileHeader(
-                playerName  = state.playerName,
-                onNameSaved = viewModel::savePlayerName,
-            )
 
-            // ── Collection stats ───────────────────────────────────────────────
-            if (state.isLoading) {
-                Box(
-                    modifier         = Modifier.fillMaxWidth().height(120.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(28.dp))
+            // ── Hero ──────────────────────────────────────────────────────────
+            item {
+                ProfileHeroSection(
+                    uiState      = uiState,
+                    onNameSaved  = viewModel::savePlayerName,
+                )
+            }
+
+            // ── KPI grid ──────────────────────────────────────────────────────
+            item {
+                ProfileKpiSection(
+                    uiState  = uiState,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+
+            // ── Best deck ─────────────────────────────────────────────────────
+            if (uiState.deckStats.isNotEmpty()) {
+                item {
+                    BestDeckSection(
+                        deck     = uiState.deckStats.first(),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
                 }
-            } else {
-                StatsSection(stats = state.stats)
             }
 
-            // ── Game stats ─────────────────────────────────────────────────────
-            if (state.totalGames > 0) {
-                GameStatsSection(state = state)
+            // ── Survey insights ───────────────────────────────────────────────
+            if (uiState.surveyCount > 0) {
+                item {
+                    SurveyInsightsSection(
+                        uiState  = uiState,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
             }
 
-            // ── Recent games ───────────────────────────────────────────────────
-            if (state.recentSessions.isNotEmpty()) {
-                RecentGamesSection(sessions = state.recentSessions)
+            // ── Achievements ──────────────────────────────────────────────────
+            if (uiState.achievements.isNotEmpty()) {
+                item {
+                    SectionTitle(
+                        text     = "Achievements",
+                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
+                    )
+                }
+                val rows = uiState.achievements.chunked(3)
+                items(rows) { row ->
+                    AchievementRow(
+                        achievements = row,
+                        modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
             }
 
-            // ── Deck performance ───────────────────────────────────────────────
-            if (state.deckStats.isNotEmpty()) {
-                DeckPerformanceSection(deckStats = state.deckStats)
+            // ── Recent games ──────────────────────────────────────────────────
+            if (uiState.recentSessions.isNotEmpty()) {
+                item {
+                    SectionTitle(
+                        text     = "Recent Games",
+                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
+                    )
+                }
+                items(uiState.recentSessions) { session ->
+                    RecentGameRow(
+                        session      = session,
+                        playerName   = uiState.playerName,
+                        modifier     = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
+                    )
+                }
             }
 
-            // ── Theme selector ─────────────────────────────────────────────────
-            ThemeSection(
-                selected = state.selectedTheme,
-                onSelect = viewModel::selectTheme,
-            )
+            // ── Collection summary ────────────────────────────────────────────
+            uiState.collectionStats?.let { stats ->
+                item {
+                    CollectionSummarySection(
+                        stats    = stats,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
 
-            // ── Language selector ──────────────────────────────────────────────
-            LanguageSection(
-                selected = state.selectedLanguage,
-                onSelect = viewModel::selectLanguage,
-            )
+            // ── Theme selector ────────────────────────────────────────────────
+            item {
+                ThemeSection(
+                    selected = uiState.selectedTheme,
+                    onSelect = viewModel::selectTheme,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
 
-            // ── App info ───────────────────────────────────────────────────────
-            AppInfoFooter()
+            // ── Language selector ─────────────────────────────────────────────
+            item {
+                LanguageSection(
+                    selected = uiState.selectedLanguage,
+                    onSelect = viewModel::selectLanguage,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
 
-            Spacer(Modifier.height(8.dp))
+            // ── Footer ────────────────────────────────────────────────────────
+            item {
+                AppInfoFooter(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Profile header
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Hero section ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ProfileHeader(
-    playerName:  String,
+private fun ProfileHeroSection(
+    uiState:    ProfileViewModel.UiState,
     onNameSaved: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    var editedName by remember(playerName) { mutableStateOf(playerName) }
+    var editedName by remember(uiState.playerName) { mutableStateOf(uiState.playerName) }
 
     Column(
-        modifier            = Modifier.fillMaxWidth(),
+        modifier            = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        mc.primaryAccent.copy(alpha = 0.08f),
+                        mc.background,
+                    )
+                )
+            )
+            .padding(vertical = 28.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Gradient avatar
         Box(
-            contentAlignment = Alignment.Center,
-            modifier         = Modifier
-                .size(72.dp)
+            modifier = Modifier
+                .size(88.dp)
                 .clip(CircleShape)
-                .background(mc.primaryAccent.copy(alpha = 0.15f))
-                .border(2.dp, mc.primaryAccent.copy(alpha = 0.5f), CircleShape),
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            mc.primaryAccent.copy(alpha = 0.35f),
+                            mc.goldMtg.copy(alpha = 0.15f),
+                        )
+                    )
+                )
+                .border(2.dp, mc.primaryAccent.copy(alpha = 0.6f), CircleShape),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                "\u2726",
-                style = MaterialTheme.magicTypography.displayMedium,
-                color = mc.primaryAccent,
-            )
+            Text("✦", style = MaterialTheme.magicTypography.displayMedium, color = mc.primaryAccent)
         }
-        Text(
-            "\u00c6ther Tracker",
-            style     = MaterialTheme.magicTypography.titleLarge,
-            color     = mc.goldMtg,
-            textAlign = TextAlign.Center,
-        )
-        OutlinedTextField(
+
+        // Inline editable name
+        BasicTextField(
             value         = editedName,
             onValueChange = { editedName = it },
             singleLine    = true,
-            label         = {
-                Text(
-                    "Your name",
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textSecondary,
-                )
-            },
+            textStyle     = MaterialTheme.magicTypography.titleLarge.copy(
+                color     = mc.textPrimary,
+                textAlign = TextAlign.Center,
+            ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(
-                onDone = { if (editedName.isNotBlank()) onNameSaved(editedName) }
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor   = mc.primaryAccent,
-                unfocusedBorderColor = mc.textSecondary,
-                focusedTextColor     = mc.textPrimary,
-                unfocusedTextColor   = mc.textPrimary,
-                cursorColor          = mc.primaryAccent,
-            ),
-            modifier = Modifier.width(220.dp),
+            keyboardActions = KeyboardActions(onDone = {
+                if (editedName.isNotBlank()) onNameSaved(editedName)
+            }),
+            decorationBox = { innerTextField ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    innerTextField()
+                    Spacer(Modifier.height(3.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(160.dp)
+                            .height(1.dp)
+                            .background(mc.primaryAccent.copy(alpha = 0.4f))
+                    )
+                }
+            },
+            modifier = Modifier.widthIn(min = 80.dp, max = 220.dp),
         )
-    }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Collection stats
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun StatsSection(stats: CollectionStats?) {
-    val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("Collection")
-        if (stats == null) {
-            Text(
-                "No collection data yet.",
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textDisabled,
-            )
-        } else {
+        // Play style badge
+        Surface(
+            shape  = RoundedCornerShape(20.dp),
+            color  = mc.primaryAccent.copy(alpha = 0.1f),
+            border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f)),
+        ) {
             Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier              = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment     = Alignment.CenterVertically,
             ) {
-                StatCell("Cards",  stats.totalCards.toString(),                     Modifier.weight(1f))
-                StatCell("Unique", stats.uniqueCards.toString(),                    Modifier.weight(1f))
-                StatCell("Decks",  stats.totalDecks.toString(),                     Modifier.weight(1f))
-                StatCell("Value",  "$${String.format("%.0f", stats.totalValueUsd)}", Modifier.weight(1f), valueColor = true)
+                Text(uiState.playStyle.icon, fontSize = 14.sp)
+                Text(
+                    uiState.playStyle.label,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.primaryAccent,
+                )
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Game stats
-// ─────────────────────────────────────────────────────────────────────────────
+// ── KPI grid ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun GameStatsSection(state: ProfileUiState) {
-    val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun ProfileKpiSection(
+    uiState:  ProfileViewModel.UiState,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier            = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         SectionTitle("Game Stats")
         Row(
             modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatCell("Games",     state.totalGames.toString(),                    Modifier.weight(1f))
-            StatCell("Wins",      state.totalWins.toString(),                     Modifier.weight(1f))
-            StatCell("Win %",     "${(state.winRate * 100).roundToInt()}%",        Modifier.weight(1f))
+            KpiCell("Games",  uiState.totalGames.toString(),               Modifier.weight(1f))
+            KpiCell("Wins",   uiState.totalWins.toString(),                Modifier.weight(1f))
+            KpiCell("Win %",  "${(uiState.winRate * 100).roundToInt()}%",  Modifier.weight(1f))
         }
         Row(
             modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatCell(
-                label    = "Avg life\non win",
-                value    = state.avgLifeOnWin.roundToInt().toString(),
-                modifier = Modifier.weight(1f),
-                valueColor = true,
-            )
-            StatCell(
-                label    = "Avg life\non loss",
-                value    = state.avgLifeOnLoss.roundToInt().toString(),
-                modifier = Modifier.weight(1f),
-            )
+            KpiCell("Streak",    uiState.currentStreak.toString(),               Modifier.weight(1f), accent = true)
+            KpiCell("Avg life",  uiState.avgLifeOnWin.roundToInt().toString(),   Modifier.weight(1f))
+            KpiCell("Avg turn",  if (uiState.avgWinTurn > 0) "T${uiState.avgWinTurn.roundToInt()}" else "—",
+                                                                                  Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun KpiCell(
+    label:    String,
+    value:    String,
+    modifier: Modifier,
+    accent:   Boolean = false,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(mc.surface)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            value,
+            style = MaterialTheme.magicTypography.titleLarge,
+            color = if (accent) mc.goldMtg else mc.primaryAccent,
+        )
+        Text(
+            label,
+            style     = MaterialTheme.magicTypography.labelSmall,
+            color     = mc.textSecondary,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+// ── Best deck section ─────────────────────────────────────────────────────────
+
+@Composable
+private fun BestDeckSection(
+    deck:     DeckStatsRow,
+    modifier: Modifier = Modifier,
+) {
+    val mc      = MaterialTheme.magicColors
+    val winRate = if (deck.totalGames > 0) deck.wins.toFloat() / deck.totalGames else 0f
+    Column(
+        modifier            = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SectionTitle("Best Deck")
+        Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text     = deck.deckName ?: "Unknown Deck",
+                        style    = MaterialTheme.magicTypography.bodyMedium,
+                        color    = mc.textPrimary,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text  = "${deck.totalGames}G · ${(winRate * 100).roundToInt()}% WR",
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.primaryAccent,
+                    )
+                }
+                LinearProgressIndicator(
+                    progress   = { winRate },
+                    modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                    color      = mc.primaryAccent,
+                    trackColor = mc.surfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// ── Survey insights section ───────────────────────────────────────────────────
+
+@Composable
+private fun SurveyInsightsSection(
+    uiState:  ProfileViewModel.UiState,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(
+        modifier            = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SectionTitle("Survey Insights")
+        Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    InsightCell("Surveys",    uiState.surveyCount.toString(),                Modifier.weight(1f))
+                    InsightCell("Mana issues", uiState.manaIssueCount.toString(),            Modifier.weight(1f))
+                    InsightCell("Hand rating", if (uiState.avgHandRating > 0)
+                        "${"%.1f".format(uiState.avgHandRating)}/5" else "—",               Modifier.weight(1f))
+                }
+                if (uiState.favoriteWinStyle.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Win style: ",
+                            style = MaterialTheme.magicTypography.bodySmall,
+                            color = mc.textSecondary,
+                        )
+                        Text(
+                            uiState.favoriteWinStyle.lowercase()
+                                .replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.magicTypography.labelMedium,
+                            color = mc.goldMtg,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InsightCell(label: String, value: String, modifier: Modifier) {
+    val mc = MaterialTheme.magicColors
+    Column(
+        modifier            = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(value, style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
+        Text(
+            label,
+            style     = MaterialTheme.magicTypography.labelSmall,
+            color     = mc.textSecondary,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+// ── Achievements section ──────────────────────────────────────────────────────
+
+@Composable
+private fun AchievementRow(
+    achievements: List<Achievement>,
+    modifier:     Modifier = Modifier,
+) {
+    Row(
+        modifier              = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        achievements.forEach { achievement ->
+            AchievementCard(achievement = achievement, modifier = Modifier.weight(1f))
+        }
+        // Pad empty slots if row has fewer than 3
+        repeat(3 - achievements.size) {
             Spacer(Modifier.weight(1f))
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Recent games
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
-private fun RecentGamesSection(sessions: List<GameSessionWithPlayers>) {
+private fun AchievementCard(
+    achievement: Achievement,
+    modifier:    Modifier = Modifier,
+) {
     val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle("Recent Games")
-        sessions.forEach { session ->
-            RecentGameRow(session = session)
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (achievement.isUnlocked) mc.surface
+                else mc.surface.copy(alpha = 0.4f)
+            )
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text     = achievement.icon,
+            fontSize = 22.sp,
+            color    = if (achievement.isUnlocked) Color.Unspecified
+                       else Color.Gray.copy(alpha = 0.4f),
+        )
+        Text(
+            text      = achievement.title,
+            style     = MaterialTheme.magicTypography.labelSmall,
+            color     = if (achievement.isUnlocked) mc.textPrimary else mc.textDisabled,
+            textAlign = TextAlign.Center,
+            maxLines  = 2,
+            overflow  = TextOverflow.Ellipsis,
+        )
+        if (!achievement.isUnlocked && achievement.progress > 0f) {
+            LinearProgressIndicator(
+                progress   = { achievement.progress },
+                modifier   = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)),
+                color      = mc.primaryAccent.copy(alpha = 0.5f),
+                trackColor = mc.surfaceVariant,
+            )
+        } else if (achievement.isUnlocked) {
+            Text("✓", style = MaterialTheme.magicTypography.labelSmall, color = mc.lifePositive)
         }
     }
 }
 
+// ── Recent games ──────────────────────────────────────────────────────────────
+
 @Composable
-private fun RecentGameRow(session: GameSessionWithPlayers) {
+private fun RecentGameRow(
+    session:    GameSessionWithPlayers,
+    playerName: String,
+    modifier:   Modifier = Modifier,
+) {
     val mc      = MaterialTheme.magicColors
     val s       = session.session
     val winner  = session.players.find { it.isWinner }
-    val isWin   = winner?.playerName == "Player 1"
+    val isWin   = winner?.playerName == playerName
     val players = session.players.joinToString(", ") { it.playerName }
 
-    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
+    Surface(shape = RoundedCornerShape(10.dp), color = mc.surface, modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier              = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // W/L badge
             Surface(
                 shape = RoundedCornerShape(4.dp),
                 color = if (isWin) mc.lifePositive.copy(alpha = 0.2f)
@@ -293,12 +541,11 @@ private fun RecentGameRow(session: GameSessionWithPlayers) {
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text     = s.mode,
-                    style    = MaterialTheme.magicTypography.labelSmall,
-                    color    = mc.goldMtg,
+                    text  = s.mode,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.goldMtg,
                 )
                 Text(
                     text     = players,
@@ -308,7 +555,6 @@ private fun RecentGameRow(session: GameSessionWithPlayers) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text  = formatDate(s.playedAt),
@@ -325,104 +571,37 @@ private fun RecentGameRow(session: GameSessionWithPlayers) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Deck performance
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Collection summary ────────────────────────────────────────────────────────
 
 @Composable
-private fun DeckPerformanceSection(deckStats: List<DeckStatsRow>) {
-    val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle("Deck Performance")
-        deckStats.forEach { row ->
-            DeckStatRow(row = row)
-        }
-    }
-}
-
-@Composable
-private fun DeckStatRow(row: DeckStatsRow) {
-    val mc      = MaterialTheme.magicColors
-    val winRate = if (row.totalGames > 0) row.wins.toFloat() / row.totalGames else 0f
-
-    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+private fun CollectionSummarySection(
+    stats:    CollectionStats,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Collection")
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text     = row.deckName ?: "Unknown Deck",
-                    style    = MaterialTheme.magicTypography.bodyMedium,
-                    color    = mc.textPrimary,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text  = "${row.totalGames} games  •  ${(winRate * 100).roundToInt()}%",
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textSecondary,
-                )
-            }
-            LinearProgressIndicator(
-                progress   = { winRate },
-                modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                color      = mc.primaryAccent,
-                trackColor = mc.surfaceVariant,
-            )
+            KpiCell("Cards",  stats.totalCards.toString(),                        Modifier.weight(1f))
+            KpiCell("Unique", stats.uniqueCards.toString(),                       Modifier.weight(1f))
+            KpiCell("Decks",  stats.totalDecks.toString(),                        Modifier.weight(1f))
+            KpiCell("Value",  "$${String.format("%.0f", stats.totalValueUsd)}",   Modifier.weight(1f), accent = true)
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Common cells
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Theme + Language + Footer ─────────────────────────────────────────────────
 
 @Composable
-private fun StatCell(
-    label:      String,
-    value:      String,
-    modifier:   Modifier,
-    valueColor: Boolean = false,
+private fun ThemeSection(
+    selected: AppTheme,
+    onSelect: (AppTheme) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    Column(
-        modifier            = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(mc.surface)
-            .padding(vertical = 14.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            value,
-            style = MaterialTheme.magicTypography.titleLarge,
-            color = if (valueColor) mc.goldMtg else mc.primaryAccent,
-        )
-        Text(
-            label,
-            style     = MaterialTheme.magicTypography.labelSmall,
-            color     = mc.textSecondary,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Theme + Language + Footer (unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun ThemeSection(selected: AppTheme, onSelect: (AppTheme) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionTitle("Theme")
         Row(
             modifier              = Modifier.fillMaxWidth(),
@@ -477,7 +656,7 @@ private fun ThemeTile(
             maxLines  = 1,
         )
         if (isLocked) {
-            Text("\uD83D\uDD12", style = MaterialTheme.magicTypography.labelSmall)
+            Text("🔒", style = MaterialTheme.magicTypography.labelSmall)
         } else if (selected) {
             Text("Active", style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
         }
@@ -485,14 +664,14 @@ private fun ThemeTile(
 }
 
 @Composable
-private fun LanguageSection(selected: String, onSelect: (String) -> Unit) {
+private fun LanguageSection(
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val mc = MaterialTheme.magicColors
-    val languages = listOf(
-        "en" to "English",
-        "es" to "Español",
-        "de" to "Deutsch",
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val languages = listOf("en" to "English", "es" to "Español", "de" to "Deutsch")
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionTitle("Card Language")
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -522,20 +701,20 @@ private fun LanguageSection(selected: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun AppInfoFooter() {
+private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
     Column(
-        modifier            = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(mc.surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        InfoRow("App",    "MagicFolder")
-        InfoRow("Version","1.0.0")
-        InfoRow("Data",   "Scryfall API")
-        InfoRow("Engine", "\u00c6ther Tracker v1")
+        InfoRow("App",     "MagicFolder")
+        InfoRow("Version", "1.0.0")
+        InfoRow("Data",    "Scryfall API")
+        InfoRow("Engine",  "Æther Tracker v1")
     }
 }
 
@@ -551,16 +730,15 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 @Composable
-private fun SectionTitle(text: String) {
+private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
-        text  = text,
-        style = MaterialTheme.magicTypography.labelLarge,
-        color = MaterialTheme.magicColors.textSecondary,
+        text     = text,
+        style    = MaterialTheme.magicTypography.labelLarge,
+        color    = MaterialTheme.magicColors.textSecondary,
+        modifier = modifier,
     )
 }
 
@@ -581,6 +759,5 @@ private fun formatDuration(ms: Long): String {
     return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
 }
 
-private fun formatDate(timestamp: Long): String {
-    return SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
-}
+private fun formatDate(timestamp: Long): String =
+    SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
