@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -48,6 +49,14 @@ fun GamePlayScreen(
     val mc = MaterialTheme.magicColors
 
     var showLayoutEditor by remember { mutableStateOf(false) }
+    var showGameResult   by remember { mutableStateOf(false) }
+    var showExitDialog   by remember { mutableStateOf(false) }
+    var showResetDialog  by remember { mutableStateOf(false) }
+
+    // Intercept system back button — show exit dialog instead of navigating
+    BackHandler(enabled = uiState.winner == null) {
+        showExitDialog = true
+    }
 
     Box(
         modifier = Modifier
@@ -59,8 +68,8 @@ fun GamePlayScreen(
                 mode           = uiState.mode,
                 turnNumber     = uiState.turnNumber,
                 activePlayer   = uiState.players.find { it.id == uiState.activePlayerId },
-                onReset        = viewModel::resetGame,
-                onExit         = onBackHome,
+                onReset        = { showResetDialog = true },
+                onExit         = { showExitDialog  = true },
                 onLayoutEdit   = { showLayoutEditor = true },
             )
             PlayerGrid(
@@ -114,14 +123,70 @@ fun GamePlayScreen(
             )
         }
 
-        // ── Game result screen ────────────────────────────────────────────────
-        uiState.gameResult?.let { result ->
-            GameResultScreen(
-                gameResult = result,
-                onNewGame  = { viewModel.resetGame(); onNewGame() },
-                onBackHome = onBackHome,
-                onSurvey   = { onSurvey(uiState.lastSessionId ?: 0L) },
+        // ── Exit confirmation dialog ──────────────────────────────────────────
+        if (showExitDialog) {
+            AlertDialog(
+                onDismissRequest = { showExitDialog = false },
+                title   = { Text("Leave game?", color = mc.textPrimary) },
+                text    = { Text("Game progress will be lost.", color = mc.textSecondary) },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.resetGame(); onBackHome() }) {
+                        Text("Leave", color = mc.lifeNegative)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExitDialog = false }) {
+                        Text("Stay", color = mc.primaryAccent)
+                    }
+                },
+                containerColor = mc.surface,
             )
+        }
+
+        // ── Reset confirmation dialog ─────────────────────────────────────────
+        if (showResetDialog) {
+            AlertDialog(
+                onDismissRequest = { showResetDialog = false },
+                title   = { Text("Reset game?", color = mc.textPrimary) },
+                text    = { Text("All life totals and counters will reset.", color = mc.textSecondary) },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.resetGame(); showResetDialog = false }) {
+                        Text("Reset", color = mc.lifeNegative)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetDialog = false }) {
+                        Text("Cancel", color = mc.primaryAccent)
+                    }
+                },
+                containerColor = mc.surface,
+            )
+        }
+
+        // ── Winner overlay ────────────────────────────────────────────────────
+        AnimatedVisibility(
+            visible = uiState.winner != null && !showGameResult,
+            enter   = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 3 },
+        ) {
+            uiState.winner?.let { winner ->
+                WinnerOverlay(
+                    winner        = winner,
+                    onViewResults = { showGameResult = true },
+                    onPlayAgain   = { viewModel.resetGame(); onNewGame() },
+                )
+            }
+        }
+
+        // ── Game result screen ────────────────────────────────────────────────
+        if (showGameResult) {
+            uiState.gameResult?.let { result ->
+                GameResultScreen(
+                    gameResult = result,
+                    onNewGame  = { viewModel.resetGame(); onNewGame() },
+                    onBackHome = onBackHome,
+                    onSurvey   = { onSurvey(uiState.lastSessionId ?: 0L) },
+                )
+            }
         }
     }
 }
@@ -310,93 +375,105 @@ private fun PlayerCard(
             )
         }
 
-        if (player.eliminated) {
-            EliminatedOverlay()
-        } else {
-            Column(
-                modifier            = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween,
+        Column(
+            modifier            = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            // ── Player name ───────────────────────────────────────────
+            Text(
+                text     = player.name,
+                style    = MaterialTheme.magicTypography.labelSmall,
+                color    = theme.accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable(onClick = onEditName),
+            )
+
+            // ── Life counter ──────────────────────────────────────────
+            val animatedLife by animateIntAsState(
+                targetValue   = player.life,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness    = Spring.StiffnessMedium,
+                ),
+                label = "life_${player.id}",
+            )
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier              = Modifier.weight(1f).fillMaxWidth(),
             ) {
-                // ── Player name ───────────────────────────────────────────
-                Text(
-                    text     = player.name,
-                    style    = MaterialTheme.magicTypography.labelSmall,
-                    color    = theme.accent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable(onClick = onEditName),
+                LifeButton(
+                    label        = "−",
+                    theme        = theme,
+                    direction    = -1,
+                    onLifeChange = onLife,
+                    modifier     = Modifier.size(48.dp),
                 )
 
-                // ── Life counter ──────────────────────────────────────────
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier              = Modifier.weight(1f).fillMaxWidth(),
-                ) {
-                    LifeButton(
-                        label        = "−",
-                        theme        = theme,
-                        direction    = -1,
-                        onLifeChange = onLife,
-                        modifier     = Modifier.size(48.dp),
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text      = animatedLife.toString(),
+                        style     = MaterialTheme.magicTypography.lifeNumber,
+                        color     = mc.textPrimary,
+                        maxLines  = 1,
+                        textAlign = TextAlign.Center,
                     )
-
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text      = player.life.toString(),
-                            style     = MaterialTheme.magicTypography.lifeNumber,
-                            color     = mc.textPrimary,
-                            maxLines  = 1,
-                            textAlign = TextAlign.Center,
-                        )
-                        FloatingDelta(
-                            delta         = delta,
-                            positiveColor = mc.lifePositive,
-                            negativeColor = mc.lifeNegative,
-                            modifier      = Modifier.align(Alignment.TopCenter),
-                        )
-                    }
-
-                    LifeButton(
-                        label        = "+",
-                        theme        = theme,
-                        direction    = +1,
-                        onLifeChange = onLife,
-                        modifier     = Modifier.size(48.dp),
+                    FloatingDelta(
+                        delta         = delta,
+                        positiveColor = mc.lifePositive,
+                        negativeColor = mc.lifeNegative,
+                        modifier      = Modifier.align(Alignment.TopCenter),
                     )
                 }
 
-                // ── Bottom row ────────────────────────────────────────────
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    PoisonPips(
-                        count    = player.poison,
-                        theme    = theme,
-                        onSet    = { newVal ->
-                            val d = newVal - player.poison
-                            onCounter(CounterType.POISON, d)
-                        },
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (uiState.mode == GameMode.COMMANDER) {
-                            CardActionButton(
-                                label   = "⚔",
-                                theme   = theme,
-                                onClick = onCmdPanel,
-                                danger  = player.commanderDamage.values.any { it >= 21 },
-                            )
-                        }
-                        CardActionButton(label = "◆", theme = theme, onClick = onCtrPanel)
-                        DiceCoinsRow(dice = dice, coin = coin, theme = theme, onRoll = onRoll, onFlip = onFlip)
+                LifeButton(
+                    label        = "+",
+                    theme        = theme,
+                    direction    = +1,
+                    onLifeChange = onLife,
+                    modifier     = Modifier.size(48.dp),
+                )
+            }
+
+            // ── Bottom row ────────────────────────────────────────────
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                PoisonPips(
+                    count    = player.poison,
+                    theme    = theme,
+                    onSet    = { newVal ->
+                        val d = newVal - player.poison
+                        onCounter(CounterType.POISON, d)
+                    },
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (uiState.mode == GameMode.COMMANDER) {
+                        CardActionButton(
+                            label   = "⚔",
+                            theme   = theme,
+                            onClick = onCmdPanel,
+                            danger  = player.commanderDamage.values.any { it >= 21 },
+                        )
                     }
+                    CardActionButton(label = "◆", theme = theme, onClick = onCtrPanel)
+                    DiceCoinsRow(dice = dice, coin = coin, theme = theme, onRoll = onRoll, onFlip = onFlip)
                 }
             }
+        }
+
+        // ── Eliminated overlay (animated) ────────────────────────────────
+        AnimatedVisibility(
+            visible = player.eliminated,
+            enter   = fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.85f),
+        ) {
+            EliminatedOverlay(player = player, mode = uiState.mode)
         }
     }
 }
@@ -569,23 +646,104 @@ private fun DiceCoinsRow(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun EliminatedOverlay() {
-    val mc = MaterialTheme.magicColors
+private fun EliminatedOverlay(player: Player, mode: GameMode) {
+    val reason = when {
+        player.life <= 0    -> "Ran out of life"
+        player.poison >= 10 -> "Poison"
+        mode == GameMode.COMMANDER && player.commanderDamage.values.any { it >= 21 } -> "Commander damage"
+        else                -> null
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier         = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f)),
+            .background(Color.Black.copy(alpha = 0.72f)),
     ) {
-        Text(
-            text          = "FALLEN",
-            color         = Color(0xFFE63946),
-            fontSize      = 24.sp,
-            fontWeight    = FontWeight.Black,
-            letterSpacing = 4.sp,
-            fontFamily    = CinzelFontFamily,
-            textAlign     = TextAlign.Center,
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = "💀", fontSize = 20.sp, textAlign = TextAlign.Center)
+            Text(
+                text          = "FALLEN",
+                color         = Color(0xFFE63946),
+                fontSize      = 24.sp,
+                fontWeight    = FontWeight.Black,
+                letterSpacing = 6.sp,
+                fontFamily    = CinzelFontFamily,
+                textAlign     = TextAlign.Center,
+            )
+            if (reason != null) {
+                Text(
+                    text      = reason,
+                    color     = Color.White.copy(alpha = 0.70f),
+                    fontSize  = 11.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Winner overlay
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun WinnerOverlay(
+    winner:        Player,
+    onViewResults: () -> Unit,
+    onPlayAgain:   () -> Unit,
+) {
+    val mc    = MaterialTheme.magicColors
+    val theme = mc.playerColors.getOrNull(winner.themeIndex % 10) ?: mc.playerColors[0]
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier         = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.85f)),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier            = Modifier.padding(32.dp),
+        ) {
+            Text(text = "👑", fontSize = 48.sp, textAlign = TextAlign.Center)
+            Text(
+                text          = winner.name,
+                color         = theme.accent,
+                fontSize      = 32.sp,
+                fontWeight    = FontWeight.Black,
+                letterSpacing = 2.sp,
+                fontFamily    = CinzelFontFamily,
+                textAlign     = TextAlign.Center,
+            )
+            Text(
+                text          = "WINS!",
+                color         = mc.goldMtg,
+                fontSize      = 20.sp,
+                fontWeight    = FontWeight.Bold,
+                letterSpacing = 6.sp,
+                fontFamily    = CinzelFontFamily,
+                textAlign     = TextAlign.Center,
+            )
+            Text(
+                text  = "${winner.life} life remaining",
+                color = mc.textSecondary,
+                style = MaterialTheme.magicTypography.bodyMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick  = onViewResults,
+                colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("View Results", color = mc.background)
+            }
+            TextButton(onClick = onPlayAgain) {
+                Text("Play Again", color = mc.textSecondary)
+            }
+        }
     }
 }
 

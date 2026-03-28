@@ -1,5 +1,10 @@
 package com.mmg.magicfolder.feature.profile
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -473,12 +478,29 @@ private fun AchievementCard(
     modifier:    Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val glowAlpha = if (achievement.isUnlocked) {
+        val infiniteTransition = rememberInfiniteTransition(label = "achievement_glow")
+        infiniteTransition.animateFloat(
+            initialValue  = 0.3f,
+            targetValue   = 0.8f,
+            animationSpec = infiniteRepeatable(
+                animation  = tween(800),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "glow_alpha",
+        ).value
+    } else 0f
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(
                 if (achievement.isUnlocked) mc.surface
                 else mc.surface.copy(alpha = 0.4f)
+            )
+            .then(
+                if (achievement.isUnlocked)
+                    Modifier.border(1.dp, mc.primaryAccent.copy(alpha = glowAlpha), RoundedCornerShape(12.dp))
+                else Modifier
             )
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

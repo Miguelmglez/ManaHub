@@ -1,5 +1,10 @@
 package com.mmg.magicfolder.app.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -68,9 +73,13 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
         },
     ) { padding ->
         NavHost(
-            navController    = navController,
-            startDestination = Screen.Collection.route,
-            modifier         = modifier.padding(padding),
+            navController      = navController,
+            startDestination   = Screen.Collection.route,
+            modifier           = modifier.padding(padding),
+            enterTransition    = { fadeIn(tween(300)) + slideInHorizontally(tween(300))  { it / 5 } },
+            exitTransition     = { fadeOut(tween(200)) },
+            popEnterTransition = { fadeIn(tween(300)) },
+            popExitTransition  = { fadeOut(tween(200)) + slideOutHorizontally(tween(300)) { it / 5 } },
         ) {
 
             // ── Collection ────────────────────────────────────────────────────

@@ -32,6 +32,7 @@ android {
 
 dependencies {
     implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.splashscreen)
     implementation(libs.foundation)
     implementation(libs.material3)
     implementation(libs.tv.material)

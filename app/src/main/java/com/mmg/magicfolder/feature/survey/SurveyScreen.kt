@@ -1,6 +1,7 @@
 package com.mmg.magicfolder.feature.survey
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -85,8 +86,13 @@ fun SurveyScreen(
         }
 
         // ── Progress bar ──────────────────────────────────────────────────────
+        val animatedProgress by animateFloatAsState(
+            targetValue   = viewModel.progress,
+            animationSpec = tween(400),
+            label         = "survey_progress",
+        )
         LinearProgressIndicator(
-            progress   = { viewModel.progress },
+            progress   = { animatedProgress },
             modifier   = Modifier.fillMaxWidth().height(3.dp),
             color      = MaterialTheme.magicColors.primaryAccent,
             trackColor = MaterialTheme.magicColors.surfaceVariant,

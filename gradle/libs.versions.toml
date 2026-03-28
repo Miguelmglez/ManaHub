@@ -20,7 +20,8 @@ firebase-crashlytics-buildtools = "3.0.6"
 foundation = "1.10.5"
 material3 = "1.4.0"
 datastore  = "1.1.1"
-tv-material = "1.0.1"
+tv-material    = "1.0.1"
+splashscreen   = "1.0.1"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -57,7 +58,8 @@ foundation          = { group = "androidx.compose.foundation", name = "foundatio
 compose-googlefonts = { group = "androidx.compose.ui",         name = "ui-text-google-fonts" }
 material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tv-material" }
+tv-material  = { group = "androidx.tv",   name = "tv-material",               version.ref = "tv-material"  }
+splashscreen = { group = "androidx.core", name = "core-splashscreen",         version.ref = "splashscreen" }
 
 [plugins]
 android-application = { id = "com.android.application",            version.ref = "agp" }

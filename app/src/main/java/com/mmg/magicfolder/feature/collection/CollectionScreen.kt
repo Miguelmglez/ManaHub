@@ -1,6 +1,9 @@
 package com.mmg.magicfolder.feature.collection
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.*
@@ -331,8 +334,17 @@ private fun CardGrid(
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(cards, key = { it.userCard.id }) { item ->
-            CardGridItem(item = item, onClick = { onCardClick(item.card.scryfallId) })
+        itemsIndexed(cards, key = { _, item -> item.userCard.id }) { index, item ->
+            var visible by remember(item.userCard.id) { mutableStateOf(false) }
+            LaunchedEffect(item.userCard.id) { visible = true }
+            val delay = (index % 12) * 30
+            AnimatedVisibility(
+                visible = visible,
+                enter   = fadeIn(tween(300, delayMillis = delay)) +
+                          scaleIn(tween(300, delayMillis = delay), initialScale = 0.92f),
+            ) {
+                CardGridItem(item = item, onClick = { onCardClick(item.card.scryfallId) })
+            }
         }
     }
 }
