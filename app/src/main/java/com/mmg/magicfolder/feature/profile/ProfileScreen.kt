@@ -1,14 +1,8 @@
 package com.mmg.magicfolder.feature.profile
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,7 +38,6 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
@@ -55,16 +48,23 @@ fun ProfileScreen(
     Scaffold(
         containerColor = mc.background,
         topBar = {
-            TopAppBar(
-                title = {
+            Surface(
+                color    = mc.backgroundSecondary,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        stringResource(R.string.profile_title),
+                        text  = stringResource(R.string.profile_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
+                }
+            }
         },
     ) { padding ->
         LazyColumn(
@@ -198,14 +198,14 @@ private fun ProfileHeroSection(
                     )
                 )
             )
-            .padding(vertical = 28.dp, horizontal = 16.dp),
+            .padding(top = 8.dp, bottom = 24.dp, start = 16.dp, end = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Gradient avatar
         Box(
             modifier = Modifier
-                .size(88.dp)
+                .size(80.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.verticalGradient(
@@ -404,54 +404,34 @@ private fun SurveyInsightsSection(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    InsightCell("Surveys",    uiState.surveyCount.toString(),                Modifier.weight(1f))
-                    InsightCell("Mana issues", uiState.manaIssueCount.toString(),            Modifier.weight(1f))
-                    InsightCell("Hand rating", if (uiState.avgHandRating > 0)
-                        "${"%.1f".format(uiState.avgHandRating)}/5" else "—",               Modifier.weight(1f))
-                }
-                if (uiState.favoriteWinStyle.isNotEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Win style: ",
-                            style = MaterialTheme.magicTypography.bodySmall,
-                            color = mc.textSecondary,
-                        )
-                        Text(
-                            uiState.favoriteWinStyle.lowercase()
-                                .replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.magicTypography.labelMedium,
-                            color = mc.goldMtg,
-                        )
-                    }
-                }
+                InsightRow("Hand Quality",   "${(uiState.avgHandRating * 20).roundToInt()}%",  (uiState.avgHandRating / 5f).toFloat())
+                InsightRow("Mana Issues",  "${uiState.manaIssueCount} games",  (uiState.manaIssueCount.toFloat() / uiState.totalGames.coerceAtLeast(1)).coerceAtMost(1f))
             }
         }
     }
 }
 
 @Composable
-private fun InsightCell(label: String, value: String, modifier: Modifier) {
+private fun InsightRow(label: String, value: String, progress: Float) {
     val mc = MaterialTheme.magicColors
-    Column(
-        modifier            = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(value, style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
-        Text(
-            label,
-            style     = MaterialTheme.magicTypography.labelSmall,
-            color     = mc.textSecondary,
-            textAlign = TextAlign.Center,
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+            Text(value, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+        }
+        LinearProgressIndicator(
+            progress   = { progress },
+            modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+            color      = mc.primaryAccent,
+            trackColor = mc.surfaceVariant,
         )
     }
 }
 
-// ── Achievements section ──────────────────────────────────────────────────────
+// ── Achievements row ──────────────────────────────────────────────────────────
 
 @Composable
 private fun AchievementRow(
@@ -462,10 +442,9 @@ private fun AchievementRow(
         modifier              = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        achievements.forEach { achievement ->
-            AchievementCard(achievement = achievement, modifier = Modifier.weight(1f))
+        achievements.forEach { ach ->
+            AchievementCell(achievement = ach, modifier = Modifier.weight(1f))
         }
-        // Pad empty slots if row has fewer than 3
         repeat(3 - achievements.size) {
             Spacer(Modifier.weight(1f))
         }
@@ -473,67 +452,37 @@ private fun AchievementRow(
 }
 
 @Composable
-private fun AchievementCard(
+private fun AchievementCell(
     achievement: Achievement,
     modifier:    Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val glowAlpha = if (achievement.isUnlocked) {
-        val infiniteTransition = rememberInfiniteTransition(label = "achievement_glow")
-        infiniteTransition.animateFloat(
-            initialValue  = 0.3f,
-            targetValue   = 0.8f,
-            animationSpec = infiniteRepeatable(
-                animation  = tween(800),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "glow_alpha",
-        ).value
-    } else 0f
+    val isUnlocked = achievement.isUnlocked
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (achievement.isUnlocked) mc.surface
-                else mc.surface.copy(alpha = 0.4f)
-            )
-            .then(
-                if (achievement.isUnlocked)
-                    Modifier.border(1.dp, mc.primaryAccent.copy(alpha = glowAlpha), RoundedCornerShape(12.dp))
-                else Modifier
-            )
-            .padding(10.dp),
+            .background(if (isUnlocked) mc.surface else mc.surface.copy(alpha = 0.4f))
+            .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             text     = achievement.icon,
-            fontSize = 22.sp,
-            color    = if (achievement.isUnlocked) Color.Unspecified
-                       else Color.Gray.copy(alpha = 0.4f),
+            fontSize = 24.sp,
+            color    = if (isUnlocked) Color.Unspecified else mc.textDisabled,
         )
         Text(
             text      = achievement.title,
             style     = MaterialTheme.magicTypography.labelSmall,
-            color     = if (achievement.isUnlocked) mc.textPrimary else mc.textDisabled,
+            color     = if (isUnlocked) mc.textPrimary else mc.textDisabled,
             textAlign = TextAlign.Center,
-            maxLines  = 2,
+            maxLines  = 1,
             overflow  = TextOverflow.Ellipsis,
         )
-        if (!achievement.isUnlocked && achievement.progress > 0f) {
-            LinearProgressIndicator(
-                progress   = { achievement.progress },
-                modifier   = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)),
-                color      = mc.primaryAccent.copy(alpha = 0.5f),
-                trackColor = mc.surfaceVariant,
-            )
-        } else if (achievement.isUnlocked) {
-            Text("✓", style = MaterialTheme.magicTypography.labelSmall, color = mc.lifePositive)
-        }
     }
 }
 
-// ── Recent games ──────────────────────────────────────────────────────────────
+// ── Recent games row ──────────────────────────────────────────────────────────
 
 @Composable
 private fun RecentGameRow(
@@ -541,56 +490,39 @@ private fun RecentGameRow(
     playerName: String,
     modifier:   Modifier = Modifier,
 ) {
-    val mc      = MaterialTheme.magicColors
-    val s       = session.session
-    val winner  = session.players.find { it.isWinner }
-    val isWin   = winner?.playerName == playerName
-    val players = session.players.joinToString(", ") { it.playerName }
+    val mc = MaterialTheme.magicColors
+    val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
+    val dateStr    = dateFormat.format(Date(session.session.playedAt))
 
-    Surface(shape = RoundedCornerShape(10.dp), color = mc.surface, modifier = modifier.fillMaxWidth()) {
+    val myPlayer = session.players.find { it.playerName == playerName }
+    val isWin    = myPlayer?.isWinner == true
+
+    Surface(
+        shape  = RoundedCornerShape(12.dp),
+        color  = mc.surface,
+        modifier = modifier.fillMaxWidth(),
+    ) {
         Row(
-            modifier              = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier          = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = if (isWin) mc.lifePositive.copy(alpha = 0.2f)
-                        else mc.lifeNegative.copy(alpha = 0.2f),
-            ) {
-                Text(
-                    text     = if (isWin) "W" else "L",
-                    style    = MaterialTheme.magicTypography.labelMedium,
-                    color    = if (isWin) mc.lifePositive else mc.lifeNegative,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = s.mode,
+                    text  = session.session.mode,
                     style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.goldMtg,
+                    color = mc.textSecondary,
                 )
                 Text(
-                    text     = players,
-                    style    = MaterialTheme.magicTypography.bodySmall,
-                    color    = mc.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text  = formatDate(s.playedAt),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textDisabled,
-                )
-                Text(
-                    text  = formatDuration(s.durationMs),
-                    style = MaterialTheme.magicTypography.labelSmall,
+                    text  = dateStr,
+                    style = MaterialTheme.magicTypography.bodySmall,
                     color = mc.textDisabled,
                 )
             }
+            Text(
+                text  = if (isWin) "WIN" else "LOSS",
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = if (isWin) mc.primaryAccent else mc.textDisabled,
+            )
         }
     }
 }
@@ -602,21 +534,41 @@ private fun CollectionSummarySection(
     stats:    CollectionStats,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle("Collection")
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            KpiCell("Cards",  stats.totalCards.toString(),                        Modifier.weight(1f))
-            KpiCell("Unique", stats.uniqueCards.toString(),                       Modifier.weight(1f))
-            KpiCell("Decks",  stats.totalDecks.toString(),                        Modifier.weight(1f))
-            KpiCell("Value",  "$${String.format("%.0f", stats.totalValueUsd)}",   Modifier.weight(1f), accent = true)
+    val mc = MaterialTheme.magicColors
+    Column(
+        modifier            = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SectionTitle("Collection Summary")
+        Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    Text("Total Cards", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text(stats.totalCards.toString(), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Est. Value", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text("$${String.format("%.2f", stats.totalValueUsd)}", style = MaterialTheme.magicTypography.titleMedium, color = mc.goldMtg)
+                }
+            }
         }
     }
 }
 
-// ── Theme + Language + Footer ─────────────────────────────────────────────────
+// ── Sections ──────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text  = text,
+        style = MaterialTheme.magicTypography.labelLarge,
+        color = MaterialTheme.magicColors.textSecondary,
+        modifier = modifier,
+    )
+}
 
 @Composable
 private fun ThemeSelectorSection(
@@ -732,29 +684,25 @@ private fun LanguageSection(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val languages = listOf("en" to "English", "es" to "Español", "de" to "Deutsch")
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("Card Language")
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement   = Arrangement.spacedBy(8.dp),
-        ) {
-            languages.forEach { (code, label) ->
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Language")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("English", "Español").forEach { lang ->
+                val code = if (lang == "English") "en" else "es"
                 val isSelected = code == selected
                 Surface(
                     onClick = { onSelect(code) },
-                    shape   = RoundedCornerShape(8.dp),
+                    shape   = RoundedCornerShape(10.dp),
                     color   = if (isSelected) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface,
-                    border  = BorderStroke(
-                        width = if (isSelected) 1.5.dp else 0.5.dp,
-                        color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
-                    ),
+                    border  = if (isSelected) BorderStroke(1.dp, mc.primaryAccent) else null,
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(
-                        text     = label,
-                        style    = MaterialTheme.magicTypography.labelMedium,
-                        color    = if (isSelected) mc.primaryAccent else mc.textSecondary,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        text     = lang,
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        textAlign = TextAlign.Center,
+                        style    = MaterialTheme.magicTypography.bodySmall,
+                        color    = if (isSelected) mc.primaryAccent else mc.textPrimary,
                     )
                 }
             }
@@ -766,42 +714,13 @@ private fun LanguageSection(
 private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(mc.surface)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier            = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        InfoRow(stringResource(R.string.settings_app_name_label),    stringResource(R.string.app_name))
-        InfoRow(stringResource(R.string.settings_version_label),     "1.0.0")
-        InfoRow(stringResource(R.string.settings_data_source_label), stringResource(R.string.settings_data_source_value))
-        InfoRow("Engine",  stringResource(R.string.app_name) + " v1")
+        Text("Magic Folder v1.0.4", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+        Text("Developed with ❤️ for the MTG community", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled, textAlign = TextAlign.Center)
     }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    val mc = MaterialTheme.magicColors
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.magicTypography.bodySmall, color = mc.textDisabled)
-        Text(value, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
-    }
-}
-
-// ── Shared helpers ────────────────────────────────────────────────────────────
-
-@Composable
-private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text     = text,
-        style    = MaterialTheme.magicTypography.labelLarge,
-        color    = MaterialTheme.magicColors.textSecondary,
-        modifier = modifier,
-    )
 }
 
 private fun formatDuration(ms: Long): String {

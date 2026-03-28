@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -25,6 +26,7 @@ import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.ui.components.StaleWarningBanner
 import com.mmg.magicfolder.core.ui.theme.MagicColors
+import com.mmg.magicfolder.core.ui.theme.MagicTheme
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.decks.DeckListScreen
@@ -42,6 +44,36 @@ fun CollectionScreen(
     viewModel:         CollectionViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    
+    CollectionContent(
+        uiState             = uiState,
+        onCardClick         = onCardClick,
+        onScannerClick      = onScannerClick,
+        onDeckClick         = onDeckClick,
+        onCreateDeckClick   = onCreateDeckClick,
+        onViewModeToggle    = viewModel::onViewModeToggle,
+        onSortChange        = viewModel::onSortChange,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onFilterChange      = viewModel::onFilterChange,
+        onDeleteCard        = viewModel::onDeleteCard,
+        onErrorDismissed    = viewModel::onErrorDismissed,
+    )
+}
+
+@Composable
+private fun CollectionContent(
+    uiState:             CollectionUiState,
+    onCardClick:         (String) -> Unit,
+    onScannerClick:      () -> Unit,
+    onDeckClick:         (Long) -> Unit,
+    onCreateDeckClick:   () -> Unit,
+    onViewModeToggle:    () -> Unit,
+    onSortChange:        (SortOrder) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onFilterChange:      (ColorFilter) -> Unit,
+    onDeleteCard:        (Long) -> Unit,
+    onErrorDismissed:    () -> Unit,
+) {
     var selectedTab by remember { mutableIntStateOf(TAB_CARDS) }
     val mc = MaterialTheme.magicColors
 
@@ -49,8 +81,8 @@ fun CollectionScreen(
         topBar = {
             CollectionTopBar(
                 viewMode         = uiState.viewMode,
-                onViewModeToggle = viewModel::onViewModeToggle,
-                onSortChange     = viewModel::onSortChange,
+                onViewModeToggle = onViewModeToggle,
+                onSortChange     = onSortChange,
                 currentSort      = uiState.sortOrder,
                 onScannerClick   = onScannerClick,
             )
@@ -92,10 +124,12 @@ fun CollectionScreen(
             // ── Tab content ───────────────────────────────────────────────────
             when (selectedTab) {
                 TAB_CARDS -> CardsTabContent(
-                    uiState        = uiState,
-                    onCardClick    = onCardClick,
-                    onScannerClick = onScannerClick,
-                    viewModel      = viewModel,
+                    uiState             = uiState,
+                    onCardClick         = onCardClick,
+                    onScannerClick      = onScannerClick,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onFilterChange      = onFilterChange,
+                    onDeleteCard        = onDeleteCard,
                 )
                 TAB_DECKS -> DeckListScreen(
                     onDeckClick       = onDeckClick,
@@ -106,7 +140,7 @@ fun CollectionScreen(
 
         // Error dismissal
         uiState.error?.let {
-            LaunchedEffect(it) { viewModel.onErrorDismissed() }
+            LaunchedEffect(it) { onErrorDismissed() }
         }
     }
 }
@@ -117,10 +151,12 @@ fun CollectionScreen(
 
 @Composable
 private fun CardsTabContent(
-    uiState:        CollectionUiState,
-    onCardClick:    (String) -> Unit,
-    onScannerClick: () -> Unit,
-    viewModel:      CollectionViewModel,
+    uiState:             CollectionUiState,
+    onCardClick:         (String) -> Unit,
+    onScannerClick:      () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onFilterChange:      (ColorFilter) -> Unit,
+    onDeleteCard:        (Long) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     Column(modifier = Modifier.fillMaxSize()) {
@@ -132,14 +168,14 @@ private fun CardsTabContent(
         // Search bar
         SearchBar(
             query         = uiState.searchQuery,
-            onQueryChange = viewModel::onSearchQueryChange,
+            onQueryChange = onSearchQueryChange,
             modifier      = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
         // Color filter chips
         ColorFilterRow(
             activeFilter   = uiState.activeFilter,
-            onFilterChange = viewModel::onFilterChange,
+            onFilterChange = onFilterChange,
         )
 
         // Card count
@@ -173,7 +209,7 @@ private fun CardsTabContent(
             ViewMode.LIST -> CardList(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
-                onDelete    = viewModel::onDeleteCard,
+                onDelete    = onDeleteCard,
             )
         }
     }
@@ -300,12 +336,12 @@ private fun ColorFilterRow(
                 onClick  = { onFilterChange(filter) },
                 label    = {
                     if (isColor) {
-                        ManaSymbolImage(token = manaCode!!, size = 32.dp)
+                        ManaSymbolImage(token = manaCode, size = 32.dp)
                     } else {
                         Text(filter.displayName, style = MaterialTheme.magicTypography.labelMedium)
                     }
                 },
-                modifier = if (isColor) Modifier.size(48.dp) else Modifier.widthIn(min = 56.dp),
+                modifier = if (isColor) Modifier.size(48.dp) else Modifier.height(48.dp),
                 colors   = FilterChipDefaults.filterChipColors(
                     selectedContainerColor     = (manaColor ?: mc.primaryAccent).copy(alpha = 0.20f),
                     selectedLabelColor         = manaColor ?: mc.primaryAccent,
