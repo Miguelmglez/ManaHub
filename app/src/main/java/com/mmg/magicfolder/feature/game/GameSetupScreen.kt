@@ -22,8 +22,9 @@ import com.mmg.magicfolder.feature.game.model.GameMode
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameSetupScreen(
-    onBack:      () -> Unit,
-    onStartGame: (GameMode, Int) -> Unit,
+    onBack:                () -> Unit,
+    onStartGame:           (GameMode, Int) -> Unit,
+    onNavigateToTournament: () -> Unit = {},
 ) {
     var selectedMode  by remember { mutableStateOf(GameMode.COMMANDER) }
     var playerCount   by remember { mutableIntStateOf(4) }
@@ -123,6 +124,14 @@ fun GameSetupScreen(
                     "Begin the Game",
                     style = MaterialTheme.magicTypography.titleMedium,
                     color = mc.background,
+                )
+            }
+
+            TextButton(onClick = onNavigateToTournament) {
+                Text(
+                    "Create a tournament instead →",
+                    color = mc.textSecondary,
+                    style = MaterialTheme.magicTypography.bodySmall,
                 )
             }
         }

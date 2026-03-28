@@ -4,6 +4,7 @@ import com.mmg.magicfolder.core.domain.repository.CardRepository
 import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
 import com.mmg.magicfolder.core.domain.repository.StatsRepository
+import com.mmg.magicfolder.core.domain.repository.TournamentRepository
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository
 import dagger.Binds
 import dagger.Module
@@ -29,4 +30,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindGameSessionRepository(impl: GameSessionRepositoryImpl): GameSessionRepository
+
+    @Binds @Singleton
+    abstract fun bindTournamentRepository(impl: TournamentRepositoryImpl): TournamentRepository
 }
