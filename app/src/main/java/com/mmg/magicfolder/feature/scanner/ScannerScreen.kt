@@ -1,18 +1,22 @@
 package com.mmg.magicfolder.feature.scanner
 
-
 import android.Manifest
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -21,10 +25,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.*
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.common.InputImage
 import com.mmg.magicfolder.core.domain.model.Card
-import java.util.concurrent.Executors
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +33,7 @@ fun ScannerScreen(
     onBack:    () -> Unit,
     viewModel: ScannerViewModel = hiltViewModel(),
 ) {
-    val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState          by viewModel.uiState.collectAsStateWithLifecycle()
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
 
     Scaffold(
@@ -44,42 +45,34 @@ fun ScannerScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black),
             )
         },
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color.Black),
+        ) {
             when {
                 !cameraPermission.status.isGranted -> {
                     CameraPermissionRequest(onRequest = { cameraPermission.launchPermissionRequest() })
                 }
-                uiState.isLoadingCard -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
                 else -> {
-                    CameraPreview(
-                        isActive       = uiState.isScanning,
-                        onBarcodeFound = viewModel::onBarcodeDetected,
+                    CameraPreview(onCardNameDetected = viewModel::onCardNameDetected)
+                    ScannerOverlay(
+                        detectedName = uiState.detectedName,
+                        isSearching  = uiState.isSearching,
+                        error        = uiState.error,
                     )
-                    // Scanning overlay
-                    ScanOverlay()
                 }
             }
 
-            // Error
-            uiState.error?.let { err ->
-                Snackbar(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                    action = {
-                        TextButton(onClick = viewModel::onErrorDismissed) { Text("OK") }
-                    },
-                ) { Text(err) }
-            }
-
-            // Success
+            // Success snackbar
             if (uiState.addedSuccessfully) {
                 LaunchedEffect(Unit) {
-                    kotlinx.coroutines.delay(1500)
+                    kotlinx.coroutines.delay(1_500)
                     viewModel.onSuccessDismissed()
                 }
                 Snackbar(
@@ -89,13 +82,13 @@ fun ScannerScreen(
         }
     }
 
-    // Confirm sheet after scan
-    if (uiState.showConfirmSheet && uiState.scannedCard != null) {
+    // Confirm sheet after successful OCR + Scryfall lookup
+    if (uiState.showConfirmSheet && uiState.foundCard != null) {
         AddCardConfirmSheet(
-            card      = uiState.scannedCard!!,
+            card      = uiState.foundCard!!,
             onConfirm = { isFoil, condition, language, qty ->
                 viewModel.onConfirmAdd(
-                    scryfallId = uiState.pendingScryfallId!!,
+                    scryfallId = uiState.foundCard!!.scryfallId,
                     isFoil     = isFoil,
                     condition  = condition,
                     language   = language,
@@ -107,68 +100,178 @@ fun ScannerScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Camera preview wired to CardNameAnalyzer
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun CameraPreview(
-    isActive:       Boolean,
-    onBarcodeFound: (String) -> Unit,
-) {
-    val context       = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val executor      = remember { Executors.newSingleThreadExecutor() }
-    val scanner       = remember { BarcodeScanning.getClient() }
+private fun CameraPreview(onCardNameDetected: (String) -> Unit) {
+    val context          = LocalContext.current
+    val lifecycleOwner   = LocalLifecycleOwner.current
+    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     AndroidView(
         factory = { ctx ->
-            val previewView = PreviewView(ctx)
-            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-            cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
-                val imageAnalysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                    .also { analysis ->
-                        analysis.setAnalyzer(executor) { imageProxy ->
-                            if (!isActive) { imageProxy.close(); return@setAnalyzer }
-                            val mediaImage = imageProxy.image ?: run { imageProxy.close(); return@setAnalyzer }
-                            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                            scanner.process(image)
-                                .addOnSuccessListener { barcodes ->
-                                    barcodes.firstOrNull()?.rawValue?.let { onBarcodeFound(it) }
-                                }
-                                .addOnCompleteListener { imageProxy.close() }
-                        }
-                    }
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis
-                )
-            }, ContextCompat.getMainExecutor(ctx))
-            previewView
+            PreviewView(ctx).apply {
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            }
         },
         modifier = Modifier.fillMaxSize(),
+        update = { previewView ->
+            val cameraProvider = cameraProviderFuture.get()
+
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also { analysis ->
+                    analysis.setAnalyzer(
+                        ContextCompat.getMainExecutor(previewView.context),
+                        CardNameAnalyzer { name -> onCardNameDetected(name) },
+                    )
+                }
+
+            try {
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    imageAnalyzer,
+                )
+            } catch (_: Exception) { }
+        },
     )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Scanner overlay — guide frame + status feedback
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun ScanOverlay() {
+private fun ScannerOverlay(
+    detectedName: String?,
+    isSearching:  Boolean,
+    error:        String?,
+) {
     Box(modifier = Modifier.fillMaxSize()) {
-        Surface(
-            modifier = Modifier.align(Alignment.Center).size(240.dp),
-            color    = androidx.compose.ui.graphics.Color.Transparent,
-            border   = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-            shape    = MaterialTheme.shapes.medium,
-        ) {}
+
+        // Corner guide frame
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val frameWidth  = size.width * 0.85f
+            val frameHeight = frameWidth * 0.72f   // MTG card proportion
+            val left        = (size.width - frameWidth) / 2
+            val top         = size.height * 0.20f
+
+            val cornerLen   = 40f
+            val strokeWidth = 3f
+            val accentColor = Color(0xFFC77DFF)
+
+            // Top-left
+            drawLine(accentColor, Offset(left, top), Offset(left + cornerLen, top), strokeWidth)
+            drawLine(accentColor, Offset(left, top), Offset(left, top + cornerLen), strokeWidth)
+            // Top-right
+            drawLine(accentColor, Offset(left + frameWidth, top), Offset(left + frameWidth - cornerLen, top), strokeWidth)
+            drawLine(accentColor, Offset(left + frameWidth, top), Offset(left + frameWidth, top + cornerLen), strokeWidth)
+            // Bottom-left
+            drawLine(accentColor, Offset(left, top + frameHeight), Offset(left + cornerLen, top + frameHeight), strokeWidth)
+            drawLine(accentColor, Offset(left, top + frameHeight), Offset(left, top + frameHeight - cornerLen), strokeWidth)
+            // Bottom-right
+            drawLine(accentColor, Offset(left + frameWidth, top + frameHeight), Offset(left + frameWidth - cornerLen, top + frameHeight), strokeWidth)
+            drawLine(accentColor, Offset(left + frameWidth, top + frameHeight), Offset(left + frameWidth, top + frameHeight - cornerLen), strokeWidth)
+
+            // Dashed guide line — marks the card name zone (top 18% of card)
+            val nameZoneBottom = top + frameHeight * 0.18f
+            drawLine(
+                color       = accentColor.copy(alpha = 0.35f),
+                start       = Offset(left + 20f, nameZoneBottom),
+                end         = Offset(left + frameWidth - 20f, nameZoneBottom),
+                strokeWidth = 1f,
+                pathEffect  = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)),
+            )
+        }
+
+        // Top instruction label
         Text(
-            text     = "Point at a card's barcode",
+            text     = "Point at the card name",
             style    = MaterialTheme.typography.bodyMedium,
-            color    = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp),
+            color    = Color.White.copy(alpha = 0.85f),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+                .background(Color.Black.copy(alpha = 0.50f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
         )
+
+        // Bottom status area
+        Box(
+            modifier        = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = 40.dp, start = 24.dp, end = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                error != null -> {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFE63946).copy(alpha = 0.85f),
+                    ) {
+                        Text(
+                            text     = error,
+                            style    = MaterialTheme.typography.bodyMedium,
+                            color    = Color.White,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+                isSearching && detectedName != null -> {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.Black.copy(alpha = 0.75f),
+                    ) {
+                        Row(
+                            modifier              = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment     = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(16.dp),
+                                color       = Color(0xFFC77DFF),
+                                strokeWidth = 2.dp,
+                            )
+                            Text(
+                                text  = "\"$detectedName\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.Black.copy(alpha = 0.60f),
+                    ) {
+                        Text(
+                            text     = "Hold card steady in good light",
+                            style    = MaterialTheme.typography.bodySmall,
+                            color    = Color.White.copy(alpha = 0.70f),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Camera permission request
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun CameraPermissionRequest(onRequest: () -> Unit) {
@@ -177,15 +280,22 @@ private fun CameraPermissionRequest(onRequest: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(Icons.Default.CameraAlt, contentDescription = null,
+        Icon(
+            Icons.Default.CameraAlt,
+            contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint     = MaterialTheme.colorScheme.onSurfaceVariant)
+            tint     = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.height(16.dp))
         Text("Camera access needed to scan cards", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
         Button(onClick = onRequest) { Text("Grant permission") }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Confirm sheet — reused after OCR identifies the card
+// ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -203,7 +313,7 @@ private fun AddCardConfirmSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            modifier            = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(card.name, style = MaterialTheme.typography.titleMedium)
@@ -221,13 +331,11 @@ private fun AddCardConfirmSheet(
             }
             HorizontalDivider()
 
-            // Foil toggle
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Foil", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = isFoil, onCheckedChange = { isFoil = it })
             }
 
-            // Quantity
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Quantity", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 IconButton(onClick = { if (qty > 1) qty-- }) {
@@ -239,7 +347,6 @@ private fun AddCardConfirmSheet(
                 }
             }
 
-            // Condition
             Text("Condition", style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 conditions.forEach { c ->
@@ -247,7 +354,6 @@ private fun AddCardConfirmSheet(
                 }
             }
 
-            // Language
             var expanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                 OutlinedTextField(
@@ -268,9 +374,14 @@ private fun AddCardConfirmSheet(
                 }
             }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
                 TextButton(onClick = onDismiss) { Text("Cancel") }
-                Button(onClick = { onConfirm(isFoil, condition, language, qty) }) { Text("Add to collection") }
+                Button(onClick = { onConfirm(isFoil, condition, language, qty) }) {
+                    Text("Add to collection")
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
