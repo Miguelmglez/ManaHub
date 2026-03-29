@@ -13,6 +13,7 @@ navigation           = "2.8.0"
 lifecycle            = "2.8.3"
 coroutines           = "1.8.1"
 mlkit-barcode        = "17.3.0"
+mlkit-text-recognition = "16.0.1"
 camerax              = "1.3.4"
 mockk                = "1.13.11"
 turbine              = "1.1.0"
@@ -50,6 +51,7 @@ camerax-camera2         = { group = "androidx.camera", name = "camera-camera2", 
 camerax-lifecycle       = { group = "androidx.camera", name = "camera-lifecycle",          version.ref = "camerax" }
 camerax-view            = { group = "androidx.camera", name = "camera-view",               version.ref = "camerax" }
 mlkit-barcode           = { group = "com.google.mlkit", name = "barcode-scanning",         version.ref = "mlkit-barcode" }
+mlkit-text-recognition  = { group = "com.google.mlkit", name = "text-recognition",          version.ref = "mlkit-text-recognition" }
 mockk                   = { group = "io.mockk", name = "mockk",                            version.ref = "mockk" }
 turbine                 = { group = "app.cash.turbine", name = "turbine",                  version.ref = "turbine" }
 coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
