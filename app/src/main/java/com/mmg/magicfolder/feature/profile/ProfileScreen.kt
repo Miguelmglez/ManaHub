@@ -31,6 +31,8 @@ import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
 import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.magicfolder.core.domain.model.Achievement
 import com.mmg.magicfolder.core.domain.model.CollectionStats
+import com.mmg.magicfolder.core.ui.components.ManaSymbol
+import com.mmg.magicfolder.core.ui.components.ManaColor
 import com.mmg.magicfolder.core.ui.theme.AppTheme
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
@@ -83,8 +85,10 @@ fun ProfileScreen(
             // ── KPI grid ──────────────────────────────────────────────────────
             item {
                 ProfileKpiSection(
-                    uiState  = uiState,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    uiState           = uiState,
+                    favouriteColor    = uiState.favouriteColor,
+                    mostValuableColor = uiState.mostValuableColor,
+                    modifier          = Modifier.padding(horizontal = 16.dp),
                 )
             }
 
@@ -111,15 +115,8 @@ fun ProfileScreen(
             // ── Achievements ──────────────────────────────────────────────────
             if (uiState.achievements.isNotEmpty()) {
                 item {
-                    SectionTitle(
-                        text     = "Achievements",
-                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
-                    )
-                }
-                val rows = uiState.achievements.chunked(3)
-                items(rows) { row ->
-                    AchievementRow(
-                        achievements = row,
+                    AchievementsSection(
+                        achievements = uiState.achievements,
                         modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
@@ -157,15 +154,6 @@ fun ProfileScreen(
                 ThemeSelectorSection(
                     currentTheme     = uiState.currentTheme,
                     onThemeSelected  = viewModel::selectTheme,
-                )
-            }
-
-            // ── Language selector ─────────────────────────────────────────────
-            item {
-                LanguageSection(
-                    selected = uiState.selectedLanguage,
-                    onSelect = viewModel::selectLanguage,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
 
@@ -275,8 +263,10 @@ private fun ProfileHeroSection(
 
 @Composable
 private fun ProfileKpiSection(
-    uiState:  ProfileViewModel.UiState,
-    modifier: Modifier = Modifier,
+    uiState:           ProfileViewModel.UiState,
+    favouriteColor:    String?,
+    mostValuableColor: String?,
+    modifier:          Modifier = Modifier,
 ) {
     Column(
         modifier            = modifier,
@@ -295,10 +285,9 @@ private fun ProfileKpiSection(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            KpiCell("Streak",    uiState.currentStreak.toString(),               Modifier.weight(1f), accent = true)
-            KpiCell("Avg life",  uiState.avgLifeOnWin.roundToInt().toString(),   Modifier.weight(1f))
-            KpiCell("Avg turn",  if (uiState.avgWinTurn > 0) "T${uiState.avgWinTurn.roundToInt()}" else "—",
-                                                                                  Modifier.weight(1f))
+            KpiCell("Streak", uiState.currentStreak.toString(), Modifier.weight(1f), accent = true)
+            ColorStatCard(label = "Fav. Color",  colorCode = favouriteColor,    modifier = Modifier.weight(1f))
+            ColorStatCard(label = "Top Value",   colorCode = mostValuableColor, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -431,53 +420,279 @@ private fun InsightRow(label: String, value: String, progress: Float) {
     }
 }
 
-// ── Achievements row ──────────────────────────────────────────────────────────
+// ── Achievements section ──────────────────────────────────────────────────────
 
 @Composable
-private fun AchievementRow(
+private fun AchievementsSection(
     achievements: List<Achievement>,
     modifier:     Modifier = Modifier,
 ) {
-    Row(
-        modifier              = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        achievements.forEach { ach ->
-            AchievementCell(achievement = ach, modifier = Modifier.weight(1f))
+    val mc       = MaterialTheme.magicColors
+    val unlocked   = achievements.filter { it.isUnlocked }
+    val inProgress = achievements.filter { !it.isUnlocked && (it.progress ?: 0f) > 0f }
+    val locked     = achievements.filter { !it.isUnlocked && (it.progress ?: 0f) == 0f }
+
+    var selectedAchievement by remember { mutableStateOf<Achievement?>(null) }
+    var showLocked          by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle("Achievements", modifier = Modifier.padding(top = 8.dp))
+
+        // Unlocked grid
+        if (unlocked.isNotEmpty()) {
+            Text("Unlocked (${unlocked.size})", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+            unlocked.chunked(4).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { ach ->
+                        AchievementBadge(
+                            achievement = ach,
+                            onClick     = { selectedAchievement = ach },
+                            modifier    = Modifier.weight(1f),
+                        )
+                    }
+                    repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
         }
-        repeat(3 - achievements.size) {
-            Spacer(Modifier.weight(1f))
+
+        // In-progress
+        if (inProgress.isNotEmpty()) {
+            Text("In Progress (${inProgress.size})", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+            inProgress.forEach { ach ->
+                AchievementProgressRow(
+                    achievement = ach,
+                    onClick     = { selectedAchievement = ach },
+                )
+            }
+        }
+
+        // Locked — collapsed
+        if (locked.isNotEmpty()) {
+            TextButton(
+                onClick            = { showLocked = !showLocked },
+                contentPadding     = PaddingValues(0.dp),
+            ) {
+                Text(
+                    text  = if (showLocked) "Hide locked" else "${locked.size} locked achievements",
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textDisabled,
+                )
+            }
+            if (showLocked) {
+                locked.chunked(4).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { ach ->
+                            AchievementBadge(
+                                achievement = ach,
+                                onClick     = { selectedAchievement = ach },
+                                modifier    = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+    }
+
+    selectedAchievement?.let { ach ->
+        AchievementDetailDialog(
+            achievement = ach,
+            onDismiss   = { selectedAchievement = null },
+        )
+    }
+}
+
+@Composable
+private fun AchievementBadge(
+    achievement: Achievement,
+    onClick:     () -> Unit,
+    modifier:    Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        onClick  = onClick,
+        modifier = modifier,
+        shape    = RoundedCornerShape(12.dp),
+        color    = if (achievement.isUnlocked) mc.surface else mc.surface.copy(alpha = 0.4f),
+        border   = if (achievement.isUnlocked)
+            BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f))
+        else null,
+    ) {
+        Column(
+            modifier            = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text     = achievement.emoji,
+                fontSize = 22.sp,
+                color    = if (achievement.isUnlocked) Color.Unspecified else mc.textDisabled,
+            )
+            Text(
+                text      = achievement.title,
+                style     = MaterialTheme.magicTypography.labelSmall,
+                color     = if (achievement.isUnlocked) mc.textPrimary else mc.textDisabled,
+                textAlign = TextAlign.Center,
+                maxLines  = 2,
+                overflow  = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 @Composable
-private fun AchievementCell(
+private fun AchievementProgressRow(
     achievement: Achievement,
+    onClick:     () -> Unit,
     modifier:    Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val isUnlocked = achievement.isUnlocked
+    Surface(
+        onClick  = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape    = RoundedCornerShape(12.dp),
+        color    = mc.surface,
+    ) {
+        Row(
+            modifier          = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(achievement.emoji, fontSize = 20.sp, modifier = Modifier.padding(end = 12.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(achievement.title, style = MaterialTheme.magicTypography.bodySmall, color = mc.textPrimary)
+                    achievement.progressLabel?.let {
+                        Text(it, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                    }
+                }
+                achievement.progress?.let { prog ->
+                    LinearProgressIndicator(
+                        progress   = { prog },
+                        modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        color      = mc.primaryAccent,
+                        trackColor = mc.surfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementDetailDialog(
+    achievement: Achievement,
+    onDismiss:   () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton    = {
+            TextButton(onClick = onDismiss) { Text("OK") }
+        },
+        title = {
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(achievement.emoji, fontSize = 28.sp)
+                Text(achievement.title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = mc.primaryAccent.copy(alpha = 0.1f),
+                ) {
+                    Text(
+                        text     = achievement.category.label,
+                        style    = MaterialTheme.magicTypography.labelSmall,
+                        color    = mc.primaryAccent,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+                Text(achievement.description, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
+                if (!achievement.isUnlocked) {
+                    achievement.progress?.let { prog ->
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier              = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text("Progress", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+                                achievement.progressLabel?.let {
+                                    Text(it, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                                }
+                            }
+                            LinearProgressIndicator(
+                                progress   = { prog },
+                                modifier   = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                color      = mc.primaryAccent,
+                                trackColor = mc.surfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        containerColor = mc.backgroundSecondary,
+    )
+}
+
+// ── Color stat card ───────────────────────────────────────────────────────────
+
+@Composable
+private fun ColorStatCard(
+    label:     String,
+    colorCode: String?,
+    modifier:  Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isUnlocked) mc.surface else mc.surface.copy(alpha = 0.4f))
-            .padding(8.dp),
+            .background(mc.surface)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
+        if (colorCode != null) {
+            val manaColor = when (colorCode.uppercase()) {
+                "W" -> ManaColor.W
+                "U" -> ManaColor.U
+                "B" -> ManaColor.B
+                "R" -> ManaColor.R
+                "G" -> ManaColor.G
+                "C" -> ManaColor.C
+                else -> null
+            }
+            if (manaColor != null) {
+                ManaSymbol(color = manaColor, size = 26.dp)
+            } else {
+                // "M" multicolor — gold circle
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Color(0xFFB8860B))
+                        .border(1.5.dp, Color(0xFFDAA520), androidx.compose.foundation.shape.CircleShape),
+                ) {
+                    Text("✦", fontSize = 13.sp, color = Color.White, textAlign = TextAlign.Center)
+                }
+            }
+        } else {
+            Text("—", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
+        }
         Text(
-            text     = achievement.icon,
-            fontSize = 24.sp,
-            color    = if (isUnlocked) Color.Unspecified else mc.textDisabled,
-        )
-        Text(
-            text      = achievement.title,
+            label,
             style     = MaterialTheme.magicTypography.labelSmall,
-            color     = if (isUnlocked) mc.textPrimary else mc.textDisabled,
+            color     = mc.textSecondary,
             textAlign = TextAlign.Center,
-            maxLines  = 1,
-            overflow  = TextOverflow.Ellipsis,
         )
     }
 }
@@ -672,39 +887,6 @@ private fun ThemeTile(
                         .clip(CircleShape)
                         .background(mc.primaryAccent),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LanguageSection(
-    selected: String,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle("Language")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("English", "Español").forEach { lang ->
-                val code = if (lang == "English") "en" else "es"
-                val isSelected = code == selected
-                Surface(
-                    onClick = { onSelect(code) },
-                    shape   = RoundedCornerShape(10.dp),
-                    color   = if (isSelected) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface,
-                    border  = if (isSelected) BorderStroke(1.dp, mc.primaryAccent) else null,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        text     = lang,
-                        modifier = Modifier.padding(vertical = 10.dp),
-                        textAlign = TextAlign.Center,
-                        style    = MaterialTheme.magicTypography.bodySmall,
-                        color    = if (isSelected) mc.primaryAccent else mc.textPrimary,
-                    )
-                }
             }
         }
     }

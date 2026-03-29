@@ -33,6 +33,7 @@ interface StatsDao {
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
                c.image_art_crop AS imageArtCrop, uc.is_foil AS isFoil,
+               c.color_identity AS colorIdentity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
                     THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd
         FROM user_cards uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id

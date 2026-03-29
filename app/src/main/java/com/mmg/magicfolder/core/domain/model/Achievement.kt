@@ -1,5 +1,11 @@
 package com.mmg.magicfolder.core.domain.model
 
+enum class AchievementCategory(val label: String) {
+    GAMES("Games"),
+    COLLECTION("Collection"),
+    DECKS("Decks"),
+}
+
 enum class AchievementId {
     FIRST_WIN,
     WIN_STREAK_3,
@@ -19,10 +25,14 @@ enum class AchievementId {
 }
 
 data class Achievement(
-    val id:          AchievementId,
-    val title:       String,
-    val description: String,
-    val icon:        String,
-    val isUnlocked:  Boolean,
-    val progress:    Float = 0f,   // 0..1 for partial progress display
-)
+    val id:            AchievementId,
+    val title:         String,
+    val description:   String,
+    val emoji:         String,
+    val unlockedAt:    Long?                 = null,
+    val progress:      Float?                = null,   // null = binary achievement
+    val progressLabel: String?               = null,
+    val category:      AchievementCategory   = AchievementCategory.GAMES,
+) {
+    val isUnlocked: Boolean get() = unlockedAt != null
+}

@@ -46,11 +46,12 @@ class ProfileViewModel @Inject constructor(
     data class UiState(
         val playerName:              String     = "Player 1",
         val currentTheme:            AppTheme   = AppTheme.NeonVoid,
-        val selectedLanguage:        String     = "en",
         val playStyle:               PlayStyle  = PlayStyle.BALANCED,
         val isLoading:               Boolean    = true,
         // Collection
         val collectionStats:         CollectionStats?           = null,
+        val favouriteColor:          String?                    = null,
+        val mostValuableColor:       String?                    = null,
         // Game stats
         val totalGames:              Int    = 0,
         val totalWins:               Int    = 0,
@@ -85,11 +86,6 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        langPref.languageFlow
-            .onEach { lang -> _uiState.update { it.copy(selectedLanguage = lang) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
-
         langPref.themeFlow
             .onEach { theme -> _uiState.update { it.copy(currentTheme = theme) } }
             .catch { /* ignore */ }
@@ -97,7 +93,16 @@ class ProfileViewModel @Inject constructor(
 
         // ── Collection stats ──────────────────────────────────────────────────
         statsRepo.observeCollectionStats()
-            .onEach { stats -> _uiState.update { it.copy(collectionStats = stats, isLoading = false) } }
+            .onEach { stats ->
+                _uiState.update {
+                    it.copy(
+                        collectionStats    = stats,
+                        isLoading          = false,
+                        favouriteColor     = stats.computeFavouriteColor(),
+                        mostValuableColor  = stats.computeMostValuableColor(),
+                    )
+                }
+            }
             .catch { _uiState.update { it.copy(isLoading = false) } }
             .launchIn(viewModelScope)
 
@@ -207,10 +212,6 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch { langPref.savePlayerName(name.trim()) }
     }
 
-    fun selectLanguage(lang: String) {
-        viewModelScope.launch { langPref.set(lang) }
-    }
-
     fun selectTheme(theme: AppTheme) {
         viewModelScope.launch {
             langPref.saveTheme(theme)
@@ -224,6 +225,25 @@ class ProfileViewModel @Inject constructor(
         favoriteElim == "COMMANDER_DAMAGE" -> PlayStyle.MIDRANGE
         avgWinTurn > 12.0                  -> PlayStyle.CONTROL
         else                               -> PlayStyle.BALANCED
+    }
+
+    private fun CollectionStats.computeFavouriteColor(): String? =
+        byColor
+            .filterKeys { it != MtgColor.COLORLESS && it != MtgColor.MULTICOLOR }
+            .maxByOrNull { it.value }
+            ?.key
+            ?.name  // "W","U","B","R","G"
+
+    private fun CollectionStats.computeMostValuableColor(): String? {
+        val identity = mostValuableCards.firstOrNull()?.colorIdentity ?: return null
+        val parsed = identity
+            .removeSurrounding("[", "]").split(",")
+            .map { it.trim().removeSurrounding("\"") }.filter { it.isNotEmpty() }
+        return when {
+            parsed.isEmpty() -> "C"
+            parsed.size > 1  -> "M"
+            else             -> parsed.first()
+        }
     }
 
     private fun buildAchievementStats(s: UiState): AchievementStats {

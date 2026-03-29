@@ -1,13 +1,21 @@
 package com.mmg.magicfolder.core.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
@@ -41,6 +49,25 @@ fun ManaSymbolImage(
     size: Dp = 18.dp,
     modifier: Modifier = Modifier,
 ) {
+    // Scryfall has no M.svg for multicolor — render a gold circle manually
+    if (token.uppercase() == "M") {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFFB8860B))
+                .border((size.value * 0.06f).dp, Color(0xFFDAA520), CircleShape),
+        ) {
+            Text(
+                text       = "✦",
+                fontSize   = (size.value * 0.48f).sp,
+                color      = Color(0xFFFFF3CD),
+                textAlign  = TextAlign.Center,
+            )
+        }
+        return
+    }
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(tokenToSvgUrl(token))

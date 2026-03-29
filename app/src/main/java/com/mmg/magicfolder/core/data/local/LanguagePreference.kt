@@ -13,7 +13,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private val Context.langDataStore by preferencesDataStore(name = "lang_prefs")
-private val KEY_LANG        = stringPreferencesKey("selected_lang")
 private val KEY_PLAYER_NAME = stringPreferencesKey("player_name")
 private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
 
@@ -21,10 +20,6 @@ private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
 class LanguagePreference @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    val languageFlow: Flow<String> = context.langDataStore.data
-        .map { prefs -> prefs[KEY_LANG] ?: "en" }
-        .catch { emit("en") }
-
     val playerNameFlow: Flow<String> = context.langDataStore.data
         .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Player 1" }
         .catch { emit("Player 1") }
@@ -38,10 +33,6 @@ class LanguagePreference @Inject constructor(
             }
         }
         .catch { emit(AppTheme.NeonVoid) }
-
-    suspend fun set(lang: String) {
-        context.langDataStore.edit { it[KEY_LANG] = lang }
-    }
 
     suspend fun savePlayerName(name: String) {
         context.langDataStore.edit { it[KEY_PLAYER_NAME] = name }

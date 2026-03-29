@@ -15,11 +15,12 @@ data class CollectionStats(
 )
 
 data class CardValue(
-    val scryfallId:   String,
-    val name:         String,
-    val priceUsd:     Double,
-    val isFoil:       Boolean,
-    val imageArtCrop: String?,
+    val scryfallId:    String,
+    val name:          String,
+    val priceUsd:      Double,
+    val isFoil:        Boolean,
+    val imageArtCrop:  String?,
+    val colorIdentity: String = "",
 )
 
 enum class MtgColor { W, U, B, R, G, COLORLESS, MULTICOLOR }

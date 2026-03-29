@@ -48,11 +48,12 @@ class StatsRepositoryImpl @Inject constructor(
             totalValueEur = valueEur,
             mostValuableCards = topCards.map {
                 CardValue(
-                    it.scryfallId,
-                    it.name,
-                    it.priceUsd,
-                    it.isFoil,
-                    it.imageArtCrop
+                    scryfallId    = it.scryfallId,
+                    name          = it.name,
+                    priceUsd      = it.priceUsd,
+                    isFoil        = it.isFoil,
+                    imageArtCrop  = it.imageArtCrop,
+                    colorIdentity = it.colorIdentity,
                 )
             },
             byColor = colors.toColorMap(),

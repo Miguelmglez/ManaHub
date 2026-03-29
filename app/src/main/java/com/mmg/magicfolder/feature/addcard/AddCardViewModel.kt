@@ -2,11 +2,11 @@ package com.mmg.magicfolder.feature.addcard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.magicfolder.core.data.local.LanguagePreference
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.DataResult
 import com.mmg.magicfolder.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.magicfolder.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.magicfolder.core.util.LocaleLanguageProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -18,7 +18,7 @@ import javax.inject.Inject
 class AddCardViewModel @Inject constructor(
     private val searchCards:     SearchCardsUseCase,
     private val addToCollection: AddCardToCollectionUseCase,
-    private val langPref:        LanguagePreference,
+    private val localeLanguage:  LocaleLanguageProvider,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddCardUiState())
@@ -38,7 +38,7 @@ class AddCardViewModel @Inject constructor(
                         return@collectLatest
                     }
                     _uiState.update { it.copy(isSearching = true) }
-                    val lang = runCatching { langPref.languageFlow.first() }.getOrDefault("en")
+                    val lang = localeLanguage.get()
                     val effectiveQuery = if (lang != "en") "$query lang:$lang" else query
                     when (val result = searchCards(effectiveQuery)) {
                         is DataResult.Success -> _uiState.update {
