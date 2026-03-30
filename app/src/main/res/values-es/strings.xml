@@ -1,14 +1,503 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    ManaHub — Spanish translations
-    TODO: Translate all strings from values/strings.xml
-
-    Priority strings to translate first:
-    - All UI labels (nav, buttons, titles)
-    - Error messages
-    - Survey questions and answers
--->
 <resources>
+    <!-- APP GLOBAL -->
     <string name="app_name">ManaHub</string>
-    <!-- TODO: Add Spanish translations -->
+    <string name="app_tagline">Tu compañero de Magic</string>
+
+    <!-- Acciones comunes -->
+    <string name="action_save">Guardar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_confirm">Confirmar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_edit">Editar</string>
+    <string name="action_add">Añadir</string>
+    <string name="action_remove">Quitar</string>
+    <string name="action_search">Buscar</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_back">Atrás</string>
+    <string name="action_skip">Omitir</string>
+    <string name="action_next">Siguiente</string>
+    <string name="action_done">Listo</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="action_refresh">Actualizar</string>
+    <string name="action_reset">Restablecer</string>
+    <string name="action_exit">Salir</string>
+    <string name="action_apply">Aplicar</string>
+    <string name="action_move">Mover</string>
+    <string name="action_share">Compartir</string>
+    <string name="action_copy">Copiar</string>
+    <string name="action_play_again">Jugar de nuevo</string>
+
+    <!-- Estados genéricos -->
+    <string name="state_loading">Cargando…</string>
+    <string name="state_error">Algo ha salido mal</string>
+    <string name="state_empty">No hay nada aquí todavía</string>
+    <string name="state_coming_soon">Próximamente</string>
+    <string name="state_optional">Opcional</string>
+
+    <!-- Navegación -->
+    <string name="nav_collection">Colección</string>
+    <string name="nav_play">Jugar</string>
+    <string name="nav_profile">Perfil</string>
+    <string name="nav_stats">Estadísticas</string>
+    <string name="nav_settings">Ajustes</string>
+
+    <!-- COLLECTION SCREEN -->
+    <string name="collection_title">ManaHub</string>
+    <string name="collection_search_hint">Buscar en la colección…</string>
+    <string name="collection_tab_cards">Cartas</string>
+    <string name="collection_tab_decks">Mazos</string>
+    <string name="collection_filter_all">Todos</string>
+    <string name="collection_filter_white">Blanco</string>
+    <string name="collection_filter_blue">Azul</string>
+    <string name="collection_filter_black">Negro</string>
+    <string name="collection_filter_red">Rojo</string>
+    <string name="collection_filter_green">Verde</string>
+    <string name="collection_filter_multicolor">Multicolor</string>
+    <string name="collection_filter_active">Mostrando:</string>
+    <string name="collection_filter_all_colors">(todos los colores)</string>
+    <string name="collection_filter_clear">Limpiar</string>
+    <string name="collection_card_count">%1$d cartas</string>
+    <string name="collection_empty_title">Tu colección está vacía</string>
+    <string name="collection_empty_subtitle">Añade tu primera carta pulsando +</string>
+    <string name="collection_empty_action">Añadir una carta</string>
+    <string name="collection_stale_banner">Los precios pueden estar desactualizados. Pulsa para actualizar.</string>
+    <string name="collection_sort_name">Nombre</string>
+    <string name="collection_sort_price">Precio</string>
+    <string name="collection_sort_rarity">Rareza</string>
+    <string name="collection_sort_cmc">Coste de maná</string>
+    <string name="collection_view_grid">Vista de cuadrícula</string>
+    <string name="collection_view_list">Vista de lista</string>
+
+    <!-- ADD CARD SCREEN -->
+    <string name="addcard_title">Añadir carta</string>
+    <string name="addcard_tab_search">Buscar</string>
+    <string name="addcard_tab_scanner">Escáner</string>
+    <string name="addcard_search_hint">Nombre de la carta…</string>
+    <string name="addcard_search_min_chars">Escribe al menos 2 caracteres para buscar</string>
+    <string name="addcard_no_results">No se han encontrado cartas</string>
+    <string name="addcard_no_results_subtitle">Prueba a buscar en otro idioma\no revisa la ortografía</string>
+    <string name="addcard_scanner_title">Escanear código de barras</string>
+    <string name="addcard_scanner_subtitle">Apunta con la cámara al código de barras\nen el reverso de la carta</string>
+    <string name="addcard_scanner_button">Abrir escáner</string>
+    <string name="addcard_confirm_title">Añadir a la colección</string>
+    <string name="addcard_confirm_quantity">Cantidad</string>
+    <string name="addcard_confirm_foil">Foil</string>
+    <string name="addcard_confirm_condition">Estado</string>
+    <string name="addcard_confirm_language">Idioma</string>
+    <string name="addcard_confirm_button">Añadir a la colección</string>
+    <string name="addcard_condition_nm">Near Mint</string>
+    <string name="addcard_condition_lp">Lightly Played</string>
+    <string name="addcard_condition_mp">Moderately Played</string>
+    <string name="addcard_condition_hp">Heavily Played</string>
+    <string name="addcard_condition_dmg">Dañada</string>
+    <string name="addcard_added_success">%1$s añadida a la colección</string>
+
+    <!-- CARD DETAIL SCREEN -->
+    <string name="carddetail_title">Detalle de la carta</string>
+    <string name="carddetail_oracle_text">Texto de Oracle</string>
+    <string name="carddetail_flavor_text">Texto de ambientación</string>
+    <string name="carddetail_legalities">Legalidad</string>
+    <string name="carddetail_legality_legal">Legal</string>
+    <string name="carddetail_legality_banned">Prohibida</string>
+    <string name="carddetail_legality_restricted">Restringida</string>
+    <string name="carddetail_legality_not_legal">No legal</string>
+    <string name="carddetail_price_usd">USD</string>
+    <string name="carddetail_price_eur">EUR</string>
+    <string name="carddetail_price_foil">Foil</string>
+    <string name="carddetail_view_scryfall">Ver en Scryfall</string>
+    <string name="carddetail_tags_section">Etiquetas</string>
+    <string name="carddetail_edit_title">Editar carta</string>
+    <string name="carddetail_delete_title">Quitar carta</string>
+    <string name="carddetail_delete_message">¿Quitar %1$s de tu colección?</string>
+    <string name="carddetail_flip_card">Girar carta</string>
+    <string name="carddetail_in_decks">En %1$d mazo(s)</string>
+    <string name="carddetail_quantity">%1$d en la colección</string>
+    <string name="carddetail_market_prices">Precios de mercado</string>
+    <string name="carddetail_in_collection">En tu colección</string>
+    <string name="carddetail_legality">Legalidad</string>
+    <string name="carddetail_price_regular">Normal</string>
+    <string name="carddetail_condition">Estado</string>
+    <string name="carddetail_language">Idioma</string>
+    <string name="carddetail_quantity_label">Cantidad</string>
+
+    <!-- STATS SCREEN -->
+    <string name="stats_title">Estadísticas</string>
+    <string name="stats_overview">Resumen</string>
+    <string name="stats_total_cards">Total de cartas</string>
+    <string name="stats_unique_cards">Cartas únicas</string>
+    <string name="stats_decks_saved">Mazos guardados</string>
+    <string name="stats_collection_value">Valor de la colección</string>
+    <string name="stats_most_valuable">Cartas más valiosas</string>
+    <string name="stats_color_distribution">Distribución de colores</string>
+    <string name="stats_mana_curve">Curva de maná</string>
+    <string name="stats_by_type">Por tipo</string>
+    <string name="stats_by_rarity">Por rareza</string>
+    <string name="stats_refresh_prices">Actualizar precios</string>
+    <string name="stats_updated_just_now">Actualizado ahora mismo</string>
+    <string name="stats_updated_ago">Actualizado hace %1$s</string>
+    <string name="stats_prices_outdated">Los precios pueden estar desactualizados</string>
+    <string name="stats_refreshing">Actualizando precios…</string>
+    <string name="stats_refresh_progress">%1$d / %2$d lotes</string>
+    <string name="stats_refresh_success">Actualizados %1$d precios</string>
+    <string name="stats_refresh_error">Error al actualizar precios</string>
+    <string name="stats_empty_collection">Añade cartas para ver tus estadísticas</string>
+    <string name="stats_currency_usd">USD</string>
+    <string name="stats_currency_eur">EUR</string>
+    <string name="stats_rarity_common">Común</string>
+    <string name="stats_rarity_uncommon">Infrecuente</string>
+    <string name="stats_rarity_rare">Rara</string>
+    <string name="stats_rarity_mythic">Mítica</string>
+
+    <!-- DECK LIST SCREEN -->
+    <string name="decklist_title">Mazos</string>
+    <string name="decklist_create_button">Crear nuevo mazo</string>
+    <string name="decklist_empty_title">Aún no hay mazos</string>
+    <string name="decklist_empty_subtitle">Crea tu primer mazo con la ayuda de nuestro constructor inteligente</string>
+    <string name="decklist_empty_action">Crear mi primer mazo</string>
+    <string name="decklist_delete_title">Eliminar mazo</string>
+    <string name="decklist_delete_message">¿Eliminar %1$s? Esto no se puede deshacer.</string>
+    <string name="decklist_format_commander">Commander</string>
+    <string name="decklist_format_standard">Estándar</string>
+    <string name="decklist_format_modern">Modern</string>
+    <string name="decklist_format_draft">Draft</string>
+    <string name="decklist_card_count">%1$d cartas</string>
+    <string name="decklist_win_rate">%1$d%% de victorias</string>
+
+    <!-- DECK DETAIL SCREEN -->
+    <string name="deckdetail_tab_mainboard">Mazo principal (%1$d)</string>
+    <string name="deckdetail_tab_sideboard">Banquillo (%1$d)</string>
+    <string name="deckdetail_move_to_side">↓ Mover al banquillo</string>
+    <string name="deckdetail_move_to_main">↑ Mover al principal</string>
+    <string name="deckdetail_sideboard_empty_title">No hay cartas en el banquillo</string>
+    <string name="deckdetail_sideboard_empty_subtitle">Añade cartas que ayuden en emparejamientos específicos</string>
+    <string name="deckdetail_sideboard_add">Añadir cartas al banquillo</string>
+    <string name="deckdetail_group_creatures">Criaturas</string>
+    <string name="deckdetail_group_instants">Instantáneos</string>
+    <string name="deckdetail_group_sorceries">Conjuros</string>
+    <string name="deckdetail_group_enchantments">Encantamientos</string>
+    <string name="deckdetail_group_artifacts">Artefactos</string>
+    <string name="deckdetail_group_planeswalkers">Planeswalkers</string>
+    <string name="deckdetail_group_lands">Tierras</string>
+    <string name="deckdetail_incomplete_banner">%1$d cartas de %2$d</string>
+    <string name="deckdetail_menu_rename">Renombrar</string>
+    <string name="deckdetail_menu_export">Exportar</string>
+    <string name="deckdetail_menu_delete">Eliminar mazo</string>
+
+    <!-- DECK BUILDER SCREEN -->
+    <string name="deckbuilder_title">Constructor de mazos</string>
+    <string name="deckbuilder_step_setup">Configuración</string>
+    <string name="deckbuilder_step_building">Construcción</string>
+    <string name="deckbuilder_step_review">Revisión</string>
+    <string name="deckbuilder_name_hint">Nombre del mazo…</string>
+    <string name="deckbuilder_format_label">Formato</string>
+    <string name="deckbuilder_colors_label">Colores</string>
+    <string name="deckbuilder_strategy_label">Estrategia inicial</string>
+    <string name="deckbuilder_strategy_custom">Empezar con una carta específica</string>
+    <string name="deckbuilder_begin_button">Empezar a construir →</string>
+    <string name="deckbuilder_synergy_score">Sinergia %1$d%%</string>
+    <string name="deckbuilder_why_card">¿Por qué esta carta?</string>
+    <string name="deckbuilder_owned_badge">En tu colección</string>
+    <string name="deckbuilder_not_owned_badge">No disponible</string>
+    <string name="deckbuilder_action_add">✓ Añadir al mazo</string>
+    <string name="deckbuilder_action_skip">✕ Omitir</string>
+    <string name="deckbuilder_action_alternatives">⋯ Alternativas</string>
+    <string name="deckbuilder_cards_progress">%1$d / %2$d cartas</string>
+    <string name="deckbuilder_too_many_cards">%1$d cartas sobre el límite — haz recortes</string>
+    <string name="deckbuilder_save_button">Guardar mazo</string>
+    <string name="deckbuilder_sideboard_section">Sugerencias para el banquillo</string>
+    <string name="deckbuilder_sideboard_subtitle">Cartas que podrían ayudar contra mazos específicos</string>
+    <string name="deckbuilder_filter_title">Filtros</string>
+    <string name="deckbuilder_filter_acquisition">Adquisición</string>
+    <string name="deckbuilder_filter_owned_only">Solo cartas que tengo</string>
+    <string name="deckbuilder_filter_include_missing">Incluir cartas por adquirir</string>
+    <string name="deckbuilder_filter_wishlist">Solo mi lista de deseos</string>
+    <string name="deckbuilder_filter_rarity">Rareza</string>
+    <string name="deckbuilder_filter_max_price">Precio máx. por carta</string>
+    <string name="deckbuilder_filter_budget">Presupuesto total</string>
+    <string name="deckbuilder_filter_no_limit">Sin límite</string>
+    <string name="deckbuilder_review_deck">Revisar mazo</string>
+    <string name="deckbuilder_all_reviewed">Todas las cartas revisadas</string>
+    <string name="deckbuilder_add_to_deck">Añadir al mazo</string>
+
+    <!-- GAME SETUP SCREEN -->
+    <string name="gamesetup_title">Nueva partida</string>
+    <string name="gamesetup_app_title">ManaHub</string>
+    <string name="gamesetup_mode_label">Modo de juego</string>
+    <string name="gamesetup_mode_standard">Estándar</string>
+    <string name="gamesetup_mode_standard_life">20 vidas</string>
+    <string name="gamesetup_mode_commander">Commander</string>
+    <string name="gamesetup_mode_commander_life">40 vidas</string>
+    <string name="gamesetup_players_label">Jugadores</string>
+    <string name="gamesetup_player_name_hint">Jugador %1$d</string>
+    <string name="gamesetup_choose_color">Elegir color</string>
+    <string name="gamesetup_layout_label">Pulsa un jugador para cambiar su posición</string>
+    <string name="gamesetup_deck_label">Tu mazo</string>
+    <string name="gamesetup_deck_no_tracking">Jugar sin registrar mazo</string>
+    <string name="gamesetup_commander_label">Comandante</string>
+    <string name="gamesetup_commander_hint">Buscar comandante…</string>
+    <string name="gamesetup_begin_button">Empezar la partida</string>
+    <string name="gamesetup_tournament_link">Crear un torneo en su lugar →</string>
+
+    <!-- GAME SCREEN -->
+    <string name="game_title">ManaHub</string>
+    <string name="game_mode_standard">ESTÁNDAR</string>
+    <string name="game_mode_commander">COMMANDER</string>
+    <string name="game_fallen_label">DERROTADO</string>
+    <string name="game_fallen_life">Se quedó sin vidas</string>
+    <string name="game_fallen_poison">Veneno</string>
+    <string name="game_fallen_commander">Daño de comandante</string>
+    <string name="game_pending_defeat_title">Condición de derrota cumplida</string>
+    <string name="game_pending_defeat_confirm">Confirmar derrota</string>
+    <string name="game_pending_defeat_revoke">¡Sigo vivo!</string>
+    <string name="game_commander_button">⚔ Daño de cmd.</string>
+    <string name="game_counters_button">◆ Contadores</string>
+    <string name="game_dice_label">d20</string>
+    <string name="game_coin_label">¢</string>
+    <string name="game_poison_label">☠ Veneno</string>
+    <string name="game_experience_label">✦ Experiencia</string>
+    <string name="game_energy_label">⚡ Energía</string>
+    <string name="game_custom_counter_hint">Nombre del contador…</string>
+    <string name="game_reset_title">¿Reiniciar partida?</string>
+    <string name="game_reset_message">Todas las vidas y contadores se restablecerán.</string>
+    <string name="game_reset_confirm">Reiniciar</string>
+    <string name="game_exit_title">¿Salir de la partida?</string>
+    <string name="game_exit_message">Se perderá el progreso actual.</string>
+    <string name="game_exit_confirm">Salir</string>
+    <string name="game_exit_cancel">Quedarse</string>
+    <string name="game_layout_editor_title">Editar disposición</string>
+    <string name="game_layout_editor_subtitle">Elige una plantilla o ajusta las rotaciones</string>
+    <string name="game_layout_editor_rotation">Rotación del jugador</string>
+    <string name="game_layout_editor_rotate">Girar en sentido horario</string>
+    <string name="game_rename_player">Renombrar jugador</string>
+    <string name="game_cmd_damage_title">Daño de Comandante → %1$s</string>
+    <string name="game_counters_title">%1$s — Contadores</string>
+
+    <!-- Victory overlay -->
+    <string name="game_wins_label">¡GANA!</string>
+    <string name="game_victory_life_remaining">%1$d vidas restantes</string>
+    <string name="game_victory_view_results">Ver resultados</string>
+
+    <!-- GAME RESULT SCREEN -->
+    <string name="gameresult_title">Resultado de la partida</string>
+    <string name="gameresult_winner_label">VICTORIA</string>
+    <string name="gameresult_standings_title">Clasificación final</string>
+    <string name="gameresult_highlights_title">Destacados</string>
+    <string name="gameresult_most_damage">Más daño realizado</string>
+    <string name="gameresult_closest_match">Partida más reñida</string>
+    <string name="gameresult_duration_label">Duración</string>
+    <string name="gameresult_turns_label">Turnos</string>
+    <string name="gameresult_review_button">✦ Revisar esta partida</string>
+    <string name="gameresult_review_subtitle">~2 min · ayuda a mejorar tu mazo</string>
+    <string name="gameresult_elimination_life">0 vidas</string>
+    <string name="gameresult_elimination_poison">☠ 10 veneno</string>
+    <string name="gameresult_elimination_commander">⚔ 21 daño cmd.</string>
+
+    <!-- SURVEY SCREEN -->
+    <string name="survey_title">Revisión de la partida</string>
+    <string name="survey_progress">%1$d / %2$d</string>
+    <string name="survey_skip_all_description">Omitir encuesta</string>
+    <string name="survey_skip_question">Omitir</string>
+    <string name="survey_confirm_button">Confirmar →</string>
+    <string name="survey_next_button">Siguiente →</string>
+    <string name="survey_save_button">Guardar →</string>
+    <string name="survey_free_text_hint">Notas opcionales sobre la partida…</string>
+
+    <!-- Survey questions -->
+    <string name="survey_q_result_win">¿Cómo se sintió la victoria?</string>
+    <string name="survey_q_result_loss">¿Qué te costó la partida?</string>
+    <string name="survey_q_mana">¿Cómo fue tu maná?</string>
+    <string name="survey_q_hand">¿Cómo fue tu mano inicial?</string>
+    <string name="survey_q_commander_plan">El daño de comandante fue decisivo.\n¿Era ese tu plan?</string>
+    <string name="survey_q_commander_badge">⚔ Victoria por daño de comandante</string>
+    <string name="survey_q_loss_reason">¿Qué habría cambiado el resultado?</string>
+    <string name="survey_q_sideboard">¿Cambiaste cartas del banquillo?</string>
+    <string name="survey_q_free_text">¿Algo que destacar de la partida?</string>
+    <string name="survey_q_free_text_badge">Opcional</string>
+
+    <!-- Survey answers -->
+    <string name="survey_a_dominant">Dominante</string>
+    <string name="survey_a_close">Por poco</string>
+    <string name="survey_a_lucky">Suerte en el robo</string>
+    <string name="survey_a_skillful">Superioridad técnica</string>
+    <string name="survey_a_overwhelmed">Abrumado</string>
+    <string name="survey_a_mana_issues">Problemas de maná</string>
+    <string name="survey_a_no_answers">Sin respuestas</string>
+    <string name="survey_a_too_slow">Demasiado lento</string>
+    <string name="survey_a_mana_smooth">Fluido</string>
+    <string name="survey_a_mana_flooded">Inundación de tierras</string>
+    <string name="survey_a_mana_screwed">Atasco de maná</string>
+    <string name="survey_a_mana_colors">Colores equivocados</string>
+    <string name="survey_a_mana_none">Sin problemas</string>
+    <string name="survey_a_planned">Planeado</string>
+    <string name="survey_a_developed">Surgió de forma natural</string>
+    <string name="survey_a_surprise">Me sorprendió hasta a mí</string>
+    <string name="survey_a_more_removal">Más eliminación</string>
+    <string name="survey_a_better_curve">Mejor curva de maná</string>
+    <string name="survey_a_more_interaction">Más interacción</string>
+    <string name="survey_a_nothing">El oponente fue mejor</string>
+    <string name="survey_a_side_helped">Sí, ayudó</string>
+    <string name="survey_a_side_no_help">Sí, pero no cambió nada</string>
+    <string name="survey_a_side_no_swaps">Sin cambios</string>
+    <string name="survey_a_side_forgot">Me olvidé</string>
+
+    <!-- Hand rating labels -->
+    <string name="survey_hand_1">Mano muy mala</string>
+    <string name="survey_hand_2">Mano débil</string>
+    <string name="survey_hand_3">Mano jugable</string>
+    <string name="survey_hand_4">Buena mano</string>
+    <string name="survey_hand_5">Mano perfecta</string>
+
+    <!-- TOURNAMENT SCREEN -->
+    <string name="tournament_setup_title">Nuevo torneo</string>
+    <string name="tournament_name_hint">Nombre del torneo…</string>
+    <string name="tournament_format_label">Formato</string>
+    <string name="tournament_structure_label">Estructura</string>
+    <string name="tournament_structure_round_robin">Round Robin</string>
+    <string name="tournament_structure_round_robin_desc">Todos contra todos</string>
+    <string name="tournament_structure_swiss">Suizo</string>
+    <string name="tournament_structure_swiss_desc">Emparejados por puntuación similar</string>
+    <string name="tournament_structure_elimination">Eliminación directa</string>
+    <string name="tournament_structure_elimination_desc">Si pierdes, estás fuera</string>
+    <string name="tournament_matches_per_pairing">Partidas por emparejamiento</string>
+    <string name="tournament_matches_per_pairing_single">por emparejamiento</string>
+    <string name="tournament_matches_per_pairing_multi">por emparejamiento (mejor de %1$d)</string>
+    <string name="tournament_pairings_label">Emparejamientos</string>
+    <string name="tournament_pairings_random">Emparejamientos aleatorios</string>
+    <string name="tournament_pairings_random_desc">Cruces generados automáticamente</string>
+    <string name="tournament_pairings_manual">Emparejamientos manuales</string>
+    <string name="tournament_pairings_manual_desc">Tú eliges el orden de las partidas</string>
+    <string name="tournament_players_label">Jugadores (%1$d)</string>
+    <string name="tournament_add_player">+ Añadir jugador</string>
+    <string name="tournament_create_button">Crear torneo ⚔</string>
+    <string name="tournament_tab_standings">Clasificación</string>
+    <string name="tournament_tab_matches">Partidas</string>
+    <string name="tournament_winner_label">🏆 Ganador del torneo</string>
+    <string name="tournament_start_next">▶ Empezar siguiente partida</string>
+    <string name="tournament_standings_header_player">#  Jugador</string>
+    <string name="tournament_standings_w">V</string>
+    <string name="tournament_standings_l">D</string>
+    <string name="tournament_standings_pts">Pts</string>
+    <string name="tournament_standings_life">Vida</string>
+    <string name="tournament_match_vs">VS</string>
+    <string name="tournament_match_play">Jugar</string>
+    <string name="tournament_round_label">Ronda %1$d</string>
+    <string name="tournament_finished_label">Torneo finalizado</string>
+
+    <!-- PROFILE SCREEN -->
+    <string name="profile_title">Perfil</string>
+    <string name="profile_section_themes">Tema visual</string>
+    <string name="profile_name_hint">Tu nombre…</string>
+    <string name="profile_name_edit_description">Editar nombre</string>
+    <string name="profile_play_since">Planeswalker desde %1$s</string>
+    <string name="profile_no_games_yet">Juega tu primera partida para desbloquear estadísticas</string>
+    <string name="profile_section_game_stats">Estadísticas de juego</string>
+    <string name="profile_stat_games">Partidas</string>
+    <string name="profile_stat_win_rate">% Victorias</string>
+    <string name="profile_stat_streak">Racha</string>
+    <string name="profile_stat_avg_life_won">Media vida al ganar</string>
+    <string name="profile_stat_avg_duration">Duración media</string>
+    <string name="profile_stat_avg_win_turn">Turno medio de victoria</string>
+    <string name="profile_stat_turn_format">T%1$d</string>
+    <string name="profile_favourite_format">Formato favorito</string>
+    <string name="profile_section_best_deck">Mejor mazo</string>
+    <string name="profile_deck_games">%1$d partidas jugadas</string>
+    <string name="profile_deck_win_rate">tasa de victorias</string>
+    <string name="profile_section_insights">Análisis de juego</string>
+    <string name="profile_insights_based_on">Basado en %1$d revisiones de partidas</string>
+    <string name="profile_insight_hand">Mano inicial</string>
+    <string name="profile_insight_mana">Problemas de maná</string>
+    <string name="profile_insight_mana_value">%1$d%% de las partidas</string>
+    <string name="profile_insight_win_style">Cómo ganas</string>
+    <string name="profile_section_achievements">Logros (%1$d/%2$d)</string>
+    <string name="profile_section_recent_games">Partidas recientes</string>
+    <string name="profile_section_collection">Colección</string>
+    <string name="profile_win_badge">V</string>
+    <string name="profile_loss_badge">D</string>
+
+    <!-- Play styles -->
+    <string name="playstyle_aggro">Aggro</string>
+    <string name="playstyle_aggro_desc">Terminas las partidas rápido y pegas fuerte</string>
+    <string name="playstyle_control">Control</string>
+    <string name="playstyle_control_desc">Aguantas más que el rival y ganas al final</string>
+    <string name="playstyle_commander">Commander</string>
+    <string name="playstyle_commander_desc">El campo de batalla multijugador es tu hogar</string>
+    <string name="playstyle_consistent">Consistente</string>
+    <string name="playstyle_consistent_desc">Juegas un Magic sólido y eficiente</string>
+    <string name="playstyle_midrange">Midrange</string>
+    <string name="playstyle_midrange_desc">Flexible y adaptable en cualquier partida</string>
+
+    <!-- Achievements -->
+    <string name="achievement_first_blood">Primera sangre</string>
+    <string name="achievement_first_blood_desc">Gana tu primera partida</string>
+    <string name="achievement_dominant">Dominante</string>
+    <string name="achievement_dominant_desc">Gana una partida con más de 30 vidas</string>
+    <string name="achievement_poison_master">Maestro del veneno</string>
+    <string name="achievement_poison_master_desc">Elimina a un jugador con contadores de veneno</string>
+    <string name="achievement_commander_wrath">Ira del Comandante</string>
+    <string name="achievement_commander_wrath_desc">Elimina a un jugador con daño de comandante</string>
+    <string name="achievement_on_fire">En racha</string>
+    <string name="achievement_on_fire_desc">Gana 3 partidas seguidas</string>
+    <string name="achievement_champion">Campeón</string>
+    <string name="achievement_champion_desc">Gana un torneo</string>
+    <string name="achievement_collector_1">Coleccionista I</string>
+    <string name="achievement_collector_1_desc">Añade 50 cartas a tu colección</string>
+    <string name="achievement_collector_2">Coleccionista II</string>
+    <string name="achievement_collector_2_desc">Añade 200 cartas a tu colección</string>
+    <string name="achievement_collector_3">Coleccionista III</string>
+    <string name="achievement_collector_3_desc">Añade 500 cartas a tu colección</string>
+    <string name="achievement_mythic_hunter">Cazador de míticas</string>
+    <string name="achievement_mythic_hunter_desc">Posee una carta rara mítica</string>
+    <string name="achievement_high_roller">Gran apostador</string>
+    <string name="achievement_high_roller_desc">Posee una carta que valga más de 50 €</string>
+    <string name="achievement_five_colors">Cinco colores</string>
+    <string name="achievement_five_colors_desc">Ten cartas de los 5 colores</string>
+    <string name="achievement_deck_builder">Constructor de mazos</string>
+    <string name="achievement_deck_builder_desc">Crea tu primer mazo</string>
+    <string name="achievement_aggro_master">Maestro Aggro</string>
+    <string name="achievement_aggro_master_desc">Gana una partida en menos de 8 turnos</string>
+    <string name="achievement_control_freak">Maniático del control</string>
+    <string name="achievement_control_freak_desc">Gana una partida que dure más de 20 turnos</string>
+
+    <!-- SETTINGS SCREEN -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_language">Idioma</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_currency">Moneda</string>
+    <string name="settings_currency_usd">USD ($)</string>
+    <string name="settings_currency_eur">EUR (€)</string>
+    <string name="settings_section_collection">Colección</string>
+    <string name="settings_default_view">Vista predeterminada</string>
+    <string name="settings_default_view_grid">Cuadrícula</string>
+    <string name="settings_default_view_list">Lista</string>
+    <string name="settings_section_prices">Precios y caché</string>
+    <string name="settings_auto_refresh">Auto-actualizar precios</string>
+    <string name="settings_auto_refresh_subtitle">Actualizar precios al abrir la app</string>
+    <string name="settings_clear_cache">Limpiar caché de imágenes</string>
+    <string name="settings_clear_cache_subtitle">Liberar espacio de almacenamiento</string>
+    <string name="settings_section_about">Acerca de</string>
+    <string name="settings_app_name_label">App</string>
+    <string name="settings_version_label">Versión</string>
+    <string name="settings_data_source_label">Datos</string>
+    <string name="settings_data_source_value">Scryfall API</string>
+    <string name="settings_open_scryfall">Abrir web de Scryfall</string>
+
+    <!-- SIDEBOARD RECOMMENDATIONS -->
+    <string name="sideboard_rec_title">Sugerencias para el banquillo</string>
+    <string name="sideboard_rec_subtitle">Basado en tu revisión de la partida</string>
+    <string name="sideboard_rec_add_to_main">↑ Añadir al principal</string>
+    <string name="sideboard_rec_move_to_side">↓ Mover al banquillo</string>
+    <string name="sideboard_rec_apply">Aplicar cambios</string>
+    <string name="sideboard_rec_reason_removal">Informaste de falta de respuestas.</string>
+    <string name="sideboard_rec_reason_mana">Tuviste problemas de maná.</string>
+
+    <!-- ERRORS Y MENSAJES GENÉRICOS -->
+    <string name="error_network">Error de conexión. Revisa tu internet.</string>
+    <string name="error_scryfall">No se pudo contactar con Scryfall. Inténtalo de nuevo.</string>
+    <string name="error_card_not_found">Carta no encontrada</string>
+    <string name="error_save_failed">No se pudo guardar. Inténtalo de nuevo.</string>
+    <string name="error_unknown">Ha ocurrido un error inesperado</string>
 </resources>
