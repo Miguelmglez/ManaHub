@@ -4,7 +4,6 @@ package com.mmg.magicfolder.feature.carddetail
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -49,9 +48,8 @@ fun CardDetailScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -222,7 +220,7 @@ private fun CardDetailContent(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         ) {
-            card.oracleText?.let {
+            card.printedText?.let {
                 Text(
                     text     = it,
                     style    = MaterialTheme.typography.bodyMedium,
@@ -277,8 +275,7 @@ private fun CardDetailContent(
 
         // Scryfall link
         TextButton(onClick = { uriHandler.openUri(card.scryfallUri) }) {
-            Icon(Icons.Default.OpenInBrowser, contentDescription = null,
-                modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.carddetail_view_scryfall))
         }
@@ -290,9 +287,10 @@ private fun PriceSection(card: Card, userCard: UserCard?) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.carddetail_market_prices), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            PricePill(label = stringResource(R.string.carddetail_price_regular), price = card.priceUsd, currency = "$")
-            PricePill(label = stringResource(R.string.carddetail_price_foil),    price = card.priceUsdFoil, currency = "$")
-            PricePill(label = stringResource(R.string.carddetail_price_eur),     price = card.priceEur, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_foil_eur),price = card.priceEurFoil, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_foil_usd),price = card.priceUsdFoil, currency = "$")
+            PricePill(label = stringResource(R.string.carddetail_price_eur),price = card.priceEur, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_usd), price = card.priceUsd, currency = "$")
         }
     }
 }

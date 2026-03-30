@@ -4,6 +4,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -14,6 +15,7 @@ import coil.compose.AsyncImage
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
+import com.mmg.magicfolder.core.util.LocaleLanguageProvider
 
 @Composable
 fun CardGridItem(
@@ -81,10 +83,18 @@ fun CardGridItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val price = if (userCard.isFoil) card.priceUsdFoil else card.priceUsd
-                if (price != null) {
+                val isUs = remember { LocaleLanguageProvider().get() == "us" }
+
+                val price = card.run {
+                    if (userCard.isFoil) {
+                        if (isUs) priceUsdFoil else priceEurFoil
+                    } else {
+                        if (isUs) priceUsd else priceEur
+                    }
+                }
+                price?.let { p ->
                     Text(
-                        text  = "$${String.format("%.2f", price)}",
+                        text  = if (isUs) "$${"%.2f".format(p)}" else "${"%.2f".format(p)}€",
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.goldMtg,
                     )

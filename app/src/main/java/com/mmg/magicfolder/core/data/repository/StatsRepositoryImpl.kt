@@ -72,7 +72,6 @@ class StatsRepositoryImpl @Inject constructor(
                 .map { it.trim().removeSurrounding("\"") }.filter { it.isNotEmpty() }
             val color = when {
                 parsed.isEmpty() -> MtgColor.COLORLESS
-                parsed.size > 1  -> MtgColor.MULTICOLOR
                 else -> when (parsed.first()) {
                     "W" -> MtgColor.W; "U" -> MtgColor.U; "B" -> MtgColor.B
                     "R" -> MtgColor.R; "G" -> MtgColor.G

@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "33651f5d097911be71a41db270d8631c",
+    "identityHash": "5f60d2efc3c02de0cbae6ce7254def20",
     "entities": [
       {
         "tableName": "cards",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`scryfall_id` TEXT NOT NULL, `name` TEXT NOT NULL, `lang` TEXT NOT NULL, `mana_cost` TEXT, `cmc` REAL NOT NULL, `colors` TEXT NOT NULL, `color_identity` TEXT NOT NULL, `type_line` TEXT NOT NULL, `oracle_text` TEXT, `keywords` TEXT NOT NULL, `power` TEXT, `toughness` TEXT, `loyalty` TEXT, `set_code` TEXT NOT NULL, `set_name` TEXT NOT NULL, `collector_number` TEXT NOT NULL, `rarity` TEXT NOT NULL, `released_at` TEXT NOT NULL, `frame_effects` TEXT NOT NULL, `promo_types` TEXT NOT NULL, `image_normal` TEXT, `image_art_crop` TEXT, `image_back_normal` TEXT, `price_usd` REAL, `price_usd_foil` REAL, `price_eur` REAL, `price_eur_foil` REAL, `legality_standard` TEXT NOT NULL, `legality_pioneer` TEXT NOT NULL, `legality_modern` TEXT NOT NULL, `legality_commander` TEXT NOT NULL, `flavor_text` TEXT, `artist` TEXT, `scryfall_uri` TEXT NOT NULL, `cached_at` INTEGER NOT NULL, `is_stale` INTEGER NOT NULL, `stale_reason` TEXT, `tags` TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(`scryfall_id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`scryfall_id` TEXT NOT NULL, `name` TEXT NOT NULL, `printed_name` TEXT NOT NULL, `lang` TEXT NOT NULL, `mana_cost` TEXT, `cmc` REAL NOT NULL, `colors` TEXT NOT NULL, `color_identity` TEXT NOT NULL, `type_line` TEXT NOT NULL, `oracle_text` TEXT, `printed_text` TEXT, `keywords` TEXT NOT NULL, `power` TEXT, `toughness` TEXT, `loyalty` TEXT, `set_code` TEXT NOT NULL, `set_name` TEXT NOT NULL, `collector_number` TEXT NOT NULL, `rarity` TEXT NOT NULL, `released_at` TEXT NOT NULL, `frame_effects` TEXT NOT NULL, `promo_types` TEXT NOT NULL, `image_normal` TEXT, `image_art_crop` TEXT, `image_back_normal` TEXT, `price_usd` REAL, `price_usd_foil` REAL, `price_eur` REAL, `price_eur_foil` REAL, `legality_standard` TEXT NOT NULL, `legality_pioneer` TEXT NOT NULL, `legality_modern` TEXT NOT NULL, `legality_commander` TEXT NOT NULL, `flavor_text` TEXT, `artist` TEXT, `scryfall_uri` TEXT NOT NULL, `cached_at` INTEGER NOT NULL, `is_stale` INTEGER NOT NULL, `stale_reason` TEXT, `tags` TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(`scryfall_id`))",
         "fields": [
           {
             "fieldPath": "scryfallId",
@@ -17,6 +17,12 @@
           {
             "fieldPath": "name",
             "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "printedName",
+            "columnName": "printed_name",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -59,6 +65,12 @@
           {
             "fieldPath": "oracleText",
             "columnName": "oracle_text",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "printedText",
+            "columnName": "printed_text",
             "affinity": "TEXT",
             "notNull": false
           },
@@ -1076,7 +1088,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '33651f5d097911be71a41db270d8631c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5f60d2efc3c02de0cbae6ce7254def20')"
     ]
   }
 }

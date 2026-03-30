@@ -1,11 +1,12 @@
 package com.mmg.magicfolder.core.data.remote.mapper
 
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.mmg.magicfolder.core.data.local.entity.CardEntity
 import com.mmg.magicfolder.core.domain.model.Card
 
 private val gson = Gson()
-private val listType = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
+private val listType = object : TypeToken<List<String>>() {}.type
 
 internal fun String.toStringList(): List<String> = gson.fromJson(this, listType) ?: emptyList()
 internal fun List<String>.toJson(): String = gson.toJson(this)
@@ -13,12 +14,14 @@ internal fun List<String>.toJson(): String = gson.toJson(this)
 fun CardEntity.toDomain(): Card = Card(
     scryfallId        = scryfallId,
     name              = name,
+    printedName       = printedName,
     manaCost          = manaCost,
     cmc               = cmc,
     colors            = colors.toStringList(),
     colorIdentity     = colorIdentity.toStringList(),
     typeLine          = typeLine,
     oracleText        = oracleText,
+    printedText       = printedText,
     keywords          = keywords.toStringList(),
     power             = power,
     toughness         = toughness,
@@ -53,6 +56,7 @@ fun CardEntity.toDomain(): Card = Card(
 fun Card.toEntity(): CardEntity = CardEntity(
     scryfallId        = scryfallId,
     name              = name,
+    printedName       = printedName,
     lang              = lang,
     manaCost          = manaCost,
     cmc               = cmc,
@@ -60,6 +64,7 @@ fun Card.toEntity(): CardEntity = CardEntity(
     colorIdentity     = colorIdentity.toJson(),
     typeLine          = typeLine,
     oracleText        = oracleText,
+    printedText       = printedText,
     keywords          = keywords.toJson(),
     power             = power,
     toughness         = toughness,

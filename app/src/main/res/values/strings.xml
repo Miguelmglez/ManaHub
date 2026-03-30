@@ -84,14 +84,14 @@
     <string name="addcard_no_results">No cards found</string>
     <string name="addcard_no_results_subtitle">Try searching in another language\nor check the spelling</string>
     <string name="addcard_scanner_title">Scan card barcode</string>
-    <string name="addcard_scanner_subtitle">Point the camera at the barcode\non the back of the card</string>
+    <string name="addcard_scanner_subtitle">Point the camera at cards name</string>
     <string name="addcard_scanner_button">Open Scanner</string>
-    <string name="addcard_confirm_title">Add to collection</string>
+    <string name="addcard_confirm_title">Add</string>
     <string name="addcard_confirm_quantity">Quantity</string>
     <string name="addcard_confirm_foil">Foil</string>
     <string name="addcard_confirm_condition">Condition</string>
     <string name="addcard_confirm_language">Language</string>
-    <string name="addcard_confirm_button">Add to collection</string>
+    <string name="addcard_confirm_button">Add</string>
     <string name="addcard_condition_nm">Near Mint</string>
     <string name="addcard_condition_lp">Lightly Played</string>
     <string name="addcard_condition_mp">Moderately Played</string>
@@ -112,7 +112,8 @@
     <string name="carddetail_legality_not_legal">Not Legal</string>
     <string name="carddetail_price_usd">USD</string>
     <string name="carddetail_price_eur">EUR</string>
-    <string name="carddetail_price_foil">Foil</string>
+    <string name="carddetail_price_foil_eur">Foil EUR</string>
+    <string name="carddetail_price_foil_usd">Foil USD</string>
     <string name="carddetail_view_scryfall">View on Scryfall</string>
     <string name="carddetail_tags_section">Tags</string>
     <string name="carddetail_edit_title">Edit card</string>
@@ -123,8 +124,7 @@
     <string name="carddetail_quantity">%1$d in collection</string>
     <string name="carddetail_market_prices">Market prices</string>
     <string name="carddetail_in_collection">In your collection</string>
-    <string name="carddetail_legality">Legality</string>
-    <string name="carddetail_price_regular">Regular</string>
+    <string name="carddetail_legality">Legal in</string>
     <string name="carddetail_condition">Condition</string>
     <string name="carddetail_language">Language</string>
     <string name="carddetail_quantity_label">Quantity</string>
