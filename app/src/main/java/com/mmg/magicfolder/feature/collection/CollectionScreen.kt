@@ -399,7 +399,6 @@ private fun ActiveFiltersIndicator(
                     }
                 }
                 if (activeFilters.size > 1 &&
-                    !activeFilters.contains(ColorFilter.MULTICOLOR) &&
                     !activeFilters.contains(ColorFilter.COLORLESS)
                 ) {
                     Text(
@@ -524,7 +523,6 @@ val ColorFilter.displayName get() = when (this) {
     ColorFilter.R          -> "Red"
     ColorFilter.G          -> "Green"
     ColorFilter.COLORLESS  -> "Colorless"
-    ColorFilter.MULTICOLOR -> "Multi"
 }
 
 /** Returns the Scryfall card-symbol token for mana filters, null for ALL. */
@@ -535,7 +533,6 @@ private fun ColorFilter.manaCode(): String? = when (this) {
     ColorFilter.R          -> "R"
     ColorFilter.G          -> "G"
     ColorFilter.COLORLESS  -> "C"
-    ColorFilter.MULTICOLOR -> "M"
     else                   -> null
 }
 
@@ -546,6 +543,5 @@ private fun ColorFilter.manaColor(mc: MagicColors) = when (this) {
     ColorFilter.R          -> mc.manaR
     ColorFilter.G          -> mc.manaG
     ColorFilter.COLORLESS  -> mc.manaC
-    ColorFilter.MULTICOLOR -> mc.goldMtg
     else                   -> null
 }

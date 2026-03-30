@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import com.mmg.magicfolder.R
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,14 +42,27 @@ fun CardDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(uiState.card?.name ?: "") },
-                navigationIcon = {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
-                },
-                actions = {
+                    Text(
+                        text = uiState.card?.name ?: "",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     uiState.userCard?.let {
                         IconButton(onClick = viewModel::onShowEditDialog) {
                             Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit))
@@ -58,8 +72,8 @@ fun CardDetailScreen(
                                 tint = MaterialTheme.colorScheme.error)
                         }
                     }
-                },
-            )
+                }
+            }
         },
     ) { padding ->
         when {

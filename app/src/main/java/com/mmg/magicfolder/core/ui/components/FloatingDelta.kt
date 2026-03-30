@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.mmg.magicfolder.core.ui.theme.RajdhaniFontFamily
+import com.mmg.magicfolder.core.ui.theme.MulishFontFamily
 
 @Composable
 fun FloatingDelta(
@@ -28,7 +28,7 @@ fun FloatingDelta(
         delta?.let { d ->
             Text(
                 text       = if (d > 0) "+$d" else "$d",
-                fontFamily = RajdhaniFontFamily,
+                fontFamily = MulishFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize   = 22.sp,
                 color      = if (d > 0) positiveColor else negativeColor,

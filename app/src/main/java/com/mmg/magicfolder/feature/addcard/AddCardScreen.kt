@@ -56,15 +56,16 @@ fun AddCardScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Add Card",
-                        style = ty.titleLarge,
-                        color = mc.textPrimary,
-                    )
-                },
-                navigationIcon = {
+            Surface(
+                color = mc.backgroundSecondary,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.Default.ArrowBack,
@@ -72,9 +73,16 @@ fun AddCardScreen(
                             tint = mc.textPrimary,
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
+                    Text(
+                        text = "Add Card",
+                        style = ty.titleLarge,
+                        color = mc.textPrimary,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         },
         containerColor = mc.background,
     ) { padding ->

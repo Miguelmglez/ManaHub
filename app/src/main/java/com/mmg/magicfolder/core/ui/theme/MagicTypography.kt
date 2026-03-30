@@ -9,20 +9,20 @@ import com.mmg.magicfolder.R
 
 // ── Font families cargadas desde res/font/ ────────────────────────────────────
 
-val CinzelFontFamily = FontFamily(
-    Font(R.font.cinzel_regular,   FontWeight.Normal),
-    Font(R.font.cinzel_semibold,  FontWeight.SemiBold),
-    Font(R.font.cinzel_bold,      FontWeight.Bold),
-    Font(R.font.cinzel_extrabold, FontWeight.ExtraBold),
-    Font(R.font.cinzel_black,     FontWeight.Black),
+val MarcellusFontFamily = FontFamily(
+    Font(R.font.marcellus_regular, FontWeight.Normal),
+    Font(R.font.marcellus_regular,  FontWeight.SemiBold),
+    Font(R.font.marcellus_regular,      FontWeight.Bold),
+    Font(R.font.marcellus_regular, FontWeight.ExtraBold),
+    Font(R.font.marcellus_regular,     FontWeight.Black),
 )
 
-val RajdhaniFontFamily = FontFamily(
-    Font(R.font.rajdhani_light,    FontWeight.Light),
-    Font(R.font.rajdhani_regular,  FontWeight.Normal),
-    Font(R.font.rajdhani_medium,   FontWeight.Medium),
-    Font(R.font.rajdhani_semibold, FontWeight.SemiBold),
-    Font(R.font.rajdhani_bold,     FontWeight.Bold),
+val MulishFontFamily = FontFamily(
+    Font(R.font.mulish_light,    FontWeight.Light),
+    Font(R.font.mulish_regular,  FontWeight.Normal),
+    Font(R.font.mulish_medium,   FontWeight.Medium),
+    Font(R.font.mulish_semibold, FontWeight.SemiBold),
+    Font(R.font.mulish_bold,     FontWeight.Bold),
 )
 
 val ManaFontFamily = FontFamily(
@@ -35,25 +35,25 @@ val ManaFontFamily = FontFamily(
  * Typography scale for the ManaHub design system.
  *
  * Hierarchy:
- *  displayLarge / displayMedium — CinzelFontFamily Black, section titles, victory screen
- *  lifeNumber / lifeNumberMd   — CinzelFontFamily Black, main life-total numeral
- *  titleLarge / titleMedium    — CinzelFontFamily, card titles, feature headers
- *  labelLarge … labelSmall     — CinzelFontFamily, nav tabs, chips, badges
- *  bodyLarge … bodySmall       — RajdhaniFontFamily, prose, descriptions, metadata
- *  deltaNumber                 — RajdhaniFontFamily, floating +N / −N delta indicator
+ *  displayLarge / displayMedium — MarcellusFontFamily Black, section titles, victory screen
+ *  lifeNumber / lifeNumberMd   — MarcellusFontFamily Black, main life-total numeral
+ *  titleLarge / titleMedium    — MarcellusFontFamily, card titles, feature headers
+ *  labelLarge … labelSmall     — MarcellusFontFamily, nav tabs, chips, badges
+ *  bodyLarge … bodySmall       — mulishFontFamily, prose, descriptions, metadata
+ *  deltaNumber                 — mulishFontFamily, floating +N / −N delta indicator
  */
 data class MagicTypography(
 
     // ── Display ───────────────────────────────────────────────────────────────
     val displayLarge: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.Black,
         fontSize      = 40.sp,
         lineHeight    = 48.sp,
         letterSpacing = 1.sp,
     ),
     val displayMedium: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.Black,
         fontSize      = 32.sp,
         lineHeight    = 40.sp,
@@ -62,14 +62,14 @@ data class MagicTypography(
 
     // ── Life numerals ─────────────────────────────────────────────────────────
     val lifeNumber: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.Black,
         fontSize      = 88.sp,
         lineHeight    = 88.sp,
         letterSpacing = (-2).sp,
     ),
     val lifeNumberMd: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.Black,
         fontSize      = 64.sp,
         lineHeight    = 64.sp,
@@ -78,14 +78,14 @@ data class MagicTypography(
 
     // ── Titles ────────────────────────────────────────────────────────────────
     val titleLarge: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.Bold,
         fontSize      = 22.sp,
         lineHeight    = 30.sp,
         letterSpacing = 1.sp,
     ),
     val titleMedium: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.SemiBold,
         fontSize      = 18.sp,
         lineHeight    = 26.sp,
@@ -94,21 +94,21 @@ data class MagicTypography(
 
     // ── Labels ────────────────────────────────────────────────────────────────
     val labelLarge: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.Bold,
         fontSize      = 14.sp,
         lineHeight    = 18.sp,
         letterSpacing = 3.sp,
     ),
     val labelMedium: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.SemiBold,
         fontSize      = 12.sp,
         lineHeight    = 16.sp,
         letterSpacing = 2.sp,
     ),
     val labelSmall: TextStyle = TextStyle(
-        fontFamily    = CinzelFontFamily,
+        fontFamily    = MarcellusFontFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 11.sp,
         lineHeight    = 14.sp,
@@ -117,21 +117,21 @@ data class MagicTypography(
 
     // ── Body ──────────────────────────────────────────────────────────────────
     val bodyLarge: TextStyle = TextStyle(
-        fontFamily    = RajdhaniFontFamily,
+        fontFamily    = MulishFontFamily,
         fontWeight    = FontWeight.SemiBold,
         fontSize      = 18.sp,
         lineHeight    = 26.sp,
         letterSpacing = 0.sp,
     ),
     val bodyMedium: TextStyle = TextStyle(
-        fontFamily    = RajdhaniFontFamily,
+        fontFamily    = MulishFontFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 16.sp,
         lineHeight    = 22.sp,
         letterSpacing = 0.sp,
     ),
     val bodySmall: TextStyle = TextStyle(
-        fontFamily    = RajdhaniFontFamily,
+        fontFamily    = MulishFontFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 14.sp,
         lineHeight    = 20.sp,
@@ -140,7 +140,7 @@ data class MagicTypography(
 
     // ── Delta indicator ───────────────────────────────────────────────────────
     val deltaNumber: TextStyle = TextStyle(
-        fontFamily    = RajdhaniFontFamily,
+        fontFamily    = MulishFontFamily,
         fontWeight    = FontWeight.Bold,
         fontSize      = 22.sp,
         lineHeight    = 28.sp,

@@ -50,6 +50,8 @@ fun SurveyScreen(
     viewModel:  SurveyViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
 
     LaunchedEffect(Unit) {
         viewModel.initWithResult(gameResult)
@@ -62,28 +64,32 @@ fun SurveyScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.magicColors.background)
-            .statusBarsPadding(),
+            .background(mc.background),
     ) {
-        // ── Top bar ───────────────────────────────────────────────────────────
-        Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically,
+        // ── Top bar (Compact) ────────────────────────────────────────────────
+        Surface(
+            color = mc.background,
         ) {
-            Text(
-                text  = stringResource(R.string.survey_title),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = MaterialTheme.magicColors.textPrimary,
-            )
-            IconButton(onClick = { viewModel.skipAll() }) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = stringResource(R.string.survey_skip_all_description),
-                    tint               = MaterialTheme.magicColors.textSecondary,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text  = stringResource(R.string.survey_title),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
                 )
+                IconButton(onClick = { viewModel.skipAll() }) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.survey_skip_all_description),
+                        tint               = mc.textSecondary,
+                    )
+                }
             }
         }
 
@@ -96,8 +102,8 @@ fun SurveyScreen(
         LinearProgressIndicator(
             progress   = { animatedProgress },
             modifier   = Modifier.fillMaxWidth().height(3.dp),
-            color      = MaterialTheme.magicColors.primaryAccent,
-            trackColor = MaterialTheme.magicColors.surfaceVariant,
+            color      = mc.primaryAccent,
+            trackColor = mc.surfaceVariant,
         )
         if (uiState.questions.isNotEmpty()) {
             Text(
@@ -106,8 +112,8 @@ fun SurveyScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 4.dp),
                 textAlign = TextAlign.End,
-                style     = MaterialTheme.magicTypography.labelSmall,
-                color     = MaterialTheme.magicColors.textDisabled,
+                style     = ty.labelSmall,
+                color     = mc.textDisabled,
             )
         }
 
@@ -142,6 +148,9 @@ private fun QuestionContent(
     onAnswer: (String) -> Unit,
     onSkip:   () -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -156,21 +165,21 @@ private fun QuestionContent(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.magicColors.goldMtg.copy(alpha = 0.15f))
+                    .background(mc.goldMtg.copy(alpha = 0.15f))
                     .padding(horizontal = 12.dp, vertical = 5.dp),
             ) {
                 Text(
                     text  = badge,
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = MaterialTheme.magicColors.goldMtg,
+                    style = ty.labelSmall,
+                    color = mc.goldMtg,
                 )
             }
         }
 
         Text(
             text  = question.text,
-            style = MaterialTheme.magicTypography.titleMedium,
-            color = MaterialTheme.magicColors.textPrimary,
+            style = ty.titleMedium,
+            color = mc.textPrimary,
         )
 
         when (val opt = question.answerOption) {
@@ -198,6 +207,7 @@ private fun SingleChoiceGrid(
     onSelect: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     LazyVerticalGrid(
         columns               = GridCells.Fixed(2),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -223,7 +233,7 @@ private fun SingleChoiceGrid(
                     }
                     Text(
                         text      = choice.label,
-                        style     = MaterialTheme.magicTypography.bodyMedium,
+                        style     = ty.bodyMedium,
                         color     = mc.textPrimary,
                         textAlign = TextAlign.Center,
                     )
@@ -244,6 +254,7 @@ private fun MultiChoiceList(
     onSkip:    () -> Unit,
 ) {
     val mc       = MaterialTheme.magicColors
+    val ty       = MaterialTheme.magicTypography
     var selected by remember { mutableStateOf(setOf<String>()) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -270,7 +281,7 @@ private fun MultiChoiceList(
                     if (choice.emoji.isNotEmpty()) Text(text = choice.emoji, fontSize = 20.sp)
                     Text(
                         text     = choice.label,
-                        style    = MaterialTheme.magicTypography.bodyMedium,
+                        style    = ty.bodyMedium,
                         color    = mc.textPrimary,
                         modifier = Modifier.weight(1f),
                     )
@@ -318,6 +329,7 @@ private fun StarRatingInput(
     onSkip:    () -> Unit,
 ) {
     val mc     = MaterialTheme.magicColors
+    val ty     = MaterialTheme.magicTypography
     var rating by remember { mutableIntStateOf(0) }
 
     Column(
@@ -344,7 +356,7 @@ private fun StarRatingInput(
                     4 -> "Good hand"
                     else -> "Perfect hand"
                 },
-                style = MaterialTheme.magicTypography.bodySmall,
+                style = ty.bodySmall,
                 color = mc.textSecondary,
             )
         }
@@ -379,6 +391,7 @@ private fun FreeTextInput(
     onSkip:    () -> Unit,
 ) {
     val mc            = MaterialTheme.magicColors
+    val ty            = MaterialTheme.magicTypography
     var text          by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
