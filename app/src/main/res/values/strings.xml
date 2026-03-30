@@ -18,7 +18,7 @@
     <string name="action_close">Close</string>
     <string name="action_back">Back</string>
     <string name="action_skip">Skip</string>
-    <string name="action_next">Next →</string>
+    <string name="action_next">Next</string>
     <string name="action_done">Done</string>
     <string name="action_retry">Retry</string>
     <string name="action_refresh">Refresh</string>
