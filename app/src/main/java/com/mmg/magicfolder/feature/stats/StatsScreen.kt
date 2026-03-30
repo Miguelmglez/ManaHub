@@ -25,6 +25,7 @@ import com.mmg.magicfolder.core.domain.model.*
 import com.mmg.magicfolder.core.ui.theme.MagicColors
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
+import com.mmg.magicfolder.core.util.LocaleLanguageProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -285,6 +286,8 @@ private fun MostValuableSection(
     currency:    Currency,
     onCardClick: (String) -> Unit,
 ) {
+    val isUs = remember { LocaleLanguageProvider().get() == "us" }
+
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.stats_most_valuable), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
@@ -310,7 +313,7 @@ private fun MostValuableSection(
                     )
                 },
                 supportingContent = if (card.isFoil) {
-                    { Text(stringResource(R.string.carddetail_price_foil), style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
+                    { Text(stringResource(if (isUs) R.string.carddetail_price_foil_usd else R.string.carddetail_price_foil_eur)  , style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
                 } else null,
             )
             if (index < cards.size - 1) HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
@@ -423,6 +426,5 @@ val MtgColor.displayName get() = when (this) {
     MtgColor.R          -> "Red"
     MtgColor.G          -> "Green"
     MtgColor.COLORLESS  -> "Colorless"
-    MtgColor.MULTICOLOR -> "Multicolor"
     else                -> "Unknown"
 }

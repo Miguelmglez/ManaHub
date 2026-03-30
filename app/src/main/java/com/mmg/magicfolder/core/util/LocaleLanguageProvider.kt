@@ -20,6 +20,11 @@ class LocaleLanguageProvider @Inject constructor() {
         "it" -> "it"
         "ko" -> "ko"
         "ru" -> "ru"
-        else -> "en"
+        else -> getEnglishCountryCode()
+    }
+
+    private fun getEnglishCountryCode(): String = when ((Locale.getDefault().country)) {
+        "GB" -> "gb"
+        else -> "us"
     }
 }

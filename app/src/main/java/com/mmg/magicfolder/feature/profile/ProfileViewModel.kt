@@ -229,7 +229,7 @@ class ProfileViewModel @Inject constructor(
 
     private fun CollectionStats.computeFavouriteColor(): String? =
         byColor
-            .filterKeys { it != MtgColor.COLORLESS && it != MtgColor.MULTICOLOR }
+            .filterKeys { it != MtgColor.COLORLESS }
             .maxByOrNull { it.value }
             ?.key
             ?.name  // "W","U","B","R","G"
@@ -260,8 +260,8 @@ class ProfileViewModel @Inject constructor(
             maxCardValueUsd     = s.collectionStats?.mostValuableCards?.firstOrNull()?.priceUsd ?: 0.0,
             avgWinTurn          = s.avgWinTurn,
             favoriteElimination = s.mostFrequentElimination,
-            distinctColorCount  = byColor.entries.count { (color, count) ->
-                color != MtgColor.COLORLESS && color != MtgColor.MULTICOLOR && count > 0
+            distinctColorCount  = byColor.entries.count { (color) ->
+                color != MtgColor.COLORLESS
             },
         )
     }

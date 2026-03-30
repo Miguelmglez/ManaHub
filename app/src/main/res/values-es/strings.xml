@@ -78,14 +78,14 @@
     <string name="addcard_no_results">No se han encontrado cartas</string>
     <string name="addcard_no_results_subtitle">Prueba a buscar en otro idioma\no revisa la ortografía</string>
     <string name="addcard_scanner_title">Escanear código de barras</string>
-    <string name="addcard_scanner_subtitle">Apunta con la cámara al código de barras\nen el reverso de la carta</string>
+    <string name="addcard_scanner_subtitle">Apunta con la cámara al nombre de la carta</string>
     <string name="addcard_scanner_button">Abrir escáner</string>
-    <string name="addcard_confirm_title">Añadir a la colección</string>
+    <string name="addcard_confirm_title">Añadir</string>
     <string name="addcard_confirm_quantity">Cantidad</string>
     <string name="addcard_confirm_foil">Foil</string>
     <string name="addcard_confirm_condition">Estado</string>
     <string name="addcard_confirm_language">Idioma</string>
-    <string name="addcard_confirm_button">Añadir a la colección</string>
+    <string name="addcard_confirm_button">Añadir</string>
     <string name="addcard_condition_nm">Near Mint</string>
     <string name="addcard_condition_lp">Lightly Played</string>
     <string name="addcard_condition_mp">Moderately Played</string>
@@ -104,7 +104,8 @@
     <string name="carddetail_legality_not_legal">No legal</string>
     <string name="carddetail_price_usd">USD</string>
     <string name="carddetail_price_eur">EUR</string>
-    <string name="carddetail_price_foil">Foil</string>
+    <string name="carddetail_price_foil_eur">Foil EUR</string>
+    <string name="carddetail_price_foil_usd">Foil USD</string>
     <string name="carddetail_view_scryfall">Ver en Scryfall</string>
     <string name="carddetail_tags_section">Etiquetas</string>
     <string name="carddetail_edit_title">Editar carta</string>
@@ -115,8 +116,7 @@
     <string name="carddetail_quantity">%1$d en la colección</string>
     <string name="carddetail_market_prices">Precios de mercado</string>
     <string name="carddetail_in_collection">En tu colección</string>
-    <string name="carddetail_legality">Legalidad</string>
-    <string name="carddetail_price_regular">Normal</string>
+    <string name="carddetail_legality">Legal en</string>
     <string name="carddetail_condition">Estado</string>
     <string name="carddetail_language">Idioma</string>
     <string name="carddetail_quantity_label">Cantidad</string>

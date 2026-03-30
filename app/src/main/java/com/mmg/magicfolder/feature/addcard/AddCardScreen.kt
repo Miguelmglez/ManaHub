@@ -2,12 +2,15 @@ package com.mmg.magicfolder.feature.addcard
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -27,6 +31,7 @@ import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.ui.components.CardRarity
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
@@ -62,7 +67,6 @@ fun AddCardScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -77,7 +81,9 @@ fun AddCardScreen(
                         text = "Add Card",
                         style = ty.titleLarge,
                         color = mc.textPrimary,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -103,8 +109,8 @@ fun AddCardScreen(
                         onClick  = { selectedTab = index },
                         text = {
                             Text(
-                                title,
-                                style = ty.labelMedium,
+                                title.uppercase(),
+                                style = ty.labelLarge,
                                 color = if (selectedTab == index) mc.primaryAccent else mc.textDisabled,
                             )
                         },
@@ -310,7 +316,7 @@ private fun SearchResultItem(card: Card, onClick: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text     = card.name,
+                    text     = card.printedName,
                     style    = ty.bodyMedium,
                     color    = mc.textPrimary,
                     maxLines = 1,
@@ -440,132 +446,201 @@ private fun AddCardConfirmSheet(
     var condition by remember { mutableStateOf("NM") }
     var language  by remember { mutableStateOf("en") }
     var qty       by remember { mutableIntStateOf(1) }
+    val uriHandler = LocalUriHandler.current
+    var showBackFace by remember { mutableStateOf(false) }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
 
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState       = sheetState,
         containerColor   = mc.backgroundSecondary,
     ) {
-        Column(
-            modifier            = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(card.name, style = ty.titleMedium, color = mc.textPrimary)
+        Column(modifier = Modifier.fillMaxHeight(0.85f)) {
+            // Header (Sticky)
             Text(
-                text  = "${card.setName} · ${card.rarity}",
-                style = ty.bodySmall,
-                color = mc.textSecondary,
+                text     = card.name,
+                style    = ty.titleMedium,
+                color    = mc.textPrimary,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp)
             )
-            card.priceUsd?.let {
+
+            // Scrollable Content
+            Column(
+                modifier            = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 Text(
-                    text  = "Market price: $${String.format("%.2f", it)}",
-                    style = ty.bodyMedium,
-                    color = mc.goldMtg,
+                    text  = "${card.setName} · ${card.rarity}",
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
                 )
-            }
-            HorizontalDivider(color = mc.surfaceVariant)
-
-            // Foil toggle
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.addcard_confirm_foil), Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
-                Switch(
-                    checked         = isFoil,
-                    onCheckedChange = { isFoil = it },
-                    colors          = SwitchDefaults.colors(
-                        checkedThumbColor   = mc.background,
-                        checkedTrackColor   = mc.primaryAccent,
-                        uncheckedThumbColor = mc.textDisabled,
-                        uncheckedTrackColor = mc.surfaceVariant,
-                    ),
-                )
-            }
-
-            // Quantity stepper
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.addcard_confirm_quantity), Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
-                IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove), tint = mc.textSecondary)
+                card.priceUsd?.let {
+                    Text(
+                        text  = "Market price: $${String.format("%.2f", it)}",
+                        style = ty.bodyMedium,
+                        color = mc.goldMtg,
+                    )
                 }
-                Text("$qty", style = ty.titleMedium, color = mc.primaryAccent)
-                IconButton(onClick = { qty++ }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add), tint = mc.textSecondary)
-                }
-            }
 
-            // Condition chips
-            Text(stringResource(R.string.addcard_confirm_condition), style = ty.labelLarge, color = mc.textSecondary)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditions.forEach { c ->
-                    FilterChip(
-                        selected = c == condition,
-                        onClick  = { condition = c },
-                        label    = { Text(c, style = ty.labelMedium) },
-                        colors   = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.18f),
-                            selectedLabelColor     = mc.primaryAccent,
-                            containerColor         = mc.surface,
-                            labelColor             = mc.textSecondary,
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.medium)
+                        .then(
+                            if (card.imageBackNormal != null)
+                                Modifier.clickable { showBackFace = !showBackFace }
+                            else Modifier
                         ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled             = true,
-                            selected            = c == condition,
-                            selectedBorderColor = mc.primaryAccent,
-                            borderColor         = mc.surfaceVariant,
+                    contentAlignment  = Alignment.Center,
+                ) {
+                    val imageUrl = if (showBackFace && card.imageBackNormal != null)
+                        card.imageBackNormal else card.imageNormal
+
+                    SubcomposeAsyncImage(
+                        model              = imageUrl,
+                        contentDescription = card.name,
+                        contentScale       = ContentScale.Fit,
+                        loading            = {
+                            CircularProgressIndicator(
+                                color       = mc.primaryAccent,
+                                modifier    = Modifier.size(32.dp),
+                                strokeWidth = 2.dp
+                            )
+                        },
+                        modifier           = Modifier.fillMaxSize(),
+                    )
+
+                    // DFC flip hint
+                    if (card.imageBackNormal != null) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp),
+                            color    = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shape    = MaterialTheme.shapes.small,
+                        ) {
+                            Text(
+                                text     = if (showBackFace) "Tap to see front" else "Tap to flip",
+                                style    = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(color = mc.surfaceVariant)
+
+                // Foil toggle
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.addcard_confirm_foil), Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
+                    Switch(
+                        checked         = isFoil,
+                        onCheckedChange = { isFoil = it },
+                        colors          = SwitchDefaults.colors(
+                            checkedThumbColor   = mc.background,
+                            checkedTrackColor   = mc.primaryAccent,
+                            uncheckedThumbColor = mc.textDisabled,
+                            uncheckedTrackColor = mc.surfaceVariant,
                         ),
                     )
                 }
-            }
 
-            // Language dropdown
-            var expanded by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                OutlinedTextField(
-                    value         = language.uppercase(),
-                    onValueChange = {},
-                    readOnly      = true,
-                    label         = { Text(stringResource(R.string.addcard_confirm_language), style = ty.labelMedium, color = mc.textSecondary) },
-                    trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                    modifier      = Modifier.menuAnchor().fillMaxWidth(),
-                    textStyle     = ty.bodyMedium,
-                    colors        = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor     = mc.textPrimary,
-                        unfocusedTextColor   = mc.textPrimary,
-                        focusedBorderColor   = mc.primaryAccent,
-                        unfocusedBorderColor = mc.surfaceVariant,
-                    ),
-                )
-                ExposedDropdownMenu(
-                    expanded         = expanded,
-                    onDismissRequest = { expanded = false },
-                    containerColor   = mc.surface,
-                ) {
-                    languages.forEach { lang ->
-                        DropdownMenuItem(
-                            text    = { Text(lang.uppercase(), style = ty.bodyMedium, color = mc.textPrimary) },
-                            onClick = { language = lang; expanded = false },
+                // Quantity stepper
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.addcard_confirm_quantity), Modifier.weight(1f), style = ty.bodyMedium, color = mc.textPrimary)
+                    IconButton(onClick = { if (qty > 1) qty-- }) {
+                        Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove), tint = mc.textSecondary)
+                    }
+                    Text("$qty", style = ty.titleMedium, color = mc.primaryAccent)
+                    IconButton(onClick = { qty++ }) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add), tint = mc.textSecondary)
+                    }
+                }
+
+                // Condition chips
+                Text(stringResource(R.string.addcard_confirm_condition), style = ty.labelLarge, color = mc.textSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    conditions.forEach { c ->
+                        FilterChip(
+                            selected = c == condition,
+                            onClick  = { condition = c },
+                            label    = { Text(c, style = ty.labelMedium) },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = mc.primaryAccent.copy(alpha = 0.18f),
+                                selectedLabelColor     = mc.primaryAccent,
+                                containerColor         = mc.surface,
+                                labelColor             = mc.textSecondary,
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled             = true,
+                                selected            = c == condition,
+                                selectedBorderColor = mc.primaryAccent,
+                                borderColor         = mc.surfaceVariant,
+                            ),
                         )
                     }
                 }
-            }
 
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.action_cancel), style = ty.labelLarge, color = mc.textSecondary)
+                // Language dropdown
+                var expanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                    OutlinedTextField(
+                        value         = language.uppercase(),
+                        onValueChange = {},
+                        readOnly      = true,
+                        label         = { Text(stringResource(R.string.addcard_confirm_language), style = ty.labelLarge, color = mc.textSecondary) },
+                        trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier      = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        textStyle     = ty.bodyMedium,
+                        colors        = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor     = mc.textPrimary,
+                            unfocusedTextColor   = mc.textPrimary,
+                            focusedBorderColor   = mc.primaryAccent,
+                            unfocusedBorderColor = mc.surfaceVariant,
+                        ),
+                    )
+                    ExposedDropdownMenu(
+                        expanded         = expanded,
+                        onDismissRequest = { expanded = false },
+                        containerColor   = mc.surface,
+                    ) {
+                        languages.forEach { lang ->
+                            DropdownMenuItem(
+                                text    = { Text(lang.uppercase(), style = ty.bodyMedium, color = mc.textPrimary) },
+                                onClick = { language = lang; expanded = false },
+                            )
+                        }
+                    }
                 }
-                Button(
-                    onClick = { onConfirm(isFoil, condition, language, qty) },
-                    colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                    shape   = RoundedCornerShape(8.dp),
+
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(stringResource(R.string.addcard_confirm_button), style = ty.labelLarge, color = mc.background)
+                    TextButton(onClick = onDismiss,
+                        modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.action_cancel), style = ty.labelLarge, color = mc.textSecondary)
+                    }
+                    Button(
+                        onClick = { onConfirm(isFoil, condition, language, qty) },
+                        colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                        shape   = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.addcard_confirm_button), style = ty.labelLarge, color = mc.background)
+                    }
                 }
+                Spacer(Modifier.height(16.dp))
             }
-            Spacer(Modifier.height(16.dp))
         }
     }
 }

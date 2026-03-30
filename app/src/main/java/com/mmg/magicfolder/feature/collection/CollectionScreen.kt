@@ -26,10 +26,10 @@ import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.ui.components.StaleWarningBanner
 import com.mmg.magicfolder.core.ui.theme.MagicColors
-import com.mmg.magicfolder.core.ui.theme.MagicTheme
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.decks.DeckListScreen
+import java.util.Locale
 
 // ── Sub-tab index constants ───────────────────────────────────────────────────
 private const val TAB_CARDS = 0
@@ -104,8 +104,8 @@ private fun CollectionContent(
                     onClick  = { selectedTab = TAB_CARDS },
                     text     = {
                         Text(
-                            text  = stringResource(R.string.collection_tab_cards),
-                            style = MaterialTheme.magicTypography.labelSmall,
+                            text  = stringResource(R.string.collection_tab_cards).uppercase(Locale.getDefault()),
+                            style = MaterialTheme.magicTypography.labelLarge,
                         )
                     },
                 )
@@ -114,8 +114,8 @@ private fun CollectionContent(
                     onClick  = { selectedTab = TAB_DECKS },
                     text     = {
                         Text(
-                            text  = stringResource(R.string.collection_tab_decks),
-                            style = MaterialTheme.magicTypography.labelSmall,
+                            text  = stringResource(R.string.collection_tab_decks).uppercase(Locale.getDefault()),
+                            style = MaterialTheme.magicTypography.labelLarge,
                         )
                     },
                 )
