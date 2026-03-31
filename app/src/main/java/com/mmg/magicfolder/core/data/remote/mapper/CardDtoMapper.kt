@@ -4,7 +4,6 @@ import com.mmg.magicfolder.core.data.local.entity.CardEntity
 import com.mmg.magicfolder.core.data.remote.dto.CardDto
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.data.local.mapper.toEntityCard
-import com.mmg.magicfolder.core.data.local.mapper.toTagsJson
 
 fun CardDto.toDomain(): Card {
     val front = cardFaces?.firstOrNull()
@@ -47,8 +46,8 @@ fun CardDto.toDomain(): Card {
         isStale = false,
         staleReason = null,
         cachedAt = System.currentTimeMillis(),
-        printedName = printedName,
-        printedText = printedText,
+        printedName = printedName?:"",
+        printedText = printedText?:"",
         printedTypeLine = printedTypeLine?:""
     )
 }

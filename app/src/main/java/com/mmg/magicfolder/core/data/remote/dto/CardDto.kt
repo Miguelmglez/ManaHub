@@ -5,7 +5,7 @@ import com.google.gson.annotations.SerializedName
 data class CardDto(
     @SerializedName("id")               val id:              String,
     @SerializedName("name")             val name:            String,
-    @SerializedName("printed_name")     val printedName:            String,
+    @SerializedName("printed_name")     val printedName:     String?,
     @SerializedName("lang")             val lang:            String,
     @SerializedName("mana_cost")        val manaCost:        String?,
     @SerializedName("cmc")              val cmc:             Double,

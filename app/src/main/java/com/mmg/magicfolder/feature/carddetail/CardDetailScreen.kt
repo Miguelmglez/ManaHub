@@ -210,7 +210,7 @@ private fun CardDetailContent(
             card.manaCost?.let {
                 ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
-            Text(card.printedTypeLine, style = MaterialTheme.typography.bodyMedium,
+            Text(card.printedTypeLine?:card.typeLine, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 

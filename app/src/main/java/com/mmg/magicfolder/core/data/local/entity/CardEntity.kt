@@ -10,16 +10,16 @@ data class CardEntity(
     val scryfallId: String,
 
     @ColumnInfo(name = "name")           val name:           String,
-    @ColumnInfo(name = "printed_name")   val printedName:    String,
+    @ColumnInfo(name = "printed_name")   val printedName:    String?,
     @ColumnInfo(name = "lang")           val lang:           String,
     @ColumnInfo(name = "mana_cost")      val manaCost:       String?,
     @ColumnInfo(name = "cmc")            val cmc:            Double,
     @ColumnInfo(name = "colors")         val colors:         String,  // JSON: ["W","U"]
     @ColumnInfo(name = "color_identity") val colorIdentity:  String,  // JSON: ["W","U"]
     @ColumnInfo(name = "type_line")      val typeLine:       String,
-    @ColumnInfo(name = "printed_type_line")val printedTypeLine:       String,
+    @ColumnInfo(name = "printed_type_line")val printedTypeLine:String?,
     @ColumnInfo(name = "oracle_text")    val oracleText:     String?,
-    @ColumnInfo(name = "printed_text")   val printedText:     String?,
+    @ColumnInfo(name = "printed_text")   val printedText:    String?,
     @ColumnInfo(name = "keywords")       val keywords:       String,  // JSON list
     @ColumnInfo(name = "power")          val power:          String?,
     @ColumnInfo(name = "toughness")      val toughness:      String?,
