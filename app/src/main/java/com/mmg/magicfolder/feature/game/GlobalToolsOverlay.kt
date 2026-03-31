@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mmg.magicfolder.core.ui.theme.CinzelFontFamily
+import com.mmg.magicfolder.core.ui.theme.MarcellusFontFamily
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
@@ -84,7 +84,7 @@ fun GlobalToolsOverlay(
                 text       = buttonLabel,
                 fontSize   = 13.sp,
                 color      = mc.primaryAccent,
-                fontFamily = CinzelFontFamily,
+                fontFamily = MarcellusFontFamily,
                 fontWeight = FontWeight.Bold,
             )
         }

@@ -67,22 +67,11 @@ class CollectionViewModel @Inject constructor(
                 if (current.contains(ColorFilter.COLORLESS)) current.remove(ColorFilter.COLORLESS)
                 else { current.clear(); current.add(ColorFilter.COLORLESS) }
             }
-            ColorFilter.MULTICOLOR -> {
-                if (current.contains(ColorFilter.MULTICOLOR)) current.remove(ColorFilter.MULTICOLOR)
-                else {
-                    current.removeAll(setOf(
-                        ColorFilter.W, ColorFilter.U, ColorFilter.B,
-                        ColorFilter.R, ColorFilter.G, ColorFilter.COLORLESS,
-                    ))
-                    current.add(ColorFilter.MULTICOLOR)
-                }
-            }
             else -> {
                 // WUBRG — multi-selectable, exclusive with COLORLESS and MULTICOLOR
                 if (current.contains(filter)) current.remove(filter)
                 else {
                     current.remove(ColorFilter.COLORLESS)
-                    current.remove(ColorFilter.MULTICOLOR)
                     current.add(filter)
                 }
             }
@@ -131,7 +120,6 @@ class CollectionViewModel @Inject constructor(
                 val colors = item.card.colorIdentity
                 when {
                     filters.contains(ColorFilter.COLORLESS)  -> colors.isEmpty()
-                    filters.contains(ColorFilter.MULTICOLOR) -> colors.size >= 2
                     else -> {
                         // AND logic: card must contain ALL selected WUBRG colors
                         val selectedColors = filters.map { it.name }.toSet()

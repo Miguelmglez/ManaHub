@@ -13,6 +13,6 @@ data class CollectionUiState(
     val hasStaleCards: Boolean                = false,
 )
 
-enum class ColorFilter { ALL, W, U, B, R, G, COLORLESS, MULTICOLOR }
+enum class ColorFilter { ALL, W, U, B, R, G, COLORLESS }
 enum class SortOrder   { DATE_ADDED, NAME, PRICE_DESC, PRICE_ASC, RARITY }
 enum class ViewMode    { GRID, LIST }

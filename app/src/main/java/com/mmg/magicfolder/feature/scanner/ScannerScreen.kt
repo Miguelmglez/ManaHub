@@ -329,6 +329,13 @@ private fun AddCardConfirmSheet(
                     color = MaterialTheme.colorScheme.tertiary,
                 )
             }
+            card.priceEur?.let {
+                Text(
+                    text  = "Market price: ${String.format("%.2f", it)}€",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             HorizontalDivider()
 
             Row(verticalAlignment = Alignment.CenterVertically) {

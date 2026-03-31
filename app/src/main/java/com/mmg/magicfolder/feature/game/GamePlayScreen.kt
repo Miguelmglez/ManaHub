@@ -29,7 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import com.mmg.magicfolder.core.ui.components.FloatingDelta
 import com.mmg.magicfolder.core.ui.theme.ThemeBackground
-import com.mmg.magicfolder.core.ui.theme.CinzelFontFamily
+import com.mmg.magicfolder.core.ui.theme.MarcellusFontFamily
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.core.ui.theme.coloredShadow
 import com.mmg.magicfolder.core.ui.theme.magicColors
@@ -731,7 +731,7 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
                 fontSize      = 24.sp,
                 fontWeight    = FontWeight.Black,
                 letterSpacing = 6.sp,
-                fontFamily    = CinzelFontFamily,
+                fontFamily    = MarcellusFontFamily,
                 textAlign     = TextAlign.Center,
             )
             if (reason != null) {
@@ -776,7 +776,7 @@ private fun WinnerOverlay(
                 fontSize      = 32.sp,
                 fontWeight    = FontWeight.Black,
                 letterSpacing = 2.sp,
-                fontFamily    = CinzelFontFamily,
+                fontFamily    = MarcellusFontFamily,
                 textAlign     = TextAlign.Center,
             )
             Text(
@@ -785,7 +785,7 @@ private fun WinnerOverlay(
                 fontSize      = 20.sp,
                 fontWeight    = FontWeight.Bold,
                 letterSpacing = 6.sp,
-                fontFamily    = CinzelFontFamily,
+                fontFamily    = MarcellusFontFamily,
                 textAlign     = TextAlign.Center,
             )
             Text(

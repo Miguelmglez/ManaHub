@@ -41,6 +41,7 @@ fun DeckBuilderScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val mc    = MaterialTheme.magicColors
+    val ty    = MaterialTheme.magicTypography
 
     // Navigate away once deck is saved
     if (state.savedDeckId != null) {
@@ -50,36 +51,42 @@ fun DeckBuilderScreen(
     Scaffold(
         containerColor = mc.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        when (state.step) {
-                            DeckBuilderStep.SETUP    -> "New Deck"
-                            DeckBuilderStep.BUILDING -> "${state.mainboardCount} / ${state.targetSize}"
-                            DeckBuilderStep.REVIEW   -> "Review Deck"
-                        },
-                        style = MaterialTheme.magicTypography.titleLarge,
-                        color = mc.textPrimary,
-                    )
-                },
-                navigationIcon = {
+            Surface(
+                color = mc.backgroundSecondary,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconButton(onClick = {
                         if (state.step == DeckBuilderStep.SETUP) onBack()
                         else viewModel.goBack()
                     }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textSecondary)
                     }
-                },
-                actions = {
+                    Text(
+                        text = when (state.step) {
+                            DeckBuilderStep.SETUP    -> "New Deck"
+                            DeckBuilderStep.BUILDING -> "${state.mainboardCount} / ${state.targetSize}"
+                            DeckBuilderStep.REVIEW   -> "Review Deck"
+                        },
+                        style = ty.titleLarge,
+                        color = mc.textPrimary,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     if (state.step == DeckBuilderStep.BUILDING && state.mainboardCount > 0) {
                         TextButton(onClick = viewModel::goToReview) {
                             Text(stringResource(R.string.deckbuilder_step_review), color = mc.primaryAccent,
-                                style = MaterialTheme.magicTypography.labelLarge)
+                                style = ty.labelLarge)
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
+                }
+            }
         },
     ) { padding ->
         when (state.step) {

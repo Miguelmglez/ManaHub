@@ -290,5 +290,4 @@ val ColorFilter.displayName get() = when (this) {
     ColorFilter.R          -> "Red"
     ColorFilter.G          -> "Green"
     ColorFilter.COLORLESS  -> "Colorless"
-    ColorFilter.MULTICOLOR -> "Multi"
 }

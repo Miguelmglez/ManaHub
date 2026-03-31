@@ -4,7 +4,6 @@ package com.mmg.magicfolder.feature.carddetail
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,6 +16,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import com.mmg.magicfolder.R
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,14 +41,26 @@ fun CardDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(uiState.card?.name ?: "") },
-                navigationIcon = {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
-                },
-                actions = {
+                    Text(
+                        text = uiState.card?.name ?: "",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     uiState.userCard?.let {
                         IconButton(onClick = viewModel::onShowEditDialog) {
                             Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit))
@@ -58,8 +70,8 @@ fun CardDetailScreen(
                                 tint = MaterialTheme.colorScheme.error)
                         }
                     }
-                },
-            )
+                }
+            }
         },
     ) { padding ->
         when {
@@ -198,7 +210,7 @@ private fun CardDetailContent(
             card.manaCost?.let {
                 ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
-            Text(card.typeLine, style = MaterialTheme.typography.bodyMedium,
+            Text(card.printedTypeLine?:card.typeLine, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
@@ -208,7 +220,7 @@ private fun CardDetailContent(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         ) {
-            card.oracleText?.let {
+            card.printedText?.let {
                 Text(
                     text     = it,
                     style    = MaterialTheme.typography.bodyMedium,
@@ -263,8 +275,7 @@ private fun CardDetailContent(
 
         // Scryfall link
         TextButton(onClick = { uriHandler.openUri(card.scryfallUri) }) {
-            Icon(Icons.Default.OpenInBrowser, contentDescription = null,
-                modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.carddetail_view_scryfall))
         }
@@ -276,9 +287,10 @@ private fun PriceSection(card: Card, userCard: UserCard?) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.carddetail_market_prices), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            PricePill(label = stringResource(R.string.carddetail_price_regular), price = card.priceUsd, currency = "$")
-            PricePill(label = stringResource(R.string.carddetail_price_foil),    price = card.priceUsdFoil, currency = "$")
-            PricePill(label = stringResource(R.string.carddetail_price_eur),     price = card.priceEur, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_foil_eur),price = card.priceEurFoil, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_foil_usd),price = card.priceUsdFoil, currency = "$")
+            PricePill(label = stringResource(R.string.carddetail_price_eur),price = card.priceEur, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_usd), price = card.priceUsd, currency = "$")
         }
     }
 }

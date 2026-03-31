@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.magicfolder.core.ui.theme.ManaFontFamily
-import com.mmg.magicfolder.core.ui.theme.RajdhaniFontFamily
+import com.mmg.magicfolder.core.ui.theme.MulishFontFamily
 
 // ── Unicode glyphs from the Mana font ─────────────────────────────────────────
 // Reference: https://andrewgioia.github.io/mana/cheatsheet.html
@@ -155,7 +155,7 @@ private fun ManaSymbolSingle(symbol: String, size: Dp) {
         ) {
             Text(
                 text = symbol,
-                fontFamily = RajdhaniFontFamily,
+                fontFamily = MulishFontFamily,
                 fontSize = (size.value * 0.5f).sp,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,

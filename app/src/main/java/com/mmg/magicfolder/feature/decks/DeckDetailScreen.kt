@@ -35,35 +35,21 @@ fun DeckDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
 
     Scaffold(
         containerColor = mc.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text  = uiState.deck?.name ?: "Deck",
-                            style = MaterialTheme.magicTypography.titleMedium,
-                            color = mc.textPrimary,
-                        )
-                        uiState.deck?.format?.let { fmt ->
-                            Surface(
-                                shape    = RoundedCornerShape(4.dp),
-                                color    = mc.goldMtg.copy(alpha = 0.15f),
-                                modifier = Modifier.padding(top = 2.dp),
-                            ) {
-                                Text(
-                                    text     = fmt.uppercase(),
-                                    style    = MaterialTheme.magicTypography.labelSmall,
-                                    color    = mc.goldMtg,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                )
-                            }
-                        }
-                    }
-                },
-                navigationIcon = {
+            Surface(
+                color = mc.backgroundSecondary,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector        = Icons.Default.ArrowBack,
@@ -71,9 +57,32 @@ fun DeckDetailScreen(
                             tint               = mc.textSecondary,
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
+                    Column(
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text  = uiState.deck?.name ?: "Deck",
+                            style = ty.titleMedium,
+                            color = mc.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        uiState.deck?.format?.let { fmt ->
+                            Surface(
+                                shape    = RoundedCornerShape(4.dp),
+                                color    = mc.goldMtg.copy(alpha = 0.15f),
+                            ) {
+                                Text(
+                                    text     = fmt.uppercase(),
+                                    style    = ty.labelSmall,
+                                    color    = mc.goldMtg,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         },
     ) { padding ->
         when {
@@ -90,7 +99,7 @@ fun DeckDetailScreen(
             ) {
                 Text(
                     text  = "Este mazo está vacío",
-                    style = MaterialTheme.magicTypography.titleMedium,
+                    style = ty.titleMedium,
                     color = mc.textSecondary,
                 )
             }
@@ -161,6 +170,7 @@ private fun DeckSummaryCard(
     maxInCurve: Int,
 ) {
     val mc          = MaterialTheme.magicColors
+    val ty          = MaterialTheme.magicTypography
     val isCommander = deck.format.lowercase() == "commander"
     val targetCount = if (isCommander) 100 else 60
 
@@ -176,12 +186,12 @@ private fun DeckSummaryCard(
             ) {
                 Text(
                     text  = "Total Cards",
-                    style = MaterialTheme.magicTypography.labelMedium,
+                    style = ty.labelMedium,
                     color = mc.textSecondary,
                 )
                 Text(
                     text  = "$totalCards / $targetCount",
-                    style = MaterialTheme.magicTypography.titleMedium,
+                    style = ty.titleMedium,
                     color = if (totalCards >= targetCount) mc.lifePositive else mc.textPrimary,
                 )
             }
@@ -196,7 +206,7 @@ private fun DeckSummaryCard(
             if (manaCurve.isNotEmpty()) {
                 Text(
                     text  = "MANA CURVE",
-                    style = MaterialTheme.magicTypography.labelSmall,
+                    style = ty.labelSmall,
                     color = mc.textSecondary,
                 )
                 ManaCurveBar(manaCurve = manaCurve, maxInCurve = maxInCurve)
@@ -208,6 +218,7 @@ private fun DeckSummaryCard(
 @Composable
 private fun ManaCurveBar(manaCurve: Map<Int, Int>, maxInCurve: Int) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Row(
         modifier              = Modifier.fillMaxWidth().height(56.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -232,7 +243,7 @@ private fun ManaCurveBar(manaCurve: Map<Int, Int>, maxInCurve: Int) {
                 }
                 Text(
                     text  = if (cmc == 7) "7+" else cmc.toString(),
-                    style = MaterialTheme.magicTypography.labelSmall,
+                    style = ty.labelSmall,
                     color = mc.textDisabled,
                 )
             }
@@ -247,6 +258,7 @@ private fun ManaCurveBar(manaCurve: Map<Int, Int>, maxInCurve: Int) {
 @Composable
 private fun TypeGroupHeader(typeName: String, count: Int) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Row(
         modifier              = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -254,12 +266,12 @@ private fun TypeGroupHeader(typeName: String, count: Int) {
     ) {
         Text(
             text  = typeName,
-            style = MaterialTheme.magicTypography.titleMedium,
+            style = ty.titleMedium,
             color = mc.goldMtg,
         )
         Text(
             text  = "($count)",
-            style = MaterialTheme.magicTypography.bodyMedium,
+            style = ty.bodyMedium,
             color = mc.textSecondary,
         )
     }
@@ -275,6 +287,7 @@ private fun CardRow(
     onRemove: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
         Row(
             modifier              = Modifier.fillMaxWidth().padding(8.dp),
@@ -294,7 +307,7 @@ private fun CardRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text     = deckCard.card?.name ?: deckCard.scryfallId,
-                    style    = MaterialTheme.magicTypography.bodyMedium,
+                    style    = ty.bodyMedium,
                     color    = mc.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -302,7 +315,7 @@ private fun CardRow(
                 deckCard.card?.typeLine?.let { type ->
                     Text(
                         text     = type,
-                        style    = MaterialTheme.magicTypography.bodySmall,
+                        style    = ty.bodySmall,
                         color    = mc.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -311,7 +324,7 @@ private fun CardRow(
                 deckCard.card?.manaCost?.let { cost ->
                     Text(
                         text  = cost,
-                        style = MaterialTheme.magicTypography.labelSmall,
+                        style = ty.labelSmall,
                         color = mc.textSecondary,
                     )
                 }
@@ -324,7 +337,7 @@ private fun CardRow(
                 ) {
                     Text(
                         text     = "\u00d7${deckCard.quantity}",
-                        style    = MaterialTheme.magicTypography.labelMedium,
+                        style    = ty.labelMedium,
                         color    = mc.primaryAccent,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
