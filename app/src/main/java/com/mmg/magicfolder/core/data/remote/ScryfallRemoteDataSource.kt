@@ -36,6 +36,11 @@ class ScryfallRemoteDataSource @Inject constructor(
         }
     }
 
+    suspend fun searchWithRawQuery(query: String): List<Card> =
+        safeCall {
+            requestQueue.execute { api.searchCards(query, page = 1) }.data.toDomain()
+        }.getOrDefault(emptyList())
+
     suspend fun getCardsBatch(scryfallIds: List<String>): Result<List<Card>> =
         safeCall {
             val allCards = mutableListOf<CardDto>()

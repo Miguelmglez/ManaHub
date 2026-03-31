@@ -4,22 +4,26 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mmg.magicfolder.feature.addcard.AdvancedSearchSheet
 import com.mmg.magicfolder.core.ui.components.CardGridItem
 import com.mmg.magicfolder.core.ui.components.CardListItem
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
@@ -44,35 +48,48 @@ fun CollectionScreen(
     viewModel:         CollectionViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+    var showAdvancedSearch by remember { mutableStateOf(false) }
+
     CollectionContent(
-        uiState             = uiState,
-        onCardClick         = onCardClick,
-        onScannerClick      = onScannerClick,
-        onDeckClick         = onDeckClick,
-        onCreateDeckClick   = onCreateDeckClick,
-        onViewModeToggle    = viewModel::onViewModeToggle,
-        onSortChange        = viewModel::onSortChange,
-        onSearchQueryChange = viewModel::onSearchQueryChange,
-        onToggleFilter      = viewModel::toggleColorFilter,
-        onDeleteCard        = viewModel::onDeleteCard,
-        onErrorDismissed    = viewModel::onErrorDismissed,
+        uiState               = uiState,
+        onCardClick           = onCardClick,
+        onScannerClick        = onScannerClick,
+        onDeckClick           = onDeckClick,
+        onCreateDeckClick     = onCreateDeckClick,
+        onViewModeToggle      = viewModel::onViewModeToggle,
+        onSortChange          = viewModel::onSortChange,
+        onSearchQueryChange   = viewModel::onSearchQueryChange,
+        onToggleFilter        = viewModel::toggleColorFilter,
+        onDeleteCard          = viewModel::onDeleteCard,
+        onErrorDismissed      = viewModel::onErrorDismissed,
+        onShowAdvancedSearch  = { showAdvancedSearch = true },
     )
+
+    if (showAdvancedSearch) {
+        AdvancedSearchSheet(
+            onDismiss = { showAdvancedSearch = false },
+            onSearch = { advancedQuery, _ ->
+                viewModel.applyAdvancedFilters(advancedQuery)
+                showAdvancedSearch = false
+            },
+        )
+    }
 }
 
 @Composable
 private fun CollectionContent(
-    uiState:             CollectionUiState,
-    onCardClick:         (String) -> Unit,
-    onScannerClick:      () -> Unit,
-    onDeckClick:         (Long) -> Unit,
-    onCreateDeckClick:   () -> Unit,
-    onViewModeToggle:    () -> Unit,
-    onSortChange:        (SortOrder) -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onToggleFilter:      (ColorFilter) -> Unit,
-    onDeleteCard:        (Long) -> Unit,
-    onErrorDismissed:    () -> Unit,
+    uiState:              CollectionUiState,
+    onCardClick:          (String) -> Unit,
+    onScannerClick:       () -> Unit,
+    onDeckClick:          (Long) -> Unit,
+    onCreateDeckClick:    () -> Unit,
+    onViewModeToggle:     () -> Unit,
+    onSortChange:         (SortOrder) -> Unit,
+    onSearchQueryChange:  (String) -> Unit,
+    onToggleFilter:       (ColorFilter) -> Unit,
+    onDeleteCard:         (Long) -> Unit,
+    onErrorDismissed:     () -> Unit,
+    onShowAdvancedSearch: () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(TAB_CARDS) }
     val mc = MaterialTheme.magicColors
@@ -124,12 +141,13 @@ private fun CollectionContent(
             // ── Tab content ───────────────────────────────────────────────────
             when (selectedTab) {
                 TAB_CARDS -> CardsTabContent(
-                    uiState             = uiState,
-                    onCardClick         = onCardClick,
-                    onScannerClick      = onScannerClick,
-                    onSearchQueryChange = onSearchQueryChange,
-                    onToggleFilter      = onToggleFilter,
-                    onDeleteCard        = onDeleteCard,
+                    uiState               = uiState,
+                    onCardClick           = onCardClick,
+                    onScannerClick        = onScannerClick,
+                    onSearchQueryChange   = onSearchQueryChange,
+                    onToggleFilter        = onToggleFilter,
+                    onDeleteCard          = onDeleteCard,
+                    onShowAdvancedSearch  = onShowAdvancedSearch,
                 )
                 TAB_DECKS -> DeckListScreen(
                     onDeckClick       = onDeckClick,
@@ -151,12 +169,13 @@ private fun CollectionContent(
 
 @Composable
 private fun CardsTabContent(
-    uiState:             CollectionUiState,
-    onCardClick:         (String) -> Unit,
-    onScannerClick:      () -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onToggleFilter:      (ColorFilter) -> Unit,
-    onDeleteCard:        (Long) -> Unit,
+    uiState:              CollectionUiState,
+    onCardClick:          (String) -> Unit,
+    onScannerClick:       () -> Unit,
+    onSearchQueryChange:  (String) -> Unit,
+    onToggleFilter:       (ColorFilter) -> Unit,
+    onDeleteCard:         (Long) -> Unit,
+    onShowAdvancedSearch: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     Column(modifier = Modifier.fillMaxSize()) {
@@ -165,12 +184,33 @@ private fun CardsTabContent(
             StaleWarningBanner()
         }
 
-        // Search bar
-        SearchBar(
-            query         = uiState.searchQuery,
-            onQueryChange = onSearchQueryChange,
-            modifier      = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+        // Search bar + advanced search button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SearchBar(
+                query         = uiState.searchQuery,
+                onQueryChange = onSearchQueryChange,
+                modifier      = Modifier.weight(1f),
+            )
+            IconButton(
+                onClick = onShowAdvancedSearch,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(mc.primaryAccent.copy(alpha = 0.1f)),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = stringResource(R.string.advsearch_button),
+                    tint = mc.primaryAccent,
+                )
+            }
+        }
 
         // Color filter chips
         ColorFilterRow(

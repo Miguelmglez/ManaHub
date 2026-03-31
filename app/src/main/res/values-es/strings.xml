@@ -500,4 +500,35 @@
     <string name="error_card_not_found">Carta no encontrada</string>
     <string name="error_save_failed">No se pudo guardar. Inténtalo de nuevo.</string>
     <string name="error_unknown">Ha ocurrido un error inesperado</string>
+
+    <!-- BÚSQUEDA AVANZADA -->
+    <string name="advsearch_title">Búsqueda avanzada</string>
+    <string name="advsearch_button">Búsqueda avanzada</string>
+    <string name="advsearch_clear">Limpiar todo</string>
+    <string name="advsearch_search_button">Buscar cartas →</string>
+    <string name="advsearch_query_preview">Consulta generada</string>
+    <string name="advsearch_section_name">Nombre de la carta</string>
+    <string name="advsearch_name_hint">ej. Rayo</string>
+    <string name="advsearch_name_exact">Solo nombre exacto</string>
+    <string name="advsearch_section_oracle">Texto de reglas contiene</string>
+    <string name="advsearch_oracle_hint">ej. volar, roba una carta…</string>
+    <string name="advsearch_section_type">Tipo de carta</string>
+    <string name="advsearch_type_hint">ej. Criatura Legendaria Elfo</string>
+    <string name="advsearch_section_colors">Colores</string>
+    <string name="advsearch_colors_exact">Exactamente estos colores</string>
+    <string name="advsearch_section_mana">Valor de maná (CMC)</string>
+    <string name="advsearch_section_rarity">Rareza</string>
+    <string name="advsearch_section_stats">Fuerza / Resistencia</string>
+    <string name="advsearch_power">Fuerza</string>
+    <string name="advsearch_toughness">Resistencia</string>
+    <string name="advsearch_section_price">Precio máximo</string>
+    <string name="advsearch_section_format">Legalidad en formato</string>
+    <string name="advsearch_format_legal">Mostrar cartas:</string>
+    <string name="advsearch_format_is_legal">Legales</string>
+    <string name="advsearch_format_is_banned">No legales</string>
+    <string name="advsearch_section_keyword">Palabras clave</string>
+    <string name="advsearch_keyword_hint">ej. Vuelo, Prisa…</string>
+    <string name="advsearch_section_sort">Ordenar resultados</string>
+    <string name="advsearch_no_results">No se encontraron cartas</string>
+    <string name="advsearch_no_criteria">Añade al menos un criterio</string>
 </resources>

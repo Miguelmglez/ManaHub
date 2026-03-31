@@ -527,6 +527,39 @@
     <string name="sideboard_rec_reason_mana">You had mana issues.</string>
 
     <!-- ══════════════════════════════════════════
+         ADVANCED SEARCH
+    ═══════════════════════════════════════════ -->
+    <string name="advsearch_title">Advanced Search</string>
+    <string name="advsearch_button">Advanced search</string>
+    <string name="advsearch_clear">Clear all</string>
+    <string name="advsearch_search_button">Search cards →</string>
+    <string name="advsearch_query_preview">Built query</string>
+    <string name="advsearch_section_name">Card name</string>
+    <string name="advsearch_name_hint">e.g. Lightning Bolt</string>
+    <string name="advsearch_name_exact">Exact name only</string>
+    <string name="advsearch_section_oracle">Rules text contains</string>
+    <string name="advsearch_oracle_hint">e.g. flying, draw a card…</string>
+    <string name="advsearch_section_type">Card type</string>
+    <string name="advsearch_type_hint">e.g. Legendary Creature Elf</string>
+    <string name="advsearch_section_colors">Colors</string>
+    <string name="advsearch_colors_exact">Exactly these colors</string>
+    <string name="advsearch_section_mana">Mana value (CMC)</string>
+    <string name="advsearch_section_rarity">Rarity</string>
+    <string name="advsearch_section_stats">Power / Toughness</string>
+    <string name="advsearch_power">Power</string>
+    <string name="advsearch_toughness">Toughness</string>
+    <string name="advsearch_section_price">Max price</string>
+    <string name="advsearch_section_format">Format legality</string>
+    <string name="advsearch_format_legal">Show cards:</string>
+    <string name="advsearch_format_is_legal">Legal</string>
+    <string name="advsearch_format_is_banned">Not legal</string>
+    <string name="advsearch_section_keyword">Keywords</string>
+    <string name="advsearch_keyword_hint">e.g. Flying, Haste…</string>
+    <string name="advsearch_section_sort">Sort results</string>
+    <string name="advsearch_no_results">No cards found for this search</string>
+    <string name="advsearch_no_criteria">Add at least one criterion to search</string>
+
+    <!-- ══════════════════════════════════════════
          ERRORS Y MENSAJES GENÉRICOS
     ═══════════════════════════════════════════ -->
     <string name="error_network">Connection error. Check your internet.</string>

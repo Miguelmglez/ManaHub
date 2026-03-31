@@ -89,6 +89,22 @@ class AddCardViewModel @Inject constructor(
         _uiState.update { it.copy(showConfirmSheet = false, selectedCard = null) }
     }
 
+    /** Direct search with a raw Scryfall query (bypasses debounce and lang appending). */
+    fun onAdvancedQuerySearch(rawQuery: String) {
+        if (rawQuery.isBlank()) return
+        _uiState.update { it.copy(query = rawQuery, isSearching = true) }
+        viewModelScope.launch {
+            when (val result = searchCards(rawQuery)) {
+                is DataResult.Success -> _uiState.update {
+                    it.copy(results = result.data, isSearching = false, error = null)
+                }
+                is DataResult.Error -> _uiState.update {
+                    it.copy(error = result.message, isSearching = false)
+                }
+            }
+        }
+    }
+
     fun onErrorDismissed()   = _uiState.update { it.copy(error = null) }
     fun onSuccessDismissed() = _uiState.update { it.copy(addedSuccessfully = false) }
 }

@@ -55,7 +55,10 @@ fun AddCardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Search", "Scanner")
+    val tabs = listOf(
+        stringResource(R.string.addcard_tab_search),
+        stringResource(R.string.addcard_tab_scanner),
+    )
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
@@ -78,7 +81,7 @@ fun AddCardScreen(
                         )
                     }
                     Text(
-                        text = "Add Card",
+                        text = stringResource(R.string.addcard_title),
                         style = ty.titleLarge,
                         color = mc.textPrimary,
                         modifier = Modifier
@@ -119,14 +122,27 @@ fun AddCardScreen(
             }
 
             // ── Tab content ───────────────────────────────────────────────────
+            var showAdvancedSearch by remember { mutableStateOf(false) }
+
             when (selectedTab) {
                 0 -> SearchTab(
                     uiState = uiState,
                     onQueryChange = viewModel::onQueryChange,
                     onCardSelected = viewModel::onCardSelected,
+                    onAdvancedSearch = { showAdvancedSearch = true },
                 )
 
                 1 -> ScannerTab(onNavigateToScanner = onNavigateToScanner)
+            }
+
+            if (showAdvancedSearch) {
+                AdvancedSearchSheet(
+                    onDismiss = { showAdvancedSearch = false },
+                    onSearch = { _, rawQuery ->
+                        viewModel.onAdvancedQuerySearch(rawQuery)
+                        showAdvancedSearch = false
+                    },
+                )
             }
         }
     }
@@ -169,6 +185,7 @@ private fun SearchTab(
     uiState: AddCardUiState,
     onQueryChange: (String) -> Unit,
     onCardSelected: (Card) -> Unit,
+    onAdvancedSearch: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -182,44 +199,63 @@ private fun SearchTab(
     ) {
         Spacer(Modifier.height(12.dp))
 
-        // ── Search field ──────────────────────────────────────────────────────
-        OutlinedTextField(
-            value = uiState.query,
-            onValueChange = onQueryChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester),
-            placeholder = {
-                Text(stringResource(R.string.addcard_search_hint), color = mc.textDisabled)
-            },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
-            },
-            trailingIcon = if (uiState.query.isNotEmpty()) {
-                {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(
-                            Icons.Default.Clear,
-                            contentDescription = stringResource(R.string.action_close),
-                            tint = mc.textDisabled
-                        )
+        // ── Search field + advanced search button ─────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = uiState.query,
+                onValueChange = onQueryChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                placeholder = {
+                    Text(stringResource(R.string.addcard_search_hint), color = mc.textDisabled)
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
+                },
+                trailingIcon = if (uiState.query.isNotEmpty()) {
+                    {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = stringResource(R.string.action_close),
+                                tint = mc.textDisabled
+                            )
+                        }
                     }
-                }
-            } else null,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onQueryChange(uiState.query) }),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = mc.primaryAccent,
-                unfocusedBorderColor = mc.primaryAccent.copy(alpha = 0.25f),
-                cursorColor = mc.primaryAccent,
-                focusedTextColor = mc.textPrimary,
-                unfocusedTextColor = mc.textPrimary,
-                focusedContainerColor = mc.surface,
-                unfocusedContainerColor = mc.surface,
-            ),
-            shape = RoundedCornerShape(12.dp),
-        )
+                } else null,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onQueryChange(uiState.query) }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = mc.primaryAccent,
+                    unfocusedBorderColor = mc.primaryAccent.copy(alpha = 0.25f),
+                    cursorColor = mc.primaryAccent,
+                    focusedTextColor = mc.textPrimary,
+                    unfocusedTextColor = mc.textPrimary,
+                    focusedContainerColor = mc.surface,
+                    unfocusedContainerColor = mc.surface,
+                ),
+                shape = RoundedCornerShape(12.dp),
+            )
+            IconButton(
+                onClick = onAdvancedSearch,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(mc.primaryAccent.copy(alpha = 0.1f)),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = stringResource(R.string.advsearch_button),
+                    tint = mc.primaryAccent,
+                )
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -246,12 +282,12 @@ private fun SearchTab(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            "No cards found",
+                            stringResource(R.string.addcard_no_results),
                             style = ty.titleMedium,
                             color = mc.textSecondary,
                         )
                         Text(
-                            "Try another spelling or search in another language",
+                            stringResource(R.string.addcard_no_results_subtitle),
                             style = ty.bodySmall,
                             color = mc.textDisabled,
                             textAlign = TextAlign.Center,
@@ -263,7 +299,7 @@ private fun SearchTab(
             uiState.query.length < 2 && uiState.results.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        "Type at least 2 characters to search",
+                        stringResource(R.string.addcard_search_min_chars),
                         style = ty.bodyMedium,
                         color = mc.textDisabled,
                         textAlign = TextAlign.Center,
@@ -403,12 +439,12 @@ private fun ScannerTab(onNavigateToScanner: () -> Unit) {
                 tint = mc.primaryAccent,
             )
             Text(
-                "Scan card barcode",
+                stringResource(R.string.addcard_scanner_title),
                 style = ty.titleMedium,
                 color = mc.textPrimary,
             )
             Text(
-                "Point the camera at the barcode\non the back of the card",
+                stringResource(R.string.addcard_scanner_subtitle),
                 style = ty.bodySmall,
                 color = mc.textSecondary,
                 textAlign = TextAlign.Center,
@@ -427,7 +463,7 @@ private fun ScannerTab(onNavigateToScanner: () -> Unit) {
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Open Scanner",
+                    stringResource(R.string.addcard_scanner_button),
                     style = ty.labelLarge,
                     color = mc.background,
                 )

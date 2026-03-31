@@ -501,4 +501,35 @@
     <string name="error_card_not_found">Karte nicht gefunden</string>
     <string name="error_save_failed">Speichern fehlgeschlagen.</string>
     <string name="error_unknown">Ein unerwarteter Fehler ist aufgetreten</string>
+
+    <!-- ERWEITERTE SUCHE -->
+    <string name="advsearch_title">Erweiterte Suche</string>
+    <string name="advsearch_button">Erweiterte Suche</string>
+    <string name="advsearch_clear">Alles löschen</string>
+    <string name="advsearch_search_button">Karten suchen →</string>
+    <string name="advsearch_query_preview">Generierte Abfrage</string>
+    <string name="advsearch_section_name">Kartenname</string>
+    <string name="advsearch_name_hint">z.B. Blitzstrahl</string>
+    <string name="advsearch_name_exact">Nur exakter Name</string>
+    <string name="advsearch_section_oracle">Regeltext enthält</string>
+    <string name="advsearch_oracle_hint">z.B. Flugfähigkeit, ziehe eine Karte…</string>
+    <string name="advsearch_section_type">Kartentyp</string>
+    <string name="advsearch_type_hint">z.B. Legendäre Kreatur Elf</string>
+    <string name="advsearch_section_colors">Farben</string>
+    <string name="advsearch_colors_exact">Genau diese Farben</string>
+    <string name="advsearch_section_mana">Manawert (CMC)</string>
+    <string name="advsearch_section_rarity">Seltenheit</string>
+    <string name="advsearch_section_stats">Stärke / Widerstandskraft</string>
+    <string name="advsearch_power">Stärke</string>
+    <string name="advsearch_toughness">Widerstandskraft</string>
+    <string name="advsearch_section_price">Höchstpreis</string>
+    <string name="advsearch_section_format">Format-Legalität</string>
+    <string name="advsearch_format_legal">Karten anzeigen:</string>
+    <string name="advsearch_format_is_legal">Legal</string>
+    <string name="advsearch_format_is_banned">Nicht legal</string>
+    <string name="advsearch_section_keyword">Schlüsselwörter</string>
+    <string name="advsearch_keyword_hint">z.B. Flugfähigkeit, Eile…</string>
+    <string name="advsearch_section_sort">Ergebnisse sortieren</string>
+    <string name="advsearch_no_results">Keine Karten gefunden</string>
+    <string name="advsearch_no_criteria">Füge mindestens ein Kriterium hinzu</string>
 </resources>
