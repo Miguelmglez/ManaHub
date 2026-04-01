@@ -257,7 +257,7 @@ class ProfileViewModel @Inject constructor(
             hasMythic           = (byRarity[Rarity.MYTHIC] ?: 0) > 0,
             deckCount           = s.collectionStats?.totalDecks ?: 0,
             surveyCount         = s.surveyCount,
-            maxCardValueUsd     = s.collectionStats?.mostValuableCards?.firstOrNull()?.priceUsd ?: 0.0,
+            maxCardValue        = s.collectionStats?.mostValuableCards?.firstOrNull()?.priceUsd ?: 0.0,
             avgWinTurn          = s.avgWinTurn,
             favoriteElimination = s.mostFrequentElimination,
             distinctColorCount  = byColor.entries.count { (color) ->

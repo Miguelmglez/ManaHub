@@ -5,6 +5,7 @@ import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.domain.model.Achievement
 import com.mmg.magicfolder.core.domain.model.AchievementCategory
 import com.mmg.magicfolder.core.domain.model.AchievementId
+import com.mmg.magicfolder.core.util.PriceFormatter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,7 +18,7 @@ data class AchievementStats(
     val hasMythic:           Boolean,
     val deckCount:           Int,
     val surveyCount:         Int,
-    val maxCardValueUsd:     Double,
+    val maxCardValue:        Double,
     val avgWinTurn:          Double,
     val favoriteElimination: String,
     val distinctColorCount:  Int,
@@ -142,9 +143,9 @@ class CheckAchievementsUseCase @Inject constructor(
             title         = context.getString(R.string.achievement_high_roller),
             description   = context.getString(R.string.achievement_high_roller_desc),
             emoji         = "💎",
-            unlockedAt    = if (stats.maxCardValueUsd >= 20.0) NOW else null,
-            progress      = (stats.maxCardValueUsd / 20.0).toFloat().coerceAtMost(1f),
-            progressLabel = "$${stats.maxCardValueUsd.toInt()}/$20",
+            unlockedAt    = if (stats.maxCardValue >= 50.0) NOW else null,
+            progress      = (stats.maxCardValue / 50.0).toFloat().coerceAtMost(1f),
+            progressLabel = "Most valuable: ${PriceFormatter.format(stats.maxCardValue)} / ${PriceFormatter.format(50.0)}",
             category      = AchievementCategory.COLLECTION,
         ),
         Achievement(

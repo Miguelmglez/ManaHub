@@ -15,7 +15,7 @@ import coil.compose.AsyncImage
 import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
-import com.mmg.magicfolder.core.util.LocaleLanguageProvider
+import com.mmg.magicfolder.core.util.PriceFormatter
 
 @Composable
 fun CardGridItem(
@@ -83,18 +83,16 @@ fun CardGridItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val isUs = remember { LocaleLanguageProvider().get() == "us" }
-
-                val price = card.run {
+                val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, userCard.isFoil) {
                     if (userCard.isFoil) {
-                        if (isUs) priceUsdFoil else priceEurFoil
+                        PriceFormatter.formatFromScryfall(card.priceUsdFoil, card.priceEurFoil)
                     } else {
-                        if (isUs) priceUsd else priceEur
+                        PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur)
                     }
                 }
-                price?.let { p ->
+                if (priceText != "—") {
                     Text(
-                        text  = if (isUs) "$${"%.2f".format(p)}" else "${"%.2f".format(p)}€",
+                        text  = priceText,
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.goldMtg,
                     )

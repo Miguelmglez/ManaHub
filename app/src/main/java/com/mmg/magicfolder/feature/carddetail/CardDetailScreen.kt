@@ -30,6 +30,8 @@ import com.mmg.magicfolder.core.ui.components.FoilBadge
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
 import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.components.StaleBadge
+import com.mmg.magicfolder.core.util.CardTypeTranslator
+import com.mmg.magicfolder.core.util.PriceFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -210,8 +212,11 @@ private fun CardDetailContent(
             card.manaCost?.let {
                 ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
-            Text(card.printedTypeLine?:card.typeLine, style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                CardTypeTranslator.translateTypeLine(card.printedTypeLine ?: card.typeLine),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         // Oracle text
@@ -301,7 +306,7 @@ private fun PricePill(label: String, price: Double?, currency: String) {
         Text(label, style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            text  = if (price != null) "$currency${String.format("%.2f", price)}" else "—",
+            text  = PriceFormatter.format(price, currency),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.tertiary,
         )
