@@ -7,82 +7,96 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mmg.magicfolder.R
+import com.mmg.magicfolder.core.domain.model.BuilderStep
+import com.mmg.magicfolder.core.domain.model.BuilderTab
+import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.domain.model.DeckBuilderState
+import com.mmg.magicfolder.core.domain.model.DeckCard
+import com.mmg.magicfolder.core.domain.model.DeckFormat
+import com.mmg.magicfolder.core.domain.model.ReviewGroupBy
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
-import com.mmg.magicfolder.feature.decks.engine.*
+import com.mmg.magicfolder.feature.decks.components.BuildingFilters
+import com.mmg.magicfolder.feature.decks.components.CommanderBanner
+import com.mmg.magicfolder.feature.decks.components.CommanderSearchSheet
+import com.mmg.magicfolder.feature.decks.components.DeckCardRow
+import com.mmg.magicfolder.feature.decks.components.LandsSection
+import com.mmg.magicfolder.feature.decks.components.ManaCurveChart
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckBuilderScreen(
-    onBack:      () -> Unit,
-    viewModel:   DeckBuilderEngine = hiltViewModel(),
+    onNavigateBack: () -> Unit,
+    onDeckSaved:    () -> Unit,
+    viewModel:      DeckBuilderViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsState()
-    val mc    = MaterialTheme.magicColors
-    val ty    = MaterialTheme.magicTypography
-
-    // Navigate away once deck is saved
-    if (state.savedDeckId != null) {
-        LaunchedEffect(Unit) { onBack() }
-    }
+    val state                by viewModel.state.collectAsStateWithLifecycle()
+    val commanderResults     by viewModel.commanderResults.collectAsStateWithLifecycle()
+    val isSearchingCommander by viewModel.isSearchingCommander.collectAsStateWithLifecycle()
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
 
     Scaffold(
         containerColor = mc.background,
         topBar = {
-            Surface(
-                color = mc.backgroundSecondary,
-            ) {
+            Surface(color = mc.backgroundSecondary) {
                 Row(
-                    modifier = Modifier
+                    modifier          = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = {
-                        if (state.step == DeckBuilderStep.SETUP) onBack()
-                        else viewModel.goBack()
+                        when (state.step) {
+                            BuilderStep.SETUP    -> onNavigateBack()
+                            BuilderStep.BUILDING -> onNavigateBack()
+                            BuilderStep.REVIEW   -> viewModel.goBackToBuilding()
+                        }
                     }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textSecondary)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            tint               = mc.textSecondary,
+                        )
                     }
                     Text(
                         text = when (state.step) {
-                            DeckBuilderStep.SETUP    -> "New Deck"
-                            DeckBuilderStep.BUILDING -> "${state.mainboardCount} / ${state.targetSize}"
-                            DeckBuilderStep.REVIEW   -> "Review Deck"
+                            BuilderStep.SETUP    -> stringResource(R.string.deckbuilder_title)
+                            BuilderStep.BUILDING -> "${state.totalCardCount} / ${state.format.targetDeckSize}"
+                            BuilderStep.REVIEW   -> stringResource(R.string.deckbuilder_step_review)
                         },
-                        style = ty.titleLarge,
-                        color = mc.textPrimary,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        style    = ty.titleLarge,
+                        color    = mc.textPrimary,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    if (state.step == DeckBuilderStep.BUILDING && state.mainboardCount > 0) {
+                    if (state.step == BuilderStep.BUILDING) {
                         TextButton(onClick = viewModel::goToReview) {
-                            Text(stringResource(R.string.deckbuilder_step_review), color = mc.primaryAccent,
-                                style = ty.labelLarge)
+                            Text(
+                                text  = stringResource(R.string.deckbuilder_step_review),
+                                color = mc.primaryAccent,
+                                style = ty.labelLarge,
+                            )
                         }
                     }
                 }
@@ -90,29 +104,40 @@ fun DeckBuilderScreen(
         },
     ) { padding ->
         when (state.step) {
-            DeckBuilderStep.SETUP    -> SetupStep(
-                state    = state,
-                modifier = Modifier.padding(padding),
-                onNameChange     = viewModel::setDeckName,
-                onFormatSelect   = viewModel::setFormat,
-                onColorToggle    = viewModel::toggleColor,
-                onStrategySelect = viewModel::setSeedStrategy,
-                onContinue       = viewModel::goToBuilding,
+            BuilderStep.SETUP -> SetupStep(
+                state                = state,
+                commanderResults     = commanderResults,
+                isSearchingCommander = isSearchingCommander,
+                onCommanderSearch    = viewModel::searchCommander,
+                onCommanderClear     = viewModel::clearCommanderSearch,
+                onBuild              = { name, format, commander ->
+                    viewModel.setupDeck(name, format, commander)
+                },
+                modifier             = Modifier.padding(padding),
             )
-            DeckBuilderStep.BUILDING -> BuildingStep(
-                state    = state,
-                modifier = Modifier.padding(padding),
-                onDecide = viewModel::decide,
-                onReview = viewModel::goToReview,
+            BuilderStep.BUILDING -> BuildingStep(
+                state                 = state,
+                onAddToMainboard      = viewModel::addToMainboard,
+                onAddToSideboard      = viewModel::addToSideboard,
+                onRemoveFromMainboard = viewModel::removeFromMainboard,
+                onRemoveNonBasicLand  = viewModel::removeNonBasicLand,
+                onSetTab              = viewModel::setActiveTab,
+                onToggleColorFilter   = viewModel::toggleColorFilter,
+                onClearFilters        = viewModel::clearFilters,
+                onGoToReview          = viewModel::goToReview,
+                getFilteredCards      = viewModel::getFilteredCards,
+                modifier              = Modifier.padding(padding),
             )
-            DeckBuilderStep.REVIEW   -> ReviewStep(
-                state    = state,
-                modifier = Modifier.padding(padding),
-                onRemoveMain    = viewModel::removeFromMainboard,
-                onRemoveSide    = viewModel::removeFromSideboard,
-                onMoveToSide    = viewModel::moveToSideboard,
-                onSave          = viewModel::saveDeck,
-                onClearError    = viewModel::clearError,
+            BuilderStep.REVIEW -> ReviewStep(
+                state                 = state,
+                onRemoveFromMainboard = viewModel::removeFromMainboard,
+                onRemoveFromSideboard = viewModel::removeFromSideboard,
+                onMoveToSideboard     = viewModel::moveToSideboard,
+                onMoveToMainboard     = viewModel::moveToMainboard,
+                onRemoveNonBasicLand  = viewModel::removeNonBasicLand,
+                onSetGroupBy          = viewModel::setReviewGroupBy,
+                onSave                = { viewModel.saveDeck(onDeckSaved) },
+                modifier              = Modifier.padding(padding),
             )
         }
     }
@@ -124,15 +149,22 @@ fun DeckBuilderScreen(
 
 @Composable
 private fun SetupStep(
-    state:           DeckBuilderUiState,
-    modifier:        Modifier,
-    onNameChange:    (String) -> Unit,
-    onFormatSelect:  (GameFormat) -> Unit,
-    onColorToggle:   (ManaColor) -> Unit,
-    onStrategySelect:(SeedStrategy) -> Unit,
-    onContinue:      () -> Unit,
+    state:                DeckBuilderState,
+    commanderResults:     List<Card>,
+    isSearchingCommander: Boolean,
+    onCommanderSearch:    (String) -> Unit,
+    onCommanderClear:     () -> Unit,
+    onBuild:              (String, DeckFormat, Card?) -> Unit,
+    modifier:             Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    var deckName          by remember { mutableStateOf("") }
+    var selectedFormat    by remember { mutableStateOf(DeckFormat.STANDARD) }
+    var selectedCommander by remember { mutableStateOf<Card?>(null) }
+    var showCommanderSheet by remember { mutableStateOf(false) }
+
+    val canBuild = deckName.isNotBlank() &&
+        (!selectedFormat.requiresCommander || selectedCommander != null)
 
     Column(modifier = modifier.fillMaxSize()) {
         Column(
@@ -140,15 +172,15 @@ private fun SetupStep(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            // ── Deck name ─────────────────────────────────────────────────────
+            // Deck name
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Deck Name")
+                SectionLabel(stringResource(R.string.deckbuilder_setup_name_label))
                 OutlinedTextField(
-                    value         = state.deckName,
-                    onValueChange = onNameChange,
-                    placeholder   = { Text("e.g. Izzet Tempo", color = mc.textDisabled) },
+                    value         = deckName,
+                    onValueChange = { deckName = it },
+                    placeholder   = { Text(stringResource(R.string.deckbuilder_name_hint), color = mc.textDisabled) },
                     singleLine    = true,
                     modifier      = Modifier.fillMaxWidth(),
                     colors        = OutlinedTextFieldDefaults.colors(
@@ -162,26 +194,49 @@ private fun SetupStep(
                 )
             }
 
-            // ── Format ────────────────────────────────────────────────────────
+            // Format selector
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Format")
-                FormatGrid(selected = state.format, onSelect = onFormatSelect)
+                SectionLabel(stringResource(R.string.deckbuilder_setup_format_label))
+                FormatGrid(
+                    selected = selectedFormat,
+                    onSelect = { fmt ->
+                        selectedFormat    = fmt
+                        selectedCommander = null
+                        onCommanderClear()
+                    },
+                )
             }
 
-            // ── Color identity ────────────────────────────────────────────────
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Color Identity  (optional)")
-                ColorIdentityRow(selected = state.selectedColors, onToggle = onColorToggle)
-            }
-
-            // ── Seed strategy ─────────────────────────────────────────────────
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Strategy")
-                StrategyGrid(selected = state.seedStrategy, onSelect = onStrategySelect)
+            // Commander search (only for Commander format)
+            if (selectedFormat.requiresCommander) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionLabel(stringResource(R.string.deckbuilder_setup_commander_label))
+                    if (selectedCommander != null) {
+                        CommanderBanner(
+                            commander = selectedCommander!!,
+                            modifier  = Modifier.clickable { showCommanderSheet = true },
+                        )
+                    } else {
+                        OutlinedButton(
+                            onClick  = { showCommanderSheet = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            border   = androidx.compose.foundation.BorderStroke(
+                                1.dp, mc.primaryAccent.copy(alpha = 0.6f)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(
+                                text  = stringResource(R.string.deckbuilder_search_commander_hint),
+                                style = MaterialTheme.magicTypography.labelLarge,
+                                color = mc.primaryAccent,
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        // ── Continue button ────────────────────────────────────────────────────
+        // Build button
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -189,8 +244,8 @@ private fun SetupStep(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
             Button(
-                onClick  = onContinue,
-                enabled  = state.canAdvanceSetup,
+                onClick  = { onBuild(deckName, selectedFormat, selectedCommander) },
+                enabled  = canBuild,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors   = ButtonDefaults.buttonColors(
                     containerColor         = mc.primaryAccent,
@@ -199,23 +254,43 @@ private fun SetupStep(
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Text(
-                    "Build Deck",
+                    text  = stringResource(R.string.deckbuilder_setup_build_button),
                     style = MaterialTheme.magicTypography.titleMedium,
-                    color = if (state.canAdvanceSetup) mc.background else mc.textDisabled,
+                    color = if (canBuild) mc.background else mc.textDisabled,
                 )
             }
         }
     }
+
+    if (showCommanderSheet) {
+        CommanderSearchSheet(
+            results       = commanderResults,
+            isSearching   = isSearchingCommander,
+            onQueryChange = onCommanderSearch,
+            onSelectCard  = { card ->
+                selectedCommander  = card
+                showCommanderSheet = false
+                onCommanderClear()
+            },
+            onDismiss = {
+                showCommanderSheet = false
+                onCommanderClear()
+            },
+        )
+    }
 }
 
 @Composable
-private fun FormatGrid(selected: GameFormat, onSelect: (GameFormat) -> Unit) {
-    val mc  = MaterialTheme.magicColors
-    val row = GameFormat.entries.chunked(4)
+private fun FormatGrid(
+    selected: DeckFormat,
+    onSelect: (DeckFormat) -> Unit,
+) {
+    val mc   = MaterialTheme.magicColors
+    val rows = DeckFormat.entries.chunked(4)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        row.forEach { chunk ->
+        rows.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                chunk.forEach { fmt ->
+                row.forEach { fmt ->
                     val sel = fmt == selected
                     Box(
                         contentAlignment = Alignment.Center,
@@ -232,97 +307,15 @@ private fun FormatGrid(selected: GameFormat, onSelect: (GameFormat) -> Unit) {
                             .padding(vertical = 10.dp),
                     ) {
                         Text(
-                            text  = fmt.displayName,
-                            style = MaterialTheme.magicTypography.labelMedium,
-                            color = if (sel) mc.primaryAccent else mc.textSecondary,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ColorIdentityRow(
-    selected: Set<ManaColor>,
-    onToggle: (ManaColor) -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        ManaColor.entries.forEach { color ->
-            val sel = color in selected
-            val bg  = manaColorBg(color)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier         = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(if (sel) bg else bg.copy(alpha = 0.25f))
-                    .border(
-                        width = if (sel) 2.dp else 0.dp,
-                        color = if (sel) Color.White.copy(alpha = 0.6f) else Color.Transparent,
-                        shape = CircleShape,
-                    )
-                    .clickable { onToggle(color) },
-            ) {
-                Text(
-                    text  = color.symbol,
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = Color.White,
-                )
-            }
-        }
-    }
-}
-
-private fun manaColorBg(color: ManaColor): Color = when (color) {
-    ManaColor.W -> Color(0xFFF5F0D0)
-    ManaColor.U -> Color(0xFF0E68AB)
-    ManaColor.B -> Color(0xFF21160A)
-    ManaColor.R -> Color(0xFFD32029)
-    ManaColor.G -> Color(0xFF00733E)
-}
-
-@Composable
-private fun StrategyGrid(
-    selected: SeedStrategy?,
-    onSelect: (SeedStrategy) -> Unit,
-) {
-    val mc  = MaterialTheme.magicColors
-    val rows = SeedStrategy.entries.chunked(3)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { strategy ->
-                    val sel = strategy == selected
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (sel) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface)
-                            .border(
-                                width = if (sel) 1.5.dp else 0.5.dp,
-                                color = if (sel) mc.primaryAccent else mc.surfaceVariant,
-                                shape = RoundedCornerShape(12.dp),
-                            )
-                            .clickable { onSelect(strategy) }
-                            .padding(vertical = 14.dp, horizontal = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(strategy.icon, style = MaterialTheme.magicTypography.titleLarge)
-                        Text(
-                            strategy.displayName,
+                            text      = stringResource(fmt.displayNameRes),
                             style     = MaterialTheme.magicTypography.labelMedium,
-                            color     = if (sel) mc.primaryAccent else mc.textPrimary,
+                            color     = if (sel) mc.primaryAccent else mc.textSecondary,
                             textAlign = TextAlign.Center,
-                            maxLines  = 1,
                         )
                     }
                 }
-                // Pad last row if fewer than 3
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                // Pad last row if uneven
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -332,249 +325,223 @@ private fun StrategyGrid(
 //  Step 2 — Building
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BuildingStep(
-    state:    DeckBuilderUiState,
-    modifier: Modifier,
-    onDecide: (PathDecision) -> Unit,
-    onReview: () -> Unit,
+    state:                DeckBuilderState,
+    onAddToMainboard:     (DeckCard) -> Unit,
+    onAddToSideboard:     (DeckCard) -> Unit,
+    onRemoveFromMainboard:(String) -> Unit,
+    onRemoveNonBasicLand: (String) -> Unit,
+    onSetTab:             (BuilderTab) -> Unit,
+    onToggleColorFilter:  (String) -> Unit,
+    onClearFilters:       () -> Unit,
+    onGoToReview:         () -> Unit,
+    getFilteredCards:     (List<DeckCard>) -> List<DeckCard>,
+    modifier:             Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
 
-    Column(
-        modifier            = modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // ── Deck progress ──────────────────────────────────────────────────────
-        DeckProgressBar(state = state)
-
-        // ── Main content ───────────────────────────────────────────────────────
-        when {
-            state.isLoadingQueue -> {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = mc.primaryAccent)
-                }
-            }
-            state.queueIsExhausted -> {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(stringResource(R.string.deckbuilder_all_reviewed), style = MaterialTheme.magicTypography.titleMedium,
-                            color = mc.textSecondary)
-                        Text("${state.mainboardCount} cards in deck",
-                            style = MaterialTheme.magicTypography.bodyMedium, color = mc.textDisabled)
-                        Button(
-                            onClick = onReview,
-                            colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                            shape   = RoundedCornerShape(8.dp),
-                        ) {
-                            Text(stringResource(R.string.deckbuilder_review_deck), color = mc.background,
-                                style = MaterialTheme.magicTypography.titleMedium)
-                        }
-                    }
-                }
-            }
-            else -> {
-                state.currentSuggestion?.let { suggestion ->
-                    SuggestionCard(
-                        suggestion = suggestion,
-                        modifier   = Modifier.weight(1f),
-                    )
-                    DecisionRow(onDecide = onDecide)
-                }
-            }
-        }
+    val sourceCards = when (state.activeTab) {
+        BuilderTab.MY_COLLECTION       -> state.collectionCards
+        BuilderTab.SCRYFALL_SUGGESTIONS -> state.suggestions
     }
-}
+    val visibleCards = remember(sourceCards, state.filterColors, state.filterType, state.filterMaxCmc) {
+        getFilteredCards(sourceCards)
+    }
 
-@Composable
-private fun DeckProgressBar(state: DeckBuilderUiState) {
-    val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier            = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+    Column(modifier = modifier.fillMaxSize()) {
+        // Progress bar
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(mc.backgroundSecondary)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                "${state.mainboardCount} / ${state.targetSize} cards",
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.textSecondary,
-            )
-            Text(
-                "${(state.progressFraction * 100).toInt()}%",
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.primaryAccent,
-            )
-        }
-        LinearProgressIndicator(
-            progress       = { state.progressFraction },
-            modifier       = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-            color          = mc.primaryAccent,
-            trackColor     = mc.surfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun SuggestionCard(
-    suggestion: CardSuggestion,
-    modifier:   Modifier,
-) {
-    val mc   = MaterialTheme.magicColors
-    val card = suggestion.card
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors   = CardDefaults.cardColors(containerColor = mc.surface),
-        shape    = RoundedCornerShape(16.dp),
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Art
-            AsyncImage(
-                model              = card.imageNormal,
-                contentDescription = card.name,
-                contentScale       = ContentScale.Crop,
-                modifier           = Modifier.fillMaxWidth().weight(1f)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-            )
-
-            // Info panel
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        card.name,
-                        style    = MaterialTheme.magicTypography.titleMedium,
-                        color    = mc.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        "CMC ${card.cmc.toInt()}",
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.textSecondary,
-                    )
-                }
-
-                // Score bar
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    LinearProgressIndicator(
-                        progress   = { suggestion.score },
-                        modifier   = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
-                        color      = scoreColor(suggestion.score, mc.primaryAccent, mc.goldMtg, mc.lifeNegative),
-                        trackColor = mc.surfaceVariant,
-                    )
-                    Text(
-                        "${(suggestion.score * 100).toInt()}%",
-                        style = MaterialTheme.magicTypography.labelMedium,
-                        color = mc.textSecondary,
-                    )
-                }
-
-                // Reason chips
-                if (suggestion.reasons.isNotEmpty()) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier              = Modifier.fillMaxWidth(),
-                    ) {
-                        suggestion.reasons.take(3).forEach { reason ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(mc.primaryAccent.copy(alpha = 0.12f))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                            ) {
-                                Text(
-                                    reason,
-                                    style    = MaterialTheme.magicTypography.labelSmall,
-                                    color    = mc.primaryAccent,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                        if (suggestion.isOwned) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(mc.lifePositive.copy(alpha = 0.15f))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                            ) {
-                                Text(
-                                    "Owned",
-                                    style = MaterialTheme.magicTypography.labelSmall,
-                                    color = mc.lifePositive,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Card type line
                 Text(
-                    card.typeLine,
-                    style    = MaterialTheme.magicTypography.bodySmall,
-                    color    = mc.textDisabled,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    "${state.totalCardCount} / ${state.format.targetDeckSize}",
+                    style = ty.labelLarge,
+                    color = mc.textSecondary,
+                )
+                Text(
+                    "${(state.completionPercent * 100).toInt()}%",
+                    style = ty.labelLarge,
+                    color = mc.primaryAccent,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun DecisionRow(onDecide: (PathDecision) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Skip
-        OutlinedButton(
-            onClick  = { onDecide(PathDecision.SKIP) },
-            modifier = Modifier.weight(1f).height(48.dp),
-            border   = BorderStroke(1.dp, mc.surfaceVariant),
-            shape    = RoundedCornerShape(8.dp),
-        ) {
-            Icon(Icons.Default.Close, contentDescription = null, tint = mc.textSecondary,
-                modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.action_skip), style = MaterialTheme.magicTypography.labelLarge, color = mc.textSecondary)
+            LinearProgressIndicator(
+                progress   = { state.completionPercent },
+                modifier   = Modifier.fillMaxWidth().height(3.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color      = mc.primaryAccent,
+                trackColor = mc.surfaceVariant,
+            )
         }
 
-        // Add
-        Button(
-            onClick  = { onDecide(PathDecision.ADD) },
-            modifier = Modifier.weight(2f).height(48.dp),
-            colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            shape    = RoundedCornerShape(8.dp),
+        // Main scrollable content
+        LazyColumn(
+            modifier       = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = 80.dp),
         ) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = mc.background,
-                modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.deckbuilder_add_to_deck), style = MaterialTheme.magicTypography.labelLarge, color = mc.background)
+            // Commander banner
+            state.commander?.let { cmdr ->
+                item {
+                    CommanderBanner(
+                        commander = cmdr,
+                        modifier  = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
+
+            // Mainboard quick-view
+            if (state.mainboard.isNotEmpty()) {
+                item {
+                    SectionLabel(
+                        text     = "${stringResource(R.string.deckbuilder_step_building)} · ${state.nonLandCardCount}",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+                items(state.mainboard, key = { "main_${it.card.scryfallId}" }) { dc ->
+                    DeckCardRow(
+                        deckCard = dc,
+                        onRemove = { onRemoveFromMainboard(dc.card.scryfallId) },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    )
+                }
+            }
+
+            // Lands
+            if (state.nonBasicLands.isNotEmpty() || state.basicLands.total > 0) {
+                item {
+                    LandsSection(
+                        nonBasicLands    = state.nonBasicLands,
+                        basicLands       = state.basicLands,
+                        onRemoveNonBasic = onRemoveNonBasicLand,
+                        modifier         = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
+            // Divider & tab row
+            item {
+                Spacer(Modifier.height(8.dp))
+                TabRow(
+                    selectedTabIndex = state.activeTab.ordinal,
+                    containerColor   = mc.backgroundSecondary,
+                    contentColor     = mc.primaryAccent,
+                    modifier         = Modifier.fillMaxWidth(),
+                ) {
+                    BuilderTab.entries.forEach { tab ->
+                        Tab(
+                            selected = state.activeTab == tab,
+                            onClick  = { onSetTab(tab) },
+                            text     = {
+                                Text(
+                                    text  = when (tab) {
+                                        BuilderTab.MY_COLLECTION        -> stringResource(R.string.deckbuilder_tab_collection)
+                                        BuilderTab.SCRYFALL_SUGGESTIONS -> stringResource(R.string.deckbuilder_tab_suggestions)
+                                    },
+                                    style = MaterialTheme.magicTypography.labelMedium,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+
+            // Filters
+            item {
+                BuildingFilters(
+                    selectedColors = state.filterColors,
+                    onToggleColor  = onToggleColorFilter,
+                    onClearFilters = onClearFilters,
+                    modifier       = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+
+            // Card list
+            when {
+                (state.activeTab == BuilderTab.MY_COLLECTION && state.isLoadingCollection) ||
+                (state.activeTab == BuilderTab.SCRYFALL_SUGGESTIONS && state.isLoadingSuggestions) -> {
+                    item {
+                        Box(
+                            modifier         = Modifier.fillMaxWidth().height(120.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(color = mc.primaryAccent)
+                        }
+                    }
+                }
+                visibleCards.isEmpty() -> {
+                    item {
+                        Text(
+                            text     = stringResource(R.string.deckbuilder_no_cards),
+                            style    = MaterialTheme.magicTypography.bodyMedium,
+                            color    = mc.textDisabled,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
+                        )
+                    }
+                }
+                else -> {
+                    items(visibleCards, key = { "${state.activeTab}_${it.card.scryfallId}" }) { dc ->
+                        DeckCardRow(
+                            deckCard = dc,
+                            onAdd    = { onAddToMainboard(dc) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
         }
 
-        // Sideboard
-        OutlinedButton(
-            onClick  = { onDecide(PathDecision.SIDEBOARD) },
-            modifier = Modifier.weight(1f).height(48.dp),
-            border   = BorderStroke(1.dp, mc.secondaryAccent.copy(alpha = 0.5f)),
-            shape    = RoundedCornerShape(8.dp),
+        // Bottom summary bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(mc.backgroundSecondary)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
-            Text("Side", style = MaterialTheme.magicTypography.labelLarge, color = mc.secondaryAccent)
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    Text(
+                        text  = stringResource(
+                            R.string.deckbuilder_format_total_cards,
+                            state.totalCardCount
+                        ),
+                        style = ty.labelLarge,
+                        color = mc.textPrimary,
+                    )
+                    Text(
+                        text  = stringResource(
+                            R.string.deckbuilder_lands,
+                        ) + ": ${state.totalLandCount}",
+                        style = ty.labelSmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                Button(
+                    onClick  = onGoToReview,
+                    colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                    shape    = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(40.dp),
+                ) {
+                    Text(
+                        text  = stringResource(R.string.deckbuilder_step_review),
+                        style = ty.labelLarge,
+                        color = mc.background,
+                    )
+                }
+            }
         }
     }
 }
@@ -585,64 +552,157 @@ private fun DecisionRow(onDecide: (PathDecision) -> Unit) {
 
 @Composable
 private fun ReviewStep(
-    state:        DeckBuilderUiState,
-    modifier:     Modifier,
-    onRemoveMain: (String) -> Unit,
-    onRemoveSide: (String) -> Unit,
-    onMoveToSide: (String) -> Unit,
-    onSave:       () -> Unit,
-    onClearError: () -> Unit,
+    state:                 DeckBuilderState,
+    onRemoveFromMainboard: (String) -> Unit,
+    onRemoveFromSideboard: (String) -> Unit,
+    onMoveToSideboard:     (String) -> Unit,
+    onMoveToMainboard:     (String) -> Unit,
+    onRemoveNonBasicLand:  (String) -> Unit,
+    onSetGroupBy:          (ReviewGroupBy) -> Unit,
+    onSave:                () -> Unit,
+    modifier:              Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    // Group mainboard
+    val grouped = remember(state.mainboard, state.reviewGroupBy) {
+        when (state.reviewGroupBy) {
+            ReviewGroupBy.TYPE   -> state.mainboard.groupBy { cardTypeLabel(it.card.typeLine) }
+            ReviewGroupBy.COLOR  -> state.mainboard.groupBy { mainColorLabel(it.card.colors) }
+            ReviewGroupBy.CMC    -> state.mainboard.groupBy { cmcLabel(it.card.cmc) }
+            ReviewGroupBy.RARITY -> state.mainboard.groupBy { it.card.rarity.replaceFirstChar { c -> c.uppercase() } }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
-            modifier            = Modifier.fillMaxSize(),
-            contentPadding      = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+            modifier       = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            // ── Mainboard ──────────────────────────────────────────────────────
+            // Mana curve chart
             item {
-                SectionLabel("Mainboard  (${state.mainboardCount} cards)", Modifier.padding(bottom = 8.dp))
+                ManaCurveChart(
+                    cards    = state.mainboard,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
             }
-            if (state.mainboard.isEmpty()) {
-                item {
+
+            // Group-by selector
+            item {
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
                     Text(
-                        "No cards added yet.",
-                        style    = MaterialTheme.magicTypography.bodyMedium,
-                        color    = mc.textDisabled,
-                        modifier = Modifier.padding(bottom = 12.dp),
+                        text  = "Group:",
+                        style = ty.labelSmall,
+                        color = mc.textDisabled,
+                    )
+                    ReviewGroupBy.entries.forEach { g ->
+                        val sel = g == state.reviewGroupBy
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (sel) mc.primaryAccent.copy(0.15f) else mc.surface)
+                                .border(
+                                    width = if (sel) 1.dp else 0.dp,
+                                    color = if (sel) mc.primaryAccent else mc.surface,
+                                    shape = RoundedCornerShape(6.dp),
+                                )
+                                .clickable { onSetGroupBy(g) }
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text  = when (g) {
+                                    ReviewGroupBy.TYPE   -> stringResource(R.string.deckbuilder_group_type)
+                                    ReviewGroupBy.COLOR  -> stringResource(R.string.deckbuilder_group_color)
+                                    ReviewGroupBy.CMC    -> stringResource(R.string.deckbuilder_group_cmc)
+                                    ReviewGroupBy.RARITY -> stringResource(R.string.deckbuilder_group_rarity)
+                                },
+                                style = ty.labelSmall,
+                                color = if (sel) mc.primaryAccent else mc.textSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Grouped mainboard sections
+            grouped.entries.sortedBy { it.key }.forEach { (groupLabel, cards) ->
+                item(key = "group_$groupLabel") {
+                    SectionLabel(
+                        text     = "$groupLabel (${cards.sumOf { it.quantity }})",
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                     )
                 }
-            } else {
-                items(state.mainboard, key = { it.card.scryfallId }) { entry ->
-                    DeckEntryRow(
-                        entry          = entry,
-                        onRemove       = { onRemoveMain(entry.card.scryfallId) },
-                        onMoveToSide   = { onMoveToSide(entry.card.scryfallId) },
-                        showMoveToSide = true,
+                items(cards, key = { "main_${it.card.scryfallId}" }) { dc ->
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                    ) {
+                        DeckCardRow(
+                            deckCard = dc,
+                            onRemove = { onRemoveFromMainboard(dc.card.scryfallId) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        // Move to sideboard button
+                        TextButton(
+                            onClick  = { onMoveToSideboard(dc.card.scryfallId) },
+                            modifier = Modifier.width(48.dp),
+                        ) {
+                            Text("SB", style = ty.labelSmall, color = mc.secondaryAccent)
+                        }
+                    }
+                }
+            }
+
+            // Lands section
+            if (state.nonBasicLands.isNotEmpty() || state.basicLands.total > 0) {
+                item {
+                    LandsSection(
+                        nonBasicLands    = state.nonBasicLands,
+                        basicLands       = state.basicLands,
+                        onRemoveNonBasic = onRemoveNonBasicLand,
+                        modifier         = Modifier.padding(top = 8.dp),
                     )
                 }
             }
 
-            // ── Sideboard ──────────────────────────────────────────────────────
+            // Sideboard
             if (state.sideboard.isNotEmpty()) {
                 item {
-                    Spacer(Modifier.height(16.dp))
-                    SectionLabel("Sideboard  (${state.sideboardCount} cards)", Modifier.padding(bottom = 8.dp))
-                }
-                items(state.sideboard, key = { "side_${it.card.scryfallId}" }) { entry ->
-                    DeckEntryRow(
-                        entry          = entry,
-                        onRemove       = { onRemoveSide(entry.card.scryfallId) },
-                        onMoveToSide   = {},
-                        showMoveToSide = false,
+                    SectionLabel(
+                        text     = "Sideboard (${state.sideboard.sumOf { it.quantity }})",
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                     )
+                }
+                items(state.sideboard, key = { "side_${it.card.scryfallId}" }) { dc ->
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                    ) {
+                        DeckCardRow(
+                            deckCard = dc,
+                            onRemove = { onRemoveFromSideboard(dc.card.scryfallId) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(
+                            onClick  = { onMoveToMainboard(dc.card.scryfallId) },
+                            modifier = Modifier.width(56.dp),
+                        ) {
+                            Text("→MB", style = ty.labelSmall, color = mc.primaryAccent)
+                        }
+                    }
                 }
             }
         }
 
-        // ── Save button ────────────────────────────────────────────────────────
+        // Save button
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -652,7 +712,7 @@ private fun ReviewStep(
         ) {
             Button(
                 onClick  = onSave,
-                enabled  = state.mainboard.isNotEmpty() && !state.isSaving,
+                enabled  = state.totalCardCount > 0,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors   = ButtonDefaults.buttonColors(
                     containerColor         = mc.primaryAccent,
@@ -660,31 +720,18 @@ private fun ReviewStep(
                 ),
                 shape = RoundedCornerShape(8.dp),
             ) {
-                if (state.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color    = mc.background,
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(
-                        "Save Deck",
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = if (state.mainboard.isNotEmpty()) mc.background else mc.textDisabled,
-                    )
-                }
+                Text(
+                    text  = stringResource(R.string.deckbuilder_save_button),
+                    style = MaterialTheme.magicTypography.titleMedium,
+                    color = if (state.totalCardCount > 0) mc.background else mc.textDisabled,
+                )
             }
         }
 
-        // ── Error snackbar ─────────────────────────────────────────────────────
+        // Error
         state.error?.let { msg ->
             Snackbar(
-                action = {
-                    TextButton(onClick = onClearError) {
-                        Text(stringResource(R.string.action_close), color = mc.primaryAccent)
-                    }
-                },
-                modifier         = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                modifier         = Modifier.align(Alignment.BottomCenter).padding(bottom = 72.dp, start = 16.dp, end = 16.dp),
                 containerColor   = mc.lifeNegative.copy(alpha = 0.9f),
                 contentColor     = mc.textPrimary,
             ) {
@@ -694,70 +741,8 @@ private fun ReviewStep(
     }
 }
 
-@Composable
-private fun DeckEntryRow(
-    entry:          DeckEntry,
-    onRemove:       () -> Unit,
-    onMoveToSide:   () -> Unit,
-    showMoveToSide: Boolean,
-) {
-    val mc = MaterialTheme.magicColors
-    Row(
-        modifier          = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(mc.surface)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Small art thumbnail
-        AsyncImage(
-            model              = entry.card.imageArtCrop,
-            contentDescription = null,
-            contentScale       = ContentScale.Crop,
-            modifier           = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(mc.surfaceVariant),
-        )
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                entry.card.name,
-                style    = MaterialTheme.magicTypography.bodyMedium,
-                color    = mc.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    "CMC ${entry.card.cmc.toInt()}",
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textDisabled,
-                )
-                if (entry.isOwned) {
-                    Text("·", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
-                    Text("Owned", style = MaterialTheme.magicTypography.labelSmall, color = mc.lifePositive)
-                }
-            }
-        }
-
-        if (showMoveToSide) {
-            IconButton(onClick = onMoveToSide, modifier = Modifier.size(32.dp)) {
-                Text("→SB", style = MaterialTheme.magicTypography.labelSmall, color = mc.secondaryAccent)
-            }
-        }
-
-        IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "Remove",
-                tint = mc.textDisabled, modifier = Modifier.size(16.dp))
-        }
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Shared helpers
+//  Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -770,8 +755,34 @@ private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-private fun scoreColor(score: Float, high: Color, mid: Color, low: Color): Color = when {
-    score >= 0.7f -> high
-    score >= 0.4f -> mid
-    else          -> low
+private fun cardTypeLabel(typeLine: String): String = when {
+    typeLine.contains("Creature",    ignoreCase = true) -> "Creature"
+    typeLine.contains("Planeswalker",ignoreCase = true) -> "Planeswalker"
+    typeLine.contains("Instant",     ignoreCase = true) -> "Instant"
+    typeLine.contains("Sorcery",     ignoreCase = true) -> "Sorcery"
+    typeLine.contains("Enchantment", ignoreCase = true) -> "Enchantment"
+    typeLine.contains("Artifact",    ignoreCase = true) -> "Artifact"
+    typeLine.contains("Land",        ignoreCase = true) -> "Land"
+    else                                                -> "Other"
+}
+
+private fun mainColorLabel(colors: List<String>): String = when {
+    colors.isEmpty()  -> "Colorless"
+    colors.size > 1   -> "Multicolor"
+    else              -> when (colors.first().uppercase()) {
+        "W" -> "White"
+        "U" -> "Blue"
+        "B" -> "Black"
+        "R" -> "Red"
+        "G" -> "Green"
+        else -> colors.first()
+    }
+}
+
+private fun cmcLabel(cmc: Double): String = when (cmc.toInt()) {
+    0, 1 -> "0–1"
+    2    -> "2"
+    3    -> "3"
+    4    -> "4"
+    else -> "5+"
 }

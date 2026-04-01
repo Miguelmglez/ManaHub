@@ -127,7 +127,14 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(Screen.DeckBuilder.route) {
-                DeckBuilderScreen(onBack = { navController.popBackStack() })
+                DeckBuilderScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onDeckSaved    = {
+                        navController.navigate(Screen.Collection.route) {
+                            popUpTo(Screen.DeckBuilder.route) { inclusive = true }
+                        }
+                    },
+                )
             }
 
             // ── Stats ─────────────────────────────────────────────────────────

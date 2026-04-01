@@ -22,6 +22,7 @@
     <string name="action_refresh">Actualizar</string>
     <string name="action_reset">Restablecer</string>
     <string name="action_exit">Salir</string>
+    <string name="action_clear_filters">Limpiar</string>
     <string name="action_apply">Aplicar</string>
     <string name="action_move">Mover</string>
     <string name="action_share">Compartir</string>
@@ -219,6 +220,25 @@
     <string name="deckbuilder_review_deck">Revisar mazo</string>
     <string name="deckbuilder_all_reviewed">Todas las cartas revisadas</string>
     <string name="deckbuilder_add_to_deck">Añadir al mazo</string>
+    <string name="deckbuilder_tab_collection">Mi Colección</string>
+    <string name="deckbuilder_tab_suggestions">Sugerencias Scryfall</string>
+    <string name="deckbuilder_mana_curve_title">Curva de Maná</string>
+    <string name="deckbuilder_ideal_curve">Ideal</string>
+    <string name="deckbuilder_group_type">Tipo</string>
+    <string name="deckbuilder_group_color">Color</string>
+    <string name="deckbuilder_group_cmc">CMC</string>
+    <string name="deckbuilder_group_rarity">Rareza</string>
+    <string name="deckbuilder_format_total_cards">Total: %1$d</string>
+    <string name="deckbuilder_lands">Tierras</string>
+    <string name="deckbuilder_no_cards">Sin cartas aún</string>
+    <string name="deckbuilder_owned_label">En colección</string>
+    <string name="deckbuilder_not_owned_label">No disponible</string>
+    <string name="deckbuilder_commander_label">Comandante</string>
+    <string name="deckbuilder_setup_name_label">Nombre del mazo</string>
+    <string name="deckbuilder_setup_format_label">Formato</string>
+    <string name="deckbuilder_setup_commander_label">Elige Comandante</string>
+    <string name="deckbuilder_setup_build_button">Construir mazo</string>
+    <string name="deckbuilder_search_commander_hint">Buscar criatura legendaria…</string>
 
     <!-- GAME SETUP SCREEN -->
     <string name="gamesetup_title">Nueva partida</string>
@@ -552,6 +572,7 @@
     <string name="format_pioneer">Pionero</string>
     <string name="format_pauper">Pauper</string>
     <string name="format_historic">Histórico</string>
+    <string name="format_draft">Draft</string>
 
     <!-- BÚSQUEDA AVANZADA ADICIONAL -->
     <string name="advsearch_rarity_operator">Comparar:</string>
