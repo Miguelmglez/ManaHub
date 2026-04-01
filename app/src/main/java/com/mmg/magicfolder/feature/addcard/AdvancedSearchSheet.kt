@@ -167,26 +167,33 @@ fun AdvancedSearchSheet(
                 // ── Card type ──
                 item {
                     SearchSection(title = stringResource(R.string.advsearch_section_type)) {
-                        val commonTypes = listOf(
-                            "Creature", "Instant", "Sorcery",
-                            "Enchantment", "Artifact", "Planeswalker", "Land", "Legendary",
+                        data class TypeOption(val scryfallValue: String, val labelRes: Int)
+                        val typeOptions = listOf(
+                            TypeOption("Creature",     R.string.cardtype_creature),
+                            TypeOption("Instant",      R.string.cardtype_instant),
+                            TypeOption("Sorcery",      R.string.cardtype_sorcery),
+                            TypeOption("Enchantment",  R.string.cardtype_enchantment),
+                            TypeOption("Artifact",     R.string.cardtype_artifact),
+                            TypeOption("Planeswalker", R.string.cardtype_planeswalker),
+                            TypeOption("Land",         R.string.cardtype_land),
+                            TypeOption("Legendary",    R.string.cardtype_legendary),
                         )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            commonTypes.forEach { type ->
-                                val isSelected = uiState.cardType.contains(type, ignoreCase = true)
+                            typeOptions.forEach { option ->
+                                val isSelected = uiState.cardType.contains(option.scryfallValue, ignoreCase = true)
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = {
                                         val new = if (isSelected)
-                                            uiState.cardType.replace(type, "", ignoreCase = true).trim()
+                                            uiState.cardType.replace(option.scryfallValue, "", ignoreCase = true).trim()
                                         else
-                                            "${uiState.cardType} $type".trim()
+                                            "${uiState.cardType} ${option.scryfallValue}".trim()
                                         viewModel.setCardType(new)
                                     },
-                                    label = { Text(type, style = ty.labelSmall) },
+                                    label = { Text(stringResource(option.labelRes), style = ty.labelSmall) },
                                 )
                             }
                         }
@@ -293,51 +300,65 @@ fun AdvancedSearchSheet(
                 // ── Rarity ──
                 item {
                     SearchSection(title = stringResource(R.string.advsearch_section_rarity)) {
-                        OperatorSelector(
-                            selected = uiState.rarityOp,
-                            onSelect = { op -> viewModel.setRarity(uiState.selectedRarity, op) },
-                            options = listOf(
-                                ComparisonOperator.EQUAL,
-                                ComparisonOperator.GREATER_OR_EQUAL,
-                                ComparisonOperator.LESS_OR_EQUAL,
-                            ),
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                "common" to "●",
-                                "uncommon" to "◆",
-                                "rare" to "◈",
-                                "mythic" to "✦",
-                            ).forEach { (rarity, symbol) ->
-                                val isSelected = uiState.selectedRarity == rarity
-                                val color = when (rarity) {
-                                    "common" -> Color(0xFFAAAAAA)
-                                    "uncommon" -> Color(0xFFB0C4DE)
-                                    "rare" -> Color(0xFFC9A84C)
-                                    "mythic" -> Color(0xFFE8A030)
-                                    else -> Color.White
-                                }
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        viewModel.setRarity(
-                                            if (isSelected) "" else rarity,
-                                            uiState.rarityOp,
-                                        )
-                                    },
-                                    label = {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Text(symbol, color = color, fontSize = 14.sp)
-                                            Text(
-                                                rarity.replaceFirstChar { it.uppercase() },
-                                                style = ty.labelSmall,
-                                            )
-                                        }
-                                    },
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.advsearch_rarity_operator),
+                                    style = ty.bodySmall,
+                                    color = mc.textSecondary,
                                 )
+                                OperatorSelector(
+                                    selected = uiState.rarityOp,
+                                    onSelect = { op -> viewModel.setRarity(uiState.selectedRarity, op) },
+                                    options = listOf(
+                                        ComparisonOperator.EQUAL,
+                                        ComparisonOperator.GREATER_OR_EQUAL,
+                                        ComparisonOperator.LESS_OR_EQUAL,
+                                    ),
+                                )
+                            }
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                listOf(
+                                    "common"   to Pair("●", Color(0xFFAAAAAA)),
+                                    "uncommon" to Pair("◆", Color(0xFFB0C4DE)),
+                                    "rare"     to Pair("◈", Color(0xFFC9A84C)),
+                                    "mythic"   to Pair("✦", Color(0xFFE8A030)),
+                                ).forEach { (rarity, symbolColor) ->
+                                    val (symbol, color) = symbolColor
+                                    val isSelected = uiState.selectedRarity == rarity
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            viewModel.setRarity(
+                                                if (isSelected) "" else rarity,
+                                                uiState.rarityOp,
+                                            )
+                                        },
+                                        label = {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Text(symbol, color = color, fontSize = 14.sp)
+                                                Text(
+                                                    stringResource(when (rarity) {
+                                                        "common"   -> R.string.stats_rarity_common
+                                                        "uncommon" -> R.string.stats_rarity_uncommon
+                                                        "rare"     -> R.string.stats_rarity_rare
+                                                        else       -> R.string.stats_rarity_mythic
+                                                    }),
+                                                    style = ty.labelSmall,
+                                                )
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -473,25 +494,33 @@ fun AdvancedSearchSheet(
                                 color = if (uiState.formatLegal) mc.lifePositive else mc.lifeNegative,
                             )
                         }
+                        data class FormatOption(val scryfallValue: String, val labelRes: Int)
+                        val formatOptions = listOf(
+                            FormatOption("commander", R.string.format_commander),
+                            FormatOption("standard",  R.string.format_standard),
+                            FormatOption("modern",    R.string.format_modern),
+                            FormatOption("legacy",    R.string.format_legacy),
+                            FormatOption("vintage",   R.string.format_vintage),
+                            FormatOption("pioneer",   R.string.format_pioneer),
+                            FormatOption("pauper",    R.string.format_pauper),
+                            FormatOption("historic",  R.string.format_historic),
+                        )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            listOf(
-                                "commander", "standard", "modern",
-                                "legacy", "vintage", "pioneer", "pauper", "historic",
-                            ).forEach { format ->
+                            formatOptions.forEach { option ->
                                 FilterChip(
-                                    selected = uiState.selectedFormat == format,
+                                    selected = uiState.selectedFormat == option.scryfallValue,
                                     onClick = {
                                         viewModel.setFormat(
-                                            if (uiState.selectedFormat == format) "" else format,
+                                            if (uiState.selectedFormat == option.scryfallValue) "" else option.scryfallValue,
                                             uiState.formatLegal,
                                         )
                                     },
                                     label = {
                                         Text(
-                                            format.replaceFirstChar { it.uppercase() },
+                                            stringResource(option.labelRes),
                                             style = ty.labelSmall,
                                         )
                                     },
@@ -507,20 +536,29 @@ fun AdvancedSearchSheet(
                         title = stringResource(R.string.advsearch_section_keyword),
                         collapsedByDefault = true,
                     ) {
+                        data class KeywordOption(val scryfallValue: String, val labelRes: Int)
+                        val keywordOptions = listOf(
+                            KeywordOption("Flying",       R.string.keyword_flying),
+                            KeywordOption("Haste",        R.string.keyword_haste),
+                            KeywordOption("Trample",      R.string.keyword_trample),
+                            KeywordOption("Lifelink",     R.string.keyword_lifelink),
+                            KeywordOption("Deathtouch",   R.string.keyword_deathtouch),
+                            KeywordOption("Vigilance",    R.string.keyword_vigilance),
+                            KeywordOption("Flash",        R.string.keyword_flash),
+                            KeywordOption("Reach",        R.string.keyword_reach),
+                            KeywordOption("First Strike", R.string.keyword_first_strike),
+                            KeywordOption("Hexproof",     R.string.keyword_hexproof),
+                        )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            listOf(
-                                "Flying", "Haste", "Trample", "Lifelink",
-                                "Deathtouch", "Vigilance", "Flash",
-                                "Reach", "First Strike", "Hexproof",
-                            ).forEach { kw ->
-                                val isSelected = uiState.keyword.contains(kw, ignoreCase = true)
+                            keywordOptions.forEach { option ->
+                                val isSelected = uiState.keyword.contains(option.scryfallValue, ignoreCase = true)
                                 FilterChip(
                                     selected = isSelected,
-                                    onClick = { viewModel.setKeyword(if (isSelected) "" else kw) },
-                                    label = { Text(kw, style = ty.labelSmall) },
+                                    onClick = { viewModel.setKeyword(if (isSelected) "" else option.scryfallValue) },
+                                    label = { Text(stringResource(option.labelRes), style = ty.labelSmall) },
                                 )
                             }
                         }

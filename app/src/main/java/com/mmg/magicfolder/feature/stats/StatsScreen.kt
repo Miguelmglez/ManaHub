@@ -25,7 +25,7 @@ import com.mmg.magicfolder.core.domain.model.*
 import com.mmg.magicfolder.core.ui.theme.MagicColors
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
-import com.mmg.magicfolder.core.util.LocaleLanguageProvider
+import com.mmg.magicfolder.core.util.PriceFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -173,10 +173,10 @@ private fun SummarySection(
                         style = MaterialTheme.magicTypography.labelMedium,
                         color = mc.textSecondary,
                     )
-                    val value  = if (currency == Currency.USD) stats.totalValueUsd else stats.totalValueEur
-                    val symbol = if (currency == Currency.USD) "$" else "€"
+                    val currCode = if (currency == Currency.USD) "usd" else "eur"
+                    val value    = if (currency == Currency.USD) stats.totalValueUsd else stats.totalValueEur
                     Text(
-                        text  = "$symbol${String.format("%.2f", value)}",
+                        text  = PriceFormatter.format(value, currCode),
                         style = MaterialTheme.magicTypography.displayMedium,
                         color = mc.goldMtg,
                     )
@@ -286,8 +286,6 @@ private fun MostValuableSection(
     currency:    Currency,
     onCardClick: (String) -> Unit,
 ) {
-    val isUs = remember { LocaleLanguageProvider().get() == "us" }
-
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.stats_most_valuable), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
@@ -304,16 +302,15 @@ private fun MostValuableSection(
                     )
                 },
                 trailingContent = {
-                    val symbol = if (currency == Currency.USD) "$" else "€"
-                    val price  = if (currency == Currency.USD) card.priceUsd else card.priceUsd
+                    val currCode = if (currency == Currency.USD) "usd" else "eur"
                     Text(
-                        text  = "$symbol${String.format("%.2f", price)}",
+                        text  = PriceFormatter.format(card.priceUsd, currCode),
                         style = MaterialTheme.magicTypography.bodyLarge,
                         color = mc.goldMtg,
                     )
                 },
                 supportingContent = if (card.isFoil) {
-                    { Text(stringResource(if (isUs) R.string.carddetail_price_foil_usd else R.string.carddetail_price_foil_eur)  , style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
+                    { Text(stringResource(R.string.carddetail_price_foil_usd), style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
                 } else null,
             )
             if (index < cards.size - 1) HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)

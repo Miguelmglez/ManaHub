@@ -1,10 +1,11 @@
 package com.mmg.magicfolder.feature.stats
 
 import com.mmg.magicfolder.core.domain.model.CollectionStats
+import com.mmg.magicfolder.core.util.PriceFormatter
 
 data class StatsUiState(
     val stats:               CollectionStats? = null,
-    val currency:            Currency         = Currency.USD,
+    val currency:            Currency         = if (PriceFormatter.isEuropeanLocale()) Currency.EUR else Currency.USD,
     val isLoading:           Boolean          = true,
     val error:               String?          = null,
     val isRefreshingPrices:  Boolean          = false,
