@@ -568,4 +568,66 @@
     <string name="error_save_failed">Could not save. Try again.</string>
     <string name="error_unknown">An unexpected error occurred</string>
 
+    <!-- ══════════════════════════════════════════
+         CARD TYPES
+    ═══════════════════════════════════════════ -->
+    <string name="cardtype_creature">Creature</string>
+    <string name="cardtype_instant">Instant</string>
+    <string name="cardtype_sorcery">Sorcery</string>
+    <string name="cardtype_enchantment">Enchantment</string>
+    <string name="cardtype_artifact">Artifact</string>
+    <string name="cardtype_planeswalker">Planeswalker</string>
+    <string name="cardtype_land">Land</string>
+    <string name="cardtype_legendary">Legendary</string>
+    <string name="cardtype_battle">Battle</string>
+    <string name="cardtype_tribal">Tribal</string>
+
+    <!-- ══════════════════════════════════════════
+         KEYWORDS
+    ═══════════════════════════════════════════ -->
+    <string name="keyword_flying">Flying</string>
+    <string name="keyword_haste">Haste</string>
+    <string name="keyword_trample">Trample</string>
+    <string name="keyword_lifelink">Lifelink</string>
+    <string name="keyword_deathtouch">Deathtouch</string>
+    <string name="keyword_vigilance">Vigilance</string>
+    <string name="keyword_flash">Flash</string>
+    <string name="keyword_reach">Reach</string>
+    <string name="keyword_first_strike">First Strike</string>
+    <string name="keyword_hexproof">Hexproof</string>
+
+    <!-- ══════════════════════════════════════════
+         GAME FORMATS
+    ═══════════════════════════════════════════ -->
+    <string name="format_commander">Commander</string>
+    <string name="format_standard">Standard</string>
+    <string name="format_modern">Modern</string>
+    <string name="format_legacy">Legacy</string>
+    <string name="format_vintage">Vintage</string>
+    <string name="format_pioneer">Pioneer</string>
+    <string name="format_pauper">Pauper</string>
+    <string name="format_historic">Historic</string>
+
+    <!-- ══════════════════════════════════════════
+         ADVANCED SEARCH ADDITIONS
+    ═══════════════════════════════════════════ -->
+    <string name="advsearch_rarity_operator">Compare:</string>
+    <string name="advsearch_color_mode_color">Color</string>
+    <string name="advsearch_color_mode_identity">Identity</string>
+    <string name="advsearch_sort_name">Name</string>
+    <string name="advsearch_sort_cmc">CMC</string>
+    <string name="advsearch_sort_price">Price</string>
+    <string name="advsearch_sort_rarity">Rarity</string>
+    <string name="advsearch_sort_released">Date</string>
+    <string name="advsearch_sort_color">Color</string>
+    <string name="advsearch_dir_asc">↑ Asc</string>
+    <string name="advsearch_dir_desc">↓ Desc</string>
+
+    <!-- ══════════════════════════════════════════
+         PRICE FORMATTING
+    ═══════════════════════════════════════════ -->
+    <string name="price_not_available">—</string>
+    <string name="price_label_eur">EUR</string>
+    <string name="price_label_usd">USD</string>
+
 </resources>

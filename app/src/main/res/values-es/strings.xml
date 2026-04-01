@@ -501,6 +501,58 @@
     <string name="error_save_failed">No se pudo guardar. Inténtalo de nuevo.</string>
     <string name="error_unknown">Ha ocurrido un error inesperado</string>
 
+    <!-- TIPOS DE CARTA -->
+    <string name="cardtype_creature">Criatura</string>
+    <string name="cardtype_instant">Instantáneo</string>
+    <string name="cardtype_sorcery">Conjuro</string>
+    <string name="cardtype_enchantment">Encantamiento</string>
+    <string name="cardtype_artifact">Artefacto</string>
+    <string name="cardtype_planeswalker">Planeswalker</string>
+    <string name="cardtype_land">Tierra</string>
+    <string name="cardtype_legendary">Legendaria</string>
+    <string name="cardtype_battle">Batalla</string>
+    <string name="cardtype_tribal">Tribal</string>
+
+    <!-- PALABRAS CLAVE -->
+    <string name="keyword_flying">Volar</string>
+    <string name="keyword_haste">Prisa</string>
+    <string name="keyword_trample">Arrollar</string>
+    <string name="keyword_lifelink">Vínculo vital</string>
+    <string name="keyword_deathtouch">Toque mortífero</string>
+    <string name="keyword_vigilance">Vigilancia</string>
+    <string name="keyword_flash">Rayo</string>
+    <string name="keyword_reach">Alcance</string>
+    <string name="keyword_first_strike">Daño de combate primero</string>
+    <string name="keyword_hexproof">Protección hexadecimal</string>
+
+    <!-- FORMATOS -->
+    <string name="format_commander">Commander</string>
+    <string name="format_standard">Estándar</string>
+    <string name="format_modern">Moderno</string>
+    <string name="format_legacy">Legado</string>
+    <string name="format_vintage">Vintage</string>
+    <string name="format_pioneer">Pionero</string>
+    <string name="format_pauper">Pauper</string>
+    <string name="format_historic">Histórico</string>
+
+    <!-- BÚSQUEDA AVANZADA ADICIONAL -->
+    <string name="advsearch_rarity_operator">Comparar:</string>
+    <string name="advsearch_color_mode_color">Color</string>
+    <string name="advsearch_color_mode_identity">Identidad</string>
+    <string name="advsearch_sort_name">Nombre</string>
+    <string name="advsearch_sort_cmc">CMC</string>
+    <string name="advsearch_sort_price">Precio</string>
+    <string name="advsearch_sort_rarity">Rareza</string>
+    <string name="advsearch_sort_released">Fecha</string>
+    <string name="advsearch_sort_color">Color</string>
+    <string name="advsearch_dir_asc">↑ Asc</string>
+    <string name="advsearch_dir_desc">↓ Desc</string>
+
+    <!-- PRECIOS -->
+    <string name="price_not_available">—</string>
+    <string name="price_label_eur">EUR</string>
+    <string name="price_label_usd">USD</string>
+
     <!-- BÚSQUEDA AVANZADA -->
     <string name="advsearch_title">Búsqueda avanzada</string>
     <string name="advsearch_button">Búsqueda avanzada</string>

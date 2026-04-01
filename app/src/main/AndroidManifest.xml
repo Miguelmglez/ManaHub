@@ -17,6 +17,7 @@
         <activity
             android:name="com.mmg.magicfolder.app.MainActivity"
             android:exported="true"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
