@@ -38,16 +38,22 @@ object SurveyQuestionEngine {
 
     fun buildQuestions(result: GameResult, context: Context): List<SurveyQuestion> {
         val questions   = mutableListOf<SurveyQuestion>()
-        val localPlayer = result.playerResults.firstOrNull()
-        val isWinner    = localPlayer?.player?.id == result.winner.id
+        val appUserWon  = result.appUserWon
 
-        // Q1 — always: subjective outcome
+        // Q1 — always: subjective outcome, branched by win/loss
         questions += SurveyQuestion(
-            id   = "result_feel",
-            type = "RESULT_FEEL",
-            text = if (isWinner) context.getString(R.string.survey_q_result_win) else context.getString(R.string.survey_q_result_loss),
+            id           = "result_feel",
+            type         = "RESULT_FEEL",
+            contextBadge = if (appUserWon)
+                context.getString(R.string.survey_q_win_badge)
+            else
+                context.getString(R.string.survey_q_loss_badge),
+            text         = if (appUserWon)
+                context.getString(R.string.survey_q_result_win)
+            else
+                context.getString(R.string.survey_q_result_loss),
             answerOption = AnswerOption.SingleChoice(
-                if (isWinner) listOf(
+                if (appUserWon) listOf(
                     SurveyChoice("DOMINANT",  context.getString(R.string.survey_a_dominant),    "\uD83D\uDCAA"),
                     SurveyChoice("CLOSE",     context.getString(R.string.survey_a_close),       "\uD83D\uDE05"),
                     SurveyChoice("LUCKY",     context.getString(R.string.survey_a_lucky),       "\uD83C\uDF40"),
@@ -83,40 +89,72 @@ object SurveyQuestionEngine {
             answerOption = AnswerOption.StarRating(maxStars = 5),
         )
 
-        // Q4 — contextual: commander damage decisive
-        val commanderWin = result.playerResults.any {
-            it.eliminationReason == EliminationReason.COMMANDER_DAMAGE
-        }
-        if (commanderWin && result.gameMode == GameMode.COMMANDER) {
-            questions += SurveyQuestion(
-                id           = "commander_plan",
-                type         = "COMMANDER_DAMAGE",
-                text         = context.getString(R.string.survey_q_commander_plan),
-                contextBadge = context.getString(R.string.survey_q_commander_badge),
-                answerOption = AnswerOption.SingleChoice(listOf(
-                    SurveyChoice("PLANNED",   context.getString(R.string.survey_a_planned),    "\uD83C\uDFAF"),
-                    SurveyChoice("DEVELOPED", context.getString(R.string.survey_a_developed),  "\uD83C\uDF31"),
-                    SurveyChoice("SURPRISE",  context.getString(R.string.survey_a_surprise),   "\uD83D\uDE2E"),
-                )),
-            )
-        }
+        if (appUserWon) {
+            // ── WIN branch ────────────────────────────────────────────────────
 
-        // Q5 — contextual: loss reason
-        if (!isWinner) {
+            // Q4 win — contextual: commander damage decisive
+            val commanderWin = result.playerResults.any {
+                it.eliminationReason == EliminationReason.COMMANDER_DAMAGE
+            }
+            if (commanderWin && result.gameMode == GameMode.COMMANDER) {
+                questions += SurveyQuestion(
+                    id           = "commander_plan",
+                    type         = "COMMANDER_DAMAGE",
+                    text         = context.getString(R.string.survey_q_commander_plan),
+                    contextBadge = context.getString(R.string.survey_q_commander_badge),
+                    answerOption = AnswerOption.SingleChoice(listOf(
+                        SurveyChoice("PLANNED",   context.getString(R.string.survey_a_planned),    "\uD83C\uDFAF"),
+                        SurveyChoice("DEVELOPED", context.getString(R.string.survey_a_developed),  "\uD83C\uDF31"),
+                        SurveyChoice("SURPRISE",  context.getString(R.string.survey_a_surprise),   "\uD83D\uDE2E"),
+                    )),
+                )
+            }
+
+            // Q5 win — optional: anything to do differently?
             questions += SurveyQuestion(
-                id   = "loss_reason",
-                type = "LOSS_REASON",
-                text = context.getString(R.string.survey_q_loss_reason),
+                id           = "win_improvement",
+                type         = "FREE_TEXT",
+                text         = context.getString(R.string.survey_q_win_improvement),
+                contextBadge = context.getString(R.string.survey_q_optional_badge),
+                answerOption = AnswerOption.FreeText,
+            )
+
+        } else {
+            // ── LOSS branch ───────────────────────────────────────────────────
+
+            // Q4 loss — what would you change?
+            questions += SurveyQuestion(
+                id           = "loss_reason",
+                type         = "LOSS_REASON",
+                text         = context.getString(R.string.survey_q_loss_reason),
+                contextBadge = context.getString(R.string.survey_q_loss_reason_badge),
                 answerOption = AnswerOption.SingleChoice(listOf(
-                    SurveyChoice("REMOVAL",     context.getString(R.string.survey_a_more_removal),    "\u2694"),
-                    SurveyChoice("CURVE",       context.getString(R.string.survey_a_better_curve),    "\uD83D\uDCCA"),
+                    SurveyChoice("REMOVAL",     context.getString(R.string.survey_a_more_removal),     "\u2694"),
+                    SurveyChoice("CURVE",       context.getString(R.string.survey_a_better_curve),     "\uD83D\uDCCA"),
                     SurveyChoice("INTERACTION", context.getString(R.string.survey_a_more_interaction), "\uD83D\uDEE1"),
-                    SurveyChoice("NOTHING",     context.getString(R.string.survey_a_nothing),          "\uD83E\uDD1D"),
+                    SurveyChoice("NOTHING",     context.getString(R.string.survey_a_nothing),           "\uD83E\uDD1D"),
                 )),
             )
+
+            // Q5 loss — contextual: sideboard if app user has a deck
+            val appUser = result.allPlayers.firstOrNull { it.isAppUser }
+            if (appUser?.deckId != null) {
+                questions += SurveyQuestion(
+                    id           = "sideboard",
+                    type         = "SIDEBOARD",
+                    text         = context.getString(R.string.survey_q_sideboard),
+                    contextBadge = context.getString(R.string.survey_q_sideboard_badge),
+                    answerOption = AnswerOption.SingleChoice(listOf(
+                        SurveyChoice("SIDE_HELPED",  context.getString(R.string.survey_a_side_helped),  "\uD83D\uDCAA"),
+                        SurveyChoice("SIDE_NO_HELP", context.getString(R.string.survey_a_side_no_help), "\uD83E\uDD37"),
+                        SurveyChoice("NO_SWAPS",     context.getString(R.string.survey_a_side_no_swaps),"\uD83D\uDEAB"),
+                        SurveyChoice("FORGOT",       context.getString(R.string.survey_a_side_forgot),  "\uD83E\uDD26"),
+                    )),
+                )
+            }
         }
 
-        // Q6 — always last: free notes
+        // Last — always: free notes
         questions += SurveyQuestion(
             id           = "free_notes",
             type         = "FREE_TEXT",

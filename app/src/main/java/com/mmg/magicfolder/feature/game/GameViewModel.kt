@@ -40,7 +40,10 @@ data class GameUiState(
     val showLayoutEditor:            Boolean = false,
     // Per-player accumulated life deltas (cleared after 1.5s of inactivity)
     val lifeDeltas:   Map<Int, Int>     = emptyMap(),
-)
+) {
+    val appUserPlayer: Player? get() = players.firstOrNull { it.isAppUser }
+    val appUserWon:    Boolean get() = winner?.isAppUser == true
+}
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
@@ -347,13 +350,17 @@ class GameViewModel @Inject constructor(
         if (alive.size == 1 && s.players.size > 1) {
             val winner = alive.first()
             val duration = System.currentTimeMillis() - s.gameStartTime
+            val appUser = s.players.firstOrNull { it.isAppUser }
             val result = GameResult(
-                winner        = winner,
-                allPlayers    = s.players,
-                gameMode      = s.mode,
-                totalTurns    = s.turnNumber,
-                durationMs    = duration,
-                playerResults = s.players.map { p ->
+                winner           = winner,
+                allPlayers       = s.players,
+                gameMode         = s.mode,
+                totalTurns       = s.turnNumber,
+                durationMs       = duration,
+                appUserWon       = winner.isAppUser,
+                appUserFinalLife = appUser?.life ?: 0,
+                appUserName      = appUser?.name ?: "",
+                playerResults    = s.players.map { p ->
                     PlayerResult(
                         player                       = p,
                         finalLife                    = p.life,
@@ -389,10 +396,11 @@ class GameViewModel @Inject constructor(
         val mode    = _uiState.value.mode
         val players = configs.mapIndexed { i, config ->
             Player(
-                id    = i,
-                name  = config.name.ifEmpty { "Player ${i + 1}" },
-                life  = mode.startingLife,
-                theme = config.theme,
+                id        = i,
+                name      = config.name.ifEmpty { "Player ${i + 1}" },
+                life      = mode.startingLife,
+                theme     = config.theme,
+                isAppUser = config.isAppUser,
             )
         }
         val layout = selectedLayout ?: LayoutTemplates.getDefaultLayout(players.size)
@@ -404,10 +412,11 @@ class GameViewModel @Inject constructor(
             val clampedCount = playerCount.coerceIn(2, 6)
             val players = (0 until clampedCount).map { i ->
                 Player(
-                    id    = i,
-                    name  = "Player ${i + 1}",
-                    life  = mode.startingLife,
-                    theme = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                    id        = i,
+                    name      = "Player ${i + 1}",
+                    life      = mode.startingLife,
+                    theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                    isAppUser = i == 0,
                 )
             }
             return GameUiState(

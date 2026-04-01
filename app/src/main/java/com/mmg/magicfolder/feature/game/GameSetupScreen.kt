@@ -1,5 +1,6 @@
 package com.mmg.magicfolder.feature.game
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -339,26 +340,59 @@ private fun PlayerConfigRow(
                 .clickable { showColorPicker = true },
         )
 
-        // Name field
-        BasicTextField(
-            value       = config.name,
-            onValueChange = onNameChange,
-            modifier    = Modifier.weight(1f),
-            textStyle   = MaterialTheme.magicTypography.bodyLarge.copy(color = mc.textPrimary),
-            singleLine  = true,
-            decorationBox = { inner ->
-                Box {
-                    if (config.name.isEmpty()) {
-                        Text(
-                            stringResource(R.string.gamesetup_player_name_hint, config.id + 1),
-                            style = MaterialTheme.magicTypography.bodyLarge,
-                            color = mc.textDisabled,
-                        )
-                    }
-                    inner()
+        // Name field — read-only for the app user (Player 1)
+        if (config.isAppUser) {
+            Row(
+                modifier              = Modifier.weight(1f),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text  = config.name.ifBlank { stringResource(R.string.game_setup_default_player_name) },
+                    style = MaterialTheme.magicTypography.bodyLarge,
+                    color = if (config.isDefaultName) mc.textDisabled else mc.primaryAccent,
+                )
+                Surface(
+                    shape  = RoundedCornerShape(6.dp),
+                    color  = mc.primaryAccent.copy(alpha = 0.15f),
+                    border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.4f)),
+                ) {
+                    Text(
+                        text     = stringResource(R.string.game_setup_you_badge),
+                        style    = MaterialTheme.magicTypography.labelSmall,
+                        color    = mc.primaryAccent,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
                 }
-            },
-        )
+                if (config.isDefaultName) {
+                    Text(
+                        text  = stringResource(R.string.game_setup_set_name_hint),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textDisabled,
+                    )
+                }
+            }
+        } else {
+            BasicTextField(
+                value         = config.name,
+                onValueChange = onNameChange,
+                modifier      = Modifier.weight(1f),
+                textStyle     = MaterialTheme.magicTypography.bodyLarge.copy(color = mc.textPrimary),
+                singleLine    = true,
+                decorationBox = { inner ->
+                    Box {
+                        if (config.name.isEmpty()) {
+                            Text(
+                                stringResource(R.string.gamesetup_player_name_hint, config.id + 1),
+                                style = MaterialTheme.magicTypography.bodyLarge,
+                                color = mc.textDisabled,
+                            )
+                        }
+                        inner()
+                    }
+                },
+            )
+        }
 
     }
 

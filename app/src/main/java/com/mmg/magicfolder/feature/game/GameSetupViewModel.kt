@@ -1,6 +1,8 @@
 package com.mmg.magicfolder.feature.game
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.data.local.LanguagePreference
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.feature.game.model.GameMode
@@ -10,18 +12,24 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Data model
 // ─────────────────────────────────────────────────────────────────────────────
 
+private val DEFAULT_NAMES = setOf("Player 1", "Jugador 1", "Spieler 1")
+
 data class PlayerConfig(
-    val id:         Int,
-    val name:       String,
-    val theme:      PlayerThemeColors,
-    val gridPosition: Int = 0,
+    val id:           Int,
+    val name:         String,
+    val theme:        PlayerThemeColors,
+    val gridPosition: Int     = 0,
+    val isAppUser:    Boolean = false,
+    val isDefaultName: Boolean = false,
 )
 
 data class GameSetupUiState(
@@ -36,10 +44,30 @@ data class GameSetupUiState(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @HiltViewModel
-class GameSetupViewModel @Inject constructor() : ViewModel() {
+class GameSetupViewModel @Inject constructor(
+    private val languagePreference: LanguagePreference,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(buildInitialState(GameMode.STANDARD, 2))
     val uiState: StateFlow<GameSetupUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            val profileName = languagePreference.playerNameFlow.first()
+            val isDefault   = profileName.isBlank() || profileName in DEFAULT_NAMES
+            _uiState.update { state ->
+                val configs = state.playerConfigs.toMutableList()
+                if (configs.isNotEmpty()) {
+                    configs[0] = configs[0].copy(
+                        name          = profileName,
+                        isAppUser     = true,
+                        isDefaultName = isDefault,
+                    )
+                }
+                state.copy(playerConfigs = configs)
+            }
+        }
+    }
 
     fun onModeChange(mode: GameMode) {
         _uiState.update { it.copy(selectedMode = mode) }
@@ -50,10 +78,12 @@ class GameSetupViewModel @Inject constructor() : ViewModel() {
         val current = _uiState.value.playerConfigs
         val configs = List(clampedCount) { i ->
             current.getOrNull(i) ?: PlayerConfig(
-                id           = i,
-                name         = "",
-                theme        = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
-                gridPosition = i,
+                id            = i,
+                name          = "",
+                theme         = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                gridPosition  = i,
+                isAppUser     = false,
+                isDefaultName = true,
             )
         }
         _uiState.update { it.copy(
@@ -87,10 +117,12 @@ class GameSetupViewModel @Inject constructor() : ViewModel() {
     private fun buildInitialState(mode: GameMode, count: Int): GameSetupUiState {
         val configs = List(count) { i ->
             PlayerConfig(
-                id           = i,
-                name         = "",
-                theme        = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
-                gridPosition = i,
+                id            = i,
+                name          = "",
+                theme         = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                gridPosition  = i,
+                isAppUser     = i == 0,
+                isDefaultName = true,
             )
         }
         return GameSetupUiState(

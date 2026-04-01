@@ -303,7 +303,18 @@
     <string name="survey_save_button">Guardar →</string>
     <string name="survey_free_text_hint">Notas opcionales sobre la partida…</string>
 
+    <!-- Game setup -->
+    <string name="game_setup_you_badge">Tú</string>
+    <string name="game_setup_default_player_name">Jugador 1</string>
+    <string name="game_setup_set_name_hint">· Pon tu nombre en el Perfil</string>
+
     <!-- Survey questions -->
+    <string name="survey_q_win_badge">🏆 Victoria</string>
+    <string name="survey_q_loss_badge">💀 Derrota</string>
+    <string name="survey_q_loss_reason_badge">🎯 Próxima vez</string>
+    <string name="survey_q_sideboard_badge">📋 Banquillo</string>
+    <string name="survey_q_optional_badge">💭 Opcional</string>
+    <string name="survey_q_win_improvement">¿Algo que harías diferente la próxima vez?</string>
     <string name="survey_q_result_win">¿Cómo se sintió la victoria?</string>
     <string name="survey_q_result_loss">¿Qué te costó la partida?</string>
     <string name="survey_q_mana">¿Cómo fue tu maná?</string>

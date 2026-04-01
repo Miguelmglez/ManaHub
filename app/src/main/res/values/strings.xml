@@ -327,7 +327,18 @@
     <string name="survey_save_button">Save →</string>
     <string name="survey_free_text_hint">Optional notes about this game…</string>
 
+    <!-- Game setup -->
+    <string name="game_setup_you_badge">You</string>
+    <string name="game_setup_default_player_name">Player 1</string>
+    <string name="game_setup_set_name_hint">· Set your name in Profile</string>
+
     <!-- Survey questions -->
+    <string name="survey_q_win_badge">🏆 Victory</string>
+    <string name="survey_q_loss_badge">💀 Defeat</string>
+    <string name="survey_q_loss_reason_badge">🎯 Next time</string>
+    <string name="survey_q_sideboard_badge">📋 Sideboard</string>
+    <string name="survey_q_optional_badge">💭 Optional</string>
+    <string name="survey_q_win_improvement">Anything you\'d do differently next time?</string>
     <string name="survey_q_result_win">How did the win feel?</string>
     <string name="survey_q_result_loss">What cost you the game?</string>
     <string name="survey_q_mana">How was your mana?</string>

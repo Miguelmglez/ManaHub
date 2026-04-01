@@ -19,6 +19,7 @@ data class Player(
     val theme:            PlayerThemeColors,
     val gridPosition:     Int                 = id,
     val rotation:         Int                 = 0,           // 0, 90, 180, 270
+    val isAppUser:        Boolean             = false,
 )
 
 data class CustomCounter(

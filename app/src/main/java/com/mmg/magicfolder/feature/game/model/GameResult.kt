@@ -1,12 +1,15 @@
 package com.mmg.magicfolder.feature.game.model
 
 data class GameResult(
-    val winner:         Player,
-    val allPlayers:     List<Player>,
-    val gameMode:       GameMode,
-    val totalTurns:     Int,
-    val durationMs:     Long,
-    val playerResults:  List<PlayerResult>,
+    val winner:           Player,
+    val allPlayers:       List<Player>,
+    val gameMode:         GameMode,
+    val totalTurns:       Int,
+    val durationMs:       Long,
+    val playerResults:    List<PlayerResult>,
+    val appUserWon:       Boolean = false,
+    val appUserFinalLife: Int     = 0,
+    val appUserName:      String  = "",
 )
 
 data class PlayerResult(
