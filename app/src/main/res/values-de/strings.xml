@@ -23,6 +23,7 @@
     <string name="action_refresh">Aktualisieren</string>
     <string name="action_reset">Zurücksetzen</string>
     <string name="action_exit">Beenden</string>
+    <string name="action_clear_filters">Löschen</string>
     <string name="action_apply">Anwenden</string>
     <string name="action_move">Verschieben</string>
     <string name="action_share">Teilen</string>
@@ -220,6 +221,25 @@
     <string name="deckbuilder_review_deck">Deck prüfen</string>
     <string name="deckbuilder_all_reviewed">Alle Karten geprüft</string>
     <string name="deckbuilder_add_to_deck">Zum Deck hinzufügen</string>
+    <string name="deckbuilder_tab_collection">Meine Sammlung</string>
+    <string name="deckbuilder_tab_suggestions">Scryfall-Vorschläge</string>
+    <string name="deckbuilder_mana_curve_title">Manakurve</string>
+    <string name="deckbuilder_ideal_curve">Ideal</string>
+    <string name="deckbuilder_group_type">Typ</string>
+    <string name="deckbuilder_group_color">Farbe</string>
+    <string name="deckbuilder_group_cmc">MKK</string>
+    <string name="deckbuilder_group_rarity">Seltenheit</string>
+    <string name="deckbuilder_format_total_cards">Gesamt: %1$d</string>
+    <string name="deckbuilder_lands">Länder</string>
+    <string name="deckbuilder_no_cards">Noch keine Karten</string>
+    <string name="deckbuilder_owned_label">In Sammlung</string>
+    <string name="deckbuilder_not_owned_label">Nicht vorhanden</string>
+    <string name="deckbuilder_commander_label">Anführer</string>
+    <string name="deckbuilder_setup_name_label">Deckname</string>
+    <string name="deckbuilder_setup_format_label">Format</string>
+    <string name="deckbuilder_setup_commander_label">Anführer wählen</string>
+    <string name="deckbuilder_setup_build_button">Deck bauen</string>
+    <string name="deckbuilder_search_commander_hint">Legendäre Kreatur suchen…</string>
 
     <!-- GAME SETUP SCREEN -->
     <string name="gamesetup_title">Neues Spiel</string>
@@ -553,6 +573,7 @@
     <string name="format_pioneer">Pioneer</string>
     <string name="format_pauper">Pauper</string>
     <string name="format_historic">Historic</string>
+    <string name="format_draft">Draft</string>
 
     <!-- ERWEITERTE SUCHE ZUSÄTZLICH -->
     <string name="advsearch_rarity_operator">Vergleichen:</string>

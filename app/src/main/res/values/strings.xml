@@ -24,6 +24,7 @@
     <string name="action_refresh">Refresh</string>
     <string name="action_reset">Reset</string>
     <string name="action_exit">Exit</string>
+    <string name="action_clear_filters">Clear</string>
     <string name="action_apply">Apply</string>
     <string name="action_move">Move</string>
     <string name="action_share">Share</string>
@@ -235,6 +236,25 @@
     <string name="deckbuilder_review_deck">Review Deck</string>
     <string name="deckbuilder_all_reviewed">All cards reviewed</string>
     <string name="deckbuilder_add_to_deck">Add to Deck</string>
+    <string name="deckbuilder_tab_collection">My Collection</string>
+    <string name="deckbuilder_tab_suggestions">Scryfall Suggestions</string>
+    <string name="deckbuilder_mana_curve_title">Mana Curve</string>
+    <string name="deckbuilder_ideal_curve">Ideal</string>
+    <string name="deckbuilder_group_type">Type</string>
+    <string name="deckbuilder_group_color">Color</string>
+    <string name="deckbuilder_group_cmc">CMC</string>
+    <string name="deckbuilder_group_rarity">Rarity</string>
+    <string name="deckbuilder_format_total_cards">Total: %1$d</string>
+    <string name="deckbuilder_lands">Lands</string>
+    <string name="deckbuilder_no_cards">No cards yet</string>
+    <string name="deckbuilder_owned_label">Owned</string>
+    <string name="deckbuilder_not_owned_label">Not owned</string>
+    <string name="deckbuilder_commander_label">Commander</string>
+    <string name="deckbuilder_setup_name_label">Deck Name</string>
+    <string name="deckbuilder_setup_format_label">Format</string>
+    <string name="deckbuilder_setup_commander_label">Choose Commander</string>
+    <string name="deckbuilder_setup_build_button">Build Deck</string>
+    <string name="deckbuilder_search_commander_hint">Search legendary creature…</string>
 
     <!-- ══════════════════════════════════════════
          GAME SETUP SCREEN
@@ -625,6 +645,7 @@
     <string name="format_pioneer">Pioneer</string>
     <string name="format_pauper">Pauper</string>
     <string name="format_historic">Historic</string>
+    <string name="format_draft">Draft</string>
 
     <!-- ══════════════════════════════════════════
          ADVANCED SEARCH ADDITIONS

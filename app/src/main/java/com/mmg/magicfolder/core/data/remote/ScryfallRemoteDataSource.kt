@@ -19,6 +19,9 @@ class ScryfallRemoteDataSource @Inject constructor(
     suspend fun searchCardByName(query: String): Result<Card> =
         safeCall { requestQueue.execute { api.getCardByName(query) }.toDomain() }
 
+    suspend fun getCardByExactName(name: String): Result<Card> =
+        safeCall { requestQueue.execute { api.getCardByExactName(name) }.toDomain() }
+
     suspend fun searchCards(query: String, page: Int = 1): Result<List<Card>> =
         safeCall { requestQueue.execute { api.searchCards(query, page = page) }.data.toDomain() }
 
