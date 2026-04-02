@@ -1,0 +1,87 @@
+package com.mmg.magicfolder.feature.addcard
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.magicfolder.core.domain.model.MagicSet
+import com.mmg.magicfolder.core.domain.model.PLAYABLE_SET_TYPES
+import com.mmg.magicfolder.core.domain.model.SetType
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class SetPickerViewModel @Inject constructor(
+    private val scryfallDataSource: ScryfallRemoteDataSource,
+) : ViewModel() {
+
+    data class UiState(
+        val allSets: List<MagicSet> = emptyList(),
+        val filteredSets: List<MagicSet> = emptyList(),
+        val searchQuery: String = "",
+        val selectedTypes: Set<SetType> = emptySet(),
+        val isLoading: Boolean = false,
+        val error: String? = null,
+    )
+
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init { loadSets() }
+
+    private fun loadSets() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val sets = scryfallDataSource.getAllSets()
+                _uiState.update { it.copy(
+                    allSets = sets,
+                    filteredSets = sets,
+                    isLoading = false,
+                )}
+            } catch (e: Exception) {
+                _uiState.update { it.copy(
+                    isLoading = false,
+                    error = e.message,
+                )}
+            }
+        }
+    }
+
+    fun onSearchQueryChanged(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+        applyFilters()
+    }
+
+    fun toggleTypeFilter(type: SetType) {
+        val current = _uiState.value.selectedTypes.toMutableSet()
+        if (current.contains(type)) current.remove(type) else current.add(type)
+        _uiState.update { it.copy(selectedTypes = current) }
+        applyFilters()
+    }
+
+    fun clearFilters() {
+        _uiState.update { it.copy(
+            searchQuery = "",
+            selectedTypes = emptySet(),
+            filteredSets = _uiState.value.allSets,
+        )}
+    }
+
+    private fun applyFilters() {
+        val s = _uiState.value
+        val filtered = s.allSets.filter { set ->
+            val matchesQuery = s.searchQuery.isBlank() ||
+                set.name.contains(s.searchQuery, ignoreCase = true) ||
+                set.code.contains(s.searchQuery, ignoreCase = true)
+            val matchesType = s.selectedTypes.isEmpty() ||
+                set.setType in s.selectedTypes
+            matchesQuery && matchesType
+        }
+        _uiState.update { it.copy(filteredSets = filtered) }
+    }
+}

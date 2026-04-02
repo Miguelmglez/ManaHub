@@ -622,4 +622,22 @@
     <string name="advsearch_section_sort">Ordenar resultados</string>
     <string name="advsearch_no_results">No se encontraron cartas</string>
     <string name="advsearch_no_criteria">Añade al menos un criterio</string>
+
+    <!-- SET PICKER -->
+    <string name="advsearch_section_set">Colección / Set</string>
+    <string name="advsearch_set_hint">Buscar por nombre o código de set…</string>
+    <string name="advsearch_set_picker_title">Elegir colección</string>
+    <string name="advsearch_set_search_hint">Nombre o código (ej. MOM, EOE…)</string>
+    <string name="advsearch_set_clear">Quitar colección</string>
+    <string name="advsearch_set_no_results">No se encontraron sets</string>
+    <string name="advsearch_set_count">%1$d colecciones</string>
+    <string name="advsearch_set_card_count">%1$d cartas</string>
+    <string name="set_type_expansion">Expansión</string>
+    <string name="set_type_core">Principal</string>
+    <string name="set_type_masters">Masters</string>
+    <string name="set_type_draft_innovation">Draft</string>
+    <string name="set_type_commander">Commander</string>
+    <string name="set_type_starter">Iniciación</string>
+    <string name="set_type_funny">Humor</string>
+    <string name="set_type_other">Otro</string>
 </resources>

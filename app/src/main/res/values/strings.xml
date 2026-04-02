@@ -663,6 +663,26 @@
     <string name="advsearch_dir_desc">↓ Desc</string>
 
     <!-- ══════════════════════════════════════════
+         ADVANCED SEARCH — SET PICKER
+    ═══════════════════════════════════════════ -->
+    <string name="advsearch_section_set">Set / Collection</string>
+    <string name="advsearch_set_hint">Search by set name or code…</string>
+    <string name="advsearch_set_picker_title">Choose a Set</string>
+    <string name="advsearch_set_search_hint">Set name or code (e.g. MOM, EOE…)</string>
+    <string name="advsearch_set_clear">Clear set</string>
+    <string name="advsearch_set_no_results">No sets found</string>
+    <string name="advsearch_set_count">%1$d sets</string>
+    <string name="advsearch_set_card_count">%1$d cards</string>
+    <string name="set_type_expansion">Expansion</string>
+    <string name="set_type_core">Core</string>
+    <string name="set_type_masters">Masters</string>
+    <string name="set_type_draft_innovation">Draft</string>
+    <string name="set_type_commander">Commander</string>
+    <string name="set_type_starter">Starter</string>
+    <string name="set_type_funny">Funny</string>
+    <string name="set_type_other">Other</string>
+
+    <!-- ══════════════════════════════════════════
          PRICE FORMATTING
     ═══════════════════════════════════════════ -->
     <string name="price_not_available">—</string>

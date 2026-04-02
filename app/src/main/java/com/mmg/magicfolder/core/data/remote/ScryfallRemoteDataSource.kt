@@ -4,6 +4,9 @@ import com.mmg.magicfolder.core.data.remote.dto.*
 import com.mmg.magicfolder.core.data.remote.dto.SearchResultDto
 import com.mmg.magicfolder.core.data.remote.mapper.toDomain
 import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.domain.model.MagicSet
+import com.mmg.magicfolder.core.domain.model.PLAYABLE_SET_TYPES
+import com.mmg.magicfolder.core.domain.model.SetType
 import com.mmg.magicfolder.core.network.ScryfallRequestQueue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,6 +60,26 @@ class ScryfallRemoteDataSource @Inject constructor(
             }
             allCards.toDomain()
         }
+
+    suspend fun getAllSets(): List<MagicSet> {
+        return requestQueue.execute { api.getSets() }
+            .data
+            .filter { dto ->
+                !dto.digital &&
+                SetType.from(dto.setType) in PLAYABLE_SET_TYPES
+            }
+            .map { dto ->
+                MagicSet(
+                    code       = dto.code,
+                    name       = dto.name,
+                    setType    = SetType.from(dto.setType),
+                    releasedAt = dto.releasedAt,
+                    cardCount  = dto.cardCount,
+                    iconSvgUri = dto.iconSvgUri,
+                )
+            }
+            .sortedByDescending { it.releasedAt ?: "" }
+    }
 
     // Reutilizes /cards/search with unique=art to get one entry per unique artwork
     suspend fun searchPlaneswalkerArts(
