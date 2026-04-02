@@ -460,8 +460,15 @@ private fun TagPickerSheet(
 ) {
     val categories = TagCategory.entries
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        contentWindowInsets = { WindowInsets(0) }
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .navigationBarsPadding()
+        ) {
             Text("Añadir etiqueta", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
 
@@ -514,9 +521,14 @@ private fun EditCardSheet(
     var qty by remember { mutableIntStateOf(userCard.quantity) }
     var cond by remember { mutableStateOf(userCard.condition) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        contentWindowInsets = { WindowInsets(0) }
+    ) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.carddetail_edit_title), style = MaterialTheme.typography.titleMedium)

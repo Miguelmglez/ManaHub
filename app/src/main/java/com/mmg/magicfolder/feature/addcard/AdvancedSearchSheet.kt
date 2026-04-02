@@ -56,11 +56,13 @@ fun AdvancedSearchSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        contentWindowInsets = { WindowInsets(0) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.92f),
+                .fillMaxHeight(0.92f)
+                .navigationBarsPadding(),
         ) {
             // ── Header ──────────────────────────────────────────────────────────
             Row(
@@ -240,7 +242,7 @@ fun AdvancedSearchSheet(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            listOf("W", "U", "B", "R", "G", "C", "M").forEach { color ->
+                            listOf("W", "U", "B", "R", "G", "C").forEach { color ->
                                 val isSelected = uiState.selectedColors.contains(color)
                                 Box(
                                     modifier = Modifier

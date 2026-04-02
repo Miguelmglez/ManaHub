@@ -824,9 +824,12 @@ private fun CmdDamagePanel(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor   = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) }
     ) {
         Column(
-            modifier            = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier            = Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -894,9 +897,12 @@ private fun CountersPanel(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor   = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) }
     ) {
         Column(
-            modifier            = Modifier.padding(16.dp),
+            modifier            = Modifier
+                .padding(16.dp)
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -1074,6 +1080,3 @@ private fun RenameDialog(
         },
     )
 }
-
-
-

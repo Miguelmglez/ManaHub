@@ -369,17 +369,23 @@ private fun ColorFilterRow(
 ) {
     val mc      = MaterialTheme.magicColors
     val isAllActive = activeFilters.isEmpty()
+    
+    // Optimizamos usando keys para que el scroll sea más fluido
     LazyRow(
         contentPadding        = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier              = Modifier.padding(vertical = 4.dp),
     ) {
-        items(ColorFilter.entries) { filter ->
-            val manaCode  = filter.manaCode()
-            val manaColor = filter.manaColor(mc)
+        items(
+            items = ColorFilter.entries,
+            key = { it.name }
+        ) { filter ->
+            val manaCode  = remember(filter) { filter.manaCode() }
+            val manaColor = remember(filter, mc) { filter.manaColor(mc) }
             val isColor   = manaCode != null
             val isSelected = if (filter == ColorFilter.ALL) isAllActive
                              else activeFilters.contains(filter)
+            
             FilterChip(
                 selected = isSelected,
                 onClick  = { onToggleFilter(filter) },
@@ -498,7 +504,10 @@ private fun CardList(
         contentPadding      = PaddingValues(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        items(cards, key = { it.userCard.id }) { item ->
+        items(
+            items = cards,
+            key = { it.userCard.id }
+        ) { item ->
             CardListItem(
                 item     = item,
                 onClick  = { onCardClick(item.card.scryfallId) },
