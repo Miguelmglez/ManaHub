@@ -49,11 +49,13 @@ fun SetPickerSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        contentWindowInsets = { WindowInsets(0) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.92f),
+                .fillMaxHeight(0.92f)
+                .navigationBarsPadding(),
         ) {
             // ── Header ──
             Row(

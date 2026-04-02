@@ -420,8 +420,15 @@ private fun ColorPickerSheet(
     onDismiss:       () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        contentWindowInsets = { WindowInsets(0) }
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .navigationBarsPadding()
+        ) {
             Text(
                 stringResource(R.string.gamesetup_choose_color),
                 style = MaterialTheme.magicTypography.titleMedium,
