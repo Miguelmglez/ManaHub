@@ -640,4 +640,6 @@
     <string name="set_type_starter">Iniciación</string>
     <string name="set_type_funny">Humor</string>
     <string name="set_type_other">Otro</string>
+    <string name="advsearch_set_selected_count">%1$d colecciones</string>
+    <string name="advsearch_set_done">Hecho (%1$d colecciones)</string>
 </resources>

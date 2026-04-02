@@ -380,15 +380,15 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(title = stringResource(R.string.advsearch_section_set)) {
                         var showSetPicker by remember { mutableStateOf(false) }
-                        val selectedSet = uiState.selectedSet
+                        val selectedSets = uiState.selectedSets
 
                         Surface(
                             onClick = { showSetPicker = true },
                             shape = RoundedCornerShape(12.dp),
                             color = mc.surface,
                             border = BorderStroke(
-                                width = if (selectedSet != null) 1.5.dp else 0.5.dp,
-                                color = if (selectedSet != null) mc.primaryAccent
+                                width = if (selectedSets.isNotEmpty()) 1.5.dp else 0.5.dp,
+                                color = if (selectedSets.isNotEmpty()) mc.primaryAccent
                                         else mc.surfaceVariant,
                             ),
                             modifier = Modifier.fillMaxWidth(),
@@ -398,60 +398,87 @@ fun AdvancedSearchSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                if (selectedSet != null) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(selectedSet.iconSvgUri)
-                                            .decoderFactory(SvgDecoder.Factory())
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = selectedSet.name,
-                                        modifier = Modifier.size(24.dp),
-                                        colorFilter = ColorFilter.tint(mc.primaryAccent),
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = if (selectedSets.isNotEmpty()) mc.primaryAccent
+                                           else mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(
+                                    text = if (selectedSets.isEmpty())
+                                        stringResource(R.string.advsearch_set_hint)
+                                    else
+                                        stringResource(
+                                            R.string.advsearch_set_selected_count,
+                                            selectedSets.size,
+                                        ),
+                                    style = ty.bodyMedium,
+                                    color = if (selectedSets.isNotEmpty()) mc.primaryAccent
+                                            else mc.textDisabled,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+
+                        // Chips de sets seleccionados
+                        if (selectedSets.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(top = 8.dp),
+                            ) {
+                                selectedSets.forEach { set ->
+                                    InputChip(
+                                        selected = true,
+                                        onClick = { viewModel.toggleSet(set) },
+                                        label = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            ) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(LocalContext.current)
+                                                        .data(set.iconSvgUri)
+                                                        .decoderFactory(SvgDecoder.Factory())
+                                                        .crossfade(true)
+                                                        .build(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    colorFilter = ColorFilter.tint(mc.primaryAccent),
+                                                )
+                                                Text(
+                                                    set.code.uppercase(),
+                                                    style = ty.labelSmall,
+                                                )
+                                            }
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(12.dp),
+                                            )
+                                        },
                                     )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            selectedSet.name,
-                                            style = ty.bodyMedium,
-                                            color = mc.primaryAccent,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Text(
-                                            selectedSet.code.uppercase(),
-                                            style = ty.bodySmall,
-                                            color = mc.textDisabled,
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.setSelectedSet(null) },
-                                        modifier = Modifier.size(24.dp),
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Close,
-                                            contentDescription = null,
-                                            tint = mc.textDisabled,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    }
-                                } else {
-                                    Icon(
-                                        Icons.Default.Search,
-                                        contentDescription = null,
-                                        tint = mc.textDisabled,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                    Text(
-                                        stringResource(R.string.advsearch_set_hint),
-                                        style = ty.bodyMedium,
-                                        color = mc.textDisabled,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = mc.textDisabled,
-                                        modifier = Modifier.size(20.dp),
+                                }
+                                if (selectedSets.size > 1) {
+                                    InputChip(
+                                        selected = false,
+                                        onClick = viewModel::clearSets,
+                                        label = {
+                                            Text(
+                                                stringResource(R.string.advsearch_clear),
+                                                style = ty.labelSmall,
+                                                color = mc.lifeNegative,
+                                            )
+                                        },
                                     )
                                 }
                             }
@@ -459,11 +486,8 @@ fun AdvancedSearchSheet(
 
                         if (showSetPicker) {
                             SetPickerSheet(
-                                currentSetCode = uiState.selectedSet?.code,
-                                onSetSelected = { set ->
-                                    viewModel.setSelectedSet(set)
-                                    showSetPicker = false
-                                },
+                                selectedSetCodes = selectedSets.map { it.code }.toSet(),
+                                onToggleSet = viewModel::toggleSet,
                                 onDismiss = { showSetPicker = false },
                             )
                         }
