@@ -623,4 +623,22 @@
     <string name="advsearch_section_sort">Ergebnisse sortieren</string>
     <string name="advsearch_no_results">Keine Karten gefunden</string>
     <string name="advsearch_no_criteria">Füge mindestens ein Kriterium hinzu</string>
+
+    <!-- SET PICKER -->
+    <string name="advsearch_section_set">Set / Kollektion</string>
+    <string name="advsearch_set_hint">Nach Set-Name oder Code suchen…</string>
+    <string name="advsearch_set_picker_title">Set auswählen</string>
+    <string name="advsearch_set_search_hint">Name oder Code (z.B. MOM, EOE…)</string>
+    <string name="advsearch_set_clear">Set entfernen</string>
+    <string name="advsearch_set_no_results">Keine Sets gefunden</string>
+    <string name="advsearch_set_count">%1$d Sets</string>
+    <string name="advsearch_set_card_count">%1$d Karten</string>
+    <string name="set_type_expansion">Erweiterung</string>
+    <string name="set_type_core">Hauptset</string>
+    <string name="set_type_masters">Masters</string>
+    <string name="set_type_draft_innovation">Draft</string>
+    <string name="set_type_commander">Commander</string>
+    <string name="set_type_starter">Starter</string>
+    <string name="set_type_funny">Komisch</string>
+    <string name="set_type_other">Sonstige</string>
 </resources>

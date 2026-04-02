@@ -34,4 +34,7 @@ interface ScryfallApi {
 
     @GET("symbology")
     suspend fun getAllSymbols(): SymbologyListDto
+
+    @GET("sets")
+    suspend fun getSets(): ScryfallSetsResponseDto
 }

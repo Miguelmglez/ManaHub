@@ -6,6 +6,7 @@ import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.magicfolder.core.domain.model.AdvancedSearchQuery
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.ComparisonOperator
+import com.mmg.magicfolder.core.domain.model.MagicSet
 import com.mmg.magicfolder.core.domain.model.SearchCriterion
 import com.mmg.magicfolder.core.domain.model.SearchDirection
 import com.mmg.magicfolder.core.domain.model.SearchOrder
@@ -36,7 +37,7 @@ class AdvancedSearchViewModel @Inject constructor(
         val manaCostOp: ComparisonOperator = ComparisonOperator.EQUAL,
         val selectedRarity: String = "",
         val rarityOp: ComparisonOperator = ComparisonOperator.EQUAL,
-        val setCode: String = "",
+        val selectedSet: MagicSet? = null,
         val powerValue: String = "",
         val powerOp: ComparisonOperator = ComparisonOperator.EQUAL,
         val toughnessValue: String = "",
@@ -80,8 +81,9 @@ class AdvancedSearchViewModel @Inject constructor(
         }
         if (s.selectedRarity.isNotBlank())
             criteria.add(SearchCriterion.Rarity(s.selectedRarity, s.rarityOp))
-        if (s.setCode.isNotBlank())
-            criteria.add(SearchCriterion.CardSet(s.setCode))
+        s.selectedSet?.let { set ->
+            criteria.add(SearchCriterion.CardSet(set.code))
+        }
         s.powerValue.toIntOrNull()?.let {
             criteria.add(SearchCriterion.Power(it, s.powerOp))
         }
@@ -152,8 +154,8 @@ class AdvancedSearchViewModel @Inject constructor(
         updateBuiltQuery()
     }
 
-    fun setSetCode(code: String) {
-        _uiState.update { it.copy(setCode = code) }
+    fun setSelectedSet(set: MagicSet?) {
+        _uiState.update { it.copy(selectedSet = set) }
         updateBuiltQuery()
     }
 

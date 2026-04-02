@@ -10,18 +10,28 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.decode.SvgDecoder
+import coil.request.ImageRequest
 import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.domain.model.AdvancedSearchQuery
 import com.mmg.magicfolder.core.domain.model.ComparisonOperator
@@ -360,6 +370,100 @@ fun AdvancedSearchSheet(
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+
+                // ── Set / Collection ──
+                item {
+                    SearchSection(title = stringResource(R.string.advsearch_section_set)) {
+                        var showSetPicker by remember { mutableStateOf(false) }
+                        val selectedSet = uiState.selectedSet
+
+                        Surface(
+                            onClick = { showSetPicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = mc.surface,
+                            border = BorderStroke(
+                                width = if (selectedSet != null) 1.5.dp else 0.5.dp,
+                                color = if (selectedSet != null) mc.primaryAccent
+                                        else mc.surfaceVariant,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                if (selectedSet != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(selectedSet.iconSvgUri)
+                                            .decoderFactory(SvgDecoder.Factory())
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = selectedSet.name,
+                                        modifier = Modifier.size(24.dp),
+                                        colorFilter = ColorFilter.tint(mc.primaryAccent),
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            selectedSet.name,
+                                            style = ty.bodyMedium,
+                                            color = mc.primaryAccent,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            selectedSet.code.uppercase(),
+                                            style = ty.bodySmall,
+                                            color = mc.textDisabled,
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.setSelectedSet(null) },
+                                        modifier = Modifier.size(24.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = null,
+                                            tint = mc.textDisabled,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = mc.textDisabled,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                    Text(
+                                        stringResource(R.string.advsearch_set_hint),
+                                        style = ty.bodyMedium,
+                                        color = mc.textDisabled,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = mc.textDisabled,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        if (showSetPicker) {
+                            SetPickerSheet(
+                                currentSetCode = uiState.selectedSet?.code,
+                                onSetSelected = { set ->
+                                    viewModel.setSelectedSet(set)
+                                    showSetPicker = false
+                                },
+                                onDismiss = { showSetPicker = false },
+                            )
                         }
                     }
                 }
