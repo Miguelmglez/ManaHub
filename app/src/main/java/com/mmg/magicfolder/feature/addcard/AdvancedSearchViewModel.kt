@@ -37,7 +37,7 @@ class AdvancedSearchViewModel @Inject constructor(
         val manaCostOp: ComparisonOperator = ComparisonOperator.EQUAL,
         val selectedRarity: String = "",
         val rarityOp: ComparisonOperator = ComparisonOperator.EQUAL,
-        val selectedSet: MagicSet? = null,
+        val selectedSets: Set<MagicSet> = emptySet(),
         val powerValue: String = "",
         val powerOp: ComparisonOperator = ComparisonOperator.EQUAL,
         val toughnessValue: String = "",
@@ -81,8 +81,8 @@ class AdvancedSearchViewModel @Inject constructor(
         }
         if (s.selectedRarity.isNotBlank())
             criteria.add(SearchCriterion.Rarity(s.selectedRarity, s.rarityOp))
-        s.selectedSet?.let { set ->
-            criteria.add(SearchCriterion.CardSet(set.code))
+        if (s.selectedSets.isNotEmpty()) {
+            criteria.add(SearchCriterion.CardSet(s.selectedSets.map { it.code }.toSet()))
         }
         s.powerValue.toIntOrNull()?.let {
             criteria.add(SearchCriterion.Power(it, s.powerOp))
@@ -154,8 +154,19 @@ class AdvancedSearchViewModel @Inject constructor(
         updateBuiltQuery()
     }
 
-    fun setSelectedSet(set: MagicSet?) {
-        _uiState.update { it.copy(selectedSet = set) }
+    fun toggleSet(set: MagicSet) {
+        val current = _uiState.value.selectedSets.toMutableSet()
+        if (current.any { it.code == set.code }) {
+            current.removeAll { it.code == set.code }
+        } else {
+            current.add(set)
+        }
+        _uiState.update { it.copy(selectedSets = current) }
+        updateBuiltQuery()
+    }
+
+    fun clearSets() {
+        _uiState.update { it.copy(selectedSets = emptySet()) }
         updateBuiltQuery()
     }
 

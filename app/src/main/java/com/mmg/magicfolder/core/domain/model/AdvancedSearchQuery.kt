@@ -42,7 +42,7 @@ sealed class SearchCriterion {
         val operator: ComparisonOperator = ComparisonOperator.EQUAL,
     ) : SearchCriterion()
 
-    data class CardSet(val setCode: String) : SearchCriterion()
+    data class CardSet(val setCodes: Set<String>) : SearchCriterion()
 
     data class Power(
         val value: Int,

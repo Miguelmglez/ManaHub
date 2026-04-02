@@ -681,6 +681,8 @@
     <string name="set_type_starter">Starter</string>
     <string name="set_type_funny">Funny</string>
     <string name="set_type_other">Other</string>
+    <string name="advsearch_set_selected_count">%1$d sets selected</string>
+    <string name="advsearch_set_done">Done (%1$d sets)</string>
 
     <!-- ══════════════════════════════════════════
          PRICE FORMATTING
