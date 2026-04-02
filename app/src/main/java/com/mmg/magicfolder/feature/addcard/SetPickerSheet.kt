@@ -1,12 +1,13 @@
 package com.mmg.magicfolder.feature.addcard
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -14,10 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,8 +39,8 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetPickerSheet(
-    currentSetCode: String?,
-    onSetSelected: (MagicSet?) -> Unit,
+    selectedSetCodes: Set<String>,
+    onToggleSet: (MagicSet) -> Unit,
     onDismiss: () -> Unit,
     viewModel: SetPickerViewModel = hiltViewModel(),
 ) {
@@ -49,7 +52,7 @@ fun SetPickerSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        contentWindowInsets = { WindowInsets(0) }
+        contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
             modifier = Modifier
@@ -70,12 +73,19 @@ fun SetPickerSheet(
                     style = ty.titleMedium,
                     color = mc.textPrimary,
                 )
-                if (currentSetCode != null) {
-                    TextButton(onClick = { onSetSelected(null) }) {
+                if (selectedSetCodes.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = mc.primaryAccent.copy(0.15f),
+                    ) {
                         Text(
-                            stringResource(R.string.advsearch_set_clear),
-                            color = mc.lifeNegative,
+                            stringResource(
+                                R.string.advsearch_set_selected_count,
+                                selectedSetCodes.size,
+                            ),
                             style = ty.labelSmall,
+                            color = mc.primaryAccent,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         )
                     }
                 }
@@ -92,20 +102,12 @@ fun SetPickerSheet(
                     )
                 },
                 leadingIcon = {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = null,
-                        tint = mc.textDisabled,
-                    )
+                    Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
                 },
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = null,
-                                tint = mc.textDisabled,
-                            )
+                            Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled)
                         }
                     }
                 },
@@ -149,10 +151,7 @@ fun SetPickerSheet(
                         selected = uiState.selectedTypes.contains(type),
                         onClick = { viewModel.toggleTypeFilter(type) },
                         label = {
-                            Text(
-                                stringResource(type.labelRes()),
-                                style = ty.labelSmall,
-                            )
+                            Text(stringResource(type.labelRes()), style = ty.labelSmall)
                         },
                     )
                 }
@@ -165,18 +164,12 @@ fun SetPickerSheet(
             // ── Content ──
             when {
                 uiState.isLoading -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = mc.primaryAccent)
                     }
                 }
                 uiState.filteredSets.isEmpty() -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
                             stringResource(R.string.advsearch_set_no_results),
                             color = mc.textDisabled,
@@ -192,6 +185,7 @@ fun SetPickerSheet(
                     )
 
                     LazyColumn(
+                        modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     ) {
                         items(
@@ -200,15 +194,31 @@ fun SetPickerSheet(
                         ) { set ->
                             SetPickerRow(
                                 set = set,
-                                isSelected = set.code == currentSetCode,
-                                onClick = {
-                                    onSetSelected(set)
-                                    onDismiss()
-                                },
+                                isSelected = selectedSetCodes.contains(set.code),
+                                onClick = { onToggleSet(set) },
                             )
                         }
                     }
                 }
+            }
+
+            // ── Done button ──
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+            ) {
+                Text(
+                    if (selectedSetCodes.isEmpty())
+                        stringResource(R.string.action_close)
+                    else
+                        stringResource(R.string.advsearch_set_done, selectedSetCodes.size),
+                    style = ty.labelLarge,
+                )
             }
         }
     }
@@ -256,11 +266,7 @@ private fun SetPickerRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        set.code.uppercase(),
-                        style = ty.bodySmall,
-                        color = mc.textDisabled,
-                    )
+                    Text(set.code.uppercase(), style = ty.bodySmall, color = mc.textDisabled)
                     Text("·", color = mc.textDisabled)
                     Text(
                         stringResource(R.string.advsearch_set_card_count, set.cardCount),
@@ -269,17 +275,29 @@ private fun SetPickerRow(
                     )
                     set.releasedAt?.let { date ->
                         Text("·", color = mc.textDisabled)
-                        Text(
-                            date.take(4),
-                            style = ty.bodySmall,
-                            color = mc.textDisabled,
-                        )
+                        Text(date.take(4), style = ty.bodySmall, color = mc.textDisabled)
                     }
                 }
             }
 
-            if (isSelected) {
-                Text("✓", color = mc.primaryAccent, fontSize = 16.sp)
+            // Checkbox visual
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+                        shape = RoundedCornerShape(4.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSelected) {
+                    Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

@@ -54,8 +54,17 @@ class BuildScryfallQueryUseCase @Inject constructor() {
                 "mv${criterion.operator.symbol}${criterion.value}"
             is SearchCriterion.Rarity ->
                 "r${criterion.operator.symbol}${criterion.rarity}"
-            is SearchCriterion.CardSet ->
-                "s:${criterion.setCode.lowercase()}"
+            is SearchCriterion.CardSet -> {
+                if (criterion.setCodes.isEmpty()) return null
+                if (criterion.setCodes.size == 1)
+                    "s:${criterion.setCodes.first().lowercase()}"
+                else {
+                    val parts = criterion.setCodes.joinToString(" OR ") {
+                        "s:${it.lowercase()}"
+                    }
+                    "($parts)"
+                }
+            }
             is SearchCriterion.Power ->
                 "pow${criterion.operator.symbol}${criterion.value}"
             is SearchCriterion.Toughness ->

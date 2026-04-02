@@ -641,4 +641,6 @@
     <string name="set_type_starter">Starter</string>
     <string name="set_type_funny">Komisch</string>
     <string name="set_type_other">Sonstige</string>
+    <string name="advsearch_set_selected_count">%1$d Sets ausgewählt</string>
+    <string name="advsearch_set_done">Fertig (%1$d Sets)</string>
 </resources>
