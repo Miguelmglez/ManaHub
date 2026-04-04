@@ -688,4 +688,42 @@
     <string name="pref_news_language_at_least_one">Debes seleccionar al menos un idioma de noticias</string>
     <string name="pref_app_language_restart">El idioma de la app cambiará. Puede requerir reinicio.</string>
 
+    <!-- ══════════════════════════════════════════
+         DRAFT SECTION
+    ═══════════════════════════════════════════ -->
+    <string name="draft_title">Draft</string>
+    <string name="draft_search_hint">Buscar colecciones…</string>
+    <string name="draft_released">Lanzado %1$s</string>
+    <string name="draft_cards_count">%1$d cartas</string>
+    <string name="draft_tab_guide">Guía</string>
+    <string name="draft_tab_tier_list">Tier List</string>
+    <string name="draft_tab_cards">Cartas</string>
+    <string name="draft_tab_videos">Vídeos</string>
+    <string name="draft_guide_overview">Resumen</string>
+    <string name="draft_guide_mechanics">Mecánicas</string>
+    <string name="draft_guide_archetypes">Arquetipos</string>
+    <string name="draft_guide_top_commons">Mejores Comunes</string>
+    <string name="draft_guide_top_uncommons">Mejores Infrecuentes</string>
+    <string name="draft_guide_tips">Consejos Generales</string>
+    <string name="draft_guide_not_available">La guía aún no está disponible para esta colección</string>
+    <string name="draft_tier_list_not_available">La tier list aún no está disponible para esta colección</string>
+    <string name="draft_tier_updated">Última actualización: %1$s</string>
+    <string name="draft_filter_by_color">Filtrar por color</string>
+    <string name="draft_filter_by_rarity">Filtrar por rareza</string>
+    <string name="draft_sort_by">Ordenar por</string>
+    <string name="draft_sort_price">Precio</string>
+    <string name="draft_sort_win_rate">Win Rate</string>
+    <string name="draft_sort_name">Nombre</string>
+    <string name="draft_sort_collector">Nº de colector</string>
+    <string name="draft_win_rate_approx">≈%1$.1f%% WR</string>
+    <string name="draft_win_rate_disclaimer">Basado en análisis de IA, valores aproximados</string>
+    <string name="draft_videos_empty">No se encontraron vídeos para esta colección</string>
+    <string name="draft_videos_error">No se pudieron cargar los vídeos</string>
+    <string name="draft_key_cards">Cartas Clave</string>
+    <string name="draft_strategy">Estrategia</string>
+    <string name="draft_archetype_tier">Tier %1$s</string>
+    <string name="draft_no_sets">No se encontraron colecciones drafteables</string>
+    <string name="draft_loading_sets">Cargando colecciones…</string>
+    <string name="draft_retry">Reintentar</string>
+
 </resources>

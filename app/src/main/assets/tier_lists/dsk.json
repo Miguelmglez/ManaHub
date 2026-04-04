@@ -1,0 +1,77 @@
+{
+  "set_code": "dsk",
+  "set_name": "Duskmourn: House of Horror",
+  "last_updated": "2024-10-01",
+  "tiers": [
+    {
+      "tier": "S",
+      "label": "Bombs / Must Pick",
+      "description": "Cards you should always first-pick",
+      "cards": [
+        {"name": "Overlord of the Hauntwoods", "color": "G", "rarity": "mythic", "reason": "Generates massive value with land ramp and a huge body"},
+        {"name": "Sheltered by Ghosts", "color": "W", "rarity": "uncommon", "reason": "Premium removal that also grants protection — best common/uncommon in the set"},
+        {"name": "Screaming Nemesis", "color": "R", "rarity": "rare", "reason": "Punishes any interaction and deals massive damage"},
+        {"name": "Fear of Impostors", "color": "U", "rarity": "uncommon", "reason": "Efficient body with Eerie trigger that clones threats"},
+        {"name": "Enduring Innocence", "color": "W", "rarity": "rare", "reason": "Recurring card advantage engine that's hard to remove permanently"}
+      ]
+    },
+    {
+      "tier": "A",
+      "label": "Premium / Strong Pick",
+      "description": "Very strong cards, pick early",
+      "cards": [
+        {"name": "Grabbed by the Throat", "color": "B", "rarity": "common", "reason": "Premium removal at common — kills almost anything"},
+        {"name": "Paranormal Analyst", "color": "U", "rarity": "common", "reason": "Excellent Eerie payoff that draws cards consistently"},
+        {"name": "Torch the Tower", "color": "R", "rarity": "common", "reason": "Efficient instant-speed removal with bonus damage"},
+        {"name": "Sawblade Skinripper", "color": "B", "rarity": "uncommon", "reason": "Huge menace threat that closes games fast"},
+        {"name": "Spectral Snatcher", "color": "U", "rarity": "common", "reason": "Evasive threat that generates value"},
+        {"name": "Drag to the Roots", "color": "BG", "rarity": "uncommon", "reason": "Versatile removal that also fuels Delirium"},
+        {"name": "Patched Plaything", "color": "WU", "rarity": "uncommon", "reason": "Strong Eerie payoff with excellent stats"},
+        {"name": "Grasping Longneck", "color": "G", "rarity": "uncommon", "reason": "Powerful Delirium payoff with great stats"}
+      ]
+    },
+    {
+      "tier": "B",
+      "label": "Good Playables",
+      "description": "Solid cards that make every deck better",
+      "cards": [
+        {"name": "Seized from Slumber", "color": "W", "rarity": "common", "reason": "Enchantment-based removal that triggers Eerie"},
+        {"name": "Commune with Nature", "color": "G", "rarity": "common", "reason": "Finds creatures and fills the graveyard for Delirium"},
+        {"name": "Final Vengeance", "color": "B", "rarity": "common", "reason": "Cheap removal with Delirium bonus"},
+        {"name": "Scorching Dragonfire", "color": "R", "rarity": "common", "reason": "Solid removal with exile clause"},
+        {"name": "Acrobatic Cheerleader", "color": "W", "rarity": "common", "reason": "Efficient flyer with Survival synergy"},
+        {"name": "Unwilling Vessel", "color": "W", "rarity": "common", "reason": "Strong Room that provides removal and a body"},
+        {"name": "Wildfire Wickerfolk", "color": "G", "rarity": "common", "reason": "Solid body that fuels Delirium on death"},
+        {"name": "Cult Ceremony", "color": "B", "rarity": "common", "reason": "Sacrifice payoff with board-wide impact"}
+      ]
+    },
+    {
+      "tier": "C",
+      "label": "Filler / Decent",
+      "description": "Playable but replaceable",
+      "cards": [
+        {"name": "Flesh Burrower", "color": "R", "rarity": "common", "reason": "Solid two-drop for Delirium decks"},
+        {"name": "Piggy Bank", "color": "G", "rarity": "common", "reason": "Artifact creature that helps Delirium count"},
+        {"name": "Fear of Surveillance", "color": "U", "rarity": "common", "reason": "Decent flyer for Eerie decks"},
+        {"name": "Ghostly Dancers", "color": "WU", "rarity": "uncommon", "reason": "Eerie payoff that's slow but powerful when it works"}
+      ]
+    },
+    {
+      "tier": "D",
+      "label": "Sideboard / Avoid",
+      "description": "Only play if desperate or as sideboard cards",
+      "cards": [
+        {"name": "Impossible Inferno", "color": "R", "rarity": "uncommon", "reason": "Too expensive for what it does in most games"},
+        {"name": "Threats Around Every Corner", "color": "GU", "rarity": "uncommon", "reason": "Slow and doesn't impact the board immediately"}
+      ]
+    },
+    {
+      "tier": "F",
+      "label": "Unplayable",
+      "description": "Never put these in your deck",
+      "cards": [
+        {"name": "Cathartic Parting", "color": "BG", "rarity": "uncommon", "reason": "Too narrow and the effect doesn't justify a card slot"}
+      ]
+    }
+  ]
+}

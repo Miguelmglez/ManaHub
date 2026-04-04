@@ -736,4 +736,42 @@
     <string name="pref_news_language_at_least_one">At least one news language must be selected</string>
     <string name="pref_app_language_restart">The app language will change. This may require a restart.</string>
 
+    <!-- ══════════════════════════════════════════
+         DRAFT SECTION
+    ═══════════════════════════════════════════ -->
+    <string name="draft_title">Draft</string>
+    <string name="draft_search_hint">Search sets…</string>
+    <string name="draft_released">Released %1$s</string>
+    <string name="draft_cards_count">%1$d cards</string>
+    <string name="draft_tab_guide">Guide</string>
+    <string name="draft_tab_tier_list">Tier List</string>
+    <string name="draft_tab_cards">Cards</string>
+    <string name="draft_tab_videos">Videos</string>
+    <string name="draft_guide_overview">Overview</string>
+    <string name="draft_guide_mechanics">Mechanics</string>
+    <string name="draft_guide_archetypes">Archetypes</string>
+    <string name="draft_guide_top_commons">Top Commons</string>
+    <string name="draft_guide_top_uncommons">Top Uncommons</string>
+    <string name="draft_guide_tips">General Tips</string>
+    <string name="draft_guide_not_available">Guide not available for this set yet</string>
+    <string name="draft_tier_list_not_available">Tier list not available for this set yet</string>
+    <string name="draft_tier_updated">Last updated: %1$s</string>
+    <string name="draft_filter_by_color">Filter by color</string>
+    <string name="draft_filter_by_rarity">Filter by rarity</string>
+    <string name="draft_sort_by">Sort by</string>
+    <string name="draft_sort_price">Price</string>
+    <string name="draft_sort_win_rate">Win Rate</string>
+    <string name="draft_sort_name">Name</string>
+    <string name="draft_sort_collector">Collector #</string>
+    <string name="draft_win_rate_approx">≈%1$.1f%% WR</string>
+    <string name="draft_win_rate_disclaimer">Based on AI analysis, approximate values</string>
+    <string name="draft_videos_empty">No videos found for this set</string>
+    <string name="draft_videos_error">Could not load videos</string>
+    <string name="draft_key_cards">Key Cards</string>
+    <string name="draft_strategy">Strategy</string>
+    <string name="draft_archetype_tier">Tier %1$s</string>
+    <string name="draft_no_sets">No draftable sets found</string>
+    <string name="draft_loading_sets">Loading sets…</string>
+    <string name="draft_retry">Retry</string>
+
 </resources>
