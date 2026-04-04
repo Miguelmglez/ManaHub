@@ -174,4 +174,5 @@ private fun ContentSourceEntity.toDomain() = ContentSource(
     isEnabled = isEnabled,
     isDefault = isDefault,
     iconUrl   = iconUrl,
+    language  = language,
 )
