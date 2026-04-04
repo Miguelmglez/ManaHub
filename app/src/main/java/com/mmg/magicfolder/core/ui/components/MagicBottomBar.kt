@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,9 +35,9 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MagicBottomBar
-//  Custom 3-slot bottom bar with a gradient FAB in the centre slot.
+//  Custom 5-slot bottom bar with a gradient FAB in the centre slot.
 //
-//  Slot layout:  [Collection]  [⚔ PLAY FAB]  [Profile]
+//  Slot layout:  [Collection] [News] [⚔ PLAY FAB] [Draft] [Profile]
 //
 //  The FAB overflows the top of the bar by 8 dp.
 //  The outer Box does NOT clip, so the overflow is visible.
@@ -48,6 +49,7 @@ fun MagicBottomBar(
     onCollectionClick: () -> Unit,
     onNewsClick:       () -> Unit,
     onPlayClick:       () -> Unit,
+    onDraftClick:      () -> Unit,
     onProfileClick:    () -> Unit,
     modifier:          Modifier = Modifier,
 ) {
@@ -119,7 +121,16 @@ fun MagicBottomBar(
                 )
             }
 
-            // Slot 3 — Profile
+            // Slot 4 — Draft
+            BottomBarTab(
+                label    = "DRAFT",
+                icon     = Icons.Default.Style,
+                selected = currentRoute == Screen.Draft.route,
+                onClick  = onDraftClick,
+                modifier = Modifier.weight(1f),
+            )
+
+            // Slot 5 — Profile
             BottomBarTab(
                 label    = "PROFILE",
                 icon     = Icons.Default.Person,

@@ -6,6 +6,14 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
+}
+
 android {
     namespace = "com.mmg.magicfolder"
     compileSdk = 35
@@ -16,6 +24,12 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField(
+            "String",
+            "YOUTUBE_API_KEY",
+            "\"${localProperties.getProperty("YOUTUBE_API_KEY", "")}\""
+        )
     }
 
     compileOptions {
@@ -23,7 +37,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     packaging {
         jniLibs {

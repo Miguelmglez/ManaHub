@@ -33,6 +33,8 @@ import com.mmg.magicfolder.feature.carddetail.CardDetailScreen
 import com.mmg.magicfolder.feature.collection.CollectionScreen
 import com.mmg.magicfolder.feature.decks.DeckBuilderScreen
 import com.mmg.magicfolder.feature.decks.DeckDetailScreen
+import com.mmg.magicfolder.feature.draft.presentation.ui.DraftScreen
+import com.mmg.magicfolder.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.magicfolder.feature.game.GamePlayScreen
 import com.mmg.magicfolder.feature.game.GameSetupScreen
 import com.mmg.magicfolder.feature.game.GameViewModel
@@ -49,12 +51,13 @@ import com.mmg.magicfolder.feature.tournament.TournamentSetupScreen
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Bottom-bar visibility rules
-//  Visible on the three root tabs; hidden on all detail / game / scanner flows.
+//  Visible on the four root tabs; hidden on all detail / game / scanner flows.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 private val bottomBarRoutes = setOf(
     Screen.Collection.route,
     Screen.News.route,
+    Screen.Draft.route,
     Screen.Profile.route,
 )
 
@@ -74,6 +77,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     onCollectionClick = { navController.navigateTab(Screen.Collection.route) },
                     onNewsClick       = { navController.navigateTab(Screen.News.route) },
                     onPlayClick       = { navController.navigate(Screen.GameSetup.route) },
+                    onDraftClick      = { navController.navigateTab(Screen.Draft.route) },
                     onProfileClick    = { navController.navigateTab(Screen.Profile.route) },
                 )
             }
@@ -165,6 +169,34 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             composable(Screen.NewsSourcesSettings.route) {
                 NewsSourcesSettingsScreen(
                     onBack = { navController.popBackStack() },
+                )
+            }
+
+            // ── Draft ─────────────────────────────────────────────────────────
+            composable(Screen.Draft.route) {
+                DraftScreen(
+                    onSetClick = { setCode, setName, iconUri, releasedAt ->
+                        navController.navigate(
+                            Screen.DraftSetDetail.createRoute(setCode, setName, iconUri, releasedAt)
+                        )
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.DraftSetDetail.route,
+                arguments = listOf(
+                    navArgument("setCode") { type = NavType.StringType },
+                    navArgument("setName") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("setIconUri") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("setReleasedAt") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) {
+                SetDraftDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
                 )
             }
 

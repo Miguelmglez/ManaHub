@@ -6,6 +6,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mmg.magicfolder.core.data.local.converter.RoomConverters
 import com.mmg.magicfolder.core.data.local.dao.*
 import com.mmg.magicfolder.core.data.local.entity.*
+import com.mmg.magicfolder.feature.draft.data.local.DraftSetDao
+import com.mmg.magicfolder.feature.draft.data.local.DraftSetEntity
 import com.mmg.magicfolder.feature.news.data.local.ContentSourceEntity
 import com.mmg.magicfolder.feature.news.data.local.NewsArticleEntity
 import com.mmg.magicfolder.feature.news.data.local.NewsDao
@@ -27,8 +29,9 @@ import com.mmg.magicfolder.feature.news.data.local.NewsVideoEntity
         NewsArticleEntity::class,
         NewsVideoEntity::class,
         ContentSourceEntity::class,
+        DraftSetEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -42,6 +45,7 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun surveyAnswerDao():   SurveyAnswerDao
     abstract fun tournamentDao():     TournamentDao
     abstract fun newsDao():           NewsDao
+    abstract fun draftSetDao():      DraftSetDao
 }
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -212,6 +216,24 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         database.execSQL(
             "ALTER TABLE content_sources ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"
         )
+    }
+}
+
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS draft_sets (
+                id          TEXT    NOT NULL PRIMARY KEY,
+                code        TEXT    NOT NULL,
+                name        TEXT    NOT NULL,
+                setType     TEXT    NOT NULL,
+                releasedAt  TEXT    NOT NULL,
+                iconSvgUri  TEXT    NOT NULL,
+                cardCount   INTEGER NOT NULL,
+                scryfallUri TEXT    NOT NULL,
+                cachedAt    INTEGER NOT NULL
+            )
+        """.trimIndent())
     }
 }
 

@@ -52,7 +52,8 @@
       "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/domain/repository\")",
       "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/domain/usecase\")",
       "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/data/local\")",
-      "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/data/remote\")"
+      "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/data/remote\")",
+      "Bash(./gradlew compileDebugKotlin)"
     ]
   }
 }
