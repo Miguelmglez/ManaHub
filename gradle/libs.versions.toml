@@ -24,6 +24,7 @@ datastore  = "1.1.1"
 tv-material    = "1.0.1"
 splashscreen   = "1.0.1"
 emojis = "1.4.0"
+browser        = "1.8.0"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -64,6 +65,7 @@ datastore-preferences = { group = "androidx.datastore", name = "datastore-prefer
 tv-material  = { group = "androidx.tv",   name = "tv-material",               version.ref = "tv-material"  }
 splashscreen = { group = "androidx.core", name = "core-splashscreen",         version.ref = "splashscreen" }
 emojis = { group = "androidx.emoji2", name = "emoji2", version.ref = "emojis" }
+browser      = { group = "androidx.browser", name = "browser",               version.ref = "browser" }
 
 [plugins]
 android-application = { id = "com.android.application",            version.ref = "agp" }

@@ -642,4 +642,50 @@
     <string name="set_type_other">Otro</string>
     <string name="advsearch_set_selected_count">%1$d colecciones</string>
     <string name="advsearch_set_done">Hecho (%1$d colecciones)</string>
+
+    <!-- ══════════════════════════════════════════
+         NEWS SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="nav_news">Noticias</string>
+    <string name="news_title">Noticias</string>
+    <string name="news_search_hint">Buscar artículos y vídeos…</string>
+    <string name="news_filter_all">Todo</string>
+    <string name="news_filter_articles">Artículos</string>
+    <string name="news_filter_videos">Vídeos</string>
+    <string name="news_all_sources">Todas las fuentes</string>
+    <string name="news_empty">Sin noticias todavía. Desliza hacia abajo para actualizar.</string>
+
+    <!-- ══════════════════════════════════════════
+         NEWS SOURCES SETTINGS
+    ═══════════════════════════════════════════ -->
+    <string name="news_sources_title">Gestionar fuentes</string>
+    <string name="news_sources_section_articles">Fuentes de artículos</string>
+    <string name="news_sources_section_videos">Fuentes de vídeos</string>
+    <string name="news_sources_add_title">Añadir fuente personalizada</string>
+    <string name="news_sources_name_hint">Nombre de la fuente</string>
+    <string name="news_sources_url_hint">URL del feed o ID de canal de YouTube</string>
+    <string name="news_sources_validate_add">Validar y añadir</string>
+    <string name="news_sources_found_items">%1$d elementos encontrados</string>
+
+    <!-- Settings section for News -->
+    <string name="settings_section_news">Noticias</string>
+    <string name="settings_manage_news_sources">Gestionar fuentes de noticias</string>
+    <string name="settings_manage_news_sources_subtitle">Activar, desactivar o añadir feeds personalizados</string>
+
+    <!-- ══════════════════════════════════════════
+         USER PREFERENCES
+    ═══════════════════════════════════════════ -->
+    <string name="preferences_title">Preferencias</string>
+    <string name="pref_app_language">Idioma de la app</string>
+    <string name="pref_card_language">Idioma de las cartas</string>
+    <string name="pref_news_language">Idioma de noticias y vídeos</string>
+    <string name="pref_currency">Moneda</string>
+    <string name="pref_language_english">English</string>
+    <string name="pref_language_spanish">Español</string>
+    <string name="pref_language_german">Deutsch</string>
+    <string name="pref_currency_usd">USD ($)</string>
+    <string name="pref_currency_eur">EUR (€)</string>
+    <string name="pref_news_language_at_least_one">Debes seleccionar al menos un idioma de noticias</string>
+    <string name="pref_app_language_restart">El idioma de la app cambiará. Puede requerir reinicio.</string>
+
 </resources>

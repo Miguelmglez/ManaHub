@@ -1,8 +1,10 @@
 package com.mmg.magicfolder.feature.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,8 +21,9 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack:    () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel(),
+    onBack:               () -> Unit,
+    onManageNewsSources:  () -> Unit = {},
+    viewModel:            SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc       = MaterialTheme.magicColors
@@ -67,6 +70,41 @@ fun SettingsScreen(
                 checked  = uiState.autoRefreshPrices,
                 onCheckedChange = viewModel::onAutoRefreshChanged,
             )
+
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                stringResource(R.string.settings_section_news),
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textPrimary,
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onManageNewsSources)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_manage_news_sources),
+                        style = MaterialTheme.magicTypography.bodyLarge,
+                        color = mc.textPrimary,
+                    )
+                    Text(
+                        stringResource(R.string.settings_manage_news_sources_subtitle),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                )
+            }
         }
     }
 }

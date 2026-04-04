@@ -6,19 +6,20 @@ import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.DataResult
 import com.mmg.magicfolder.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.magicfolder.core.domain.usecase.collection.AddCardToCollectionUseCase
-import com.mmg.magicfolder.core.util.LocaleLanguageProvider
+import com.mmg.magicfolder.core.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AddCardViewModel @Inject constructor(
-    private val searchCards:     SearchCardsUseCase,
-    private val addToCollection: AddCardToCollectionUseCase,
-    private val localeLanguage:  LocaleLanguageProvider,
+    private val searchCards:        SearchCardsUseCase,
+    private val addToCollection:    AddCardToCollectionUseCase,
+    private val userPreferences:    UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddCardUiState())
@@ -32,13 +33,14 @@ class AddCardViewModel @Inject constructor(
             queryFlow
                 .debounce(400L)
                 .distinctUntilChanged()
-                .collectLatest { query ->
+                .combine(userPreferences.preferencesFlow) { query, prefs -> query to prefs }
+                .collectLatest { (query, prefs) ->
                     if (query.length < 2) {
                         _uiState.update { it.copy(results = emptyList(), isSearching = false) }
                         return@collectLatest
                     }
                     _uiState.update { it.copy(isSearching = true) }
-                    val lang = localeLanguage.get()
+                    val lang = prefs.cardLanguage.code
                     val effectiveQuery = if (lang != "en") "$query lang:$lang" else query
                     when (val result = searchCards(effectiveQuery)) {
                         is DataResult.Success -> _uiState.update {

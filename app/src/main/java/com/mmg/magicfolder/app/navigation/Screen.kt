@@ -48,6 +48,10 @@ sealed class Screen(val route: String) {
         fun route(id: Long) = "tournament/$id"
     }
 
+    // ── News ──────────────────────────────────────────────────────────────────
+    object News : Screen("news")
+    object NewsSourcesSettings : Screen("news_sources_settings")
+
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Draft  : Screen("draft")
     object Puzzle : Screen("puzzle")

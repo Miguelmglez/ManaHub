@@ -80,21 +80,25 @@ object PriceFormatter {
     // Para valores de Scryfall (String?): elige el campo correcto según el locale
     fun selectPrice(
         priceUsd: String?,
-        priceEur: String?
+        priceEur: String?,
+        preferredCurrency: String? = null,
     ): Pair<Double?, String> {
-        return if (isEuropeanLocale()) {
+        val useEur = preferredCurrency?.equals("EUR", ignoreCase = true) ?: isEuropeanLocale()
+        return if (useEur) {
             Pair(priceEur?.toDoubleOrNull(), "eur")
         } else {
             Pair(priceUsd?.toDoubleOrNull(), "usd")
         }
     }
 
-    // Para valores Double? directamente: elige según el locale
+    // Para valores Double? directamente: elige según el locale o preferencia
     fun selectPrice(
         priceUsd: Double?,
-        priceEur: Double?
+        priceEur: Double?,
+        preferredCurrency: String? = null,
     ): Pair<Double?, String> {
-        return if (isEuropeanLocale()) {
+        val useEur = preferredCurrency?.equals("EUR", ignoreCase = true) ?: isEuropeanLocale()
+        return if (useEur) {
             Pair(priceEur, "eur")
         } else {
             Pair(priceUsd, "usd")
@@ -105,9 +109,10 @@ object PriceFormatter {
     fun formatFromScryfall(
         priceUsd: String?,
         priceEur: String?,
-        showSymbol: Boolean = true
+        showSymbol: Boolean = true,
+        preferredCurrency: String? = null,
     ): String {
-        val (amount, currency) = selectPrice(priceUsd, priceEur)
+        val (amount, currency) = selectPrice(priceUsd, priceEur, preferredCurrency)
         return format(amount, currency, showSymbol)
     }
 
@@ -115,9 +120,10 @@ object PriceFormatter {
     fun formatFromScryfall(
         priceUsd: Double?,
         priceEur: Double?,
-        showSymbol: Boolean = true
+        showSymbol: Boolean = true,
+        preferredCurrency: String? = null,
     ): String {
-        val (amount, currency) = selectPrice(priceUsd, priceEur)
+        val (amount, currency) = selectPrice(priceUsd, priceEur, preferredCurrency)
         return format(amount, currency, showSymbol)
     }
 }

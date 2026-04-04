@@ -56,6 +56,8 @@ import com.mmg.magicfolder.feature.settings.SettingsScreen
 import com.mmg.magicfolder.feature.stats.StatsScreen
 import com.mmg.magicfolder.feature.tournament.TournamentListScreen
 import com.mmg.magicfolder.feature.tournament.TournamentScreen
+import com.mmg.magicfolder.feature.news.presentation.NewsScreen
+import com.mmg.magicfolder.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.magicfolder.feature.tournament.TournamentSetupScreen
 import com.mmg.magicfolder.feature.tournament.TournamentViewModel
 
@@ -66,6 +68,7 @@ import com.mmg.magicfolder.feature.tournament.TournamentViewModel
 
 private val bottomBarRoutes = setOf(
     Screen.Collection.route,
+    Screen.News.route,
     Screen.Profile.route,
 )
 
@@ -129,7 +132,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     MagicBottomBar(
                         currentRoute      = currentRoute,
                         onCollectionClick = { navController.navigateTab(Screen.Collection.route) },
-                        onPlayClick       = { navController.navigate(Screen.GameSetup.route) },
+                        onNewsClick       = { navController.navigateTab(Screen.News.route) },onPlayClick       = { navController.navigate(Screen.GameSetup.route) },
                         onProfileClick    = { navController.navigateTab(Screen.Profile.route) },
                     )
                 }
@@ -216,7 +219,21 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
 
             // ── Settings ──────────────────────────────────────────────────────
             composable(Screen.Settings.route) {
-                SettingsScreen(onBack = { navController.popBackStack() })
+                SettingsScreen(
+                    onBack              = { navController.popBackStack() },
+                    onManageNewsSources = { navController.navigate(Screen.NewsSourcesSettings.route) },
+                )
+            }
+
+            // ── News ──────────────────────────────────────────────────────────
+            composable(Screen.News.route) {
+                NewsScreen()
+            }
+
+            composable(Screen.NewsSourcesSettings.route) {
+                NewsSourcesSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             // ── Profile ───────────────────────────────────────────────────────

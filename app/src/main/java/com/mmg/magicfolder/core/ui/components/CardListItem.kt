@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
+import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
+import com.mmg.magicfolder.core.util.PriceFormatter
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,10 +90,15 @@ fun CardListItem(
         },
         trailingContent = {
             Column(horizontalAlignment = Alignment.End) {
-                val price = if (userCard.isFoil) card.priceUsdFoil else card.priceUsd
-                if (price != null) {
+                val preferredCurrency = LocalPreferredCurrency.current
+                val priceText = PriceFormatter.formatFromScryfall(
+                    priceUsd = if (userCard.isFoil) card.priceUsdFoil else card.priceUsd,
+                    priceEur = if (userCard.isFoil) card.priceEurFoil else card.priceEur,
+                    preferredCurrency = preferredCurrency,
+                )
+                if (priceText != "—") {
                     Text(
-                        text  = "$${String.format("%.2f", price)}",
+                        text  = priceText,
                         style = MaterialTheme.magicTypography.bodyMedium,
                         color = mc.goldMtg,
                     )
