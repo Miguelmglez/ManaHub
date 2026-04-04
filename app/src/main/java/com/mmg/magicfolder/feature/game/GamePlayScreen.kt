@@ -86,9 +86,11 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.game.model.CounterType
 import com.mmg.magicfolder.feature.game.model.CustomCounter
 import com.mmg.magicfolder.feature.game.model.GameMode
+import com.mmg.magicfolder.feature.game.model.GridSlotPosition
 import com.mmg.magicfolder.feature.game.model.LayoutTemplate
 import com.mmg.magicfolder.feature.game.model.LayoutTemplates
 import com.mmg.magicfolder.feature.game.model.Player
+import com.mmg.magicfolder.feature.game.model.ScreenedGridSlotPosition
 import com.mmg.magicfolder.feature.game.model.toDefaultDegrees
 import kotlinx.coroutines.launch
 
@@ -273,8 +275,7 @@ private fun GamePlayContent(
                 title = { Text(stringResource(R.string.game_exit_title), color = mc.textPrimary) },
                 text = {
                     Text(
-                        stringResource(R.string.game_exit_message),
-                        color = mc.textSecondary
+                        stringResource(R.string.game_exit_message), color = mc.textSecondary
                     )
                 },
                 confirmButton = {
@@ -298,8 +299,7 @@ private fun GamePlayContent(
                 title = { Text(stringResource(R.string.game_reset_title), color = mc.textPrimary) },
                 text = {
                     Text(
-                        stringResource(R.string.game_reset_message),
-                        color = mc.textSecondary
+                        stringResource(R.string.game_reset_message), color = mc.textSecondary
                     )
                 },
                 confirmButton = {
@@ -484,28 +484,72 @@ private fun GamePlayerGrid(
     onFlipCoin: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val mc = MaterialTheme.magicColors
+
     Box(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.weight(1f)) {
-                activeLayout.gridRows.forEach { rowSlotIndices ->
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(16.dp)
-                            .fillMaxWidth()
-                    ) {
-                        when (rowSlotIndices.value){
+                activeLayout.gridRows.forEach { (position, slots) ->
+                    when (position) {
+                        ScreenedGridSlotPosition.TOP-> {
+                            Row(modifier = Modifier.weight(1f)) {
+                                Box(modifier = Modifier.weight(1f).background(mc.goldMtg)) { }
+
+                            }
+                        }
+                         ScreenedGridSlotPosition.BOTTOM -> {
+                            Row(modifier = Modifier.weight(1f)) {
+                                Box(modifier = Modifier.weight(1f).background(mc.primaryAccent)) { }
+
+                            }
+                        }
+
+                        else -> {
+                            val leftPlayers = slots.filter { it.position == GridSlotPosition.LEFT}
+                            val rightPlayers = slots.filter { it.position == GridSlotPosition.RIGHT}
+                            Row(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    leftPlayers.forEach { _ ->
+                                        Row(modifier = Modifier.weight(1f)){
+                                            Box(modifier = Modifier.weight(1f).background(mc.manaB)) { }
+                                        }
+
+                                    }
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    rightPlayers.forEach { _ ->
+                                        Row(modifier = Modifier.weight(1f)){
+                                            Box(modifier = Modifier.weight(1f).background(mc.manaC)) { }
+                                        }
+                                    }
+                                }
+
+                            }
 
                         }
-                        rowSlotIndices.value.forEach { slotIndex ->
-                            Column(
-                                modifier = Modifier
-                                    .padding(16.dp)
-                                    .fillMaxWidth()
-                                    .weight(0.5f)
-                            ) {
-                                Box(modifier = Modifier.background(Color(R.color.white))) { }
-                                /*val slot = activeLayout.slots[
+                    }
+                }
+            }
+        }
+        /*
+            activeLayout.gridRows.forEac { rowSlotIndices ->
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                ) {
+                    when (rowSlotIndices.value) {
+
+                    }
+                    rowSlotIndices.value.forEach { slotIndex ->
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth()
+                                .weight(0.5f)
+                        ) {
+                            Box(modifier = Modifier.background(Color(R.color.white))) { }val slot = activeLayout.slots[
                                     slotIndex.position]
                                 val player = players.find { it.id == slot.playerId }
                                 if (player != null) {
@@ -525,15 +569,15 @@ private fun GamePlayerGrid(
                                         onRevokeDefeat = { onRevokeDefeat(player.id) },
                                         modifier = Modifier
                                             .fillMaxSize(),
-                                    )*/
+                                    )
 
-                                }
-                            }
                         }
                     }
                 }
             }
         }
+    }*/
+    }/*
         GlobalToolsOverlay(
             state = toolsState,
             onToggle = onToggleTools,
@@ -542,8 +586,7 @@ private fun GamePlayerGrid(
             modifier = Modifier
                 .align(Alignment.Center)
                 .wrapContentSize(),
-        )
-    }
+        )*/
 }
 
 
@@ -587,8 +630,7 @@ private fun PlayerCard(
                 blurRadius = 20.dp,
             )
             .background(theme.background)
-            .border(width = 0.5.dp, color = theme.accent.copy(alpha = 0.40f))
-    ) {
+            .border(width = 0.5.dp, color = theme.accent.copy(alpha = 0.40f))) {
         // 1. Theme background pattern
         ThemeBackground(modifier = Modifier.matchParentSize())
 
@@ -615,8 +657,7 @@ private fun PlayerCard(
         ) {
             // ── Top row: name + quick +1 ──────────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = player.name,
@@ -763,8 +804,7 @@ private fun LifeButton(
                         tryAwaitRelease()
                         isPressed = false
                         job.cancel()
-                    }
-                )
+                    })
             },
     ) {
         Text(
@@ -795,8 +835,7 @@ private fun PoisonPips(
                     .size(9.dp)
                     .clip(CircleShape)
                     .background(if (filled) mc.poisonColor else theme.accent.copy(alpha = 0.22f))
-                    .clickable { onSet(if (filled) i - 1 else i) }
-            )
+                    .clickable { onSet(if (filled) i - 1 else i) })
         }
     }
 }
@@ -1030,8 +1069,7 @@ private fun CountersPanel(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
-        contentWindowInsets = { WindowInsets(0) }
-    ) {
+        contentWindowInsets = { WindowInsets(0) }) {
         Column(
             modifier = Modifier
                 .padding(16.dp)
@@ -1046,20 +1084,14 @@ private fun CountersPanel(
 
             // Standard counters
             CounterRowItem(
-                stringResource(R.string.game_poison_label),
-                player.poison,
-                theme
+                stringResource(R.string.game_poison_label), player.poison, theme
             ) { onCounter(CounterType.POISON, it) }
             if (mode == GameMode.COMMANDER) {
                 CounterRowItem(
-                    stringResource(R.string.game_experience_label),
-                    player.experience,
-                    theme
+                    stringResource(R.string.game_experience_label), player.experience, theme
                 ) { onCounter(CounterType.EXPERIENCE, it) }
                 CounterRowItem(
-                    stringResource(R.string.game_energy_label),
-                    player.energy,
-                    theme
+                    stringResource(R.string.game_energy_label), player.energy, theme
                 ) { onCounter(CounterType.ENERGY, it) }
             }
 
@@ -1251,10 +1283,10 @@ private fun GamePlayInteractivePreview() {
     val initialPlayers = listOf(
         Player(id = 0, name = "Miguel", life = 40, theme = PlayerTheme.ALL[0], isAppUser = true),
         Player(id = 1, name = "Liliana", life = 38, theme = PlayerTheme.ALL[1]),
-        Player(id = 2, name = "Ajani", life = 42, theme = PlayerTheme.ALL[2]),
-                Player(id = 3, name = "Ajani", life = 42, theme = PlayerTheme.ALL[2]),
-    Player(id = 4, name = "Ajani", life = 42, theme = PlayerTheme.ALL[2]),
-    Player(id = 5, name = "Ajani", life = 42, theme = PlayerTheme.ALL[2])
+        Player(id = 2, name = "Liliana", life = 38, theme = PlayerTheme.ALL[2]),
+        Player(id = 3, name = "Liliana", life = 38, theme = PlayerTheme.ALL[3]),
+        Player(id = 4, name = "Liliana", life = 38, theme = PlayerTheme.ALL[4]),
+        Player(id = 5, name = "Liliana", life = 38, theme = PlayerTheme.ALL[5]),
 
     )
 
@@ -1282,27 +1314,22 @@ private fun GamePlayInteractivePreview() {
                 uiState = uiState.copy(
                     players = initialPlayers.map {
                         it.copy(
-                            life = 40,
-                            poison = 0,
-                            defeated = false
+                            life = 40, poison = 0, defeated = false
                         )
-                    },
-                    winner = null
+                    }, winner = null
                 )
             },
             onLifeChange = { pid, delta ->
                 uiState = uiState.copy(
                     players = uiState.players.map { p ->
                         if (p.id == pid) p.copy(life = p.life + delta) else p
-                    }
-                )
+                    })
             },
             onPoison = { pid, delta ->
                 uiState = uiState.copy(
                     players = uiState.players.map { p ->
                         if (p.id == pid) p.copy(poison = (p.poison + delta).coerceIn(0, 10)) else p
-                    }
-                )
+                    })
             },
             onCmdPanel = { pid -> uiState = uiState.copy(showCmdPanelForPlayerId = pid) },
             onCtrPanel = { pid -> uiState = uiState.copy(showCounterPanelForPlayerId = pid) },
@@ -1311,15 +1338,13 @@ private fun GamePlayInteractivePreview() {
                 uiState = uiState.copy(
                     players = uiState.players.map { p ->
                         if (p.id == pid) p.copy(defeated = true, pendingDefeat = false) else p
-                    }
-                )
+                    })
             },
             onRevokeDefeat = { pid ->
                 uiState = uiState.copy(
                     players = uiState.players.map { p ->
                         if (p.id == pid) p.copy(pendingDefeat = false) else p
-                    }
-                )
+                    })
             },
             onToggleTools = { toolsState = toolsState.copy(isExpanded = !toolsState.isExpanded) },
             onRollDice = { toolsState = toolsState.copy(lastDiceResult = (1..20).random()) },
@@ -1338,8 +1363,7 @@ private fun GamePlayInteractivePreview() {
                 uiState = uiState.copy(
                     players = uiState.players.map { p ->
                         if (p.id == pid) p.copy(name = name) else p
-                    }
-                )
+                    })
             },
             onCmdDamage = { targetId, srcId, delta ->
                 uiState = uiState.copy(
@@ -1352,8 +1376,7 @@ private fun GamePlayInteractivePreview() {
                                 ))
                             )
                         } else p
-                    }
-                )
+                    })
             },
             onCounter = { pid, type, delta ->
                 uiState = uiState.copy(
@@ -1379,8 +1402,7 @@ private fun GamePlayInteractivePreview() {
                                 )
                             }
                         } else p
-                    }
-                )
+                    })
             },
             onCustomChange = { pid, cid, delta ->
                 uiState = uiState.copy(
@@ -1390,8 +1412,7 @@ private fun GamePlayInteractivePreview() {
                                 if (c.id == cid) c.copy(value = (c.value + delta).coerceAtLeast(0)) else c
                             })
                         } else p
-                    }
-                )
+                    })
             },
             onCustomRemove = { pid, cid ->
                 uiState = uiState.copy(
@@ -1399,8 +1420,7 @@ private fun GamePlayInteractivePreview() {
                         if (p.id == pid) {
                             p.copy(customCounters = p.customCounters.filter { it.id != cid })
                         } else p
-                    }
-                )
+                    })
             },
             onAddCustom = { pid, name ->
                 uiState = uiState.copy(
@@ -1408,15 +1428,11 @@ private fun GamePlayInteractivePreview() {
                         if (p.id == pid) {
                             p.copy(
                                 customCounters = p.customCounters + CustomCounter(
-                                    System.currentTimeMillis(),
-                                    name,
-                                    0
+                                    System.currentTimeMillis(), name, 0
                                 )
                             )
                         } else p
-                    }
-                )
-            }
-        )
+                    })
+            })
     }
 }

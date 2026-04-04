@@ -156,11 +156,11 @@ private fun LayoutMiniPreview(
     val gapPx     = 2f
 
     Canvas(modifier = modifier) {
-        drawLayoutPreview(template, cellColor, gapPx)
+       // drawLayoutPreview(template, cellColor, gapPx)
     }
 }
 
-private fun DrawScope.drawLayoutPreview(
+/*private fun DrawScope.drawLayoutPreview(
     template:  LayoutTemplate,
     cellColor: Color,
     gap:       Float,
@@ -187,7 +187,7 @@ private fun DrawScope.drawLayoutPreview(
             }
         }
     }
-}
+}*/
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  PlayerRotationRow

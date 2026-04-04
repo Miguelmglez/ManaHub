@@ -44,7 +44,6 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.addcard.AddCardScreen
 import com.mmg.magicfolder.feature.carddetail.CardDetailScreen
 import com.mmg.magicfolder.feature.collection.CollectionScreen
-import com.mmg.magicfolder.feature.decks.DeckAddCardsScreen
 import com.mmg.magicfolder.feature.decks.DeckBuilderScreen
 import com.mmg.magicfolder.feature.decks.DeckDetailScreen
 import com.mmg.magicfolder.feature.game.GamePlayScreen
@@ -193,7 +192,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 route     = Screen.DeckAddCards.route,
                 arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
             ) {
-                DeckAddCardsScreen(onBack = { navController.popBackStack() })
+             //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Screen.DeckBuilder.route) {
