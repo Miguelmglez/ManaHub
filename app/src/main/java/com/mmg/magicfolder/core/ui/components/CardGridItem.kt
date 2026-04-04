@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,11 +84,12 @@ fun CardGridItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, userCard.isFoil) {
+                val preferredCurrency = LocalPreferredCurrency.current
+                val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, userCard.isFoil, preferredCurrency) {
                     if (userCard.isFoil) {
-                        PriceFormatter.formatFromScryfall(card.priceUsdFoil, card.priceEurFoil)
+                        PriceFormatter.formatFromScryfall(card.priceUsdFoil, card.priceEurFoil, preferredCurrency = preferredCurrency)
                     } else {
-                        PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur)
+                        PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur, preferredCurrency = preferredCurrency)
                     }
                 }
                 if (priceText != "—") {
