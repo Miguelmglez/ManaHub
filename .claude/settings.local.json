@@ -47,7 +47,12 @@
       "Bash(export JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\")",
       "Bash(where java:*)",
       "Read(//c/Users/Miguel/.gradle/wrapper/dists//**)",
-      "Bash(export JAVA_HOME=\"/c/Users/Miguel/.gradle/jdks/jetbrains_s_r_o_-21-amd64-windows.2\")"
+      "Bash(export JAVA_HOME=\"/c/Users/Miguel/.gradle/jdks/jetbrains_s_r_o_-21-amd64-windows.2\")",
+      "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/domain/model\")",
+      "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/domain/repository\")",
+      "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/domain/usecase\")",
+      "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/data/local\")",
+      "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/data/remote\")"
     ]
   }
 }

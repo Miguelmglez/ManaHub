@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 fun MagicBottomBar(
     currentRoute:      String?,
     onCollectionClick: () -> Unit,
+    onNewsClick:       () -> Unit,
     onPlayClick:       () -> Unit,
     onProfileClick:    () -> Unit,
     modifier:          Modifier = Modifier,
@@ -95,7 +97,16 @@ fun MagicBottomBar(
                 modifier = Modifier.weight(1f),
             )
 
-            // Slot 2 — Play FAB (overflows upward by 8 dp)
+            // Slot 2 — News
+            BottomBarTab(
+                label    = "NEWS",
+                icon     = Icons.Default.Newspaper,
+                selected = currentRoute == Screen.News.route,
+                onClick  = onNewsClick,
+                modifier = Modifier.weight(1f),
+            )
+
+            // Slot 3 — Play FAB (overflows upward by 8 dp)
             Box(
                 modifier         = Modifier
                     .weight(1f)
