@@ -1,11 +1,13 @@
 package com.mmg.magicfolder.core.data.repository
 
+import com.mmg.magicfolder.core.data.local.UserPreferencesDataStore
 import com.mmg.magicfolder.core.domain.repository.CardRepository
 import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
 import com.mmg.magicfolder.core.domain.repository.StatsRepository
 import com.mmg.magicfolder.core.domain.repository.TournamentRepository
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository
+import com.mmg.magicfolder.core.domain.repository.UserPreferencesRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,4 +35,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindTournamentRepository(impl: TournamentRepositoryImpl): TournamentRepository
+
+    @Binds @Singleton
+    abstract fun bindUserPreferencesRepository(impl: UserPreferencesDataStore): UserPreferencesRepository
 }

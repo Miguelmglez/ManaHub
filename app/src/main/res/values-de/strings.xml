@@ -643,4 +643,50 @@
     <string name="set_type_other">Sonstige</string>
     <string name="advsearch_set_selected_count">%1$d Sets ausgewählt</string>
     <string name="advsearch_set_done">Fertig (%1$d Sets)</string>
+
+    <!-- ══════════════════════════════════════════
+         NEWS SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="nav_news">Neuigkeiten</string>
+    <string name="news_title">Neuigkeiten</string>
+    <string name="news_search_hint">Artikel und Videos suchen…</string>
+    <string name="news_filter_all">Alle</string>
+    <string name="news_filter_articles">Artikel</string>
+    <string name="news_filter_videos">Videos</string>
+    <string name="news_all_sources">Alle Quellen</string>
+    <string name="news_empty">Noch keine Neuigkeiten. Zum Aktualisieren nach unten ziehen.</string>
+
+    <!-- ══════════════════════════════════════════
+         NEWS SOURCES SETTINGS
+    ═══════════════════════════════════════════ -->
+    <string name="news_sources_title">Quellen verwalten</string>
+    <string name="news_sources_section_articles">Artikelquellen</string>
+    <string name="news_sources_section_videos">Videoquellen</string>
+    <string name="news_sources_add_title">Eigene Quelle hinzufügen</string>
+    <string name="news_sources_name_hint">Name der Quelle</string>
+    <string name="news_sources_url_hint">Feed-URL oder YouTube-Kanal-ID</string>
+    <string name="news_sources_validate_add">Überprüfen und hinzufügen</string>
+    <string name="news_sources_found_items">%1$d Einträge gefunden</string>
+
+    <!-- Settings section for News -->
+    <string name="settings_section_news">Neuigkeiten</string>
+    <string name="settings_manage_news_sources">Nachrichtenquellen verwalten</string>
+    <string name="settings_manage_news_sources_subtitle">Feeds aktivieren, deaktivieren oder eigene hinzufügen</string>
+
+    <!-- ══════════════════════════════════════════
+         USER PREFERENCES
+    ═══════════════════════════════════════════ -->
+    <string name="preferences_title">Einstellungen</string>
+    <string name="pref_app_language">App-Sprache</string>
+    <string name="pref_card_language">Kartensprache</string>
+    <string name="pref_news_language">Sprache für Nachrichten und Videos</string>
+    <string name="pref_currency">Währung</string>
+    <string name="pref_language_english">English</string>
+    <string name="pref_language_spanish">Español</string>
+    <string name="pref_language_german">Deutsch</string>
+    <string name="pref_currency_usd">USD ($)</string>
+    <string name="pref_currency_eur">EUR (€)</string>
+    <string name="pref_news_language_at_least_one">Mindestens eine Nachrichtensprache muss ausgewählt sein</string>
+    <string name="pref_app_language_restart">Die App-Sprache wird geändert. Ein Neustart kann erforderlich sein.</string>
+
 </resources>

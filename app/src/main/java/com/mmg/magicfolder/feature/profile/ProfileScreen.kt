@@ -1,5 +1,6 @@
 package com.mmg.magicfolder.feature.profile
 
+import android.app.Activity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,7 +35,12 @@ import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
 import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.magicfolder.core.domain.model.Achievement
+import com.mmg.magicfolder.core.domain.model.AppLanguage
+import com.mmg.magicfolder.core.domain.model.CardLanguage
 import com.mmg.magicfolder.core.domain.model.CollectionStats
+import com.mmg.magicfolder.core.domain.model.NewsLanguage
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
+import com.mmg.magicfolder.core.domain.model.UserPreferences
 import com.mmg.magicfolder.core.ui.components.ManaColor
 import com.mmg.magicfolder.core.ui.components.ManaSymbol
 import com.mmg.magicfolder.core.ui.theme.AppTheme
@@ -51,8 +57,15 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
+    val activity = LocalContext.current as? Activity
     var showAvatarPicker by remember { mutableStateOf(false) }
+
+    // Recreate activity when app language changes
+    LaunchedEffect(Unit) {
+        viewModel.appLanguageChanged.collect { activity?.recreate() }
+    }
 
     if (showAvatarPicker) {
         AvatarPickerSheet(onDismiss = { showAvatarPicker = false })
@@ -160,6 +173,18 @@ fun ProfileScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
+            }
+
+            // ── Preferences ───────────────────────────────────────────────────
+            item {
+                PreferencesSection(
+                    prefs             = prefsState.userPreferences,
+                    onAppLanguage     = viewModel::setAppLanguage,
+                    onCardLanguage    = viewModel::setCardLanguage,
+                    onNewsLanguages   = viewModel::setNewsLanguages,
+                    onCurrency        = viewModel::setPreferredCurrency,
+                    modifier          = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
 
             // ── Theme selector ────────────────────────────────────────────────
@@ -808,6 +833,166 @@ private fun CollectionSummarySection(
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Est. Value", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
                     Text("$${String.format("%.2f", stats.totalValueUsd)}", style = MaterialTheme.magicTypography.titleMedium, color = mc.goldMtg)
+                }
+            }
+        }
+    }
+}
+
+// ── Preferences section ───────────────────────────────────────────────────────
+
+@Composable
+private fun PreferencesSection(
+    prefs:           UserPreferences,
+    onAppLanguage:   (AppLanguage) -> Unit,
+    onCardLanguage:  (CardLanguage) -> Unit,
+    onNewsLanguages: (Set<NewsLanguage>) -> Unit,
+    onCurrency:      (PreferredCurrency) -> Unit,
+    modifier:        Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.preferences_title))
+        Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                // App Language — single-select dropdown
+                PreferenceDropdownRow(
+                    label    = stringResource(R.string.pref_app_language),
+                    selected = prefs.appLanguage.displayName,
+                    options  = AppLanguage.entries.map { it.displayName },
+                    onSelect = { idx -> onAppLanguage(AppLanguage.entries[idx]) },
+                )
+                HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+
+                // Card Language — single-select dropdown
+                PreferenceDropdownRow(
+                    label    = stringResource(R.string.pref_card_language),
+                    selected = prefs.cardLanguage.displayName,
+                    options  = CardLanguage.entries.map { it.displayName },
+                    onSelect = { idx -> onCardLanguage(CardLanguage.entries[idx]) },
+                )
+                HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+
+                // News Language — multi-select checkboxes
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.pref_news_language),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        NewsLanguage.entries.forEach { lang ->
+                            val checked = lang in prefs.newsLanguages
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable {
+                                    val updated = if (checked) {
+                                        prefs.newsLanguages - lang
+                                    } else {
+                                        prefs.newsLanguages + lang
+                                    }
+                                    if (updated.isNotEmpty()) onNewsLanguages(updated)
+                                },
+                            ) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = mc.primaryAccent,
+                                        uncheckedColor = mc.textDisabled,
+                                    ),
+                                )
+                                Text(
+                                    text = lang.displayName,
+                                    style = MaterialTheme.magicTypography.bodySmall,
+                                    color = if (checked) mc.textPrimary else mc.textSecondary,
+                                )
+                            }
+                        }
+                    }
+                }
+                HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+
+                // Currency — radio buttons
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.pref_currency),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        PreferredCurrency.entries.forEach { currency ->
+                            val selected = currency == prefs.preferredCurrency
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { onCurrency(currency) },
+                            ) {
+                                RadioButton(
+                                    selected = selected,
+                                    onClick  = null,
+                                    colors   = RadioButtonDefaults.colors(
+                                        selectedColor   = mc.primaryAccent,
+                                        unselectedColor = mc.textDisabled,
+                                    ),
+                                )
+                                Text(
+                                    text  = currency.displayName,
+                                    style = MaterialTheme.magicTypography.bodySmall,
+                                    color = if (selected) mc.textPrimary else mc.textSecondary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreferenceDropdownRow(
+    label:    String,
+    selected: String,
+    options:  List<String>,
+    onSelect: (Int) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    var expanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier              = Modifier.fillMaxWidth(),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
+        Box {
+            Surface(
+                onClick = { expanded = true },
+                shape   = RoundedCornerShape(8.dp),
+                color   = mc.surfaceVariant,
+            ) {
+                Text(
+                    text     = selected,
+                    style    = MaterialTheme.magicTypography.bodySmall,
+                    color    = mc.primaryAccent,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+            DropdownMenu(
+                expanded         = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                options.forEachIndexed { idx, option ->
+                    DropdownMenuItem(
+                        text    = { Text(option) },
+                        onClick = {
+                            onSelect(idx)
+                            expanded = false
+                        },
+                    )
                 }
             }
         }

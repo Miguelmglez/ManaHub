@@ -4,6 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.data.local.LanguagePreference
 import com.mmg.magicfolder.core.data.local.PreferencesDataStore
+import com.mmg.magicfolder.core.domain.model.AppLanguage
+import com.mmg.magicfolder.core.domain.model.CardLanguage
+import com.mmg.magicfolder.core.domain.model.NewsLanguage
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
+import com.mmg.magicfolder.core.domain.model.UserPreferences
+import com.mmg.magicfolder.core.domain.repository.UserPreferencesRepository
 import com.mmg.magicfolder.core.data.local.dao.DeckStatsRow
 import com.mmg.magicfolder.core.data.local.dao.SurveyAnswerDao
 import com.mmg.magicfolder.core.data.local.entity.GameSessionWithPlayers
@@ -42,8 +48,12 @@ class ProfileViewModel @Inject constructor(
     private val surveyAnswerDao:       SurveyAnswerDao,
     private val langPref:              LanguagePreference,
     private val preferencesDataStore:  PreferencesDataStore,
+    private val userPreferencesRepo:   UserPreferencesRepository,
     private val checkAchievementsUseCase: CheckAchievementsUseCase,
 ) : ViewModel() {
+
+    private val _appLanguageChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val appLanguageChanged: SharedFlow<Unit> = _appLanguageChanged.asSharedFlow()
 
     data class UiState(
         val playerName:              String     = "Player 1",
@@ -79,10 +89,28 @@ class ProfileViewModel @Inject constructor(
         val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
     }
 
+    data class PreferencesState(
+        val userPreferences: UserPreferences = UserPreferences(
+            appLanguage = AppLanguage.ENGLISH,
+            cardLanguage = CardLanguage.ENGLISH,
+            newsLanguages = setOf(NewsLanguage.ENGLISH),
+            preferredCurrency = PreferredCurrency.USD,
+        ),
+    )
+
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    private val _prefsState = MutableStateFlow(PreferencesState())
+    val prefsState: StateFlow<PreferencesState> = _prefsState.asStateFlow()
+
     init {
+        // ── User preferences ──────────────────────────────────────────────────
+        userPreferencesRepo.preferencesFlow
+            .onEach { prefs -> _prefsState.update { it.copy(userPreferences = prefs) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
         // ── Preferences ───────────────────────────────────────────────────────
         preferencesDataStore.avatarUrlFlow
             .onEach { url -> _uiState.update { it.copy(avatarUrl = url) } }
@@ -224,6 +252,26 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             langPref.saveTheme(theme)
         }
+    }
+
+    fun setAppLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            userPreferencesRepo.setAppLanguage(language)
+            _appLanguageChanged.emit(Unit)
+        }
+    }
+
+    fun setCardLanguage(language: CardLanguage) {
+        viewModelScope.launch { userPreferencesRepo.setCardLanguage(language) }
+    }
+
+    fun setNewsLanguages(languages: Set<NewsLanguage>) {
+        if (languages.isEmpty()) return
+        viewModelScope.launch { userPreferencesRepo.setNewsLanguages(languages) }
+    }
+
+    fun setPreferredCurrency(currency: PreferredCurrency) {
+        viewModelScope.launch { userPreferencesRepo.setPreferredCurrency(currency) }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
