@@ -198,15 +198,20 @@ fun NewsScreen(
                             items = uiState.items,
                             key = { it.id },
                         ) { item ->
+                            val badge = if (uiState.showLanguageBadge)
+                                uiState.sourceLanguageMap[item.sourceId]
+                            else null
                             when (item) {
                                 is NewsItem.Article -> ArticleCard(
                                     article = item,
+                                    languageBadge = badge,
                                     onClick = {
                                         openArticle(context, item.url, mc.primaryAccent.toArgb())
                                     },
                                 )
                                 is NewsItem.Video -> VideoCard(
                                     video = item,
+                                    languageBadge = badge,
                                     onClick = {
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.url))
                                         context.startActivity(intent)

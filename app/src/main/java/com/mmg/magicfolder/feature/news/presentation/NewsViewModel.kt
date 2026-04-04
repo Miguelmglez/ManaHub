@@ -2,6 +2,7 @@ package com.mmg.magicfolder.feature.news.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.domain.repository.UserPreferencesRepository
 import com.mmg.magicfolder.feature.news.domain.model.ContentSource
 import com.mmg.magicfolder.feature.news.domain.model.ContentType
 import com.mmg.magicfolder.feature.news.domain.model.NewsItem
@@ -20,6 +21,7 @@ class NewsViewModel @Inject constructor(
     getNewsFeed: GetNewsFeedUseCase,
     private val refreshNewsFeed: RefreshNewsFeedUseCase,
     manageSources: ManageSourcesUseCase,
+    userPreferences: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -38,18 +40,27 @@ class NewsViewModel @Inject constructor(
         debouncedQuery,
         _contentType,
         _selectedSourceId,
-        _isRefreshing,
-        _error,
+        combine(_isRefreshing, _error) { r, e -> r to e },
+        combine(manageSources.observeSources(), userPreferences.preferencesFlow) { srcs, prefs ->
+            val activeLanguages = prefs.newsLanguages.map { it.code }.toSet()
+            val languageMap = srcs.associate { it.id to it.language }
+            val enabledIds = srcs
+                .filter { it.isEnabled && it.language in activeLanguages }
+                .map { it.id }
+                .toSet()
+            Triple(activeLanguages, languageMap, enabledIds)
+        },
     ) { args ->
-        val allItems = args[0] as List<*>
+        @Suppress("UNCHECKED_CAST")
+        val allItems = args[0] as List<NewsItem>
         val query = args[1] as String
         val type = args[2] as ContentType
         val sourceId = args[3] as String?
-        val refreshing = args[4] as Boolean
-        val error = args[5] as String?
+        val (refreshing, error) = args[4] as Pair<Boolean, String?>
+        val (activeLanguages, languageMap, enabledSourceIds) = args[5] as Triple<Set<String>, Map<String, String>, Set<String>>
 
-        @Suppress("UNCHECKED_CAST")
-        val items = (allItems as List<NewsItem>)
+        val items = allItems
+            .filter { item -> item.sourceId in enabledSourceIds }
             .filter { item ->
                 when (type) {
                     ContentType.ALL     -> true
@@ -66,13 +77,15 @@ class NewsViewModel @Inject constructor(
             }
 
         NewsUiState(
-            items        = items,
-            isLoading    = items.isEmpty() && refreshing,
-            isRefreshing = refreshing,
-            searchQuery  = _searchQuery.value,
-            contentType  = type,
+            items            = items,
+            isLoading        = items.isEmpty() && refreshing,
+            isRefreshing     = refreshing,
+            searchQuery      = _searchQuery.value,
+            contentType      = type,
             selectedSourceId = sourceId,
-            error        = error,
+            error            = error,
+            sourceLanguageMap    = languageMap,
+            showLanguageBadge    = activeLanguages.size > 1,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NewsUiState())
 
@@ -104,4 +117,6 @@ data class NewsUiState(
     val contentType: ContentType = ContentType.ALL,
     val selectedSourceId: String? = null,
     val error: String? = null,
+    val sourceLanguageMap: Map<String, String> = emptyMap(),
+    val showLanguageBadge: Boolean = false,
 )

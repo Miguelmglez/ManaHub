@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -23,6 +25,7 @@ fun ArticleCard(
     article: NewsItem.Article,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    languageBadge: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
@@ -48,13 +51,22 @@ fun ArticleCard(
         }
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = article.title,
-                style = mt.bodyLarge,
-                color = mc.textPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = article.title,
+                    style = mt.bodyLarge,
+                    color = mc.textPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (languageBadge != null) {
+                    LanguageBadge(languageBadge)
+                }
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = "${article.sourceName}  ·  ${TimeAgoFormatter.format(article.publishedAt)}",
@@ -73,5 +85,21 @@ fun ArticleCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+internal fun LanguageBadge(code: String) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = mc.primaryAccent.copy(alpha = 0.15f),
+    ) {
+        Text(
+            text = code.uppercase(),
+            style = MaterialTheme.magicTypography.labelSmall,
+            color = mc.primaryAccent,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+        )
     }
 }

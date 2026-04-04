@@ -29,6 +29,7 @@ fun VideoCard(
     video: NewsItem.Video,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    languageBadge: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
@@ -68,6 +69,12 @@ fun VideoCard(
                     tint = Color.White,
                     modifier = Modifier.size(32.dp),
                 )
+            }
+            // Language badge — top-right corner of thumbnail
+            if (languageBadge != null) {
+                Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                    LanguageBadge(languageBadge)
+                }
             }
         }
 
