@@ -14,4 +14,5 @@ data class ContentSourceEntity(
     @ColumnInfo(name = "is_enabled") val isEnabled: Boolean = true,
     @ColumnInfo(name = "is_default") val isDefault: Boolean = true,
     @ColumnInfo(name = "icon_url")   val iconUrl: String? = null,
+    @ColumnInfo(name = "language")   val language: String = "en", // "en", "es", "de"
 )

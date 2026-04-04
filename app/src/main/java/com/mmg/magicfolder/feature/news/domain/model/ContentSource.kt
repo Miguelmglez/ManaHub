@@ -8,4 +8,5 @@ data class ContentSource(
     val isEnabled: Boolean = true,
     val isDefault: Boolean = true,
     val iconUrl: String? = null,
+    val language: String = "en", // "en", "es", "de"
 )

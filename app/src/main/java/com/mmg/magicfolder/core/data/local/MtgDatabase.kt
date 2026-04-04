@@ -28,7 +28,7 @@ import com.mmg.magicfolder.feature.news.data.local.NewsVideoEntity
         NewsVideoEntity::class,
         ContentSourceEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -203,6 +203,14 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         )
         database.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_survey_cardRef ON survey_answers(cardReference)"
+        )
+    }
+}
+
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE content_sources ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"
         )
     }
 }
