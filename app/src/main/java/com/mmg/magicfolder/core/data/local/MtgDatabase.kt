@@ -6,6 +6,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mmg.magicfolder.core.data.local.converter.RoomConverters
 import com.mmg.magicfolder.core.data.local.dao.*
 import com.mmg.magicfolder.core.data.local.entity.*
+import com.mmg.magicfolder.feature.news.data.local.ContentSourceEntity
+import com.mmg.magicfolder.feature.news.data.local.NewsArticleEntity
+import com.mmg.magicfolder.feature.news.data.local.NewsDao
+import com.mmg.magicfolder.feature.news.data.local.NewsVideoEntity
 
 @Database(
     entities = [
@@ -20,8 +24,11 @@ import com.mmg.magicfolder.core.data.local.entity.*
         TournamentEntity::class,
         TournamentPlayerEntity::class,
         TournamentMatchEntity::class,
+        NewsArticleEntity::class,
+        NewsVideoEntity::class,
+        ContentSourceEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -34,6 +41,7 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun gameSessionDao():    GameSessionDao
     abstract fun surveyAnswerDao():   SurveyAnswerDao
     abstract fun tournamentDao():     TournamentDao
+    abstract fun newsDao():           NewsDao
 }
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -196,5 +204,52 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         database.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_survey_cardRef ON survey_answers(cardReference)"
         )
+    }
+}
+
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS news_articles (
+                id           TEXT NOT NULL PRIMARY KEY,
+                title        TEXT NOT NULL,
+                description  TEXT NOT NULL,
+                image_url    TEXT,
+                published_at INTEGER NOT NULL,
+                source_name  TEXT NOT NULL,
+                source_id    TEXT NOT NULL,
+                url          TEXT NOT NULL,
+                author       TEXT,
+                fetched_at   INTEGER NOT NULL
+            )
+        """.trimIndent())
+
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS news_videos (
+                video_id     TEXT NOT NULL PRIMARY KEY,
+                title        TEXT NOT NULL,
+                description  TEXT NOT NULL,
+                image_url    TEXT,
+                published_at INTEGER NOT NULL,
+                source_name  TEXT NOT NULL,
+                source_id    TEXT NOT NULL,
+                url          TEXT NOT NULL,
+                channel_name TEXT NOT NULL,
+                duration     TEXT,
+                fetched_at   INTEGER NOT NULL
+            )
+        """.trimIndent())
+
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS content_sources (
+                id         TEXT    NOT NULL PRIMARY KEY,
+                name       TEXT    NOT NULL,
+                feed_url   TEXT    NOT NULL,
+                type       TEXT    NOT NULL,
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                is_default INTEGER NOT NULL DEFAULT 1,
+                icon_url   TEXT
+            )
+        """.trimIndent())
     }
 }

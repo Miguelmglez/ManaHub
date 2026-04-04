@@ -84,5 +84,6 @@ dependencies {
     implementation(libs.material.icons.extended)
     implementation(libs.compose.googlefonts)
     implementation(libs.datastore.preferences)
+    implementation(libs.browser)
 
 }

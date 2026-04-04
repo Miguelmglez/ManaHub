@@ -691,4 +691,33 @@
     <string name="price_label_eur">EUR</string>
     <string name="price_label_usd">USD</string>
 
+    <!-- ══════════════════════════════════════════
+         NEWS SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="nav_news">News</string>
+    <string name="news_title">News</string>
+    <string name="news_search_hint">Search articles and videos…</string>
+    <string name="news_filter_all">All</string>
+    <string name="news_filter_articles">Articles</string>
+    <string name="news_filter_videos">Videos</string>
+    <string name="news_all_sources">All Sources</string>
+    <string name="news_empty">No news yet. Pull down to refresh.</string>
+
+    <!-- ══════════════════════════════════════════
+         NEWS SOURCES SETTINGS
+    ═══════════════════════════════════════════ -->
+    <string name="news_sources_title">Manage News Sources</string>
+    <string name="news_sources_section_articles">Article Sources</string>
+    <string name="news_sources_section_videos">Video Sources</string>
+    <string name="news_sources_add_title">Add Custom Source</string>
+    <string name="news_sources_name_hint">Source name</string>
+    <string name="news_sources_url_hint">Feed URL or YouTube channel ID</string>
+    <string name="news_sources_validate_add">Validate &amp; Add</string>
+    <string name="news_sources_found_items">Found %1$d items</string>
+
+    <!-- Settings section for News -->
+    <string name="settings_section_news">News</string>
+    <string name="settings_manage_news_sources">Manage News Sources</string>
+    <string name="settings_manage_news_sources_subtitle">Enable, disable, or add custom feeds</string>
+
 </resources>
