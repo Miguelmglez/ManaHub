@@ -672,4 +672,20 @@
     <string name="settings_manage_news_sources">Gestionar fuentes de noticias</string>
     <string name="settings_manage_news_sources_subtitle">Activar, desactivar o añadir feeds personalizados</string>
 
+    <!-- ══════════════════════════════════════════
+         USER PREFERENCES
+    ═══════════════════════════════════════════ -->
+    <string name="preferences_title">Preferencias</string>
+    <string name="pref_app_language">Idioma de la app</string>
+    <string name="pref_card_language">Idioma de las cartas</string>
+    <string name="pref_news_language">Idioma de noticias y vídeos</string>
+    <string name="pref_currency">Moneda</string>
+    <string name="pref_language_english">English</string>
+    <string name="pref_language_spanish">Español</string>
+    <string name="pref_language_german">Deutsch</string>
+    <string name="pref_currency_usd">USD ($)</string>
+    <string name="pref_currency_eur">EUR (€)</string>
+    <string name="pref_news_language_at_least_one">Debes seleccionar al menos un idioma de noticias</string>
+    <string name="pref_app_language_restart">El idioma de la app cambiará. Puede requerir reinicio.</string>
+
 </resources>

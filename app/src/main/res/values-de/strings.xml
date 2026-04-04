@@ -673,4 +673,20 @@
     <string name="settings_manage_news_sources">Nachrichtenquellen verwalten</string>
     <string name="settings_manage_news_sources_subtitle">Feeds aktivieren, deaktivieren oder eigene hinzufügen</string>
 
+    <!-- ══════════════════════════════════════════
+         USER PREFERENCES
+    ═══════════════════════════════════════════ -->
+    <string name="preferences_title">Einstellungen</string>
+    <string name="pref_app_language">App-Sprache</string>
+    <string name="pref_card_language">Kartensprache</string>
+    <string name="pref_news_language">Sprache für Nachrichten und Videos</string>
+    <string name="pref_currency">Währung</string>
+    <string name="pref_language_english">English</string>
+    <string name="pref_language_spanish">Español</string>
+    <string name="pref_language_german">Deutsch</string>
+    <string name="pref_currency_usd">USD ($)</string>
+    <string name="pref_currency_eur">EUR (€)</string>
+    <string name="pref_news_language_at_least_one">Mindestens eine Nachrichtensprache muss ausgewählt sein</string>
+    <string name="pref_app_language_restart">Die App-Sprache wird geändert. Ein Neustart kann erforderlich sein.</string>
+
 </resources>

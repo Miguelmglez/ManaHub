@@ -720,4 +720,20 @@
     <string name="settings_manage_news_sources">Manage News Sources</string>
     <string name="settings_manage_news_sources_subtitle">Enable, disable, or add custom feeds</string>
 
+    <!-- ══════════════════════════════════════════
+         USER PREFERENCES
+    ═══════════════════════════════════════════ -->
+    <string name="preferences_title">Preferences</string>
+    <string name="pref_app_language">App Language</string>
+    <string name="pref_card_language">Card Language</string>
+    <string name="pref_news_language">News &amp; Videos Language</string>
+    <string name="pref_currency">Currency</string>
+    <string name="pref_language_english">English</string>
+    <string name="pref_language_spanish">Español</string>
+    <string name="pref_language_german">Deutsch</string>
+    <string name="pref_currency_usd">USD ($)</string>
+    <string name="pref_currency_eur">EUR (€)</string>
+    <string name="pref_news_language_at_least_one">At least one news language must be selected</string>
+    <string name="pref_app_language_restart">The app language will change. This may require a restart.</string>
+
 </resources>
