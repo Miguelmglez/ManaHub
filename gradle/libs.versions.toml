@@ -51,7 +51,6 @@ coil-svg                = { group = "io.coil-kt", name = "coil-svg",            
 camerax-camera2         = { group = "androidx.camera", name = "camera-camera2",            version.ref = "camerax" }
 camerax-lifecycle       = { group = "androidx.camera", name = "camera-lifecycle",          version.ref = "camerax" }
 camerax-view            = { group = "androidx.camera", name = "camera-view",               version.ref = "camerax" }
-mlkit-barcode           = { group = "com.google.mlkit", name = "barcode-scanning",         version.ref = "mlkit-barcode" }
 mlkit-text-recognition  = { group = "com.google.mlkit", name = "text-recognition",          version.ref = "mlkit-text-recognition" }
 mockk                   = { group = "io.mockk", name = "mockk",                            version.ref = "mockk" }
 turbine                 = { group = "app.cash.turbine", name = "turbine",                  version.ref = "turbine" }

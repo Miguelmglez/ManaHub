@@ -1,0 +1,70 @@
+{
+  "set_code": "stx",
+  "set_name": "Secrets of Strixhaven",
+  "last_updated": "2026-04-05",
+  "tiers": [
+    {
+      "tier": "S",
+      "label": "Bombs / Must Pick",
+      "description": "Cards you should always first-pick",
+      "cards": [
+        {"name": "Professor Onyx", "color": "B", "rarity": "mythic", "reason": "Drain-and-gain Magecraft trigger that wins the game on its own; incredible card advantage."},
+        {"name": "Galazeth Prismari", "color": "UR", "rarity": "mythic", "reason": "Turns all your artifacts into mana for big spells; elite body and ramp."},
+        {"name": "Beledros Witherbloom", "color": "BG", "rarity": "mythic", "reason": "Generates tokens every turn and can untap all your lands for explosive Opus plays."},
+        {"name": "Mizzix's Mastery", "color": "R", "rarity": "rare", "reason": "Overload for a massive turn of casting every spell in your graveyard; pure game-ender."},
+        {"name": "Tanazir Quandrix", "color": "GU", "rarity": "mythic", "reason": "Doubles counters on ETB and makes your team's base stats massive when attacking."}
+      ]
+    },
+    {
+      "tier": "A",
+      "label": "Premium / Strong Pick",
+      "description": "Very strong cards, pick early",
+      "cards": [
+        {"name": "Igneous Inspiration", "color": "R", "rarity": "uncommon", "reason": "Efficient removal that Learns; essential for access to the sideboard Lessons."},
+        {"name": "Professor of Symbology", "color": "W", "rarity": "uncommon", "reason": "Top-tier 2-drop that ensures you never miss a land drop or utility Lesson."},
+        {"name": "Bury in Books", "color": "U", "rarity": "common", "reason": "Excellent tempo removal that puts a creature deep into the library."},
+        {"name": "Frost Blossom", "color": "GU", "rarity": "uncommon", "reason": "Provides mana acceleration and fixes for the 5-mana Opus spells."},
+        {"name": "Closing Statement", "color": "WB", "rarity": "uncommon", "reason": "Destroys any creature and puts a counter on your own for a low cost if cast in main phase."}
+      ]
+    },
+    {
+      "tier": "B",
+      "label": "Good Playables",
+      "description": "Solid cards that make every deck better",
+      "cards": [
+        {"name": "Pest Summoning", "color": "BG", "rarity": "common", "reason": "Essential Lesson for Witherbloom; provides bodies and lifegain fuel."},
+        {"name": "Prismari Pledgemage", "color": "UR", "rarity": "common", "reason": "Solid blocker that can attack as a 3/3 frequently."},
+        {"name": "Guiding Voice", "color": "W", "rarity": "common", "reason": "Cheap targeted spell for Silverquill that triggers Magecraft and Learns."},
+        {"name": "Field Trip", "color": "G", "rarity": "common", "reason": "Ramp that Learns; keeps the cards flowing while accelerating mana."},
+        {"name": "Rise of Extus", "color": "WB", "rarity": "common", "reason": "Exile removal that also brings back a creature from your graveyard."}
+      ]
+    },
+    {
+      "tier": "C",
+      "label": "Filler / Decent",
+      "description": "Playable but replaceable",
+      "cards": [
+        {"name": "Environmental Sciences", "color": "C", "rarity": "common", "reason": "The most important Lesson for fixing mana, though not a main-deck card."},
+        {"name": "Biblioplex Assistant", "color": "C", "rarity": "common", "reason": "Recovers a key instant or sorcery to the top of the library."},
+        {"name": "Reject", "color": "U", "rarity": "common", "reason": "Standard counterspell; fine but often the first card to be cut."}
+      ]
+    },
+    {
+      "tier": "D",
+      "label": "Sideboard / Avoid",
+      "description": "Only play if desperate or as sideboard cards",
+      "cards": [
+        {"name": "Introduction to Prophecy", "color": "C", "rarity": "common", "reason": "Too expensive for a main-deck card; only take as a mid-pick Lesson."},
+        {"name": "Fracture", "color": "WB", "rarity": "uncommon", "reason": "Great in Constructed, but often misses in Limited where creatures dominate."}
+      ]
+    },
+    {
+      "tier": "F",
+      "label": "Unplayable",
+      "description": "Never put these in your deck",
+      "cards": [
+        {"name": "Secret Rendezvous", "color": "W", "rarity": "uncommon", "reason": "Giving your opponent 3 cards is a recipe for losing, regardless of your gain."}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "set_code": "stx",
+  "set_name": "Secrets of Strixhaven",
+  "last_updated": "2026-04-05",
+  "overview": "Strixhaven is a spells-matter set built around five distinct magical colleges. The format introduces the 'Learn' and 'Lesson' mechanic, effectively giving you an extra hand in your sideboard. It is a slower, high-synergy format where casting targeted spells and managing graveyard resources are vital for victory.",
+  "mechanics": [
+    {
+      "name": "Magecraft",
+      "description": "Triggers whenever you cast or copy an instant or sorcery spell.",
+      "draft_tip": "Prioritize cheap cantrips and combat tricks to trigger Magecraft multiple times in a single turn."
+    },
+    {
+      "name": "Learn & Lesson",
+      "description": "Learn allows you to put a Lesson card from your sideboard into your hand or discard a card to draw a card.",
+      "draft_tip": "Draft at least 3-4 Lessons (sideboard cards) early so your Learn cards always have high-impact targets."
+    },
+    {
+      "name": "Ward",
+      "description": "A keyword that counters spells or abilities unless the opponent pays an additional mana cost.",
+      "draft_tip": "Ward makes your high-cost bombs much harder to remove; use it to protect your late-game threats."
+    }
+  ],
+  "archetypes": [
+    {
+      "colors": "WB",
+      "name": "Silverquill: Repartee Aggro",
+      "tier": "A",
+      "description": "Inspire your creatures with words of affirmation or hurl cutting critiques at enemies. Get rewarded for casting targeted spells while pressing the attack.",
+      "key_commons": ["Guiding Voice", "Silverquill Pledgemage", "Closing Statement"],
+      "strategy": "Go aggressive. Use +1/+1 counters and targeted 'buff' spells to trigger Magecraft and finish the opponent before they stabilize."
+    },
+    {
+      "colors": "UR",
+      "name": "Prismari: Opus Spellcasting",
+      "tier": "S",
+      "description": "Load up your deck with instants and sorceries! Fire off cheap spells or get a showstopping bonus from spending five or more mana on your opus.",
+      "key_commons": ["Prismari Pledgemage", "Spectacle Mage", "Igneous Inspiration"],
+      "strategy": "Survive the early game with cheap interaction, then cast massive 5+ CMC spells to swing the game in your favor."
+    },
+    {
+      "colors": "BG",
+      "name": "Witherbloom: Lifegain Swarm",
+      "tier": "A",
+      "description": "Build up an army of Pests and other creatures to gain lots of life and overwhelm opponents. Steady lifegain will also infuse your spells with boosted effects.",
+      "key_commons": ["Pest Summoning", "Hunt for Specimens", "Dina, Soul Steeper"],
+      "strategy": "Generate Pest tokens. Use them as sacrifice fodder for value or as a way to gain life and trigger 'lifegain matters' cards."
+    },
+    {
+      "colors": "RW",
+      "name": "Lorehold: Flashback Excavation",
+      "tier": "B",
+      "description": "Fill your graveyard and then dig it back up again. When cards leave your graveyard, you'll uncover the power for history-making plays.",
+      "key_commons": ["Lorehold Excavation", "Stonebound Mentor", "Pilgrim of the Ages"],
+      "strategy": "Focused on the graveyard. Use recursion and effects that trigger when cards leave the yard to generate late-game value."
+    },
+    {
+      "colors": "GU",
+      "name": "Quandrix: Incremental Value",
+      "tier": "A",
+      "description": "Grow your creatures with counters as you cast bigger and bigger spells! Accelerate your mana and attack with huge creatures.",
+      "key_commons": ["Quandrix Pledgemage", "Eureka Moment", "Field Trip"],
+      "strategy": "Ramp to 8 lands as quickly as possible. Quandrix cards become significantly more powerful once you reach the '8 lands' threshold."
+    },
+    {
+      "colors": "UB",
+      "name": "Withered Knowledge",
+      "tier": "B",
+      "description": "A grindy control deck that uses self-mill and reanimation to outlast the opponent.",
+      "key_commons": ["Bury in Books", "Hunt for Specimens", "Flunk"],
+      "strategy": "Combine Silverquill's removal with Witherbloom's graveyard recursion to create a deck that never runs out of threats."
+    },
+    {
+      "colors": "RG",
+      "name": "Elemental Ramp",
+      "tier": "C",
+      "description": "Uses Prismari's big spells and Quandrix's ramp to cast massive Elemental threats.",
+      "key_commons": ["Igneous Inspiration", "Field Trip", "Elemental Summoning"],
+      "strategy": "Ramp hard into 5-mana and 7-mana Elementals. This deck relies heavily on having a good mix of Learn cards and Lessons."
+    },
+    {
+      "colors": "GW",
+      "name": "Tokens & Counters",
+      "tier": "B",
+      "description": "Combines Witherbloom's token generation with Silverquill's +1/+1 counter support.",
+      "key_commons": ["Guiding Voice", "Pest Summoning", "Dueling Coach"],
+      "strategy": "Go wide with tokens and use Quandrix-style scaling to make your board state overwhelming for ground-based decks."
+    },
+    {
+      "colors": "WU",
+      "name": "Tempo Skies",
+      "tier": "B",
+      "description": "Evasive flyers protected by blue bounce and white protection spells.",
+      "key_commons": ["Bury in Books", "Professor of Symbology", "Frost Trickster"],
+      "strategy": "The 'anti-meta' deck. While others ramp or setup graveyards, you fly over and use tempo spells to keep them off-balance."
+    },
+    {
+      "colors": "BR",
+      "name": "Aggro Burn",
+      "tier": "C",
+      "description": "Fast-paced aggression using black's drain effects and red's direct damage.",
+      "key_commons": ["Igneous Inspiration", "Hunt for Specimens", "Lash of Malice"],
+      "strategy": "Use cheap creatures and burn spells to lower the opponent's life total quickly. Learns into damage-dealing Lessons to finish the job."
+    }
+  ],
+  "top_commons": {
+    "W": ["Guiding Voice", "Professor of Symbology", "Star Pupil"],
+    "U": ["Bury in Books", "Frost Trickster", "Arcane Subtraction"],
+    "B": ["Hunt for Specimens", "Lash of Malice", "Mage Hunter's Onslaught"],
+    "R": ["Igneous Inspiration", "Prismari Pledgemage", "Explosive Welcome"],
+    "G": ["Field Trip", "Quandrix Pledgemage", "Mage Duel"]
+  },
+  "top_uncommons": {
+    "W": ["Dueling Coach", "Thunderous Orator"],
+    "U": ["Solve the Equation", "Divide by Zero"],
+    "B": ["Flunk", "Plumb the Forbidden"],
+    "R": ["Grinning Ignus", "Dragon's Approach"],
+    "G": ["Bookwurm", "Dragonsguard Elite"]
+  },
+  "general_tips": [
+    "Environmental Sciences is a high-priority Lesson; it ensures you hit your land drops in a format that rewards high-mana spells.",
+    "Don't main-deck Lessons unless they are extremely high impact; it's almost always better to keep them in the sideboard for Learn triggers.",
+    "Magecraft triggers on COPIED spells too. Spells with 'Storm' or Prismari copy effects provide double value.",
+    "The 5-mana hybrid Pledgemages (like Silverquill Pledgemage) are very flexible and should be picked highly for any deck in those colors.",
+    "Keep track of your graveyard for Lorehold strategies; exiling the wrong card can shut off your recursion engines."
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "set_code": "ff",
+  "set_name": "Final Fantasy",
+  "last_updated": "2026-04-05",
+  "tiers": [
+    {
+      "tier": "S",
+      "label": "Bombs / Must Pick",
+      "description": "Cards you should always first-pick",
+      "cards": [
+        {"name": "Sephiroth, One-Winged Angel", "color": "B", "rarity": "mythic", "reason": "Massive flyer that destroys a creature on ETB and has a powerful Flashback board wipe."},
+        {"name": "Cloud Strife", "color": "RW", "rarity": "mythic", "reason": "Becomes indestructible when equipped and deals excess damage to the opponent; ultimate finisher."},
+        {"name": "Bahamut, King of Dragons", "color": "C", "rarity": "rare", "reason": "High-cost flyer that deals 5 damage to all non-dragon creatures when it enters."},
+        {"name": "Aerith, Ancient Protector", "color": "GW", "rarity": "rare", "reason": "Provides Ward to your team and can sacrifice itself to give Indestructible at instant speed."},
+        {"name": "Ultima Weapon", "color": "C", "rarity": "mythic", "reason": "Power and toughness equal to your life total; can end the game in a single swing."}
+      ]
+    },
+    {
+      "tier": "A",
+      "label": "Premium / Strong Pick",
+      "description": "Very strong cards, pick early",
+      "cards": [
+        {"name": "Chocobo Rider", "color": "G", "rarity": "common", "reason": "Solid Landfall enabler that grows and provides mana fixing."},
+        {"name": "Black Mage Barrage", "color": "R", "rarity": "uncommon", "reason": "Efficient burn spell that rewards you for casting non-creature spells."},
+        {"name": "Cid's Engineering", "color": "W", "rarity": "uncommon", "reason": "Creates two artifact tokens that can be sacrificed for value or to crew Vehicles."},
+        {"name": "Phoenix Down", "color": "W", "rarity": "common", "reason": "The premier reanimation spell for small creatures in white."},
+        {"name": "Moogle Messenger", "color": "U", "rarity": "common", "reason": "Cheap flyer that loots cards into the graveyard for Flashback strategies."}
+      ]
+    },
+    {
+      "tier": "B",
+      "label": "Good Playables",
+      "description": "Solid cards that make every deck better",
+      "cards": [
+        {"name": "Warrior of Light", "color": "W", "rarity": "common", "reason": "Reliable 2-drop that creates a Wizard token to help go-wide strategies."},
+        {"name": "Mana Potion", "color": "C", "rarity": "common", "reason": "Standard ramp artifact that can be sacrificed late-game to draw a card."},
+        {"name": "Firaga", "color": "R", "rarity": "common", "reason": "Flexible removal spell that can hit creatures or planeswalkers."},
+        {"name": "Esuna", "color": "W", "rarity": "common", "reason": "Efficient protection spell that removes -1/-1 counters or Auras from your creatures."},
+        {"name": "Cactuar Scout", "color": "G", "rarity": "common", "reason": "Provides Haste and Deathtouch; trades up effectively against bombs."}
+      ]
+    },
+    {
+      "tier": "C",
+      "label": "Filler / Decent",
+      "description": "Playable but replaceable",
+      "cards": [
+        {"name": "Midgar City", "color": "C", "rarity": "common", "reason": "Utility land that provides colorless mana and a minor late-game benefit."},
+        {"name": "Iron Giant", "color": "C", "rarity": "uncommon", "reason": "Big blocker but too slow for aggressive decks."},
+        {"name": "Steal", "color": "U", "rarity": "uncommon", "reason": "Conditional bounce or artifact theft; very situational."}
+      ]
+    },
+    {
+      "tier": "D",
+      "label": "Sideboard / Avoid",
+      "description": "Only play if desperate or as sideboard cards",
+      "cards": [
+        {"name": "Tent", "color": "G", "rarity": "uncommon", "reason": "Provides minor lifegain and land search; too slow for Limited."},
+        {"name": "Broken Materia", "color": "C", "rarity": "common", "reason": "Artifact that provides zero value unless you have very specific synergies."}
+      ]
+    },
+    {
+      "tier": "F",
+      "label": "Unplayable",
+      "description": "Never put these in your deck",
+      "cards": [
+        {"name": "Gilgamesh's Trash", "color": "B", "rarity": "common", "reason": "Overcosted discard effect that doesn't affect the board."}
+      ]
+    }
+  ]
+}

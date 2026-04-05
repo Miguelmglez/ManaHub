@@ -1,0 +1,118 @@
+{
+  "set_code": "eoe",
+  "set_name": "Edge of Eternities",
+  "last_updated": "2026-04-05",
+  "overview": "Edge of Eternities is a high-tech sci-fi set that takes place in the Sothera system. The format is defined by artifact synergies, the Void mechanic, and Spacecrafts. It features a mix of high-speed artifact aggro and grindy resource-based control decks.",
+  "mechanics": [
+    {
+      "name": "Void",
+      "description": "Use the void mechanic at the cost of creatures and artifacts to trigger devastating events.",
+      "draft_tip": "Draft cards that generate 'Scrap' or 'Drone' tokens to use as fuel for your Void costs without losing your main board presence."
+    },
+    {
+      "name": "Lander Tokens",
+      "description": "Lander tokens can be sacrificed to put a land from your hand onto the battlefield or to trigger landfall.",
+      "draft_tip": "Essential for the RG Landfall archetype; they allow you to trigger landfall at instant speed during combat."
+    },
+    {
+      "name": "Spacecrafts (Crew)",
+      "description": "Station your Spacecrafts by tapping creatures, then reap the rewards of your dedicated crew.",
+      "draft_tip": "Spacecrafts (Vehicles) are high-impact but need pilots. Ensure your deck has at least a 2:1 ratio of creatures to Spacecrafts."
+    }
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Second Spell",
+      "tier": "B",
+      "description": "Cast your second spell in a turn and earn additional bonuses to overwhelm your opponent.",
+      "key_commons": ["Data Stream", "Cybernetic Enhancement"],
+      "strategy": "Prioritize cheap 1-mana spells and cantrips to consistently trigger your 'second spell' bonuses every turn."
+    },
+    {
+      "colors": "UB",
+      "name": "Artifact Control",
+      "tier": "A",
+      "description": "Assemble an artifact-based deck to grind out your opponent's resources turn by turn.",
+      "key_commons": ["Black Hole Singularity", "Data Stream"],
+      "strategy": "Focus on removal and recursive artifacts. Win the long game by exhausting the opponent's options."
+    },
+    {
+      "colors": "BR",
+      "name": "Void",
+      "tier": "S",
+      "description": "Use the void mechanic at the cost of creatures and artifacts—then trigger devastating events.",
+      "key_commons": ["Scrap-Heap Rat", "Plasma Grenade"],
+      "strategy": "Aggressive sacrifice. Use small tokens as fodder to activate powerful Void abilities that clear the board or burn the opponent."
+    },
+    {
+      "colors": "RG",
+      "name": "Landers & Landfall",
+      "tier": "A",
+      "description": "Use Lander tokens and landfall to create mana advantage. Landers can help to trigger landfall more easily.",
+      "key_commons": ["Fuel Cell", "Sothera's Breath"],
+      "strategy": "Generate as many Lander tokens as possible. Use them to ramp into massive threats or trigger mid-combat landfall buffs."
+    },
+    {
+      "colors": "GW",
+      "name": "+1/+1 Counters",
+      "tier": "B",
+      "description": "Boost your entire army with +1/+1 counters—stack 'em up and watch the enemies fall.",
+      "key_commons": ["Cybernetic Enhancement", "Station Security"],
+      "strategy": "Build a wide board and use mass-pump spells. Ideal for overwhelming slower control decks."
+    },
+    {
+      "colors": "WB",
+      "name": "Go Wide",
+      "tier": "A",
+      "description": "Assemble the largest battlefield in the system and conquer your opponents with sheer numbers.",
+      "key_commons": ["Drone Swarm", "Station Security"],
+      "strategy": "Prioritize cards that create multiple bodies. Use 'Anthem' effects to make your swarm of Drones lethal."
+    },
+    {
+      "colors": "UR",
+      "name": "Artifact Aggro",
+      "tier": "S",
+      "description": "Play cheap artifacts you've uncovered on your travels to quickly overpower the field with supreme synergies.",
+      "key_commons": ["Laser Volley", "Plasma Grenade"],
+      "strategy": "Fastest deck in the format. Use low-cost artifact creatures and 'Affinity'-like effects to dump your hand by turn 3."
+    },
+    {
+      "colors": "BG",
+      "name": "Graveyard",
+      "tier": "B",
+      "description": "Salvage long-forgotten ships and fallen warriors with a graveyard strategy that keeps you coming back.",
+      "key_commons": ["Scrap-Heap Rat", "Black Hole Singularity"],
+      "strategy": "Self-mill is your friend. Use the graveyard as a second hand to out-value opponents in the late game."
+    },
+    {
+      "colors": "RW",
+      "name": "Space Stations",
+      "tier": "A",
+      "description": "Station your Spacecrafts by tapping creatures, then reap the rewards of your dedicated crew.",
+      "key_commons": ["Laser Volley", "Station Security"],
+      "strategy": "Focus on high-Crew-value Spacecrafts. Use creatures that provide bonuses specifically when they crew a vehicle."
+    },
+    {
+      "colors": "GU",
+      "name": "Ramp",
+      "tier": "B",
+      "description": "Explore Sothera's furthest regions and worlds by controlling the largest monsters and ships in the system.",
+      "key_commons": ["Xenotech Surveyor", "Data Stream"],
+      "strategy": "Spend the first 3 turns developing mana. Once you hit 6+ mana, deploy 'Bombs' that the opponent cannot answer."
+    }
+  ],
+  "top_commons": {
+    "W": ["Cybernetic Enhancement", "Station Security", "Orbital Strike"],
+    "U": ["Data Stream", "Gravity Well", "Hologram Projection"],
+    "B": ["Black Hole Singularity", "Scrap-Heap Rat", "Virus Upload"],
+    "R": ["Laser Volley", "Plasma Grenade", "Ignite Engines"],
+    "G": ["Sothera's Breath", "Xenotech Surveyor", "Oxygen Tank"]
+  },
+  "general_tips": [
+    "Artifact removal is main-deckable in this set due to the high number of Spacecrafts and Artifact Aggro decks.",
+    "Don't ignore Lander tokens; they are the key to mana fixing in a 3-color Sothera strategy.",
+    "The format is fast. If your deck doesn't have a play on turn 2, you will likely lose to Artifact Aggro.",
+    "Spacecrafts are powerful but vulnerable to 'crew-kill' responses; always hold up protection when crewing."
+  ]
+}
