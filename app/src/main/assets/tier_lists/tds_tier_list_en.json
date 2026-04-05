@@ -1,0 +1,70 @@
+{
+  "set_code": "tds",
+  "set_name": "Tarkir: Dragonstorm",
+  "last_updated": "2026-04-05",
+  "tiers": [
+    {
+      "tier": "S",
+      "label": "Bombs / Must Pick",
+      "description": "Cards you should always first-pick",
+      "cards": [
+        {"name": "Sarkhan, Dragon-Soul", "color": "URG", "rarity": "mythic", "reason": "Ultimate Planeswalker that generates Dragon tokens and provides Storm-like value"},
+        {"name": "Ugin's Breath", "color": "C", "rarity": "rare", "reason": "Massive colorless board wipe that exiles; essential for any control strategy"},
+        {"name": "Dragonstorm Alpha", "color": "R", "rarity": "rare", "reason": "Gives all your creatures Haste and has a Harmonize trigger to double your best spell"},
+        {"name": "Zurgo, the Unstoppable", "color": "RWB", "rarity": "rare", "reason": "Indestructible on your turn and generates Mobilize tokens whenever it attacks"},
+        {"name": "Spirit of the Khan", "color": "W", "rarity": "mythic", "reason": "A 2/2 for 1 mana that taxes the opponent's non-Dragon spells"}
+      ]
+    },
+    {
+      "tier": "A",
+      "label": "Premium / Strong Pick",
+      "description": "Very strong cards, pick early",
+      "cards": [
+        {"name": "Dragonfire Volley", "color": "R", "rarity": "common", "reason": "Premier removal that deals 4 damage and can deal 1 to all enemies if you have a Dragon"},
+        {"name": "Abzan Outlast", "color": "G", "rarity": "uncommon", "reason": "Provides +1/+1 counters and Lifelink; cornerstone of the Counters archetype"},
+        {"name": "Mobilize the Hordes", "color": "W", "rarity": "uncommon", "reason": "Creates three 1/1 Warrior tokens at instant speed; perfect for Mardu Mobilize"},
+        {"name": "Sultai Graverobber", "color": "B", "rarity": "common", "reason": "Key enabler for 'Leaves the Graveyard' that grows every time a card is exiled"},
+        {"name": "Jeskai Insight", "color": "U", "rarity": "uncommon", "reason": "Draws cards and grants Prowess to your team for a turn"}
+      ]
+    },
+    {
+      "tier": "B",
+      "label": "Good Playables",
+      "description": "Solid cards that make every deck better",
+      "cards": [
+        {"name": "Warrior of the Steppe", "color": "W", "rarity": "common", "reason": "Solid 2-drop that creates a Mobilize token on ETB"},
+        {"name": "Harmonize Echo", "color": "U", "rarity": "common", "reason": "Utility spell that copies the next instant or sorcery; great for Two Spells decks"},
+        {"name": "Temur Brawler", "color": "G", "rarity": "common", "reason": "High-toughness creature that enables Harmonize for your biggest spells"},
+        {"name": "Blood-Sacrifice Rite", "color": "B", "rarity": "common", "reason": "Efficient sacrifice outlet that provides card draw and life drain"},
+        {"name": "Sandblast Sentinel", "color": "W", "rarity": "common", "reason": "Provides +1/+1 counters to your Spirit tokens; key for Abzan Endure"}
+      ]
+    },
+    {
+      "tier": "C",
+      "label": "Filler / Decent",
+      "description": "Playable but replaceable",
+      "cards": [
+        {"name": "Tarkir Wilds", "color": "C", "rarity": "common", "reason": "Standard fetch land for mana fixing; slow but necessary for 3-color clans"},
+        {"name": "Dragon-Scale Shield", "color": "C", "rarity": "common", "reason": "Equipment that provides minimal stats; only good if you need more artifact count"},
+        {"name": "Reckless Strike", "color": "R", "rarity": "common", "reason": "Cheap combat trick that is fine but easily telegraphed"}
+      ]
+    },
+    {
+      "tier": "D",
+      "label": "Sideboard / Avoid",
+      "description": "Only play if desperate or as sideboard cards",
+      "cards": [
+        {"name": "Dragon-Slayer's Trap", "color": "W", "rarity": "uncommon", "reason": "Narrow removal that only hits Dragons; sideboard only"},
+        {"name": "Whispering Spirits", "color": "U", "rarity": "common", "reason": "Too small of a body for its mana cost, even in Spirit decks"}
+      ]
+    },
+    {
+      "tier": "F",
+      "label": "Unplayable",
+      "description": "Never put these in your deck",
+      "cards": [
+        {"name": "Broken Dragon-Egg", "color": "R", "rarity": "common", "reason": "Too slow, too random, and zero board impact"}
+      ]
+    }
+  ]
+}

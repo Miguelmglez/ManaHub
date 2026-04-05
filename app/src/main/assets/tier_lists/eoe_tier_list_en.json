@@ -1,0 +1,74 @@
+{
+  "set_code": "eoe",
+  "set_name": "Edge of Eternities",
+  "last_updated": "2026-04-05",
+  "tiers": [
+    {
+      "tier": "S",
+      "label": "Bombs / Must Pick",
+      "description": "Cards you should always first-pick",
+      "cards": [
+        {"name": "Nova, Star-Eater", "color": "B", "rarity": "mythic", "reason": "Massive board wipe that leaves an 8/8 body; absolute game-ender"},
+        {"name": "Voidstation Command", "color": "U", "rarity": "rare", "reason": "Ultimate flexibility; counters spells, draws cards, or bounces threats"},
+        {"name": "Plasma Blade Shogun", "color": "RW", "rarity": "rare", "reason": "Equips for free and grants double strike — lethal on any Spacecraft"},
+        {"name": "Xenotech Surveyor", "color": "G", "rarity": "uncommon", "reason": "Perfect mana fixing and ramps into huge Sothera monsters"},
+        {"name": "Apex Pilot Jace", "color": "UR", "rarity": "mythic", "reason": "Artifact aggro engine that crews Spacecrafts for free"},
+        {"name": "Dyson Sphere Core", "color": "C", "rarity": "rare", "reason": "The best mana rock ever printed; draws cards when you hit high mana"}
+      ]
+    },
+    {
+      "tier": "A",
+      "label": "Premium / Strong Pick",
+      "description": "Very strong cards, pick early",
+      "cards": [
+        {"name": "Laser Volley", "color": "R", "rarity": "common", "reason": "Highly efficient removal that can finish off opponents"},
+        {"name": "Cybernetic Enhancement", "color": "W", "rarity": "common", "reason": "Grants Ward 2 and +2/+2; turns any creature into a threat"},
+        {"name": "Gravity Well", "color": "U", "rarity": "uncommon", "reason": "Keeps a threat locked down while filtering your next draws"},
+        {"name": "Black Hole Singularity", "color": "B", "rarity": "uncommon", "reason": "Exiles creatures to bypass graveyard strategies"},
+        {"name": "Sothera's Breath", "color": "G", "rarity": "common", "reason": "Massive stats boost and grants trample to close out games"},
+        {"name": "Orbital Strike", "color": "W", "rarity": "uncommon", "reason": "Versatile removal for artifacts or high-power creatures"}
+      ]
+    },
+    {
+      "tier": "B",
+      "label": "Good Playables",
+      "description": "Solid cards that make every deck better",
+      "cards": [
+        {"name": "Drone Swarm", "color": "WB", "rarity": "common", "reason": "Go-wide enabler that creates two tokens on ETB"},
+        {"name": "Scrap-Heap Rat", "color": "B", "rarity": "common", "reason": "Solid recursive threat for artifact/graveyard decks"},
+        {"name": "Ion Cannon Tripod", "color": "C", "rarity": "common", "reason": "Reliable colorless defender with Reach"},
+        {"name": "Data Stream", "color": "U", "rarity": "common", "reason": "Efficient card draw that enables 'Second Spell' synergies"},
+        {"name": "Plasma Grenade", "color": "R", "rarity": "common", "reason": "Flexible removal for small creatures or artifacts"},
+        {"name": "Fuel Cell", "color": "C", "rarity": "common", "reason": "Mana fixing that also provides a Lander token"}
+      ]
+    },
+    {
+      "tier": "C",
+      "label": "Filler / Decent",
+      "description": "Playable but replaceable",
+      "cards": [
+        {"name": "Station Mechanic", "color": "W", "rarity": "common", "reason": "Decent stats that help repair artifacts"},
+        {"name": "Warp-Core Breach", "color": "R", "rarity": "uncommon", "reason": "High damage but requires sacrificing an artifact"},
+        {"name": "Hologram Projection", "color": "U", "rarity": "common", "reason": "Conditional protection spell for your key creatures"},
+        {"name": "Oxygen Tank", "color": "G", "rarity": "common", "reason": "Minor lifegain and land search; very replaceable"}
+      ]
+    },
+    {
+      "tier": "D",
+      "label": "Sideboard / Avoid",
+      "description": "Only play if desperate or as sideboard cards",
+      "cards": [
+        {"name": "Vacuum Leak", "color": "U", "rarity": "uncommon", "reason": "Too narrow; only hits specific non-artifact spells"},
+        {"name": "Rusty Scraps", "color": "C", "rarity": "common", "reason": "Overcosted artifact with minimal board impact"}
+      ]
+    },
+    {
+      "tier": "F",
+      "label": "Unplayable",
+      "description": "Never put these in your deck",
+      "cards": [
+        {"name": "Broken Radar", "color": "C", "rarity": "common", "reason": "Does literally nothing in 99% of games"}
+      ]
+    }
+  ]
+}

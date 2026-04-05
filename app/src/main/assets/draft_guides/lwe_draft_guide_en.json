@@ -1,0 +1,141 @@
+{
+  "set_code": "lwe",
+  "set_name": "Lorwyn Eclipsed",
+  "last_updated": "2026-04-05",
+  "overview": "Lorwyn Eclipsed returns to a world of duality. While the sun sets, the tribal alliances of Lorwyn must adapt to the creeping shadows of Shadowmoor. The set is heavily tribal-focused with a darker twist: -1/-1 counters and Wither represent the encroaching eclipse. To succeed, you must commit to a tribe while navigating the complex combat math of the Wither mechanic.",
+  "mechanics": [
+    {
+      "name": "Kinship",
+      "description": "At the beginning of your upkeep, you may look at the top card of your library. If it shares a creature type, you gain a bonus.",
+      "draft_tip": "Tribal density is key. Aim for 12+ creatures of your primary type to make Kinship reliable."
+    },
+    {
+      "name": "Wither",
+      "description": "This creature deals damage to creatures in the form of -1/-1 counters.",
+      "draft_tip": "Wither is excellent for taking down large threats over multiple turns. It also permanently shuts down 'Persist' creatures."
+    },
+    {
+      "name": "Thoughtweft (Shared Abilities)",
+      "description": "Kithkin creatures that grant abilities to all other Kithkin you control.",
+      "draft_tip": "Prioritize creatures that grant keywords like First Strike or Vigilance to the whole team; they scale exponentially."
+    },
+    {
+      "name": "Persist",
+      "description": "When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield with a -1/-1 counter.",
+      "draft_tip": "Look for ways to remove -1/-1 counters (like +1/+1 counters or blink effects) to make your creatures effectively immortal."
+    }
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Merfolk Tapping",
+      "tier": "A",
+      "description": "Use a variety of tricky tapping synergies to cast your spells for cheap and disrupt your opponents.",
+      "key_commons": ["Silvergill Drowner", "Stonybrook Angler", "Aquitect's Will"],
+      "key_uncommons": ["Summon the School", "Merrow Reejerey"],
+      "strategy": "Control the board by tapping down the opponent's best blockers. Use 'Tapped matters' payoffs to generate mana or card advantage."
+    },
+    {
+      "colors": "BR",
+      "name": "Goblins -1/-1 Counters",
+      "tier": "S",
+      "description": "Throw boggarts at every problem! Find ways to put -1/-1 counters on your disposable Goblin forces and reap rewards.",
+      "key_commons": ["Tarfire", "Boggart Arsonists", "Cinderspit Shot"],
+      "key_uncommons": ["Boggart Shenanigans", "Murderous Redcap"],
+      "strategy": "Aggressive sacrifice. Use Goblins with Persist and sacrifice them to deal damage or place counters on enemy threats."
+    },
+    {
+      "colors": "GW",
+      "name": "Kithkin Thoughtweft",
+      "tier": "A",
+      "description": "Use the power of shared consciousness to spread abilities among Kithkin. The more Kithkin you play, the greater your thoughtweft grows!",
+      "key_commons": ["Goldmeadow Bodyguard", "Kinsbaile Skirmisher", "Wizened Cenn"],
+      "key_uncommons": ["Cloudgoat Ranger", "Thoughtweft Trio"],
+      "strategy": "Go-wide aggro. Build a massive board of small Kithkin and use 'Anthem' lords to make them impossible to block profitably."
+    },
+    {
+      "colors": "UR",
+      "name": "Elementals Spells",
+      "tier": "B",
+      "description": "Burn bright like a flamekin. Cast big spells to unleash seismic Elemental power!",
+      "key_commons": ["Cinderspit Shot", "Inner-Flame Acolyte", "Soulbright Flamekin"],
+      "key_uncommons": ["Flamekin Bladewhirl", "Mulldrifter"],
+      "strategy": "Midrange/Control. Use efficient removal to survive the early game, then cast high-CMC Elementals or big 'X' spells to close the game."
+    },
+    {
+      "colors": "BG",
+      "name": "Elves Graveyard",
+      "tier": "A",
+      "description": "Harness the cycle of nature and use your graveyard as a resource to overwhelm your opponents.",
+      "key_commons": ["Gilt-Leaf Ambush", "Scarred Vinebreeder", "Eyeblight's Ending"],
+      "key_uncommons": ["Lys Alana Huntmaster", "Immaculate Magistrate"],
+      "strategy": "Token generation and recursion. Use Elves that create tokens whenever you cast an Elf spell, and bring back key pieces from the yard."
+    },
+    {
+      "colors": "UB",
+      "name": "Faerie Flash",
+      "tier": "S",
+      "description": "The masters of the night. Use flash, flying, and disruption to win without ever tapping out on your own turn.",
+      "key_commons": ["Peppersmoke", "Spellstutter Sprite", "Pestermite"],
+      "key_uncommons": ["Mistbind Marauder", "Scion of Oona"],
+      "strategy": "Pure tempo. Play everything at the end of your opponent's turn. Counter their key spells and chip away with small flyers."
+    },
+    {
+      "colors": "RG",
+      "name": "Giant Stomp",
+      "tier": "B",
+      "description": "Raw power. Play the biggest creatures in the set and trample over anyone small enough to stand in the way.",
+      "key_commons": ["Stinkdrinker Daredevil", "Giant's Ire", "Blind-Spot Giant"],
+      "key_uncommons": ["Sunrise Sovereign", "Feudkiller's Verdict"],
+      "strategy": "Ramp into Giants. Use cost-reducers to play 6/6s on turn 4. This deck struggles against deathtouch but dominates ground combat."
+    },
+    {
+      "colors": "WB",
+      "name": "Cinder Attrition",
+      "tier": "B",
+      "description": "A slow, painful death. Use lifelink and life-drain effects to stay alive while your opponent withers away.",
+      "key_commons": ["Nip Gwyllion", "Edge of the Divinity", "Beckon Apparition"],
+      "key_uncommons": ["Divinity of Pride", "Nightsky Mimic"],
+      "strategy": "Drain and Gain. Focus on creatures that trigger when you gain life or when the opponent loses life. Grind them out."
+    },
+    {
+      "colors": "RW",
+      "name": "Flamekin Aggro",
+      "tier": "A",
+      "description": "High velocity. Use haste creatures and cheap combat tricks to end the game before the sun even sets.",
+      "key_commons": ["Inner-Flame Acolyte", "Flamekin Harbinger", "Surge of Thoughtweft"],
+      "key_uncommons": ["Figure of Destiny", "Balefire Liege"],
+      "strategy": "Hyper-aggro. Every creature should have haste or provide a power boost. Don't worry about the late game; there isn't one."
+    },
+    {
+      "colors": "GU",
+      "name": "Treefolk Ramp",
+      "tier": "C",
+      "description": "Slow and steady wins the race. Ramp into massive Treefolk that care about toughness and longevity.",
+      "key_commons": ["Fertilid", "Treefolk Harbinger", "Bosk Banneret"],
+      "key_uncommons": ["Doran's Bark", "Leaf-Crowned Elder"],
+      "strategy": "Survival. Use high-toughness blockers to stall the early game. Use Kinship to play Treefolk for free from the top of your deck."
+    }
+  ],
+  "top_commons": {
+    "W": ["Goldmeadow Bodyguard", "Valley Questcaller", "Kinsbaile Skirmisher"],
+    "U": ["Silvergill Drowner", "Mulldrifter", "Stonybrook Angler"],
+    "B": ["Nameless Inversion", "Eyeblight's Ending", "Peppersmoke"],
+    "R": ["Cinderspit Shot", "Tarfire", "Inner-Flame Acolyte"],
+    "G": ["Gilt-Leaf Ambush", "Treefolk Harbinger", "Lignify"]
+  },
+  "top_uncommons": {
+    "W": ["Cloudgoat Ranger", "Wizened Cenn"],
+    "U": ["Spellstutter Sprite", "Mistbind Marauder"],
+    "B": ["Murderous Redcap", "Bitterblossom Reborn"],
+    "R": ["Boggart Shenanigans", "Flamekin Bladewhirl"],
+    "G": ["Lys Alana Huntmaster", "Immaculate Magistrate"]
+  },
+  "general_tips": [
+    "Wither changes how you block. Even a 1/1 can permanently weaken a 5/5, so don't be afraid to chump-block.",
+    "Tribal synergies are 'all-or-nothing'. If you are drafting Elves, avoid picking non-Elf creatures unless they are top-tier bombs.",
+    "Nameless Inversion is the most flexible card in the set; it counts as every creature type, triggering all Kinship and tribal effects.",
+    "Persist creatures are great for sacrifice decks, but watch out for Wither removal which negates the Persist trigger.",
+    "The 'Eclipse' makes the format grindier than Bloomburrow. Prioritize card advantage and ways to break board stalls."
+  ]
+}
