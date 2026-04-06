@@ -21,10 +21,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DeckCard(
-    val scryfallId:  String,
-    val quantity:    Int,
+    val scryfallId: String,
+    val quantity: Int,
     val isSideboard: Boolean,
-    val card:        Card?,
+    val card: Card?,
 )
 
 @HiltViewModel
@@ -42,22 +42,22 @@ class DeckDetailViewModel @Inject constructor(
     private val deckId: Long = checkNotNull(savedStateHandle["deckId"])
 
     data class AddCardRow(
-        val card:           Card,
+        val card: Card,
         val quantityInDeck: Int,
-        val isOwned:        Boolean,
+        val isOwned: Boolean,
     )
 
     data class UiState(
-        val deck:              Deck?             = null,
-        val cards:             List<DeckCard>    = emptyList(),
-        val isLoading:         Boolean           = true,
-        val totalCards:        Int               = 0,
-        val manaCurve:         Map<Int, Int>     = emptyMap(),
-        val colorDistribution: Map<String, Int>  = emptyMap(),
+        val deck: Deck? = null,
+        val cards: List<DeckCard> = emptyList(),
+        val isLoading: Boolean = true,
+        val totalCards: Int = 0,
+        val manaCurve: Map<Int, Int> = emptyMap(),
+        val colorDistribution: Map<String, Int> = emptyMap(),
         // Add cards sheet state
-        val addCardsQuery:     String            = "",
-        val addCardsResults:   List<AddCardRow>  = emptyList(),
-        val isSearchingCards:  Boolean           = false,
+        val addCardsQuery: String = "",
+        val addCardsResults: List<AddCardRow> = emptyList(),
+        val isSearchingCards: Boolean = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -81,8 +81,8 @@ class DeckDetailViewModel @Inject constructor(
                 deckCardsMap = deckWithCards.mainboard.associate { it.scryfallId to it.quantity }
                 _uiState.update {
                     it.copy(
-                        deck       = deckWithCards.deck,
-                        isLoading  = false,
+                        deck = deckWithCards.deck,
+                        isLoading = false,
                         totalCards = deckWithCards.totalCards,
                         // Update quantities in add cards results
                         addCardsResults = it.addCardsResults.map { row ->
@@ -93,14 +93,14 @@ class DeckDetailViewModel @Inject constructor(
                 val mainboard = deckWithCards.mainboard.map { slot ->
                     val card = when (val r = cardRepository.getCardById(slot.scryfallId)) {
                         is DataResult.Success -> r.data
-                        else                  -> null
+                        else -> null
                     }
                     DeckCard(slot.scryfallId, slot.quantity, isSideboard = false, card = card)
                 }
                 _uiState.update {
                     it.copy(
-                        cards             = mainboard,
-                        manaCurve         = buildManaCurve(mainboard),
+                        cards = mainboard,
+                        manaCurve = buildManaCurve(mainboard),
                         colorDistribution = buildColorDist(mainboard),
                     )
                 }
@@ -114,7 +114,8 @@ class DeckDetailViewModel @Inject constructor(
             try {
                 val owned = userCardRepository.observeCollection().first()
                 collectionCards = owned.map { it.card }.sortedBy { it.name }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -139,9 +140,9 @@ class DeckDetailViewModel @Inject constructor(
                 s.copy(
                     addCardsResults = filtered.map { card ->
                         AddCardRow(
-                            card           = card,
+                            card = card,
                             quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
-                            isOwned        = card.scryfallId in ownedIds,
+                            isOwned = card.scryfallId in ownedIds,
                         )
                     },
                 )
@@ -156,9 +157,9 @@ class DeckDetailViewModel @Inject constructor(
             s.copy(
                 addCardsResults = collectionCards.map { card ->
                     AddCardRow(
-                        card           = card,
+                        card = card,
                         quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
-                        isOwned        = true,
+                        isOwned = true,
                     )
                 },
             )
@@ -172,17 +173,17 @@ class DeckDetailViewModel @Inject constructor(
                 val result = cardRepository.searchCards(query)
                 val cards = when (result) {
                     is DataResult.Success -> result.data
-                    is DataResult.Error   -> emptyList()
+                    is DataResult.Error -> emptyList()
                 }
                 val ownedIds = collectionCards.map { it.scryfallId }.toSet()
                 _uiState.update { s ->
                     s.copy(
                         isSearchingCards = false,
-                        addCardsResults  = cards.map { card ->
+                        addCardsResults = cards.map { card ->
                             AddCardRow(
-                                card           = card,
+                                card = card,
                                 quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
-                                isOwned        = card.scryfallId in ownedIds,
+                                isOwned = card.scryfallId in ownedIds,
                             )
                         },
                     )
@@ -229,7 +230,12 @@ class DeckDetailViewModel @Inject constructor(
             val existingEntry = _uiState.value.cards.find { it.card?.name == name }
             if (existingEntry != null) {
                 val currentQty = deckCardsMap[existingEntry.scryfallId] ?: 0
-                deckRepository.addCardToDeck(deckId, existingEntry.scryfallId, currentQty + 1, false)
+                deckRepository.addCardToDeck(
+                    deckId,
+                    existingEntry.scryfallId,
+                    currentQty + 1,
+                    false
+                )
             } else {
                 // searchCardByName fetches from Scryfall AND caches in the local DB,
                 // which satisfies the FK constraint on deck_cards.scryfall_id.
@@ -248,7 +254,12 @@ class DeckDetailViewModel @Inject constructor(
             if (currentQty <= 1) {
                 deckRepository.removeCardFromDeck(deckId, existingEntry.scryfallId, false)
             } else {
-                deckRepository.addCardToDeck(deckId, existingEntry.scryfallId, currentQty - 1, false)
+                deckRepository.addCardToDeck(
+                    deckId,
+                    existingEntry.scryfallId,
+                    currentQty - 1,
+                    false
+                )
             }
         }
     }
@@ -271,4 +282,13 @@ class DeckDetailViewModel @Inject constructor(
             .flatMap { it.colors }
             .groupBy { it }
             .mapValues { it.value.size }
+
+    fun getManaCode(landName: String): String? = when (landName) {
+        "Plains" -> "W"
+        "Island" -> "U"
+        "Swamp" -> "B"
+        "Mountain" -> "R"
+        "Forest" -> "G"
+        else -> null
+    }
 }

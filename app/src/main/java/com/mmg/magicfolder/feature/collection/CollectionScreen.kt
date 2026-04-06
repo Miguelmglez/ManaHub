@@ -102,8 +102,17 @@ private fun CollectionContent(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onScannerClick) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.addcard_title))
+            if (selectedTab == TAB_CARDS) {
+                FloatingActionButton(
+                    onClick        = onScannerClick,
+                    containerColor = mc.primaryAccent,
+                    contentColor   = mc.background
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.addcard_title)
+                    )
+                }
             }
         },
     ) { padding ->

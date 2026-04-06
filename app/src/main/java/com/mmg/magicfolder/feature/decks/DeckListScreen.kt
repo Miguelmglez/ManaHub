@@ -217,7 +217,7 @@ private fun CreateDeckDialog(
 ) {
     val mc = MaterialTheme.magicColors
     var name   by remember { mutableStateOf("") }
-    var format by remember { mutableStateOf("casual") }
+    var format by remember { mutableStateOf("standard") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -256,7 +256,7 @@ private fun CreateDeckDialog(
 
 @Composable
 private fun FormatSelector(selected: String, onSelect: (String) -> Unit) {
-    val formats = listOf("casual", "standard", "pioneer", "modern", "legacy", "vintage", "commander", "pauper")
+    val formats = listOf("standard", "commander", "draft")
     val mc = MaterialTheme.magicColors
     Column {
         Text(
