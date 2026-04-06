@@ -8,11 +8,13 @@ import com.mmg.magicfolder.core.domain.model.DataResult
 import com.mmg.magicfolder.feature.draft.domain.model.DraftVideo
 import com.mmg.magicfolder.feature.draft.domain.model.SetDraftGuide
 import com.mmg.magicfolder.feature.draft.domain.model.SetTierList
+import com.mmg.magicfolder.feature.draft.domain.usecase.GetCardByNameUseCase
 import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetCardsUseCase
 import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetVideosUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,7 +27,10 @@ data class SetDraftDetailUiState(
     val setName: String = "",
     val setIconUri: String = "",
     val setReleasedAt: String = "",
+    // Main tabs: 0 = Guide, 1 = Cards
     val selectedTab: Int = 0,
+    // Cards sub-tabs: 0 = All Cards, 1 = Tier List
+    val selectedCardsSubTab: Int = 0,
     // Guide
     val guide: SetDraftGuide? = null,
     val isGuideLoading: Boolean = false,
@@ -43,14 +48,16 @@ data class SetDraftDetailUiState(
     val hasMoreCards: Boolean = false,
     val cardColorFilter: Set<String> = emptySet(),
     val cardRarityFilter: Set<String> = emptySet(),
-    val cardSortBy: CardSortOption = CardSortOption.COLLECTOR,
-    // Videos
+    val cardSortBy: CardSortOption = CardSortOption.RARITY,
+    // Videos (loaded in background, shown in Guide tab)
     val videos: List<DraftVideo> = emptyList(),
     val isVideosLoading: Boolean = false,
-    val videosError: String? = null,
+    // Card detail bottom sheet
+    val cardDetail: Card? = null,
+    val isCardDetailLoading: Boolean = false,
 )
 
-enum class CardSortOption { PRICE, NAME, COLLECTOR, RARITY }
+enum class CardSortOption { PRICE, NAME, RARITY }
 
 @HiltViewModel
 class SetDraftDetailViewModel @Inject constructor(
@@ -59,6 +66,7 @@ class SetDraftDetailViewModel @Inject constructor(
     private val getSetTierListUseCase: GetSetTierListUseCase,
     private val getSetCardsUseCase: GetSetCardsUseCase,
     private val getSetVideosUseCase: GetSetVideosUseCase,
+    private val getCardByNameUseCase: GetCardByNameUseCase,
 ) : ViewModel() {
 
     val setCode: String = savedStateHandle.get<String>("setCode") ?: ""
@@ -83,16 +91,17 @@ class SetDraftDetailViewModel @Inject constructor(
 
     init {
         loadGuide()
+        loadVideos()
+        loadCards() // eager load for art-crop URL cache
     }
 
     fun onTabSelected(tab: Int) {
         _uiState.update { it.copy(selectedTab = tab) }
-        when (tab) {
-            0 -> if (!guideLoaded) loadGuide()
-            1 -> if (!tierListLoaded) loadTierList()
-            2 -> if (!cardsLoaded) loadCards()
-            3 -> if (!videosLoaded) loadVideos()
-        }
+    }
+
+    fun onCardsSubTabSelected(tab: Int) {
+        _uiState.update { it.copy(selectedCardsSubTab = tab) }
+        if (tab == 1 && !tierListLoaded) loadTierList()
     }
 
     fun loadGuide() {
@@ -127,34 +136,47 @@ class SetDraftDetailViewModel @Inject constructor(
         }
     }
 
-    fun loadCards(nextPage: Boolean = false) {
+    /**
+     * Loads ALL pages of set cards sequentially (150 ms between pages to respect
+     * Scryfall's 10 req/s limit).  Updates [SetDraftDetailUiState.cards] progressively
+     * so the art-crop cache is populated as quickly as possible.
+     */
+    fun loadCards() {
         viewModelScope.launch {
-            val page = if (nextPage) _uiState.value.cardsPage + 1 else 1
             _uiState.update { it.copy(isCardsLoading = true, cardsError = null) }
-            when (val result = getSetCardsUseCase(setCode, page)) {
-                is DataResult.Success -> {
-                    cardsLoaded = true
-                    _uiState.update { state ->
-                        val newCards = if (nextPage) state.cards + result.data else result.data
-                        state.copy(
-                            cards = newCards,
-                            isCardsLoading = false,
-                            cardsPage = page,
-                            hasMoreCards = result.data.size >= 175,
-                        )
+            val accumulated = mutableListOf<Card>()
+            var page = 1
+            var keepGoing = true
+            while (keepGoing) {
+                when (val result = getSetCardsUseCase(setCode, page)) {
+                    is DataResult.Success -> {
+                        accumulated.addAll(result.data)
+                        // Publish intermediate results so art-crop URLs appear progressively
+                        _uiState.update { it.copy(cards = accumulated.toList()) }
+                        if (result.data.size >= 175) {
+                            page++
+                            delay(150L) // stay well under Scryfall's 10 req/s limit
+                        } else {
+                            keepGoing = false
+                        }
+                    }
+                    is DataResult.Error -> {
+                        keepGoing = false
+                        if (accumulated.isEmpty()) {
+                            _uiState.update { it.copy(cardsError = result.message) }
+                        }
+                        // If we already have some cards, don't surface the error
                     }
                 }
-                is DataResult.Error -> {
-                    cardsLoaded = true
-                    _uiState.update { it.copy(isCardsLoading = false, cardsError = result.message) }
-                }
             }
+            cardsLoaded = true
+            _uiState.update { it.copy(isCardsLoading = false, hasMoreCards = false, cardsPage = page) }
         }
     }
 
     fun loadVideos() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isVideosLoading = true, videosError = null) }
+            _uiState.update { it.copy(isVideosLoading = true) }
             when (val result = getSetVideosUseCase(setCode, setName)) {
                 is DataResult.Success -> {
                     videosLoaded = true
@@ -162,10 +184,30 @@ class SetDraftDetailViewModel @Inject constructor(
                 }
                 is DataResult.Error -> {
                     videosLoaded = true
-                    _uiState.update { it.copy(isVideosLoading = false, videosError = result.message) }
+                    _uiState.update { it.copy(isVideosLoading = false) }
                 }
             }
         }
+    }
+
+    fun loadCardDetail(cardName: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCardDetailLoading = true, cardDetail = null) }
+            when (val result = getCardByNameUseCase(cardName, setCode)) {
+                is DataResult.Success -> _uiState.update {
+                    it.copy(cardDetail = result.data, isCardDetailLoading = false)
+                }
+                is DataResult.Error -> _uiState.update { it.copy(isCardDetailLoading = false) }
+            }
+        }
+    }
+
+    fun showCardDetail(card: Card) {
+        _uiState.update { it.copy(cardDetail = card, isCardDetailLoading = false) }
+    }
+
+    fun dismissCardDetail() {
+        _uiState.update { it.copy(cardDetail = null, isCardDetailLoading = false) }
     }
 
     fun toggleCardColorFilter(color: String) {

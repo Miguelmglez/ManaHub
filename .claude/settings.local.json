@@ -53,7 +53,11 @@
       "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/domain/usecase\")",
       "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/data/local\")",
       "Bash(mkdir -p \"/c/Users/Miguel/AndroidStudioProjects/Magic_Folder/app/src/main/java/com/mmg/magicfolder/feature/news/data/remote\")",
-      "Bash(./gradlew compileDebugKotlin)"
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew :app:compileDebugKotlin)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" cmd.exe /c \"gradlew.bat :app:compileDebugKotlin 2>&1\")",
+      "Bash(cmd.exe /c \"set JAVA_HOME=C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr && gradlew.bat :app:compileDebugKotlin\")",
+      "Bash(cmd.exe:*)"
     ]
   }
 }

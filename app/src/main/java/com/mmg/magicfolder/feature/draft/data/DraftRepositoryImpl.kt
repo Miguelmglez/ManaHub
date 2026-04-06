@@ -56,16 +56,20 @@ class DraftRepositoryImpl @Inject constructor(
                 if (!forceRefresh && isCacheFresh) {
                     val cached = draftSetDao.getAllSetsSnapshot()
                     if (cached.isNotEmpty()) {
-                        return@withContext DataResult.Success(cached.map { it.toDomain() })
+                        val availableCodes = getAvailableDraftSetCodes()
+                        val filtered = cached.filter { it.code.lowercase() in availableCodes }
+                        return@withContext DataResult.Success(filtered.map { it.toDomain() })
                     }
                 }
 
                 val response = scryfallApi.getSets()
+                val availableCodes = getAvailableDraftSetCodes()
                 val filtered = response.data
                     .filter { it.setType in DRAFTABLE_TYPES }
                     .filter { (it.releasedAt ?: "") >= MIN_RELEASE_DATE }
                     .filter { !it.name.contains("Commander", ignoreCase = true) }
                     .filter { !it.digital }
+                    .filter { it.code.lowercase() in availableCodes }
                     .sortedByDescending { it.releasedAt }
 
                 val entities = filtered.map { it.toEntity() }
@@ -76,7 +80,9 @@ class DraftRepositoryImpl @Inject constructor(
             } catch (e: Exception) {
                 val cached = draftSetDao.getAllSetsSnapshot()
                 if (cached.isNotEmpty()) {
-                    DataResult.Success(cached.map { it.toDomain() }, isStale = true)
+                    val availableCodes = getAvailableDraftSetCodes()
+                    val filtered = cached.filter { it.code.lowercase() in availableCodes }
+                    DataResult.Success(filtered.map { it.toDomain() }, isStale = true)
                 } else {
                     DataResult.Error(e.message ?: "Failed to load sets")
                 }
@@ -87,7 +93,7 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun getSetGuide(setCode: String): DataResult<SetDraftGuide> {
         return withContext(Dispatchers.IO) {
             try {
-                val json = context.assets.open("draft_guides/$setCode.json")
+                val json = context.assets.open("draft_guides/$setCode"+"_draft_guide_en.json")
                     .bufferedReader().use { it.readText() }
                 val map = gson.fromJson<Map<String, Any>>(json, object : TypeToken<Map<String, Any>>() {}.type)
                 val guide = parseGuide(map)
@@ -101,7 +107,7 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun getSetTierList(setCode: String): DataResult<SetTierList> {
         return withContext(Dispatchers.IO) {
             try {
-                val json = context.assets.open("tier_lists/$setCode.json")
+                val json = context.assets.open("tier_lists/$setCode"+"_tier_list_en.json")
                     .bufferedReader().use { it.readText() }
                 val map = gson.fromJson<Map<String, Any>>(json, object : TypeToken<Map<String, Any>>() {}.type)
                 val tierList = parseTierList(map)
@@ -165,6 +171,46 @@ class DraftRepositoryImpl @Inject constructor(
                 DataResult.Error(e.message ?: "Failed to load videos")
             }
         }
+    }
+
+    override suspend fun resolveCardId(cardName: String, setCode: String): DataResult<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val card = scryfallApi.getCardByName(name = cardName, set = setCode)
+                DataResult.Success(card.id)
+            } catch (_: Exception) {
+                try {
+                    val card = scryfallApi.getCardByName(name = cardName)
+                    DataResult.Success(card.id)
+                } catch (e: Exception) {
+                    DataResult.Error(e.message ?: "Card not found")
+                }
+            }
+        }
+    }
+
+    override suspend fun getCardByName(name: String, setCode: String): DataResult<Card> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val card = scryfallApi.getCardByName(name = name, set = setCode)
+                DataResult.Success(card.toDomain())
+            } catch (_: Exception) {
+                try {
+                    val card = scryfallApi.getCardByName(name = name)
+                    DataResult.Success(card.toDomain())
+                } catch (e: Exception) {
+                    DataResult.Error(e.message ?: "Card not found")
+                }
+            }
+        }
+    }
+
+    private fun getAvailableDraftSetCodes(): Set<String> {
+        return try {
+            (context.assets.list("draft_guides") ?: emptyArray())
+                .map { it.substringBefore("_draft_guide").lowercase() }
+                .toSet()
+        } catch (_: Exception) { emptySet() }
     }
 
     @Suppress("UNCHECKED_CAST")
