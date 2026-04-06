@@ -32,6 +32,7 @@ interface CardDao {
     @Query("""
         DELETE FROM cards
         WHERE scryfall_id NOT IN (SELECT scryfall_id FROM user_cards)
+        AND scryfall_id NOT IN (SELECT scryfall_id FROM deck_cards)
         AND cached_at < :evictBefore
     """)
     suspend fun evictStaleCache(evictBefore: Long)

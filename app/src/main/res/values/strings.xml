@@ -129,6 +129,15 @@
     <string name="carddetail_condition">Condition</string>
     <string name="carddetail_language">Language</string>
     <string name="carddetail_quantity_label">Quantity</string>
+    <string name="collection_unique_cards">unique cards</string>
+    <string name="collection_total_copies">copies</string>
+    <string name="collection_copy_types">types</string>
+    <string name="carddetail_add_copy">Add to collection</string>
+    <string name="carddetail_no_copies">You don\'t have this card in your collection</string>
+    <string name="carddetail_alternative_art">Alternative art</string>
+    <string name="carddetail_alternative_art_short">Alt art</string>
+    <string name="carddetail_delete_copy_title">Remove copy</string>
+    <string name="carddetail_delete_copy_message">Remove this copy from your collection?</string>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN
@@ -255,6 +264,14 @@
     <string name="deckbuilder_setup_commander_label">Choose Commander</string>
     <string name="deckbuilder_setup_build_button">Build Deck</string>
     <string name="deckbuilder_search_commander_hint">Search legendary creature…</string>
+    <string name="deckbuilder_basic_lands">Basic Lands</string>
+    <string name="deckbuilder_copy_warning">Exceeds %1$d-copy limit</string>
+    <string name="deckbuilder_copy_warning_ack">I confirm this card allows more copies</string>
+    <string name="deckbuilder_add_cards">Add Cards</string>
+    <string name="deckbuilder_add_cards_search_hint">Search cards…</string>
+    <string name="deckbuilder_add_cards_done">Done</string>
+    <string name="deckbuilder_deck_empty">This deck is empty</string>
+    <string name="deckbuilder_max_copies_reached">Max copies reached</string>
 
     <!-- ══════════════════════════════════════════
          GAME SETUP SCREEN

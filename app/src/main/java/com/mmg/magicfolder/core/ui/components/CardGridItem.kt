@@ -13,20 +13,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.mmg.magicfolder.core.domain.model.UserCardWithCard
+import com.mmg.magicfolder.feature.collection.CollectionCardGroup
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.core.util.PriceFormatter
 
 @Composable
 fun CardGridItem(
-    item:     UserCardWithCard,
+    item:     CollectionCardGroup,
     onClick:  () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val card     = item.card
-    val userCard = item.userCard
-    val mc       = MaterialTheme.magicColors
+    val card = item.card
+    val mc   = MaterialTheme.magicColors
 
     Card(
         onClick   = onClick,
@@ -59,7 +58,7 @@ fun CardGridItem(
                         .align(Alignment.TopEnd)
                         .padding(4.dp),
                 )
-                // Quantity badge
+                // Quantity badge (total across all copies)
                 Surface(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -68,11 +67,28 @@ fun CardGridItem(
                     shape    = MaterialTheme.shapes.extraSmall,
                 ) {
                     Text(
-                        text     = "×${userCard.quantity}${if (userCard.isFoil) " ✦" else ""}",
+                        text     = "×${item.totalQuantity}${if (item.hasFoil) " ✦" else ""}",
                         style    = MaterialTheme.magicTypography.labelSmall,
-                        color    = if (userCard.isFoil) mc.goldMtg else mc.textPrimary,
+                        color    = if (item.hasFoil) mc.goldMtg else mc.textPrimary,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                     )
+                }
+                // Multi-copy indicator
+                if (item.distinctCopies > 1) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp),
+                        color    = mc.primaryAccent.copy(alpha = 0.85f),
+                        shape    = MaterialTheme.shapes.extraSmall,
+                    ) {
+                        Text(
+                            text     = "${item.distinctCopies}t",
+                            style    = MaterialTheme.magicTypography.labelSmall,
+                            color    = mc.background,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                        )
+                    }
                 }
             }
             // Card name + price + tags
@@ -85,8 +101,8 @@ fun CardGridItem(
                     overflow = TextOverflow.Ellipsis,
                 )
                 val preferredCurrency = LocalPreferredCurrency.current
-                val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, userCard.isFoil, preferredCurrency) {
-                    if (userCard.isFoil) {
+                val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, item.hasFoil, preferredCurrency) {
+                    if (item.hasFoil) {
                         PriceFormatter.formatFromScryfall(card.priceUsdFoil, card.priceEurFoil, preferredCurrency = preferredCurrency)
                     } else {
                         PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur, preferredCurrency = preferredCurrency)

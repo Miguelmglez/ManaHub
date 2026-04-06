@@ -129,15 +129,17 @@ fun DeckBuilderScreen(
                 modifier              = Modifier.padding(padding),
             )
             BuilderStep.REVIEW -> ReviewStep(
-                state                 = state,
-                onRemoveFromMainboard = viewModel::removeFromMainboard,
-                onRemoveFromSideboard = viewModel::removeFromSideboard,
-                onMoveToSideboard     = viewModel::moveToSideboard,
-                onMoveToMainboard     = viewModel::moveToMainboard,
-                onRemoveNonBasicLand  = viewModel::removeNonBasicLand,
-                onSetGroupBy          = viewModel::setReviewGroupBy,
-                onSave                = { viewModel.saveDeck(onDeckSaved) },
-                modifier              = Modifier.padding(padding),
+                state                    = state,
+                onRemoveFromMainboard    = viewModel::removeFromMainboard,
+                onRemoveFromSideboard    = viewModel::removeFromSideboard,
+                onMoveToSideboard        = viewModel::moveToSideboard,
+                onMoveToMainboard        = viewModel::moveToMainboard,
+                onRemoveNonBasicLand     = viewModel::removeNonBasicLand,
+                onSetGroupBy             = viewModel::setReviewGroupBy,
+                onAcknowledgeOverLimit   = viewModel::acknowledgeOverLimit,
+                onUnacknowledgeOverLimit = viewModel::unacknowledgeOverLimit,
+                onSave                   = { viewModel.saveDeck(onDeckSaved) },
+                modifier                 = Modifier.padding(padding),
             )
         }
     }
@@ -552,15 +554,17 @@ private fun BuildingStep(
 
 @Composable
 private fun ReviewStep(
-    state:                 DeckBuilderState,
-    onRemoveFromMainboard: (String) -> Unit,
-    onRemoveFromSideboard: (String) -> Unit,
-    onMoveToSideboard:     (String) -> Unit,
-    onMoveToMainboard:     (String) -> Unit,
-    onRemoveNonBasicLand:  (String) -> Unit,
-    onSetGroupBy:          (ReviewGroupBy) -> Unit,
-    onSave:                () -> Unit,
-    modifier:              Modifier,
+    state:                    DeckBuilderState,
+    onRemoveFromMainboard:    (String) -> Unit,
+    onRemoveFromSideboard:    (String) -> Unit,
+    onMoveToSideboard:        (String) -> Unit,
+    onMoveToMainboard:        (String) -> Unit,
+    onRemoveNonBasicLand:     (String) -> Unit,
+    onSetGroupBy:             (ReviewGroupBy) -> Unit,
+    onAcknowledgeOverLimit:   (String) -> Unit,
+    onUnacknowledgeOverLimit: (String) -> Unit,
+    onSave:                   () -> Unit,
+    modifier:                 Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -639,22 +643,59 @@ private fun ReviewStep(
                     )
                 }
                 items(cards, key = { "main_${it.card.scryfallId}" }) { dc ->
-                    Row(
-                        modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment     = Alignment.CenterVertically,
-                    ) {
-                        DeckCardRow(
-                            deckCard = dc,
-                            onRemove = { onRemoveFromMainboard(dc.card.scryfallId) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        // Move to sideboard button
-                        TextButton(
-                            onClick  = { onMoveToSideboard(dc.card.scryfallId) },
-                            modifier = Modifier.width(48.dp),
+                    Column {
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment     = Alignment.CenterVertically,
                         ) {
-                            Text("SB", style = ty.labelSmall, color = mc.secondaryAccent)
+                            DeckCardRow(
+                                deckCard = dc,
+                                onRemove = { onRemoveFromMainboard(dc.card.scryfallId) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            // Move to sideboard button
+                            TextButton(
+                                onClick  = { onMoveToSideboard(dc.card.scryfallId) },
+                                modifier = Modifier.width(48.dp),
+                            ) {
+                                Text("SB", style = ty.labelSmall, color = mc.secondaryAccent)
+                            }
+                        }
+                        // Copy limit warning for standard-like formats
+                        if (dc.card.scryfallId in state.overLimitCards) {
+                            val isAcknowledged = dc.card.scryfallId in state.acknowledgedOverLimitCards
+                            Surface(
+                                shape    = RoundedCornerShape(6.dp),
+                                color    = if (isAcknowledged) mc.surface else mc.lifeNegative.copy(alpha = 0.1f),
+                                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp, bottom = 4.dp),
+                            ) {
+                                Row(
+                                    modifier          = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text  = stringResource(R.string.deckbuilder_copy_warning, state.format.maxCopies),
+                                        style = ty.labelSmall,
+                                        color = if (isAcknowledged) mc.textDisabled else mc.lifeNegative,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Checkbox(
+                                        checked         = isAcknowledged,
+                                        onCheckedChange = { checked ->
+                                            if (checked) onAcknowledgeOverLimit(dc.card.scryfallId)
+                                            else onUnacknowledgeOverLimit(dc.card.scryfallId)
+                                        },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor   = mc.primaryAccent,
+                                            uncheckedColor = mc.lifeNegative,
+                                            checkmarkColor = mc.background,
+                                        ),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
