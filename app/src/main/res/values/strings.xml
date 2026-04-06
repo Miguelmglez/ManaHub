@@ -129,6 +129,15 @@
     <string name="carddetail_condition">Condition</string>
     <string name="carddetail_language">Language</string>
     <string name="carddetail_quantity_label">Quantity</string>
+    <string name="collection_unique_cards">unique cards</string>
+    <string name="collection_total_copies">copies</string>
+    <string name="collection_copy_types">types</string>
+    <string name="carddetail_add_copy">Add to collection</string>
+    <string name="carddetail_no_copies">You don\'t have this card in your collection</string>
+    <string name="carddetail_alternative_art">Alternative art</string>
+    <string name="carddetail_alternative_art_short">Alt art</string>
+    <string name="carddetail_delete_copy_title">Remove copy</string>
+    <string name="carddetail_delete_copy_message">Remove this copy from your collection?</string>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN

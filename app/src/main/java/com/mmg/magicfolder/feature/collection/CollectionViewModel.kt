@@ -111,7 +111,7 @@ class CollectionViewModel @Inject constructor(
                 query.criteria.all { criterion -> matchesCriterion(card, criterion) }
             }
         }
-        _uiState.update { it.copy(cards = filtered) }
+        _uiState.update { it.copy(cards = filtered.groupByCard()) }
     }
 
     private fun matchesCriterion(card: UserCardWithCard, criterion: SearchCriterion): Boolean {
@@ -217,16 +217,19 @@ class CollectionViewModel @Inject constructor(
             }
         }
 
+        // Group copies of the same card into one entry
+        val grouped = result.groupByCard()
+
         // Sort
-        result = when (state.sortOrder) {
-            SortOrder.NAME        -> result.sortedBy { it.card.name }
-            SortOrder.PRICE_DESC  -> result.sortedByDescending { it.card.priceUsd ?: 0.0 }
-            SortOrder.PRICE_ASC   -> result.sortedBy { it.card.priceUsd ?: 0.0 }
-            SortOrder.RARITY      -> result.sortedByDescending { rarityWeight(it.card.rarity) }
-            SortOrder.DATE_ADDED  -> result.sortedByDescending { it.userCard.addedAt }
+        val sorted = when (state.sortOrder) {
+            SortOrder.NAME        -> grouped.sortedBy { it.card.name }
+            SortOrder.PRICE_DESC  -> grouped.sortedByDescending { it.card.priceUsd ?: 0.0 }
+            SortOrder.PRICE_ASC   -> grouped.sortedBy { it.card.priceUsd ?: 0.0 }
+            SortOrder.RARITY      -> grouped.sortedByDescending { rarityWeight(it.card.rarity) }
+            SortOrder.DATE_ADDED  -> grouped.sortedByDescending { it.latestAddedAt }
         }
 
-        _uiState.update { it.copy(cards = result) }
+        _uiState.update { it.copy(cards = sorted) }
     }
 
     private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {

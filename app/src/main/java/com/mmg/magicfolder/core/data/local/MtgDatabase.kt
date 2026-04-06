@@ -31,7 +31,7 @@ import com.mmg.magicfolder.feature.news.data.local.NewsVideoEntity
         ContentSourceEntity::class,
         DraftSetEntity::class,
     ],
-    version = 14,
+    version = 17,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -216,6 +216,22 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         database.execSQL(
             "ALTER TABLE content_sources ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"
         )
+    }
+}
+
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE user_cards ADD COLUMN is_alternative_art INTEGER NOT NULL DEFAULT 0"
+        )
+        database.execSQL(
+            "DROP INDEX IF EXISTS index_user_cards_scryfall_id_is_foil_condition_language"
+        )
+        database.execSQL("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            index_user_cards_scryfall_id_is_foil_condition_language_is_alternative_art
+            ON user_cards (scryfall_id, is_foil, condition, language, is_alternative_art)
+        """.trimIndent())
     }
 }
 

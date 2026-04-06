@@ -28,14 +28,18 @@ class UserCardRepositoryImpl @Inject constructor(
     override fun searchInCollection(query: String): Flow<List<UserCardWithCard>> =
         userCardDao.searchInCollection(query).map { it.map { r -> r.toDomain() } }
 
+    override fun observeByScryfallId(scryfallId: String): Flow<List<UserCard>> =
+        userCardDao.observeByScryfallId(scryfallId).map { it.map { entity -> entity.toDomain() } }
+
     override suspend fun addOrIncrement(userCard: UserCard) {
         val inserted = userCardDao.insert(userCard.toEntity())
         if (inserted == -1L) {
             userCardDao.incrementQuantityByUniqueKey(
-                scryfallId = userCard.scryfallId,
-                isFoil     = userCard.isFoil,
-                condition  = userCard.condition,
-                language   = userCard.language,
+                scryfallId       = userCard.scryfallId,
+                isFoil           = userCard.isFoil,
+                isAlternativeArt = userCard.isAlternativeArt,
+                condition        = userCard.condition,
+                language         = userCard.language,
             )
         }
     }

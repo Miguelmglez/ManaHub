@@ -30,17 +30,25 @@ interface UserCardDao {
     // Called when insert() returns -1 — increments the existing matching row.
     @Query("""
         UPDATE user_cards SET quantity = quantity + 1
-        WHERE scryfall_id = :scryfallId
-        AND   is_foil     = :isFoil
-        AND   condition   = :condition
-        AND   language    = :language
+        WHERE scryfall_id        = :scryfallId
+        AND   is_foil            = :isFoil
+        AND   is_alternative_art = :isAlternativeArt
+        AND   condition          = :condition
+        AND   language           = :language
     """)
     suspend fun incrementQuantityByUniqueKey(
-        scryfallId: String,
-        isFoil:     Boolean,
-        condition:  String,
-        language:   String,
+        scryfallId:       String,
+        isFoil:           Boolean,
+        isAlternativeArt: Boolean,
+        condition:        String,
+        language:         String,
     )
+
+    // Plain query (no @Relation) so Room returns one row per UserCardEntity,
+    // avoiding the collapse that @Transaction/@Relation causes when multiple rows
+    // share the same scryfall_id.
+    @Query("SELECT * FROM user_cards WHERE scryfall_id = :scryfallId ORDER BY added_at DESC")
+    fun observeByScryfallId(scryfallId: String): Flow<List<UserCardEntity>>
 
     @Transaction
     @Query("SELECT * FROM user_cards ORDER BY added_at DESC")

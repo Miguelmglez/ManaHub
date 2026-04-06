@@ -16,21 +16,23 @@ class AddCardToCollectionUseCase @Inject constructor(
     private val userCardRepository: UserCardRepository,
 ) {
     suspend operator fun invoke(
-        scryfallId: String,
-        isFoil:     Boolean = false,
-        condition:  String  = "NM",
-        language:   String  = "en",
-        quantity:   Int     = 1,
+        scryfallId:       String,
+        isFoil:           Boolean = false,
+        isAlternativeArt: Boolean = false,
+        condition:        String  = "NM",
+        language:         String  = "en",
+        quantity:         Int     = 1,
     ): DataResult<Unit> {
         val cardResult = cardRepository.getCardById(scryfallId)
         if (cardResult is DataResult.Error) return DataResult.Error(cardResult.message)
         userCardRepository.addOrIncrement(
             UserCard(
-                scryfallId = scryfallId,
-                isFoil     = isFoil,
-                condition  = condition,
-                language   = language,
-                quantity   = quantity,
+                scryfallId       = scryfallId,
+                isFoil           = isFoil,
+                isAlternativeArt = isAlternativeArt,
+                condition        = condition,
+                language         = language,
+                quantity         = quantity,
             )
         )
         return DataResult.Success(Unit)

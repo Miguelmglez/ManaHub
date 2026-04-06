@@ -9,6 +9,7 @@ interface UserCardRepository {
     fun observeByColor(color: String): Flow<List<UserCardWithCard>>
     fun observeByRarity(rarity: String): Flow<List<UserCardWithCard>>
     fun searchInCollection(query: String): Flow<List<UserCardWithCard>>
+    fun observeByScryfallId(scryfallId: String): Flow<List<UserCard>>
     suspend fun addOrIncrement(userCard: UserCard)
     suspend fun updateCard(userCard: UserCard)
     suspend fun deleteCard(id: Long)

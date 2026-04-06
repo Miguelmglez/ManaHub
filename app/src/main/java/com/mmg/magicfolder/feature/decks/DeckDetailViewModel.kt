@@ -3,7 +3,6 @@ package com.mmg.magicfolder.feature.decks
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.DataResult
 import com.mmg.magicfolder.core.domain.model.Deck
@@ -33,7 +32,6 @@ class DeckDetailViewModel @Inject constructor(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
-    private val scryfallDataSource: ScryfallRemoteDataSource,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -233,10 +231,12 @@ class DeckDetailViewModel @Inject constructor(
                 val currentQty = deckCardsMap[existingEntry.scryfallId] ?: 0
                 deckRepository.addCardToDeck(deckId, existingEntry.scryfallId, currentQty + 1, false)
             } else {
-                try {
-                    val card = scryfallDataSource.getCardByExactName(name).getOrThrow()
-                    deckRepository.addCardToDeck(deckId, card.scryfallId, 1, false)
-                } catch (_: Exception) { }
+                // searchCardByName fetches from Scryfall AND caches in the local DB,
+                // which satisfies the FK constraint on deck_cards.scryfall_id.
+                val result = cardRepository.searchCardByName(name)
+                if (result is DataResult.Success) {
+                    deckRepository.addCardToDeck(deckId, result.data.scryfallId, 1, false)
+                }
             }
         }
     }
