@@ -3,6 +3,7 @@ package com.mmg.magicfolder.feature.decks
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.DataResult
 import com.mmg.magicfolder.core.domain.model.Deck
@@ -32,8 +33,13 @@ class DeckDetailViewModel @Inject constructor(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
+    private val scryfallDataSource: ScryfallRemoteDataSource,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+
+    companion object {
+        val BASIC_LAND_NAMES = listOf("Plains", "Island", "Swamp", "Mountain", "Forest")
+    }
 
     private val deckId: Long = checkNotNull(savedStateHandle["deckId"])
 
@@ -215,6 +221,34 @@ class DeckDetailViewModel @Inject constructor(
                 deckRepository.removeCardFromDeck(deckId, scryfallId, false)
             } else {
                 deckRepository.addCardToDeck(deckId, scryfallId, currentQty - 1, false)
+            }
+        }
+    }
+
+    fun addBasicLandByName(name: String) {
+        viewModelScope.launch {
+            // Try to find the land already in the deck (any print)
+            val existingEntry = _uiState.value.cards.find { it.card?.name == name }
+            if (existingEntry != null) {
+                val currentQty = deckCardsMap[existingEntry.scryfallId] ?: 0
+                deckRepository.addCardToDeck(deckId, existingEntry.scryfallId, currentQty + 1, false)
+            } else {
+                try {
+                    val card = scryfallDataSource.getCardByExactName(name).getOrThrow()
+                    deckRepository.addCardToDeck(deckId, card.scryfallId, 1, false)
+                } catch (_: Exception) { }
+            }
+        }
+    }
+
+    fun removeBasicLandByName(name: String) {
+        viewModelScope.launch {
+            val existingEntry = _uiState.value.cards.find { it.card?.name == name } ?: return@launch
+            val currentQty = deckCardsMap[existingEntry.scryfallId] ?: 0
+            if (currentQty <= 1) {
+                deckRepository.removeCardFromDeck(deckId, existingEntry.scryfallId, false)
+            } else {
+                deckRepository.addCardToDeck(deckId, existingEntry.scryfallId, currentQty - 1, false)
             }
         }
     }
