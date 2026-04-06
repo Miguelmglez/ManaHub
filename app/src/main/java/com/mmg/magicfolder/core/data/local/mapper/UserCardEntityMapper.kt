@@ -7,6 +7,7 @@ import com.mmg.magicfolder.core.data.local.dao.UserCardWithCard as UserCardWithC
 
 fun UserCardEntity.toDomain(): UserCard = UserCard(
     id = id, scryfallId = scryfallId, quantity = quantity, isFoil = isFoil,
+    isAlternativeArt = isAlternativeArt,
     condition = condition, language = language, isForTrade = isForTrade,
     isInWishlist = isInWishlist, minTradeValue = minTradeValue,
     notes = notes, acquiredAt = acquiredAt, addedAt = addedAt,
@@ -19,6 +20,7 @@ fun UserCardWithCardEntity.toDomain(): UserCardWithCard = UserCardWithCard(
 
 fun UserCard.toEntity(): UserCardEntity = UserCardEntity(
     id = id, scryfallId = scryfallId, quantity = quantity, isFoil = isFoil,
+    isAlternativeArt = isAlternativeArt,
     condition = condition, language = language, isForTrade = isForTrade,
     isInWishlist = isInWishlist, minTradeValue = minTradeValue,
     notes = notes, acquiredAt = acquiredAt, addedAt = addedAt,

@@ -1,12 +1,7 @@
 package com.mmg.magicfolder.core.ui.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.res.stringResource
-import com.mmg.magicfolder.R
-import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
 import com.mmg.magicfolder.core.util.PriceFormatter
@@ -15,23 +10,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.mmg.magicfolder.R
+import com.mmg.magicfolder.feature.collection.CollectionCardGroup
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
 @Composable
 fun CardListItem(
-    item:     UserCardWithCard,
+    item:     CollectionCardGroup,
     onClick:  () -> Unit,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val card     = item.card
-    val userCard = item.userCard
-    val mc       = MaterialTheme.magicColors
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    val card = item.card
+    val mc   = MaterialTheme.magicColors
 
     ListItem(
         modifier = modifier.clickable(onClick = onClick),
@@ -53,8 +48,9 @@ fun CardListItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color    = mc.textPrimary,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-                if (userCard.isFoil) {
+                if (item.hasFoil) {
                     Spacer(Modifier.width(4.dp))
                     FoilBadge()
                 }
@@ -75,25 +71,27 @@ fun CardListItem(
                     size     = 14.dp,
                 )
                 Text(
-                    text     = "${card.setCode.uppercase()} · ${card.printedTypeLine?:card.typeLine.substringBefore(" —").trim()}",
+                    text     = "${card.setCode.uppercase()} · ${card.printedTypeLine ?: card.typeLine.substringBefore(" —").trim()}",
                     style    = MaterialTheme.magicTypography.bodySmall,
                     color    = mc.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text  = "· ${userCard.condition}",
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textDisabled,
-                )
+                if (item.distinctCopies > 1) {
+                    Text(
+                        text  = "· ${item.distinctCopies} ${stringResource(R.string.collection_copy_types)}",
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.primaryAccent,
+                    )
+                }
             }
         },
         trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 val preferredCurrency = LocalPreferredCurrency.current
                 val priceText = PriceFormatter.formatFromScryfall(
-                    priceUsd = if (userCard.isFoil) card.priceUsdFoil else card.priceUsd,
-                    priceEur = if (userCard.isFoil) card.priceEurFoil else card.priceEur,
+                    priceUsd = if (item.hasFoil) card.priceUsdFoil else card.priceUsd,
+                    priceEur = if (item.hasFoil) card.priceEurFoil else card.priceEur,
                     preferredCurrency = preferredCurrency,
                 )
                 if (priceText != "—") {
@@ -104,38 +102,11 @@ fun CardListItem(
                     )
                 }
                 Text(
-                    text  = "×${userCard.quantity}",
+                    text  = "×${item.totalQuantity}",
                     style = MaterialTheme.magicTypography.bodySmall,
                     color = mc.textSecondary,
                 )
-                IconButton(
-                    onClick  = { showDeleteDialog = true },
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.action_delete),
-                        modifier           = Modifier.size(16.dp),
-                        tint               = mc.textDisabled,
-                    )
-                }
             }
         },
     )
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title            = { Text(stringResource(R.string.carddetail_delete_title)) },
-            text             = { Text(stringResource(R.string.carddetail_delete_message, card.name)) },
-            confirmButton    = {
-                TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_remove), color = mc.lifeNegative)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
-    }
 }

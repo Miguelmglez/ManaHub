@@ -1,0 +1,62 @@
+{
+  "set_code": "tla",
+  "set_name": "Avatar: The Last Airbender",
+  "last_updated": "2026-04-06",
+  "tiers": [
+    {
+      "tier": "S",
+      "label": "Bombs / Must Pick",
+      "description": "Game-winning cards that provide overwhelming advantage the moment they hit the board.",
+      "cards": [
+        {"name": "Aang, the Last Airbender", "color": "W", "rarity": "mythic", "reason": "Ultimate tempo threat with Airbending protection and evasion."},
+        {"name": "The Earth King", "color": "W", "rarity": "rare", "reason": "Massive anthem for Ally decks that makes combat impossible for opponents."},
+        {"name": "Azula, Cunning Usurper", "color": "UR", "rarity": "mythic", "reason": "Punishes every play and draw, providing inevitable card advantage."},
+        {"name": "Koh, the Face Stealer", "color": "UB", "rarity": "mythic", "reason": "Large evasive flyer that empties the opponent's hand upon entry."},
+        {"name": "Bumi, Unleashed", "color": "RG", "rarity": "mythic", "reason": "Huge stats and Earthbending reach that closes games in one or two turns."}
+      ]
+    },
+    {
+      "tier": "A",
+      "label": "Premium / Strong Pick",
+      "description": "High-tier uncommons and rares that define the best archetypes.",
+      "cards": [
+        {"name": "Appa, Loyal Sky Bison", "color": "W", "rarity": "uncommon", "reason": "The best uncommon; high stats and evasion that wins through the air."},
+        {"name": "Toph, the Blind Bandit", "color": "G", "rarity": "rare", "reason": "Premier Earthbending engine that creates continuous board pressure."},
+        {"name": "Iroh, Grand Lotus", "color": "R", "rarity": "rare", "reason": "Consistent card advantage and synergy with Firebending spells."},
+        {"name": "Master Pakku", "color": "U", "rarity": "rare", "reason": "Powerful Waterbend payoff that controls the battlefield."},
+        {"name": "Suki, Kyoshi Leader", "color": "GW", "rarity": "rare", "reason": "Elite Ally payoff that protects and buffs your entire team."}
+      ]
+    },
+    {
+      "tier": "B",
+      "label": "Good Playables",
+      "description": "Strong synergy pieces and efficient removal for their respective colors.",
+      "cards": [
+        {"name": "Water Tribe Rallier", "color": "W", "rarity": "uncommon", "reason": "Essential for Ally-based strategies to go wide."},
+        {"name": "Messenger Hawk", "color": "WU", "rarity": "uncommon", "reason": "Generates Clues and provides evasion for Skies archetypes."},
+        {"name": "Agni Kai", "color": "R", "rarity": "uncommon", "reason": "Versatile removal that can act as a finisher in aggressive red decks."},
+        {"name": "Mai, Jaded Edge", "color": "B", "rarity": "uncommon", "reason": "Efficient conditional removal with a relevant body for sacrifice decks."}
+      ]
+    },
+    {
+      "tier": "C",
+      "label": "Filler / Decent",
+      "description": "Solid cards that fill the curve and support the main mechanics.",
+      "cards": [
+        {"name": "Air Nomad Student", "color": "W", "rarity": "common", "reason": "Standard aggressive 2-drop that fits into white aggro builds."},
+        {"name": "Kyoshi Warriors", "color": "W", "rarity": "common", "reason": "Good token generator for Ally or sacrifice synergies."},
+        {"name": "Earth Rumble", "color": "G", "rarity": "common", "reason": "Basic Earthbending enabler that provides reach in the late game."}
+      ]
+    },
+    {
+      "tier": "D",
+      "label": "Sideboard / Avoid",
+      "description": "Cards that are either too situational or too weak for the main deck.",
+      "cards": [
+        {"name": "Abandon Attachments", "color": "W", "rarity": "uncommon", "reason": "Strictly a sideboard card against heavy enchantment/artifact decks."},
+        {"name": "Cabbage Merchant's Cart", "color": "C", "rarity": "common", "reason": "Flavor card with negligible board impact and slow value."},
+        {"name": "Secret of the Fire Nation", "color": "B", "rarity": "uncommon", "reason": "Too much setup required for a payoff that doesn't win the game."}
+      ]
+    }
+  ]
+}

@@ -168,18 +168,27 @@ class DeckBuilderViewModel @Inject constructor(
         val s = _state.value
         val card = deckCard.card
 
+        // Non-basic lands go to their own section
         if (BasicLandCalculator.isLand(card) && !BasicLandCalculator.isBasicLand(card)) {
             addNonBasicLand(deckCard)
             return
         }
 
-        if (s.format.uniqueCards) {
-            val alreadyIn = s.mainboard.any { it.card.scryfallId == card.scryfallId }
-            if (alreadyIn) return
+        // Basic lands are always unlimited — skip copy checks
+        val isBasic = BasicLandCalculator.isBasicLand(card)
+
+        if (!isBasic) {
+            // Commander: hard limit at 1 copy (unique cards)
+            if (s.format.uniqueCards) {
+                val alreadyIn = s.mainboard.any { it.card.scryfallId == card.scryfallId }
+                if (alreadyIn) return
+            }
+
+            // Draft (maxCopies >= 99): no limit — skip check
+            // Standard-like formats (maxCopies < 99): soft limit, allow but warn in review
         }
 
         val existing = s.mainboard.find { it.card.scryfallId == card.scryfallId }
-        if (existing != null && existing.quantity >= s.format.maxCopies) return
 
         val newMainboard = if (existing != null) {
             s.mainboard.map { dc ->
@@ -193,6 +202,18 @@ class DeckBuilderViewModel @Inject constructor(
 
         _state.update { it.copy(mainboard = newMainboard) }
         recalculateBasicLands()
+    }
+
+    fun acknowledgeOverLimit(scryfallId: String) {
+        _state.update {
+            it.copy(acknowledgedOverLimitCards = it.acknowledgedOverLimitCards + scryfallId)
+        }
+    }
+
+    fun unacknowledgeOverLimit(scryfallId: String) {
+        _state.update {
+            it.copy(acknowledgedOverLimitCards = it.acknowledgedOverLimitCards - scryfallId)
+        }
     }
 
     fun addToSideboard(deckCard: DeckCard) {

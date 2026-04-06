@@ -1,0 +1,147 @@
+{
+  "set_code": "dsk",
+  "set_name": "Duskmourn: House of Horror",
+  "last_updated": "2024-10-01",
+  "overview": "Duskmourn is a horror-themed set that emphasizes survival mechanics and eerie synergies. The format is medium-speed with strong incentives to be aggressive in certain color pairs while controlling archetypes reward patience. Delirium and room mechanics are central to many strategies, and enchantments matter more than usual due to the Room subtype.",
+  "mechanics": [
+    {
+      "name": "Rooms",
+      "description": "Room enchantments are double-faced enchantments. You can unlock the second room by paying its cost later. Each side has a different effect.",
+      "draft_tip": "Rooms provide excellent value in longer games. Prioritize rooms that have strong first halves since you may not always unlock the second side. They count as enchantments for synergies."
+    },
+    {
+      "name": "Delirium",
+      "description": "Cards with Delirium get a bonus if you have four or more card types in your graveyard.",
+      "draft_tip": "Build your deck with diverse card types to enable Delirium. Artifact creatures, enchantment creatures, and instant/sorcery splits help reach the threshold quickly."
+    },
+    {
+      "name": "Survival",
+      "description": "Survival triggers the first time a creature you control attacks while you have less life than your starting total.",
+      "draft_tip": "Survival is naturally enabled in aggressive strategies. Don't be afraid to take some early damage — your survival payoffs will reward it."
+    },
+    {
+      "name": "Eerie",
+      "description": "Eerie triggers whenever an enchantment enters the battlefield under your control or you unlock a Room.",
+      "draft_tip": "Eerie rewards enchantment-heavy builds. Rooms trigger Eerie twice — once when cast and again when unlocked. This makes rooms premium in Eerie decks."
+    },
+    {
+      "name": "Manifest Dread",
+      "description": "Look at the top two cards of your library, put one face down as a 2/2 creature, and the other into your graveyard.",
+      "draft_tip": "Manifest Dread fuels Delirium by milling cards and creates board presence. The face-down creatures can be turned face up if they're creature cards."
+    }
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Eerie Control",
+      "tier": "A",
+      "description": "White-Blue focuses on Eerie triggers from enchantments and rooms to generate incremental value and control the board.",
+      "key_commons": ["Unwilling Vessel", "Seized from Slumber", "Paranormal Analyst"],
+      "key_uncommons": ["Patched Plaything", "Ghostly Dancers"],
+      "strategy": "Draft rooms and enchantments highly. Use Eerie payoffs to generate card advantage and tempo. Win by outvaluing the opponent with repeated triggers."
+    },
+    {
+      "colors": "UB",
+      "name": "Eerie Tempo",
+      "tier": "S",
+      "description": "Blue-Black combines Eerie triggers with tempo plays and removal to dominate the mid-game.",
+      "key_commons": ["Paranormal Analyst", "Spectral Snatcher", "Grabbed by the Throat"],
+      "key_uncommons": ["Fear of Impostors", "Twist Reality"],
+      "strategy": "Focus on efficient creatures with Eerie payoffs. Use removal to clear blockers and enchantments to trigger Eerie repeatedly."
+    },
+    {
+      "colors": "BR",
+      "name": "Sacrifice Aggro",
+      "tier": "A",
+      "description": "Black-Red uses sacrifice synergies and aggressive creatures to pressure opponents.",
+      "key_commons": ["Torch the Tower", "Cult Ceremony", "Scorching Dragonfire"],
+      "key_uncommons": ["Sawblade Skinripper", "Screaming Nemesis"],
+      "strategy": "Draft cheap aggressive creatures and sacrifice outlets. Use burn spells to clear the way and close out games quickly."
+    },
+    {
+      "colors": "RG",
+      "name": "Delirium Midrange",
+      "tier": "B",
+      "description": "Red-Green focuses on reaching Delirium quickly to power up creatures and spells.",
+      "key_commons": ["Flesh Burrower", "Wildfire Wickerfolk", "Piggy Bank"],
+      "key_uncommons": ["Grasping Longneck", "Peer Past the Veil"],
+      "strategy": "Diversify card types to enable Delirium fast. Play efficient midrange threats that become powerful once Delirium is active."
+    },
+    {
+      "colors": "GW",
+      "name": "Survival Aggro",
+      "tier": "B",
+      "description": "Green-White uses Survival triggers and go-wide strategies to overwhelm opponents.",
+      "key_commons": ["Sheltered by Ghosts", "Acrobatic Cheerleader", "Commune with Nature"],
+      "key_uncommons": ["Enduring Innocence", "Coordinated Clobbering"],
+      "strategy": "Build a curve of efficient creatures. Enable Survival by attacking early and use combat tricks to win races."
+    },
+    {
+      "colors": "WB",
+      "name": "Enchantments Value",
+      "tier": "A",
+      "description": "White-Black uses enchantment synergies for removal and value generation.",
+      "key_commons": ["Sheltered by Ghosts", "Seized from Slumber", "Final Vengeance"],
+      "key_uncommons": ["Resurrected Cultist", "Broodspinner"],
+      "strategy": "Prioritize enchantment-based removal. Use enchantment payoffs to generate card advantage while controlling the board."
+    },
+    {
+      "colors": "UR",
+      "name": "Rooms Tempo",
+      "tier": "B",
+      "description": "Blue-Red combines rooms with tempo plays and direct damage.",
+      "key_commons": ["Pyroclasm", "Paranormal Analyst", "Torch the Tower"],
+      "key_uncommons": ["Glassworks", "Impossible Inferno"],
+      "strategy": "Draft rooms with strong immediate effects. Use burn to clear the path while rooms provide ongoing value."
+    },
+    {
+      "colors": "BG",
+      "name": "Delirium Graveyard",
+      "tier": "A",
+      "description": "Black-Green maximizes Delirium with self-mill and graveyard recursion.",
+      "key_commons": ["Flesh Burrower", "Grabbed by the Throat", "Commune with Nature"],
+      "key_uncommons": ["Drag to the Roots", "Cathartic Parting"],
+      "strategy": "Self-mill aggressively to fuel Delirium. Use recursion to grind out opponents and powerful Delirium payoffs as finishers."
+    },
+    {
+      "colors": "RW",
+      "name": "Survival Aggro",
+      "tier": "C",
+      "description": "Red-White goes aggressive with Survival triggers and efficient beaters.",
+      "key_commons": ["Acrobatic Cheerleader", "Torch the Tower", "Scorching Dragonfire"],
+      "key_uncommons": ["Screaming Nemesis", "Enduring Innocence"],
+      "strategy": "Curve out aggressively. Use combat tricks and burn to push through damage and trigger Survival."
+    },
+    {
+      "colors": "GU",
+      "name": "Manifest Value",
+      "tier": "C",
+      "description": "Green-Blue uses Manifest Dread to generate card advantage and board presence.",
+      "key_commons": ["Commune with Nature", "Paranormal Analyst", "Wildfire Wickerfolk"],
+      "key_uncommons": ["Threats Around Every Corner", "Peer Past the Veil"],
+      "strategy": "Use Manifest Dread to fill the board while milling for value. Turn creatures face up for tempo and use green's size advantage."
+    }
+  ],
+  "top_commons": {
+    "W": ["Sheltered by Ghosts", "Seized from Slumber", "Acrobatic Cheerleader"],
+    "U": ["Paranormal Analyst", "Fear of Surveillance", "Spectral Snatcher"],
+    "B": ["Grabbed by the Throat", "Final Vengeance", "Cult Ceremony"],
+    "R": ["Torch the Tower", "Scorching Dragonfire", "Flesh Burrower"],
+    "G": ["Commune with Nature", "Wildfire Wickerfolk", "Piggy Bank"]
+  },
+  "top_uncommons": {
+    "W": ["Enduring Innocence", "Coordinated Clobbering"],
+    "U": ["Fear of Impostors", "Twist Reality"],
+    "B": ["Sawblade Skinripper", "Drag to the Roots"],
+    "R": ["Screaming Nemesis", "Impossible Inferno"],
+    "G": ["Grasping Longneck", "Peer Past the Veil"]
+  },
+  "general_tips": [
+    "Rooms are premium picks — they provide two-for-one value and trigger Eerie twice.",
+    "Delirium is easier to enable than it looks. Prioritize artifact creatures and enchantment creatures for type diversity.",
+    "The format rewards proactive strategies. Pure control without a win condition struggles.",
+    "Enchantment-based removal (like Sheltered by Ghosts) is premium because it enables Eerie.",
+    "Survival decks want to trade life for tempo early — don't be afraid to take damage.",
+    "Manifest Dread is excellent because it develops your board while fueling your graveyard."
+  ]
+}

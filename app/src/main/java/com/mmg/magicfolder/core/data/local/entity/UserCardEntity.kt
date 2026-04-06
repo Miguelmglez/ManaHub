@@ -15,7 +15,7 @@ import androidx.room.*
         Index("is_for_trade"),
         Index("is_in_wishlist"),
         // Prevents duplicate logical entries for the same physical card variant
-        Index(value = ["scryfall_id", "is_foil", "condition", "language"], unique = true),
+        Index(value = ["scryfall_id", "is_foil", "condition", "language", "is_alternative_art"], unique = true),
     ],
 )
 data class UserCardEntity(
@@ -23,13 +23,14 @@ data class UserCardEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id") val id: Long = 0,
 
-    @ColumnInfo(name = "scryfall_id")  val scryfallId:   String,
-    @ColumnInfo(name = "quantity")     val quantity:     Int     = 1,
-    @ColumnInfo(name = "is_foil")      val isFoil:       Boolean = false,
+    @ColumnInfo(name = "scryfall_id")       val scryfallId:      String,
+    @ColumnInfo(name = "quantity")          val quantity:        Int     = 1,
+    @ColumnInfo(name = "is_foil")           val isFoil:          Boolean = false,
+    @ColumnInfo(name = "is_alternative_art") val isAlternativeArt: Boolean = false,
     // Condition: NM | LP | MP | HP | DMG
-    @ColumnInfo(name = "condition")    val condition:    String  = "NM",
+    @ColumnInfo(name = "condition")         val condition:       String  = "NM",
     // Language ISO: en | ja | de | fr | es | pt | it | ko | ru | zhs | zht
-    @ColumnInfo(name = "language")     val language:     String  = "en",
+    @ColumnInfo(name = "language")          val language:        String  = "en",
 
     @ColumnInfo(name = "is_for_trade")    val isForTrade:    Boolean = false,
     @ColumnInfo(name = "is_in_wishlist")  val isInWishlist:  Boolean = false,

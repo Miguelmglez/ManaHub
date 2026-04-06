@@ -129,6 +129,15 @@
     <string name="carddetail_condition">Condition</string>
     <string name="carddetail_language">Language</string>
     <string name="carddetail_quantity_label">Quantity</string>
+    <string name="collection_unique_cards">unique cards</string>
+    <string name="collection_total_copies">copies</string>
+    <string name="collection_copy_types">types</string>
+    <string name="carddetail_add_copy">Add to collection</string>
+    <string name="carddetail_no_copies">You don\'t have this card in your collection</string>
+    <string name="carddetail_alternative_art">Alternative art</string>
+    <string name="carddetail_alternative_art_short">Alt art</string>
+    <string name="carddetail_delete_copy_title">Remove copy</string>
+    <string name="carddetail_delete_copy_message">Remove this copy from your collection?</string>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN
@@ -255,6 +264,14 @@
     <string name="deckbuilder_setup_commander_label">Choose Commander</string>
     <string name="deckbuilder_setup_build_button">Build Deck</string>
     <string name="deckbuilder_search_commander_hint">Search legendary creature…</string>
+    <string name="deckbuilder_basic_lands">Basic Lands</string>
+    <string name="deckbuilder_copy_warning">Exceeds %1$d-copy limit</string>
+    <string name="deckbuilder_copy_warning_ack">I confirm this card allows more copies</string>
+    <string name="deckbuilder_add_cards">Add Cards</string>
+    <string name="deckbuilder_add_cards_search_hint">Search cards…</string>
+    <string name="deckbuilder_add_cards_done">Done</string>
+    <string name="deckbuilder_deck_empty">This deck is empty</string>
+    <string name="deckbuilder_max_copies_reached">Max copies reached</string>
 
     <!-- ══════════════════════════════════════════
          GAME SETUP SCREEN
@@ -735,5 +752,46 @@
     <string name="pref_currency_eur">EUR (€)</string>
     <string name="pref_news_language_at_least_one">At least one news language must be selected</string>
     <string name="pref_app_language_restart">The app language will change. This may require a restart.</string>
+
+    <!-- ══════════════════════════════════════════
+         DRAFT SECTION
+    ═══════════════════════════════════════════ -->
+    <string name="draft_title">Draft</string>
+    <string name="draft_search_hint">Search sets…</string>
+    <string name="draft_released">Released %1$s</string>
+    <string name="draft_cards_count">%1$d cards</string>
+    <string name="draft_tab_guide">Guide</string>
+    <string name="draft_tab_tier_list">Tier List</string>
+    <string name="draft_tab_cards">Cards</string>
+    <string name="draft_tab_videos">Videos</string>
+    <string name="draft_guide_overview">Overview</string>
+    <string name="draft_guide_mechanics">Mechanics</string>
+    <string name="draft_guide_archetypes">Archetypes</string>
+    <string name="draft_guide_top_commons">Top Commons</string>
+    <string name="draft_guide_top_uncommons">Top Uncommons</string>
+    <string name="draft_guide_tips">General Tips</string>
+    <string name="draft_guide_not_available">Guide not available for this set yet</string>
+    <string name="draft_tier_list_not_available">Tier list not available for this set yet</string>
+    <string name="draft_tier_updated">Last updated: %1$s</string>
+    <string name="draft_filter_by_color">Filter by color</string>
+    <string name="draft_filter_by_rarity">Filter by rarity</string>
+    <string name="draft_sort_by">Sort by</string>
+    <string name="draft_sort_price">Price</string>
+    <string name="draft_sort_win_rate">Win Rate</string>
+    <string name="draft_sort_name">Name</string>
+    <string name="draft_sort_collector">Collector #</string>
+    <string name="draft_win_rate_approx">≈%1$.1f%% WR</string>
+    <string name="draft_win_rate_disclaimer">Based on AI analysis, approximate values</string>
+    <string name="draft_videos_empty">No videos found for this set</string>
+    <string name="draft_videos_error">Could not load videos</string>
+    <string name="draft_key_cards">Key Cards</string>
+    <string name="draft_strategy">Strategy</string>
+    <string name="draft_archetype_tier">Tier %1$s</string>
+    <string name="draft_no_sets">No draftable sets found</string>
+    <string name="draft_loading_sets">Loading sets…</string>
+    <string name="draft_retry">Retry</string>
+    <string name="draft_cards_all">All Cards</string>
+    <string name="draft_guide_videos">Videos</string>
+    <string name="draft_card_artist">Artist: %1$s</string>
 
 </resources>

@@ -1,0 +1,99 @@
+{
+  "set_code": "tla",
+  "set_name": "Avatar: The Last Airbender",
+  "last_updated": "2026-04-06",
+  "overview": "TLA is a synergy-driven set where the four nations use elemental bending and Allies. Success in draft requires balancing the Learn/Lesson system with specific nation synergies.",
+  "mechanics": [
+    {
+      "name": "Airbending",
+      "description": "Exiles a permanent; owner can pay {2} to return it. Used for tempo or saving your own units.",
+      "draft_tip": "Prioritize flyers in WU to capitalize on the tempo gain from Airbending."
+    },
+    {
+      "name": "Waterbend {X}",
+      "description": "Tap creatures/artifacts to reduce generic costs. Rewards defensive boards and token generation.",
+      "draft_tip": "Clue tokens are excellent fuel for Waterbend spells in UB and UR."
+    },
+    {
+      "name": "Earthbending X",
+      "description": "Turns a land into a creature with X +1/+1 counters and haste. Late-game mana sink.",
+      "draft_tip": "Ensure you have enough defensive commons in Green to survive until Earthbending becomes relevant."
+    },
+    {
+      "name": "Firebending",
+      "description": "Provides mana or triggers when attacking or casting multiple spells per turn.",
+      "draft_tip": "Draft low-curve red decks to ensure you can double-spell frequently."
+    },
+    {
+      "name": "Allies",
+      "description": "Tribal scaling that rewards having multiple Ally creatures on the battlefield.",
+      "draft_tip": "GW and RW are the core Ally colors. Don't let high-impact Allies pass."
+    }
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Air Nomads / Flyers",
+      "tier": "A",
+      "description": "Winning through the air with evasive creatures and Airbending tempo.",
+      "strategy": "Lock down the ground and use Glider Flight and Appa to win the race.",
+      "key_commons": ["Air Nomad Student", "Glider Flight", "North Temple Guardian"],
+      "key_uncommons": ["Appa, Loyal Sky Bison", "Messenger Hawk", "Air Temple Acolyte"]
+    },
+    {
+      "colors": "UB",
+      "name": "Water Tribe / Draw Two",
+      "tier": "B",
+      "description": "Control deck utilizing Clues and 'Second Card' triggers.",
+      "strategy": "Grind with Northern Tribe Scout and use Waterbend to cast expensive control spells.",
+      "key_commons": ["Northern Tribe Scout", "Watery Grasp", "Foggy Swamp Bender"],
+      "key_uncommons": ["Waterbend Scroll", "Spirit Oasis", "Yue's Protection"]
+    },
+    {
+      "colors": "BR",
+      "name": "Fire Nation / Aggro",
+      "tier": "A",
+      "description": "High-velocity attacks and direct burn damage.",
+      "strategy": "Use Fire Nation Soldier and Agni Kai to keep the pressure high early.",
+      "key_commons": ["Fire Nation Soldier", "Redirect Flame", "Combustion Technique"],
+      "key_uncommons": ["Agni Kai", "Focus Fire", "Lightning Strike"]
+    },
+    {
+      "colors": "RG",
+      "name": "Earth Kingdom / Midrange",
+      "tier": "A",
+      "description": "Big creatures and mana ramp using Earthbending for reach.",
+      "strategy": "Survive the early game and finish with animated Earthbending lands.",
+      "key_commons": ["Earth Rumble", "Badger-Mole", "Rocky Rebuke"],
+      "key_uncommons": ["Rumble Champion", "King Bumi's Wisdom", "Earth Kingdom Tank"]
+    },
+    {
+      "colors": "GW",
+      "name": "Team Avatar / Allies",
+      "tier": "S",
+      "description": "The strongest tribal archetype focusing on go-wide scaling.",
+      "strategy": "Curve out with Allies and use The Earth King or United Front as finishers.",
+      "key_commons": ["Kyoshi Warriors", "Allies at Last", "Village Protector"],
+      "key_uncommons": ["Water Tribe Rallier", "United Front", "Team Avatar Assemble"]
+    }
+  ],
+  "top_commons": {
+    "W": ["Kyoshi Warriors", "Air Nomad Student", "Allies at Last"],
+    "U": ["Northern Tribe Scout", "Watery Grasp", "Waterbending Lesson"],
+    "B": ["Dai Li Agent", "Mai's Daggers", "Black Sun Acolyte"],
+    "R": ["Fire Nation Soldier", "Combustion Technique", "Redirect Flame"],
+    "G": ["Earth Rumble", "Badger-Mole", "Earthbending Lesson"]
+  },
+  "top_uncommons": {
+    "W": ["Appa, Loyal Sky Bison", "Earth Kingdom Jailer", "United Front"],
+    "U": ["Waterbend Scroll", "Spirit Oasis", "Messenger Hawk"],
+    "B": ["Mai, Jaded Edge", "Sacrifice for the Cause", "Ty Lee's Pressure Point"],
+    "R": ["Agni Kai", "Focus Fire", "Lightning Strike"],
+    "G": ["Rumble Champion", "King Bumi's Wisdom", "Badger-Mole Den"]
+  },
+  "general_tips": [
+    "White is the deepest color; if it's open, your Ally synergies will be top-tier.",
+    "Lessons are vital for Bo1 play; ensure you have 2-3 utility Lessons in your sideboard.",
+    "Firebending requires you to be proactive; don't draft too many reactive spells in BR or UR."
+  ]
+}
