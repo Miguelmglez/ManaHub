@@ -78,6 +78,14 @@ fun SetDraftDetailScreen(
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
 
+    // Navigate to card detail when a tier/guide card is resolved
+    LaunchedEffect(state.pendingCardNavigation) {
+        state.pendingCardNavigation?.let { scryfallId ->
+            viewModel.onCardNavigationHandled()
+            onCardClick(scryfallId)
+        }
+    }
+
     val tabs = listOf(
         stringResource(R.string.draft_tab_guide),
         stringResource(R.string.draft_tab_tier_list),
@@ -164,8 +172,8 @@ fun SetDraftDetailScreen(
 
             // Tab content
             when (state.selectedTab) {
-                0 -> GuideTab(state)
-                1 -> TierListTab(state, viewModel::toggleTierListColorFilter)
+                0 -> GuideTab(state, viewModel::resolveAndNavigate)
+                1 -> TierListTab(state, viewModel::toggleTierListColorFilter, viewModel::resolveAndNavigate)
                 2 -> CardsTab(state, viewModel, onCardClick)
                 3 -> VideosTab(state, viewModel::loadVideos)
             }
@@ -178,7 +186,7 @@ fun SetDraftDetailScreen(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun GuideTab(state: SetDraftDetailUiState) {
+private fun GuideTab(state: SetDraftDetailUiState, onCardClick: (String) -> Unit) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
 
@@ -218,7 +226,7 @@ private fun GuideTab(state: SetDraftDetailUiState) {
                         ExpandableSection(stringResource(R.string.draft_guide_archetypes)) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 guide.archetypes.forEach { arch ->
-                                    ArchetypeCard(arch)
+                                    ArchetypeCard(arch, onCardClick)
                                 }
                             }
                         }
@@ -228,7 +236,7 @@ private fun GuideTab(state: SetDraftDetailUiState) {
                 if (guide.topCommons.isNotEmpty()) {
                     item {
                         ExpandableSection(stringResource(R.string.draft_guide_top_commons)) {
-                            ColorGroupedCards(guide.topCommons)
+                            ColorGroupedCards(guide.topCommons, onCardClick)
                         }
                     }
                 }
@@ -236,7 +244,7 @@ private fun GuideTab(state: SetDraftDetailUiState) {
                 if (guide.topUncommons.isNotEmpty()) {
                     item {
                         ExpandableSection(stringResource(R.string.draft_guide_top_uncommons)) {
-                            ColorGroupedCards(guide.topUncommons)
+                            ColorGroupedCards(guide.topUncommons, onCardClick)
                         }
                     }
                 }
@@ -305,7 +313,7 @@ private fun MechanicCard(mechanic: MechanicGuide) {
 }
 
 @Composable
-private fun ArchetypeCard(archetype: ArchetypeGuide) {
+private fun ArchetypeCard(archetype: ArchetypeGuide, onCardClick: (String) -> Unit) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
     val tierColor = TIER_COLORS[archetype.tier] ?: colors.textSecondary
@@ -355,17 +363,34 @@ private fun ArchetypeCard(archetype: ArchetypeGuide) {
             if (archetype.keyCommons.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    stringResource(R.string.draft_key_cards) + ": " + archetype.keyCommons.joinToString(", "),
+                    stringResource(R.string.draft_key_cards) + ":",
                     style = typography.labelSmall,
                     color = colors.textDisabled,
                 )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    archetype.keyCommons.forEach { name ->
+                        SuggestionChip(
+                            onClick = { onCardClick(name) },
+                            label = { Text(name, style = typography.labelSmall) },
+                        )
+                    }
+                    archetype.keyUncommons.forEach { name ->
+                        SuggestionChip(
+                            onClick = { onCardClick(name) },
+                            label = { Text(name, style = typography.labelSmall) },
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ColorGroupedCards(cards: Map<String, List<String>>) {
+private fun ColorGroupedCards(cards: Map<String, List<String>>, onCardClick: (String) -> Unit) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
 
@@ -380,11 +405,16 @@ private fun ColorGroupedCards(cards: Map<String, List<String>>) {
                         .background(manaColor),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    cardNames.joinToString(", "),
-                    style = typography.bodySmall,
-                    color = colors.textPrimary,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    cardNames.forEach { name ->
+                        Text(
+                            name,
+                            style = typography.bodySmall,
+                            color = colors.primaryAccent,
+                            modifier = Modifier.clickable { onCardClick(name) },
+                        )
+                    }
+                }
             }
         }
     }
@@ -398,6 +428,7 @@ private fun ColorGroupedCards(cards: Map<String, List<String>>) {
 private fun TierListTab(
     state: SetDraftDetailUiState,
     onToggleColor: (String) -> Unit,
+    onCardClick: (String) -> Unit,
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -441,7 +472,7 @@ private fun TierListTab(
                             TierBanner(tier.tier, tier.label, tier.description)
                         }
                         items(filteredCards) { card ->
-                            TierCardItem(card, state.setCode)
+                            TierCardItem(card, state.setCode, onClick = { onCardClick(card.name) })
                         }
                     }
                 }
@@ -483,7 +514,7 @@ private fun TierBanner(tier: String, label: String, description: String) {
 }
 
 @Composable
-private fun TierCardItem(card: TierCard, setCode: String) {
+private fun TierCardItem(card: TierCard, setCode: String, onClick: () -> Unit) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
     val manaColor = MANA_COLORS[card.color] ?: colors.textDisabled
@@ -491,6 +522,7 @@ private fun TierCardItem(card: TierCard, setCode: String) {
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = colors.surface,
+        modifier = Modifier.clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier

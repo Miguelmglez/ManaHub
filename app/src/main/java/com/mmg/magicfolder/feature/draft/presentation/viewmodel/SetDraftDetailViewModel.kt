@@ -12,6 +12,7 @@ import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetCardsUseCase
 import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.magicfolder.feature.draft.domain.usecase.GetSetVideosUseCase
+import com.mmg.magicfolder.feature.draft.domain.usecase.LookupCardIdUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,8 @@ data class SetDraftDetailUiState(
     val videos: List<DraftVideo> = emptyList(),
     val isVideosLoading: Boolean = false,
     val videosError: String? = null,
+    // Card navigation (resolved scryfallId ready to navigate)
+    val pendingCardNavigation: String? = null,
 )
 
 enum class CardSortOption { PRICE, NAME, COLLECTOR, RARITY }
@@ -59,6 +62,7 @@ class SetDraftDetailViewModel @Inject constructor(
     private val getSetTierListUseCase: GetSetTierListUseCase,
     private val getSetCardsUseCase: GetSetCardsUseCase,
     private val getSetVideosUseCase: GetSetVideosUseCase,
+    private val lookupCardIdUseCase: LookupCardIdUseCase,
 ) : ViewModel() {
 
     val setCode: String = savedStateHandle.get<String>("setCode") ?: ""
@@ -186,6 +190,19 @@ class SetDraftDetailViewModel @Inject constructor(
 
     fun setCardSortBy(sort: CardSortOption) {
         _uiState.update { it.copy(cardSortBy = sort) }
+    }
+
+    fun resolveAndNavigate(cardName: String) {
+        viewModelScope.launch {
+            when (val result = lookupCardIdUseCase(cardName, setCode)) {
+                is DataResult.Success -> _uiState.update { it.copy(pendingCardNavigation = result.data) }
+                is DataResult.Error -> { /* silently ignore — user can tap again */ }
+            }
+        }
+    }
+
+    fun onCardNavigationHandled() {
+        _uiState.update { it.copy(pendingCardNavigation = null) }
     }
 
     fun toggleTierListColorFilter(color: String) {
