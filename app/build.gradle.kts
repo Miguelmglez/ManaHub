@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.foundation)
     implementation(libs.material3)
     implementation(libs.tv.material)
+    implementation(libs.emojis)
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.compose.ui)
@@ -103,5 +104,7 @@ dependencies {
     implementation(libs.compose.googlefonts)
     implementation(libs.datastore.preferences)
     implementation(libs.browser)
+
+
 
 }

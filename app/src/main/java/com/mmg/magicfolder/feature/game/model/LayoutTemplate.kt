@@ -5,16 +5,18 @@ package com.mmg.magicfolder.feature.game.model
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum class GridSlotPosition {
-    BOTTOM,              // bottom row, text normal (0°)
-    TOP,                 // top row, text rotated 180°
     LEFT,                // left column, text rotated 90°
     RIGHT,               // right column, text rotated 270°
     FULL_WIDTH_BOTTOM,   // full-width bottom, normal
     FULL_WIDTH_TOP,      // full-width top, rotated 180°
 }
+enum class ScreenedGridSlotPosition {
+    TOP,
+    MID,
+    BOTTOM,
+}
 
 fun GridSlotPosition?.toDefaultDegrees(): Int = when (this) {
-    GridSlotPosition.TOP,
     GridSlotPosition.FULL_WIDTH_TOP -> 180
     GridSlotPosition.LEFT           -> 90
     GridSlotPosition.RIGHT          -> 270
@@ -27,9 +29,7 @@ fun GridSlotPosition?.toDefaultDegrees(): Int = when (this) {
 
 data class PlayerSlot(
     val playerId: Int,
-    val position: GridSlotPosition,
-    val rowSpan:  Int = 1,
-    val colSpan:  Int = 1,
+    val position: GridSlotPosition
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ data class LayoutTemplate(
     val playerCount: Int,
     val slots:       List<PlayerSlot>,
     /** Rows of slot indices (into slots list), top to bottom. null = empty cell. */
-    val gridRows:    List<List<Int?>>,
+    val gridRows:    Map<ScreenedGridSlotPosition, List<PlayerSlot>>
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,205 +52,158 @@ data class LayoutTemplate(
 object LayoutTemplates {
 
     // ─── 2 players ───────────────────────────────────────────────────────────
-
+    var slots = listOf(
+        PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
+        PlayerSlot(1, GridSlotPosition.FULL_WIDTH_BOTTOM),
+    )
     val TWO_TOP_BOTTOM = LayoutTemplate(
         id = "2_top_bottom", name = "Top / Bottom", playerCount = 2,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0), listOf(1)),
+        slots = slots,
+        gridRows = mapOf(ScreenedGridSlotPosition.TOP to listOf(slots[0]),ScreenedGridSlotPosition.BOTTOM to listOf(this.slots[1])),
     )
 
+     var slots2 = listOf(
+         PlayerSlot(0, GridSlotPosition.LEFT),
+         PlayerSlot(1, GridSlotPosition.RIGHT),
+    )
     val TWO_SIDE_BY_SIDE = LayoutTemplate(
         id = "2_side", name = "Side by Side", playerCount = 2,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.LEFT),
-            PlayerSlot(1, GridSlotPosition.RIGHT),
-        ),
-        gridRows = listOf(listOf(0, 1)),
+        slots = slots2,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots2[0],slots2[1]))
     )
 
-    val layoutsFor2 = listOf(TWO_TOP_BOTTOM, TWO_SIDE_BY_SIDE)
+    val layoutsFor2 = listOf(TWO_SIDE_BY_SIDE, TWO_TOP_BOTTOM)
 
     // ─── 3 players ───────────────────────────────────────────────────────────
 
+    var slots3 = listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.RIGHT),
+        PlayerSlot(2, GridSlotPosition.FULL_WIDTH_BOTTOM),
+    )
     val THREE_U_SHAPE = LayoutTemplate(
-        id = "3_u", name = "U Shape", playerCount = 3,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.TOP),
-            PlayerSlot(2, GridSlotPosition.FULL_WIDTH_BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1), listOf(2)),
-    )
-
-    val THREE_ONE_TOP = LayoutTemplate(
-        id = "3_one_top", name = "1 Top, 2 Bottom", playerCount = 3,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
-            PlayerSlot(1, GridSlotPosition.BOTTOM),
-            PlayerSlot(2, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0), listOf(1, 2)),
-    )
-
-    val THREE_TRIANGLE = LayoutTemplate(
         id = "3_triangle", name = "Triangle", playerCount = 3,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.LEFT),
-            PlayerSlot(1, GridSlotPosition.RIGHT),
-            PlayerSlot(2, GridSlotPosition.FULL_WIDTH_BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1), listOf(2)),
+        slots = slots3,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots3[0],slots3[1]),ScreenedGridSlotPosition.BOTTOM to listOf(slots3[2]))
+    )
+    var slots5 = listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.LEFT),
+        PlayerSlot(2, GridSlotPosition.RIGHT)
+    )
+    val THREE_TRIANGLE = LayoutTemplate(
+        id = "3_two_one", name = "U Shape", playerCount = 3,
+        slots = slots5,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots5[0],slots5[1],slots5[2])),
     )
 
-    val layoutsFor3 = listOf(THREE_U_SHAPE, THREE_ONE_TOP, THREE_TRIANGLE)
+    val layoutsFor3 = listOf(THREE_U_SHAPE, THREE_TRIANGLE)
 
     // ─── 4 players ───────────────────────────────────────────────────────────
-
-    val FOUR_GRID = LayoutTemplate(
-        id = "4_grid", name = "2×2 Grid", playerCount = 4,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.TOP),
-            PlayerSlot(2, GridSlotPosition.BOTTOM),
-            PlayerSlot(3, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1), listOf(2, 3)),
+    var slots7 = listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.LEFT),
+        PlayerSlot(2, GridSlotPosition.RIGHT),
+        PlayerSlot(3, GridSlotPosition.RIGHT),
     )
-
     val FOUR_COMPASS = LayoutTemplate(
         id = "4_compass", name = "4 Sides", playerCount = 4,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
-            PlayerSlot(1, GridSlotPosition.LEFT),
-            PlayerSlot(2, GridSlotPosition.RIGHT),
-            PlayerSlot(3, GridSlotPosition.FULL_WIDTH_BOTTOM),
-        ),
-        gridRows = listOf(listOf(0), listOf(1, 2), listOf(3)),
+        slots = slots7,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots7[0],slots7[1],slots7[2],slots7[3])),
     )
 
-    val FOUR_ONE_THREE = LayoutTemplate(
-        id = "4_one_three", name = "1 Top, 3 Bottom", playerCount = 4,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
-            PlayerSlot(1, GridSlotPosition.BOTTOM),
-            PlayerSlot(2, GridSlotPosition.BOTTOM),
-            PlayerSlot(3, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0), listOf(1, 2, 3)),
+    var slots8 = listOf(
+        PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
+        PlayerSlot(1, GridSlotPosition.FULL_WIDTH_BOTTOM),
+        PlayerSlot(2, GridSlotPosition.LEFT),
+        PlayerSlot(3, GridSlotPosition.RIGHT),
+    )
+    val FOUR_CROSS = LayoutTemplate(
+        id = "4_cross", name = "4 Sides", playerCount = 4,
+        slots = slots8,
+        gridRows = mapOf(ScreenedGridSlotPosition.TOP to listOf(slots8[0]),
+            ScreenedGridSlotPosition.MID to listOf(slots8[2],slots8[3]), ScreenedGridSlotPosition.BOTTOM to listOf(slots8[1])),
     )
 
-    val layoutsFor4 = listOf(FOUR_GRID, FOUR_COMPASS, FOUR_ONE_THREE)
+    val layoutsFor4 = listOf(FOUR_COMPASS,FOUR_CROSS)
 
     // ─── 5 players ───────────────────────────────────────────────────────────
 
+    var slots9 = listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.LEFT),
+        PlayerSlot(2, GridSlotPosition.LEFT),
+        PlayerSlot(3, GridSlotPosition.RIGHT),
+        PlayerSlot(4, GridSlotPosition.RIGHT),
+    )
     val FIVE_THREE_TWO = LayoutTemplate(
         id = "5_three_two", name = "3 Top, 2 Bottom", playerCount = 5,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.TOP),
-            PlayerSlot(2, GridSlotPosition.TOP),
-            PlayerSlot(3, GridSlotPosition.BOTTOM),
-            PlayerSlot(4, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1, 2), listOf(3, 4)),
-    )
+        slots = slots9,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots9[0],slots9[1],slots9[2],slots9[3],slots9[4])))
 
+    var slots10 =listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.LEFT),
+        PlayerSlot(2, GridSlotPosition.RIGHT),
+        PlayerSlot(3, GridSlotPosition.RIGHT),
+        PlayerSlot(4, GridSlotPosition.RIGHT),
+    )
     val FIVE_TWO_THREE = LayoutTemplate(
         id = "5_two_three", name = "2 Top, 3 Bottom", playerCount = 5,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.TOP),
-            PlayerSlot(2, GridSlotPosition.BOTTOM),
-            PlayerSlot(3, GridSlotPosition.BOTTOM),
-            PlayerSlot(4, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1), listOf(2, 3, 4)),
-    )
+        slots = slots10,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots10[0],slots10[1],slots10[2],slots10[3],slots10[4]))
+        )
 
+    var slots11 =listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.LEFT),
+        PlayerSlot(2, GridSlotPosition.RIGHT),
+        PlayerSlot(3, GridSlotPosition.RIGHT),
+        PlayerSlot(4, GridSlotPosition.FULL_WIDTH_BOTTOM),
+    )
     val FIVE_SIDES_BOTTOM = LayoutTemplate(
         id = "5_sides_bottom", name = "2+2 Sides, 1 Bottom", playerCount = 5,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.LEFT),
-            PlayerSlot(1, GridSlotPosition.RIGHT),
-            PlayerSlot(2, GridSlotPosition.LEFT),
-            PlayerSlot(3, GridSlotPosition.RIGHT),
-            PlayerSlot(4, GridSlotPosition.FULL_WIDTH_BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1), listOf(2, 3), listOf(4)),
+        slots = slots11,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots11[0],slots11[1],slots11[2],slots11[3]),ScreenedGridSlotPosition.BOTTOM to listOf(slots11[4])
+        )
     )
 
-    val FIVE_CROSS = LayoutTemplate(
-        id = "5_cross", name = "Cross", playerCount = 5,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
-            PlayerSlot(1, GridSlotPosition.LEFT),
-            PlayerSlot(2, GridSlotPosition.RIGHT),
-            PlayerSlot(3, GridSlotPosition.BOTTOM),
-            PlayerSlot(4, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0), listOf(1, 2), listOf(3, 4)),
-    )
 
-    val layoutsFor5 = listOf(FIVE_THREE_TWO, FIVE_TWO_THREE, FIVE_SIDES_BOTTOM, FIVE_CROSS)
+    val layoutsFor5 = listOf(FIVE_SIDES_BOTTOM,FIVE_THREE_TWO,FIVE_TWO_THREE)
 
     // ─── 6 players ───────────────────────────────────────────────────────────
 
-    val SIX_THREE_THREE = LayoutTemplate(
-        id = "6_three_three", name = "3×2 Grid", playerCount = 6,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.TOP),
-            PlayerSlot(2, GridSlotPosition.TOP),
-            PlayerSlot(3, GridSlotPosition.BOTTOM),
-            PlayerSlot(4, GridSlotPosition.BOTTOM),
-            PlayerSlot(5, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1, 2), listOf(3, 4, 5)),
+    var slots13 = listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.LEFT),
+        PlayerSlot(2, GridSlotPosition.LEFT),
+        PlayerSlot(3, GridSlotPosition.RIGHT),
+        PlayerSlot(4, GridSlotPosition.RIGHT),
+        PlayerSlot(5, GridSlotPosition.RIGHT),
     )
-
-    val SIX_FULL_TABLE = LayoutTemplate(
-        id = "6_full_table", name = "Full Table", playerCount = 6,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.TOP),
-            PlayerSlot(2, GridSlotPosition.LEFT),
-            PlayerSlot(3, GridSlotPosition.RIGHT),
-            PlayerSlot(4, GridSlotPosition.BOTTOM),
-            PlayerSlot(5, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1), listOf(2, 3), listOf(4, 5)),
-    )
-
-    val SIX_LONG_TABLE = LayoutTemplate(
-        id = "6_long_table", name = "Long Table", playerCount = 6,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
-            PlayerSlot(1, GridSlotPosition.LEFT),
-            PlayerSlot(2, GridSlotPosition.RIGHT),
-            PlayerSlot(3, GridSlotPosition.LEFT),
-            PlayerSlot(4, GridSlotPosition.RIGHT),
-            PlayerSlot(5, GridSlotPosition.FULL_WIDTH_BOTTOM),
-        ),
-        gridRows = listOf(listOf(0), listOf(1, 2), listOf(3, 4), listOf(5)),
-    )
-
     val SIX_TWO_ROWS = LayoutTemplate(
         id = "6_two_rows", name = "2 Rows of 3", playerCount = 6,
-        slots = listOf(
-            PlayerSlot(0, GridSlotPosition.TOP),
-            PlayerSlot(1, GridSlotPosition.TOP),
-            PlayerSlot(2, GridSlotPosition.TOP),
-            PlayerSlot(3, GridSlotPosition.BOTTOM),
-            PlayerSlot(4, GridSlotPosition.BOTTOM),
-            PlayerSlot(5, GridSlotPosition.BOTTOM),
-        ),
-        gridRows = listOf(listOf(0, 1, 2), listOf(3, 4, 5)),
+        slots = slots13,
+        gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots13[0],slots13[1],slots13[2],slots13[3],slots13[4],slots13[5])
+        )
     )
 
-    val layoutsFor6 = listOf(SIX_THREE_THREE, SIX_FULL_TABLE, SIX_LONG_TABLE, SIX_TWO_ROWS)
+    var slots14 = listOf(
+        PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
+        PlayerSlot(1, GridSlotPosition.LEFT),
+        PlayerSlot(2, GridSlotPosition.LEFT),
+        PlayerSlot(3, GridSlotPosition.RIGHT),
+        PlayerSlot(4, GridSlotPosition.RIGHT),
+        PlayerSlot(5, GridSlotPosition.FULL_WIDTH_BOTTOM),
+    )
+    val SIX_CROSSED = LayoutTemplate(
+        id = "6_crossed", name = "2 Rows of 3", playerCount = 6,
+        slots = slots14,
+        gridRows = mapOf(ScreenedGridSlotPosition.TOP to listOf(slots14[0]), ScreenedGridSlotPosition.MID to listOf(slots14[1],slots14[2],slots14[3],slots14[4]),
+            ScreenedGridSlotPosition.BOTTOM to listOf(slots14[5]))
+    )
+
+    val layoutsFor6 = listOf(SIX_TWO_ROWS, SIX_CROSSED)
 
     // ─── Lookups ──────────────────────────────────────────────────────────────
 

@@ -102,8 +102,17 @@ private fun CollectionContent(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onScannerClick) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.addcard_title))
+            if (selectedTab == TAB_CARDS) {
+                FloatingActionButton(
+                    onClick        = onScannerClick,
+                    containerColor = mc.primaryAccent,
+                    contentColor   = mc.background
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.addcard_title)
+                    )
+                }
             }
         },
     ) { padding ->
@@ -364,23 +373,17 @@ private fun ColorFilterRow(
 ) {
     val mc      = MaterialTheme.magicColors
     val isAllActive = activeFilters.isEmpty()
-    
-    // Optimizamos usando keys para que el scroll sea más fluido
     LazyRow(
         contentPadding        = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier              = Modifier.padding(vertical = 4.dp),
     ) {
-        items(
-            items = ColorFilter.entries,
-            key = { it.name }
-        ) { filter ->
-            val manaCode  = remember(filter) { filter.manaCode() }
-            val manaColor = remember(filter, mc) { filter.manaColor(mc) }
+        items(ColorFilter.entries) { filter ->
+            val manaCode  = filter.manaCode()
+            val manaColor = filter.manaColor(mc)
             val isColor   = manaCode != null
             val isSelected = if (filter == ColorFilter.ALL) isAllActive
                              else activeFilters.contains(filter)
-            
             FilterChip(
                 selected = isSelected,
                 onClick  = { onToggleFilter(filter) },

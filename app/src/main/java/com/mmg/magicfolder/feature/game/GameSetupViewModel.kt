@@ -93,10 +93,6 @@ class GameSetupViewModel @Inject constructor(
         )}
     }
 
-    fun selectLayout(template: LayoutTemplate) {
-        _uiState.update { it.copy(selectedLayout = template) }
-    }
-
     fun updatePlayerName(index: Int, name: String) {
         val configs = _uiState.value.playerConfigs.toMutableList()
         if (index in configs.indices) {

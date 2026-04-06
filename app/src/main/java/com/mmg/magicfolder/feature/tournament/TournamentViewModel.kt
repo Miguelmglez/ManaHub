@@ -8,6 +8,9 @@ import com.mmg.magicfolder.core.data.local.entity.TournamentMatchEntity
 import com.mmg.magicfolder.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.magicfolder.core.data.local.entity.projection.TournamentStanding
 import com.mmg.magicfolder.core.domain.repository.TournamentRepository
+import com.mmg.magicfolder.core.ui.theme.PlayerTheme
+import com.mmg.magicfolder.feature.game.PlayerConfig
+import com.mmg.magicfolder.feature.game.model.GameMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -70,6 +73,43 @@ class TournamentViewModel @Inject constructor(
             repository.startMatch(match.id)
             onNavigateToGame(match.id)
         }
+    }
+
+    fun startMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Unit) {
+        viewModelScope.launch {
+            repository.startMatch(matchId)
+            onNavigateToGame(matchId)
+        }
+    }
+
+    /**
+     * Returns (tournamentPlayerIds, playerConfigs) for a given match, ready to pass to GameViewModel.
+     */
+    fun buildPlayerConfigsForMatch(matchId: Long): Pair<List<Long>, List<PlayerConfig>> {
+        val state = _uiState.value
+        val match = state.matches.find { it.id == matchId } ?: return Pair(emptyList(), emptyList())
+        val ids = match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+        val configs = ids.mapIndexed { index, playerId ->
+            val player = state.players.find { it.id == playerId }
+            PlayerConfig(
+                id        = index,
+                name      = player?.playerName ?: "Player ${index + 1}",
+                theme     = PlayerTheme.ALL[(player?.seed ?: index) % PlayerTheme.ALL.size],
+                isAppUser = index == 0,
+            )
+        }
+        return Pair(ids, configs)
+    }
+
+    fun getGameMode(): GameMode {
+        return when (_uiState.value.tournament?.format?.uppercase()) {
+            "COMMANDER" -> GameMode.COMMANDER
+            else        -> GameMode.STANDARD
+        }
+    }
+
+    fun recordMatchResultManual(matchId: Long, winnerId: Long) {
+        recordMatchResult(matchId, winnerId, null, emptyMap())
     }
 
     fun recordMatchResult(

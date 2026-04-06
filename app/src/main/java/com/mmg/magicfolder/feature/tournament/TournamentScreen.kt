@@ -40,7 +40,8 @@ fun TournamentScreen(
 ) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
     val mc           = MaterialTheme.magicColors
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab  by remember { mutableIntStateOf(0) }
+    var recordResultForMatch by remember { mutableStateOf<TournamentMatchEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -111,16 +112,33 @@ fun TournamentScreen(
                     },
                 )
                 1 -> MatchesTab(
-                    matches   = uiState.matches,
-                    players   = uiState.players,
-                    onStartMatch = { matchId ->
-                        viewModel.startNextMatch { _ ->
+                    matches         = uiState.matches,
+                    players         = uiState.players,
+                    onStartMatch    = { matchId ->
+                        viewModel.startMatch(matchId) { _ ->
                             onStartMatch(matchId, tournamentId)
                         }
                     },
+                    onRecordResult  = { match -> recordResultForMatch = match },
                 )
             }
         }
+    }
+
+    // Manual result entry dialog
+    recordResultForMatch?.let { match ->
+        val ids = match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+        val p1  = uiState.players.find { it.id == ids.getOrNull(0) }
+        val p2  = uiState.players.find { it.id == ids.getOrNull(1) }
+        RecordResultDialog(
+            p1        = p1,
+            p2        = p2,
+            onConfirm = { winnerId ->
+                viewModel.recordMatchResultManual(match.id, winnerId)
+                recordResultForMatch = null
+            },
+            onDismiss = { recordResultForMatch = null },
+        )
     }
 }
 
@@ -271,9 +289,10 @@ private fun StandingRow(standing: TournamentStanding) {
 
 @Composable
 private fun MatchesTab(
-    matches:      List<TournamentMatchEntity>,
-    players:      List<TournamentPlayerEntity>,
-    onStartMatch: (Long) -> Unit,
+    matches:        List<TournamentMatchEntity>,
+    players:        List<TournamentPlayerEntity>,
+    onStartMatch:   (Long) -> Unit,
+    onRecordResult: (TournamentMatchEntity) -> Unit,
 ) {
     val playerMap = remember(players) { players.associateBy { it.id } }
     val byRound   = remember(matches) { matches.groupBy { it.round } }
@@ -294,9 +313,10 @@ private fun MatchesTab(
             }
             items(roundMatches) { match ->
                 MatchRow(
-                    match     = match,
-                    playerMap = playerMap,
-                    onStart   = if (match.status == "PENDING") ({ onStartMatch(match.id) }) else null,
+                    match          = match,
+                    playerMap      = playerMap,
+                    onStart        = if (match.status == "PENDING") ({ onStartMatch(match.id) }) else null,
+                    onRecordResult = if (match.status != "FINISHED") ({ onRecordResult(match) }) else null,
                 )
             }
         }
@@ -305,9 +325,10 @@ private fun MatchesTab(
 
 @Composable
 private fun MatchRow(
-    match:     TournamentMatchEntity,
-    playerMap: Map<Long, TournamentPlayerEntity>,
-    onStart:   (() -> Unit)?,
+    match:          TournamentMatchEntity,
+    playerMap:      Map<Long, TournamentPlayerEntity>,
+    onStart:        (() -> Unit)?,
+    onRecordResult: (() -> Unit)?,
 ) {
     val mc  = MaterialTheme.magicColors
     val ids = match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
@@ -330,40 +351,103 @@ private fun MatchRow(
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier              = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            PlayerMatchSlot(player = p1, match = match, isP1 = true, modifier = Modifier.weight(1f))
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier            = Modifier.padding(horizontal = 12.dp),
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier              = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text  = when (match.status) { "FINISHED" -> "✓"; "ACTIVE" -> "●"; else -> stringResource(R.string.tournament_match_vs) },
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = when (match.status) {
-                        "FINISHED" -> mc.lifePositive.copy(alpha = 0.6f)
-                        "ACTIVE"   -> mc.primaryAccent
-                        else       -> mc.textDisabled
-                    },
-                )
-                if (onStart != null) {
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(
-                        onClick        = onStart,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                PlayerMatchSlot(player = p1, match = match, isP1 = true, modifier = Modifier.weight(1f))
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier            = Modifier.padding(horizontal = 12.dp),
+                ) {
+                    Text(
+                        text  = when (match.status) { "FINISHED" -> "✓"; "ACTIVE" -> "●"; else -> stringResource(R.string.tournament_match_vs) },
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = when (match.status) {
+                            "FINISHED" -> mc.lifePositive.copy(alpha = 0.6f)
+                            "ACTIVE"   -> mc.primaryAccent
+                            else       -> mc.textDisabled
+                        },
+                    )
+                    if (onStart != null) {
+                        Spacer(Modifier.height(4.dp))
+                        TextButton(
+                            onClick        = onStart,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                        }
+                    }
+                }
+
+                PlayerMatchSlot(player = p2, match = match, isP1 = false, modifier = Modifier.weight(1f))
+            }
+
+            // Record result button for unfinished matches
+            if (onRecordResult != null && match.status != "FINISHED") {
+                HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
+                TextButton(
+                    onClick        = onRecordResult,
+                    modifier       = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text  = "Record result manually",
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textSecondary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordResultDialog(
+    p1:        TournamentPlayerEntity?,
+    p2:        TournamentPlayerEntity?,
+    onConfirm: (winnerId: Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = mc.surface,
+        title = {
+            Text(
+                text  = "Who won?",
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textPrimary,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOfNotNull(p1, p2).forEach { player ->
+                    val playerColor = parseColor(player.playerColor)
+                    Button(
+                        onClick  = { onConfirm(player.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = ButtonDefaults.buttonColors(containerColor = playerColor.copy(alpha = 0.85f)),
                     ) {
-                        Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                        Text(
+                            text  = player.playerName,
+                            style = MaterialTheme.magicTypography.labelLarge,
+                            color = androidx.compose.ui.graphics.Color.White,
+                        )
                     }
                 }
             }
-
-            PlayerMatchSlot(player = p2, match = match, isP1 = false, modifier = Modifier.weight(1f))
-        }
-    }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = mc.textSecondary)
+            }
+        },
+    )
 }
 
 @Composable

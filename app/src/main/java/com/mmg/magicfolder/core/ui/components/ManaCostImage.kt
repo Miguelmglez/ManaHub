@@ -49,7 +49,7 @@ fun ManaSymbolImage(
     size: Dp = 18.dp,
     modifier: Modifier = Modifier,
 ) {
-    // Scryfall has no M.svg for multicolor — render a gold circle manually
+    /*// Scryfall has no M.svg for multicolor — render a gold circle manually
     if (token.uppercase() == "M") {
         Box(
             contentAlignment = Alignment.Center,
@@ -67,7 +67,7 @@ fun ManaSymbolImage(
             )
         }
         return
-    }
+    }*/
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(tokenToSvgUrl(token))

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
+import com.mmg.magicfolder.core.domain.repository.TournamentRepository
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.feature.game.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +33,10 @@ data class GameUiState(
     // Layout
     val activeLayout:     LayoutTemplate    = LayoutTemplates.getDefaultLayout(4),
     val playerRotations:  Map<Int, Int>     = emptyMap(),  // playerId → rotation degrees override
+    // Tournament context (null = standalone game)
+    val activeTournamentId:      Long?      = null,
+    val activeTournamentMatchId: Long?      = null,
+    val tournamentPlayerIds:     List<Long> = emptyList(), // index → tournament player DB id
     // UI visibility
     val showPhasePanel:              Boolean = false,
     val editingNameForPlayerId:      Int?    = null,
@@ -47,8 +52,9 @@ data class GameUiState(
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    savedStateHandle:            SavedStateHandle,
-    private val gameSessionRepo: GameSessionRepository,
+    savedStateHandle:             SavedStateHandle,
+    private val gameSessionRepo:  GameSessionRepository,
+    private val tournamentRepo:   TournamentRepository,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -75,7 +81,10 @@ class GameViewModel @Inject constructor(
                 .collect { result ->
                     launch(Dispatchers.IO) {
                         runCatching { gameSessionRepo.saveGameSession(result) }
-                            .onSuccess { id -> _uiState.update { it.copy(lastSessionId = id) } }
+                            .onSuccess { id ->
+                                _uiState.update { it.copy(lastSessionId = id) }
+                                recordTournamentResultIfNeeded(id, result)
+                            }
                     }
                 }
         }
@@ -388,6 +397,62 @@ class GameViewModel @Inject constructor(
         if (alive.isEmpty()) return s.activePlayerId
         val idx = alive.indexOfFirst { it.id == s.activePlayerId }
         return alive[(idx + 1) % alive.size].id
+    }
+
+    // ── Tournament ────────────────────────────────────────────────────────────
+
+    /**
+     * Initialise a fresh game for a tournament match with pre-built player configs.
+     * Stores tournament context so result is auto-recorded when the game ends.
+     */
+    fun initFromTournamentMatch(
+        matchId:              Long,
+        tournamentId:         Long,
+        tournamentPlayerIds:  List<Long>,
+        configs:              List<PlayerConfig>,
+        mode:                 GameMode,
+        layout:               LayoutTemplate? = null,
+    ) {
+        deltaJobs.values.forEach { it.cancel() }
+        deltaJobs.clear()
+        val players = configs.mapIndexed { i, cfg ->
+            Player(
+                id        = i,
+                name      = cfg.name.ifEmpty { "Player ${i + 1}" },
+                life      = mode.startingLife,
+                theme     = cfg.theme,
+                isAppUser = cfg.isAppUser,
+            )
+        }
+        val actualLayout = layout ?: LayoutTemplates.getDefaultLayout(players.size)
+        _uiState.value = GameUiState(
+            players              = players,
+            mode                 = mode,
+            activePlayerId       = players.first().id,
+            activeLayout         = actualLayout,
+            gameStartTime        = System.currentTimeMillis(),
+            activeTournamentId   = tournamentId,
+            activeTournamentMatchId = matchId,
+            tournamentPlayerIds  = tournamentPlayerIds,
+        )
+        _toolsState.value = GlobalToolsState()
+    }
+
+    private fun recordTournamentResultIfNeeded(sessionId: Long, result: GameResult) {
+        val s = _uiState.value
+        val matchId = s.activeTournamentMatchId ?: return
+        val tournamentId = s.activeTournamentId ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val winnerIndex = s.players.indexOfFirst { it.id == result.winner.id }
+            val winnerTournamentId = s.tournamentPlayerIds.getOrNull(winnerIndex) ?: return@launch
+            val lifeTotals = s.players.mapIndexedNotNull { i, p ->
+                val tid = s.tournamentPlayerIds.getOrNull(i) ?: return@mapIndexedNotNull null
+                tid to p.life
+            }.toMap()
+            runCatching {
+                tournamentRepo.finishMatch(matchId, winnerTournamentId, sessionId, lifeTotals)
+            }
+        }
     }
 
     // ── Setup init from PlayerConfig ──────────────────────────────────────────

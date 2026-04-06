@@ -99,12 +99,12 @@ fun MagicBottomBar(
                 modifier = Modifier.weight(1f),
             )
 
-            // Slot 2 — News
+            // Slot 2 — Draft
             BottomBarTab(
-                label    = "NEWS",
-                icon     = Icons.Default.Newspaper,
-                selected = currentRoute == Screen.News.route,
-                onClick  = onNewsClick,
+                label    = "DRAFT",
+                icon     = Icons.Default.Style,
+                selected = currentRoute == Screen.Draft.route,
+                onClick  = onDraftClick,
                 modifier = Modifier.weight(1f),
             )
 
@@ -121,15 +121,15 @@ fun MagicBottomBar(
                 )
             }
 
-            // Slot 4 — Draft
+            // Slot 4 — News
+
             BottomBarTab(
-                label    = "DRAFT",
-                icon     = Icons.Default.Style,
-                selected = currentRoute == Screen.Draft.route,
-                onClick  = onDraftClick,
+                label    = "NEWS",
+                icon     = Icons.Default.Newspaper,
+                selected = currentRoute == Screen.News.route,
+                onClick  = onNewsClick,
                 modifier = Modifier.weight(1f),
             )
-
             // Slot 5 — Profile
             BottomBarTab(
                 label    = "PROFILE",
@@ -234,7 +234,7 @@ private fun PlayFab(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter            = painterResource(R.drawable.ic_crossed_swords),
+            painter            = painterResource(R.drawable.ic_battle),
             contentDescription = "Play Game",
             tint               = Color.White,
             modifier           = Modifier.size(28.dp),

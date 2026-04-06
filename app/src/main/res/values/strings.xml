@@ -292,7 +292,7 @@
     <string name="gamesetup_commander_label">Commander</string>
     <string name="gamesetup_commander_hint">Search commander…</string>
     <string name="gamesetup_begin_button">Begin the Game</string>
-    <string name="gamesetup_tournament_link">Create a tournament instead →</string>
+    <string name="gamesetup_tournament_link">Create a tournament instead</string>
 
     <!-- ══════════════════════════════════════════
          GAME SCREEN

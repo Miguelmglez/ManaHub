@@ -36,15 +36,17 @@ import coil.request.ImageRequest
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.Deck
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
+import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckDetailScreen(
-    deckId:    Long,
-    onBack:    () -> Unit,
-    viewModel: DeckDetailViewModel = hiltViewModel(),
+    deckId:      Long,
+    onBack:      () -> Unit,
+    onAddCards:  () -> Unit,
+    viewModel:   DeckDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
@@ -64,7 +66,6 @@ fun DeckDetailScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -152,6 +153,7 @@ fun DeckDetailScreen(
             onRemove      = viewModel::removeCardFromDeck,
             onAddBasicLand    = viewModel::addBasicLandByName,
             onRemoveBasicLand = viewModel::removeBasicLandByName,
+            viewModel = viewModel,
             onDismiss     = {
                 showAddCardsSheet = false
                 viewModel.clearAddCardsState()
@@ -405,6 +407,7 @@ private fun AddCardsSheet(
     onRemove:         (String) -> Unit,
     onAddBasicLand:   (String) -> Unit,
     onRemoveBasicLand:(String) -> Unit,
+    viewModel: DeckDetailViewModel,
     onDismiss:        () -> Unit,
 ) {
     val mc         = MaterialTheme.magicColors
@@ -485,6 +488,7 @@ private fun AddCardsSheet(
                             quantityInDeck = quantity,
                             onAdd        = { onAddBasicLand(landName) },
                             onRemove     = { onRemoveBasicLand(landName) },
+                            manaCode = {viewModel.getManaCode(landName)}
                         )
                     }
                     item(key = "basic_lands_divider") {
@@ -547,6 +551,7 @@ private fun BasicLandRow(
     quantityInDeck: Int,
     onAdd:         () -> Unit,
     onRemove:      () -> Unit,
+    manaCode: () -> String?,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -559,17 +564,15 @@ private fun BasicLandRow(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text     = name,
-                style    = ty.bodyMedium,
-                color    = mc.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text  = stringResource(R.string.deckbuilder_basic_lands).lowercase(),
-                style = ty.labelSmall,
-                color = mc.textDisabled,
-            )
+            manaCode()?.let { ManaSymbolImage(token = it, size = 24.dp, modifier = Modifier.padding(2.dp)) }
+                Text(
+                    text     = name,
+                    style    = ty.bodyMedium,
+                    color    = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+
+
             // Quantity controls
             Row(
                 verticalAlignment     = Alignment.CenterVertically,

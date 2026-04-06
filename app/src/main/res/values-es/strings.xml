@@ -265,7 +265,7 @@
     <string name="gamesetup_commander_label">Comandante</string>
     <string name="gamesetup_commander_hint">Buscar comandante…</string>
     <string name="gamesetup_begin_button">Empezar la partida</string>
-    <string name="gamesetup_tournament_link">Crear un torneo en su lugar →</string>
+    <string name="gamesetup_tournament_link">Crear un torneo en su lugar</string>
 
     <!-- GAME SCREEN -->
     <string name="game_title">ManaHub</string>

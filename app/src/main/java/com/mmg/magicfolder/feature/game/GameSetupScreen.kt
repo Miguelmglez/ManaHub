@@ -1,14 +1,24 @@
 package com.mmg.magicfolder.feature.game
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -18,32 +28,38 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.mmg.magicfolder.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.game.model.GameMode
 import com.mmg.magicfolder.feature.game.model.LayoutTemplate
-import com.mmg.magicfolder.feature.game.model.LayoutTemplates
 
 @Composable
 fun GameSetupScreen(
@@ -62,8 +78,7 @@ fun GameSetupScreen(
         onModeChange          = viewModel::onModeChange,
         onPlayerCountChange   = viewModel::onPlayerCountChange,
         onUpdatePlayerName    = viewModel::updatePlayerName,
-        onUpdatePlayerTheme   = viewModel::updatePlayerTheme,
-        onSelectLayout        = viewModel::selectLayout,
+        onUpdatePlayerTheme   = viewModel::updatePlayerTheme
     )
 }
 
@@ -77,7 +92,6 @@ private fun GameSetupScreenContent(
     onPlayerCountChange:   (Int) -> Unit,
     onUpdatePlayerName:    (Int, String) -> Unit,
     onUpdatePlayerTheme:   (Int, PlayerThemeColors) -> Unit,
-    onSelectLayout:        (LayoutTemplate) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -144,61 +158,10 @@ private fun GameSetupScreenContent(
                 onPlayerCountChange = onPlayerCountChange,
             )
 
-            // ── Layout selector ───────────────────────────────────────────────
-            val layouts = LayoutTemplates.getLayoutsForCount(uiState.playerCount)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(layouts, key = { it.id }) { template ->
-                    val isSelected  = template.id == uiState.selectedLayout.id
-                    val borderColor = if (isSelected) mc.primaryAccent else mc.surfaceVariant
-                    val bgColor     = if (isSelected) mc.primaryAccent.copy(alpha = 0.10f) else mc.surface
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier            = Modifier
-                            .width(64.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(bgColor)
-                            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                            .clickable { onSelectLayout(template) }
-                            .padding(6.dp),
-                    ) {
-                        Canvas(modifier = Modifier.fillMaxWidth().height(40.dp)) {
-                            val rows    = template.gridRows
-                            val numRows = rows.size.coerceAtLeast(1)
-                            val maxCols = rows.maxOf { it.size }.coerceAtLeast(1)
-                            val gap     = 2f
-                            val cellW   = (size.width  - gap * (maxCols - 1)) / maxCols
-                            val cellH   = (size.height - gap * (numRows  - 1)) / numRows
-                            val color   = if (isSelected) mc.primaryAccent.copy(alpha = 0.50f)
-                                          else mc.textDisabled.copy(alpha = 0.30f)
-                            rows.forEachIndexed { ri, row ->
-                                row.forEachIndexed { ci, slot ->
-                                    if (slot != null) {
-                                        drawRoundRect(
-                                            color        = color,
-                                            topLeft      = Offset(ci * (cellW + gap), ri * (cellH + gap)),
-                                            size         = Size(cellW, cellH),
-                                            cornerRadius = CornerRadius(2f),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        Text(
-                            text      = template.name,
-                            fontSize  = 8.sp,
-                            color     = if (isSelected) mc.primaryAccent else mc.textSecondary,
-                            textAlign = TextAlign.Center,
-                            maxLines  = 2,
-                        )
-                    }
-                }
-            }
-
             // ── Player config list ────────────────────────────────────────────
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.heightIn(max = 300.dp),
+                modifier = Modifier.weight(1f),
             ) {
                 itemsIndexed(uiState.playerConfigs) { index, config ->
                     PlayerConfigRow(
@@ -211,8 +174,6 @@ private fun GameSetupScreenContent(
                     )
                 }
             }
-
-            Spacer(Modifier.weight(1f))
 
             // ── Begin button ──────────────────────────────────────────────────
             Button(
@@ -232,7 +193,7 @@ private fun GameSetupScreenContent(
             TextButton(onClick = onNavigateToTournament) {
                 Text(
                     stringResource(R.string.gamesetup_tournament_link),
-                    color = mc.textSecondary,
+                    color = mc.goldMtg,
                     style = MaterialTheme.magicTypography.bodySmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -500,7 +461,7 @@ private fun ModeTile(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text  = if (mode == GameMode.COMMANDER) "⚔" else "🔮",
+            text  = if (mode == GameMode.COMMANDER) "⚔️" else "🔮",
             style = MaterialTheme.magicTypography.displayMedium,
         )
         Text(

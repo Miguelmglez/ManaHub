@@ -34,6 +34,7 @@ enum class ManaColor(val symbol: String, val displayName: String) {
     B("B", "Black"),
     R("R", "Red"),
     G("G", "Green"),
+    C("C", "Colorless"),
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
