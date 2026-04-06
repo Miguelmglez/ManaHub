@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -67,6 +68,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -94,6 +96,7 @@ import com.mmg.magicfolder.feature.game.model.LayoutTemplates
 import com.mmg.magicfolder.feature.game.model.Player
 import com.mmg.magicfolder.feature.game.model.ScreenedGridSlotPosition
 import com.mmg.magicfolder.feature.game.model.toDefaultDegrees
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -224,15 +227,15 @@ private fun GamePlayContent(
         }
 
         // ── Commander damage panel ─────────────────────────────────────────────
-        /*  uiState.showCmdPanelForPlayerId?.let { targetId ->
-              val target = uiState.players.find { it.id == targetId } ?: return@let
-              CmdDamagePanel(
-                  target = target,
-                  allPlayers = uiState.players,
-                  onDamage = { srcId, d -> onCmdDamage(targetId, srcId, d) },
-                  onDismiss = { onCmdPanel(null) },
-              )
-          }*/
+        uiState.showCmdPanelForPlayerId?.let { targetId ->
+            val target = uiState.players.find { it.id == targetId } ?: return@let
+            CmdDamagePanel(
+                target = target,
+                allPlayers = uiState.players,
+                onDamage = { srcId, d -> onCmdDamage(targetId, srcId, d) },
+                onDismiss = { onCmdPanel(null) },
+            )
+        }
 
         // ── Counters panel ────────────────────────────────────────────────────
         uiState.showCounterPanelForPlayerId?.let { pid ->
@@ -510,7 +513,11 @@ private fun GamePlayerGrid(
                 activeLayout.gridRows.forEach { (position, slots) ->
                     when (position) {
                         ScreenedGridSlotPosition.TOP -> {
-                            Row(modifier = Modifier.fillMaxWidth().weight(sizeLayout.first)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(sizeLayout.first)
+                            ) {
                                 val slot = slots[0]
                                 val player = players.find { it.id == slot.playerId }
                                 if (player != null) {
@@ -522,21 +529,23 @@ private fun GamePlayerGrid(
                                         rotation = rotation,
                                         lifeDelta = lifeDeltas[player.id],
                                         onLife = { d -> onLifeChange(player.id, d) },
-                                        onPoison = { d -> onPoison(player.id, d) },
                                         onCmdPanel = { onCmdPanel(player.id) },
                                         onCtrPanel = { onCtrPanel(player.id) },
                                         onEditName = { onEditName(player.id) },
                                         onConfirmDefeat = { onConfirmDefeat(player.id) },
                                         onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                        modifier = Modifier
-                                            .fillMaxSize(),
+                                        modifier = Modifier.fillMaxSize(),
                                     )
                                 }
                             }
                         }
 
                         ScreenedGridSlotPosition.BOTTOM -> {
-                            Row(modifier = Modifier.fillMaxWidth().weight(sizeLayout.first)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(sizeLayout.first)
+                            ) {
                                 val slot = slots[0]
                                 val player = players.find { it.id == slot.playerId }
                                 if (player != null) {
@@ -548,14 +557,12 @@ private fun GamePlayerGrid(
                                         rotation = rotation,
                                         lifeDelta = lifeDeltas[player.id],
                                         onLife = { d -> onLifeChange(player.id, d) },
-                                        onPoison = { d -> onPoison(player.id, d) },
                                         onCmdPanel = { onCmdPanel(player.id) },
                                         onCtrPanel = { onCtrPanel(player.id) },
                                         onEditName = { onEditName(player.id) },
                                         onConfirmDefeat = { onConfirmDefeat(player.id) },
                                         onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                        modifier = Modifier
-                                            .fillMaxSize(),
+                                        modifier = Modifier.fillMaxSize(),
                                     )
                                 }
 
@@ -566,11 +573,20 @@ private fun GamePlayerGrid(
                             val leftPlayers = slots.filter { it.position == GridSlotPosition.LEFT }
                             val rightPlayers =
                                 slots.filter { it.position == GridSlotPosition.RIGHT }
-                            Row(modifier = Modifier.fillMaxWidth().weight(sizeLayout.second)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(sizeLayout.second)
+                            ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     leftPlayers.forEachIndexed { index, slot ->
-                                        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                                            val player = players.find { leftPlayers[index].playerId == it.id }
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .weight(1f)
+                                        ) {
+                                            val player =
+                                                players.find { leftPlayers[index].playerId == it.id }
                                             if (player != null) {
                                                 val rotation = playerRotations[player.id]
                                                     ?: slot.position.toDefaultDegrees()
@@ -580,14 +596,12 @@ private fun GamePlayerGrid(
                                                     rotation = rotation,
                                                     lifeDelta = lifeDeltas[player.id],
                                                     onLife = { d -> onLifeChange(player.id, d) },
-                                                    onPoison = { d -> onPoison(player.id, d) },
                                                     onCmdPanel = { onCmdPanel(player.id) },
                                                     onCtrPanel = { onCtrPanel(player.id) },
                                                     onEditName = { onEditName(player.id) },
                                                     onConfirmDefeat = { onConfirmDefeat(player.id) },
                                                     onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                                    modifier = Modifier
-                                                        .fillMaxSize(),
+                                                    modifier = Modifier.fillMaxSize(),
                                                 )
                                             }
                                         }
@@ -596,7 +610,11 @@ private fun GamePlayerGrid(
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     rightPlayers.forEachIndexed { index, slot ->
-                                        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .weight(1f)
+                                        ) {
                                             val player =
                                                 players.find { rightPlayers[index].playerId == it.id }
                                             if (player != null) {
@@ -608,14 +626,12 @@ private fun GamePlayerGrid(
                                                     rotation = rotation,
                                                     lifeDelta = lifeDeltas[player.id],
                                                     onLife = { d -> onLifeChange(player.id, d) },
-                                                    onPoison = { d -> onPoison(player.id, d) },
                                                     onCmdPanel = { onCmdPanel(player.id) },
                                                     onCtrPanel = { onCtrPanel(player.id) },
                                                     onEditName = { onEditName(player.id) },
                                                     onConfirmDefeat = { onConfirmDefeat(player.id) },
                                                     onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                                    modifier = Modifier
-                                                        .fillMaxSize(),
+                                                    modifier = Modifier.fillMaxSize(),
                                                 )
                                             }
                                         }
@@ -629,8 +645,6 @@ private fun GamePlayerGrid(
                 }
             }
         }
-
-    }/*
         GlobalToolsOverlay(
             state = toolsState,
             onToggle = onToggleTools,
@@ -639,7 +653,8 @@ private fun GamePlayerGrid(
             modifier = Modifier
                 .align(Alignment.Center)
                 .wrapContentSize(),
-        )*/
+        )
+    }
 }
 
 
@@ -655,7 +670,6 @@ private fun PlayerCard(
     rotation: Int,
     lifeDelta: Int?,
     onLife: (Int) -> Unit,
-    onPoison: (Int) -> Unit,
     onCmdPanel: () -> Unit,
     onCtrPanel: () -> Unit,
     onEditName: () -> Unit,
@@ -665,7 +679,6 @@ private fun PlayerCard(
 ) {
     val mc = MaterialTheme.magicColors
     val theme = player.theme
-    lifeDelta
     val startingLife = gameMode.startingLife
 
     // Life color coding: red when ≤ 0, green when above starting, neutral otherwise
@@ -676,7 +689,7 @@ private fun PlayerCard(
     }
 
     BoxWithConstraints(
-        modifier = modifier,
+        modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         val isRotated = rotation % 180 != 0
@@ -691,9 +704,16 @@ private fun PlayerCard(
                     color = theme.accent.copy(alpha = 0.25f),
                     blurRadius = 20.dp,
                 )
-                .background(theme.background)
-                .border(width = 0.5.dp, color = theme.accent.copy(alpha = 0.40f))
-        ) {
+                // 1. Clip the content to rounded corners
+            .clip(RoundedCornerShape(16.dp))
+                // 2. Apply background (it will now be clipped)
+            .background(theme.background)
+                // 3. Apply border using the SAME shape
+            .border(
+                width = 0.5.dp,
+                color = theme.accent.copy(alpha = 0.40f),
+                shape = RoundedCornerShape(16.dp)
+            )) {
             // 1. Theme background pattern
             ThemeBackground(modifier = Modifier.matchParentSize())
 
@@ -714,13 +734,15 @@ private fun PlayerCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                // ── Top row: name + quick +1 ──────────────────────────────
+                // ── Top row: name ──────────────────────────────
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.2f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -735,31 +757,82 @@ private fun PlayerCard(
                             .clickable(onClick = onEditName)
                     )
                 }
-                Text(
-                    text = player.life.toString(),
-                    style = MaterialTheme.magicTypography.lifeNumber,
-                    color = lifeColor,
-                    maxLines = 1,
-                    textAlign = TextAlign.Center,
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.8f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    // 1. Ghost element: An invisible Spacer that mirrors the Icon's width + padding.
+                    // This pushes the Text exactly to the center by offsetting the Icon on the right.
+                    val iconSize = 28.dp
+                    val iconPadding = 24.dp
+
+                    Spacer(modifier = Modifier.size(iconSize + iconPadding))
+
+                    // 2. The Main Text: Now perfectly centered because the Row is balanced.
+                    Text(
+                        text = player.life.toString(),
+                        style = MaterialTheme.magicTypography.lifeNumber,
+                        color = lifeColor,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            onLife(-1)
+                        })
+
+                    // 3. The Real Icon: Attached to the right of the text.
+                    Icon(
+                        painter = painterResource(R.drawable.ic_heart),
+                        contentDescription = "Life Icon",
+                        tint = theme.accent,
+                        modifier = Modifier
+                            .padding(start = iconPadding)
+                            .size(iconSize)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                onLife(1)
+                            })
+                }
 
                 // ── Bottom row ────────────────────────────────────────────
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.2f),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
 
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (gameMode == GameMode.COMMANDER) {
-                            CardActionButton(
-                                label = "⚔",
-                                theme = theme,
-                                onClick = onCmdPanel,
-                                danger = player.commanderDamage.values.any { it >= 21 },
+                            Icon(
+                                painter = painterResource(R.drawable.ic_battle),
+                                contentDescription = "Play Game",
+                                tint = theme.accent,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clickable {
+                                        onCmdPanel()
+                                    },
                             )
+
                         }
-                        CardActionButton(label = "◆", theme = theme, onClick = onCtrPanel)
+                        Icon(
+                            painter = painterResource(R.drawable.ic_counter),
+                            contentDescription = "Play Game",
+                            tint = theme.accent,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable {
+                                    onCtrPanel()
+                                },
+                        )
                     }
                 }
             }
@@ -855,7 +928,7 @@ private fun LifeButton(
                         onLifeChange(direction)   // tap inmediato
 
                         val job = scope.launch {
-                            kotlinx.coroutines.delay(500L)
+                            delay(500L)
                             while (isPressed) {
                                 val elapsed = System.currentTimeMillis() - pressStart
                                 val (intervalMs, absDelta) = when {
@@ -865,7 +938,7 @@ private fun LifeButton(
                                     else -> 150L to 1
                                 }
                                 onLifeChange(direction * absDelta)
-                                kotlinx.coroutines.delay(intervalMs)
+                                delay(intervalMs)
                             }
                         }
 
@@ -1061,8 +1134,7 @@ private fun CmdDamagePanel(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
-        contentWindowInsets = { WindowInsets(0) }
-    ) {
+        contentWindowInsets = { WindowInsets(0) }) {
         Column(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1074,43 +1146,41 @@ private fun CmdDamagePanel(
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
-            allPlayers
-                .filter { it.id != target.id && !it.defeated }
-                .forEach { source ->
-                    val damage = target.commanderDamage[source.id] ?: 0
-                    val srcTheme = source.theme
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(srcTheme.accent)
-                        )
-                        Spacer(Modifier.width(8.dp))
+            allPlayers.filter { it.id != target.id && !it.defeated }.forEach { source ->
+                val damage = target.commanderDamage[source.id] ?: 0
+                val srcTheme = source.theme
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(srcTheme.accent)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        source.name,
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textPrimary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (damage >= 21) {
                         Text(
-                            source.name,
+                            "⚠ ",
                             style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.textPrimary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (damage >= 21) {
-                            Text(
-                                "⚠ ",
-                                style = MaterialTheme.magicTypography.bodyMedium,
-                                color = mc.lifeNegative
-                            )
-                        }
-                        CounterRow(
-                            value = damage,
-                            theme = srcTheme,
-                            onDecrement = { onDamage(source.id, -1) },
-                            onIncrement = { onDamage(source.id, +1) },
+                            color = mc.lifeNegative
                         )
                     }
+                    CounterRow(
+                        value = damage,
+                        theme = srcTheme,
+                        onDecrement = { onDamage(source.id, -1) },
+                        onIncrement = { onDamage(source.id, +1) },
+                    )
                 }
+            }
             Spacer(Modifier.height(8.dp))
         }
     }
