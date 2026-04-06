@@ -773,5 +773,8 @@
     <string name="draft_no_sets">No draftable sets found</string>
     <string name="draft_loading_sets">Loading sets…</string>
     <string name="draft_retry">Retry</string>
+    <string name="draft_cards_all">All Cards</string>
+    <string name="draft_guide_videos">Videos</string>
+    <string name="draft_card_artist">Artist: %1$s</string>
 
 </resources>

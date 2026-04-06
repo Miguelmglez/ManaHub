@@ -189,6 +189,22 @@ class DraftRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getCardByName(name: String, setCode: String): DataResult<Card> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val card = scryfallApi.getCardByName(name = name, set = setCode)
+                DataResult.Success(card.toDomain())
+            } catch (_: Exception) {
+                try {
+                    val card = scryfallApi.getCardByName(name = name)
+                    DataResult.Success(card.toDomain())
+                } catch (e: Exception) {
+                    DataResult.Error(e.message ?: "Card not found")
+                }
+            }
+        }
+    }
+
     private fun getAvailableDraftSetCodes(): Set<String> {
         return try {
             (context.assets.list("draft_guides") ?: emptyArray())
