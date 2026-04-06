@@ -14,4 +14,5 @@ interface DraftRepository {
     suspend fun getSetCards(setCode: String, page: Int = 1): DataResult<List<Card>>
     suspend fun getSetVideos(setCode: String, setName: String): DataResult<List<DraftVideo>>
     suspend fun resolveCardId(cardName: String, setCode: String): DataResult<String>
+    suspend fun getCardByName(name: String, setCode: String): DataResult<Card>
 }

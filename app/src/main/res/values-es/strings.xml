@@ -725,5 +725,8 @@
     <string name="draft_no_sets">No se encontraron colecciones drafteables</string>
     <string name="draft_loading_sets">Cargando colecciones…</string>
     <string name="draft_retry">Reintentar</string>
+    <string name="draft_cards_all">Todas las Cartas</string>
+    <string name="draft_guide_videos">Vídeos</string>
+    <string name="draft_card_artist">Artista: %1$s</string>
 
 </resources>
