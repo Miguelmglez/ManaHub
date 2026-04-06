@@ -1,0 +1,147 @@
+{
+  "set_code": "blb",
+  "set_name": "Bloomburrow",
+  "last_updated": "2024-08-15",
+  "overview": "Bloomburrow is a charming creature-centric set where all creatures are animals. The format is synergy-driven with strong tribal themes. Each color pair has a distinct animal type identity, and the key mechanic Offspring allows creatures to create token copies. The format is relatively fast with excellent aggro options but rewards well-built synergy decks.",
+  "mechanics": [
+    {
+      "name": "Offspring",
+      "description": "When you cast a creature with Offspring, you may pay an additional cost to create a 1/1 token copy of it.",
+      "draft_tip": "Offspring is excellent value. The token copy keeps all abilities, making creatures with strong ETB effects or keyword abilities premium Offspring targets."
+    },
+    {
+      "name": "Valiant",
+      "description": "Valiant triggers whenever the creature becomes the target of a spell or ability you control for the first time each turn.",
+      "draft_tip": "Valiant rewards combat tricks and targeted effects. Draft cheap targeting spells like equipment and auras to trigger Valiant repeatedly."
+    },
+    {
+      "name": "Forage",
+      "description": "To Forage, you exile three cards from your graveyard or sacrifice a Food token.",
+      "draft_tip": "Forage needs graveyard fuel. Self-mill and card draw help keep your graveyard stocked. Food tokens provide an alternative cost."
+    },
+    {
+      "name": "Expend",
+      "description": "Expend triggers when you spend a certain total amount of mana during your turn (Expend 4, 6, or 8).",
+      "draft_tip": "Expend rewards ramping and casting multiple spells. Higher Expend thresholds need careful mana planning — don't try to hit Expend 8 without ramp."
+    },
+    {
+      "name": "Gift",
+      "description": "Some spells let you give an opponent a gift (usually a token or card). If you do, the spell has an enhanced effect.",
+      "draft_tip": "The gifted benefit to your opponent is usually minor compared to what you get. Most Gift cards are worth using with the gift option."
+    }
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Birds Flyers",
+      "tier": "A",
+      "description": "White-Blue focuses on Bird creatures and flying synergies to dominate the air.",
+      "key_commons": ["Skyward Splash", "Stormchaser's Talent", "Plumecreed Mentor"],
+      "key_uncommons": ["Astral Wingspan", "Dazzling Denial"],
+      "strategy": "Draft flyers aggressively. Use tempo spells to protect your attackers and outrace ground-based strategies."
+    },
+    {
+      "colors": "UB",
+      "name": "Rats Sacrifice",
+      "tier": "B",
+      "description": "Blue-Black uses Rat tribal with sacrifice and recursion themes.",
+      "key_commons": ["Nocturnal Hunger", "Starscape Cleric", "Daggerfang Duo"],
+      "key_uncommons": ["Wick's Patrol", "Brazen Collector"],
+      "strategy": "Generate Rat tokens and sacrifice them for value. Use recursion to grind and removal to control the board."
+    },
+    {
+      "colors": "BR",
+      "name": "Lizards Aggro",
+      "tier": "S",
+      "description": "Black-Red Lizards is the premier aggressive archetype with excellent low-curve creatures and burn.",
+      "key_commons": ["Torch the Tower", "Fireglass Mentor", "Might of the Meek"],
+      "key_uncommons": ["Screaming Nemesis", "Lizard Blades"],
+      "strategy": "Curve out with aggressive Lizard creatures. Use burn and removal to clear blockers and close games by turn 6-7."
+    },
+    {
+      "colors": "RG",
+      "name": "Raccoons Expend",
+      "tier": "A",
+      "description": "Red-Green Raccoons use the Expend mechanic to get value from spending mana on multiple spells.",
+      "key_commons": ["Rockface Village", "Wandertale Mentor", "Territorial Aerie"],
+      "key_uncommons": ["Muerra, Trash Tactician", "Harnesser of Storms"],
+      "strategy": "Ramp early, then chain spells together to hit Expend thresholds. Raccoon payoffs reward you for casting multiple spells per turn."
+    },
+    {
+      "colors": "GW",
+      "name": "Rabbits Go-Wide",
+      "tier": "A",
+      "description": "Green-White Rabbits goes wide with token generation and anthem effects.",
+      "key_commons": ["Carrot Cake", "Valley Questcaller", "Bushy Bodyguard"],
+      "key_uncommons": ["Warren Elder", "Finneas, Ace Archer"],
+      "strategy": "Generate Rabbit tokens through Offspring and token makers. Use anthem effects to pump your team and overwhelm opponents."
+    },
+    {
+      "colors": "WB",
+      "name": "Bats Lifegain",
+      "tier": "B",
+      "description": "White-Black Bats combines flying pressure with lifegain synergies.",
+      "key_commons": ["Nocturnal Hunger", "Starscape Cleric", "Plumecreed Mentor"],
+      "key_uncommons": ["Zoraline, Cosmos Caller", "Bat Colony"],
+      "strategy": "Use Bat tokens and lifegain to stabilize while building aerial pressure. Lifegain payoffs provide extra value."
+    },
+    {
+      "colors": "UR",
+      "name": "Otters Spells",
+      "tier": "B",
+      "description": "Blue-Red Otters rewards casting noncreature spells with prowess-like triggers.",
+      "key_commons": ["Stormchaser's Talent", "Torch the Tower", "Skyward Splash"],
+      "key_uncommons": ["Festival of Embers", "Stormcatch Mentor"],
+      "strategy": "Draft a mix of efficient creatures and cheap spells. Chain spells together for maximum trigger value."
+    },
+    {
+      "colors": "BG",
+      "name": "Squirrels Forage",
+      "tier": "B",
+      "description": "Black-Green Squirrels use Forage to generate value from the graveyard.",
+      "key_commons": ["Nocturnal Hunger", "Carrot Cake", "Bushy Bodyguard"],
+      "key_uncommons": ["Vinereap Mentor", "Calamitous Tide"],
+      "strategy": "Fill your graveyard through trading and self-mill. Use Forage to convert graveyard resources into board advantage."
+    },
+    {
+      "colors": "RW",
+      "name": "Mice Valiant",
+      "tier": "A",
+      "description": "Red-White Mice uses Valiant triggers with combat tricks for explosive turns.",
+      "key_commons": ["Might of the Meek", "Valley Questcaller", "Fireglass Mentor"],
+      "key_uncommons": ["Heartfire Hero", "Mabel, Heir to Cragflame"],
+      "strategy": "Draft cheap Mice with Valiant and plenty of targeting effects. Combat tricks do double duty — triggering Valiant and winning combat."
+    },
+    {
+      "colors": "GU",
+      "name": "Frogs Ramp",
+      "tier": "C",
+      "description": "Green-Blue Frogs ramps into large threats and uses card advantage to outvalue opponents.",
+      "key_commons": ["Carrot Cake", "Stormchaser's Talent", "Wandertale Mentor"],
+      "key_uncommons": ["Tempest Angler", "Shore Up"],
+      "strategy": "Ramp into expensive threats while using card draw to maintain resources. Frogs reward patience and bigger mana."
+    }
+  ],
+  "top_commons": {
+    "W": ["Carrot Cake", "Valley Questcaller", "Plumecreed Mentor"],
+    "U": ["Stormchaser's Talent", "Skyward Splash", "Starscape Cleric"],
+    "B": ["Nocturnal Hunger", "Daggerfang Duo", "Fell"],
+    "R": ["Torch the Tower", "Fireglass Mentor", "Might of the Meek"],
+    "G": ["Bushy Bodyguard", "Wandertale Mentor", "Territorial Aerie"]
+  },
+  "top_uncommons": {
+    "W": ["Warren Elder", "Finneas, Ace Archer"],
+    "U": ["Dazzling Denial", "Shore Up"],
+    "B": ["Wick's Patrol", "Brazen Collector"],
+    "R": ["Screaming Nemesis", "Harnesser of Storms"],
+    "G": ["Vinereap Mentor", "Tempest Angler"]
+  },
+  "general_tips": [
+    "Offspring is the best mechanic in the set — creatures with strong Offspring abilities should be drafted highly.",
+    "The format is faster than average. Have a plan for the first four turns or you'll fall behind.",
+    "Carrot Cake is one of the best commons in the set — it provides Food, card filtering, and a body.",
+    "Tribal synergies are important but don't force a tribe. Good cards are better than on-tribe mediocre cards.",
+    "Combat tricks are better than usual due to Valiant — they trigger abilities and win combat.",
+    "Food tokens are valuable both for lifegain and as Forage fuel. Don't sacrifice them casually."
+  ]
+}

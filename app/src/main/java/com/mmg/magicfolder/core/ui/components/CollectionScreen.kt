@@ -21,7 +21,7 @@ import com.mmg.magicfolder.feature.collection.CollectionViewModel
 import com.mmg.magicfolder.feature.collection.ColorFilter
 import com.mmg.magicfolder.feature.collection.SortOrder
 import com.mmg.magicfolder.feature.collection.ViewMode
-import com.mmg.magicfolder.core.domain.model.UserCardWithCard
+import com.mmg.magicfolder.feature.collection.CollectionCardGroup
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +71,9 @@ fun CollectionScreen(
             )
 
             // Card count
+            val totalCopies = uiState.cards.sumOf { it.totalQuantity }
             Text(
-                text     = "${uiState.cards.size} cards",
+                text     = "${uiState.cards.size} unique · $totalCopies copies",
                 style    = MaterialTheme.typography.labelSmall,
                 color    = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -101,7 +102,6 @@ fun CollectionScreen(
                 ViewMode.LIST -> CardList(
                     cards       = uiState.cards,
                     onCardClick = onCardClick,
-                    onDelete    = viewModel::onDeleteCard,
                 )
             }
         }
@@ -211,7 +211,7 @@ private fun ColorFilterRow(
 
 @Composable
 private fun CardGrid(
-    cards:       List<UserCardWithCard>,
+    cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
 ) {
     LazyVerticalGrid(
@@ -220,7 +220,7 @@ private fun CardGrid(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(cards, key = { it.userCard.id }) { item ->
+        items(cards, key = { it.card.scryfallId }) { item ->
             CardGridItem(item = item, onClick = { onCardClick(item.card.scryfallId) })
         }
     }
@@ -228,19 +228,17 @@ private fun CardGrid(
 
 @Composable
 private fun CardList(
-    cards:       List<UserCardWithCard>,
+    cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
-    onDelete:    (Long) -> Unit,
 ) {
     androidx.compose.foundation.lazy.LazyColumn(
         contentPadding      = PaddingValues(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        items(cards, key = { it.userCard.id }) { item ->
+        items(cards, key = { it.card.scryfallId }) { item ->
             CardListItem(
-                item      = item,
-                onClick   = { onCardClick(item.card.scryfallId) },
-                onDelete  = { onDelete(item.userCard.id) },
+                item    = item,
+                onClick = { onCardClick(item.card.scryfallId) },
             )
             HorizontalDivider(thickness = 0.5.dp)
         }

@@ -7,6 +7,7 @@ import com.mmg.magicfolder.core.data.local.mapper.toDomainDeckWithCards
 import com.mmg.magicfolder.core.data.local.mapper.toEntity
 import com.mmg.magicfolder.core.domain.model.Deck
 import com.mmg.magicfolder.core.domain.model.DeckWithCards
+import com.mmg.magicfolder.core.domain.repository.CardRepository
 import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,7 +15,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class DeckRepositoryImpl @Inject constructor(private val deckDao: DeckDao) : DeckRepository {
+class DeckRepositoryImpl @Inject constructor(
+    private val deckDao: DeckDao,
+    private val cardRepository: CardRepository,
+) : DeckRepository {
 
     override fun observeAllDecks(): Flow<List<Deck>> =
         deckDao.observeAllDecks().map { it.map { d -> d.toDomainDeck() } }
@@ -28,7 +32,11 @@ class DeckRepositoryImpl @Inject constructor(private val deckDao: DeckDao) : Dec
 
     override suspend fun addCardToDeck(
         deckId: Long, scryfallId: String, quantity: Int, isSideboard: Boolean,
-    ) = deckDao.upsertDeckCard(DeckCardCrossRef(deckId, scryfallId, quantity, isSideboard))
+    ) {
+        // Ensure the card exists in the local 'cards' table to satisfy Foreign Key constraints
+        cardRepository.getCardById(scryfallId)
+        deckDao.upsertDeckCard(DeckCardCrossRef(deckId, scryfallId, quantity, isSideboard))
+    }
 
     override suspend fun removeCardFromDeck(
         deckId: Long, scryfallId: String, isSideboard: Boolean,

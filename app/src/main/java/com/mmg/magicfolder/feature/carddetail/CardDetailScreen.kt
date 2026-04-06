@@ -36,7 +36,8 @@ import com.mmg.magicfolder.core.util.PriceFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardDetailScreen(
-    onBack:    () -> Unit,
+    onBack:               () -> Unit,
+    onNavigateToAddCard:  () -> Unit,
     viewModel: CardDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,18 +64,10 @@ fun CardDetailScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    uiState.userCard?.let {
-                        IconButton(onClick = viewModel::onShowEditDialog) {
-                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit))
-                        }
-                        IconButton(onClick = viewModel::onShowDeleteConfirm) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete),
-                                tint = MaterialTheme.colorScheme.error)
-                        }
-                    }
                 }
             }
-        },
+        }
+
     ) { padding ->
         when {
             uiState.isLoading -> Box(
@@ -83,13 +76,16 @@ fun CardDetailScreen(
             ) { CircularProgressIndicator() }
 
             uiState.card != null -> CardDetailContent(
-                card          = uiState.card!!,
-                userCard      = uiState.userCard,
-                isStale       = uiState.isStale,
-                onAddTag      = viewModel::onAddTag,
-                onRemoveTag   = viewModel::onRemoveTag,
-                onShowTagPicker = viewModel::onShowTagPicker,
-                modifier      = Modifier.padding(padding),
+                card             = uiState.card!!,
+                userCards        = uiState.userCards,
+                isStale          = uiState.isStale,
+                onAddTag         = viewModel::onAddTag,
+                onRemoveTag      = viewModel::onRemoveTag,
+                onShowTagPicker  = viewModel::onShowTagPicker,
+                onShowAddSheet   = viewModel::onShowAddSheet,
+                onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
+                onRequestDelete  = viewModel::onRequestDelete,
+                modifier         = Modifier.padding(padding),
             )
         }
     }
@@ -104,31 +100,34 @@ fun CardDetailScreen(
         )
     }
 
-    // Edit bottom sheet
-    if (uiState.showEditDialog) {
-        uiState.userCard?.let { uc ->
-            EditCardSheet(
-                userCard       = uc,
-                onDismiss      = viewModel::onDismissEditDialog,
-                onUpdateQty    = { viewModel.onUpdateQuantity(uc.id, it) },
-                onUpdateCond   = { viewModel.onUpdateCondition(uc, it) },
+    // Add to collection sheet
+    if (uiState.showAddSheet) {
+        uiState.card?.let { card ->
+            AddToCollectionSheet(
+                cardName  = card.name,
+                onConfirm = { isFoil, isAltArt, condition, language, qty ->
+                    viewModel.onAddToCollection(isFoil, isAltArt, condition, language, qty)
+                },
+                onDismiss = viewModel::onDismissAddSheet,
             )
         }
     }
 
     // Delete confirmation
-    if (uiState.showDeleteConfirm) {
+    uiState.cardToDelete?.let { uc ->
         AlertDialog(
             onDismissRequest = viewModel::onDismissDeleteConfirm,
-            title   = { Text(stringResource(R.string.carddetail_delete_title)) },
-            text    = { Text(stringResource(R.string.carddetail_delete_message, uiState.card?.name ?: "")) },
+            title   = { Text(stringResource(R.string.carddetail_delete_copy_title)) },
+            text    = { Text(stringResource(R.string.carddetail_delete_copy_message)) },
             confirmButton = {
-                TextButton(onClick = { viewModel.onDeleteCard(uiState.userCard!!.id) }) {
+                TextButton(onClick = { viewModel.onDeleteCard(uc.id) }) {
                     Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::onDismissDeleteConfirm) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = viewModel::onDismissDeleteConfirm) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             },
         )
     }
@@ -136,13 +135,16 @@ fun CardDetailScreen(
 
 @Composable
 private fun CardDetailContent(
-    card:            Card,
-    userCard:        UserCard?,
-    isStale:         Boolean,
-    onAddTag:        (CardTag) -> Unit,
-    onRemoveTag:     (CardTag) -> Unit,
-    onShowTagPicker: () -> Unit,
-    modifier:        Modifier = Modifier,
+    card:             Card,
+    userCards:        List<UserCard>,
+    isStale:          Boolean,
+    onAddTag:         (CardTag) -> Unit,
+    onRemoveTag:      (CardTag) -> Unit,
+    onShowTagPicker:  () -> Unit,
+    onShowAddSheet:   () -> Unit,
+    onUpdateQuantity: (Long, Int) -> Unit,
+    onRequestDelete:  (UserCard) -> Unit,
+    modifier:         Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
     var showBackFace by remember { mutableStateOf(false) }
@@ -176,7 +178,6 @@ private fun CardDetailContent(
                     ),
             )
 
-            // DFC flip hint
             if (card.imageBackNormal != null) {
                 Surface(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
@@ -203,7 +204,6 @@ private fun CardDetailContent(
                 size    = 20.dp,
             )
             Text(card.name, style = MaterialTheme.typography.headlineSmall)
-            if (userCard?.isFoil == true) FoilBadge()
             if (isStale) StaleBadge()
         }
 
@@ -257,14 +257,19 @@ private fun CardDetailContent(
         HorizontalDivider()
 
         // Prices
-        PriceSection(card = card, userCard = userCard)
+        PriceSection(card = card)
 
         HorizontalDivider()
 
-        // Collection info
-        userCard?.let { uc ->
-            CollectionInfoSection(userCard = uc)
-        }
+        // Collection section: copies list + add button
+        CollectionSection(
+            userCards        = userCards,
+            onShowAddSheet   = onShowAddSheet,
+            onUpdateQuantity = onUpdateQuantity,
+            onRequestDelete  = onRequestDelete,
+        )
+
+        HorizontalDivider()
 
         // Legalities
         LegalitySection(card = card)
@@ -284,17 +289,301 @@ private fun CardDetailContent(
             Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.carddetail_view_scryfall))
         }
+
+        // Extra bottom padding for FAB
+        Spacer(Modifier.height(72.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Collection section: add button + list of existing copies
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CollectionSection(
+    userCards:        List<UserCard>,
+    onShowAddSheet:   () -> Unit,
+    onUpdateQuantity: (Long, Int) -> Unit,
+    onRequestDelete:  (UserCard) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                stringResource(R.string.carddetail_in_collection),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            OutlinedButton(
+                onClick  = onShowAddSheet,
+                modifier = Modifier.height(32.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.carddetail_add_copy), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
+        if (userCards.isEmpty()) {
+            Text(
+                text  = stringResource(R.string.carddetail_no_copies),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            userCards.forEach { uc ->
+                CollectionCopyRow(
+                    userCard         = uc,
+                    onUpdateQuantity = onUpdateQuantity,
+                    onRequestDelete  = onRequestDelete,
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun PriceSection(card: Card, userCard: UserCard?) {
+private fun CollectionCopyRow(
+    userCard:         UserCard,
+    onUpdateQuantity: (Long, Int) -> Unit,
+    onRequestDelete:  (UserCard) -> Unit,
+) {
+    Surface(
+        color  = MaterialTheme.colorScheme.surfaceVariant,
+        shape  = MaterialTheme.shapes.small,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            // Badges row
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                CopyBadge(label = userCard.language.uppercase())
+                CopyBadge(label = userCard.condition)
+                if (userCard.isFoil) FoilBadge()
+                if (userCard.isAlternativeArt) {
+                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
+                }
+            }
+
+            // Quantity stepper + delete
+            Row(
+                modifier          = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.carddetail_quantity_label),
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick  = { onUpdateQuantity(userCard.id, userCard.quantity - 1) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = stringResource(R.string.action_remove),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Text(
+                    text  = "${userCard.quantity}",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                IconButton(
+                    onClick  = { onUpdateQuantity(userCard.id, userCard.quantity + 1) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.action_add),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                IconButton(
+                    onClick  = { onRequestDelete(userCard) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.action_delete),
+                        tint     = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CopyBadge(label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.extraSmall,
+    ) {
+        Text(
+            text     = label,
+            style    = MaterialTheme.typography.labelSmall,
+            color    = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Add to collection bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddToCollectionSheet(
+    cardName:  String,
+    onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
+    val languages  = listOf("en", "es", "de", "fr", "it", "pt", "ja", "ko", "ru")
+
+    var isFoil           by remember { mutableStateOf(false) }
+    var isAlternativeArt by remember { mutableStateOf(false) }
+    var condition        by remember { mutableStateOf("NM") }
+    var language         by remember { mutableStateOf("en") }
+    var qty              by remember { mutableIntStateOf(1) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text  = stringResource(R.string.carddetail_add_copy),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text  = cardName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // Foil toggle
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.addcard_confirm_foil),
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(checked = isFoil, onCheckedChange = { isFoil = it })
+            }
+
+            // Alternative art toggle
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.carddetail_alternative_art),
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(checked = isAlternativeArt, onCheckedChange = { isAlternativeArt = it })
+            }
+
+            // Quantity stepper
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.addcard_confirm_quantity),
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                IconButton(onClick = { if (qty > 1) qty-- }) {
+                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove))
+                }
+                Text("$qty", style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = { qty++ }) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
+                }
+            }
+
+            // Condition chips
+            Text(stringResource(R.string.addcard_confirm_condition), style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                conditions.forEach { c ->
+                    FilterChip(
+                        selected = c == condition,
+                        onClick  = { condition = c },
+                        label    = { Text(c) },
+                    )
+                }
+            }
+
+            // Language dropdown
+            var langExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded        = langExpanded,
+                onExpandedChange = { langExpanded = it },
+            ) {
+                OutlinedTextField(
+                    value         = language.uppercase(),
+                    onValueChange = {},
+                    readOnly      = true,
+                    label         = {
+                        Text(stringResource(R.string.addcard_confirm_language),
+                            style = MaterialTheme.typography.labelLarge)
+                    },
+                    trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
+                    modifier      = Modifier.menuAnchor().fillMaxWidth(),
+                )
+                ExposedDropdownMenu(
+                    expanded          = langExpanded,
+                    onDismissRequest  = { langExpanded = false },
+                ) {
+                    languages.forEach { lang ->
+                        DropdownMenuItem(
+                            text    = { Text(lang.uppercase()) },
+                            onClick = { language = lang; langExpanded = false },
+                        )
+                    }
+                }
+            }
+
+            // Confirm / Cancel
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                Button(onClick = { onConfirm(isFoil, isAlternativeArt, condition, language, qty) }) {
+                    Text(stringResource(R.string.action_add))
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun PriceSection(card: Card) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.carddetail_market_prices), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            PricePill(label = stringResource(R.string.carddetail_price_foil_eur),price = card.priceEurFoil, currency = "€")
-            PricePill(label = stringResource(R.string.carddetail_price_foil_usd),price = card.priceUsdFoil, currency = "$")
-            PricePill(label = stringResource(R.string.carddetail_price_eur),price = card.priceEur, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_foil_eur), price = card.priceEurFoil, currency = "€")
+            PricePill(label = stringResource(R.string.carddetail_price_foil_usd), price = card.priceUsdFoil, currency = "$")
+            PricePill(label = stringResource(R.string.carddetail_price_eur), price = card.priceEur, currency = "€")
             PricePill(label = stringResource(R.string.carddetail_price_usd), price = card.priceUsd, currency = "$")
         }
     }
@@ -310,27 +599,6 @@ private fun PricePill(label: String, price: Double?, currency: String) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.tertiary,
         )
-    }
-}
-
-@Composable
-private fun CollectionInfoSection(userCard: UserCard) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(stringResource(R.string.carddetail_in_collection), style = MaterialTheme.typography.titleSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            InfoPill(label = stringResource(R.string.carddetail_quantity_label),  value = "×${userCard.quantity}")
-            InfoPill(label = stringResource(R.string.carddetail_condition), value = userCard.condition)
-            InfoPill(label = stringResource(R.string.carddetail_language),  value = userCard.language.uppercase())
-        }
-    }
-}
-
-@Composable
-private fun InfoPill(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -376,7 +644,7 @@ private fun LegalityChip(format: String, legality: String) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Tags section (expandable) in CardDetailContent
+//  Tags section
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -388,7 +656,6 @@ private fun TagsSection(
     var expanded by remember { mutableStateOf(true) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Header row
         Row(
             modifier          = Modifier
                 .fillMaxWidth()
@@ -414,15 +681,14 @@ private fun TagsSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                // Wrap chips using a simple flow-like column of rows
                 tags.chunked(3).forEach { rowTags ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         rowTags.forEach { tag ->
                             InputChip(
-                                selected        = true,
-                                onClick         = { onRemoveTag(tag) },
-                                label           = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
-                                trailingIcon    = {
+                                selected     = true,
+                                onClick      = { onRemoveTag(tag) },
+                                label        = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                                trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Quitar ${tag.label}",
@@ -505,72 +771,6 @@ private fun TagPickerSheet(
                     }
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditCardSheet(
-    userCard:     UserCard,
-    onDismiss:    () -> Unit,
-    onUpdateQty:  (Int) -> Unit,
-    onUpdateCond: (String) -> Unit,
-) {
-    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    var qty by remember { mutableIntStateOf(userCard.quantity) }
-    var cond by remember { mutableStateOf(userCard.condition) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        contentWindowInsets = { WindowInsets(0) }
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.carddetail_edit_title), style = MaterialTheme.typography.titleMedium)
-
-            // Quantity stepper
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(stringResource(R.string.carddetail_quantity_label), style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove))
-                }
-                Text("$qty", style = MaterialTheme.typography.titleMedium)
-                IconButton(onClick = { qty++ }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
-                }
-            }
-
-            // Condition selector
-            Text(stringResource(R.string.carddetail_condition), style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditions.forEach { c ->
-                    FilterChip(
-                        selected = c == cond,
-                        onClick  = { cond = c },
-                        label    = { Text(c) },
-                    )
-                }
-            }
-
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                Button(onClick = {
-                    onUpdateQty(qty)
-                    onUpdateCond(cond)
-                    onDismiss()
-                }) { Text(stringResource(R.string.action_save)) }
-            }
-            Spacer(Modifier.height(16.dp))
         }
     }
 }

@@ -87,7 +87,7 @@ class ScannerViewModel @Inject constructor(
         quantity:   Int,
     ) {
         viewModelScope.launch {
-            when (val result = addToCollection(scryfallId, isFoil, condition, language, quantity)) {
+            when (val result = addToCollection(scryfallId = scryfallId, isFoil = isFoil, condition = condition, language = language, quantity = quantity)) {
                 is DataResult.Success -> _uiState.update {
                     it.copy(
                         showConfirmSheet  = false,

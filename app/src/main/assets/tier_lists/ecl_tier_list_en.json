@@ -1,0 +1,65 @@
+{
+  "set_code": "ecl",
+  "set_name": "Lorwyn Eclipsed",
+  "last_updated": "2026-04-06",
+  "tiers": [
+    {
+      "tier": "S",
+      "label": "Bombs / Must Pick",
+      "description": "The best cards in the format. These win games on their own.",
+      "cards": [
+        {"name": "Trystan's Command", "color": "BG", "rarity": "rare", "reason": "Extremely flexible and powerful graveyard/board interaction."},
+        {"name": "Ashling's Command", "color": "UR", "rarity": "rare", "reason": "Massive tempo swing with removal and card advantage modes."},
+        {"name": "Champions of the Perfect", "color": "G", "rarity": "rare", "reason": "The best 'Behold' payoff; provides an insurmountable board presence."},
+        {"name": "Gloom Ripper", "color": "B", "rarity": "rare", "reason": "Recursive threat that dominates combat and scales with the graveyard."},
+        {"name": "Aurora Awakener", "color": "G", "rarity": "rare", "reason": "Massive stats and game-ending potential if not answered immediately."}
+      ]
+    },
+    {
+      "tier": "A",
+      "label": "Premium / Strong Pick",
+      "description": "High-power rares and the best uncommons that pull you into a color.",
+      "cards": [
+        {"name": "Champions of the Shoal", "color": "U", "rarity": "rare", "reason": "Elite card draw and board management for Blue decks."},
+        {"name": "Brigid, Clachan's Heart", "color": "W", "rarity": "rare", "reason": "A powerhouse in GW Kithkin, providing protection and aggression."},
+        {"name": "Sygg, Wanderwine Wisdom", "color": "U", "rarity": "rare", "reason": "Key engine for Merfolk decks that protects your board."},
+        {"name": "Curious Colossus", "color": "W", "rarity": "rare", "reason": "A board-altering flyer that rewards wide board states."},
+        {"name": "Kinbinding", "color": "W", "rarity": "rare", "reason": "Premium removal that leverages the typal synergies of the set."}
+      ]
+    },
+    {
+      "tier": "B",
+      "label": "Good Playables",
+      "description": "Solid cards that reward you for drafting their specific archetype.",
+      "cards": [
+        {"name": "Rimekin Recluse", "color": "U", "rarity": "uncommon", "reason": "A 3/2 Man-o'-War on an absurd rate; premium tempo piece."},
+        {"name": "Eclipsed Elf", "color": "BG", "rarity": "uncommon", "reason": "Premier payoff for Elves that digs for your best cards."},
+        {"name": "Eclipsed Merrow", "color": "WU", "rarity": "uncommon", "reason": "Essential for Merfolk consistency and board presence."},
+        {"name": "Morcant's Eyes", "color": "BG", "rarity": "uncommon", "reason": "Strong recursion engine for the Elf archetype."},
+        {"name": "Sear", "color": "R", "rarity": "uncommon", "reason": "Efficient red removal that handles most threats in the format."}
+      ]
+    },
+    {
+      "tier": "C",
+      "label": "Filler / Decent",
+      "description": "Standard cards to round out your 23 playables.",
+      "cards": [
+        {"name": "Temporal Cleansing", "color": "U", "rarity": "common", "reason": "Solid interactive spell that gets better with Convoke."},
+        {"name": "Blight Rot", "color": "B", "rarity": "common", "reason": "Efficient removal that enables -1/-1 counter synergies."},
+        {"name": "Gangly Stompling", "color": "G", "rarity": "common", "reason": "Versatile changeling that fills slots in any typal or vivid deck."},
+        {"name": "Cinder Strike", "color": "R", "rarity": "common", "reason": "Basic removal that supports the Blight mechanic."}
+      ]
+    },
+    {
+      "tier": "D",
+      "label": "Sideboard / Avoid",
+      "description": "Highly situational cards or those with power levels too low for main deck play.",
+      "cards": [
+        {"name": "Mornsong Aria", "color": "B", "rarity": "common", "reason": "Too slow and low impact for the current format pace."},
+        {"name": "Perfect Intimidation", "color": "G", "rarity": "uncommon", "reason": "Extremely narrow; only useful in very specific board stalls."},
+        {"name": "Mirrormind Crown", "color": "C", "rarity": "rare", "reason": "Requires too much setup to be a reliable value piece."},
+        {"name": "Prismatic Undercurrents", "color": "U", "rarity": "rare", "reason": "The rate is too poor for a rare slot in limited."}
+      ]
+    }
+  ]
+}

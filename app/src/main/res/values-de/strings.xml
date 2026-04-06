@@ -240,6 +240,14 @@
     <string name="deckbuilder_setup_commander_label">Anführer wählen</string>
     <string name="deckbuilder_setup_build_button">Deck bauen</string>
     <string name="deckbuilder_search_commander_hint">Legendäre Kreatur suchen…</string>
+    <string name="deckbuilder_basic_lands">Basisländer</string>
+    <string name="deckbuilder_copy_warning">Überschreitet das %1$d-Kopien-Limit</string>
+    <string name="deckbuilder_copy_warning_ack">Ich bestätige, dass diese Karte mehr Kopien erlaubt</string>
+    <string name="deckbuilder_add_cards">Karten hinzufügen</string>
+    <string name="deckbuilder_add_cards_search_hint">Karten suchen…</string>
+    <string name="deckbuilder_add_cards_done">Fertig</string>
+    <string name="deckbuilder_deck_empty">Dieses Deck ist leer</string>
+    <string name="deckbuilder_max_copies_reached">Maximale Kopien erreicht</string>
 
     <!-- GAME SETUP SCREEN -->
     <string name="gamesetup_title">Neues Spiel</string>
@@ -688,5 +696,46 @@
     <string name="pref_currency_eur">EUR (€)</string>
     <string name="pref_news_language_at_least_one">Mindestens eine Nachrichtensprache muss ausgewählt sein</string>
     <string name="pref_app_language_restart">Die App-Sprache wird geändert. Ein Neustart kann erforderlich sein.</string>
+
+    <!-- ══════════════════════════════════════════
+         DRAFT SECTION
+    ═══════════════════════════════════════════ -->
+    <string name="draft_title">Draft</string>
+    <string name="draft_search_hint">Sets suchen…</string>
+    <string name="draft_released">Veröffentlicht %1$s</string>
+    <string name="draft_cards_count">%1$d Karten</string>
+    <string name="draft_tab_guide">Leitfaden</string>
+    <string name="draft_tab_tier_list">Tier-Liste</string>
+    <string name="draft_tab_cards">Karten</string>
+    <string name="draft_tab_videos">Videos</string>
+    <string name="draft_guide_overview">Überblick</string>
+    <string name="draft_guide_mechanics">Mechaniken</string>
+    <string name="draft_guide_archetypes">Archetypen</string>
+    <string name="draft_guide_top_commons">Top Commons</string>
+    <string name="draft_guide_top_uncommons">Top Uncommons</string>
+    <string name="draft_guide_tips">Allgemeine Tipps</string>
+    <string name="draft_guide_not_available">Der Leitfaden ist für dieses Set noch nicht verfügbar</string>
+    <string name="draft_tier_list_not_available">Die Tier-Liste ist für dieses Set noch nicht verfügbar</string>
+    <string name="draft_tier_updated">Zuletzt aktualisiert: %1$s</string>
+    <string name="draft_filter_by_color">Nach Farbe filtern</string>
+    <string name="draft_filter_by_rarity">Nach Seltenheit filtern</string>
+    <string name="draft_sort_by">Sortieren nach</string>
+    <string name="draft_sort_price">Preis</string>
+    <string name="draft_sort_win_rate">Gewinnrate</string>
+    <string name="draft_sort_name">Name</string>
+    <string name="draft_sort_collector">Sammlernr.</string>
+    <string name="draft_win_rate_approx">≈%1$.1f%% GR</string>
+    <string name="draft_win_rate_disclaimer">Basierend auf KI-Analyse, Näherungswerte</string>
+    <string name="draft_videos_empty">Keine Videos für dieses Set gefunden</string>
+    <string name="draft_videos_error">Videos konnten nicht geladen werden</string>
+    <string name="draft_key_cards">Schlüsselkarten</string>
+    <string name="draft_strategy">Strategie</string>
+    <string name="draft_archetype_tier">Tier %1$s</string>
+    <string name="draft_no_sets">Keine draftbaren Sets gefunden</string>
+    <string name="draft_loading_sets">Sets werden geladen…</string>
+    <string name="draft_retry">Erneut versuchen</string>
+    <string name="draft_cards_all">Alle Karten</string>
+    <string name="draft_guide_videos">Videos</string>
+    <string name="draft_card_artist">Künstler: %1$s</string>
 
 </resources>

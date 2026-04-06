@@ -33,8 +33,8 @@ enum class DeckFormat(
         maxCopies         = 99,
         requiresCommander = false,
         uniqueCards       = false,
-    ),
-    MODERN(
+    );
+    /*MODERN(
         displayNameRes    = R.string.format_modern,
         targetDeckSize    = 60,
         targetLandCount   = 24,
@@ -73,7 +73,7 @@ enum class DeckFormat(
         maxCopies         = 4,
         requiresCommander = false,
         uniqueCards       = false,
-    );
+    );*/
 
     val nonLandSlots: Int get() = targetDeckSize - targetLandCount
 }

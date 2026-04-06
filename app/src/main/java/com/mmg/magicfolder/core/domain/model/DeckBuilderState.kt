@@ -46,7 +46,20 @@ data class DeckBuilderState(
     val isLoadingSuggestions: Boolean = false,
     val error: String? = null,
     val reviewGroupBy: ReviewGroupBy = ReviewGroupBy.TYPE,
+    val acknowledgedOverLimitCards: Set<String> = emptySet(),
 ) {
+    val overLimitCards: Set<String>
+        get() {
+            if (format.uniqueCards || format.maxCopies >= 99) return emptySet()
+            return mainboard
+                .filter { it.quantity > format.maxCopies }
+                .map { it.card.scryfallId }
+                .toSet()
+        }
+
+    val unacknowledgedOverLimitCards: Set<String>
+        get() = overLimitCards - acknowledgedOverLimitCards
+
     val nonLandCardCount: Int
         get() = mainboard.sumOf { it.quantity }
 

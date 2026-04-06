@@ -6,7 +6,10 @@ import retrofit2.http.*
 interface ScryfallApi {
 
     @GET("cards/named")
-    suspend fun getCardByName(@Query("fuzzy") name: String): CardDto
+    suspend fun getCardByName(
+        @Query("fuzzy") name: String,
+        @Query("set") set: String? = null,
+    ): CardDto
 
     @GET("cards/named")
     suspend fun getCardByExactName(@Query("exact") name: String): CardDto

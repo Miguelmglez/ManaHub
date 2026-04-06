@@ -1,5 +1,7 @@
 package com.mmg.magicfolder.app.navigation
 
+import android.net.Uri
+
 sealed class Screen(val route: String) {
 
     // ── Root ─────────────────────────────────────────────────────────────────
@@ -52,7 +54,17 @@ sealed class Screen(val route: String) {
     object News : Screen("news")
     object NewsSourcesSettings : Screen("news_sources_settings")
 
+    // ── Draft ─────────────────────────────────────────────────────────────────
+    object Draft : Screen("draft")
+    object DraftSetDetail : Screen("draft/{setCode}?setName={setName}&setIconUri={setIconUri}&setReleasedAt={setReleasedAt}") {
+        fun createRoute(
+            setCode: String,
+            setName: String,
+            setIconUri: String,
+            setReleasedAt: String,
+        ) = "draft/$setCode?setName=${Uri.encode(setName)}&setIconUri=${Uri.encode(setIconUri)}&setReleasedAt=${Uri.encode(setReleasedAt)}"
+    }
+
     // ── v2 stubs ─────────────────────────────────────────────────────────────
-    object Draft  : Screen("draft")
     object Puzzle : Screen("puzzle")
 }

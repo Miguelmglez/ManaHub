@@ -27,7 +27,6 @@ import com.mmg.magicfolder.feature.addcard.AdvancedSearchSheet
 import com.mmg.magicfolder.core.ui.components.CardGridItem
 import com.mmg.magicfolder.core.ui.components.CardListItem
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
-import com.mmg.magicfolder.core.domain.model.UserCardWithCard
 import com.mmg.magicfolder.core.ui.components.StaleWarningBanner
 import com.mmg.magicfolder.core.ui.theme.MagicColors
 import com.mmg.magicfolder.core.ui.theme.magicColors
@@ -60,7 +59,6 @@ fun CollectionScreen(
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
         onToggleFilter        = viewModel::toggleColorFilter,
-        onDeleteCard          = viewModel::onDeleteCard,
         onErrorDismissed      = viewModel::onErrorDismissed,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
     )
@@ -87,7 +85,6 @@ private fun CollectionContent(
     onSortChange:         (SortOrder) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
     onToggleFilter:       (ColorFilter) -> Unit,
-    onDeleteCard:         (Long) -> Unit,
     onErrorDismissed:     () -> Unit,
     onShowAdvancedSearch: () -> Unit,
 ) {
@@ -103,6 +100,11 @@ private fun CollectionContent(
                 currentSort      = uiState.sortOrder,
                 onScannerClick   = onScannerClick,
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onScannerClick) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.addcard_title))
+            }
         },
     ) { padding ->
         Column(
@@ -146,7 +148,6 @@ private fun CollectionContent(
                     onScannerClick        = onScannerClick,
                     onSearchQueryChange   = onSearchQueryChange,
                     onToggleFilter        = onToggleFilter,
-                    onDeleteCard          = onDeleteCard,
                     onShowAdvancedSearch  = onShowAdvancedSearch,
                 )
                 TAB_DECKS -> DeckListScreen(
@@ -174,7 +175,6 @@ private fun CardsTabContent(
     onScannerClick:       () -> Unit,
     onSearchQueryChange:  (String) -> Unit,
     onToggleFilter:       (ColorFilter) -> Unit,
-    onDeleteCard:         (Long) -> Unit,
     onShowAdvancedSearch: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -224,9 +224,10 @@ private fun CardsTabContent(
             onClear        = { onToggleFilter(ColorFilter.ALL) },
         )
 
-        // Card count
+        // Card count (unique cards; total copies shown in each item)
+        val totalCopies = uiState.cards.sumOf { it.totalQuantity }
         Text(
-            text     = "${uiState.cards.size} cards",
+            text     = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
             style    = MaterialTheme.magicTypography.labelSmall,
             color    = mc.textSecondary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -255,9 +256,9 @@ private fun CardsTabContent(
             ViewMode.LIST -> CardList(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
-                onDelete    = onDeleteCard,
             )
         }
+
     }
 }
 
@@ -288,13 +289,7 @@ private fun CollectionTopBar(
                 color    = mc.textPrimary,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onScannerClick) {
-                Icon(
-                    imageVector        = Icons.Default.QrCodeScanner,
-                    contentDescription = stringResource(R.string.action_search),
-                    tint               = mc.textSecondary
-                )
-            }
+
             IconButton(onClick = onViewModeToggle) {
                 Icon(
                     imageVector        = if (viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
@@ -464,7 +459,7 @@ private fun ActiveFiltersIndicator(
 
 @Composable
 private fun CardGrid(
-    cards:       List<UserCardWithCard>,
+    cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
 ) {
     LazyVerticalGrid(
@@ -473,9 +468,9 @@ private fun CardGrid(
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(cards, key = { _, item -> item.userCard.id }) { index, item ->
-            var visible by remember(item.userCard.id) { mutableStateOf(false) }
-            LaunchedEffect(item.userCard.id) { visible = true }
+        itemsIndexed(cards, key = { _, item -> item.card.scryfallId }) { index, item ->
+            var visible by remember(item.card.scryfallId) { mutableStateOf(false) }
+            LaunchedEffect(item.card.scryfallId) { visible = true }
             val delay = (index % 12) * 30
             AnimatedVisibility(
                 visible = visible,
@@ -490,19 +485,20 @@ private fun CardGrid(
 
 @Composable
 private fun CardList(
-    cards:       List<UserCardWithCard>,
+    cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
-    onDelete:    (Long) -> Unit,
 ) {
     androidx.compose.foundation.lazy.LazyColumn(
         contentPadding      = PaddingValues(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        items(cards, key = { it.userCard.id }) { item ->
+        items(
+            items = cards,
+            key   = { it.card.scryfallId },
+        ) { item ->
             CardListItem(
-                item     = item,
-                onClick  = { onCardClick(item.card.scryfallId) },
-                onDelete = { onDelete(item.userCard.id) },
+                item    = item,
+                onClick = { onCardClick(item.card.scryfallId) },
             )
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
         }
