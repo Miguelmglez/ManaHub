@@ -30,6 +30,8 @@ import com.mmg.magicfolder.core.ui.components.FoilBadge
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
 import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.components.StaleBadge
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
+import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
 import com.mmg.magicfolder.core.util.CardTypeTranslator
 import com.mmg.magicfolder.core.util.PriceFormatter
 
@@ -212,11 +214,19 @@ private fun CardDetailContent(
             card.manaCost?.let {
                 ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
-            Text(
-                CardTypeTranslator.translateTypeLine(card.printedTypeLine ?: card.typeLine),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (card.printedTypeLine.isNullOrEmpty()){
+                Text(
+                    text     = card.typeLine,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    text     = card.printedTypeLine,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         // Oracle text
@@ -225,13 +235,22 @@ private fun CardDetailContent(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         ) {
-            card.printedText?.let {
+            if (card.printedText.isNullOrEmpty()){
+                card.oracleText?.let {
+                    Text(
+                        text     = it,
+                        style    = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            } else {
                 Text(
-                    text     = it,
+                    text     = card.printedText,
                     style    = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(12.dp),
                 )
             }
+
         }
 
         // Flavor text
@@ -578,19 +597,26 @@ private fun AddToCollectionSheet(
 
 @Composable
 private fun PriceSection(card: Card) {
+    val preferredCurrency = LocalPreferredCurrency.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.carddetail_market_prices), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            PricePill(label = stringResource(R.string.carddetail_price_foil_eur), price = card.priceEurFoil, currency = "€")
-            PricePill(label = stringResource(R.string.carddetail_price_foil_usd), price = card.priceUsdFoil, currency = "$")
-            PricePill(label = stringResource(R.string.carddetail_price_eur), price = card.priceEur, currency = "€")
-            PricePill(label = stringResource(R.string.carddetail_price_usd), price = card.priceUsd, currency = "$")
+            PricePill(
+                label = stringResource(R.string.carddetail_price_foil),
+                price = if (preferredCurrency == PreferredCurrency.EUR) card.priceEurFoil else card.priceUsdFoil,
+                currency = preferredCurrency
+            )
+            PricePill(
+                label = stringResource(R.string.carddetail_price_normal),
+                price = if (preferredCurrency == PreferredCurrency.EUR) card.priceEur else card.priceUsd,
+                currency = preferredCurrency
+            )
         }
     }
 }
 
 @Composable
-private fun PricePill(label: String, price: Double?, currency: String) {
+private fun PricePill(label: String, price: Double?, currency: PreferredCurrency) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)

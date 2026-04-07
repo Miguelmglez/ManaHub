@@ -107,7 +107,12 @@ class ProfileViewModel @Inject constructor(
 
 
         // ── Collection stats ──────────────────────────────────────────────────
-        statsRepo.observeCollectionStats()
+        userPreferencesDataStore.preferencesFlow
+            .map { it.preferredCurrency }
+            .distinctUntilChanged()
+            .flatMapLatest { currency ->
+                statsRepo.observeCollectionStats(currency)
+            }
             .onEach { stats ->
                 _uiState.update {
                     it.copy(
@@ -223,10 +228,10 @@ class ProfileViewModel @Inject constructor(
 
         // ── Derived: achievements ─────────────────────────────────────────────
         _uiState
-            .map { s -> buildAchievementStats(s) }
+            .map { s -> s.preferredCurrency to buildAchievementStats(s) }
             .distinctUntilChanged()
-            .onEach { stats ->
-                _uiState.update { it.copy(achievements = checkAchievementsUseCase(stats)) }
+            .onEach { (currency, stats) ->
+                _uiState.update { it.copy(achievements = checkAchievementsUseCase(stats, currency)) }
             }
             .launchIn(viewModelScope)
     }

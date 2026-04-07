@@ -102,11 +102,11 @@ fun CardGridItem(
                 )
                 val preferredCurrency = LocalPreferredCurrency.current
                 val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, item.hasFoil, preferredCurrency) {
-                    if (item.hasFoil) {
-                        PriceFormatter.formatFromScryfall(card.priceUsdFoil, card.priceEurFoil, preferredCurrency = preferredCurrency)
-                    } else {
-                        PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur, preferredCurrency = preferredCurrency)
-                    }
+                    PriceFormatter.formatFromScryfall(
+                        priceUsd = if (item.hasFoil) card.priceUsdFoil else card.priceUsd,
+                        priceEur = if (item.hasFoil) card.priceEurFoil else card.priceEur,
+                        preferredCurrency = preferredCurrency
+                    )
                 }
                 if (priceText != "—") {
                     Text(

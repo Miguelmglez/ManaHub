@@ -2,6 +2,7 @@ package com.mmg.magicfolder.feature.decks
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.data.local.UserPreferencesDataStore
 import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.magicfolder.core.domain.model.BasicLandDistribution
 import com.mmg.magicfolder.core.domain.model.BuilderStep
@@ -11,6 +12,7 @@ import com.mmg.magicfolder.core.domain.model.Deck
 import com.mmg.magicfolder.core.domain.model.DeckBuilderState
 import com.mmg.magicfolder.core.domain.model.DeckCard
 import com.mmg.magicfolder.core.domain.model.DeckFormat
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
 import com.mmg.magicfolder.core.domain.model.ReviewGroupBy
 import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository
@@ -20,6 +22,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -31,10 +34,21 @@ class DeckBuilderViewModel @Inject constructor(
     private val scryfallDataSource: ScryfallRemoteDataSource,
     private val deckRepository: DeckRepository,
     private val requestQueue: ScryfallRequestQueue,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DeckBuilderState())
     val state: StateFlow<DeckBuilderState> = _state.asStateFlow()
+
+    private var preferredCurrency: PreferredCurrency = PreferredCurrency.USD
+
+    init {
+        viewModelScope.launch {
+            userPreferencesDataStore.preferredCurrencyFlow.collectLatest { currency ->
+                preferredCurrency = currency
+            }
+        }
+    }
 
     // Commander search state (separate from main state)
     private val _commanderResults = MutableStateFlow<List<Card>>(emptyList())
@@ -313,8 +327,12 @@ class DeckBuilderViewModel @Inject constructor(
         _state.update { it.copy(filterMaxCmc = cmc) }
     }
 
+    fun setMaxPriceFilter(price: Double?) {
+        _state.update { it.copy(filterMaxPrice = price) }
+    }
+
     fun clearFilters() {
-        _state.update { it.copy(filterColors = emptySet(), filterType = "", filterMaxCmc = null) }
+        _state.update { it.copy(filterColors = emptySet(), filterType = "", filterMaxCmc = null, filterMaxPrice = null) }
     }
 
     fun setActiveTab(tab: BuilderTab) {
@@ -342,7 +360,15 @@ class DeckBuilderViewModel @Inject constructor(
             val matchesType = s.filterType.isBlank() ||
                 card.typeLine.contains(s.filterType, ignoreCase = true)
             val matchesCmc = s.filterMaxCmc == null || card.cmc.toInt() <= s.filterMaxCmc!!
-            matchesColor && matchesType && matchesCmc
+
+            val cardPrice = if (preferredCurrency == PreferredCurrency.EUR) {
+                card.priceEur ?: card.priceEurFoil
+            } else {
+                card.priceUsd ?: card.priceUsdFoil
+            }
+            val matchesPrice = s.filterMaxPrice == null || (cardPrice != null && cardPrice <= s.filterMaxPrice)
+
+            matchesColor && matchesType && matchesCmc && matchesPrice
         }
     }
 

@@ -113,8 +113,10 @@
     <string name="carddetail_legality_not_legal">Not Legal</string>
     <string name="carddetail_price_usd">USD</string>
     <string name="carddetail_price_eur">EUR</string>
-    <string name="carddetail_price_foil_eur">Foil EUR</string>
-    <string name="carddetail_price_foil_usd">Foil USD</string>
+    <string name="carddetail_price_foil">Foil</string>
+    <string name="carddetail_price_foil_usd">Foil (USD)</string>
+    <string name="carddetail_price_foil_eur">Foil (EUR)</string>
+    <string name="carddetail_price_normal">Normal</string>
     <string name="carddetail_view_scryfall">View on Scryfall</string>
     <string name="carddetail_tags_section">Tags</string>
     <string name="carddetail_edit_title">Edit card</string>
@@ -532,7 +534,7 @@
     <string name="achievement_mythic_hunter">Mythic Hunter</string>
     <string name="achievement_mythic_hunter_desc">Own a mythic rare card</string>
     <string name="achievement_high_roller">High Roller</string>
-    <string name="achievement_high_roller_desc">Own a card worth more than €50</string>
+    <string name="achievement_high_roller_desc">Own a card worth more than %1$s</string>
     <string name="achievement_five_colors">Five Colors</string>
     <string name="achievement_five_colors_desc">Have cards of all 5 colors</string>
     <string name="achievement_deck_builder">Deck Builder</string>

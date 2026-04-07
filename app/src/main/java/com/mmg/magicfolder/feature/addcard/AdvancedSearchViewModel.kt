@@ -3,10 +3,12 @@ package com.mmg.magicfolder.feature.addcard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.magicfolder.core.data.local.UserPreferencesDataStore
 import com.mmg.magicfolder.core.domain.model.AdvancedSearchQuery
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.ComparisonOperator
 import com.mmg.magicfolder.core.domain.model.MagicSet
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
 import com.mmg.magicfolder.core.domain.model.SearchCriterion
 import com.mmg.magicfolder.core.domain.model.SearchDirection
 import com.mmg.magicfolder.core.domain.model.SearchOrder
@@ -15,6 +17,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,6 +26,7 @@ import javax.inject.Inject
 class AdvancedSearchViewModel @Inject constructor(
     private val scryfallDataSource: ScryfallRemoteDataSource,
     private val buildQuery: BuildScryfallQueryUseCase,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : ViewModel() {
 
     data class UiState(
@@ -59,6 +63,14 @@ class AdvancedSearchViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            val prefCurrency = userPreferencesDataStore.preferredCurrencyFlow.first()
+            _uiState.update { it.copy(priceCurrency = prefCurrency.code.lowercase()) }
+            updateBuiltQuery()
+        }
+    }
 
     private fun rebuildQuery(): AdvancedSearchQuery {
         val s = _uiState.value

@@ -6,10 +6,12 @@ import com.mmg.magicfolder.core.data.local.UserPreferencesDataStore
 import com.mmg.magicfolder.core.domain.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.magicfolder.core.domain.usecase.stats.GetCollectionStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class StatsViewModel @Inject constructor(
     private val getStats:            GetCollectionStatsUseCase,
@@ -22,7 +24,11 @@ class StatsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            getStats()
+            userPreferencesDataStore.preferredCurrencyFlow
+                .flatMapLatest { currency ->
+                    _uiState.update { it.copy(currency = currency) }
+                    getStats(currency)
+                }
                 .catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
                 .collect { stats -> _uiState.update { it.copy(stats = stats, isLoading = false) } }
         }
@@ -56,8 +62,12 @@ class StatsViewModel @Inject constructor(
     }
 
     fun onCurrencyToggle() {
-        _uiState.update {
-            it.copy(currency = if (it.currency == Currency.USD) Currency.EUR else Currency.USD)
+        viewModelScope.launch {
+            val next = if (_uiState.value.currency == com.mmg.magicfolder.core.domain.model.PreferredCurrency.USD) 
+                com.mmg.magicfolder.core.domain.model.PreferredCurrency.EUR 
+            else 
+                com.mmg.magicfolder.core.domain.model.PreferredCurrency.USD
+            userPreferencesDataStore.savePreferredCurrency(next)
         }
     }
 

@@ -42,6 +42,7 @@ data class DeckBuilderState(
     val filterColors: Set<String> = emptySet(),
     val filterType: String = "",
     val filterMaxCmc: Int? = null,
+    val filterMaxPrice: Double? = null,
     val isLoadingCollection: Boolean = false,
     val isLoadingSuggestions: Boolean = false,
     val error: String? = null,

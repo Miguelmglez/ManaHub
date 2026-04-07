@@ -47,7 +47,7 @@ class UserPreferencesDataStore @Inject constructor(
                 add("en")
                 if (deviceLang == "es" || deviceLang == "de") add(deviceLang)
             }
-            val defaultCurrency =  "EUR"
+            val defaultCurrency = if (isEuropeanLocale()) "EUR" else "USD"
 
             UserPreferences(
                 appLanguage = AppLanguage.fromCode(
@@ -90,11 +90,18 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_PREFERRED_CURRENCY] = currency.code }
     }
 
+    val preferredCurrencyFlow: Flow<PreferredCurrency> = preferencesFlow
+        .map { it.preferredCurrency }
+
+    suspend fun savePreferredCurrency(currency: PreferredCurrency) {
+        setPreferredCurrency(currency)
+    }
+
     private fun defaultPreferences() = UserPreferences(
         appLanguage = AppLanguage.ENGLISH,
         cardLanguage = CardLanguage.ENGLISH,
         newsLanguages = setOf(NewsLanguage.ENGLISH),
-        preferredCurrency = PreferredCurrency.EUR,
+        preferredCurrency = if (isEuropeanLocale()) PreferredCurrency.EUR else PreferredCurrency.USD,
     )
 
 
