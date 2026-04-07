@@ -105,8 +105,10 @@
     <string name="carddetail_legality_not_legal">No legal</string>
     <string name="carddetail_price_usd">USD</string>
     <string name="carddetail_price_eur">EUR</string>
-    <string name="carddetail_price_foil_eur">Foil EUR</string>
-    <string name="carddetail_price_foil_usd">Foil USD</string>
+    <string name="carddetail_price_foil">Foil</string>
+    <string name="carddetail_price_foil_usd">Foil (USD)</string>
+    <string name="carddetail_price_foil_eur">Foil (EUR)</string>
+    <string name="carddetail_price_normal">Normal</string>
     <string name="carddetail_view_scryfall">Ver en Scryfall</string>
     <string name="carddetail_tags_section">Etiquetas</string>
     <string name="carddetail_edit_title">Editar carta</string>
@@ -496,7 +498,7 @@
     <string name="achievement_mythic_hunter">Cazador de míticas</string>
     <string name="achievement_mythic_hunter_desc">Posee una carta rara mítica</string>
     <string name="achievement_high_roller">Gran apostador</string>
-    <string name="achievement_high_roller_desc">Posee una carta que valga más de 50 €</string>
+    <string name="achievement_high_roller_desc">Posee una carta que valga más de %1$s</string>
     <string name="achievement_five_colors">Cinco colores</string>
     <string name="achievement_five_colors_desc">Ten cartas de los 5 colores</string>
     <string name="achievement_deck_builder">Constructor de mazos</string>

@@ -104,9 +104,12 @@
     <string name="carddetail_legality_banned">Banned</string>
     <string name="carddetail_legality_restricted">Restricted</string>
     <string name="carddetail_legality_not_legal">Nicht legal</string>
+    <string name="carddetail_price_usd">USD</string>
     <string name="carddetail_price_eur">EUR</string>
-    <string name="carddetail_price_foil_eur">Foil EUR</string>
-    <string name="carddetail_price_foil_usd">Foil USD</string>
+    <string name="carddetail_price_foil">Foil</string>
+    <string name="carddetail_price_foil_usd">Foil (USD)</string>
+    <string name="carddetail_price_foil_eur">Foil (EUR)</string>
+    <string name="carddetail_price_normal">Normal</string>
     <string name="carddetail_view_scryfall">Auf Scryfall ansehen</string>
     <string name="carddetail_tags_section">Tags</string>
     <string name="carddetail_edit_title">Karte bearbeiten</string>
@@ -118,7 +121,6 @@
     <string name="carddetail_market_prices">Marktpreise</string>
     <string name="carddetail_in_collection">In deiner Sammlung</string>
     <string name="carddetail_legality">Legal in</string>
-    <string name="carddetail_price_usd">USD</string>
     <string name="carddetail_condition">Zustand</string>
     <string name="carddetail_language">Sprache</string>
     <string name="carddetail_quantity_label">Anzahl</string>
@@ -497,7 +499,7 @@
     <string name="achievement_mythic_hunter">Mythic-Jäger</string>
     <string name="achievement_mythic_hunter_desc">Besitze eine Mythic-Rare-Karte</string>
     <string name="achievement_high_roller">High Roller</string>
-    <string name="achievement_high_roller_desc">Besitze eine Karte im Wert von über 50 €</string>
+    <string name="achievement_high_roller_desc">Besitze eine Karte im Wert von über %1$s</string>
     <string name="achievement_five_colors">Fünf Farben</string>
     <string name="achievement_five_colors_desc">Habe Karten aller 5 Farben</string>
     <string name="achievement_deck_builder">Deck-Builder</string>

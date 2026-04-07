@@ -17,11 +17,11 @@ class StatsRepositoryImpl @Inject constructor(
 ) : StatsRepository {
 
     @Suppress("UNCHECKED_CAST")
-    override fun observeCollectionStats(): Flow<CollectionStats> = combine(
+    override fun observeCollectionStats(preferredCurrency: PreferredCurrency): Flow<CollectionStats> = combine(
         statsDao.observeTotals(),
         statsDao.observeTotalValueUsd(),
         statsDao.observeTotalValueEur(),
-        statsDao.observeMostValuableCards(),
+        statsDao.observeMostValuableCards(useEur = preferredCurrency == PreferredCurrency.EUR),
         statsDao.observeCountByColorIdentity(),
         statsDao.observeCountByRarity(),
         statsDao.observeCountByTypeLine(),
@@ -51,6 +51,7 @@ class StatsRepositoryImpl @Inject constructor(
                     scryfallId    = it.scryfallId,
                     name          = it.name,
                     priceUsd      = it.priceUsd,
+                    priceEur      = it.priceEur,
                     isFoil        = it.isFoil,
                     imageArtCrop  = it.imageArtCrop,
                     colorIdentity = it.colorIdentity,

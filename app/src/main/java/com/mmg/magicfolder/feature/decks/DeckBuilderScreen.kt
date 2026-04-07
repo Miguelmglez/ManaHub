@@ -125,6 +125,7 @@ fun DeckBuilderScreen(
                 onRemoveNonBasicLand  = viewModel::removeNonBasicLand,
                 onSetTab              = viewModel::setActiveTab,
                 onToggleColorFilter   = viewModel::toggleColorFilter,
+                onSetMaxPriceFilter   = viewModel::setMaxPriceFilter,
                 onClearFilters        = viewModel::clearFilters,
                 onGoToReview          = viewModel::goToReview,
                 getFilteredCards      = viewModel::getFilteredCards,
@@ -339,6 +340,7 @@ private fun BuildingStep(
     onRemoveNonBasicLand: (String) -> Unit,
     onSetTab:             (BuilderTab) -> Unit,
     onToggleColorFilter:  (String) -> Unit,
+    onSetMaxPriceFilter:  (Double?) -> Unit,
     onClearFilters:       () -> Unit,
     onGoToReview:         () -> Unit,
     getFilteredCards:     (List<DeckCard>) -> List<DeckCard>,
@@ -351,7 +353,7 @@ private fun BuildingStep(
         BuilderTab.MY_COLLECTION       -> state.collectionCards
         BuilderTab.SCRYFALL_SUGGESTIONS -> state.suggestions
     }
-    val visibleCards = remember(sourceCards, state.filterColors, state.filterType, state.filterMaxCmc) {
+    val visibleCards = remember(sourceCards, state.filterColors, state.filterType, state.filterMaxCmc, state.filterMaxPrice) {
         getFilteredCards(sourceCards)
     }
 
@@ -462,10 +464,12 @@ private fun BuildingStep(
             // Filters
             item {
                 BuildingFilters(
-                    selectedColors = state.filterColors,
-                    onToggleColor  = onToggleColorFilter,
-                    onClearFilters = onClearFilters,
-                    modifier       = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    selectedColors   = state.filterColors,
+                    maxPrice         = state.filterMaxPrice,
+                    onToggleColor    = onToggleColorFilter,
+                    onMaxPriceChange = onSetMaxPriceFilter,
+                    onClearFilters   = onClearFilters,
+                    modifier         = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
 

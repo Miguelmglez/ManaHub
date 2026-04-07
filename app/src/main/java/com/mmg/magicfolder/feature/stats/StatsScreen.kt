@@ -96,7 +96,7 @@ fun StatsScreen(
 @Composable
 private fun StatsContent(
     stats:              CollectionStats,
-    currency:           Currency,
+    currency:           PreferredCurrency,
     onCurrencyToggle:   () -> Unit,
     onCardClick:        (String) -> Unit,
     isRefreshingPrices: Boolean,
@@ -138,7 +138,7 @@ private fun StatsContent(
 @Composable
 private fun SummarySection(
     stats:              CollectionStats,
-    currency:           Currency,
+    currency:           PreferredCurrency,
     onCurrencyToggle:   () -> Unit,
     isRefreshingPrices: Boolean,
     refreshProgress:    Pair<Int, Int>?,
@@ -173,10 +173,9 @@ private fun SummarySection(
                         style = MaterialTheme.magicTypography.labelMedium,
                         color = mc.textSecondary,
                     )
-                    val currCode = if (currency == Currency.USD) "usd" else "eur"
-                    val value    = if (currency == Currency.USD) stats.totalValueUsd else stats.totalValueEur
+                    val value    = if (currency == PreferredCurrency.USD) stats.totalValueUsd else stats.totalValueEur
                     Text(
-                        text  = PriceFormatter.format(value, currCode),
+                        text  = PriceFormatter.format(value, currency),
                         style = MaterialTheme.magicTypography.displayMedium,
                         color = mc.goldMtg,
                     )
@@ -201,7 +200,7 @@ private fun SummarySection(
                 ) {
                     // Currency toggle chips
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(Currency.USD to "$", Currency.EUR to "€").forEach { (c, label) ->
+                        listOf(PreferredCurrency.USD to "$", PreferredCurrency.EUR to "€").forEach { (c, label) ->
                             val selected = currency == c
                             Surface(
                                 color  = if (selected) mc.goldMtg.copy(alpha = 0.18f) else mc.surface,
@@ -283,7 +282,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 @Composable
 private fun MostValuableSection(
     cards:       List<CardValue>,
-    currency:    Currency,
+    currency:    PreferredCurrency,
     onCardClick: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -302,15 +301,21 @@ private fun MostValuableSection(
                     )
                 },
                 trailingContent = {
-                    val currCode = if (currency == Currency.USD) "usd" else "eur"
+                    val price = if (currency == PreferredCurrency.USD) card.priceUsd else card.priceEur
                     Text(
-                        text  = PriceFormatter.format(card.priceUsd, currCode),
+                        text  = PriceFormatter.format(price, currency),
                         style = MaterialTheme.magicTypography.bodyLarge,
                         color = mc.goldMtg,
                     )
                 },
                 supportingContent = if (card.isFoil) {
-                    { Text(stringResource(R.string.carddetail_price_foil_usd), style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg) }
+                    {
+                        val resId = if (currency == PreferredCurrency.USD)
+                            R.string.carddetail_price_foil_usd
+                        else
+                            R.string.carddetail_price_foil_eur
+                        Text(stringResource(resId), style = MaterialTheme.magicTypography.bodySmall, color = mc.goldMtg)
+                    }
                 } else null,
             )
             if (index < cards.size - 1) HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)

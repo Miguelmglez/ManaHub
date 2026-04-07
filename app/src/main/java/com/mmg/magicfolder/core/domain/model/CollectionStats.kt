@@ -18,6 +18,7 @@ data class CardValue(
     val scryfallId:    String,
     val name:          String,
     val priceUsd:      Double,
+    val priceEur:      Double,
     val isFoil:        Boolean,
     val imageArtCrop:  String?,
     val colorIdentity: String = "",

@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
 
             MagicTheme(theme = theme) {
                 CompositionLocalProvider(
-                    LocalPreferredCurrency provides (userPrefs?.preferredCurrency?.code ?: "USD"),
+                    LocalPreferredCurrency provides (userPrefs?.preferredCurrency ?: com.mmg.magicfolder.core.domain.model.PreferredCurrency.USD),
                 ) {
                     AppNavGraph()
                 }

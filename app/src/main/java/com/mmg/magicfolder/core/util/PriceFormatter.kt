@@ -1,9 +1,10 @@
 package com.mmg.magicfolder.core.util
 
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
+
 object PriceFormatter {
 
-    // Locales europeos: países donde se usa EUR
-    // o donde el formato decimal europeo es estándar
+    // Locales europeos: países donde se usa EUR o donde el formato decimal europeo es estándar
     private val EUROPEAN_COUNTRIES = setOf(
         // Eurozona
         "AT","BE","CY","EE","FI","FR","DE","GR","IE",
@@ -16,112 +17,105 @@ object PriceFormatter {
         "RU","UA","TR"
     )
 
-    // Determina si el dispositivo usa formato europeo
+    // Determina si el dispositivo usa formato europeo (utilizado para el valor inicial por defecto)
     fun isEuropeanLocale(): Boolean {
         val locale = java.util.Locale.getDefault()
         return locale.country.uppercase() in EUROPEAN_COUNTRIES
     }
 
-    // Devuelve "eur" o "usd" según el locale del dispositivo
-    fun getPreferredCurrency(): String {
-        return if (isEuropeanLocale()) "eur" else "usd"
-    }
-
-    // Formatea un precio dado su valor y divisa
-    // Europeo: "1.234,56 €"  (punto miles, coma decimal, símbolo al final)
-    // USD:     "$1,234.56"   (coma miles, punto decimal, símbolo al inicio)
+    /**
+     * Formatea un precio dado su valor y divisa preferida.
+     * @param amount El valor numérico.
+     * @param currency La divisa a utilizar (USD o EUR).
+     * @param showSymbol Si se debe incluir el símbolo de la moneda.
+     */
     fun format(
         amount: Double?,
-        currency: String = getPreferredCurrency(),
+        currency: PreferredCurrency,
         showSymbol: Boolean = true
     ): String {
         if (amount == null) return "—"
 
-        return when (currency.lowercase()) {
-            "eur" -> formatEur(amount, showSymbol)
-            "usd" -> formatUsd(amount, showSymbol)
-            else  -> formatUsd(amount, showSymbol)
+        return when (currency) {
+            PreferredCurrency.EUR -> formatEur(amount, showSymbol)
+            PreferredCurrency.USD -> formatUsd(amount, showSymbol)
         }
     }
 
-    // Sobrecarga para String? (como viene de la API)
+    /**
+     * Sobrecarga para String? (formato habitual de APIs).
+     */
     fun format(
         amount: String?,
-        currency: String = getPreferredCurrency(),
+        currency: PreferredCurrency,
         showSymbol: Boolean = true
     ): String {
         return format(amount?.toDoubleOrNull(), currency, showSymbol)
     }
 
     private fun formatEur(amount: Double, showSymbol: Boolean): String {
-        // Formato europeo: separador de miles = punto
-        //                  separador decimal  = coma
-        //                  símbolo al final con espacio
-        val formatted = String.format(
-            java.util.Locale.GERMAN,  // usa formato europeo
-            "%,.2f",
-            amount
-        )
+        // Formato europeo: separador de miles = punto, separador decimal = coma, símbolo al final
+        val formatted = String.format(java.util.Locale.GERMAN, "%,.2f", amount)
         return if (showSymbol) "$formatted €" else formatted
     }
 
     private fun formatUsd(amount: Double, showSymbol: Boolean): String {
-        // Formato americano: separador de miles = coma
-        //                    separador decimal  = punto
-        //                    símbolo al inicio
-        val formatted = String.format(
-            java.util.Locale.US,
-            "%,.2f",
-            amount
-        )
+        // Formato americano: separador de miles = coma, separador decimal = punto, símbolo al inicio
+        val formatted = String.format(java.util.Locale.US, "%,.2f", amount)
         return if (showSymbol) "\$$formatted" else formatted
     }
 
-    // Para valores de Scryfall (String?): elige el campo correcto según el locale
+    /**
+     * Selecciona el precio correcto (USD o EUR) de un par de valores según la preferencia.
+     */
     fun selectPrice(
         priceUsd: String?,
         priceEur: String?,
-        preferredCurrency: String? = null,
-    ): Pair<Double?, String> {
-        val useEur = preferredCurrency?.equals("EUR", ignoreCase = true) ?: isEuropeanLocale()
-        return if (useEur) {
-            Pair(priceEur?.toDoubleOrNull(), "eur")
+        preferredCurrency: PreferredCurrency,
+    ): Pair<Double?, PreferredCurrency> {
+        return if (preferredCurrency == PreferredCurrency.EUR) {
+            Pair(priceEur?.toDoubleOrNull(), PreferredCurrency.EUR)
         } else {
-            Pair(priceUsd?.toDoubleOrNull(), "usd")
+            Pair(priceUsd?.toDoubleOrNull(), PreferredCurrency.USD)
         }
     }
 
-    // Para valores Double? directamente: elige según el locale o preferencia
+    /**
+     * Selecciona el precio correcto (USD o EUR) de un par de valores según la preferencia.
+     */
     fun selectPrice(
         priceUsd: Double?,
         priceEur: Double?,
-        preferredCurrency: String? = null,
-    ): Pair<Double?, String> {
-        val useEur = preferredCurrency?.equals("EUR", ignoreCase = true) ?: isEuropeanLocale()
-        return if (useEur) {
-            Pair(priceEur, "eur")
+        preferredCurrency: PreferredCurrency,
+    ): Pair<Double?, PreferredCurrency> {
+        return if (preferredCurrency == PreferredCurrency.EUR) {
+            Pair(priceEur, PreferredCurrency.EUR)
         } else {
-            Pair(priceUsd, "usd")
+            Pair(priceUsd, PreferredCurrency.USD)
         }
     }
 
-    // Formatea directamente desde los dos campos de Scryfall (String?)
+    /**
+     * Formatea directamente desde los dos campos de Scryfall (String?).
+     */
     fun formatFromScryfall(
         priceUsd: String?,
         priceEur: String?,
+        preferredCurrency: PreferredCurrency,
         showSymbol: Boolean = true,
-        preferredCurrency: String? = null,
     ): String {
         val (amount, currency) = selectPrice(priceUsd, priceEur, preferredCurrency)
         return format(amount, currency, showSymbol)
     }
 
-    // Formatea directamente desde Double? (como vienen del modelo Card)
+    /**
+     * Formatea directamente desde Double? (campos del modelo Card).
+     */
     fun formatFromScryfall(
         priceUsd: Double?,
         priceEur: Double?,
+        preferredCurrency: PreferredCurrency,
         showSymbol: Boolean = true,
-        preferredCurrency: String? = null,
     ): String {
         val (amount, currency) = selectPrice(priceUsd, priceEur, preferredCurrency)
         return format(amount, currency, showSymbol)

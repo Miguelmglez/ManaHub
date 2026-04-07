@@ -35,11 +35,15 @@ interface StatsDao {
                c.image_art_crop AS imageArtCrop, uc.is_foil AS isFoil,
                c.color_identity AS colorIdentity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
-                    THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd
+                    THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
+               CASE WHEN uc.is_foil = 1 AND c.price_eur_foil IS NOT NULL
+                    THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur
         FROM user_cards uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
-        ORDER BY priceUsd DESC LIMIT :limit
+        ORDER BY 
+            CASE WHEN :useEur = 1 THEN priceEur ELSE priceUsd END DESC 
+        LIMIT :limit
     """)
-    fun observeMostValuableCards(limit: Int = 5): Flow<List<CardValueProjection>>
+    fun observeMostValuableCards(limit: Int = 5, useEur: Boolean = false): Flow<List<CardValueProjection>>
 
     @Query("""
         SELECT c.color_identity AS colorIdentity, SUM(uc.quantity) AS count

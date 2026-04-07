@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -32,6 +33,7 @@ import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.DeckCard
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
+import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
@@ -234,47 +236,88 @@ fun LandsSection(
 
 @Composable
 fun BuildingFilters(
-    selectedColors:  Set<String>,
-    onToggleColor:   (String) -> Unit,
-    onClearFilters:  () -> Unit,
-    modifier:        Modifier = Modifier,
+    selectedColors: Set<String>,
+    maxPrice: Double?,
+    onToggleColor: (String) -> Unit,
+    onMaxPriceChange: (Double?) -> Unit,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val mc     = MaterialTheme.magicColors
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val colors = listOf("W", "U", "B", "R", "G")
+    val preferredCurrency = LocalPreferredCurrency.current
 
-    Row(
-        modifier              = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-    ) {
-        colors.forEach { color ->
-            val selected = color in selectedColors
-            ManaSymbolImage(
-                token    = color,
-                size     = 28.dp,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .border(
-                        width = if (selected) 2.dp else 0.dp,
-                        color = if (selected) Color.White.copy(alpha = 0.7f) else Color.Transparent,
-                        shape = CircleShape,
-                    )
-                    .clickable { onToggleColor(color) }
-                    .then(
-                        if (!selected) Modifier.background(Color.Black.copy(0.4f), CircleShape)
-                        else Modifier
-                    ),
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        if (selectedColors.isNotEmpty()) {
-            TextButton(onClick = onClearFilters) {
-                Text(
-                    text  = stringResource(R.string.action_clear_filters),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textDisabled,
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            colors.forEach { color ->
+                val selected = color in selectedColors
+                ManaSymbolImage(
+                    token = color,
+                    size = 28.dp,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .border(
+                            width = if (selected) 2.dp else 0.dp,
+                            color = if (selected) Color.White.copy(alpha = 0.7f) else Color.Transparent,
+                            shape = CircleShape,
+                        )
+                        .clickable { onToggleColor(color) }
+                        .then(
+                            if (!selected) Modifier.background(Color.Black.copy(0.4f), CircleShape)
+                            else Modifier
+                        ),
                 )
             }
+            Spacer(Modifier.weight(1f))
+            if (selectedColors.isNotEmpty() || maxPrice != null) {
+                TextButton(onClick = onClearFilters) {
+                    Text(
+                        text = stringResource(R.string.action_clear_filters),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textDisabled,
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.deckbuilder_filter_max_price),
+                style = ty.labelMedium,
+                color = mc.textSecondary
+            )
+
+            var priceText by remember(maxPrice) { mutableStateOf(maxPrice?.toString() ?: "") }
+
+            OutlinedTextField(
+                value = priceText,
+                onValueChange = {
+                    priceText = it
+                    onMaxPriceChange(it.toDoubleOrNull())
+                },
+                modifier = Modifier.width(80.dp),
+                textStyle = ty.bodySmall,
+                placeholder = { Text("—", style = ty.bodySmall, color = mc.textDisabled) },
+                suffix = { Text(preferredCurrency.symbol, style = ty.labelSmall, color = mc.textDisabled) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(8.dp),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = mc.primaryAccent,
+                    unfocusedBorderColor = mc.surfaceVariant,
+                    focusedTextColor = mc.textPrimary,
+                    unfocusedTextColor = mc.textPrimary,
+                )
+            )
         }
     }
 }
