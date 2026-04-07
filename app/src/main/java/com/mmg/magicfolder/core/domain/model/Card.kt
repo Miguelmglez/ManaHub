@@ -43,6 +43,12 @@ data class Card(
     val cachedAt: Long = 0L,
     /** Auto- and manually-assigned strategy tags. Persisted in Room as JSON. */
     val tags: List<CardTag> = emptyList(),
+    /**
+     * Tags the auto-tagging engine *suggests* for this card but whose confidence
+     * was below the auto-add threshold. Surfaced in CardDetail for the user to
+     * confirm or dismiss; never auto-applied to [tags].
+     */
+    val suggestedTags: List<SuggestedTag> = emptyList(),
 )
 
 data class UserCard(

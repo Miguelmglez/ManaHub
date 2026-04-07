@@ -118,6 +118,20 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
+    fun onConfirmSuggestedTag(tag: CardTag) {
+        viewModelScope.launch {
+            runCatching { cardRepo.confirmSuggestedTag(scryfallId, tag) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
+    fun onDismissSuggestedTag(tag: CardTag) {
+        viewModelScope.launch {
+            runCatching { cardRepo.dismissSuggestedTag(scryfallId, tag) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
     fun onDeleteCard(userCardId: Long) {
         viewModelScope.launch {
             runCatching { userCardRepo.deleteCard(userCardId) }

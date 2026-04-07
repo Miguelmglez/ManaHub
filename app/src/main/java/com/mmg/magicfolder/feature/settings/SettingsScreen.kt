@@ -64,6 +64,7 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 fun SettingsScreen(
     onBack: () -> Unit,
     onManageNewsSources: () -> Unit = {},
+    onManageTagDictionary: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -157,6 +158,35 @@ fun SettingsScreen(
                     )
                     Text(
                         stringResource(R.string.settings_manage_news_sources_subtitle),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onManageTagDictionary)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Diccionario de etiquetas",
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textPrimary,
+                    )
+                    Text(
+                        "Edita las traducciones, los patrones de detección y los umbrales del auto-tagger.",
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textSecondary,
                     )

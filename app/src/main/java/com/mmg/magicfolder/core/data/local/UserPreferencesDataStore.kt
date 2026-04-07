@@ -3,6 +3,7 @@ package com.mmg.magicfolder.core.data.local
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -34,6 +35,9 @@ private val AUTO_REFRESH_KEY       = booleanPreferencesKey("auto_refresh_prices"
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
 private val KEY_PLAYER_NAME = stringPreferencesKey("player_name")
 private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
+private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold")
+private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
+private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
 
 @Singleton
 class UserPreferencesDataStore @Inject constructor(
@@ -149,6 +153,34 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun savePlayerName(name: String) {
         context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
+    }
+
+    // ── Tag auto-tagger thresholds ────────────────────────────────────────────
+
+    val tagAutoThresholdFlow: Flow<Float> = context.userPrefsDataStore.data
+        .map { it[KEY_TAG_AUTO_THRESHOLD] ?: 0.90f }
+        .catch { emit(0.90f) }
+
+    val tagSuggestThresholdFlow: Flow<Float> = context.userPrefsDataStore.data
+        .map { it[KEY_TAG_SUGGEST_THRESHOLD] ?: 0.60f }
+        .catch { emit(0.60f) }
+
+    suspend fun saveTagAutoThreshold(value: Float) {
+        context.userPrefsDataStore.edit { it[KEY_TAG_AUTO_THRESHOLD] = value.coerceIn(0f, 1f) }
+    }
+
+    suspend fun saveTagSuggestThreshold(value: Float) {
+        context.userPrefsDataStore.edit { it[KEY_TAG_SUGGEST_THRESHOLD] = value.coerceIn(0f, 1f) }
+    }
+
+    // ── Tag dictionary overrides (JSON blob) ─────────────────────────────────
+
+    val tagDictionaryOverridesFlow: Flow<String> = context.userPrefsDataStore.data
+        .map { it[KEY_TAG_OVERRIDES_JSON] ?: "[]" }
+        .catch { emit("[]") }
+
+    suspend fun saveTagDictionaryOverrides(json: String) {
+        context.userPrefsDataStore.edit { it[KEY_TAG_OVERRIDES_JSON] = json }
     }
 
     suspend fun saveTheme(theme: AppTheme) {

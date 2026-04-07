@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.CardTag
+import com.mmg.magicfolder.core.domain.model.SuggestedTag
 import com.mmg.magicfolder.core.domain.model.TagCategory
 import com.mmg.magicfolder.core.domain.model.UserCard
 import com.mmg.magicfolder.core.ui.components.CardRarity
@@ -78,16 +79,18 @@ fun CardDetailScreen(
             ) { CircularProgressIndicator() }
 
             uiState.card != null -> CardDetailContent(
-                card             = uiState.card!!,
-                userCards        = uiState.userCards,
-                isStale          = uiState.isStale,
-                onAddTag         = viewModel::onAddTag,
-                onRemoveTag      = viewModel::onRemoveTag,
-                onShowTagPicker  = viewModel::onShowTagPicker,
-                onShowAddSheet   = viewModel::onShowAddSheet,
-                onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
-                onRequestDelete  = viewModel::onRequestDelete,
-                modifier         = Modifier.padding(padding),
+                card                  = uiState.card!!,
+                userCards             = uiState.userCards,
+                isStale               = uiState.isStale,
+                onAddTag              = viewModel::onAddTag,
+                onRemoveTag           = viewModel::onRemoveTag,
+                onShowTagPicker       = viewModel::onShowTagPicker,
+                onConfirmSuggestedTag = viewModel::onConfirmSuggestedTag,
+                onDismissSuggestedTag = viewModel::onDismissSuggestedTag,
+                onShowAddSheet        = viewModel::onShowAddSheet,
+                onUpdateQuantity      = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
+                onRequestDelete       = viewModel::onRequestDelete,
+                modifier              = Modifier.padding(padding),
             )
         }
     }
@@ -137,16 +140,18 @@ fun CardDetailScreen(
 
 @Composable
 private fun CardDetailContent(
-    card:             Card,
-    userCards:        List<UserCard>,
-    isStale:          Boolean,
-    onAddTag:         (CardTag) -> Unit,
-    onRemoveTag:      (CardTag) -> Unit,
-    onShowTagPicker:  () -> Unit,
-    onShowAddSheet:   () -> Unit,
-    onUpdateQuantity: (Long, Int) -> Unit,
-    onRequestDelete:  (UserCard) -> Unit,
-    modifier:         Modifier = Modifier,
+    card:                  Card,
+    userCards:             List<UserCard>,
+    isStale:               Boolean,
+    onAddTag:              (CardTag) -> Unit,
+    onRemoveTag:           (CardTag) -> Unit,
+    onShowTagPicker:       () -> Unit,
+    onConfirmSuggestedTag: (CardTag) -> Unit,
+    onDismissSuggestedTag: (CardTag) -> Unit,
+    onShowAddSheet:        () -> Unit,
+    onUpdateQuantity:      (Long, Int) -> Unit,
+    onRequestDelete:       (UserCard) -> Unit,
+    modifier:              Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
     var showBackFace by remember { mutableStateOf(false) }
@@ -301,6 +306,15 @@ private fun CardDetailContent(
             onRemoveTag     = onRemoveTag,
             onShowTagPicker = onShowTagPicker,
         )
+
+        // Suggested tags (confidence between suggest- and auto-thresholds)
+        if (card.suggestedTags.isNotEmpty()) {
+            SuggestedTagsSection(
+                suggestions = card.suggestedTags,
+                onConfirm   = onConfirmSuggestedTag,
+                onDismiss   = onDismissSuggestedTag,
+            )
+        }
 
         // Scryfall link
         TextButton(onClick = { uriHandler.openUri(card.scryfallUri) }) {
@@ -740,6 +754,98 @@ private fun TagsSection(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Suggested tags section — chips with confirm (✓) / dismiss (✕)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SuggestedTagsSection(
+    suggestions: List<SuggestedTag>,
+    onConfirm:   (CardTag) -> Unit,
+    onDismiss:   (CardTag) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(true) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text     = "Etiquetas sugeridas",
+                style    = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+            )
+        }
+
+        if (expanded) {
+            Text(
+                text  = "Confirma las que apliquen o descártalas. No se añaden hasta que tú las apruebes.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            suggestions.chunked(2).forEach { rowItems ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    rowItems.forEach { sug ->
+                        SuggestedTagChip(
+                            suggestion = sug,
+                            onConfirm  = { onConfirm(sug.tag) },
+                            onDismiss  = { onDismiss(sug.tag) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestedTagChip(
+    suggestion: SuggestedTag,
+    onConfirm:  () -> Unit,
+    onDismiss:  () -> Unit,
+) {
+    val pct = (suggestion.confidence * 100).toInt()
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text  = "${suggestion.tag.label}  $pct%",
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Spacer(Modifier.width(6.dp))
+            IconButton(onClick = onConfirm, modifier = Modifier.size(20.dp)) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Confirmar ${suggestion.tag.label}",
+                    tint     = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Descartar ${suggestion.tag.label}",
+                    tint     = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Tag picker bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -769,7 +875,7 @@ private fun TagPickerSheet(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 categories.forEach { category ->
-                    val tagsInCategory = CardTag.entries.filter {
+                    val tagsInCategory = CardTag.canonical.filter {
                         it.category == category && it !in currentTags
                     }
                     if (tagsInCategory.isNotEmpty()) {

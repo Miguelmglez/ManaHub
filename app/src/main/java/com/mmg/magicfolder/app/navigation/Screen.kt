@@ -29,6 +29,7 @@ sealed class Screen(val route: String) {
     // ── Stats (bottom tab 2) ─────────────────────────────────────────────────
     object Stats    : Screen("stats")
     object Settings : Screen("settings")
+    object TagDictionary : Screen("settings/tag_dictionary")
 
     // ── Profile (bottom tab 4) ───────────────────────────────────────────────
     object Profile : Screen("profile")

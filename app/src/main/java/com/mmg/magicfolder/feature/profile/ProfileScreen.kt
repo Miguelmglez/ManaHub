@@ -71,17 +71,18 @@ fun ProfileScreen(
         containerColor = mc.background,
         topBar = {
             Surface(
-                color    = mc.backgroundSecondary,
-                modifier = Modifier.fillMaxWidth()
+                color = mc.backgroundSecondary,
+                modifier = Modifier.fillMaxWidth().height(56.dp) // Forzamos 56dp para igualar a Settings (48dp del icono + 8dp de padding)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text  = stringResource(R.string.profile_title),
+                        text = stringResource(R.string.profile_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
