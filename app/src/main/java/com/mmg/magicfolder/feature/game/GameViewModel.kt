@@ -21,7 +21,7 @@ import javax.inject.Inject
 
 data class GameUiState(
     val players:          List<Player>      = emptyList(),
-    val mode:             GameMode          = GameMode.COMMANDER,
+    val mode:             GameMode          = GameMode.STANDARD,
     val activePlayerId:   Int               = 0,
     val currentPhase:     GamePhase         = GamePhase.UNTAP,
     val turnNumber:       Int               = 1,
@@ -45,6 +45,7 @@ data class GameUiState(
     val showLayoutEditor:            Boolean = false,
     // Per-player accumulated life deltas (cleared after 1.5s of inactivity)
     val lifeDeltas:   Map<Int, Int>     = emptyMap(),
+    val isGameRunning: Boolean           = false,
 ) {
     val appUserPlayer: Player? get() = players.firstOrNull { it.isAppUser }
     val appUserWon:    Boolean get() = winner?.isAppUser == true
@@ -58,11 +59,11 @@ class GameViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
-        GameMode.valueOf(savedStateHandle.get<String>("mode") ?: GameMode.COMMANDER.name)
-    }.getOrDefault(GameMode.COMMANDER)
+        GameMode.valueOf(savedStateHandle.get<String>("mode") ?: GameMode.STANDARD.name)
+    }.getOrDefault(GameMode.STANDARD)
 
     private val initPlayerCount: Int =
-        savedStateHandle.get<Int>("playerCount")?.coerceIn(2, 6) ?: 4
+        savedStateHandle.get<Int>("playerCount")?.coerceIn(2, 6) ?: 2
 
     private val _uiState = MutableStateFlow(buildInitialState(initMode, initPlayerCount))
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -82,7 +83,7 @@ class GameViewModel @Inject constructor(
                     launch(Dispatchers.IO) {
                         runCatching { gameSessionRepo.saveGameSession(result) }
                             .onSuccess { id ->
-                                _uiState.update { it.copy(lastSessionId = id) }
+                                _uiState.update { it.copy(lastSessionId = id, isGameRunning = true) }
                                 recordTournamentResultIfNeeded(id, result)
                             }
                     }
@@ -388,7 +389,7 @@ class GameViewModel @Inject constructor(
                     )
                 }
             )
-            _uiState.update { it.copy(winner = winner, gameResult = result) }
+            _uiState.update { it.copy(winner = winner, gameResult = result, isGameRunning = false) }
         }
     }
 
@@ -490,6 +491,7 @@ class GameViewModel @Inject constructor(
                 activePlayerId = players.first().id,
                 activeLayout   = LayoutTemplates.getDefaultLayout(clampedCount),
                 gameStartTime  = System.currentTimeMillis(),
+                isGameRunning = true
             )
         }
 

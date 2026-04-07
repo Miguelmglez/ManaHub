@@ -1,11 +1,11 @@
 package com.mmg.magicfolder.app.navigation
 
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,11 +33,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.mmg.magicfolder.feature.game.GameSetupViewModel
-import com.mmg.magicfolder.feature.game.PlayerConfig
-import com.mmg.magicfolder.feature.game.model.GameMode
-import com.mmg.magicfolder.feature.game.model.LayoutTemplate
-import com.mmg.magicfolder.feature.game.model.LayoutTemplates
 import com.mmg.magicfolder.core.ui.components.MagicBottomBar
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
@@ -50,16 +45,21 @@ import com.mmg.magicfolder.feature.draft.presentation.ui.DraftScreen
 import com.mmg.magicfolder.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.magicfolder.feature.game.GamePlayScreen
 import com.mmg.magicfolder.feature.game.GameSetupScreen
+import com.mmg.magicfolder.feature.game.GameSetupViewModel
 import com.mmg.magicfolder.feature.game.GameViewModel
-import com.mmg.magicfolder.feature.survey.SurveyScreen
+import com.mmg.magicfolder.feature.game.PlayerConfig
+import com.mmg.magicfolder.feature.game.model.GameMode
+import com.mmg.magicfolder.feature.game.model.LayoutTemplate
+import com.mmg.magicfolder.feature.game.model.LayoutTemplates
+import com.mmg.magicfolder.feature.news.presentation.NewsScreen
+import com.mmg.magicfolder.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.magicfolder.feature.profile.ProfileScreen
 import com.mmg.magicfolder.feature.scanner.ScannerScreen
 import com.mmg.magicfolder.feature.settings.SettingsScreen
 import com.mmg.magicfolder.feature.stats.StatsScreen
+import com.mmg.magicfolder.feature.survey.SurveyScreen
 import com.mmg.magicfolder.feature.tournament.TournamentListScreen
 import com.mmg.magicfolder.feature.tournament.TournamentScreen
-import com.mmg.magicfolder.feature.news.presentation.NewsScreen
-import com.mmg.magicfolder.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.magicfolder.feature.tournament.TournamentSetupScreen
 import com.mmg.magicfolder.feature.tournament.TournamentViewModel
 
@@ -77,87 +77,73 @@ private val bottomBarRoutes = setOf(
 
 @Composable
 fun AppNavGraph(modifier: Modifier = Modifier) {
-    val activity      = LocalContext.current as ComponentActivity
+    val activity = LocalContext.current as ComponentActivity
     // Activity-scoped so game state persists across all navigation
     val gameVm: GameViewModel = hiltViewModel(activity)
-    val gameUiState  by gameVm.uiState.collectAsStateWithLifecycle()
+    val gameUiState by gameVm.uiState.collectAsStateWithLifecycle()
 
     val navController = rememberNavController()
-    val backStack     by navController.currentBackStackEntryAsState()
-    val currentRoute  = backStack?.destination?.route
+    val backStack by navController.currentBackStackEntryAsState()
+    val currentRoute = backStack?.destination?.route
 
-    var pendingPlayerConfigs     by remember { mutableStateOf<List<PlayerConfig>?>(null) }
-    var pendingLayout            by remember { mutableStateOf<LayoutTemplate?>(null) }
+    var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
+    var pendingLayout by remember { mutableStateOf<LayoutTemplate?>(null) }
     var pendingTournamentMatchId by remember { mutableStateOf<Long?>(null) }
-    var pendingTournamentId      by remember { mutableStateOf<Long?>(null) }
+    var pendingTournamentId by remember { mutableStateOf<Long?>(null) }
     var pendingTournamentPlayers by remember { mutableStateOf<List<Long>>(emptyList()) }
-    var pendingTournamentMode    by remember { mutableStateOf<GameMode?>(null) }
+    var pendingTournamentMode by remember { mutableStateOf<GameMode?>(null) }
 
-    // Show "return to game" banner on all screens except GamePlay itself
-    val hasActiveGame = gameUiState.players.isNotEmpty() && gameUiState.winner == null
-    val isOnGamePlay  = currentRoute?.startsWith("game/play") == true
+    val hasActiveGame = gameUiState.isGameRunning || gameUiState.activeTournamentId != null
 
     Scaffold(
         bottomBar = {
             Column {
-                // Active game / tournament banner
-                if (hasActiveGame && !isOnGamePlay) {
-                    val isTournament = gameUiState.activeTournamentId != null
-                    val mc = MaterialTheme.magicColors
-                    Surface(
-                        color    = if (isTournament) mc.primaryAccent.copy(alpha = 0.15f)
-                                   else mc.surface,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        TextButton(
-                            onClick  = {
+                if (currentRoute in bottomBarRoutes) {
+                    MagicBottomBar(
+                        currentRoute = currentRoute,
+                        onCollectionClick = { navController.navigateTab(Screen.Collection.route) },
+                        onNewsClick = { navController.navigateTab(Screen.News.route) },
+                        onPlayClick = {
+                            if (hasActiveGame) {
                                 navController.navigate(
                                     Screen.GamePlay.createRoute(
                                         gameUiState.mode.name,
                                         gameUiState.players.size,
                                     )
                                 ) { launchSingleTop = true }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                text      = if (isTournament) "▶  Return to tournament match"
-                                            else "▶  Return to active game",
-                                style     = MaterialTheme.magicTypography.labelMedium,
-                                color     = if (isTournament) mc.primaryAccent else mc.textSecondary,
-                                textAlign = TextAlign.Center,
-                                modifier  = Modifier.padding(horizontal = 8.dp),
-                            )
-                        }
-                    }
-                }
-                if (currentRoute in bottomBarRoutes) {
-                    MagicBottomBar(
-                        currentRoute      = currentRoute,
-                        onCollectionClick = { navController.navigateTab(Screen.Collection.route) },
-                        onNewsClick       = { navController.navigateTab(Screen.News.route) },onPlayClick       = { navController.navigate(Screen.GameSetup.route) },
-                        onDraftClick      = { navController.navigateTab(Screen.Draft.route) },onProfileClick    = { navController.navigateTab(Screen.Profile.route) },
+                            } else {
+                                navController.navigate(Screen.GameSetup.route)
+                            }
+                        },
+                        onDraftClick = { navController.navigateTab(Screen.Draft.route) },
+                        onProfileClick = { navController.navigateTab(Screen.Profile.route) },
                     )
                 }
             }
         },
     ) { padding ->
         NavHost(
-            navController      = navController,
-            startDestination   = Screen.Collection.route,
-            modifier           = modifier.padding(padding),
-            enterTransition    = { fadeIn(tween(300)) + slideInHorizontally(tween(300))  { it / 5 } },
-            exitTransition     = { fadeOut(tween(200)) },
+            navController = navController,
+            startDestination = Screen.Collection.route,
+            modifier = modifier.padding(padding),
+            enterTransition = { fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 } },
+            exitTransition = { fadeOut(tween(200)) },
             popEnterTransition = { fadeIn(tween(300)) },
-            popExitTransition  = { fadeOut(tween(200)) + slideOutHorizontally(tween(300)) { it / 5 } },
+            popExitTransition = { fadeOut(tween(200)) + slideOutHorizontally(tween(300)) { it / 5 } },
         ) {
 
             // ── Collection ────────────────────────────────────────────────────
             composable(Screen.Collection.route) {
                 CollectionScreen(
-                    onCardClick       = { id -> navController.navigate(Screen.CollectionCardDetail.createRoute(id)) },
-                    onScannerClick    = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick       = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onCardClick = { id ->
+                        navController.navigate(
+                            Screen.CollectionCardDetail.createRoute(
+                                id
+                            )
+                        )
+                    },
+                    onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
                     onCreateDeckClick = { navController.navigate(Screen.DeckBuilder.route) },
                 )
             }
@@ -165,7 +151,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // Add card (tabbed: text search + scanner link)
             composable(Screen.CollectionAddCard.route) {
                 AddCardScreen(
-                    onNavigateBack      = { navController.popBackStack() },
+                    onNavigateBack = { navController.popBackStack() },
                     onNavigateToScanner = { navController.navigate(Screen.CollectionScanner.route) },
                 )
             }
@@ -175,39 +161,39 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(
-                route     = Screen.CollectionCardDetail.route,
+                route = Screen.CollectionCardDetail.route,
                 arguments = listOf(navArgument("scryfallId") { type = NavType.StringType }),
             ) {
                 CardDetailScreen(
-                    onBack              = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() },
                     onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
                 )
             }
 
             // ── Decks ─────────────────────────────────────────────────────────
             composable(
-                route     = Screen.DeckDetail.route,
+                route = Screen.DeckDetail.route,
                 arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
             ) { entry ->
                 val deckId = entry.arguments?.getLong("deckId") ?: 0L
                 DeckDetailScreen(
-                    deckId     = deckId,
-                    onBack     = { navController.popBackStack() },
+                    deckId = deckId,
+                    onBack = { navController.popBackStack() },
                     onAddCards = { navController.navigate(Screen.DeckAddCards.createRoute(deckId)) },
                 )
             }
 
             composable(
-                route     = Screen.DeckAddCards.route,
+                route = Screen.DeckAddCards.route,
                 arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
             ) {
-             //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
+                //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Screen.DeckBuilder.route) {
                 DeckBuilderScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onDeckSaved    = {
+                    onDeckSaved = {
                         navController.navigate(Screen.Collection.route) {
                             popUpTo(Screen.DeckBuilder.route) { inclusive = true }
                         }
@@ -218,15 +204,21 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // ── Stats ─────────────────────────────────────────────────────────
             composable(Screen.Stats.route) {
                 StatsScreen(
-                    onCardClick      = { id -> navController.navigate(Screen.CollectionCardDetail.createRoute(id)) },
-                    onSettingsClick  = { navController.navigate(Screen.Settings.route) },
+                    onCardClick = { id ->
+                        navController.navigate(
+                            Screen.CollectionCardDetail.createRoute(
+                                id
+                            )
+                        )
+                    },
+                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 )
             }
 
             // ── Settings ──────────────────────────────────────────────────────
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onBack              = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() },
                     onManageNewsSources = { navController.navigate(Screen.NewsSourcesSettings.route) },
                 )
             }
@@ -278,15 +270,21 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // ── Tournament flow ────────────────────────────────────────────────
             composable(Screen.TournamentList.route) {
                 TournamentListScreen(
-                    onNavigateBack     = { navController.popBackStack() },
+                    onNavigateBack = { navController.popBackStack() },
                     onCreateTournament = { navController.navigate(Screen.TournamentSetup.route) },
-                    onOpenTournament   = { id -> navController.navigate(Screen.TournamentDetail.route(id)) },
+                    onOpenTournament = { id ->
+                        navController.navigate(
+                            Screen.TournamentDetail.route(
+                                id
+                            )
+                        )
+                    },
                 )
             }
 
             composable(Screen.TournamentSetup.route) {
                 TournamentSetupScreen(
-                    onNavigateBack      = { navController.popBackStack() },
+                    onNavigateBack = { navController.popBackStack() },
                     onTournamentCreated = { id ->
                         navController.navigate(Screen.TournamentDetail.route(id)) {
                             popUpTo(Screen.TournamentSetup.route) { inclusive = true }
@@ -296,26 +294,31 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(
-                route     = Screen.TournamentDetail.route,
+                route = Screen.TournamentDetail.route,
                 arguments = listOf(navArgument("tournamentId") { type = NavType.LongType }),
             ) { entry ->
                 val tournamentId = entry.arguments?.getLong("tournamentId") ?: 0L
                 val tournamentVm: TournamentViewModel = hiltViewModel(entry)
                 TournamentScreen(
-                    tournamentId   = tournamentId,
+                    tournamentId = tournamentId,
                     onNavigateBack = { navController.popBackStack() },
-                    onStartMatch   = { matchId, tId ->
+                    onStartMatch = { matchId, tId ->
                         val (playerIds, configs) = tournamentVm.buildPlayerConfigsForMatch(matchId)
                         if (configs.isNotEmpty()) {
-                            val mode   = tournamentVm.getGameMode()
+                            val mode = tournamentVm.getGameMode()
                             val layout = LayoutTemplates.getDefaultLayout(configs.size)
-                            pendingPlayerConfigs     = configs
-                            pendingLayout            = layout
+                            pendingPlayerConfigs = configs
+                            pendingLayout = layout
                             pendingTournamentMatchId = matchId
-                            pendingTournamentId      = tId
+                            pendingTournamentId = tId
                             pendingTournamentPlayers = playerIds
-                            pendingTournamentMode    = mode
-                            navController.navigate(Screen.GamePlay.createRoute(mode.name, configs.size))
+                            pendingTournamentMode = mode
+                            navController.navigate(
+                                Screen.GamePlay.createRoute(
+                                    mode.name,
+                                    configs.size
+                                )
+                            )
                         }
                     },
                     viewModel = tournamentVm,
@@ -326,16 +329,21 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             composable(Screen.GameSetup.route) {
                 val setupVm: GameSetupViewModel = hiltViewModel()
                 GameSetupScreen(
-                    viewModel            = setupVm,
-                    onBack               = { navController.popBackStack() },
-                    onStartGame          = { mode, configs, layout ->
-                        pendingPlayerConfigs     = configs
-                        pendingLayout            = layout
+                    viewModel = setupVm,
+                    onBack = { navController.popBackStack() },
+                    onStartGame = { mode, configs, layout ->
+                        pendingPlayerConfigs = configs
+                        pendingLayout = layout
                         pendingTournamentMatchId = null
-                        pendingTournamentId      = null
+                        pendingTournamentId = null
                         pendingTournamentPlayers = emptyList()
-                        pendingTournamentMode    = null
-                        navController.navigate(Screen.GamePlay.createRoute(mode.name, configs.size)) {
+                        pendingTournamentMode = null
+                        navController.navigate(
+                            Screen.GamePlay.createRoute(
+                                mode.name,
+                                configs.size
+                            )
+                        ) {
                             popUpTo(Screen.GameSetup.route) { inclusive = true }
                         }
                     },
@@ -344,44 +352,44 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(
-                route     = Screen.GamePlay.route,
+                route = Screen.GamePlay.route,
                 arguments = listOf(
-                    navArgument("mode")        { type = NavType.StringType },
-                    navArgument("playerCount") { type = NavType.IntType    },
+                    navArgument("mode") { type = NavType.StringType },
+                    navArgument("playerCount") { type = NavType.IntType },
                 ),
             ) {
-                val configs  = pendingPlayerConfigs
-                val matchId  = pendingTournamentMatchId
+                val configs = pendingPlayerConfigs
+                val matchId = pendingTournamentMatchId
                 LaunchedEffect(configs) {
                     if (configs != null) {
                         if (matchId != null) {
                             gameVm.initFromTournamentMatch(
-                                matchId             = matchId,
-                                tournamentId        = pendingTournamentId ?: 0L,
+                                matchId = matchId,
+                                tournamentId = pendingTournamentId ?: 0L,
                                 tournamentPlayerIds = pendingTournamentPlayers,
-                                configs             = configs,
-                                mode                = pendingTournamentMode ?: GameMode.COMMANDER,
-                                layout              = pendingLayout,
+                                configs = configs,
+                                mode = pendingTournamentMode ?: GameMode.COMMANDER,
+                                layout = pendingLayout,
                             )
                             pendingTournamentMatchId = null
-                            pendingTournamentId      = null
+                            pendingTournamentId = null
                             pendingTournamentPlayers = emptyList()
-                            pendingTournamentMode    = null
+                            pendingTournamentMode = null
                         } else {
                             gameVm.initFromConfigs(configs, pendingLayout)
                         }
                         pendingPlayerConfigs = null
-                        pendingLayout        = null
+                        pendingLayout = null
                     }
                 }
                 // Re-read from ViewModel state to get most up-to-date tournament context
                 val tournamentId = gameUiState.activeTournamentId
                 GamePlayScreen(
-                    viewModel         = gameVm,
+                    viewModel = gameVm,
                     onTournamentClick = tournamentId?.let { tId ->
                         { navController.navigate(Screen.TournamentDetail.route(tId)) }
                     },
-                    onNewGame  = {
+                    onNewGame = {
                         navController.navigate(Screen.GameSetup.route) {
                             popUpTo(Screen.GamePlay.route) { inclusive = true }
                         }
@@ -392,22 +400,22 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                             popUpTo(0) { inclusive = true }
                         }
                     },
-                    onSurvey   = { sessionId ->
+                    onSurvey = { sessionId ->
                         navController.navigate(Screen.GameSurvey.createRoute(sessionId))
                     },
                 )
             }
             // ── Post-game survey ──────────────────────────────────────────────
             composable(
-                route     = Screen.GameSurvey.route,
+                route = Screen.GameSurvey.route,
                 arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),
             ) { backStack ->
-                val sessionId  = backStack.arguments?.getLong("sessionId") ?: 0L
+                val sessionId = backStack.arguments?.getLong("sessionId") ?: 0L
                 val gameResult = gameUiState.gameResult
 
                 if (gameResult != null) {
                     SurveyScreen(
-                        sessionId  = sessionId,
+                        sessionId = sessionId,
                         gameResult = gameResult,
                         onComplete = {
                             gameVm.resetGame()
@@ -431,6 +439,6 @@ private fun NavController.navigateTab(route: String) {
     navigate(route) {
         popUpTo(graph.startDestinationId) { saveState = true }
         launchSingleTop = true
-        restoreState    = true
+        restoreState = true
     }
 }

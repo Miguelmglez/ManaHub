@@ -92,7 +92,7 @@ fun MagicBottomBar(
         ) {
             // Slot 1 — Collection
             BottomBarTab(
-                label    = "COLLECTION",
+                label    = "FOLDER",
                 icon     = Icons.Default.CollectionsBookmark,
                 selected = currentRoute == Screen.Collection.route,
                 onClick  = onCollectionClick,
