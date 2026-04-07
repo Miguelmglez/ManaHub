@@ -1,5 +1,6 @@
 package com.mmg.magicfolder.feature.game
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,13 +48,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.rememberNavController
 import com.mmg.magicfolder.R
+import com.mmg.magicfolder.app.navigation.Screen
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.core.ui.theme.magicColors
@@ -63,43 +68,48 @@ import com.mmg.magicfolder.feature.game.model.LayoutTemplate
 
 @Composable
 fun GameSetupScreen(
-    viewModel:              GameSetupViewModel,
-    onBack:                 () -> Unit,
-    onStartGame:            (GameMode, List<PlayerConfig>, LayoutTemplate) -> Unit,
+    viewModel: GameSetupViewModel,
+    onBack: () -> Unit,
+    onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate) -> Unit,
     onNavigateToTournament: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     GameSetupScreenContent(
-        uiState               = uiState,
-        onBack                = onBack,
-        onStartGame           = onStartGame,
+        uiState = uiState,
+        onBack = onBack,
+        onStartGame = onStartGame,
         onNavigateToTournament = onNavigateToTournament,
-        onModeChange          = viewModel::onModeChange,
-        onPlayerCountChange   = viewModel::onPlayerCountChange,
-        onUpdatePlayerName    = viewModel::updatePlayerName,
-        onUpdatePlayerTheme   = viewModel::updatePlayerTheme
+        onModeChange = viewModel::onModeChange,
+        onPlayerCountChange = viewModel::onPlayerCountChange,
+        onUpdatePlayerName = viewModel::updatePlayerName,
+        onUpdatePlayerTheme = viewModel::updatePlayerTheme
     )
 }
 
 @Composable
 private fun GameSetupScreenContent(
-    uiState:               GameSetupUiState,
-    onBack:                () -> Unit,
-    onStartGame:           (GameMode, List<PlayerConfig>, LayoutTemplate) -> Unit,
+    uiState: GameSetupUiState,
+    onBack: () -> Unit,
+    onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate) -> Unit,
     onNavigateToTournament: () -> Unit,
-    onModeChange:          (GameMode) -> Unit,
-    onPlayerCountChange:   (Int) -> Unit,
-    onUpdatePlayerName:    (Int, String) -> Unit,
-    onUpdatePlayerTheme:   (Int, PlayerThemeColors) -> Unit,
+    onModeChange: (GameMode) -> Unit,
+    onPlayerCountChange: (Int) -> Unit,
+    onUpdatePlayerName: (Int, String) -> Unit,
+    onUpdatePlayerTheme: (Int, PlayerThemeColors) -> Unit,
 ) {
+    val navController = rememberNavController()
+    val activity = LocalContext.current as ComponentActivity
+    val gameVm: GameViewModel = hiltViewModel(activity)
+    val gameUiState by gameVm.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
+    val hasActiveGame = gameUiState.players.isNotEmpty() && gameUiState.winner == null
 
     Scaffold(
         containerColor = mc.background,
         topBar = {
             Surface(
-                color    = mc.backgroundSecondary,
+                color = mc.backgroundSecondary,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -110,17 +120,18 @@ private fun GameSetupScreenContent(
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector        = Icons.Default.ArrowBack,
+                            imageVector = Icons.Default.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
-                            tint               = mc.textSecondary
+                            tint = mc.textSecondary
                         )
                     }
                     Text(
-                        text     = stringResource(R.string.gamesetup_title),
-                        style    = MaterialTheme.magicTypography.titleLarge,
-                        color    = mc.textPrimary,
+                        text = stringResource(R.string.gamesetup_title),
+                        style = MaterialTheme.magicTypography.titleLarge,
+                        color = mc.textPrimary,
                         modifier = Modifier.weight(1f)
                     )
+
                 }
             }
         },
@@ -130,8 +141,8 @@ private fun GameSetupScreenContent(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement   = Arrangement.spacedBy(24.dp),
-            horizontalAlignment   = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // ── Mode selector ─────────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -143,9 +154,9 @@ private fun GameSetupScreenContent(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     GameMode.entries.forEach { mode ->
                         ModeTile(
-                            mode     = mode,
+                            mode = mode,
                             selected = mode == uiState.selectedMode,
-                            onClick  = { onModeChange(mode) },
+                            onClick = { onModeChange(mode) },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -154,7 +165,7 @@ private fun GameSetupScreenContent(
 
             // ── Player count stepper ──────────────────────────────────────────
             PlayerCountStepper(
-                playerCount         = uiState.playerCount,
+                playerCount = uiState.playerCount,
                 onPlayerCountChange = onPlayerCountChange,
             )
 
@@ -165,11 +176,11 @@ private fun GameSetupScreenContent(
             ) {
                 itemsIndexed(uiState.playerConfigs) { index, config ->
                     PlayerConfigRow(
-                        config      = config,
-                        usedThemes  = uiState.playerConfigs
+                        config = config,
+                        usedThemes = uiState.playerConfigs
                             .filter { it.id != config.id }
                             .map { it.theme },
-                        onNameChange  = { name -> onUpdatePlayerName(index, name) },
+                        onNameChange = { name -> onUpdatePlayerName(index, name) },
                         onThemeChange = { theme -> onUpdatePlayerTheme(index, theme) },
                     )
                 }
@@ -177,10 +188,18 @@ private fun GameSetupScreenContent(
 
             // ── Begin button ──────────────────────────────────────────────────
             Button(
-                onClick  = { onStartGame(uiState.selectedMode, uiState.playerConfigs, uiState.selectedLayout) },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                shape    = RoundedCornerShape(8.dp),
+                onClick = {
+                    onStartGame(
+                        uiState.selectedMode,
+                        uiState.playerConfigs,
+                        uiState.selectedLayout
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                shape = RoundedCornerShape(8.dp),
             ) {
                 Text(
                     stringResource(R.string.gamesetup_begin_button),
@@ -208,19 +227,19 @@ private fun GameSetupScreenContent(
 
 @Composable
 private fun PlayerCountStepper(
-    playerCount:        Int,
+    playerCount: Int,
     onPlayerCountChange: (Int) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        modifier              = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             stringResource(R.string.gamesetup_players_label),
-            style    = MaterialTheme.magicTypography.labelLarge,
-            color    = mc.textSecondary,
+            style = MaterialTheme.magicTypography.labelLarge,
+            color = mc.textSecondary,
             modifier = Modifier.weight(1f),
         )
         // Decrement button
@@ -242,10 +261,10 @@ private fun PlayerCountStepper(
         }
         // Current count
         Text(
-            text      = "$playerCount",
-            style     = MaterialTheme.magicTypography.displayMedium,
-            color     = mc.primaryAccent,
-            modifier  = Modifier.widthIn(min = 48.dp),
+            text = "$playerCount",
+            style = MaterialTheme.magicTypography.displayMedium,
+            color = mc.primaryAccent,
+            modifier = Modifier.widthIn(min = 48.dp),
             textAlign = TextAlign.Center,
         )
         // Increment button
@@ -274,8 +293,8 @@ private fun PlayerCountStepper(
 
 @Composable
 private fun PlayerConfigRow(
-    config:       PlayerConfig,
-    usedThemes:   List<PlayerThemeColors>,
+    config: PlayerConfig,
+    usedThemes: List<PlayerThemeColors>,
     onNameChange: (String) -> Unit,
     onThemeChange: (PlayerThemeColors) -> Unit,
 ) {
@@ -288,7 +307,7 @@ private fun PlayerConfigRow(
             .clip(RoundedCornerShape(12.dp))
             .background(mc.surface)
             .padding(12.dp),
-        verticalAlignment     = Alignment.CenterVertically,
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Color circle — tap to open picker
@@ -304,30 +323,30 @@ private fun PlayerConfigRow(
         // Name field — read-only for the app user (Player 1)
         if (config.isAppUser) {
             Row(
-                modifier              = Modifier.weight(1f),
-                verticalAlignment     = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text  = config.name.ifBlank { stringResource(R.string.game_setup_default_player_name) },
+                    text = config.name.ifBlank { stringResource(R.string.game_setup_default_player_name) },
                     style = MaterialTheme.magicTypography.bodyLarge,
                     color = if (config.isDefaultName) mc.textDisabled else mc.primaryAccent,
                 )
                 Surface(
-                    shape  = RoundedCornerShape(6.dp),
-                    color  = mc.primaryAccent.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(6.dp),
+                    color = mc.primaryAccent.copy(alpha = 0.15f),
                     border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.4f)),
                 ) {
                     Text(
-                        text     = stringResource(R.string.game_setup_you_badge),
-                        style    = MaterialTheme.magicTypography.labelSmall,
-                        color    = mc.primaryAccent,
+                        text = stringResource(R.string.game_setup_you_badge),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.primaryAccent,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
                 if (config.isDefaultName) {
                     Text(
-                        text  = stringResource(R.string.game_setup_set_name_hint),
+                        text = stringResource(R.string.game_setup_set_name_hint),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textDisabled,
                     )
@@ -335,11 +354,11 @@ private fun PlayerConfigRow(
             }
         } else {
             BasicTextField(
-                value         = config.name,
+                value = config.name,
                 onValueChange = onNameChange,
-                modifier      = Modifier.weight(1f),
-                textStyle     = MaterialTheme.magicTypography.bodyLarge.copy(color = mc.textPrimary),
-                singleLine    = true,
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.magicTypography.bodyLarge.copy(color = mc.textPrimary),
+                singleLine = true,
                 decorationBox = { inner ->
                     Box {
                         if (config.name.isEmpty()) {
@@ -377,8 +396,8 @@ private fun PlayerConfigRow(
 @Composable
 private fun ColorPickerSheet(
     availableThemes: List<PlayerThemeColors>,
-    onSelect:        (PlayerThemeColors) -> Unit,
-    onDismiss:       () -> Unit,
+    onSelect: (PlayerThemeColors) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     ModalBottomSheet(
@@ -397,16 +416,16 @@ private fun ColorPickerSheet(
             )
             Spacer(Modifier.height(16.dp))
             LazyVerticalGrid(
-                columns               = GridCells.Fixed(5),
+                columns = GridCells.Fixed(5),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement   = Arrangement.spacedBy(12.dp),
-                modifier              = Modifier.heightIn(max = 200.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.heightIn(max = 200.dp),
             ) {
                 items(availableThemes) { theme ->
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier            = Modifier.clickable { onSelect(theme) },
+                        modifier = Modifier.clickable { onSelect(theme) },
                     ) {
                         Box(
                             modifier = Modifier
@@ -415,12 +434,12 @@ private fun ColorPickerSheet(
                                 .background(theme.accent),
                         )
                         Text(
-                            text      = theme.name,
-                            style     = MaterialTheme.magicTypography.labelSmall,
-                            color     = mc.textSecondary,
+                            text = theme.name,
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.textSecondary,
                             textAlign = TextAlign.Center,
-                            maxLines  = 1,
-                            overflow  = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -437,14 +456,14 @@ private fun ColorPickerSheet(
 
 @Composable
 private fun ModeTile(
-    mode:     GameMode,
+    mode: GameMode,
     selected: Boolean,
-    onClick:  () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val mc          = MaterialTheme.magicColors
+    val mc = MaterialTheme.magicColors
     val borderColor = if (selected) mc.primaryAccent else mc.surfaceVariant
-    val bgColor     = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface
+    val bgColor = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface
 
     Column(
         modifier = modifier
@@ -461,16 +480,16 @@ private fun ModeTile(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text  = if (mode == GameMode.COMMANDER) "⚔️" else "🔮",
+            text = if (mode == GameMode.COMMANDER) "⚔️" else "🔮",
             style = MaterialTheme.magicTypography.displayMedium,
         )
         Text(
-            text  = mode.displayName,
+            text = mode.displayName,
             style = MaterialTheme.magicTypography.titleMedium,
             color = if (selected) mc.primaryAccent else mc.textPrimary,
         )
         Text(
-            text  = "${mode.startingLife} life",
+            text = "${mode.startingLife} life",
             style = MaterialTheme.magicTypography.bodySmall,
             color = mc.textSecondary,
         )
