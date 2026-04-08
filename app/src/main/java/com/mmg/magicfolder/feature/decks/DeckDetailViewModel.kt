@@ -268,6 +268,13 @@ class DeckDetailViewModel @Inject constructor(
         _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList()) }
     }
 
+    fun setCoverCard(scryfallId: String) {
+        viewModelScope.launch {
+            val deck = _uiState.value.deck ?: return@launch
+            runCatching { deckRepository.updateDeck(deck.copy(coverCardId = scryfallId)) }
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private fun buildManaCurve(cards: List<DeckCard>): Map<Int, Int> =

@@ -1,11 +1,13 @@
 package com.mmg.magicfolder.core.domain.repository
 
 import com.mmg.magicfolder.core.domain.model.Deck
+import com.mmg.magicfolder.core.domain.model.DeckSummary
 import com.mmg.magicfolder.core.domain.model.DeckWithCards
 import kotlinx.coroutines.flow.Flow
 
 interface DeckRepository {
     fun observeAllDecks(): Flow<List<Deck>>
+    fun observeAllDeckSummaries(): Flow<List<DeckSummary>>
     fun observeDeckWithCards(deckId: Long): Flow<DeckWithCards?>
     suspend fun createDeck(deck: Deck): Long
     suspend fun updateDeck(deck: Deck)

@@ -3,6 +3,7 @@ package com.mmg.magicfolder.feature.decks
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.domain.model.Deck
+import com.mmg.magicfolder.core.domain.model.DeckSummary
 import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -19,7 +20,7 @@ class DeckViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            deckRepo.observeAllDecks()
+            deckRepo.observeAllDeckSummaries()
                 .catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
                 .collect { decks -> _uiState.update { it.copy(decks = decks, isLoading = false) } }
         }
@@ -48,8 +49,8 @@ class DeckViewModel @Inject constructor(
 }
 
 data class DeckListUiState(
-    val decks:            List<Deck> = emptyList(),
-    val isLoading:        Boolean    = true,
-    val showCreateDialog: Boolean    = false,
-    val error:            String?    = null,
+    val decks:            List<DeckSummary> = emptyList(),
+    val isLoading:        Boolean           = true,
+    val showCreateDialog: Boolean           = false,
+    val error:            String?           = null,
 )

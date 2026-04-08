@@ -63,7 +63,12 @@
       "Bash(\"C:/Program Files/Android/Android Studio/jbr/bin/java.exe\" -version)",
       "Read(//c/Program Files/**)",
       "Read(//c/Users/Miguel/.gradle/jdks/**)",
-      "Bash(JAVA_HOME=\"C:/Users/Miguel/.gradle/jdks/jetbrains_s_r_o_-21-amd64-windows.2\" ./gradlew compileDebugKotlin)"
+      "Bash(JAVA_HOME=\"C:/Users/Miguel/.gradle/jdks/jetbrains_s_r_o_-21-amd64-windows.2\" ./gradlew compileDebugKotlin)",
+      "Bash(./gradlew :app:compileDebugKotlin --daemon)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew :app:compileDebugKotlin)",
+      "Bash(JAVA_HOME=\"C:\\\\\\\\Program Files\\\\\\\\Android\\\\\\\\Android Studio\\\\\\\\jbr\" ./gradlew.bat :app:compileDebugKotlin)",
+      "Bash(\"/c/Users/Miguel/.jdks/jbr-17.0.14/bin/java\" -version)",
+      "Bash(JAVA_HOME=\"/c/Users/Miguel/.jdks/jbr-17.0.14\" ./gradlew :app:compileDebugKotlin)"
     ]
   }
 }

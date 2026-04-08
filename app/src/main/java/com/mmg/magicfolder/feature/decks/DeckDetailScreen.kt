@@ -5,6 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +17,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -21,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -51,8 +56,9 @@ fun DeckDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    var showAddCardsSheet by remember { mutableStateOf(false) }
-    var selectedCardId    by remember { mutableStateOf<String?>(null) }
+    var showAddCardsSheet  by remember { mutableStateOf(false) }
+    var showCoverPicker    by remember { mutableStateOf(false) }
+    var selectedCardId     by remember { mutableStateOf<String?>(null) }
 
     // Keep the selected card detail in sync with deck state changes
     val selectedDeckCard = remember(selectedCardId, uiState.cards) {
@@ -98,6 +104,16 @@ fun DeckDetailScreen(
                             }
                         }
                     }
+                    // Cover image picker button — only shown when deck has cards with art
+                    if (uiState.cards.any { it.card?.imageArtCrop != null }) {
+                        IconButton(onClick = { showCoverPicker = true }) {
+                            Icon(
+                                imageVector        = Icons.Default.Edit,
+                                contentDescription = "Change cover image",
+                                tint               = mc.textSecondary,
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -141,6 +157,19 @@ fun DeckDetailScreen(
                 modifier        = Modifier.padding(padding),
             )
         }
+    }
+
+    // ── Cover image picker ────────────────────────────────────────────────────
+    if (showCoverPicker) {
+        CoverPickerSheet(
+            cards     = uiState.cards.filter { it.card?.imageArtCrop != null },
+            currentCoverId = uiState.deck?.coverCardId,
+            onSelect  = { scryfallId ->
+                viewModel.setCoverCard(scryfallId)
+                showCoverPicker = false
+            },
+            onDismiss = { showCoverPicker = false },
+        )
     }
 
     // ── Add cards ModalBottomSheet ────────────────────────────────────────────
@@ -940,4 +969,113 @@ private fun groupCardsByType(cards: List<DeckCard>): List<Pair<String, List<Deck
     return typeOrder
         .filter { it in groups }
         .map { it to (groups[it]!! as List<DeckCard>) }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Cover image picker ModalBottomSheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CoverPickerSheet(
+    cards:          List<DeckCard>,
+    currentCoverId: String?,
+    onSelect:       (String) -> Unit,
+    onDismiss:      () -> Unit,
+) {
+    val mc         = MaterialTheme.magicColors
+    val ty         = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = sheetState,
+        containerColor   = mc.backgroundSecondary,
+        dragHandle       = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.75f)
+                .padding(bottom = 16.dp),
+        ) {
+            Text(
+                text     = "Choose Cover Image",
+                style    = ty.titleMedium,
+                color    = mc.textPrimary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            Text(
+                text     = "Tap a card's art to use it as the deck cover",
+                style    = ty.bodySmall,
+                color    = mc.textSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp),
+            )
+
+            LazyVerticalGrid(
+                columns             = GridCells.Fixed(3),
+                contentPadding      = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement   = Arrangement.spacedBy(8.dp),
+                modifier            = Modifier.fillMaxSize(),
+            ) {
+                items(cards, key = { it.scryfallId }) { deckCard ->
+                    val artUrl    = deckCard.card?.imageArtCrop ?: return@items
+                    val isSelected = deckCard.scryfallId == currentCoverId
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1.37f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSelect(deckCard.scryfallId) },
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(artUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = deckCard.card!!.name,
+                            contentScale       = ContentScale.Crop,
+                            modifier           = Modifier.fillMaxSize(),
+                        )
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(mc.primaryAccent.copy(alpha = 0.35f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Surface(
+                                    color = mc.primaryAccent,
+                                    shape = RoundedCornerShape(50),
+                                ) {
+                                    Text(
+                                        text     = "✓",
+                                        color    = mc.background,
+                                        style    = ty.labelMedium,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    )
+                                }
+                            }
+                        }
+                        // Card name tooltip at bottom
+                        Box(
+                            modifier         = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text     = deckCard.card!!.name,
+                                style    = ty.labelSmall,
+                                color    = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
