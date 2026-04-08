@@ -160,8 +160,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 arguments = listOf(navArgument("scryfallId") { type = NavType.StringType }),
             ) {
                 CardDetailScreen(
-                    onBack = { navController.popBackStack() },
+                    onBack              = { navController.popBackStack() },
                     onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
+                    onNavigateToDeck    = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
                 )
             }
 

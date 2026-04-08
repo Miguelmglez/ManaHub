@@ -29,6 +29,9 @@ class DeckRepositoryImpl @Inject constructor(
     override fun observeAllDecks(): Flow<List<Deck>> =
         deckDao.observeAllDecks().map { it.map { d -> d.toDomainDeck() } }
 
+    override fun observeDecksContainingCard(scryfallId: String): Flow<List<Deck>> =
+        deckDao.observeDecksContainingCard(scryfallId).map { it.map { d -> d.toDomainDeck() } }
+
     override fun observeAllDeckSummaries(): Flow<List<DeckSummary>> =
         deckDao.observeDeckSummaryRows().map { rows ->
             rows.groupBy { it.deckId }

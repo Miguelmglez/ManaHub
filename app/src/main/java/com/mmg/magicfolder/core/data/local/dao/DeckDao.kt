@@ -70,6 +70,14 @@ interface DeckDao {
     @Query("SELECT COUNT(*) FROM decks")
     fun observeDeckCount(): Flow<Int>
 
+    @Query("""
+        SELECT d.* FROM decks d
+        INNER JOIN deck_cards dc ON d.id = dc.deck_id
+        WHERE dc.scryfall_id = :scryfallId
+        ORDER BY d.updated_at DESC
+    """)
+    fun observeDecksContainingCard(scryfallId: String): Flow<List<DeckEntity>>
+
     @Transaction
     @Query("SELECT * FROM decks WHERE id = :deckId")
     fun observeDeckWithCards(deckId: Long): Flow<DeckWithCards?>
