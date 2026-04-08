@@ -32,13 +32,17 @@ import com.mmg.magicfolder.core.domain.model.SuggestedTag
 import com.mmg.magicfolder.core.domain.model.TagCategory
 import com.mmg.magicfolder.core.domain.model.UserCard
 import com.mmg.magicfolder.core.domain.model.UserDefinedTag
+import com.mmg.magicfolder.core.domain.model.Deck
 import com.mmg.magicfolder.core.ui.components.CardRarity
 import com.mmg.magicfolder.core.ui.components.FoilBadge
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
+import com.mmg.magicfolder.core.ui.components.OracleText
 import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.components.StaleBadge
 import com.mmg.magicfolder.core.domain.model.PreferredCurrency
 import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
+import com.mmg.magicfolder.core.ui.theme.magicColors
+import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.core.util.PriceFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +50,7 @@ import com.mmg.magicfolder.core.util.PriceFormatter
 fun CardDetailScreen(
     onBack: () -> Unit,
     onNavigateToAddCard: () -> Unit,
+    onNavigateToDeck: (Long) -> Unit = {},
     viewModel: CardDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -93,6 +98,7 @@ fun CardDetailScreen(
             uiState.card != null -> CardDetailContent(
                 card = uiState.card!!,
                 userCards = uiState.userCards,
+                decksContainingCard = uiState.decksContainingCard,
                 isStale = uiState.isStale,
                 onRemoveAutoTag = viewModel::onRemoveTag,
                 onAddUserTag = viewModel::onAddUserTag,
@@ -105,6 +111,7 @@ fun CardDetailScreen(
                 onShowTradeSheet = viewModel::onShowTradeSheet,
                 onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
                 onRequestDelete = viewModel::onRequestDelete,
+                onNavigateToDeck = onNavigateToDeck,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -185,6 +192,7 @@ fun CardDetailScreen(
 private fun CardDetailContent(
     card: Card,
     userCards: List<UserCard>,
+    decksContainingCard: List<Deck>,
     isStale: Boolean,
     onRemoveAutoTag: (CardTag) -> Unit,
     onAddUserTag: (CardTag) -> Unit,
@@ -197,6 +205,7 @@ private fun CardDetailContent(
     onShowTradeSheet: () -> Unit,
     onUpdateQuantity: (Long, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
+    onNavigateToDeck: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -282,28 +291,21 @@ private fun CardDetailContent(
             }
         }
 
-        // Oracle text
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
-        ) {
-            if (card.printedText.isNullOrEmpty()) {
-                card.oracleText?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(12.dp),
-                    )
-                }
-            } else {
-                Text(
-                    text = card.printedText,
-                    style = MaterialTheme.typography.bodyMedium,
+        // Oracle / printed text with inline mana symbols
+        val oracleDisplayText = card.printedText.takeUnless { it.isNullOrEmpty() }
+            ?: card.oracleText
+        if (!oracleDisplayText.isNullOrEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            ) {
+                OracleText(
+                    text     = oracleDisplayText,
+                    style    = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(12.dp),
                 )
             }
-
         }
 
         // Flavor text
@@ -369,6 +371,15 @@ private fun CardDetailContent(
             )
         }
 
+        // Found in decks section
+        if (decksContainingCard.isNotEmpty()) {
+            HorizontalDivider()
+            FoundInDecksSection(
+                decks           = decksContainingCard,
+                onNavigateToDeck = onNavigateToDeck,
+            )
+        }
+
         // Scryfall link
         TextButton(onClick = { uriHandler.openUri(card.scryfallUri) }) {
             Icon(
@@ -382,6 +393,99 @@ private fun CardDetailContent(
 
         // Extra bottom padding for FAB
         Spacer(Modifier.height(72.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Found in Decks section
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FoundInDecksSection(
+    decks:            List<Deck>,
+    onNavigateToDeck: (Long) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+
+    Column(
+        modifier            = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector        = Icons.Default.LibraryBooks,
+                contentDescription = null,
+                tint               = mc.primaryAccent,
+                modifier           = Modifier.size(16.dp),
+            )
+            Text(
+                text  = "Found in ${decks.size} ${if (decks.size == 1) "Deck" else "Decks"}",
+                style = MaterialTheme.typography.titleSmall,
+                color = mc.textPrimary,
+            )
+        }
+
+        decks.forEach { deck ->
+            DeckChip(deck = deck, onClick = { onNavigateToDeck(deck.id) })
+        }
+    }
+}
+
+@Composable
+private fun DeckChip(deck: Deck, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Surface(
+        onClick = onClick,
+        color   = mc.surface,
+        shape   = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+        border  = androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector        = Icons.Default.LibraryBooks,
+                contentDescription = null,
+                tint               = mc.primaryAccent,
+                modifier           = Modifier.size(18.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text     = deck.name,
+                    style    = ty.bodyMedium,
+                    color    = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+                Surface(
+                    color  = mc.primaryAccent.copy(alpha = 0.12f),
+                    shape  = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                ) {
+                    Text(
+                        text     = deck.format.replaceFirstChar { it.uppercase() },
+                        style    = ty.labelSmall,
+                        color    = mc.primaryAccent,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                    )
+                }
+            }
+            Icon(
+                imageVector        = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint               = mc.textDisabled,
+                modifier           = Modifier.size(16.dp),
+            )
+        }
     }
 }
 

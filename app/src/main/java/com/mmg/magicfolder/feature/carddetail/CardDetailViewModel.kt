@@ -10,6 +10,7 @@ import com.mmg.magicfolder.core.domain.model.TagCategory
 import com.mmg.magicfolder.core.domain.model.UserCard
 import com.mmg.magicfolder.core.domain.model.UserDefinedTag
 import com.mmg.magicfolder.core.domain.repository.CardRepository
+import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository
 import com.mmg.magicfolder.core.domain.usecase.collection.AddCardToCollectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +23,7 @@ class CardDetailViewModel @Inject constructor(
     savedStateHandle:            SavedStateHandle,
     private val cardRepo:        CardRepository,
     private val userCardRepo:    UserCardRepository,
+    private val deckRepo:        DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
     private val userPrefs:       UserPreferencesDataStore,
 ) : ViewModel() {
@@ -34,10 +36,19 @@ class CardDetailViewModel @Inject constructor(
     init {
         loadCard()
         observeUserCards()
+        observeDecks()
         viewModelScope.launch {
             userPrefs.userDefinedTagsFlow.collect { tags ->
                 _uiState.update { it.copy(userDefinedTags = tags) }
             }
+        }
+    }
+
+    private fun observeDecks() {
+        viewModelScope.launch {
+            deckRepo.observeDecksContainingCard(scryfallId)
+                .catch { /* ignore — decks section is non-critical */ }
+                .collect { decks -> _uiState.update { it.copy(decksContainingCard = decks) } }
         }
     }
 

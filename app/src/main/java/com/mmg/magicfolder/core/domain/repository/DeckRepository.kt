@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 interface DeckRepository {
     fun observeAllDecks(): Flow<List<Deck>>
     fun observeAllDeckSummaries(): Flow<List<DeckSummary>>
+    fun observeDecksContainingCard(scryfallId: String): Flow<List<Deck>>
     fun observeDeckWithCards(deckId: Long): Flow<DeckWithCards?>
     suspend fun createDeck(deck: Deck): Long
     suspend fun updateDeck(deck: Deck)

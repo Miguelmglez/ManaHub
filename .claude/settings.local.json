@@ -68,7 +68,9 @@
       "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew :app:compileDebugKotlin)",
       "Bash(JAVA_HOME=\"C:\\\\\\\\Program Files\\\\\\\\Android\\\\\\\\Android Studio\\\\\\\\jbr\" ./gradlew.bat :app:compileDebugKotlin)",
       "Bash(\"/c/Users/Miguel/.jdks/jbr-17.0.14/bin/java\" -version)",
-      "Bash(JAVA_HOME=\"/c/Users/Miguel/.jdks/jbr-17.0.14\" ./gradlew :app:compileDebugKotlin)"
+      "Bash(JAVA_HOME=\"/c/Users/Miguel/.jdks/jbr-17.0.14\" ./gradlew :app:compileDebugKotlin)",
+      "Bash(\"/c/Users/Miguel/.jdks/jbr-17.0.14/bin/jar\" tf:*)",
+      "Bash(\"/c/Users/Miguel/.jdks/jbr-17.0.14/bin/jar\" xf:*)"
     ]
   }
 }
