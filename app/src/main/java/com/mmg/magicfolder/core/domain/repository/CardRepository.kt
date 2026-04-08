@@ -24,6 +24,9 @@ interface CardRepository {
     /** Replace the confirmed tag list for a card already in the local cache. */
     suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>)
 
+    /** Replace the user-added tag list for a card. */
+    suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>)
+
     /** Replace the suggested-tag list (used when the user dismisses suggestions). */
     suspend fun updateSuggestedTags(scryfallId: String, suggestions: List<SuggestedTag>)
 

@@ -3,9 +3,12 @@ package com.mmg.magicfolder.feature.carddetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.magicfolder.core.data.local.UserPreferencesDataStore
 import com.mmg.magicfolder.core.domain.model.CardTag
 import com.mmg.magicfolder.core.domain.model.DataResult
+import com.mmg.magicfolder.core.domain.model.TagCategory
 import com.mmg.magicfolder.core.domain.model.UserCard
+import com.mmg.magicfolder.core.domain.model.UserDefinedTag
 import com.mmg.magicfolder.core.domain.repository.CardRepository
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository
 import com.mmg.magicfolder.core.domain.usecase.collection.AddCardToCollectionUseCase
@@ -16,10 +19,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CardDetailViewModel @Inject constructor(
-    savedStateHandle:           SavedStateHandle,
-    private val cardRepo:       CardRepository,
-    private val userCardRepo:   UserCardRepository,
+    savedStateHandle:            SavedStateHandle,
+    private val cardRepo:        CardRepository,
+    private val userCardRepo:    UserCardRepository,
     private val addToCollection: AddCardToCollectionUseCase,
+    private val userPrefs:       UserPreferencesDataStore,
 ) : ViewModel() {
 
     private val scryfallId: String = checkNotNull(savedStateHandle["scryfallId"])
@@ -30,6 +34,11 @@ class CardDetailViewModel @Inject constructor(
     init {
         loadCard()
         observeUserCards()
+        viewModelScope.launch {
+            userPrefs.userDefinedTagsFlow.collect { tags ->
+                _uiState.update { it.copy(userDefinedTags = tags) }
+            }
+        }
     }
 
     private fun loadCard() {
@@ -115,6 +124,47 @@ class CardDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { cardRepo.updateCardTags(scryfallId, current - tag) }
                 .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
+    fun onAddUserTag(tag: CardTag) {
+        val current = _uiState.value.card?.userTags ?: return
+        if (tag in current) return
+        viewModelScope.launch {
+            runCatching { cardRepo.updateUserTags(scryfallId, current + tag) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
+    fun onRemoveUserTag(tag: CardTag) {
+        val current = _uiState.value.card?.userTags ?: return
+        viewModelScope.launch {
+            runCatching { cardRepo.updateUserTags(scryfallId, current - tag) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
+    /**
+     * Creates a new user-defined tag, saves it globally (so it appears in all
+     * future TagPickerSheet instances), and adds it to this card's [userTags].
+     */
+    fun onSaveAndAddCustomTag(label: String, categoryKey: String) {
+        val trimmed = label.trim()
+        if (trimmed.isEmpty()) return
+        val key = trimmed.lowercase()
+            .replace(' ', '_')
+            .replace(Regex("[^a-z0-9_]"), "")
+            .take(50)
+        if (key.isEmpty()) return
+        val userDefinedTag = UserDefinedTag(key = key, label = trimmed, categoryKey = categoryKey)
+        viewModelScope.launch {
+            runCatching {
+                userPrefs.saveUserDefinedTag(userDefinedTag)
+                cardRepo.updateUserTags(
+                    scryfallId,
+                    ((_uiState.value.card?.userTags ?: emptyList()) + CardTag(key, TagCategory.CUSTOM)).distinct()
+                )
+            }.onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
     }
 

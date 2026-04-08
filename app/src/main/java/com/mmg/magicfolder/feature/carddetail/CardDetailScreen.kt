@@ -4,6 +4,10 @@ package com.mmg.magicfolder.feature.carddetail
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,6 +20,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import com.mmg.magicfolder.R
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -26,6 +31,7 @@ import com.mmg.magicfolder.core.domain.model.CardTag
 import com.mmg.magicfolder.core.domain.model.SuggestedTag
 import com.mmg.magicfolder.core.domain.model.TagCategory
 import com.mmg.magicfolder.core.domain.model.UserCard
+import com.mmg.magicfolder.core.domain.model.UserDefinedTag
 import com.mmg.magicfolder.core.ui.components.CardRarity
 import com.mmg.magicfolder.core.ui.components.FoilBadge
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
@@ -33,7 +39,6 @@ import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.components.StaleBadge
 import com.mmg.magicfolder.core.domain.model.PreferredCurrency
 import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
-import com.mmg.magicfolder.core.util.CardTypeTranslator
 import com.mmg.magicfolder.core.util.PriceFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,8 +87,9 @@ fun CardDetailScreen(
                 card                  = uiState.card!!,
                 userCards             = uiState.userCards,
                 isStale               = uiState.isStale,
-                onAddTag              = viewModel::onAddTag,
-                onRemoveTag           = viewModel::onRemoveTag,
+                onRemoveAutoTag       = viewModel::onRemoveTag,
+                onAddUserTag          = viewModel::onAddUserTag,
+                onRemoveUserTag       = viewModel::onRemoveUserTag,
                 onShowTagPicker       = viewModel::onShowTagPicker,
                 onConfirmSuggestedTag = viewModel::onConfirmSuggestedTag,
                 onDismissSuggestedTag = viewModel::onDismissSuggestedTag,
@@ -97,11 +103,14 @@ fun CardDetailScreen(
 
     // Tag picker sheet
     if (uiState.showTagPicker) {
-        val currentTags = uiState.card?.tags ?: emptyList()
         TagPickerSheet(
-            currentTags = currentTags,
-            onAddTag    = viewModel::onAddTag,
-            onDismiss   = viewModel::onDismissTagPicker,
+            cardAutoTags          = uiState.card?.tags ?: emptyList(),
+            cardSuggestedTags     = uiState.card?.suggestedTags ?: emptyList(),
+            currentUserTags       = uiState.card?.userTags ?: emptyList(),
+            userDefinedTags       = uiState.userDefinedTags,
+            onAddUserTag          = viewModel::onAddUserTag,
+            onSaveAndAddCustomTag = viewModel::onSaveAndAddCustomTag,
+            onDismiss             = viewModel::onDismissTagPicker,
         )
     }
 
@@ -143,8 +152,9 @@ private fun CardDetailContent(
     card:                  Card,
     userCards:             List<UserCard>,
     isStale:               Boolean,
-    onAddTag:              (CardTag) -> Unit,
-    onRemoveTag:           (CardTag) -> Unit,
+    onRemoveAutoTag:       (CardTag) -> Unit,
+    onAddUserTag:          (CardTag) -> Unit,
+    onRemoveUserTag:       (CardTag) -> Unit,
     onShowTagPicker:       () -> Unit,
     onConfirmSuggestedTag: (CardTag) -> Unit,
     onDismissSuggestedTag: (CardTag) -> Unit,
@@ -302,8 +312,11 @@ private fun CardDetailContent(
 
         // Tags
         TagsSection(
-            tags            = card.tags,
-            onRemoveTag     = onRemoveTag,
+            autoTags        = card.tags,
+            userTags        = card.userTags,
+            isInCollection  = userCards.isNotEmpty(),
+            onRemoveAutoTag = onRemoveAutoTag,
+            onRemoveUserTag = onRemoveUserTag,
             onShowTagPicker = onShowTagPicker,
         )
 
@@ -687,13 +700,18 @@ private fun LegalityChip(format: String, legality: String) {
 //  Tags section
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TagsSection(
-    tags:            List<CardTag>,
-    onRemoveTag:     (CardTag) -> Unit,
+    autoTags:        List<CardTag>,
+    userTags:        List<CardTag>,
+    isInCollection:  Boolean,
+    onRemoveAutoTag: (CardTag) -> Unit,
+    onRemoveUserTag: (CardTag) -> Unit,
     onShowTagPicker: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(true) }
+    val hasAnyTag = autoTags.isNotEmpty() || (isInCollection && userTags.isNotEmpty())
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
@@ -714,19 +732,60 @@ private fun TagsSection(
         }
 
         if (expanded) {
-            if (tags.isEmpty()) {
+            // ── Auto-generated tags ──────────────────────────────────────────
+            if (autoTags.isNotEmpty()) {
                 Text(
-                    text  = "Sin etiquetas — toca + para añadir",
-                    style = MaterialTheme.typography.bodySmall,
+                    text  = "Etiquetas automáticas",
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            } else {
-                tags.chunked(3).forEach { rowTags ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        rowTags.forEach { tag ->
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement   = Arrangement.spacedBy(4.dp),
+                ) {
+                    autoTags.forEach { tag ->
+                        if (isInCollection) {
                             InputChip(
                                 selected     = true,
-                                onClick      = { onRemoveTag(tag) },
+                                onClick      = { onRemoveAutoTag(tag) },
+                                label        = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Quitar ${tag.label}",
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                },
+                            )
+                        } else {
+                            SuggestionChip(
+                                onClick = {},
+                                label   = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── User tags (only when in collection) ──────────────────────────
+            if (isInCollection) {
+                if (autoTags.isNotEmpty() || userTags.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
+                }
+                Text(
+                    text  = "Mis etiquetas",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (userTags.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement   = Arrangement.spacedBy(4.dp),
+                    ) {
+                        userTags.forEach { tag ->
+                            InputChip(
+                                selected     = true,
+                                onClick      = { onRemoveUserTag(tag) },
                                 label        = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
                                 trailingIcon = {
                                     Icon(
@@ -738,16 +797,29 @@ private fun TagsSection(
                             )
                         }
                     }
+                } else {
+                    Text(
+                        text  = "Sin etiquetas personales — toca + para añadir",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-            }
 
-            OutlinedButton(
-                onClick  = onShowTagPicker,
-                modifier = Modifier.height(32.dp),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Añadir etiqueta", style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick  = onShowTagPicker,
+                    modifier = Modifier.height(32.dp),
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Añadir etiqueta", style = MaterialTheme.typography.labelSmall)
+                }
+            } else if (!hasAnyTag) {
+                Text(
+                    text  = "Sin etiquetas automáticas",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -849,60 +921,274 @@ private fun SuggestedTagChip(
 //  Tag picker bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class TagItem(val key: String, val label: String)
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TagPickerSheet(
-    currentTags: List<CardTag>,
-    onAddTag:    (CardTag) -> Unit,
-    onDismiss:   () -> Unit,
+    cardAutoTags:          List<CardTag>,
+    cardSuggestedTags:     List<SuggestedTag>,
+    currentUserTags:       List<CardTag>,
+    userDefinedTags:       List<UserDefinedTag>,
+    onAddUserTag:          (CardTag) -> Unit,
+    onSaveAndAddCustomTag: (label: String, categoryKey: String) -> Unit,
+    onDismiss:             () -> Unit,
 ) {
-    val categories = TagCategory.entries
+    val userTagKeys = currentUserTags.map { it.key }.toSet()
+
+    // Built-in categories (excluding CUSTOM which is the fallback for raw custom tags)
+    val builtInCategories = TagCategory.entries.filter { it != TagCategory.CUSTOM }
+
+    // User-created category keys that don't map to built-in categories
+    val userCustomCategoryKeys = userDefinedTags
+        .map { it.categoryKey }
+        .filter { key -> builtInCategories.none { it.name == key } }
+        .distinct()
+
+    // ── Custom tag creator state ──────────────────────────────────────────────
+    var customLabel by remember { mutableStateOf("") }
+    var selectedCategoryKey by remember { mutableStateOf(TagCategory.STRATEGY.name) }
+    var showNewCategoryDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        contentWindowInsets = { WindowInsets(0) }
+        contentWindowInsets = { WindowInsets(0) },
     ) {
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .navigationBarsPadding()
+        LazyColumn(
+            modifier = Modifier.navigationBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text("Añadir etiqueta", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
+            // ── Header ──────────────────────────────────────────────────────
+            item {
+                Text("Añadir etiqueta", style = MaterialTheme.typography.titleMedium)
+            }
 
-            LazyColumn(
-                contentPadding      = PaddingValues(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                categories.forEach { category ->
-                    val tagsInCategory = CardTag.canonical.filter {
-                        it.category == category && it !in currentTags
-                    }
-                    if (tagsInCategory.isNotEmpty()) {
-                        item(key = category.name) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    text  = category.name,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                tagsInCategory.chunked(3).forEach { rowTags ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        rowTags.forEach { tag ->
-                                            SuggestionChip(
-                                                onClick = { onAddTag(tag); onDismiss() },
-                                                label   = {
-                                                    Text(tag.label, style = MaterialTheme.typography.labelSmall)
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+            // ── Custom tag creator ───────────────────────────────────────────
+            item {
+                CustomTagCreatorSection(
+                    label                  = customLabel,
+                    onLabelChange          = { customLabel = it },
+                    selectedCategoryKey    = selectedCategoryKey,
+                    onCategorySelected     = { selectedCategoryKey = it },
+                    builtInCategories      = builtInCategories,
+                    userCustomCategoryKeys = userCustomCategoryKeys,
+                    onNewCategoryClick     = { showNewCategoryDialog = true },
+                    onAdd                  = {
+                        if (customLabel.isNotBlank()) {
+                            onSaveAndAddCustomTag(customLabel, selectedCategoryKey)
+                            customLabel = ""
                         }
+                    },
+                )
+            }
+
+            // ── Auto-generated tags for this card ────────────────────────────
+            if (cardAutoTags.isNotEmpty()) {
+                item {
+                    TagPickerSection(
+                        title = "Auto-generadas para esta carta",
+                        tags  = cardAutoTags.map { TagItem(it.key, it.label) },
+                        onAdd = { key ->
+                            val tag = cardAutoTags.find { it.key == key } ?: return@TagPickerSection
+                            onAddUserTag(tag); onDismiss()
+                        },
+                    )
+                }
+            }
+
+            // ── Suggested tags for this card ─────────────────────────────────
+            val availableSuggestions = cardSuggestedTags.filter { it.tag.key !in userTagKeys }
+            if (availableSuggestions.isNotEmpty()) {
+                item {
+                    TagPickerSection(
+                        title = "Sugeridas para esta carta",
+                        tags  = availableSuggestions.map { sug ->
+                            TagItem(sug.tag.key, "${sug.tag.label}  ${(sug.confidence * 100).toInt()}%")
+                        },
+                        onAdd = { key ->
+                            val tag = availableSuggestions.find { it.tag.key == key }?.tag
+                                ?: return@TagPickerSection
+                            onAddUserTag(tag); onDismiss()
+                        },
+                    )
+                }
+            }
+
+            // ── Built-in categories ──────────────────────────────────────────
+            builtInCategories.forEach { category ->
+                val canonical   = CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
+                val userDefined = userDefinedTags.filter { it.categoryKey == category.name && it.key !in userTagKeys }
+                val items       = canonical.map { TagItem(it.key, it.label) } +
+                                  userDefined.map { TagItem(it.key, it.label) }
+                if (items.isNotEmpty()) {
+                    item(key = "cat_${category.name}") {
+                        TagPickerSection(
+                            title = category.name,
+                            tags  = items,
+                            onAdd = { key ->
+                                val tag = canonical.find { it.key == key }
+                                    ?: CardTag(key, category)
+                                onAddUserTag(tag); onDismiss()
+                            },
+                        )
+                    }
+                }
+            }
+
+            // ── User custom categories ────────────────────────────────────────
+            userCustomCategoryKeys.forEach { categoryKey ->
+                val items = userDefinedTags
+                    .filter { it.categoryKey == categoryKey && it.key !in userTagKeys }
+                    .map { TagItem(it.key, it.label) }
+                if (items.isNotEmpty()) {
+                    item(key = "custom_$categoryKey") {
+                        TagPickerSection(
+                            title = categoryKey,
+                            tags  = items,
+                            onAdd = { key ->
+                                onAddUserTag(CardTag(key, TagCategory.CUSTOM)); onDismiss()
+                            },
+                        )
                     }
                 }
             }
         }
     }
+
+    if (showNewCategoryDialog) {
+        NewCategoryDialog(
+            onDismiss = { showNewCategoryDialog = false },
+            onConfirm = { name ->
+                if (name.isNotBlank()) selectedCategoryKey = name.trim()
+                showNewCategoryDialog = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CustomTagCreatorSection(
+    label:                  String,
+    onLabelChange:          (String) -> Unit,
+    selectedCategoryKey:    String,
+    onCategorySelected:     (String) -> Unit,
+    builtInCategories:      List<TagCategory>,
+    userCustomCategoryKeys: List<String>,
+    onNewCategoryClick:     () -> Unit,
+    onAdd:                  () -> Unit,
+) {
+    val allCategories: List<String> = builtInCategories.map { it.name } + userCustomCategoryKeys
+
+    Surface(
+        color  = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        shape  = MaterialTheme.shapes.medium,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "Nueva etiqueta personalizada",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            OutlinedTextField(
+                value         = label,
+                onValueChange = onLabelChange,
+                modifier      = Modifier.fillMaxWidth(),
+                placeholder   = { Text("Nombre de la etiqueta…") },
+                singleLine    = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onAdd() }),
+            )
+
+            Text(
+                "Tipo:",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // Horizontally scrollable category chips
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(allCategories) { cat ->
+                    FilterChip(
+                        selected = cat == selectedCategoryKey,
+                        onClick  = { onCategorySelected(cat) },
+                        label    = { Text(cat, style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+                item {
+                    SuggestionChip(
+                        onClick = onNewCategoryClick,
+                        label   = { Text("+ Nueva", style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+            }
+
+            Button(
+                onClick  = onAdd,
+                enabled  = label.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Añadir")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class) @Composable
+private fun TagPickerSection(
+    title: String,
+    tags:  List<TagItem>,
+    onAdd: (key: String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text  = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement   = Arrangement.spacedBy(4.dp),
+        ) {
+            tags.forEach { tag ->
+                SuggestionChip(
+                    onClick = { onAdd(tag.key) },
+                    label   = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewCategoryDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title            = { Text("Nueva categoría") },
+        text             = {
+            OutlinedTextField(
+                value         = name,
+                onValueChange = { name = it },
+                placeholder   = { Text("Nombre de la categoría…") },
+                singleLine    = true,
+            )
+        },
+        confirmButton    = {
+            TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
+                Text("Crear")
+            }
+        },
+        dismissButton    = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
 }

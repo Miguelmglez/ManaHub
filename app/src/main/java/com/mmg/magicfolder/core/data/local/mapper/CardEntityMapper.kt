@@ -25,7 +25,7 @@ private data class SuggestionRecord(val k: String, val c: String, val p: Float, 
 private val tagListType        = object : TypeToken<List<TagRecord>>() {}.type
 private val suggestionListType = object : TypeToken<List<SuggestionRecord>>() {}.type
 
-internal fun String.toTagList(): List<CardTag> = runCatching {
+fun String.toTagList(): List<CardTag> = runCatching {
     val records: List<TagRecord> = gson.fromJson(this, tagListType) ?: emptyList()
     records.mapNotNull { rec ->
         val cat = runCatching { TagCategory.valueOf(rec.c) }.getOrNull() ?: return@mapNotNull null
@@ -33,10 +33,10 @@ internal fun String.toTagList(): List<CardTag> = runCatching {
     }
 }.getOrDefault(emptyList())
 
-internal fun List<CardTag>.toTagsJson(): String =
+fun List<CardTag>.toTagsJson(): String =
     gson.toJson(map { TagRecord(it.key, it.category.name) })
 
-internal fun String.toSuggestedTagList(): List<SuggestedTag> = runCatching {
+fun String.toSuggestedTagList(): List<SuggestedTag> = runCatching {
     val records: List<SuggestionRecord> = gson.fromJson(this, suggestionListType) ?: emptyList()
     records.mapNotNull { rec ->
         val cat = runCatching { TagCategory.valueOf(rec.c) }.getOrNull() ?: return@mapNotNull null
@@ -48,7 +48,7 @@ internal fun String.toSuggestedTagList(): List<SuggestedTag> = runCatching {
     }
 }.getOrDefault(emptyList())
 
-internal fun List<SuggestedTag>.toSuggestedTagsJson(): String =
+fun List<SuggestedTag>.toSuggestedTagsJson(): String =
     gson.toJson(map { SuggestionRecord(it.tag.key, it.tag.category.name, it.confidence, it.source) })
 
 // ── Entity ↔ Domain ───────────────────────────────────────────────────────────
@@ -92,6 +92,7 @@ fun CardEntity.toDomainCard(): Card = Card(
     staleReason = staleReason,
     cachedAt = cachedAt,
     tags = tags.toTagList(),
+    userTags = userTags.toTagList(),
     suggestedTags = suggestedTags.toSuggestedTagList(),
     printedName = printedName,
     printedText = printedText,
@@ -137,6 +138,7 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     staleReason = staleReason,
     cachedAt = cachedAt,
     tags = tags.toTagsJson(),
+    userTags = userTags.toTagsJson(),
     suggestedTags = suggestedTags.toSuggestedTagsJson(),
     printedName = printedName,
     printedText = printedText,

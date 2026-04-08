@@ -91,7 +91,7 @@ fun CardGridItem(
                     }
                 }
             }
-            // Card name + price + tags
+            // Card name + price
             Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     text     = card.name,
@@ -114,24 +114,6 @@ fun CardGridItem(
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.goldMtg,
                     )
-                }
-                // Mini tag chips (max 2)
-                if (card.tags.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        card.tags.take(2).forEach { tag ->
-                            Surface(
-                                color = mc.primaryAccent.copy(alpha = 0.12f),
-                                shape = MaterialTheme.shapes.extraSmall,
-                            ) {
-                                Text(
-                                    text     = tag.label,
-                                    style    = MaterialTheme.magicTypography.labelSmall,
-                                    color    = mc.primaryAccent,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }

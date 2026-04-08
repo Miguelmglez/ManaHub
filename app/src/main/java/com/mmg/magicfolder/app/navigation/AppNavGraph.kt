@@ -145,6 +145,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 AddCardScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToScanner = { navController.navigate(Screen.CollectionScanner.route) },
+                    onNavigateToCardDetail = { scryfallId ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                    },
                 )
             }
 

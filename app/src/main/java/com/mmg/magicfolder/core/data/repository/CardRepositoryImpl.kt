@@ -59,7 +59,11 @@ class CardRepositoryImpl @Inject constructor(
     private suspend fun entityWithComputedTags(card: Card) = run {
         val existing = cardDao.getById(card.scryfallId)
         val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
-        card.toEntity().copy(tags = tagsJson, suggestedTags = suggestedJson)
+        card.toEntity().copy(
+            tags = tagsJson,
+            userTags = existing?.userTags ?: "[]",
+            suggestedTags = suggestedJson,
+        )
     }
 
     override suspend fun getCardById(scryfallId: String): DataResult<Card> {
@@ -76,7 +80,11 @@ class CardRepositoryImpl @Inject constructor(
                 val (tagsJson, suggestedJson) = computeTagsForCache(card, cached?.tags)
 
                 cardDao.upsert(
-                    card.toEntity().copy(tags = tagsJson, suggestedTags = suggestedJson)
+                    card.toEntity().copy(
+                        tags = tagsJson,
+                        userTags = cached?.userTags ?: "[]",
+                        suggestedTags = suggestedJson,
+                    )
                 )
                 cardDao.clearStale(scryfallId)
                 DataResult.Success(cardDao.getById(scryfallId)!!.toDomain())
@@ -113,7 +121,11 @@ class CardRepositoryImpl @Inject constructor(
                 val existing = cardDao.getById(card.scryfallId)
                 val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
                 cardDao.upsert(
-                    card.toEntity().copy(tags = tagsJson, suggestedTags = suggestedJson)
+                    card.toEntity().copy(
+                        tags = tagsJson,
+                        userTags = existing?.userTags ?: "[]",
+                        suggestedTags = suggestedJson,
+                    )
                 )
             }
             cards.forEach { cardDao.clearStale(it.scryfallId) }
@@ -153,6 +165,10 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) {
         cardDao.updateTags(scryfallId, tags.distinct().toTagsJson())
+    }
+
+    override suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>) {
+        cardDao.updateUserTags(scryfallId, userTags.distinct().toTagsJson())
     }
 
     override suspend fun updateSuggestedTags(

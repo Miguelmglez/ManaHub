@@ -304,7 +304,7 @@ private fun PreferencesSection(
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                CardLanguage.entries.forEach { language ->
+                CardLanguage.entries.filter { it != CardLanguage.GERMAN }.forEach { language ->
                     val selected = language.displayName == prefs.cardLanguage.displayName
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -341,7 +341,7 @@ private fun PreferencesSection(
                     color = mc.textPrimary,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    NewsLanguage.entries.forEach { lang ->
+                    NewsLanguage.entries.filter { it != NewsLanguage.GERMAN }.forEach { lang ->
                         val checked = lang in prefs.newsLanguages
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

@@ -60,9 +60,13 @@ data class CardEntity(
     @ColumnInfo(name = "is_stale")     val isStale:     Boolean = false,
     @ColumnInfo(name = "stale_reason") val staleReason: String? = null,
 
-    /** JSON array of `{key, category}` objects. */
+    /** JSON array of `{key, category}` objects — auto-confirmed by the tagging engine. */
     @ColumnInfo(name = "tags", defaultValue = "[]")
     val tags: String = "[]",
+
+    /** JSON array of `{key, category}` objects — manually added by the user. */
+    @ColumnInfo(name = "user_tags", defaultValue = "[]")
+    val userTags: String = "[]",
 
     /** JSON array of `{key, category, confidence, source}` objects. */
     @ColumnInfo(name = "suggested_tags", defaultValue = "[]")

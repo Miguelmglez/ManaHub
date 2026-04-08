@@ -3,6 +3,8 @@ package com.mmg.magicfolder.core.data.remote.mapper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.magicfolder.core.data.local.entity.CardEntity
+import com.mmg.magicfolder.core.data.local.mapper.toSuggestedTagList
+import com.mmg.magicfolder.core.data.local.mapper.toTagList
 import com.mmg.magicfolder.core.domain.model.Card
 
 private val gson = Gson()
@@ -51,7 +53,10 @@ fun CardEntity.toDomain(): Card = Card(
     scryfallUri = scryfallUri,
     isStale = isStale,
     staleReason = staleReason,
-    cachedAt = cachedAt
+    cachedAt = cachedAt,
+    tags = tags.toTagList(),
+    userTags = userTags.toTagList(),
+    suggestedTags = suggestedTags.toSuggestedTagList(),
 )
 
 fun Card.toEntity(): CardEntity = CardEntity(

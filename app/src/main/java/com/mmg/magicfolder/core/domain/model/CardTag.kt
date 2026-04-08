@@ -11,7 +11,7 @@ import com.mmg.magicfolder.core.tagging.TagDictionary
 //  search and persistence remain key-based and unambiguous.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-enum class TagCategory { ARCHETYPE, STRATEGY, ROLE, TRIBAL, KEYWORD, TYPE }
+enum class TagCategory { ARCHETYPE, STRATEGY, ROLE, TRIBAL, KEYWORD, TYPE, CUSTOM }
 
 data class CardTag(
     val key: String,

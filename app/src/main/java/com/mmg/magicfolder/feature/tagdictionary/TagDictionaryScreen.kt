@@ -91,8 +91,7 @@ fun TagDictionaryScreen(
                     val q = state.query.trim().lowercase()
                     row.key.contains(q) ||
                             row.labelEn.lowercase().contains(q) ||
-                            row.labelEs.lowercase().contains(q) ||
-                            row.labelDe.lowercase().contains(q)
+                            row.labelEs.lowercase().contains(q)
                 }
             }
 
@@ -168,7 +167,7 @@ private fun DictionaryRow(
                 fontFamily = FontFamily.Monospace,
             )
             Text(
-                text  = "EN: ${row.labelEn.ifBlank { "—" }}   ES: ${row.labelEs.ifBlank { "—" }}   DE: ${row.labelDe.ifBlank { "—" }}",
+                text  = "EN: ${row.labelEn.ifBlank { "—" }}   ES: ${row.labelEs.ifBlank { "—" }}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -201,10 +200,8 @@ private fun EditEntryDialog(
 ) {
     var labelEn by remember { mutableStateOf(initial.labelEn) }
     var labelEs by remember { mutableStateOf(initial.labelEs) }
-    var labelDe by remember { mutableStateOf(initial.labelDe) }
     var patternsEn by remember { mutableStateOf(initial.patternsEn.joinToString("\n")) }
     var patternsEs by remember { mutableStateOf(initial.patternsEs.joinToString("\n")) }
-    var patternsDe by remember { mutableStateOf(initial.patternsDe.joinToString("\n")) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -217,7 +214,6 @@ private fun EditEntryDialog(
                 Text("Etiquetas", style = MaterialTheme.typography.labelMedium)
                 OutlinedTextField(value = labelEn, onValueChange = { labelEn = it }, label = { Text("EN") }, singleLine = true)
                 OutlinedTextField(value = labelEs, onValueChange = { labelEs = it }, label = { Text("ES") }, singleLine = true)
-                OutlinedTextField(value = labelDe, onValueChange = { labelDe = it }, label = { Text("DE") }, singleLine = true)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Patrones (uno por línea, en minúsculas — el motor busca coincidencias literales en el texto de la carta)",
@@ -226,7 +222,6 @@ private fun EditEntryDialog(
                 )
                 OutlinedTextField(value = patternsEn, onValueChange = { patternsEn = it }, label = { Text("Patrones EN") }, minLines = 2)
                 OutlinedTextField(value = patternsEs, onValueChange = { patternsEs = it }, label = { Text("Patrones ES") }, minLines = 2)
-                OutlinedTextField(value = patternsDe, onValueChange = { patternsDe = it }, label = { Text("Patrones DE") }, minLines = 2)
             }
         },
         confirmButton = {
@@ -235,10 +230,8 @@ private fun EditEntryDialog(
                     initial.copy(
                         labelEn    = labelEn.trim(),
                         labelEs    = labelEs.trim(),
-                        labelDe    = labelDe.trim(),
                         patternsEn = patternsEn.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
                         patternsEs = patternsEs.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
-                        patternsDe = patternsDe.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
                     )
                 )
             }) { Text("Guardar") }
