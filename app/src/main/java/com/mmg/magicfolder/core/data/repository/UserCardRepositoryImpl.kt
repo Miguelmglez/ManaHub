@@ -40,6 +40,7 @@ class UserCardRepositoryImpl @Inject constructor(
                 isAlternativeArt = userCard.isAlternativeArt,
                 condition        = userCard.condition,
                 language         = userCard.language,
+                isInWishlist     = userCard.isInWishlist,
             )
         }
     }

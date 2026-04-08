@@ -12,7 +12,9 @@ data class CardDetailUiState(
     val error:            String?        = null,
     val isStale:          Boolean        = false,
     // Dialog / sheet state
-    val showAddSheet:     Boolean        = false,
-    val showTagPicker:    Boolean        = false,
-    val cardToDelete:     UserCard?      = null,
+    val showAddSheet:      Boolean        = false,
+    val showWishlistSheet: Boolean        = false,
+    val showTradeSheet:    Boolean        = false,
+    val showTagPicker:     Boolean        = false,
+    val cardToDelete:      UserCard?      = null,
 )

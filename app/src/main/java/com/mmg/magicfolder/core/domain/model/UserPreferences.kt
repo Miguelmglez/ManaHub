@@ -42,6 +42,6 @@ enum class PreferredCurrency(val code: String, val symbol: String, val displayNa
     EUR("EUR", "€", "EUR (€)");
 
     companion object {
-        fun fromCode(code: String) = entries.find { it.code == code } ?: USD
+        fun fromCode(code: String) = entries.find { it.code == code } ?: EUR
     }
 }

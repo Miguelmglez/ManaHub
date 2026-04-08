@@ -14,8 +14,10 @@ import androidx.room.*
         Index("scryfall_id"),
         Index("is_for_trade"),
         Index("is_in_wishlist"),
-        // Prevents duplicate logical entries for the same physical card variant
-        Index(value = ["scryfall_id", "is_foil", "condition", "language", "is_alternative_art"], unique = true),
+        // Prevents duplicate logical entries for the same physical card variant.
+        // is_in_wishlist is included so the same copy can exist in both collection
+        // (is_in_wishlist = 0) and wishlist (is_in_wishlist = 1) simultaneously.
+        Index(value = ["scryfall_id", "is_foil", "condition", "language", "is_alternative_art", "is_in_wishlist"], unique = true),
     ],
 )
 data class UserCardEntity(

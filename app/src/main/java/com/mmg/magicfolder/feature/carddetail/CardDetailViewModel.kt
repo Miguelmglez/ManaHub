@@ -62,7 +62,11 @@ class CardDetailViewModel @Inject constructor(
     private fun observeUserCards() {
         viewModelScope.launch {
             userCardRepo.observeByScryfallId(scryfallId)
-                .collect { cards -> _uiState.update { it.copy(userCards = cards) } }
+                .collect { cards ->
+                    // Wishlist entries are stored separately; exclude them from the
+                    // collection list shown in CardDetailScreen.
+                    _uiState.update { it.copy(userCards = cards.filter { c -> !c.isInWishlist }) }
+                }
         }
     }
 
@@ -103,12 +107,53 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
-    fun onShowAddSheet()         = _uiState.update { it.copy(showAddSheet = true) }
-    fun onDismissAddSheet()      = _uiState.update { it.copy(showAddSheet = false) }
-    fun onShowTagPicker()        = _uiState.update { it.copy(showTagPicker = true) }
-    fun onDismissTagPicker()     = _uiState.update { it.copy(showTagPicker = false) }
+    fun onShowAddSheet()          = _uiState.update { it.copy(showAddSheet = true) }
+    fun onDismissAddSheet()       = _uiState.update { it.copy(showAddSheet = false) }
+    fun onShowWishlistSheet()     = _uiState.update { it.copy(showWishlistSheet = true) }
+    fun onDismissWishlistSheet()  = _uiState.update { it.copy(showWishlistSheet = false) }
+    fun onShowTradeSheet()        = _uiState.update { it.copy(showTradeSheet = true) }
+    fun onDismissTradeSheet()     = _uiState.update { it.copy(showTradeSheet = false) }
+    fun onShowTagPicker()         = _uiState.update { it.copy(showTagPicker = true) }
+    fun onDismissTagPicker()      = _uiState.update { it.copy(showTagPicker = false) }
     fun onRequestDelete(uc: UserCard) = _uiState.update { it.copy(cardToDelete = uc) }
-    fun onDismissDeleteConfirm() = _uiState.update { it.copy(cardToDelete = null) }
+    fun onDismissDeleteConfirm()  = _uiState.update { it.copy(cardToDelete = null) }
+
+    fun onAddToWishlist(
+        isFoil:           Boolean,
+        isAlternativeArt: Boolean,
+        condition:        String,
+        language:         String,
+        quantity:         Int,
+    ) {
+        viewModelScope.launch {
+            val wishlistCard = UserCard(
+                scryfallId       = scryfallId,
+                isFoil           = isFoil,
+                isAlternativeArt = isAlternativeArt,
+                condition        = condition,
+                language         = language,
+                quantity         = quantity,
+                isInWishlist     = true,
+            )
+            runCatching { userCardRepo.addOrIncrement(wishlistCard) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+            _uiState.update { it.copy(showWishlistSheet = false) }
+        }
+    }
+
+    fun onConfirmTradeSelection(selections: Map<Long, Boolean>) {
+        val userCards = _uiState.value.userCards
+        viewModelScope.launch {
+            selections.forEach { (id, isForTrade) ->
+                val card = userCards.find { it.id == id } ?: return@forEach
+                if (card.isForTrade != isForTrade) {
+                    runCatching { userCardRepo.updateCard(card.copy(isForTrade = isForTrade)) }
+                        .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+                }
+            }
+            _uiState.update { it.copy(showTradeSheet = false) }
+        }
+    }
 
     fun onAddTag(tag: CardTag) {
         val current = _uiState.value.card?.tags ?: return

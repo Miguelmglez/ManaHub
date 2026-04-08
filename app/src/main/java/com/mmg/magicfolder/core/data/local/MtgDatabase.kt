@@ -31,7 +31,7 @@ import com.mmg.magicfolder.feature.news.data.local.NewsVideoEntity
         ContentSourceEntity::class,
         DraftSetEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -268,6 +268,22 @@ val MIGRATION_18_19 = object : Migration(18, 19) {
         database.execSQL(
             "ALTER TABLE cards ADD COLUMN user_tags TEXT NOT NULL DEFAULT '[]'"
         )
+    }
+}
+
+val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // Expand the unique constraint to include is_in_wishlist so that the same
+        // card+attributes combination can exist as both a collection entry and a
+        // wishlist entry simultaneously.
+        database.execSQL(
+            "DROP INDEX IF EXISTS index_user_cards_scryfall_id_is_foil_condition_language_is_alternative_art"
+        )
+        database.execSQL("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            index_user_cards_scryfall_id_is_foil_condition_language_is_alternative_art_is_in_wishlist
+            ON user_cards (scryfall_id, is_foil, condition, language, is_alternative_art, is_in_wishlist)
+        """.trimIndent())
     }
 }
 

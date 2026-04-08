@@ -44,8 +44,8 @@ import com.mmg.magicfolder.core.util.PriceFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardDetailScreen(
-    onBack:               () -> Unit,
-    onNavigateToAddCard:  () -> Unit,
+    onBack: () -> Unit,
+    onNavigateToAddCard: () -> Unit,
     viewModel: CardDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,12 +63,17 @@ fun CardDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                     Text(
                         text = uiState.card?.name ?: "",
                         style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -79,24 +84,28 @@ fun CardDetailScreen(
     ) { padding ->
         when {
             uiState.isLoading -> Box(
-                Modifier.fillMaxSize().padding(padding),
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
 
             uiState.card != null -> CardDetailContent(
-                card                  = uiState.card!!,
-                userCards             = uiState.userCards,
-                isStale               = uiState.isStale,
-                onRemoveAutoTag       = viewModel::onRemoveTag,
-                onAddUserTag          = viewModel::onAddUserTag,
-                onRemoveUserTag       = viewModel::onRemoveUserTag,
-                onShowTagPicker       = viewModel::onShowTagPicker,
+                card = uiState.card!!,
+                userCards = uiState.userCards,
+                isStale = uiState.isStale,
+                onRemoveAutoTag = viewModel::onRemoveTag,
+                onAddUserTag = viewModel::onAddUserTag,
+                onRemoveUserTag = viewModel::onRemoveUserTag,
+                onShowTagPicker = viewModel::onShowTagPicker,
                 onConfirmSuggestedTag = viewModel::onConfirmSuggestedTag,
                 onDismissSuggestedTag = viewModel::onDismissSuggestedTag,
-                onShowAddSheet        = viewModel::onShowAddSheet,
-                onUpdateQuantity      = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
-                onRequestDelete       = viewModel::onRequestDelete,
-                modifier              = Modifier.padding(padding),
+                onShowAddSheet = viewModel::onShowAddSheet,
+                onShowWishlistSheet = viewModel::onShowWishlistSheet,
+                onShowTradeSheet = viewModel::onShowTradeSheet,
+                onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
+                onRequestDelete = viewModel::onRequestDelete,
+                modifier = Modifier.padding(padding),
             )
         }
     }
@@ -104,13 +113,13 @@ fun CardDetailScreen(
     // Tag picker sheet
     if (uiState.showTagPicker) {
         TagPickerSheet(
-            cardAutoTags          = uiState.card?.tags ?: emptyList(),
-            cardSuggestedTags     = uiState.card?.suggestedTags ?: emptyList(),
-            currentUserTags       = uiState.card?.userTags ?: emptyList(),
-            userDefinedTags       = uiState.userDefinedTags,
-            onAddUserTag          = viewModel::onAddUserTag,
+            cardAutoTags = uiState.card?.tags ?: emptyList(),
+            cardSuggestedTags = uiState.card?.suggestedTags ?: emptyList(),
+            currentUserTags = uiState.card?.userTags ?: emptyList(),
+            userDefinedTags = uiState.userDefinedTags,
+            onAddUserTag = viewModel::onAddUserTag,
             onSaveAndAddCustomTag = viewModel::onSaveAndAddCustomTag,
-            onDismiss             = viewModel::onDismissTagPicker,
+            onDismiss = viewModel::onDismissTagPicker,
         )
     }
 
@@ -118,7 +127,7 @@ fun CardDetailScreen(
     if (uiState.showAddSheet) {
         uiState.card?.let { card ->
             AddToCollectionSheet(
-                cardName  = card.name,
+                cardName = card.name,
                 onConfirm = { isFoil, isAltArt, condition, language, qty ->
                     viewModel.onAddToCollection(isFoil, isAltArt, condition, language, qty)
                 },
@@ -127,15 +136,40 @@ fun CardDetailScreen(
         }
     }
 
+    // Add to wishlist sheet
+    if (uiState.showWishlistSheet) {
+        uiState.card?.let { card ->
+            AddToWishlistSheet(
+                cardName = card.name,
+                onConfirm = { isFoil, isAltArt, condition, language, qty ->
+                    viewModel.onAddToWishlist(isFoil, isAltArt, condition, language, qty)
+                },
+                onDismiss = viewModel::onDismissWishlistSheet,
+            )
+        }
+    }
+
+    // Mark as tradeable sheet
+    if (uiState.showTradeSheet) {
+        MarkAsTradeableSheet(
+            userCards = uiState.userCards,
+            onConfirm = viewModel::onConfirmTradeSelection,
+            onDismiss = viewModel::onDismissTradeSheet,
+        )
+    }
+
     // Delete confirmation
     uiState.cardToDelete?.let { uc ->
         AlertDialog(
             onDismissRequest = viewModel::onDismissDeleteConfirm,
-            title   = { Text(stringResource(R.string.carddetail_delete_copy_title)) },
-            text    = { Text(stringResource(R.string.carddetail_delete_copy_message)) },
+            title = { Text(stringResource(R.string.carddetail_delete_copy_title)) },
+            text = { Text(stringResource(R.string.carddetail_delete_copy_message)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.onDeleteCard(uc.id) }) {
-                    Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
+                    Text(
+                        stringResource(R.string.action_remove),
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             },
             dismissButton = {
@@ -149,19 +183,21 @@ fun CardDetailScreen(
 
 @Composable
 private fun CardDetailContent(
-    card:                  Card,
-    userCards:             List<UserCard>,
-    isStale:               Boolean,
-    onRemoveAutoTag:       (CardTag) -> Unit,
-    onAddUserTag:          (CardTag) -> Unit,
-    onRemoveUserTag:       (CardTag) -> Unit,
-    onShowTagPicker:       () -> Unit,
+    card: Card,
+    userCards: List<UserCard>,
+    isStale: Boolean,
+    onRemoveAutoTag: (CardTag) -> Unit,
+    onAddUserTag: (CardTag) -> Unit,
+    onRemoveUserTag: (CardTag) -> Unit,
+    onShowTagPicker: () -> Unit,
     onConfirmSuggestedTag: (CardTag) -> Unit,
     onDismissSuggestedTag: (CardTag) -> Unit,
-    onShowAddSheet:        () -> Unit,
-    onUpdateQuantity:      (Long, Int) -> Unit,
-    onRequestDelete:       (UserCard) -> Unit,
-    modifier:              Modifier = Modifier,
+    onShowAddSheet: () -> Unit,
+    onShowWishlistSheet: () -> Unit,
+    onShowTradeSheet: () -> Unit,
+    onUpdateQuantity: (Long, Int) -> Unit,
+    onRequestDelete: (UserCard) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
     var showBackFace by remember { mutableStateOf(false) }
@@ -175,17 +211,17 @@ private fun CardDetailContent(
     ) {
         // Card image — tap to flip for DFC
         Box(
-            modifier          = Modifier.fillMaxWidth(),
-            contentAlignment  = Alignment.Center,
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
         ) {
             val imageUrl = if (showBackFace && card.imageBackNormal != null)
                 card.imageBackNormal else card.imageNormal
 
             AsyncImage(
-                model              = imageUrl,
+                model = imageUrl,
                 contentDescription = card.name,
-                contentScale       = ContentScale.FillWidth,
-                modifier           = Modifier
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
                     .fillMaxWidth(0.75f)
                     .clip(MaterialTheme.shapes.medium)
                     .then(
@@ -197,13 +233,15 @@ private fun CardDetailContent(
 
             if (card.imageBackNormal != null) {
                 Surface(
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                    color    = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                    shape    = MaterialTheme.shapes.small,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
-                        text     = if (showBackFace) "Tap to see front" else "Tap to flip",
-                        style    = MaterialTheme.typography.labelSmall,
+                        text = if (showBackFace) "Tap to see front" else "Tap to flip",
+                        style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
@@ -217,8 +255,8 @@ private fun CardDetailContent(
         ) {
             SetSymbol(
                 setCode = card.setCode,
-                rarity  = CardRarity.fromString(card.rarity),
-                size    = 20.dp,
+                rarity = CardRarity.fromString(card.rarity),
+                size = 20.dp,
             )
             Text(card.name, style = MaterialTheme.typography.headlineSmall)
             if (isStale) StaleBadge()
@@ -229,15 +267,15 @@ private fun CardDetailContent(
             card.manaCost?.let {
                 ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
-            if (card.printedTypeLine.isNullOrEmpty()){
+            if (card.printedTypeLine.isNullOrEmpty()) {
                 Text(
-                    text     = card.typeLine,
+                    text = card.typeLine,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 Text(
-                    text     = card.printedTypeLine,
+                    text = card.printedTypeLine,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -250,18 +288,18 @@ private fun CardDetailContent(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         ) {
-            if (card.printedText.isNullOrEmpty()){
+            if (card.printedText.isNullOrEmpty()) {
                 card.oracleText?.let {
                     Text(
-                        text     = it,
-                        style    = MaterialTheme.typography.bodyMedium,
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(12.dp),
                     )
                 }
             } else {
                 Text(
-                    text     = card.printedText,
-                    style    = MaterialTheme.typography.bodyMedium,
+                    text = card.printedText,
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(12.dp),
                 )
             }
@@ -271,17 +309,17 @@ private fun CardDetailContent(
         // Flavor text
         card.flavorText?.let {
             Text(
-                text      = "\"$it\"",
-                style     = MaterialTheme.typography.bodySmall,
+                text = "\"$it\"",
+                style = MaterialTheme.typography.bodySmall,
                 fontStyle = FontStyle.Italic,
-                color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         // Power/Toughness or Loyalty
         if (card.power != null && card.toughness != null) {
             Text(
-                text  = "${card.power}/${card.toughness}",
+                text = "${card.power}/${card.toughness}",
                 style = MaterialTheme.typography.titleMedium,
             )
         } else card.loyalty?.let {
@@ -295,12 +333,14 @@ private fun CardDetailContent(
 
         HorizontalDivider()
 
-        // Collection section: copies list + add button
+        // Collection section: copies list + add / wishlist / trade buttons
         CollectionSection(
-            userCards        = userCards,
-            onShowAddSheet   = onShowAddSheet,
+            userCards = userCards,
+            onShowAddSheet = onShowAddSheet,
+            onShowWishlistSheet = onShowWishlistSheet,
+            onShowTradeSheet = onShowTradeSheet,
             onUpdateQuantity = onUpdateQuantity,
-            onRequestDelete  = onRequestDelete,
+            onRequestDelete = onRequestDelete,
         )
 
         HorizontalDivider()
@@ -312,9 +352,9 @@ private fun CardDetailContent(
 
         // Tags
         TagsSection(
-            autoTags        = card.tags,
-            userTags        = card.userTags,
-            isInCollection  = userCards.isNotEmpty(),
+            autoTags = card.tags,
+            userTags = card.userTags,
+            isInCollection = userCards.isNotEmpty(),
             onRemoveAutoTag = onRemoveAutoTag,
             onRemoveUserTag = onRemoveUserTag,
             onShowTagPicker = onShowTagPicker,
@@ -324,14 +364,18 @@ private fun CardDetailContent(
         if (card.suggestedTags.isNotEmpty()) {
             SuggestedTagsSection(
                 suggestions = card.suggestedTags,
-                onConfirm   = onConfirmSuggestedTag,
-                onDismiss   = onDismissSuggestedTag,
+                onConfirm = onConfirmSuggestedTag,
+                onDismiss = onDismissSuggestedTag,
             )
         }
 
         // Scryfall link
         TextButton(onClick = { uriHandler.openUri(card.scryfallUri) }) {
-            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(
+                Icons.Default.OpenInBrowser,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
             Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.carddetail_view_scryfall))
         }
@@ -347,58 +391,105 @@ private fun CardDetailContent(
 
 @Composable
 private fun CollectionSection(
-    userCards:        List<UserCard>,
-    onShowAddSheet:   () -> Unit,
+    userCards: List<UserCard>,
+    onShowAddSheet: () -> Unit,
+    onShowWishlistSheet: () -> Unit,
+    onShowTradeSheet: () -> Unit,
     onUpdateQuantity: (Long, Int) -> Unit,
-    onRequestDelete:  (UserCard) -> Unit,
+    onRequestDelete: (UserCard) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                stringResource(R.string.carddetail_in_collection),
-                style = MaterialTheme.typography.titleSmall,
-            )
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        // Header: title + Wishlist + Add buttons
+
+        Text(
+            stringResource(R.string.carddetail_in_collection),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
-                onClick  = onShowAddSheet,
+                onClick = onShowWishlistSheet,
                 modifier = Modifier.height(32.dp),
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                Icon(
+                    Icons.Default.Bookmark,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
                 Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.carddetail_add_copy), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    stringResource(R.string.carddetail_add_to_wishlist),
+                    style = MaterialTheme.typography.labelSmall
+                )
             }
-        }
-
-        if (userCards.isEmpty()) {
-            Text(
-                text  = stringResource(R.string.carddetail_no_copies),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            userCards.forEach { uc ->
-                CollectionCopyRow(
-                    userCard         = uc,
-                    onUpdateQuantity = onUpdateQuantity,
-                    onRequestDelete  = onRequestDelete,
+            OutlinedButton(
+                onClick = onShowAddSheet,
+                modifier = Modifier.height(32.dp),
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    stringResource(R.string.carddetail_add_copy),
+                    style = MaterialTheme.typography.labelSmall
                 )
             }
         }
     }
+
+
+    if (userCards.isEmpty()) {
+        Text(
+            text = stringResource(R.string.carddetail_no_copies),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        userCards.forEach { uc ->
+            CollectionCopyRow(
+                userCard = uc,
+                onUpdateQuantity = onUpdateQuantity,
+                onRequestDelete = onRequestDelete,
+            )
+        }
+
+        // "Offer for trade" button — only shown when there are collection copies
+        OutlinedButton(
+            onClick = onShowTradeSheet,
+            modifier = Modifier.height(32.dp),
+        ) {
+            Icon(
+                Icons.Default.SwapHoriz,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                stringResource(R.string.carddetail_offer_for_trade),
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    }
 }
+
 
 @Composable
 private fun CollectionCopyRow(
-    userCard:         UserCard,
+    userCard: UserCard,
     onUpdateQuantity: (Long, Int) -> Unit,
-    onRequestDelete:  (UserCard) -> Unit,
+    onRequestDelete: (UserCard) -> Unit,
 ) {
     Surface(
-        color  = MaterialTheme.colorScheme.surfaceVariant,
-        shape  = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small,
     ) {
         Column(
             modifier = Modifier
@@ -409,7 +500,7 @@ private fun CollectionCopyRow(
             // Badges row
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 CopyBadge(label = userCard.language.uppercase())
                 CopyBadge(label = userCard.condition)
@@ -417,21 +508,34 @@ private fun CollectionCopyRow(
                 if (userCard.isAlternativeArt) {
                     CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
                 }
+                if (userCard.isForTrade) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = MaterialTheme.shapes.extraSmall,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.carddetail_for_trade_badge),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
             }
 
             // Quantity stepper + delete
             Row(
-                modifier          = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     stringResource(R.string.carddetail_quantity_label),
-                    style    = MaterialTheme.typography.bodySmall,
-                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(
-                    onClick  = { onUpdateQuantity(userCard.id, userCard.quantity - 1) },
+                    onClick = { onUpdateQuantity(userCard.id, userCard.quantity - 1) },
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
@@ -441,12 +545,12 @@ private fun CollectionCopyRow(
                     )
                 }
                 Text(
-                    text  = "${userCard.quantity}",
+                    text = "${userCard.quantity}",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
                 IconButton(
-                    onClick  = { onUpdateQuantity(userCard.id, userCard.quantity + 1) },
+                    onClick = { onUpdateQuantity(userCard.id, userCard.quantity + 1) },
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
@@ -457,13 +561,13 @@ private fun CollectionCopyRow(
                 }
                 Spacer(Modifier.width(8.dp))
                 IconButton(
-                    onClick  = { onRequestDelete(userCard) },
+                    onClick = { onRequestDelete(userCard) },
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = stringResource(R.string.action_delete),
-                        tint     = MaterialTheme.colorScheme.error,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -479,9 +583,9 @@ private fun CopyBadge(label: String) {
         shape = MaterialTheme.shapes.extraSmall,
     ) {
         Text(
-            text     = label,
-            style    = MaterialTheme.typography.labelSmall,
-            color    = MaterialTheme.colorScheme.onSecondaryContainer,
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }
@@ -494,18 +598,18 @@ private fun CopyBadge(label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddToCollectionSheet(
-    cardName:  String,
+    cardName: String,
     onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    val languages  = listOf("en", "es", "de", "fr", "it", "pt", "ja", "ko", "ru")
+    val languages = listOf("en", "es", "de", "fr", "it", "pt", "ja", "ko", "ru")
 
-    var isFoil           by remember { mutableStateOf(false) }
+    var isFoil by remember { mutableStateOf(false) }
     var isAlternativeArt by remember { mutableStateOf(false) }
-    var condition        by remember { mutableStateOf("NM") }
-    var language         by remember { mutableStateOf("en") }
-    var qty              by remember { mutableIntStateOf(1) }
+    var condition by remember { mutableStateOf("NM") }
+    var language by remember { mutableStateOf("en") }
+    var qty by remember { mutableIntStateOf(1) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -519,11 +623,11 @@ private fun AddToCollectionSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text  = stringResource(R.string.carddetail_add_copy),
+                text = stringResource(R.string.carddetail_add_copy),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text  = cardName,
+                text = cardName,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -556,22 +660,31 @@ private fun AddToCollectionSheet(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove))
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = stringResource(R.string.action_remove)
+                    )
                 }
                 Text("$qty", style = MaterialTheme.typography.titleMedium)
                 IconButton(onClick = { qty++ }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.action_add)
+                    )
                 }
             }
 
             // Condition chips
-            Text(stringResource(R.string.addcard_confirm_condition), style = MaterialTheme.typography.labelLarge)
+            Text(
+                stringResource(R.string.addcard_confirm_condition),
+                style = MaterialTheme.typography.labelLarge
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 conditions.forEach { c ->
                     FilterChip(
                         selected = c == condition,
-                        onClick  = { condition = c },
-                        label    = { Text(c) },
+                        onClick = { condition = c },
+                        label = { Text(c) },
                     )
                 }
             }
@@ -579,27 +692,31 @@ private fun AddToCollectionSheet(
             // Language dropdown
             var langExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
-                expanded        = langExpanded,
+                expanded = langExpanded,
                 onExpandedChange = { langExpanded = it },
             ) {
                 OutlinedTextField(
-                    value         = language.uppercase(),
+                    value = language.uppercase(),
                     onValueChange = {},
-                    readOnly      = true,
-                    label         = {
-                        Text(stringResource(R.string.addcard_confirm_language),
-                            style = MaterialTheme.typography.labelLarge)
+                    readOnly = true,
+                    label = {
+                        Text(
+                            stringResource(R.string.addcard_confirm_language),
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     },
-                    trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
-                    modifier      = Modifier.menuAnchor().fillMaxWidth(),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
                 )
                 ExposedDropdownMenu(
-                    expanded          = langExpanded,
-                    onDismissRequest  = { langExpanded = false },
+                    expanded = langExpanded,
+                    onDismissRequest = { langExpanded = false },
                 ) {
                     languages.forEach { lang ->
                         DropdownMenuItem(
-                            text    = { Text(lang.uppercase()) },
+                            text = { Text(lang.uppercase()) },
                             onClick = { language = lang; langExpanded = false },
                         )
                     }
@@ -608,12 +725,275 @@ private fun AddToCollectionSheet(
 
             // Confirm / Cancel
             Row(
-                modifier              = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                Button(onClick = { onConfirm(isFoil, isAlternativeArt, condition, language, qty) }) {
+                Button(onClick = {
+                    onConfirm(
+                        isFoil,
+                        isAlternativeArt,
+                        condition,
+                        language,
+                        qty
+                    )
+                }) {
                     Text(stringResource(R.string.action_add))
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Add to wishlist bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddToWishlistSheet(
+    cardName: String,
+    onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
+    val languages = listOf("en", "es", "de", "fr", "it", "pt", "ja", "ko", "ru")
+
+    var isFoil by remember { mutableStateOf(false) }
+    var isAlternativeArt by remember { mutableStateOf(false) }
+    var condition by remember { mutableStateOf("NM") }
+    var language by remember { mutableStateOf("en") }
+    var qty by remember { mutableIntStateOf(1) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.carddetail_wishlist_sheet_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = cardName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // Foil toggle
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.addcard_confirm_foil),
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(checked = isFoil, onCheckedChange = { isFoil = it })
+            }
+
+            // Alternative art toggle
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.carddetail_alternative_art),
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(checked = isAlternativeArt, onCheckedChange = { isAlternativeArt = it })
+            }
+
+            // Quantity stepper
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.addcard_confirm_quantity),
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                IconButton(onClick = { if (qty > 1) qty-- }) {
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = stringResource(R.string.action_remove)
+                    )
+                }
+                Text("$qty", style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = { qty++ }) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.action_add)
+                    )
+                }
+            }
+
+            // Condition chips
+            Text(
+                stringResource(R.string.addcard_confirm_condition),
+                style = MaterialTheme.typography.labelLarge
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                conditions.forEach { c ->
+                    FilterChip(
+                        selected = c == condition,
+                        onClick = { condition = c },
+                        label = { Text(c) },
+                    )
+                }
+            }
+
+            // Language dropdown
+            var langExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = langExpanded,
+                onExpandedChange = { langExpanded = it },
+            ) {
+                OutlinedTextField(
+                    value = language.uppercase(),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = {
+                        Text(
+                            stringResource(R.string.addcard_confirm_language),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                )
+                ExposedDropdownMenu(
+                    expanded = langExpanded,
+                    onDismissRequest = { langExpanded = false },
+                ) {
+                    languages.forEach { lang ->
+                        DropdownMenuItem(
+                            text = { Text(lang.uppercase()) },
+                            onClick = { language = lang; langExpanded = false },
+                        )
+                    }
+                }
+            }
+
+            // Confirm / Cancel
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                Button(onClick = {
+                    onConfirm(
+                        isFoil,
+                        isAlternativeArt,
+                        condition,
+                        language,
+                        qty
+                    )
+                }) {
+                    Text(stringResource(R.string.action_add))
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Mark as tradeable bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MarkAsTradeableSheet(
+    userCards: List<UserCard>,
+    onConfirm: (Map<Long, Boolean>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val tradeState = remember(userCards) {
+        mutableStateMapOf<Long, Boolean>().also { map ->
+            userCards.forEach { map[it.id] = it.isForTrade }
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.carddetail_trade_sheet_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.carddetail_trade_sheet_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (userCards.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.carddetail_no_copies_for_trade),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                userCards.forEach { uc ->
+                    val checked = tradeState[uc.id] ?: false
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { tradeState[uc.id] = !checked },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = { tradeState[uc.id] = it },
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                CopyBadge(label = uc.language.uppercase())
+                                CopyBadge(label = uc.condition)
+                                if (uc.isFoil) FoilBadge()
+                                if (uc.isAlternativeArt) {
+                                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
+                                }
+                            }
+                            Text(
+                                text = "×${uc.quantity}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Confirm / Cancel
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                Button(
+                    onClick = { onConfirm(tradeState.toMap()) },
+                    enabled = userCards.isNotEmpty(),
+                ) {
+                    Text(stringResource(R.string.action_save))
                 }
             }
 
@@ -626,7 +1006,10 @@ private fun AddToCollectionSheet(
 private fun PriceSection(card: Card) {
     val preferredCurrency = LocalPreferredCurrency.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.carddetail_market_prices), style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(R.string.carddetail_market_prices),
+            style = MaterialTheme.typography.titleSmall
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             PricePill(
                 label = stringResource(R.string.carddetail_price_foil),
@@ -645,10 +1028,12 @@ private fun PriceSection(card: Card) {
 @Composable
 private fun PricePill(label: String, price: Double?, currency: PreferredCurrency) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            text  = PriceFormatter.format(price, currency),
+            label, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = PriceFormatter.format(price, currency),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.tertiary,
         )
@@ -658,11 +1043,14 @@ private fun PricePill(label: String, price: Double?, currency: PreferredCurrency
 @Composable
 private fun LegalitySection(card: Card) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.carddetail_legality), style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(R.string.carddetail_legality),
+            style = MaterialTheme.typography.titleSmall
+        )
         val formats = listOf(
-            "Standard"  to card.legalityStandard,
-            "Pioneer"   to card.legalityPioneer,
-            "Modern"    to card.legalityModern,
+            "Standard" to card.legalityStandard,
+            "Pioneer" to card.legalityPioneer,
+            "Modern" to card.legalityModern,
             "Commander" to card.legalityCommander,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -687,7 +1075,7 @@ private fun LegalityChip(format: String, legality: String) {
         ) {
             Text(format, style = MaterialTheme.typography.labelSmall)
             Text(
-                text  = if (isLegal) "Legal" else "Not legal",
+                text = if (isLegal) "Legal" else "Not legal",
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isLegal) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -703,9 +1091,9 @@ private fun LegalityChip(format: String, legality: String) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TagsSection(
-    autoTags:        List<CardTag>,
-    userTags:        List<CardTag>,
-    isInCollection:  Boolean,
+    autoTags: List<CardTag>,
+    userTags: List<CardTag>,
+    isInCollection: Boolean,
     onRemoveAutoTag: (CardTag) -> Unit,
     onRemoveUserTag: (CardTag) -> Unit,
     onShowTagPicker: () -> Unit,
@@ -715,18 +1103,18 @@ private fun TagsSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
-            modifier          = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text     = "Tags",
-                style    = MaterialTheme.typography.titleSmall,
+                text = "Tags",
+                style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = null,
             )
         }
@@ -735,20 +1123,25 @@ private fun TagsSection(
             // ── Auto-generated tags ──────────────────────────────────────────
             if (autoTags.isNotEmpty()) {
                 Text(
-                    text  = "Etiquetas automáticas",
+                    text = "Etiquetas automáticas",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement   = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     autoTags.forEach { tag ->
                         if (isInCollection) {
                             InputChip(
-                                selected     = true,
-                                onClick      = { onRemoveAutoTag(tag) },
-                                label        = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                                selected = true,
+                                onClick = { onRemoveAutoTag(tag) },
+                                label = {
+                                    Text(
+                                        tag.label,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                },
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
@@ -760,7 +1153,12 @@ private fun TagsSection(
                         } else {
                             SuggestionChip(
                                 onClick = {},
-                                label   = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                                label = {
+                                    Text(
+                                        tag.label,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                },
                             )
                         }
                     }
@@ -773,20 +1171,25 @@ private fun TagsSection(
                     Spacer(Modifier.height(2.dp))
                 }
                 Text(
-                    text  = "Mis etiquetas",
+                    text = "Mis etiquetas",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (userTags.isNotEmpty()) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement   = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         userTags.forEach { tag ->
                             InputChip(
-                                selected     = true,
-                                onClick      = { onRemoveUserTag(tag) },
-                                label        = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                                selected = true,
+                                onClick = { onRemoveUserTag(tag) },
+                                label = {
+                                    Text(
+                                        tag.label,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                },
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
@@ -799,7 +1202,7 @@ private fun TagsSection(
                     }
                 } else {
                     Text(
-                        text  = "Sin etiquetas personales — toca + para añadir",
+                        text = "Sin etiquetas personales — toca + para añadir",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -807,16 +1210,20 @@ private fun TagsSection(
 
                 Spacer(Modifier.height(4.dp))
                 OutlinedButton(
-                    onClick  = onShowTagPicker,
+                    onClick = onShowTagPicker,
                     modifier = Modifier.height(32.dp),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
                     Spacer(Modifier.width(4.dp))
                     Text("Añadir etiqueta", style = MaterialTheme.typography.labelSmall)
                 }
             } else if (!hasAnyTag) {
                 Text(
-                    text  = "Sin etiquetas automáticas",
+                    text = "Sin etiquetas automáticas",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -832,32 +1239,32 @@ private fun TagsSection(
 @Composable
 private fun SuggestedTagsSection(
     suggestions: List<SuggestedTag>,
-    onConfirm:   (CardTag) -> Unit,
-    onDismiss:   (CardTag) -> Unit,
+    onConfirm: (CardTag) -> Unit,
+    onDismiss: (CardTag) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(true) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
-            modifier          = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text     = "Etiquetas sugeridas",
-                style    = MaterialTheme.typography.titleSmall,
+                text = "Etiquetas sugeridas",
+                style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = null,
             )
         }
 
         if (expanded) {
             Text(
-                text  = "Confirma las que apliquen o descártalas. No se añaden hasta que tú las apruebes.",
+                text = "Confirma las que apliquen o descártalas. No se añaden hasta que tú las apruebes.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -867,8 +1274,8 @@ private fun SuggestedTagsSection(
                     rowItems.forEach { sug ->
                         SuggestedTagChip(
                             suggestion = sug,
-                            onConfirm  = { onConfirm(sug.tag) },
-                            onDismiss  = { onDismiss(sug.tag) },
+                            onConfirm = { onConfirm(sug.tag) },
+                            onDismiss = { onDismiss(sug.tag) },
                         )
                     }
                 }
@@ -880,8 +1287,8 @@ private fun SuggestedTagsSection(
 @Composable
 private fun SuggestedTagChip(
     suggestion: SuggestedTag,
-    onConfirm:  () -> Unit,
-    onDismiss:  () -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val pct = (suggestion.confidence * 100).toInt()
     Surface(
@@ -893,7 +1300,7 @@ private fun SuggestedTagChip(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
             Text(
-                text  = "${suggestion.tag.label}  $pct%",
+                text = "${suggestion.tag.label}  $pct%",
                 style = MaterialTheme.typography.labelSmall,
             )
             Spacer(Modifier.width(6.dp))
@@ -901,7 +1308,7 @@ private fun SuggestedTagChip(
                 Icon(
                     Icons.Default.Check,
                     contentDescription = "Confirmar ${suggestion.tag.label}",
-                    tint     = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -909,7 +1316,7 @@ private fun SuggestedTagChip(
                 Icon(
                     Icons.Default.Close,
                     contentDescription = "Descartar ${suggestion.tag.label}",
-                    tint     = MaterialTheme.colorScheme.error,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -926,13 +1333,13 @@ private data class TagItem(val key: String, val label: String)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TagPickerSheet(
-    cardAutoTags:          List<CardTag>,
-    cardSuggestedTags:     List<SuggestedTag>,
-    currentUserTags:       List<CardTag>,
-    userDefinedTags:       List<UserDefinedTag>,
-    onAddUserTag:          (CardTag) -> Unit,
+    cardAutoTags: List<CardTag>,
+    cardSuggestedTags: List<SuggestedTag>,
+    currentUserTags: List<CardTag>,
+    userDefinedTags: List<UserDefinedTag>,
+    onAddUserTag: (CardTag) -> Unit,
     onSaveAndAddCustomTag: (label: String, categoryKey: String) -> Unit,
-    onDismiss:             () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val userTagKeys = currentUserTags.map { it.key }.toSet()
 
@@ -967,14 +1374,14 @@ private fun TagPickerSheet(
             // ── Custom tag creator ───────────────────────────────────────────
             item {
                 CustomTagCreatorSection(
-                    label                  = customLabel,
-                    onLabelChange          = { customLabel = it },
-                    selectedCategoryKey    = selectedCategoryKey,
-                    onCategorySelected     = { selectedCategoryKey = it },
-                    builtInCategories      = builtInCategories,
+                    label = customLabel,
+                    onLabelChange = { customLabel = it },
+                    selectedCategoryKey = selectedCategoryKey,
+                    onCategorySelected = { selectedCategoryKey = it },
+                    builtInCategories = builtInCategories,
                     userCustomCategoryKeys = userCustomCategoryKeys,
-                    onNewCategoryClick     = { showNewCategoryDialog = true },
-                    onAdd                  = {
+                    onNewCategoryClick = { showNewCategoryDialog = true },
+                    onAdd = {
                         if (customLabel.isNotBlank()) {
                             onSaveAndAddCustomTag(customLabel, selectedCategoryKey)
                             customLabel = ""
@@ -988,7 +1395,7 @@ private fun TagPickerSheet(
                 item {
                     TagPickerSection(
                         title = "Auto-generadas para esta carta",
-                        tags  = cardAutoTags.map { TagItem(it.key, it.label) },
+                        tags = cardAutoTags.map { TagItem(it.key, it.label) },
                         onAdd = { key ->
                             val tag = cardAutoTags.find { it.key == key } ?: return@TagPickerSection
                             onAddUserTag(tag); onDismiss()
@@ -1003,8 +1410,11 @@ private fun TagPickerSheet(
                 item {
                     TagPickerSection(
                         title = "Sugeridas para esta carta",
-                        tags  = availableSuggestions.map { sug ->
-                            TagItem(sug.tag.key, "${sug.tag.label}  ${(sug.confidence * 100).toInt()}%")
+                        tags = availableSuggestions.map { sug ->
+                            TagItem(
+                                sug.tag.key,
+                                "${sug.tag.label}  ${(sug.confidence * 100).toInt()}%"
+                            )
                         },
                         onAdd = { key ->
                             val tag = availableSuggestions.find { it.tag.key == key }?.tag
@@ -1017,15 +1427,17 @@ private fun TagPickerSheet(
 
             // ── Built-in categories ──────────────────────────────────────────
             builtInCategories.forEach { category ->
-                val canonical   = CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
-                val userDefined = userDefinedTags.filter { it.categoryKey == category.name && it.key !in userTagKeys }
-                val items       = canonical.map { TagItem(it.key, it.label) } +
-                                  userDefined.map { TagItem(it.key, it.label) }
+                val canonical =
+                    CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
+                val userDefined =
+                    userDefinedTags.filter { it.categoryKey == category.name && it.key !in userTagKeys }
+                val items = canonical.map { TagItem(it.key, it.label) } +
+                        userDefined.map { TagItem(it.key, it.label) }
                 if (items.isNotEmpty()) {
                     item(key = "cat_${category.name}") {
                         TagPickerSection(
                             title = category.name,
-                            tags  = items,
+                            tags = items,
                             onAdd = { key ->
                                 val tag = canonical.find { it.key == key }
                                     ?: CardTag(key, category)
@@ -1045,7 +1457,7 @@ private fun TagPickerSheet(
                     item(key = "custom_$categoryKey") {
                         TagPickerSection(
                             title = categoryKey,
-                            tags  = items,
+                            tags = items,
                             onAdd = { key ->
                                 onAddUserTag(CardTag(key, TagCategory.CUSTOM)); onDismiss()
                             },
@@ -1070,20 +1482,20 @@ private fun TagPickerSheet(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CustomTagCreatorSection(
-    label:                  String,
-    onLabelChange:          (String) -> Unit,
-    selectedCategoryKey:    String,
-    onCategorySelected:     (String) -> Unit,
-    builtInCategories:      List<TagCategory>,
+    label: String,
+    onLabelChange: (String) -> Unit,
+    selectedCategoryKey: String,
+    onCategorySelected: (String) -> Unit,
+    builtInCategories: List<TagCategory>,
     userCustomCategoryKeys: List<String>,
-    onNewCategoryClick:     () -> Unit,
-    onAdd:                  () -> Unit,
+    onNewCategoryClick: () -> Unit,
+    onAdd: () -> Unit,
 ) {
     val allCategories: List<String> = builtInCategories.map { it.name } + userCustomCategoryKeys
 
     Surface(
-        color  = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        shape  = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -1096,11 +1508,11 @@ private fun CustomTagCreatorSection(
             )
 
             OutlinedTextField(
-                value         = label,
+                value = label,
                 onValueChange = onLabelChange,
-                modifier      = Modifier.fillMaxWidth(),
-                placeholder   = { Text("Nombre de la etiqueta…") },
-                singleLine    = true,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Nombre de la etiqueta…") },
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onAdd() }),
             )
@@ -1118,21 +1530,21 @@ private fun CustomTagCreatorSection(
                 items(allCategories) { cat ->
                     FilterChip(
                         selected = cat == selectedCategoryKey,
-                        onClick  = { onCategorySelected(cat) },
-                        label    = { Text(cat, style = MaterialTheme.typography.labelSmall) },
+                        onClick = { onCategorySelected(cat) },
+                        label = { Text(cat, style = MaterialTheme.typography.labelSmall) },
                     )
                 }
                 item {
                     SuggestionChip(
                         onClick = onNewCategoryClick,
-                        label   = { Text("+ Nueva", style = MaterialTheme.typography.labelSmall) },
+                        label = { Text("+ Nueva", style = MaterialTheme.typography.labelSmall) },
                     )
                 }
             }
 
             Button(
-                onClick  = onAdd,
-                enabled  = label.isNotBlank(),
+                onClick = onAdd,
+                enabled = label.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Añadir")
@@ -1141,26 +1553,27 @@ private fun CustomTagCreatorSection(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class) @Composable
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 private fun TagPickerSection(
     title: String,
-    tags:  List<TagItem>,
+    tags: List<TagItem>,
     onAdd: (key: String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text  = title,
+            text = title,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement   = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             tags.forEach { tag ->
                 SuggestionChip(
                     onClick = { onAdd(tag.key) },
-                    label   = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
+                    label = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
                 )
             }
         }
@@ -1175,20 +1588,20 @@ private fun NewCategoryDialog(
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title            = { Text("Nueva categoría") },
-        text             = {
+        title = { Text("Nueva categoría") },
+        text = {
             OutlinedTextField(
-                value         = name,
+                value = name,
                 onValueChange = { name = it },
-                placeholder   = { Text("Nombre de la categoría…") },
-                singleLine    = true,
+                placeholder = { Text("Nombre de la categoría…") },
+                singleLine = true,
             )
         },
-        confirmButton    = {
+        confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
                 Text("Crear")
             }
         },
-        dismissButton    = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }

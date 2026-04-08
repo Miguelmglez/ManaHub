@@ -28,6 +28,7 @@ interface UserCardDao {
     suspend fun updateQuantity(id: Long, qty: Int)
 
     // Called when insert() returns -1 — increments the existing matching row.
+    // is_in_wishlist is part of the unique key so collection and wishlist entries stay separate.
     @Query("""
         UPDATE user_cards SET quantity = quantity + 1
         WHERE scryfall_id        = :scryfallId
@@ -35,6 +36,7 @@ interface UserCardDao {
         AND   is_alternative_art = :isAlternativeArt
         AND   condition          = :condition
         AND   language           = :language
+        AND   is_in_wishlist     = :isInWishlist
     """)
     suspend fun incrementQuantityByUniqueKey(
         scryfallId:       String,
@@ -42,6 +44,7 @@ interface UserCardDao {
         isAlternativeArt: Boolean,
         condition:        String,
         language:         String,
+        isInWishlist:     Boolean,
     )
 
     // Plain query (no @Relation) so Room returns one row per UserCardEntity,
