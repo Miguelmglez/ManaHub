@@ -11,6 +11,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
 import com.mmg.magicfolder.core.ui.components.ArcaneCosmosBackground
 import com.mmg.magicfolder.core.ui.components.HexGridBackground
 import com.mmg.magicfolder.core.ui.components.MedievalGrimoireBackground
@@ -22,6 +23,7 @@ import com.mmg.magicfolder.core.ui.components.MedievalGrimoireBackground
 val LocalMagicColors     = staticCompositionLocalOf<MagicColors>     { NeonVoidColors }
 val LocalMagicTypography = staticCompositionLocalOf<MagicTypography> { NeonVoidTypography }
 val LocalAppTheme        = compositionLocalOf<AppTheme>              { AppTheme.NeonVoid }
+val LocalPreferredCurrency = staticCompositionLocalOf<PreferredCurrency> { PreferredCurrency.USD }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MaterialTheme extension properties
