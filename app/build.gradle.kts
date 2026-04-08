@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -17,7 +16,7 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.mmg.magicfolder"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.mmg.magicfolder"
@@ -37,7 +36,12 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -92,9 +96,13 @@ dependencies {
     implementation(libs.camerax.view)
     implementation(libs.mlkit.text.recognition)
 
+    testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.coroutines.test)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.espresso.core)
 
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)
@@ -104,6 +112,7 @@ dependencies {
     implementation(libs.compose.googlefonts)
     implementation(libs.datastore.preferences)
     implementation(libs.browser)
+    implementation(libs.guava)
 
 
 

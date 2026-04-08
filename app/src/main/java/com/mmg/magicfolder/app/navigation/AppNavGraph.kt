@@ -47,6 +47,7 @@ import com.mmg.magicfolder.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.magicfolder.feature.profile.ProfileScreen
 import com.mmg.magicfolder.feature.scanner.ScannerScreen
 import com.mmg.magicfolder.feature.settings.SettingsScreen
+import com.mmg.magicfolder.feature.tagdictionary.TagDictionaryScreen
 import com.mmg.magicfolder.feature.stats.StatsScreen
 import com.mmg.magicfolder.feature.survey.SurveyScreen
 import com.mmg.magicfolder.feature.tournament.TournamentListScreen
@@ -144,6 +145,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 AddCardScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToScanner = { navController.navigate(Screen.CollectionScanner.route) },
+                    onNavigateToCardDetail = { scryfallId ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                    },
                 )
             }
 
@@ -210,7 +214,12 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onManageNewsSources = { navController.navigate(Screen.NewsSourcesSettings.route) },
+                    onManageTagDictionary = { navController.navigate(Screen.TagDictionary.route) },
                 )
+            }
+
+            composable(Screen.TagDictionary.route) {
+                TagDictionaryScreen(onBack = { navController.popBackStack() })
             }
 
             // ── News ──────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package com.mmg.magicfolder.core.domain.repository
 import com.mmg.magicfolder.core.domain.model.Card
 import com.mmg.magicfolder.core.domain.model.CardTag
 import com.mmg.magicfolder.core.domain.model.DataResult
+import com.mmg.magicfolder.core.domain.model.SuggestedTag
 import kotlinx.coroutines.flow.Flow
 
 interface CardRepository {
@@ -19,6 +20,19 @@ interface CardRepository {
         priceEurFoil: Double?,
     )
     suspend fun evictStaleCache()
-    /** Replace the tag list for a card already in the local cache. */
+
+    /** Replace the confirmed tag list for a card already in the local cache. */
     suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>)
+
+    /** Replace the user-added tag list for a card. */
+    suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>)
+
+    /** Replace the suggested-tag list (used when the user dismisses suggestions). */
+    suspend fun updateSuggestedTags(scryfallId: String, suggestions: List<SuggestedTag>)
+
+    /** Promote a suggested tag to a confirmed tag (and remove it from suggestions). */
+    suspend fun confirmSuggestedTag(scryfallId: String, tag: CardTag)
+
+    /** Drop a suggested tag without confirming it. */
+    suspend fun dismissSuggestedTag(scryfallId: String, tag: CardTag)
 }

@@ -31,7 +31,7 @@ import com.mmg.magicfolder.feature.news.data.local.NewsVideoEntity
         ContentSourceEntity::class,
         DraftSetEntity::class,
     ],
-    version = 17,
+    version = 19,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -250,6 +250,24 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
                 cachedAt    INTEGER NOT NULL
             )
         """.trimIndent())
+    }
+}
+
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE cards ADD COLUMN suggested_tags TEXT NOT NULL DEFAULT '[]'"
+        )
+        // Old `tags` column stored enum names; new format is JSON objects.
+        database.execSQL("UPDATE cards SET tags = '[]'")
+    }
+}
+
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE cards ADD COLUMN user_tags TEXT NOT NULL DEFAULT '[]'"
+        )
     }
 }
 

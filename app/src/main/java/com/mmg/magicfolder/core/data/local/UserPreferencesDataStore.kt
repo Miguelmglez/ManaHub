@@ -3,14 +3,18 @@ package com.mmg.magicfolder.core.data.local
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.mmg.magicfolder.core.domain.model.AppLanguage
 import com.mmg.magicfolder.core.domain.model.CardLanguage
 import com.mmg.magicfolder.core.domain.model.NewsLanguage
 import com.mmg.magicfolder.core.domain.model.PreferredCurrency
+import com.mmg.magicfolder.core.domain.model.UserDefinedTag
 import com.mmg.magicfolder.core.domain.model.UserPreferences
 import com.mmg.magicfolder.core.domain.repository.UserPreferencesRepository
 import com.mmg.magicfolder.core.ui.theme.AppTheme
@@ -34,6 +38,14 @@ private val AUTO_REFRESH_KEY       = booleanPreferencesKey("auto_refresh_prices"
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
 private val KEY_PLAYER_NAME = stringPreferencesKey("player_name")
 private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
+private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold")
+private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
+private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
+private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
+
+private data class UdtRecord(val k: String, val l: String, val c: String)
+private val udtListType = object : TypeToken<List<UdtRecord>>() {}.type
+private val gson = Gson()
 
 @Singleton
 class UserPreferencesDataStore @Inject constructor(
@@ -149,6 +161,69 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun savePlayerName(name: String) {
         context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
+    }
+
+    // ── Tag auto-tagger thresholds ────────────────────────────────────────────
+
+    val tagAutoThresholdFlow: Flow<Float> = context.userPrefsDataStore.data
+        .map { it[KEY_TAG_AUTO_THRESHOLD] ?: 0.90f }
+        .catch { emit(0.90f) }
+
+    val tagSuggestThresholdFlow: Flow<Float> = context.userPrefsDataStore.data
+        .map { it[KEY_TAG_SUGGEST_THRESHOLD] ?: 0.60f }
+        .catch { emit(0.60f) }
+
+    suspend fun saveTagAutoThreshold(value: Float) {
+        context.userPrefsDataStore.edit { it[KEY_TAG_AUTO_THRESHOLD] = value.coerceIn(0f, 1f) }
+    }
+
+    suspend fun saveTagSuggestThreshold(value: Float) {
+        context.userPrefsDataStore.edit { it[KEY_TAG_SUGGEST_THRESHOLD] = value.coerceIn(0f, 1f) }
+    }
+
+    // ── Tag dictionary overrides (JSON blob) ─────────────────────────────────
+
+    val tagDictionaryOverridesFlow: Flow<String> = context.userPrefsDataStore.data
+        .map { it[KEY_TAG_OVERRIDES_JSON] ?: "[]" }
+        .catch { emit("[]") }
+
+    suspend fun saveTagDictionaryOverrides(json: String) {
+        context.userPrefsDataStore.edit { it[KEY_TAG_OVERRIDES_JSON] = json }
+    }
+
+    // ── User-defined tags ─────────────────────────────────────────────────────
+
+    val userDefinedTagsFlow: Flow<List<UserDefinedTag>> = context.userPrefsDataStore.data
+        .map { prefs ->
+            val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
+            runCatching<List<UserDefinedTag>> {
+                val records: List<UdtRecord> = gson.fromJson(json, udtListType) ?: emptyList()
+                records.map { UserDefinedTag(key = it.k, label = it.l, categoryKey = it.c) }
+            }.getOrDefault(emptyList())
+        }
+        .catch { emit(emptyList()) }
+
+    suspend fun saveUserDefinedTag(tag: UserDefinedTag) {
+        context.userPrefsDataStore.edit { prefs ->
+            val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
+            val records: MutableList<UdtRecord> = runCatching<List<UdtRecord>> {
+                gson.fromJson(json, udtListType) ?: emptyList()
+            }.getOrDefault(emptyList()).toMutableList()
+            records.removeAll { it.k == tag.key }
+            records.add(UdtRecord(k = tag.key, l = tag.label, c = tag.categoryKey))
+            prefs[KEY_USER_DEFINED_TAGS] = gson.toJson(records)
+        }
+    }
+
+    suspend fun deleteUserDefinedTag(key: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
+            val records: MutableList<UdtRecord> = runCatching<List<UdtRecord>> {
+                gson.fromJson(json, udtListType) ?: emptyList()
+            }.getOrDefault(emptyList()).toMutableList()
+            records.removeAll { it.k == key }
+            prefs[KEY_USER_DEFINED_TAGS] = gson.toJson(records)
+        }
     }
 
     suspend fun saveTheme(theme: AppTheme) {

@@ -5,6 +5,7 @@ import coil.Coil
 import coil.ImageLoader
 import coil.decode.SvgDecoder
 import com.mmg.magicfolder.core.domain.usecase.symbols.SyncManaSymbolsUseCase
+import com.mmg.magicfolder.core.tagging.TagDictionaryRepository
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,9 @@ class MagicFolderApp : Application() {
     @Inject
     lateinit var syncManaSymbols: SyncManaSymbolsUseCase
 
+    @Inject
+    lateinit var tagDictionaryRepo: TagDictionaryRepository
+
     override fun onCreate() {
         super.onCreate()
 
@@ -26,6 +30,8 @@ class MagicFolderApp : Application() {
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching { syncManaSymbols() }
+            // Apply any user overrides before card analyzers run for the first time.
+            runCatching { tagDictionaryRepo.loadAndApply() }
         }
     }
 }
