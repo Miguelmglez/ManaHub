@@ -77,11 +77,18 @@ fun TournamentSetupScreen(
 
             // ── Tournament name ────────────────────────────────────────────────
             item {
-                SectionLabel("Tournament Name")
+                SectionLabel(stringResource(R.string.tournament_name_label))
                 OutlinedTextField(
                     value         = uiState.name,
                     onValueChange = viewModel::onNameChange,
                     modifier      = Modifier.fillMaxWidth(),
+                    placeholder   = {
+                        Text(
+                            stringResource(R.string.tournament_name_hint),
+                            style = MaterialTheme.magicTypography.bodySmall,
+                            color = mc.textDisabled,
+                        )
+                    },
                     shape         = RoundedCornerShape(12.dp),
                     singleLine    = true,
                     colors        = OutlinedTextFieldDefaults.colors(
@@ -96,11 +103,17 @@ fun TournamentSetupScreen(
 
             // ── Format ─────────────────────────────────────────────────────────
             item {
-                SectionLabel("Format")
+                SectionLabel(stringResource(R.string.tournament_format_label))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("COMMANDER", "STANDARD", "DRAFT").forEach { fmt ->
+                        val label = when (fmt) {
+                            "COMMANDER" -> stringResource(R.string.format_commander)
+                            "STANDARD"  -> stringResource(R.string.format_standard)
+                            "DRAFT"     -> stringResource(R.string.format_draft)
+                            else        -> fmt.lowercase().replaceFirstChar { it.uppercase() }
+                        }
                         FormatChip(
-                            label    = fmt.lowercase().replaceFirstChar { it.uppercase() },
+                            label    = label,
                             selected = uiState.format == fmt,
                             onClick  = { viewModel.onFormatChange(fmt) },
                             modifier = Modifier.weight(1f),
@@ -111,7 +124,7 @@ fun TournamentSetupScreen(
 
             // ── Structure ──────────────────────────────────────────────────────
             item {
-                SectionLabel("Structure")
+                SectionLabel(stringResource(R.string.tournament_structure_label))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StructureOption(
                         title       = stringResource(R.string.tournament_structure_round_robin),
@@ -139,7 +152,7 @@ fun TournamentSetupScreen(
 
             // ── Matches per pairing ────────────────────────────────────────────
             item {
-                SectionLabel("Matches per pairing")
+                SectionLabel(stringResource(R.string.tournament_matches_per_pairing))
                 Row(
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -163,9 +176,10 @@ fun TournamentSetupScreen(
                     ) {
                         Text("+", fontSize = 22.sp, color = mc.textPrimary)
                     }
+                    val label = if (uiState.matchesPerPairing == 1) stringResource(R.string.tournament_matches_per_pairing_single)
+                                else stringResource(R.string.tournament_matches_per_pairing_multi, uiState.matchesPerPairing)
                     Text(
-                        text  = if (uiState.matchesPerPairing == 1) "per pairing"
-                                else "per pairing (best of ${uiState.matchesPerPairing})",
+                        text  = label,
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textSecondary,
                     )
@@ -174,7 +188,7 @@ fun TournamentSetupScreen(
 
             // ── Pairings toggle ────────────────────────────────────────────────
             item {
-                SectionLabel("Pairings")
+                SectionLabel(stringResource(R.string.tournament_pairings_label))
                 Row(
                     modifier              = Modifier
                         .fillMaxWidth()
@@ -215,7 +229,7 @@ fun TournamentSetupScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically,
                 ) {
-                    SectionLabel("Players (${uiState.players.size})")
+                    SectionLabel(stringResource(R.string.tournament_players_label, uiState.players.size))
                     TextButton(onClick = { viewModel.addPlayer() }) {
                         Text(
                             stringResource(R.string.tournament_add_player),
@@ -442,7 +456,7 @@ private fun ColorPickerDialog(
         onDismissRequest = onDismiss,
         containerColor   = mc.surface,
         title            = {
-            Text("Pick color", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+            Text(stringResource(R.string.gamesetup_choose_color), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

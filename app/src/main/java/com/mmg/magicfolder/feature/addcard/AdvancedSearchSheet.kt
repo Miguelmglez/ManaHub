@@ -231,7 +231,10 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(title = stringResource(R.string.advsearch_section_colors)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(false to "Color", true to "Identity").forEach { (isIdentity, label) ->
+                            listOf(
+                                false to stringResource(R.string.advsearch_color_mode_color),
+                                true to stringResource(R.string.advsearch_color_mode_identity)
+                            ).forEach { (isIdentity, label) ->
                                 FilterChip(
                                     selected = uiState.useColorIdentity == isIdentity,
                                     onClick = { viewModel.setUseColorIdentity(isIdentity) },
@@ -298,14 +301,18 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.manaCostValue,
                                 onValueChange = { v -> viewModel.setManaCost(v, uiState.manaCostOp) },
-                                placeholder = { Text("0..15", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_mana_hint), color = mc.textDisabled) },
                                 modifier = Modifier.width(80.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                             )
-                            Text("CMC", style = ty.bodySmall, color = mc.textDisabled)
+                            Text(
+                                stringResource(R.string.advsearch_sort_cmc),
+                                style = ty.bodySmall,
+                                color = mc.textDisabled
+                            )
                         }
                     }
                 }
@@ -524,7 +531,7 @@ fun AdvancedSearchSheet(
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                placeholder = { Text("*", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_power_hint), color = mc.textDisabled) },
                             )
                         }
                         Row(
@@ -550,7 +557,7 @@ fun AdvancedSearchSheet(
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                placeholder = { Text("*", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_toughness_hint), color = mc.textDisabled) },
                             )
                         }
                     }
@@ -570,7 +577,7 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.priceMax,
                                 onValueChange = { v -> viewModel.setPrice(v, uiState.priceCurrency) },
-                                placeholder = { Text("0.00", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_price_hint), color = mc.textDisabled) },
                                 modifier = Modifier.width(100.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
@@ -578,7 +585,10 @@ fun AdvancedSearchSheet(
                                 singleLine = true,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("eur" to "€", "usd" to "$").forEach { (curr, symbol) ->
+                                listOf(
+                                    "eur" to stringResource(R.string.price_symbol_eur),
+                                    "usd" to stringResource(R.string.price_symbol_usd)
+                                ).forEach { (curr, symbol) ->
                                     FilterChip(
                                         selected = uiState.priceCurrency == curr,
                                         onClick = { viewModel.setPrice(uiState.priceMax, curr) },
@@ -775,7 +785,14 @@ fun AdvancedSearchSheet(
                                     onClick = { viewModel.setOrder(order, uiState.orderDirection) },
                                     label = {
                                         Text(
-                                            order.name.lowercase().replaceFirstChar { it.uppercase() },
+                                            stringResource(when(order) {
+                                                SearchOrder.NAME -> R.string.advsearch_sort_name
+                                                SearchOrder.CMC -> R.string.advsearch_sort_cmc
+                                                SearchOrder.PRICE -> R.string.advsearch_sort_price
+                                                SearchOrder.RARITY -> R.string.advsearch_sort_rarity
+                                                SearchOrder.RELEASED -> R.string.advsearch_sort_released
+                                                SearchOrder.COLOR -> R.string.advsearch_sort_color
+                                            }),
                                             style = ty.labelSmall,
                                         )
                                     },
@@ -784,8 +801,8 @@ fun AdvancedSearchSheet(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(
-                                SearchDirection.ASC to "↑ ASC",
-                                SearchDirection.DESC to "↓ DESC",
+                                SearchDirection.ASC to stringResource(R.string.advsearch_dir_asc),
+                                SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
                             ).forEach { (dir, label) ->
                                 FilterChip(
                                     selected = uiState.orderDirection == dir,

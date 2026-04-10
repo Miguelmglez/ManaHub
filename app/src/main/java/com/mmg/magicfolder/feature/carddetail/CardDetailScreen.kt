@@ -282,7 +282,7 @@ private fun CardDetailContent(
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
-                        text = if (showBackFace) "Tap to see front" else "Tap to flip",
+                        text = if (showBackFace) stringResource(R.string.carddetail_flip_see_front) else stringResource(R.string.carddetail_flip_see_back),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
@@ -358,7 +358,10 @@ private fun CardDetailContent(
                 style = MaterialTheme.typography.titleMedium,
             )
         } else card.loyalty?.let {
-            Text("Loyalty: $it", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = stringResource(R.string.carddetail_loyalty_value, it),
+                style = MaterialTheme.typography.titleMedium
+            )
         }
 
         HorizontalDivider()
@@ -455,7 +458,11 @@ private fun FoundInDecksSection(
                 modifier           = Modifier.size(16.dp),
             )
             Text(
-                text  = "Found in ${decks.size} ${if (decks.size == 1) "Deck" else "Decks"}",
+                text  = stringResource(
+                    R.string.carddetail_found_in_decks,
+                    decks.size,
+                    if (decks.size == 1) stringResource(R.string.carddetail_deck) else stringResource(R.string.carddetail_decks)
+                ),
                 style = MaterialTheme.typography.titleSmall,
                 color = mc.textPrimary,
             )
@@ -1185,10 +1192,10 @@ private fun LegalitySection(card: Card) {
             style = MaterialTheme.typography.titleSmall
         )
         val formats = listOf(
-            "Standard" to card.legalityStandard,
-            "Pioneer" to card.legalityPioneer,
-            "Modern" to card.legalityModern,
-            "Commander" to card.legalityCommander,
+            stringResource(R.string.format_standard) to card.legalityStandard,
+            stringResource(R.string.format_pioneer) to card.legalityPioneer,
+            stringResource(R.string.format_modern) to card.legalityModern,
+            stringResource(R.string.format_commander) to card.legalityCommander,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             formats.forEach { (format, legality) ->
@@ -1212,7 +1219,7 @@ private fun LegalityChip(format: String, legality: String) {
         ) {
             Text(format, style = MaterialTheme.typography.labelSmall)
             Text(
-                text = if (isLegal) "Legal" else "Not legal",
+                text = if (isLegal) stringResource(R.string.carddetail_legality_legal) else stringResource(R.string.carddetail_legality_not_legal),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isLegal) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1246,7 +1253,7 @@ private fun TagsSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Tags",
+                text = stringResource(R.string.carddetail_tags_section),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f),
             )
@@ -1260,7 +1267,7 @@ private fun TagsSection(
             // ── Auto-generated tags ──────────────────────────────────────────
             if (autoTags.isNotEmpty()) {
                 Text(
-                    text = "Etiquetas automáticas",
+                    text = stringResource(R.string.carddetail_tags_auto_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1282,7 +1289,7 @@ private fun TagsSection(
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Quitar ${tag.label}",
+                                        contentDescription = stringResource(R.string.carddetail_tags_remove_description, tag.label),
                                         modifier = Modifier.size(14.dp),
                                     )
                                 },
@@ -1308,7 +1315,7 @@ private fun TagsSection(
                     Spacer(Modifier.height(2.dp))
                 }
                 Text(
-                    text = "Mis etiquetas",
+                    text = stringResource(R.string.carddetail_tags_user_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1330,7 +1337,7 @@ private fun TagsSection(
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Quitar ${tag.label}",
+                                        contentDescription = stringResource(R.string.carddetail_tags_remove_description, tag.label),
                                         modifier = Modifier.size(14.dp),
                                     )
                                 },
@@ -1339,7 +1346,7 @@ private fun TagsSection(
                     }
                 } else {
                     Text(
-                        text = "Sin etiquetas personales — toca + para añadir",
+                        text = stringResource(R.string.carddetail_tags_user_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1356,11 +1363,11 @@ private fun TagsSection(
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("Añadir etiqueta", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.carddetail_tags_add_button), style = MaterialTheme.typography.labelSmall)
                 }
             } else if (!hasAnyTag) {
                 Text(
-                    text = "Sin etiquetas automáticas",
+                    text = stringResource(R.string.carddetail_tags_auto_empty),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1399,7 +1406,7 @@ private fun SuggestedTagsSection(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Etiquetas sugeridas",
+                text = stringResource(R.string.carddetail_tags_suggested_label),
                 style = MaterialTheme.typography.titleSmall,
                 color = mc.textPrimary,
                 modifier = Modifier.weight(1f),
@@ -1414,7 +1421,7 @@ private fun SuggestedTagsSection(
         AnimatedVisibility(visible = expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Confirma las que apliquen o descártalas. No se añaden hasta que tú las apruebes.",
+                    text = stringResource(R.string.carddetail_tags_suggested_desc),
                     style = ty.bodySmall,
                     color = mc.textSecondary,
                 )
@@ -1469,7 +1476,11 @@ private fun SuggestedTagCard(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(suggestion.tag.label, style = ty.bodyMedium, color = mc.textPrimary)
-                    Text("$pct% confidence", style = ty.labelSmall, color = mc.textDisabled)
+                    Text(
+                        text = stringResource(R.string.carddetail_tags_confidence_value, pct),
+                        style = ty.labelSmall,
+                        color = mc.textDisabled
+                    )
                 }
             }
 
@@ -1492,7 +1503,7 @@ private fun SuggestedTagCard(
                 ) {
                     Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Descartar", style = ty.labelSmall)
+                    Text(stringResource(R.string.action_discard), style = ty.labelSmall)
                 }
                 Button(
                     onClick = onConfirm,
@@ -1508,7 +1519,7 @@ private fun SuggestedTagCard(
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Añadir tag", style = ty.labelSmall)
+                    Text(stringResource(R.string.carddetail_tags_suggested_confirm), style = ty.labelSmall)
                 }
             }
         }
@@ -1569,7 +1580,7 @@ private fun TagPickerSheet(
         ) {
             // ── Header ──────────────────────────────────────────────────────
             item {
-                Text("Añadir etiqueta", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.carddetail_tags_picker_title), style = MaterialTheme.typography.titleMedium)
             }
 
             // ── Custom tag creator ───────────────────────────────────────────
@@ -1595,7 +1606,7 @@ private fun TagPickerSheet(
             if (cardAutoTags.isNotEmpty()) {
                 item {
                     TagPickerSection(
-                        title = "Auto-generadas para esta carta",
+                        title = stringResource(R.string.carddetail_tags_picker_auto),
                         tags = cardAutoTags.map { TagItem(it.key, it.label) },
                         onAdd = { key ->
                             val tag = cardAutoTags.find { it.key == key } ?: return@TagPickerSection
@@ -1610,7 +1621,7 @@ private fun TagPickerSheet(
             if (availableSuggestions.isNotEmpty()) {
                 item {
                     TagPickerSection(
-                        title = "Sugeridas para esta carta",
+                        title = stringResource(R.string.carddetail_tags_picker_suggested),
                         tags = availableSuggestions.map { sug ->
                             TagItem(
                                 sug.tag.key,
@@ -1685,12 +1696,12 @@ private fun TagPickerSheet(
     editingTagKey?.let { key ->
         AlertDialog(
             onDismissRequest = { editingTagKey = null },
-            title = { Text("Renombrar etiqueta") },
+            title = { Text(stringResource(R.string.carddetail_rename_tag)) },
             text = {
                 OutlinedTextField(
                     value = editingTagLabel,
                     onValueChange = { editingTagLabel = it },
-                    placeholder = { Text("Nuevo nombre…") },
+                    placeholder = { Text(stringResource(R.string.carddetail_new_name_hint)) },
                     singleLine = true,
                 )
             },
@@ -1702,10 +1713,10 @@ private fun TagPickerSheet(
                         }
                         editingTagKey = null
                     },
-                ) { Text("Guardar") }
+                ) { Text(stringResource(R.string.action_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { editingTagKey = null }) { Text("Cancelar") }
+                TextButton(onClick = { editingTagKey = null }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -1744,7 +1755,7 @@ private fun CustomTagCreatorSection(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "Nueva etiqueta personalizada",
+                stringResource(R.string.carddetail_new_custom_tag),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1753,14 +1764,14 @@ private fun CustomTagCreatorSection(
                 value = label,
                 onValueChange = onLabelChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Nombre de la etiqueta…") },
+                placeholder = { Text(stringResource(R.string.carddetail_tag_name_hint)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onAdd() }),
             )
 
             Text(
-                "Tipo:",
+                stringResource(R.string.carddetail_tag_type_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1779,7 +1790,7 @@ private fun CustomTagCreatorSection(
                 item {
                     SuggestionChip(
                         onClick = onNewCategoryClick,
-                        label = { Text("+ Nueva", style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(stringResource(R.string.carddetail_new_tag_button), style = MaterialTheme.typography.labelSmall) },
                     )
                 }
             }
@@ -1789,7 +1800,7 @@ private fun CustomTagCreatorSection(
                 enabled = label.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Añadir")
+                Text(stringResource(R.string.action_add))
             }
         }
     }
@@ -1842,7 +1853,7 @@ private fun TagPickerSection(
                                 ) {
                                     Icon(
                                         Icons.Default.Edit,
-                                        contentDescription = "Editar ${tag.label}",
+                                        contentDescription = stringResource(R.string.carddetail_edit_tag_description, tag.label),
                                         tint     = mc.textSecondary,
                                         modifier = Modifier.size(13.dp),
                                     )
@@ -1855,7 +1866,7 @@ private fun TagPickerSection(
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Eliminar ${tag.label}",
+                                        contentDescription = stringResource(R.string.carddetail_delete_tag_description, tag.label),
                                         tint     = mc.lifeNegative.copy(alpha = 0.7f),
                                         modifier = Modifier.size(13.dp),
                                     )
@@ -1883,20 +1894,20 @@ private fun NewCategoryDialog(
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nueva categoría") },
+        title = { Text(stringResource(R.string.carddetail_new_category_title)) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text("Nombre de la categoría…") },
+                placeholder = { Text(stringResource(R.string.carddetail_category_name_hint)) },
                 singleLine = true,
             )
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
-                Text("Crear")
+                Text(stringResource(R.string.carddetail_create_button))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

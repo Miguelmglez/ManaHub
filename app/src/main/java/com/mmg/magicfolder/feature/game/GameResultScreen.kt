@@ -59,7 +59,7 @@ fun GameResultScreen(
                         border   = androidx.compose.foundation.BorderStroke(1.dp, mc.goldMtg),
                     ) {
                         Text(
-                            "\u2756 Review this game",
+                            stringResource(R.string.gameresult_review_button),
                             style = MaterialTheme.magicTypography.labelLarge,
                         )
                     }
@@ -71,7 +71,10 @@ fun GameResultScreen(
                             onClick  = onBackHome,
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("Back to Home", style = MaterialTheme.magicTypography.labelLarge)
+                            Text(
+                                stringResource(R.string.gameresult_back_home),
+                                style = MaterialTheme.magicTypography.labelLarge
+                            )
                         }
                         Button(
                             onClick  = onNewGame,
@@ -103,7 +106,7 @@ private fun VictoryHeader(gameResult: GameResult, winnerColor: Color) {
         modifier            = Modifier.fillMaxWidth(),
     ) {
         Text(
-            text  = "VICTORY",
+            text  = stringResource(R.string.gameresult_winner_label),
             style = MaterialTheme.magicTypography.labelLarge,
             color = winnerColor,
         )
@@ -116,19 +119,19 @@ private fun VictoryHeader(gameResult: GameResult, winnerColor: Color) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text  = "${gameResult.winner.life} life remaining",
+            text  = stringResource(R.string.gameresult_life_remaining, gameResult.winner.life),
             style = MaterialTheme.magicTypography.bodyLarge,
             color = mc.lifePositive,
         )
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
-                text  = formatDuration(gameResult.durationMs),
+                text  = stringResource(R.string.gameresult_game_duration, formatDuration(gameResult.durationMs)),
                 style = MaterialTheme.magicTypography.bodyMedium,
                 color = mc.textSecondary,
             )
             Text(
-                text  = "Game ended on turn ${gameResult.totalTurns}",
+                text  = stringResource(R.string.gameresult_game_ended_turn, gameResult.totalTurns),
                 style = MaterialTheme.magicTypography.bodyMedium,
                 color = mc.textSecondary,
             )
@@ -152,7 +155,7 @@ private fun StandingsSection(gameResult: GameResult) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text  = "FINAL STANDINGS",
+            text  = stringResource(R.string.gameresult_standings_title),
             style = MaterialTheme.magicTypography.labelLarge,
             color = mc.goldMtg,
         )
@@ -200,11 +203,11 @@ private fun StandingRow(
                 modifier = Modifier.weight(1f),
             )
             val statusText = when (result?.eliminationReason) {
-                null                            -> "${result?.finalLife ?: player.life} life"
-                EliminationReason.LIFE          -> "0 life"
-                EliminationReason.POISON        -> "\u2620 10 poison"
-                EliminationReason.COMMANDER_DAMAGE -> "\u2694 21 cmd dmg"
-                EliminationReason.CONCEDE       -> "conceded"
+                null                            -> stringResource(R.string.gameresult_player_life_count, result?.finalLife ?: player.life)
+                EliminationReason.LIFE          -> stringResource(R.string.gameresult_elimination_life)
+                EliminationReason.POISON        -> stringResource(R.string.gameresult_player_poison_count)
+                EliminationReason.COMMANDER_DAMAGE -> stringResource(R.string.gameresult_player_cmd_damage_count)
+                EliminationReason.CONCEDE       -> stringResource(R.string.gameresult_player_conceded)
             }
             Text(
                 text  = statusText,
@@ -213,7 +216,7 @@ private fun StandingRow(
             )
             if (gameMode == GameMode.COMMANDER && result != null) {
                 Text(
-                    text  = "${result.totalCommanderDamageDealt} cmd",
+                    text  = stringResource(R.string.gameresult_cmd_damage_label, result.totalCommanderDamageDealt),
                     style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.commanderAccent,
                 )
@@ -242,29 +245,33 @@ private fun HighlightsSection(gameResult: GameResult) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text  = "HIGHLIGHTS",
+            text  = stringResource(R.string.gameresult_highlights_title),
             style = MaterialTheme.magicTypography.labelLarge,
             color = mc.goldMtg,
         )
         if (mostDmg != null && mostDmg.totalCommanderDamageDealt > 0) {
             HighlightCard(
                 icon  = "\u2694",
-                label = "Most damage dealt",
-                value = "${mostDmg.player.name} \u2014 ${mostDmg.totalCommanderDamageDealt} cmd dmg",
+                label = stringResource(R.string.gameresult_most_damage),
+                value = stringResource(
+                    R.string.gameresult_most_damage_desc,
+                    mostDmg.player.name,
+                    mostDmg.totalCommanderDamageDealt
+                ),
             )
         }
         if (closestGap != null && closestGap <= 5) {
             HighlightCard(
                 icon  = "\uD83C\uDFAF",
-                label = "Closest match",
-                value = "Life difference of $closestGap",
+                label = stringResource(R.string.gameresult_closest_match),
+                value = stringResource(R.string.gameresult_closest_match_desc, closestGap),
             )
         }
         if (hasPoison) {
             HighlightCard(
                 icon  = "\u2620",
-                label = "Poison elimination",
-                value = "A player was eliminated by poison counters",
+                label = stringResource(R.string.gameresult_poison_elimination),
+                value = stringResource(R.string.gameresult_poison_elimination_desc),
             )
         }
     }

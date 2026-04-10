@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -136,7 +137,7 @@ fun GlobalToolsOverlay(
                     // --- Close Button (Top-Left) ---
                     Icon(
                         painter = painterResource(R.drawable.ic_close),
-                        contentDescription = "Close tools",
+                        contentDescription = stringResource(R.string.game_tools_close_desc),
                         tint = mc.primaryAccent.copy(alpha = 0.50f),
                         modifier = Modifier
                             .align(Alignment.TopStart) // Positions it at the top-left
@@ -211,7 +212,7 @@ fun AnimatedDice(
         if (isRolling) {
             Icon(
                 painter = painterResource(R.drawable.ic_dice),
-                contentDescription = "coin flip",
+                contentDescription = stringResource(R.string.game_tools_dice_roll_desc),
                 tint = mc.primaryAccent.copy(alpha = 0.50f),
                 modifier = Modifier.size(42.dp),
             )
@@ -227,7 +228,7 @@ fun AnimatedDice(
                 } else {
                     Icon(
                         painter = painterResource(R.drawable.ic_dice),
-                        contentDescription = "coin flip",
+                        contentDescription = stringResource(R.string.game_tools_dice_roll_desc),
                         tint = mc.primaryAccent.copy(alpha = 0.50f),
                         modifier = Modifier.size(42.dp),
                     )
@@ -280,7 +281,7 @@ fun AnimatedCoin(
             result == true -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     painter = painterResource(R.drawable.ic_heads),
-                    contentDescription = "Coin flip Heads",
+                    contentDescription = stringResource(R.string.game_tools_coin_heads_desc),
                     tint = mc.textDisabled.copy(alpha = 0.50f),
                     modifier = Modifier.size(42.dp),
                 )
@@ -289,7 +290,7 @@ fun AnimatedCoin(
             result == false -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     painter = painterResource(R.drawable.ic_counter),
-                    contentDescription = "Coin flip Tails",
+                    contentDescription = stringResource(R.string.game_tools_coin_tails_desc),
                     tint = mc.textDisabled.copy(alpha = 0.50f),
                     modifier = Modifier.size(42.dp),
                 )
@@ -298,7 +299,7 @@ fun AnimatedCoin(
             else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     painter = painterResource(R.drawable.ic_coin),
-                    contentDescription = "coin flip",
+                    contentDescription = stringResource(R.string.game_tools_coin_flip_desc),
                     tint = mc.goldMtg.copy(alpha = 0.50f),
                     modifier = Modifier.size(42.dp),
                 )

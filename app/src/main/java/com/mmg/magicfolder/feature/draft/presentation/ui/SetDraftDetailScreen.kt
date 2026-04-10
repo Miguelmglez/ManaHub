@@ -119,7 +119,7 @@ fun SetDraftDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = colors.textPrimary)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back), tint = colors.textPrimary)
                 }
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -347,7 +347,7 @@ private fun ArchetypeCard(
             val keyCards = archetype.keyCommons + archetype.keyUncommons
             if (keyCards.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.draft_key_cards) + ":", style = typography.labelSmall, color = colors.textDisabled)
+                Text(stringResource(R.string.draft_key_cards_label), style = typography.labelSmall, color = colors.textDisabled)
                 Spacer(Modifier.height(4.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     keyCards.forEach { name ->
@@ -510,9 +510,9 @@ private fun AllCardsSubTab(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("${filteredAndSorted.size} cards", style = typography.labelMedium, color = mc.textSecondary)
+            Text(stringResource(R.string.collection_card_count, filteredAndSorted.size), style = typography.labelMedium, color = mc.textSecondary)
             IconButton(onClick = { showFilters = !showFilters }) {
-                Icon(Icons.Default.FilterList, "Filters", tint = mc.primaryAccent)
+                Icon(Icons.Default.FilterList, stringResource(R.string.deckbuilder_filter_title), tint = mc.primaryAccent)
             }
         }
 
@@ -532,7 +532,7 @@ private fun AllCardsSubTab(
                     RarityFilterRow(state.cardRarityFilter, viewModel::toggleCardRarityFilter, mc)
                     // Sort
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(stringResource(R.string.draft_sort_by) + ":", style = typography.labelSmall, color = mc.textSecondary)
+                        Text(stringResource(R.string.draft_sort_by_label), style = typography.labelSmall, color = mc.textSecondary)
                         CardSortOption.entries.forEach { option ->
                             val label = when (option) {
                                 CardSortOption.PRICE  -> stringResource(R.string.draft_sort_price)
@@ -557,7 +557,7 @@ private fun AllCardsSubTab(
 
         when {
             state.isCardsLoading && state.cards.isEmpty() -> LoadingIndicator()
-            state.cardsError != null && state.cards.isEmpty() -> PlaceholderMessage(state.cardsError ?: "Error")
+            state.cardsError != null && state.cards.isEmpty() -> PlaceholderMessage(state.cardsError ?: stringResource(R.string.state_error))
             else -> {
                 val gridState = rememberLazyGridState()
                 LazyVerticalGrid(
@@ -614,7 +614,7 @@ private fun DraftCardItem(card: Card, onClick: () -> Unit) {
             Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(rarityBorderColor))
             Column(modifier = Modifier.padding(4.dp)) {
                 Text(card.name, style = typography.labelSmall, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                card.priceUsd?.let { Text("$${String.format("%.2f", it)}", style = typography.labelSmall, color = colors.goldMtg) }
+                card.priceUsd?.let { Text(stringResource(R.string.price_format_usd, it), style = typography.labelSmall, color = colors.goldMtg) }
             }
         }
     }
@@ -718,7 +718,7 @@ private fun CardDetailBottomSheet(card: Card?, isLoading: Boolean) {
                         Spacer(Modifier.height(8.dp))
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current).data(card.imageBackNormal).crossfade(true).build(),
-                            contentDescription = "${card.name} (back)",
+                            contentDescription = stringResource(R.string.carddetail_back_face_description, card.name),
                             modifier = Modifier.fillMaxWidth().aspectRatio(0.72f),
                             contentScale = ContentScale.Fit,
                         )
@@ -748,7 +748,7 @@ private fun CardDetailBottomSheet(card: Card?, isLoading: Boolean) {
                             card.power != null && card.toughness != null ->
                                 Text("${card.power}/${card.toughness}", style = typography.labelLarge, color = colors.textPrimary, fontWeight = FontWeight.Bold)
                             card.loyalty != null ->
-                                Text("Loyalty: ${card.loyalty}", style = typography.labelLarge, color = colors.textPrimary, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.carddetail_loyalty_value, card.loyalty), style = typography.labelLarge, color = colors.textPrimary, fontWeight = FontWeight.Bold)
                         }
 
                         if (!card.flavorText.isNullOrBlank()) {
@@ -759,7 +759,7 @@ private fun CardDetailBottomSheet(card: Card?, isLoading: Boolean) {
                             Text(stringResource(R.string.draft_card_artist, card.artist), style = typography.labelSmall, color = colors.textDisabled)
                         }
                         card.priceUsd?.let {
-                            Text("$${String.format("%.2f", it)}", style = typography.labelMedium, color = colors.goldMtg, fontWeight = FontWeight.Medium)
+                            Text(stringResource(R.string.price_format_usd, it), style = typography.labelMedium, color = colors.goldMtg, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -785,7 +785,7 @@ private fun VideoCard(video: DraftVideo, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
                     contentScale = ContentScale.Crop,
                 )
-                Icon(Icons.Default.PlayCircle, "Play", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(48.dp).align(Alignment.Center))
+                Icon(Icons.Default.PlayCircle, stringResource(R.string.nav_play), tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(48.dp).align(Alignment.Center))
             }
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(video.title, style = typography.bodyMedium, color = colors.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)

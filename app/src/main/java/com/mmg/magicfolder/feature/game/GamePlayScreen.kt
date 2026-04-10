@@ -388,7 +388,7 @@ private fun GameTopBar(
                             .background(theme.accent)
                     )
                     Text(
-                        "T$turnNumber",
+                        stringResource(R.string.game_turn_label, turnNumber),
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.textSecondary,
                     )
@@ -399,7 +399,7 @@ private fun GameTopBar(
                         color = mc.primaryAccent.copy(alpha = 0.18f),
                     ) {
                         Text(
-                            text = "Tournament",
+                            text = stringResource(R.string.game_tournament_badge),
                             style = MaterialTheme.magicTypography.labelSmall,
                             color = mc.primaryAccent,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -422,7 +422,7 @@ private fun GameTopBar(
                 IconButton(onClick = onTournamentClick) {
                     Icon(
                         Icons.Default.EmojiEvents,
-                        contentDescription = "Tournament standings",
+                        contentDescription = stringResource(R.string.game_tournament_standings_desc),
                         tint = mc.primaryAccent
                     )
                 }
@@ -786,7 +786,7 @@ private fun PlayerCard(
                     // 3. The Real Icon: Attached to the right of the text.
                     Icon(
                         painter = painterResource(R.drawable.ic_heart),
-                        contentDescription = "Life Icon",
+                        contentDescription = stringResource(R.string.game_life_icon_desc),
                         tint = theme.accent,
                         modifier = Modifier
                             .padding(start = iconPadding)
@@ -811,7 +811,7 @@ private fun PlayerCard(
                         if (gameMode == GameMode.COMMANDER) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_battle),
-                                contentDescription = "Play Game",
+                                contentDescription = stringResource(R.string.game_commander_damage_desc),
                                 tint = theme.accent,
                                 modifier = Modifier
                                     .size(16.dp)
@@ -823,7 +823,7 @@ private fun PlayerCard(
                         }
                         Icon(
                             painter = painterResource(R.drawable.ic_counter),
-                            contentDescription = "Play Game",
+                            contentDescription = stringResource(R.string.game_counters_desc),
                             tint = theme.accent,
                             modifier = Modifier
                                 .size(16.dp)
@@ -1250,7 +1250,7 @@ private fun CountersPanel(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Remove",
+                            contentDescription = stringResource(R.string.action_remove),
                             tint = mc.textDisabled,
                             modifier = Modifier.size(14.dp),
                         )
@@ -1295,7 +1295,7 @@ private fun CountersPanel(
                         }
                     },
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add", tint = mc.primaryAccent)
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add), tint = mc.primaryAccent)
                 }
             }
             Spacer(Modifier.height(8.dp))

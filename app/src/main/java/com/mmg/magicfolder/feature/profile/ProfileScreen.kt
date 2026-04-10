@@ -150,7 +150,7 @@ fun ProfileScreen(
             if (uiState.recentSessions.isNotEmpty()) {
                 item {
                     SectionTitle(
-                        text     = "Recent Games",
+                        text     = stringResource(R.string.profile_recent_games),
                         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
                     )
                 }
@@ -342,22 +342,22 @@ private fun ProfileKpiSection(
         modifier            = modifier.padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SectionTitle("Game Stats")
+        SectionTitle(stringResource(R.string.profile_section_game_stats))
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            KpiCell("Games",  uiState.totalGames.toString(),               Modifier.weight(1f))
-            KpiCell("Wins",   uiState.totalWins.toString(),                Modifier.weight(1f))
-            KpiCell("Win %",  "${(uiState.winRate * 100).roundToInt()}%",  Modifier.weight(1f))
+            KpiCell(stringResource(R.string.profile_stat_games),  uiState.totalGames.toString(),               Modifier.weight(1f))
+            KpiCell(stringResource(R.string.profile_stat_wins),   uiState.totalWins.toString(),                Modifier.weight(1f))
+            KpiCell(stringResource(R.string.profile_stat_win_pct),  "${(uiState.winRate * 100).roundToInt()}%",  Modifier.weight(1f))
         }
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            KpiCell("Streak", uiState.currentStreak.toString(), Modifier.weight(1f), accent = true)
-            ColorStatCard(label = "Fav. Color",  colorCode = favouriteColor,    modifier = Modifier.weight(1f))
-            ColorStatCard(label = "Top Value",   colorCode = mostValuableColor, modifier = Modifier.weight(1f))
+            KpiCell(stringResource(R.string.profile_stat_streak), uiState.currentStreak.toString(), Modifier.weight(1f), accent = true)
+            ColorStatCard(label = stringResource(R.string.profile_stat_fav_color),  colorCode = favouriteColor,    modifier = Modifier.weight(1f))
+            ColorStatCard(label = stringResource(R.string.profile_stat_top_value),   colorCode = mostValuableColor, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -405,7 +405,7 @@ private fun BestDeckSection(
         modifier            = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SectionTitle("Best Deck")
+        SectionTitle(stringResource(R.string.profile_best_deck))
         Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
             Column(
                 modifier = Modifier
@@ -419,7 +419,7 @@ private fun BestDeckSection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text     = deck.deckName ?: "Unknown Deck",
+                        text     = deck.deckName ?: "???",
                         style    = MaterialTheme.magicTypography.bodyMedium,
                         color    = mc.textPrimary,
                         modifier = Modifier.weight(1f),
@@ -455,7 +455,7 @@ private fun SurveyInsightsSection(
         modifier            = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SectionTitle("Survey Insights")
+        SectionTitle(stringResource(R.string.profile_survey_insights))
         Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
             Column(
                 modifier = Modifier
@@ -463,8 +463,8 @@ private fun SurveyInsightsSection(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                InsightRow("Hand Quality",   "${(uiState.avgHandRating * 20).roundToInt()}%",  (uiState.avgHandRating / 5f).toFloat())
-                InsightRow("Mana Issues",  "${uiState.manaIssueCount} games",  (uiState.manaIssueCount.toFloat() / uiState.totalGames.coerceAtLeast(1)).coerceAtMost(1f))
+                InsightRow(stringResource(R.string.profile_insight_hand_quality),   "${(uiState.avgHandRating * 20).roundToInt()}%",  (uiState.avgHandRating / 5f).toFloat())
+                InsightRow(stringResource(R.string.profile_insight_mana_issues),  stringResource(R.string.profile_insight_mana_games, uiState.manaIssueCount),  (uiState.manaIssueCount.toFloat() / uiState.totalGames.coerceAtLeast(1)).coerceAtMost(1f))
             }
         }
     }
@@ -506,11 +506,11 @@ private fun AchievementsSection(
     var showLocked          by remember { mutableStateOf(false) }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("Achievements", modifier = Modifier.padding(top = 8.dp))
+        SectionTitle(stringResource(R.string.profile_achievements), modifier = Modifier.padding(top = 8.dp))
 
         // Unlocked grid
         if (unlocked.isNotEmpty()) {
-            Text("Unlocked (${unlocked.size})", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+            Text(stringResource(R.string.profile_achievements_unlocked, unlocked.size), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
             unlocked.chunked(4).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { ach ->
@@ -527,7 +527,7 @@ private fun AchievementsSection(
 
         // In-progress
         if (inProgress.isNotEmpty()) {
-            Text("In Progress (${inProgress.size})", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+            Text(stringResource(R.string.profile_achievements_in_progress, inProgress.size), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
             inProgress.forEach { ach ->
                 AchievementProgressRow(
                     achievement = ach,
@@ -543,7 +543,7 @@ private fun AchievementsSection(
                 contentPadding     = PaddingValues(0.dp),
             ) {
                 Text(
-                    text  = if (showLocked) "Hide locked" else "${locked.size} locked achievements",
+                    text  = if (showLocked) stringResource(R.string.profile_achievements_hide_locked) else stringResource(R.string.profile_achievements_locked_count, locked.size),
                     style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.textDisabled,
                 )
@@ -661,7 +661,7 @@ private fun AchievementDetailDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton    = {
-            TextButton(onClick = onDismiss) { Text("OK") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.profile_achievement_ok)) }
         },
         title = {
             Row(
@@ -693,7 +693,7 @@ private fun AchievementDetailDialog(
                                 modifier              = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("Progress", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+                                Text(stringResource(R.string.profile_progress), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
                                 achievement.progressLabel?.let {
                                     Text(it, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
                                 }
@@ -804,7 +804,7 @@ private fun RecentGameRow(
                 )
             }
             Text(
-                text  = if (isWin) "WIN" else "LOSS",
+                text  = if (isWin) stringResource(R.string.profile_win) else stringResource(R.string.profile_loss),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = if (isWin) mc.primaryAccent else mc.textDisabled,
             )
@@ -835,11 +835,11 @@ private fun CollectionSummarySection(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
-                    Text("Total Cards", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text(stringResource(R.string.profile_total_cards), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
                     Text(stats.totalCards.toString(), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Est. Value", style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text(stringResource(R.string.profile_est_value), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
                     val displayValue = if (currency == PreferredCurrency.EUR) stats.totalValueEur else stats.totalValueUsd
                     Text(if (currency == PreferredCurrency.EUR) "${String.format("%.2f", displayValue)}${currency.symbol}" else "${currency.symbol}${String.format("%.2f", displayValue)}", style = MaterialTheme.magicTypography.titleMedium, color = mc.goldMtg)
                 }
@@ -870,8 +870,8 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("ManaHub v1.0.0", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
-        Text("Developed with ❤️ for the MTG community", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.profile_version, "1.0.0"), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+        Text(stringResource(R.string.profile_developed_by), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled, textAlign = TextAlign.Center)
     }
 }
 

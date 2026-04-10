@@ -347,7 +347,7 @@ private fun CollectionTopBar(
                 ) {
                     SortOrder.entries.forEach { sort ->
                         DropdownMenuItem(
-                            text = { Text(sort.displayName) },
+                            text = { Text(stringResource(sort.displayResId)) },
                             onClick = {
                                 onSortChange(sort)
                                 showSortMenu = false
@@ -479,10 +479,10 @@ private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
 //  Display name extensions
 // ─────────────────────────────────────────────────────────────────────────────
 
-val SortOrder.displayName get() = when (this) {
-    SortOrder.DATE_ADDED -> "Date added"
-    SortOrder.NAME       -> "Name"
-    SortOrder.PRICE_DESC -> "Price: high to low"
-    SortOrder.PRICE_ASC  -> "Price: low to high"
-    SortOrder.RARITY     -> "Rarity"
+val SortOrder.displayResId get() = when (this) {
+    SortOrder.DATE_ADDED -> R.string.collection_sort_date
+    SortOrder.NAME       -> R.string.collection_sort_name
+    SortOrder.PRICE_DESC -> R.string.collection_sort_price_desc
+    SortOrder.PRICE_ASC  -> R.string.collection_sort_price_asc
+    SortOrder.RARITY     -> R.string.collection_sort_rarity
 }
