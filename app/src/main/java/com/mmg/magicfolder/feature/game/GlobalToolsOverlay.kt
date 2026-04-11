@@ -52,9 +52,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.magicfolder.R
+import com.mmg.magicfolder.core.ui.theme.MagicTheme
 import com.mmg.magicfolder.core.ui.theme.MarcellusFontFamily
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
@@ -64,8 +66,8 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 // ─────────────────────────────────────────────────────────────────────────────
 
 data class GlobalToolsState(
-    val isExpanded:     Boolean  = false,
-    val lastDiceResult: Int?     = null,    // null = never rolled
+    val isExpanded: Boolean = false,
+    val lastDiceResult: Int? = null,    // null = never rolled
     val lastCoinResult: Boolean? = null,    // null = never flipped
     val isRollingDice: Boolean = false,
     val isFlippingCoin: Boolean = false,
@@ -136,9 +138,7 @@ fun GlobalToolsOverlay(
         AnimatedVisibility(
             visible = state.isExpanded,
             enter = scaleIn(
-                tween(250),
-                initialScale = 0.3f,
-                transformOrigin = TransformOrigin.Center
+                tween(250), initialScale = 0.3f, transformOrigin = TransformOrigin.Center
             ) + fadeIn(tween(200)),
             exit = scaleOut(tween(200), targetScale = 0.3f) + fadeOut(tween(150)),
         ) {
@@ -154,6 +154,7 @@ fun GlobalToolsOverlay(
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // ── Close button (top-right) ──────────────────────────────
                     Box(modifier = Modifier.fillMaxWidth()) {
@@ -173,9 +174,12 @@ fun GlobalToolsOverlay(
                     }
 
                     // ── Dice + Coin row ───────────────────────────────────────
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            12.dp, Alignment.CenterHorizontally
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AnimatedDice(
@@ -190,31 +194,11 @@ fun GlobalToolsOverlay(
                         )
                     }
 
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        color = mc.primaryAccent.copy(alpha = 0.20f),
-                    )
-
-                    // ── Reset game ────────────────────────────────────────────
+                    // ── Manage players ────────────────────────────────────────
                     ToolsActionRow(
-                        icon = Icons.Default.Refresh,
-                        label = stringResource(R.string.game_tools_reset),
-                        onClick = onReset,
-                    )
-
-                    // ── Abandonar temporalmente ───────────────────────────────
-                    ToolsActionRow(
-                        icon = Icons.Default.Pause,
-                        label = stringResource(R.string.game_tools_abandon),
-                        onClick = { onAbandonGame(); onToggle() },
-                    )
-
-                    // ── Exit game (permanent) ─────────────────────────────────
-                    ToolsActionRow(
-                        icon = Icons.Default.ExitToApp,
-                        label = stringResource(R.string.game_tools_exit_game),
-                        tint = mc.lifeNegative,
-                        onClick = { onExitGame(); onToggle() },
+                        icon = Icons.Default.People,
+                        label = stringResource(R.string.game_tools_manage_players),
+                        onClick = { onManagePlayers(); onToggle() },
                     )
 
                     // ── Manage tournament (only if inside a tournament) ───────
@@ -226,12 +210,42 @@ fun GlobalToolsOverlay(
                         )
                     }
 
-                    // ── Manage players ────────────────────────────────────────
-                    ToolsActionRow(
-                        icon = Icons.Default.People,
-                        label = stringResource(R.string.game_tools_manage_players),
-                        onClick = { onManagePlayers(); onToggle() },
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = mc.primaryAccent.copy(alpha = 0.20f),
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            12.dp, Alignment.CenterHorizontally
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+
+                        // ── Pause ───────────────────────────────
+                        ToolsActionRow(
+                            icon = Icons.Default.Pause,
+                            label = stringResource(R.string.game_tools_abandon),
+                            onClick = { onAbandonGame(); onToggle() },
+                        )
+
+
+                        // ── Reset game ────────────────────────────────────────────
+                        ToolsActionRow(
+                            icon = Icons.Default.Refresh,
+                            label = stringResource(R.string.game_tools_reset),
+                            onClick = onReset,
+                        )
+
+                        // ── Exit game (permanent) ─────────────────────────────────
+                        ToolsActionRow(
+                            icon = Icons.Default.ExitToApp,
+                            label = stringResource(R.string.game_tools_exit_game),
+                            tint = mc.lifeNegative,
+                            onClick = { onExitGame(); onToggle() },
+                        )
+                    }
                 }
             }
         }
@@ -259,7 +273,6 @@ private fun ToolsActionRow(
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -267,7 +280,7 @@ private fun ToolsActionRow(
             )
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
             imageVector = icon,
@@ -310,10 +323,12 @@ fun AnimatedDice(
             .background(mc.surface)
             .border(1.5.dp, mc.primaryAccent.copy(alpha = 0.50f), RoundedCornerShape(12.dp))
             .graphicsLayer { if (isRolling) rotationZ = spinAngle }
-            .clickable(enabled = !isRolling,
+            .clickable(
+                enabled = !isRolling,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = onClick),
+                onClick = onClick
+            ),
     ) {
         if (isRolling) {
             Icon(
@@ -364,10 +379,13 @@ fun AnimatedCoin(
         label = "coin_scale",
     )
 
-    val bgBrush = if (!isFlipping && result != null)
-        Brush.radialGradient(listOf(mc.goldMtg, mc.goldMtg.copy(alpha = 0.60f)))
-    else
-        Brush.radialGradient(listOf(mc.surface, mc.surfaceVariant))
+    val bgBrush = if (!isFlipping && result != null) Brush.radialGradient(
+        listOf(
+            mc.goldMtg,
+            mc.goldMtg.copy(alpha = 0.60f)
+        )
+    )
+    else Brush.radialGradient(listOf(mc.surface, mc.surfaceVariant))
 
     Box(
         contentAlignment = Alignment.Center,
@@ -377,10 +395,12 @@ fun AnimatedCoin(
             .background(bgBrush)
             .border(2.dp, mc.goldMtg.copy(alpha = 0.70f), CircleShape)
             .graphicsLayer { if (isFlipping) scaleX = flipScale }
-            .clickable(enabled = !isFlipping,
+            .clickable(
+                enabled = !isFlipping,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = onClick),
+                onClick = onClick
+            ),
     ) {
         when {
             isFlipping -> Text("✦", fontSize = 22.sp, color = mc.goldMtg)
@@ -388,7 +408,7 @@ fun AnimatedCoin(
                 Icon(
                     painter = painterResource(R.drawable.ic_heads),
                     contentDescription = stringResource(R.string.game_tools_coin_heads_desc),
-                    tint = mc.textDisabled.copy(alpha = 0.50f),
+                    tint = mc.textDisabled.copy(alpha = 0.7f),
                     modifier = Modifier.size(42.dp),
                 )
             }
@@ -397,7 +417,7 @@ fun AnimatedCoin(
                 Icon(
                     painter = painterResource(R.drawable.ic_counter),
                     contentDescription = stringResource(R.string.game_tools_coin_tails_desc),
-                    tint = mc.textDisabled.copy(alpha = 0.50f),
+                    tint = mc.textDisabled.copy(alpha = 0.7f),
                     modifier = Modifier.size(42.dp),
                 )
             }
@@ -406,7 +426,7 @@ fun AnimatedCoin(
                 Icon(
                     painter = painterResource(R.drawable.ic_coin),
                     contentDescription = stringResource(R.string.game_tools_coin_flip_desc),
-                    tint = mc.goldMtg.copy(alpha = 0.50f),
+                    tint = mc.goldMtg.copy(alpha = 0.7f),
                     modifier = Modifier.size(42.dp),
                 )
             }
