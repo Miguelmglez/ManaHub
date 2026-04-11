@@ -85,7 +85,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
     var pendingTournamentPlayers by remember { mutableStateOf<List<Long>>(emptyList()) }
     var pendingTournamentMode by remember { mutableStateOf<GameMode?>(null) }
 
-    val hasActiveGame = gameUiState.isGameRunning || gameUiState.activeTournamentId != null
+    // hasActiveGame: true only while a game is actively running (not finished).
+    // Stays true when the game is abandoned temporarily, allowing resume from Play FAB.
+    val hasActiveGame = gameUiState.isGameRunning
 
     Scaffold(
         bottomBar = {
@@ -397,6 +399,19 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                         }
                     },
                     onBackHome = {
+                        // Used from results screen: full reset + go home
+                        gameVm.resetGame()
+                        navController.navigate(Screen.Collection.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onAbandonGame = {
+                        // Abandon temporarily: preserve game state so Play FAB can resume it
+                        navController.navigate(Screen.Collection.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onExitGame = {
                         gameVm.resetGame()
                         navController.navigate(Screen.Collection.route) {
                             popUpTo(0) { inclusive = true }

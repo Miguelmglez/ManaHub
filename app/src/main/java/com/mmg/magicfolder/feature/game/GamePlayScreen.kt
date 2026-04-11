@@ -3,20 +3,28 @@ package com.mmg.magicfolder.feature.game
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,35 +39,42 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +82,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -79,16 +93,19 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.R
+import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
 import com.mmg.magicfolder.core.ui.theme.MagicTheme
 import com.mmg.magicfolder.core.ui.theme.MarcellusFontFamily
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.core.ui.theme.ThemeBackground
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import com.mmg.magicfolder.core.ui.theme.coloredShadow
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
+import com.mmg.magicfolder.feature.game.model.CounterIconKey
 import com.mmg.magicfolder.feature.game.model.CounterType
-import com.mmg.magicfolder.feature.game.model.CustomCounter
 import com.mmg.magicfolder.feature.game.model.GameMode
 import com.mmg.magicfolder.feature.game.model.GridSlotPosition
 import com.mmg.magicfolder.feature.game.model.LayoutTemplate
@@ -96,8 +113,6 @@ import com.mmg.magicfolder.feature.game.model.LayoutTemplates
 import com.mmg.magicfolder.feature.game.model.Player
 import com.mmg.magicfolder.feature.game.model.ScreenedGridSlotPosition
 import com.mmg.magicfolder.feature.game.model.toDefaultDegrees
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Entry point (matches nav graph signature)
@@ -107,6 +122,8 @@ import kotlinx.coroutines.launch
 fun GamePlayScreen(
     onNewGame: () -> Unit,
     onBackHome: () -> Unit,
+    onAbandonGame: () -> Unit = onBackHome,
+    onExitGame: () -> Unit = {},
     onSurvey: (sessionId: Long) -> Unit = {},
     onTournamentClick: (() -> Unit)? = null,
     viewModel: GameViewModel = hiltViewModel(),
@@ -122,26 +139,28 @@ fun GamePlayScreen(
         onSurvey = onSurvey,
         onTournamentClick = onTournamentClick,
         onResetGame = viewModel::resetGame,
+        onAbandonGame = onAbandonGame,
+        onExitGame = onExitGame,
         onLifeChange = viewModel::changeLife,
-        onPoison = viewModel::changePoison,
         onCmdPanel = viewModel::showCmdPanel,
         onCtrPanel = viewModel::showCounterPanel,
-        onEditName = viewModel::showEditName,
         onConfirmDefeat = viewModel::confirmDefeat,
         onRevokeDefeat = viewModel::revokeDefeat,
         onToggleTools = viewModel::toggleTools,
         onRollDice = viewModel::rollDice,
         onFlipCoin = viewModel::flipCoin,
-        onLayoutEdit = viewModel::showLayoutEditor,
         onSelectLayout = viewModel::selectLayout,
-        onRotatePlayer = viewModel::rotatePlayerClockwise,
-        onSwapPositions = viewModel::swapPlayerPositions,
         onRenamePlayer = viewModel::renamePlayer,
         onCmdDamage = viewModel::changeCommanderDamage,
         onCounter = viewModel::changeCounter,
         onCustomChange = viewModel::changeCustomCounter,
         onCustomRemove = viewModel::removeCustomCounter,
-        onAddCustom = viewModel::addCustomCounter,
+        onAddCustom = { pid, name, iconKey -> viewModel.addCustomCounter(pid, name, iconKey) },
+        onUpdateTheme = viewModel::updatePlayerTheme,
+        onSwapGridSlots = viewModel::swapGridSlots,
+        onReorderTurnOrder = viewModel::reorderTurnOrder,
+        onEndTurn = viewModel::nextTurn,
+        onToggleLand = viewModel::toggleLandPlayed,
     )
 }
 
@@ -157,33 +176,36 @@ private fun GamePlayContent(
     onSurvey: (sessionId: Long) -> Unit,
     onTournamentClick: (() -> Unit)?,
     onResetGame: () -> Unit,
+    onAbandonGame: () -> Unit,
+    onExitGame: () -> Unit,
     onLifeChange: (playerId: Int, delta: Int) -> Unit,
-    onPoison: (playerId: Int, delta: Int) -> Unit,
     onCmdPanel: (playerId: Int?) -> Unit,
     onCtrPanel: (playerId: Int?) -> Unit,
-    onEditName: (playerId: Int?) -> Unit,
     onConfirmDefeat: (playerId: Int) -> Unit,
     onRevokeDefeat: (playerId: Int) -> Unit,
     onToggleTools: () -> Unit,
     onRollDice: () -> Unit,
     onFlipCoin: () -> Unit,
-    onLayoutEdit: (show: Boolean) -> Unit,
     onSelectLayout: (LayoutTemplate) -> Unit,
-    onRotatePlayer: (playerId: Int) -> Unit,
-    onSwapPositions: (indexA: Int, indexB: Int) -> Unit,
     onRenamePlayer: (playerId: Int, name: String) -> Unit,
     onCmdDamage: (targetId: Int, sourceId: Int, delta: Int) -> Unit,
     onCounter: (playerId: Int, type: CounterType, delta: Int) -> Unit,
     onCustomChange: (playerId: Int, counterId: Long, delta: Int) -> Unit,
     onCustomRemove: (playerId: Int, counterId: Long) -> Unit,
-    onAddCustom: (playerId: Int, name: String) -> Unit,
+    onAddCustom: (playerId: Int, name: String, iconKey: String) -> Unit,
+    onUpdateTheme: (playerId: Int, theme: PlayerThemeColors) -> Unit,
+    onSwapGridSlots: (slotIdA: Int, slotIdB: Int) -> Unit,
+    onReorderTurnOrder: (orderedPlayerIds: List<Int>) -> Unit,
+    onEndTurn: () -> Unit,
+    onToggleLand: (playerId: Int) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     var showGameResult by remember { mutableStateOf(false) }
     var showExitDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
+    var showManagePlayersSheet by remember { mutableStateOf(false) }
+    var managePlayersInitialTab by remember { mutableIntStateOf(0) }
 
-    // Intercept system back button — show exit dialog instead of navigating
     BackHandler(enabled = uiState.winner == null) {
         showExitDialog = true
     }
@@ -194,39 +216,42 @@ private fun GamePlayContent(
             .background(mc.background),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            /*GameTopBar(
-                mode = uiState.mode,
-                turnNumber = uiState.turnNumber,
-                activePlayer = uiState.players.find { it.id == uiState.activePlayerId },
-                onReset = { showResetDialog = true },
-                onExit = { showExitDialog = true },
-                onLayoutEdit = { onLayoutEdit(true) },
-                onTournamentClick = onTournamentClick,
-            )*/
             Box(modifier = Modifier.weight(1f)) {
                 GamePlayerGrid(
                     players = uiState.players,
                     gameMode = uiState.mode,
                     activeLayout = uiState.activeLayout,
+                    gridAssignment = uiState.gridAssignment,
                     playerRotations = uiState.playerRotations,
-                    lifeDeltas = uiState.lifeDeltas,
+                    activePlayerId = uiState.activePlayerId,
+                    turnNumber = uiState.turnNumber,
+                    hasPlayedLand = uiState.hasPlayedLand,
                     onLifeChange = onLifeChange,
-                    onPoison = onPoison,
                     onCmdPanel = onCmdPanel,
                     onCtrPanel = onCtrPanel,
-                    onEditName = onEditName,
                     onConfirmDefeat = onConfirmDefeat,
                     onRevokeDefeat = onRevokeDefeat,
+                    onEndTurn = onEndTurn,
+                    onToggleLand = onToggleLand,
                     toolsState = toolsState,
                     onToggleTools = onToggleTools,
                     onRollDice = onRollDice,
                     onFlipCoin = onFlipCoin,
+                    onReset = { showResetDialog = true },
+                    onAbandonGame = onAbandonGame,
+                    onExitGame = onExitGame,
+                    onManagePlayers = {
+                        managePlayersInitialTab = 0; showManagePlayersSheet = true
+                    },
+                    onPlayerNameClick = {
+                        managePlayersInitialTab = 1; showManagePlayersSheet = true
+                    },
+                    onTournament = onTournamentClick,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
         }
 
-        // ── Commander damage panel ─────────────────────────────────────────────
         uiState.showCmdPanelForPlayerId?.let { targetId ->
             val target = uiState.players.find { it.id == targetId } ?: return@let
             CmdDamagePanel(
@@ -237,7 +262,6 @@ private fun GamePlayContent(
             )
         }
 
-        // ── Counters panel ────────────────────────────────────────────────────
         uiState.showCounterPanelForPlayerId?.let { pid ->
             val player = uiState.players.find { it.id == pid } ?: return@let
             CountersPanel(
@@ -246,41 +270,35 @@ private fun GamePlayContent(
                 onCounter = { type, d -> onCounter(pid, type, d) },
                 onCustomChange = { cid, d -> onCustomChange(pid, cid, d) },
                 onCustomRemove = { cid -> onCustomRemove(pid, cid) },
-                onAddCustom = { name -> onAddCustom(pid, name) },
+                onAddCustom = { name, iconKey -> onAddCustom(pid, name, iconKey) },
                 onDismiss = { onCtrPanel(null) },
             )
         }
 
-        // ── Name edit dialog ──────────────────────────────────────────────────
-        uiState.editingNameForPlayerId?.let { pid ->
-            RenameDialog(
-                current = uiState.players.find { it.id == pid }?.name ?: "",
-                onConfirm = { onRenamePlayer(pid, it); onEditName(null) },
-                onDismiss = { onEditName(null) },
-            )
-        }
-
-        // ── Layout editor sheet ───────────────────────────────────────────────
-        if (uiState.showLayoutEditor) {
-            LayoutEditorSheet(
+        if (showManagePlayersSheet) {
+            ManagePlayersSheet(
                 players = uiState.players,
                 activeLayout = uiState.activeLayout,
-                playerRotations = uiState.playerRotations,
+                gridAssignment = uiState.gridAssignment,
+                playerCount = uiState.players.size,
+                initialTab = managePlayersInitialTab,
+                onDismiss = { showManagePlayersSheet = false },
                 onSelectLayout = onSelectLayout,
-                onRotatePlayer = onRotatePlayer,
-                onSwapPositions = onSwapPositions,
-                onDismiss = { onLayoutEdit(false) },
+                onSwapGridSlots = onSwapGridSlots,
+                onRenamePlayer = onRenamePlayer,
+                onUpdateTheme = onUpdateTheme,
+                onReorderTurnOrder = onReorderTurnOrder,
             )
         }
 
-        // ── Exit confirmation dialog ──────────────────────────────────────────
         if (showExitDialog) {
             AlertDialog(
                 onDismissRequest = { showExitDialog = false },
                 title = { Text(stringResource(R.string.game_exit_title), color = mc.textPrimary) },
                 text = {
                     Text(
-                        stringResource(R.string.game_exit_message), color = mc.textSecondary
+                        stringResource(R.string.game_exit_message),
+                        color = mc.textSecondary
                     )
                 },
                 confirmButton = {
@@ -297,14 +315,14 @@ private fun GamePlayContent(
             )
         }
 
-        // ── Reset confirmation dialog ─────────────────────────────────────────
         if (showResetDialog) {
             AlertDialog(
                 onDismissRequest = { showResetDialog = false },
                 title = { Text(stringResource(R.string.game_reset_title), color = mc.textPrimary) },
                 text = {
                     Text(
-                        stringResource(R.string.game_reset_message), color = mc.textSecondary
+                        stringResource(R.string.game_reset_message),
+                        color = mc.textSecondary
                     )
                 },
                 confirmButton = {
@@ -321,7 +339,6 @@ private fun GamePlayContent(
             )
         }
 
-        // ── Winner overlay ────────────────────────────────────────────────────
         AnimatedVisibility(
             visible = uiState.winner != null && !showGameResult,
             enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 3 },
@@ -335,7 +352,6 @@ private fun GamePlayContent(
             }
         }
 
-        // ── Game result screen ────────────────────────────────────────────────
         if (showGameResult) {
             uiState.gameResult?.let { result ->
                 GameResultScreen(
@@ -350,119 +366,6 @@ private fun GamePlayContent(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Top bar
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GameTopBar(
-    mode: GameMode,
-    turnNumber: Int,
-    activePlayer: Player?,
-    onReset: () -> Unit,
-    onExit: () -> Unit,
-    onLayoutEdit: () -> Unit = {},
-    onTournamentClick: (() -> Unit)? = null,
-) {
-    val mc = MaterialTheme.magicColors
-    TopAppBar(
-        modifier = Modifier.height(40.dp),
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    stringResource(R.string.game_title),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.goldMtg,
-                    maxLines = 1,
-                )
-                ModeBadge(mode)
-                if (activePlayer != null) {
-                    val theme = activePlayer.theme
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(theme.accent)
-                    )
-                    Text(
-                        stringResource(R.string.game_turn_label, turnNumber),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary,
-                    )
-                }
-                if (onTournamentClick != null) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = mc.primaryAccent.copy(alpha = 0.18f),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.game_tournament_badge),
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.primaryAccent,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = onExit) {
-                Icon(
-                    Icons.Default.ExitToApp,
-                    contentDescription = stringResource(R.string.action_exit),
-                    tint = mc.textSecondary
-                )
-            }
-        },
-        actions = {
-            if (onTournamentClick != null) {
-                IconButton(onClick = onTournamentClick) {
-                    Icon(
-                        Icons.Default.EmojiEvents,
-                        contentDescription = stringResource(R.string.game_tournament_standings_desc),
-                        tint = mc.primaryAccent
-                    )
-                }
-            }
-            IconButton(onClick = onLayoutEdit) {
-                Icon(
-                    Icons.Default.GridView,
-                    contentDescription = stringResource(R.string.game_layout_editor_title),
-                    tint = mc.textSecondary
-                )
-            }
-            IconButton(onClick = onReset) {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.action_reset),
-                    tint = mc.textSecondary
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-    )
-}
-
-@Composable
-private fun ModeBadge(mode: GameMode) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        color = mc.goldMtg.copy(alpha = 0.15f),
-        shape = RoundedCornerShape(4.dp),
-    ) {
-        Text(
-            text = mode.displayName.uppercase(),
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.goldMtg,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  Player grid  (template-driven layout)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -472,19 +375,28 @@ private fun GamePlayerGrid(
     players: List<Player>,
     gameMode: GameMode,
     activeLayout: LayoutTemplate,
+    gridAssignment: Map<Int, Int>,
     playerRotations: Map<Int, Int>,
-    lifeDeltas: Map<Int, Int>,
+    activePlayerId: Int,
+    turnNumber: Int,
+    hasPlayedLand: Set<Int>,
     onLifeChange: (playerId: Int, delta: Int) -> Unit,
-    onPoison: (playerId: Int, delta: Int) -> Unit,
     onCmdPanel: (playerId: Int) -> Unit,
     onCtrPanel: (playerId: Int) -> Unit,
-    onEditName: (playerId: Int) -> Unit,
     onConfirmDefeat: (playerId: Int) -> Unit,
     onRevokeDefeat: (playerId: Int) -> Unit,
+    onEndTurn: () -> Unit,
+    onToggleLand: (playerId: Int) -> Unit,
     toolsState: GlobalToolsState,
     onToggleTools: () -> Unit,
     onRollDice: () -> Unit,
     onFlipCoin: () -> Unit,
+    onReset: () -> Unit,
+    onAbandonGame: () -> Unit,
+    onExitGame: () -> Unit,
+    onManagePlayers: () -> Unit,
+    onPlayerNameClick: () -> Unit,
+    onTournament: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     MaterialTheme.magicColors
@@ -511,13 +423,18 @@ private fun GamePlayerGrid(
                 activeLayout.gridRows.forEach { (position, slots) ->
                     when (position) {
                         ScreenedGridSlotPosition.TOP -> {
+                            // Extra bottom padding for TWO_TOP_BOTTOM to clear the center overlay
+                            val extraPad = if (activeLayout.id == "2_top_bottom") 26.dp else 0.dp
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(sizeLayout.first)
+                                    .padding(bottom = extraPad)
                             ) {
                                 val slot = slots[0]
-                                val player = players.find { it.id == slot.playerId }
+                                val actualPlayerId =
+                                    gridAssignment.getOrDefault(slot.playerId, slot.playerId)
+                                val player = players.find { it.id == actualPlayerId }
                                 if (player != null) {
                                     val rotation = playerRotations[player.id]
                                         ?: slot.position.toDefaultDegrees()
@@ -525,13 +442,17 @@ private fun GamePlayerGrid(
                                         player = player,
                                         gameMode = gameMode,
                                         rotation = rotation,
-                                        lifeDelta = lifeDeltas[player.id],
+                                        isActive = player.id == activePlayerId,
+                                        turnNumber = turnNumber,
+                                        landPlayed = player.id in hasPlayedLand,
                                         onLife = { d -> onLifeChange(player.id, d) },
                                         onCmdPanel = { onCmdPanel(player.id) },
                                         onCtrPanel = { onCtrPanel(player.id) },
-                                        onEditName = { onEditName(player.id) },
                                         onConfirmDefeat = { onConfirmDefeat(player.id) },
                                         onRevokeDefeat = { onRevokeDefeat(player.id) },
+                                        onEndTurn = onEndTurn,
+                                        onLandToggle = { onToggleLand(player.id) },
+                                        onPlayerNameClick = onPlayerNameClick,
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
@@ -539,13 +460,18 @@ private fun GamePlayerGrid(
                         }
 
                         ScreenedGridSlotPosition.BOTTOM -> {
+                            // Extra top padding for TWO_TOP_BOTTOM to clear the center overlay
+                            val extraPad = if (activeLayout.id == "2_top_bottom") 26.dp else 0.dp
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(sizeLayout.first)
+                                    .padding(top = extraPad)
                             ) {
                                 val slot = slots[0]
-                                val player = players.find { it.id == slot.playerId }
+                                val actualPlayerId =
+                                    gridAssignment.getOrDefault(slot.playerId, slot.playerId)
+                                val player = players.find { it.id == actualPlayerId }
                                 if (player != null) {
                                     val rotation = playerRotations[player.id]
                                         ?: slot.position.toDefaultDegrees()
@@ -553,17 +479,20 @@ private fun GamePlayerGrid(
                                         player = player,
                                         gameMode = gameMode,
                                         rotation = rotation,
-                                        lifeDelta = lifeDeltas[player.id],
+                                        isActive = player.id == activePlayerId,
+                                        turnNumber = turnNumber,
+                                        landPlayed = player.id in hasPlayedLand,
                                         onLife = { d -> onLifeChange(player.id, d) },
                                         onCmdPanel = { onCmdPanel(player.id) },
                                         onCtrPanel = { onCtrPanel(player.id) },
-                                        onEditName = { onEditName(player.id) },
                                         onConfirmDefeat = { onConfirmDefeat(player.id) },
                                         onRevokeDefeat = { onRevokeDefeat(player.id) },
+                                        onEndTurn = onEndTurn,
+                                        onLandToggle = { onToggleLand(player.id) },
+                                        onPlayerNameClick = onPlayerNameClick,
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
-
                             }
                         }
 
@@ -583,8 +512,12 @@ private fun GamePlayerGrid(
                                                 .fillMaxWidth()
                                                 .weight(1f)
                                         ) {
-                                            val player =
-                                                players.find { leftPlayers[index].playerId == it.id }
+                                            val slotPlayerId = leftPlayers[index].playerId
+                                            val actualPlayerId = gridAssignment.getOrDefault(
+                                                slotPlayerId,
+                                                slotPlayerId
+                                            )
+                                            val player = players.find { it.id == actualPlayerId }
                                             if (player != null) {
                                                 val rotation = playerRotations[player.id]
                                                     ?: slot.position.toDefaultDegrees()
@@ -592,13 +525,17 @@ private fun GamePlayerGrid(
                                                     player = player,
                                                     gameMode = gameMode,
                                                     rotation = rotation,
-                                                    lifeDelta = lifeDeltas[player.id],
+                                                    isActive = player.id == activePlayerId,
+                                                    turnNumber = turnNumber,
+                                                    landPlayed = player.id in hasPlayedLand,
                                                     onLife = { d -> onLifeChange(player.id, d) },
                                                     onCmdPanel = { onCmdPanel(player.id) },
                                                     onCtrPanel = { onCtrPanel(player.id) },
-                                                    onEditName = { onEditName(player.id) },
                                                     onConfirmDefeat = { onConfirmDefeat(player.id) },
                                                     onRevokeDefeat = { onRevokeDefeat(player.id) },
+                                                    onEndTurn = onEndTurn,
+                                                    onLandToggle = { onToggleLand(player.id) },
+                                                    onPlayerNameClick = onPlayerNameClick,
                                                     modifier = Modifier.fillMaxSize(),
                                                 )
                                             }
@@ -613,8 +550,12 @@ private fun GamePlayerGrid(
                                                 .fillMaxWidth()
                                                 .weight(1f)
                                         ) {
-                                            val player =
-                                                players.find { rightPlayers[index].playerId == it.id }
+                                            val slotPlayerId = rightPlayers[index].playerId
+                                            val actualPlayerId = gridAssignment.getOrDefault(
+                                                slotPlayerId,
+                                                slotPlayerId
+                                            )
+                                            val player = players.find { it.id == actualPlayerId }
                                             if (player != null) {
                                                 val rotation = playerRotations[player.id]
                                                     ?: slot.position.toDefaultDegrees()
@@ -622,13 +563,17 @@ private fun GamePlayerGrid(
                                                     player = player,
                                                     gameMode = gameMode,
                                                     rotation = rotation,
-                                                    lifeDelta = lifeDeltas[player.id],
+                                                    isActive = player.id == activePlayerId,
+                                                    turnNumber = turnNumber,
+                                                    landPlayed = player.id in hasPlayedLand,
                                                     onLife = { d -> onLifeChange(player.id, d) },
                                                     onCmdPanel = { onCmdPanel(player.id) },
                                                     onCtrPanel = { onCtrPanel(player.id) },
-                                                    onEditName = { onEditName(player.id) },
                                                     onConfirmDefeat = { onConfirmDefeat(player.id) },
                                                     onRevokeDefeat = { onRevokeDefeat(player.id) },
+                                                    onEndTurn = onEndTurn,
+                                                    onLandToggle = { onToggleLand(player.id) },
+                                                    onPlayerNameClick = onPlayerNameClick,
                                                     modifier = Modifier.fillMaxSize(),
                                                 )
                                             }
@@ -648,6 +593,11 @@ private fun GamePlayerGrid(
             onToggle = onToggleTools,
             onRollDice = onRollDice,
             onFlipCoin = onFlipCoin,
+            onReset = onReset,
+            onAbandonGame = onAbandonGame,
+            onExitGame = onExitGame,
+            onManagePlayers = onManagePlayers,
+            onTournament = onTournament,
             modifier = Modifier
                 .align(Alignment.Center)
                 .wrapContentSize(),
@@ -657,65 +607,95 @@ private fun GamePlayerGrid(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Player card
+//  Player card (adaptive — 3 size tiers)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Size tier for adaptive PlayerCard rendering. */
+private enum class CardTier { LARGE, SMALL, TINY }
 
 @Composable
 private fun PlayerCard(
     player: Player,
     gameMode: GameMode,
     rotation: Int,
-    lifeDelta: Int?,
+    isActive: Boolean,
+    turnNumber: Int,
+    landPlayed: Boolean,
     onLife: (Int) -> Unit,
     onCmdPanel: () -> Unit,
     onCtrPanel: () -> Unit,
-    onEditName: () -> Unit,
+    onEndTurn: () -> Unit,
+    onLandToggle: () -> Unit,
     onConfirmDefeat: () -> Unit,
     onRevokeDefeat: () -> Unit,
     modifier: Modifier = Modifier,
+    onPlayerNameClick: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val theme = player.theme
     val startingLife = gameMode.startingLife
 
-    // Life color coding: red when ≤ 0, green when above starting, neutral otherwise
     val lifeColor = when {
         player.life <= 0 -> mc.lifeNegative
         player.life > startingLife -> mc.lifePositive
         else -> mc.textPrimary
     }
 
+    // Active glow pulse — only computed for the active player
+    val glowAlpha: Float = if (isActive) {
+        val infiniteTransition = rememberInfiniteTransition(label = "activeGlow_${player.id}")
+        val anim by infiniteTransition.animateFloat(
+            initialValue = 0.40f,
+            targetValue = 0.75f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "glowAlpha_${player.id}",
+        )
+        anim
+    } else 0.25f
+
     BoxWithConstraints(
         modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         val isRotated = rotation % 180 != 0
         val cardWidth = if (isRotated) maxHeight else maxWidth
         val cardHeight = if (isRotated) maxWidth else maxHeight
+
+        val minDim = minOf(cardWidth, cardHeight)
+        val tier = when {
+            minDim > 150.dp -> CardTier.LARGE
+            minDim >= 80.dp -> CardTier.SMALL
+            else -> CardTier.TINY
+        }
+
+        val hPad = when (tier) {
+            CardTier.LARGE -> 12.dp; CardTier.SMALL -> 8.dp; CardTier.TINY -> 4.dp
+        }
+        val vPad = when (tier) {
+            CardTier.LARGE -> 6.dp; CardTier.SMALL -> 4.dp; CardTier.TINY -> 2.dp
+        }
 
         Box(
             modifier = Modifier
                 .requiredSize(width = cardWidth, height = cardHeight)
                 .graphicsLayer { rotationZ = rotation.toFloat() }
                 .coloredShadow(
-                    color = theme.accent.copy(alpha = 0.25f),
-                    blurRadius = 20.dp,
+                    color = theme.accent.copy(alpha = glowAlpha),
+                    blurRadius = if (isActive) 28.dp else 20.dp,
                 )
-                // 1. Clip the content to rounded corners
-            .clip(RoundedCornerShape(16.dp))
-                // 2. Apply background (it will now be clipped)
-            .background(theme.background)
-                // 3. Apply border using the SAME shape
-            .border(
-                width = 0.5.dp,
-                color = theme.accent.copy(alpha = 0.40f),
-                shape = RoundedCornerShape(16.dp)
-            )) {
-            // 1. Theme background pattern
+                .clip(RoundedCornerShape(16.dp))
+                .background(theme.background)
+                .border(
+                    width = if (isActive) 2.5.dp else 0.5.dp,
+                    color = theme.accent.copy(alpha = if (isActive) 1.0f else 0.40f),
+                    shape = RoundedCornerShape(16.dp),
+                )
+        ) {
             ThemeBackground(modifier = Modifier.matchParentSize())
 
-            // 2. Radial glow from center
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -729,107 +709,180 @@ private fun PlayerCard(
                     )
             )
 
-            Column(
+            // --- Main Card Layout: Using a Box to ensure absolute centering ---
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = hPad, vertical = vPad),
             ) {
-                // ── Top row: name ──────────────────────────────
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(0.2f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = player.name,
-                        style = MaterialTheme.magicTypography.titleLarge,
-                        color = theme.accent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
+
+                // ── Header: Name + Turn indicator (Top) ────────────────────────
+                if (tier != CardTier.TINY) {
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .clickable(onClick = onEditName)
-                    )
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = player.name,
+                            style = if (tier == CardTier.LARGE)
+                                MaterialTheme.magicTypography.titleLarge
+                            else
+                                MaterialTheme.magicTypography.labelMedium,
+                            color = theme.accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = onPlayerNameClick,
+                                ),
+                        )
+                        if (isActive) {
+                            EndTurnButton(tier = tier, theme = theme, onClick = onEndTurn)
+                        }
+                    }
                 }
-                Row(
+
+                // ── Life area: Absolutely Centered ─────────────────────────────
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.8f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                        .align(Alignment.Center),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    // 1. Ghost element: An invisible Spacer that mirrors the Icon's width + padding.
-                    // This pushes the Text exactly to the center by offsetting the Icon on the right.
-                    val iconSize = 28.dp
-                    val iconPadding = 24.dp
+                    val iconSize = when (tier) {
+                        CardTier.LARGE -> 32.dp; CardTier.SMALL -> 24.dp; CardTier.TINY -> 18.dp
+                    }
+                    val iconPadding = when (tier) {
+                        CardTier.LARGE -> 56.dp; CardTier.SMALL -> 36.dp; CardTier.TINY -> 24.dp
+                    }
 
-                    Spacer(modifier = Modifier.size(iconSize + iconPadding))
+                    // 1. Chips aligned to start
+                    Column(
+                        modifier = Modifier.align(Alignment.CenterStart),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalAlignment = Alignment.Start,
+                    ) {
+                        if (tier != CardTier.TINY) {
+                            PlayerCounterChips(
+                                player = player,
+                                theme = theme,
+                                tier = tier,
+                                maxChips = if (tier == CardTier.LARGE) 3 else 2,
+                            )
+                        }
+                    }
 
-                    // 2. The Main Text: Now perfectly centered because the Row is balanced.
-                    Text(
-                        text = player.life.toString(),
-                        style = MaterialTheme.magicTypography.lifeNumber,
-                        color = lifeColor,
-                        maxLines = 1,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
+                    // 2. Life group centered: Icons aligned to the Text (the largest element)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        // Left container for Landscape icon
+                        Box(
+                            modifier = Modifier.width(iconSize + iconPadding),
+                            contentAlignment = Alignment.CenterEnd
                         ) {
-                            onLife(-1)
-                        })
+                            if (isActive && tier != CardTier.TINY) {
+                                val alpha by animateFloatAsState(
+                                    targetValue = if (landPlayed) 0.25f else 1.0f,
+                                    animationSpec = tween(200),
+                                    label = "landAlpha",
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Landscape,
+                                    contentDescription = stringResource(R.string.game_counters_button),
+                                    tint = theme.accent.copy(alpha = alpha),
+                                    modifier = Modifier
+                                        .size(iconSize)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = onLandToggle,
+                                        ),
+                                )
+                            }
+                        }
 
-                    // 3. The Real Icon: Attached to the right of the text.
-                    Icon(
-                        painter = painterResource(R.drawable.ic_heart),
-                        contentDescription = stringResource(R.string.game_life_icon_desc),
-                        tint = theme.accent,
-                        modifier = Modifier
-                            .padding(start = iconPadding)
-                            .size(iconSize)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                onLife(1)
-                            })
+                        Text(
+                            text = player.life.toString(),
+                            style = (if (tier == CardTier.LARGE)
+                                MaterialTheme.magicTypography.lifeNumber
+                            else
+                                MaterialTheme.magicTypography.lifeNumberMd).copy(
+                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                lineHeightStyle = LineHeightStyle(
+                                    alignment = LineHeightStyle.Alignment.Center,
+                                    trim = LineHeightStyle.Trim.None
+                                )
+                            ),
+                            color = lifeColor,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .padding(horizontal = iconPadding)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { onLife(-1) },
+                        )
+
+                        // Right container for Heart icon
+                        Box(
+                            modifier = Modifier.width(iconSize + iconPadding),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_heart),
+                                contentDescription = stringResource(R.string.game_life_icon_desc),
+                                tint = theme.accent,
+                                modifier = Modifier
+                                    .size(iconSize)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) { onLife(1) },
+                            )
+                        }
+                    }
                 }
 
-                // ── Bottom row ────────────────────────────────────────────
+                // ── Footer: actions + active-player controls (Bottom) ─────────
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.2f),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .align(Alignment.BottomCenter),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (gameMode == GameMode.COMMANDER) {
+                    val actionSize = when (tier) {
+                        CardTier.LARGE -> 32.dp; CardTier.SMALL -> 24.dp; CardTier.TINY -> 18.dp
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (gameMode == GameMode.COMMANDER && tier != CardTier.TINY) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_battle),
                                 contentDescription = stringResource(R.string.game_commander_damage_desc),
                                 tint = theme.accent,
                                 modifier = Modifier
-                                    .size(16.dp)
-                                    .clickable {
-                                        onCmdPanel()
-                                    },
+                                    .size(actionSize)
+                                    .clickable { onCmdPanel() },
                             )
-
                         }
                         Icon(
                             painter = painterResource(R.drawable.ic_counter),
                             contentDescription = stringResource(R.string.game_counters_desc),
                             tint = theme.accent,
                             modifier = Modifier
-                                .size(16.dp)
-                                .clickable {
-                                    onCtrPanel()
-                                },
+                                .size(actionSize)
+                                .clickable { onCtrPanel() },
                         )
                     }
                 }
@@ -880,7 +933,7 @@ private fun PlayerCard(
                 }
             }
 
-            // ── Defeated overlay (animated) ───────────────────────────────────
+            // ── Defeated overlay ──────────────────────────────────────────────
             AnimatedVisibility(
                 visible = player.defeated,
                 enter = fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.85f),
@@ -892,118 +945,203 @@ private fun PlayerCard(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Life button (tap = ±1, long-press = repeat)
+//  End turn button
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun LifeButton(
-    label: String,
+private fun EndTurnButton(
+    tier: CardTier,
     theme: PlayerThemeColors,
-    direction: Int,
-    onLifeChange: (Int) -> Unit,
-    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    val scope = rememberCoroutineScope()
-    var isPressed by remember { mutableStateOf(false) }
-    var pressStart by remember { mutableStateOf(0L) }
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(theme.accent.copy(alpha = 0.12f))
-            .border(
-                width = 1.dp,
-                color = theme.accent.copy(alpha = 0.30f),
-                shape = RoundedCornerShape(10.dp),
+    if (tier == CardTier.LARGE) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .height(22.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(theme.accent.copy(alpha = 0.15f))
+                .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick,
+                )
+                .padding(horizontal = 8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.game_end_turn),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = theme.accent,
+                fontSize = 10.sp,
             )
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        isPressed = true
-                        pressStart = System.currentTimeMillis()
-                        onLifeChange(direction)   // tap inmediato
-
-                        val job = scope.launch {
-                            delay(500L)
-                            while (isPressed) {
-                                val elapsed = System.currentTimeMillis() - pressStart
-                                val (intervalMs, absDelta) = when {
-                                    elapsed > 3000L -> 60L to 10
-                                    elapsed > 2000L -> 80L to 5
-                                    elapsed > 1000L -> 100L to 1
-                                    else -> 150L to 1
-                                }
-                                onLifeChange(direction * absDelta)
-                                delay(intervalMs)
-                            }
-                        }
-
-                        tryAwaitRelease()
-                        isPressed = false
-                        job.cancel()
-                    })
-            },
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.magicTypography.titleLarge,
-            color = mc.textPrimary,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Poison pips
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun PoisonPips(
-    count: Int,
-    theme: PlayerThemeColors,
-    onSet: (Int) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        (1..10).forEach { i ->
-            val filled = i <= count
-            Box(
-                modifier = Modifier
-                    .size(9.dp)
-                    .clip(CircleShape)
-                    .background(if (filled) mc.poisonColor else theme.accent.copy(alpha = 0.22f))
-                    .clickable { onSet(if (filled) i - 1 else i) })
+        }
+    } else {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(if (tier == CardTier.SMALL) 22.dp else 18.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(theme.accent.copy(alpha = 0.15f))
+                .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick,
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = stringResource(R.string.game_end_turn),
+                tint = theme.accent,
+                modifier = Modifier.size(if (tier == CardTier.SMALL) 14.dp else 11.dp),
+            )
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Small action buttons
+//  Counter chips row (compact display inside PlayerCard)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PlayerCounterChips(
+    player: Player,
+    theme: PlayerThemeColors,
+    tier: CardTier,
+    maxChips: Int,
+) {
+    // Collect non-zero counters: (iconKey, value) pairs
+    val activeCounters = buildList {
+        if (player.poison > 0) add(Pair(CounterIconKey.POISON, player.poison))
+        if (player.experience > 0) add(Pair(CounterIconKey.EXPERIENCE, player.experience))
+        if (player.energy > 0) add(Pair(CounterIconKey.ENERGY, player.energy))
+        player.customCounters.filter { it.value != 0 }.forEach { c ->
+            add(Pair(c.iconKey, c.value))
+        }
+    }
+    if (activeCounters.isEmpty()) return
+
+    val mc = MaterialTheme.magicColors
+    val chipHeight = if (tier == CardTier.LARGE) 18.dp else 14.dp
+    val iconSize = if (tier == CardTier.LARGE) 10.dp else 8.dp
+    val textSize = if (tier == CardTier.LARGE) 12.sp else 9.sp
+    val hPad = if (tier == CardTier.LARGE) 5.dp else 3.dp
+
+    // Logic to decide how many items per row.
+    // "Uno debajo de otro" (1 per row) if few, "filas de 2 o 3" if many.
+    val maxItemsPerRow = when {
+        activeCounters.size <= 3 -> 1
+        activeCounters.size <= 6 -> 2
+        else -> 3
+    }
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(if (tier == CardTier.LARGE) 4.dp else 3.dp),
+        verticalArrangement = Arrangement.spacedBy(if (tier == CardTier.LARGE) 4.dp else 3.dp),
+        maxItemsInEachRow = maxItemsPerRow,
+    ) {
+        activeCounters.forEach { (key, value) ->
+            Row(
+                modifier = Modifier
+                    .height(chipHeight)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(theme.accent.copy(alpha = 0.10f))
+                    .padding(horizontal = hPad),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                CounterIconView(
+                    iconKey = key,
+                    tint = theme.accent,
+                    modifier = Modifier.size(iconSize),
+                )
+                Text(
+                    text = "$value",
+                    color = mc.textPrimary,
+                    fontSize = textSize,
+                    fontWeight = FontWeight.Medium,
+                    style = LocalTextStyle.current.copy(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    )
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Counter icon renderer — maps icon key to composable
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun CardActionButton(
-    label: String,
-    theme: PlayerThemeColors,
-    onClick: () -> Unit,
-    danger: Boolean = false,
+fun CounterIconView(
+    iconKey: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
 ) {
-    val mc = MaterialTheme.magicColors
-    val borderColor = if (danger) mc.lifeNegative else theme.accent.copy(alpha = 0.40f)
-    val bgColor =
-        if (danger) mc.lifeNegative.copy(alpha = 0.15f) else theme.accent.copy(alpha = 0.10f)
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(28.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(bgColor)
-            .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
-    ) {
-        Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textPrimary)
+    // Mana keys (mana_w → "W", mana_u → "U", …): use official Scryfall SVG, same as AvatarPickerSheet
+    if (iconKey.startsWith("mana_")) {
+        ManaSymbolImage(token = iconKey.removePrefix("mana_").uppercase(), modifier = modifier)
+        return
+    }
+    when (iconKey) {
+        CounterIconKey.POISON ->
+            Icon(
+                painter = painterResource(R.drawable.ic_poison),
+                contentDescription = null,
+                tint = tint,
+                modifier = modifier
+            )
+
+        CounterIconKey.EXPERIENCE ->
+            Icon(
+                painter = painterResource(R.drawable.ic_experience),
+                contentDescription = null,
+                tint = tint,
+                modifier = modifier
+            )
+
+        CounterIconKey.ENERGY ->
+            Icon(
+                painter = painterResource(R.drawable.ic_energy),
+                contentDescription = null,
+                tint = tint,
+                modifier = modifier
+            )
+
+        CounterIconKey.STAR ->
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                tint = tint,
+                modifier = modifier
+            )
+
+        CounterIconKey.SWORD ->
+            Icon(
+                painter = painterResource(R.drawable.ic_battle),
+                contentDescription = null,
+                tint = tint,
+                modifier = modifier
+            )
+
+        CounterIconKey.SHIELD ->
+            Icon(
+                imageVector = Icons.Default.Shield,
+                contentDescription = null,
+                tint = tint,
+                modifier = modifier
+            )
+
+        else ->
+            Icon(
+                painter = painterResource(R.drawable.ic_counter),
+                contentDescription = null,
+                tint = tint,
+                modifier = modifier
+            )
     }
 }
 
@@ -1185,7 +1323,7 @@ private fun CmdDamagePanel(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Counters panel
+//  Counters panel — full-featured bottom sheet with icon support
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1196,17 +1334,19 @@ private fun CountersPanel(
     onCounter: (CounterType, Int) -> Unit,
     onCustomChange: (Long, Int) -> Unit,
     onCustomRemove: (Long) -> Unit,
-    onAddCustom: (String) -> Unit,
+    onAddCustom: (name: String, iconKey: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val theme = player.theme
     var newCounterName by remember { mutableStateOf("") }
+    var selectedIconKey by remember { mutableStateOf(CounterIconKey.DEFAULT) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
-        contentWindowInsets = { WindowInsets(0) }) {
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
         Column(
             modifier = Modifier
                 .padding(16.dp)
@@ -1219,52 +1359,74 @@ private fun CountersPanel(
                 color = mc.textPrimary,
             )
 
-            // Standard counters
-            CounterRowItem(
-                stringResource(R.string.game_poison_label), player.poison, theme
-            ) { onCounter(CounterType.POISON, it) }
-            if (mode == GameMode.COMMANDER) {
-                CounterRowItem(
-                    stringResource(R.string.game_experience_label), player.experience, theme
-                ) { onCounter(CounterType.EXPERIENCE, it) }
-                CounterRowItem(
-                    stringResource(R.string.game_energy_label), player.energy, theme
-                ) { onCounter(CounterType.ENERGY, it) }
-            }
+            // ── Built-in counters with icons ──────────────────────────────────
+            BuiltInCounterRow(
+                iconKey = CounterIconKey.POISON,
+                label = stringResource(R.string.game_poison_label),
+                value = player.poison,
+                theme = theme,
+                onDelta = { onCounter(CounterType.POISON, it) },
+            )
+            BuiltInCounterRow(
+                iconKey = CounterIconKey.EXPERIENCE,
+                label = stringResource(R.string.game_experience_label),
+                value = player.experience,
+                theme = theme,
+                onDelta = { onCounter(CounterType.EXPERIENCE, it) },
+            )
+            BuiltInCounterRow(
+                iconKey = CounterIconKey.ENERGY,
+                label = stringResource(R.string.game_energy_label),
+                value = player.energy,
+                theme = theme,
+                onDelta = { onCounter(CounterType.ENERGY, it) },
+            )
 
-            // Custom counters
-            player.customCounters.forEach { counter ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        counter.name,
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textPrimary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(
-                        onClick = { onCustomRemove(counter.id) },
-                        modifier = Modifier.size(24.dp),
+
+            // ── Custom counters ───────────────────────────────────────────────
+            if (player.customCounters.isNotEmpty()) {
+                HorizontalDivider(color = mc.surfaceVariant)
+                player.customCounters.forEach { counter ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.action_remove),
-                            tint = mc.textDisabled,
-                            modifier = Modifier.size(14.dp),
+                        CounterIconView(
+                            iconKey = counter.iconKey,
+                            tint = theme.accent,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            counter.name,
+                            style = MaterialTheme.magicTypography.bodyMedium,
+                            color = mc.textPrimary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = { onCustomRemove(counter.id) },
+                            modifier = Modifier.size(24.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.action_remove),
+                                tint = mc.textDisabled,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                        CounterRow(
+                            value = counter.value,
+                            theme = theme,
+                            onDecrement = { onCustomChange(counter.id, -1) },
+                            onIncrement = { onCustomChange(counter.id, +1) },
                         )
                     }
-                    CounterRow(
-                        value = counter.value,
-                        theme = theme,
-                        onDecrement = { onCustomChange(counter.id, -1) },
-                        onIncrement = { onCustomChange(counter.id, +1) },
-                    )
                 }
             }
 
-            // Add custom counter
+            // ── Add custom counter ────────────────────────────────────────────
+            HorizontalDivider(color = mc.surfaceVariant)
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1290,21 +1452,69 @@ private fun CountersPanel(
                 IconButton(
                     onClick = {
                         if (newCounterName.isNotBlank()) {
-                            onAddCustom(newCounterName)
+                            onAddCustom(newCounterName, selectedIconKey)
                             newCounterName = ""
+                            selectedIconKey = CounterIconKey.DEFAULT
                         }
                     },
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add), tint = mc.primaryAccent)
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.action_add),
+                        tint = mc.primaryAccent
+                    )
                 }
             }
+
+            // Icon picker
+            Text(
+                stringResource(R.string.game_counter_choose_icon),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textSecondary,
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(CounterIconKey.ALL) { key ->
+                    val isSelected = key == selectedIconKey
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) mc.primaryAccent.copy(alpha = 0.20f)
+                                else mc.surface
+                            )
+                            .border(
+                                width = if (isSelected) 1.5.dp else 0.5.dp,
+                                color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+                                shape = RoundedCornerShape(8.dp),
+                            )
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { selectedIconKey = key },
+                    ) {
+                        CounterIconView(
+                            iconKey = key,
+                            tint = if (isSelected) mc.primaryAccent else mc.textSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Built-in counter row (icon + label + counter controls)
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun CounterRowItem(
+private fun BuiltInCounterRow(
+    iconKey: String,
     label: String,
     value: Int,
     theme: PlayerThemeColors,
@@ -1315,17 +1525,24 @@ private fun CounterRowItem(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
+        CounterIconView(
+            iconKey = iconKey,
+            tint = theme.accent,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(8.dp))
         Text(
             label,
             style = MaterialTheme.magicTypography.bodyMedium,
             color = mc.textPrimary,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
         CounterRow(
             value = value,
             theme = theme,
             onDecrement = { onDelta(-1) },
-            onIncrement = { onDelta(+1) })
+            onIncrement = { onDelta(+1) },
+        )
     }
 }
 
@@ -1372,200 +1589,499 @@ private fun CounterRow(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Rename dialog
+//  Manage players sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Bottom sheet with three tabs for managing layout, player properties, and turn order.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RenameDialog(
-    current: String,
-    onConfirm: (String) -> Unit,
+private fun ManagePlayersSheet(
+    players: List<Player>,
+    activeLayout: LayoutTemplate,
+    gridAssignment: Map<Int, Int>,
+    playerCount: Int,
+    initialTab: Int = 0,
     onDismiss: () -> Unit,
+    onSelectLayout: (LayoutTemplate) -> Unit,
+    onSwapGridSlots: (slotIdA: Int, slotIdB: Int) -> Unit,
+    onRenamePlayer: (playerId: Int, name: String) -> Unit,
+    onUpdateTheme: (playerId: Int, theme: PlayerThemeColors) -> Unit,
+    onReorderTurnOrder: (orderedPlayerIds: List<Int>) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    var text by remember { mutableStateOf(current) }
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedTab by remember { mutableIntStateOf(initialTab) }
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.game_rename_player)) },
-        text = {
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+        ) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = mc.backgroundSecondary,
+                contentColor = mc.primaryAccent,
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = {
+                        Text(
+                            stringResource(R.string.game_manage_tab_layout),
+                            style = MaterialTheme.magicTypography.labelMedium,
+                        )
+                    },
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = {
+                        Text(
+                            stringResource(R.string.game_manage_tab_players),
+                            style = MaterialTheme.magicTypography.labelMedium,
+                        )
+                    },
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = {
+                        Text(
+                            stringResource(R.string.game_manage_tab_turn_order),
+                            style = MaterialTheme.magicTypography.labelMedium,
+                        )
+                    },
+                )
+            }
+
+            when (selectedTab) {
+                0 -> LayoutTab(
+                    playerCount = playerCount,
+                    activeLayout = activeLayout,
+                    onSelectLayout = onSelectLayout,
+                )
+
+                1 -> PlayersTab(
+                    players = players,
+                    gridAssignment = gridAssignment,
+                    activeLayout = activeLayout,
+                    onSwapGridSlots = onSwapGridSlots,
+                    onRenamePlayer = onRenamePlayer,
+                    onUpdateTheme = onUpdateTheme,
+                )
+
+                2 -> TurnOrderTab(
+                    players = players,
+                    onReorderTurnOrder = onReorderTurnOrder,
+                )
+            }
+        }
+    }
+}
+
+// ── Tab 0: Layout ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun LayoutTab(
+    playerCount: Int,
+    activeLayout: LayoutTemplate,
+    onSelectLayout: (LayoutTemplate) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val availableLayouts = remember(playerCount) {
+        LayoutTemplates.getLayoutsForCount(playerCount)
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.game_manage_layout_title),
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(availableLayouts) { layout ->
+                val isSelected = layout == activeLayout
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isSelected) mc.primaryAccent.copy(alpha = 0.20f) else mc.surface,
+                    border = BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+                    ),
+                    modifier = Modifier
+                        .size(width = 100.dp, height = 80.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onSelectLayout(layout) },
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = layout.name,
+                            style = MaterialTheme.magicTypography.labelMedium,
+                            color = if (isSelected) mc.primaryAccent else mc.textSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Tab 1: Players (positions + properties) ───────────────────────────────────
+
+@Composable
+private fun PlayersTab(
+    players: List<Player>,
+    gridAssignment: Map<Int, Int>,
+    activeLayout: LayoutTemplate,
+    onSwapGridSlots: (slotIdA: Int, slotIdB: Int) -> Unit,
+    onRenamePlayer: (playerId: Int, name: String) -> Unit,
+    onUpdateTheme: (playerId: Int, theme: PlayerThemeColors) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    // First selected slot for swap (null = nothing selected yet)
+    var selectedSlotId by remember { mutableStateOf<Int?>(null) }
+    // All slot ids from the active layout
+    val allSlots = remember(activeLayout) {
+        activeLayout.gridRows.values.flatten()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        // ── Positions section ─────────────────────────────────────────────────
+        Text(
+            stringResource(R.string.game_manage_positions_title),
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
+        Text(
+            stringResource(R.string.game_manage_positions_hint),
+            style = MaterialTheme.magicTypography.labelMedium,
+            color = mc.textSecondary,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            allSlots.forEach { slot ->
+                val actualPlayerId = gridAssignment.getOrDefault(slot.playerId, slot.playerId)
+                val player = players.find { it.id == actualPlayerId }
+                val isSelected = selectedSlotId == slot.playerId
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isSelected) mc.primaryAccent.copy(alpha = 0.25f)
+                    else mc.surface,
+                    border = BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) mc.primaryAccent
+                        else player?.theme?.accent?.copy(alpha = 0.40f) ?: mc.surfaceVariant,
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            when {
+                                selectedSlotId == null -> {
+                                    selectedSlotId = slot.playerId
+                                }
+
+                                selectedSlotId == slot.playerId -> {
+                                    selectedSlotId = null
+                                }
+
+                                else -> {
+                                    onSwapGridSlots(selectedSlotId!!, slot.playerId)
+                                    selectedSlotId = null
+                                }
+                            }
+                        },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (player != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(player.theme.accent)
+                            )
+                            Text(
+                                player.name,
+                                style = MaterialTheme.magicTypography.labelMedium,
+                                color = mc.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+            // Clear button
+            if (selectedSlotId != null) {
+                TextButton(onClick = { selectedSlotId = null }) {
+                    Text(
+                        stringResource(R.string.action_cancel),
+                        color = mc.textSecondary,
+                        style = MaterialTheme.magicTypography.labelMedium,
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider(color = mc.surfaceVariant)
+
+        // ── Properties section ────────────────────────────────────────────────
+        Text(
+            stringResource(R.string.game_manage_properties_title),
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
+        players.forEach { player ->
+            PlayerPropertyRow(
+                player = player,
+                onRename = { name -> onRenamePlayer(player.id, name) },
+                onUpdateTheme = { theme -> onUpdateTheme(player.id, theme) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerPropertyRow(
+    player: Player,
+    onRename: (String) -> Unit,
+    onUpdateTheme: (PlayerThemeColors) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    var nameText by remember(player.id) { mutableStateOf(player.name) }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Name row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(player.theme.accent)
+            )
             OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
+                value = nameText,
+                onValueChange = { nameText = it },
                 singleLine = true,
+                label = { Text(player.name, color = mc.textDisabled) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = mc.primaryAccent,
+                    unfocusedBorderColor = mc.surfaceVariant,
                     focusedTextColor = mc.textPrimary,
                     unfocusedTextColor = mc.textPrimary,
                 ),
+                modifier = Modifier.weight(1f),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onDone = { if (nameText.isNotBlank()) onRename(nameText) }
+                ),
             )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(text) }) {
-                Text(stringResource(R.string.action_confirm), color = mc.primaryAccent)
+        }
+        // Color swatches
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PlayerTheme.ALL.forEach { themeOption ->
+                val isCurrentTheme = themeOption == player.theme
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(themeOption.accent)
+                        .border(
+                            width = if (isCurrentTheme) 2.dp else 0.dp,
+                            color = mc.textPrimary,
+                            shape = CircleShape,
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onUpdateTheme(themeOption) },
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
+        }
+        HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.50f))
+    }
+}
+
+// ── Tab 2: Turn Order ─────────────────────────────────────────────────────────
+
+@Composable
+private fun TurnOrderTab(
+    players: List<Player>,
+    onReorderTurnOrder: (orderedPlayerIds: List<Int>) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    // Local draft of the order — initialized from current players list
+    var draftOrder by remember(players) { mutableStateOf(players.toList()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.game_manage_turn_order_title),
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
+        draftOrder.forEachIndexed { index, player ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(player.theme.accent)
+                )
+                Text(
+                    player.name,
+                    style = MaterialTheme.magicTypography.bodyMedium,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = {
+                        if (index > 0) {
+                            val mutable = draftOrder.toMutableList()
+                            val temp = mutable[index - 1]
+                            mutable[index - 1] = mutable[index]
+                            mutable[index] = temp
+                            draftOrder = mutable
+                        }
+                    },
+                    enabled = index > 0,
+                ) {
+                    Icon(
+                        Icons.Default.ArrowUpward,
+                        contentDescription = null,
+                        tint = if (index > 0) mc.textPrimary else mc.textDisabled,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (index < draftOrder.lastIndex) {
+                            val mutable = draftOrder.toMutableList()
+                            val temp = mutable[index + 1]
+                            mutable[index + 1] = mutable[index]
+                            mutable[index] = temp
+                            draftOrder = mutable
+                        }
+                    },
+                    enabled = index < draftOrder.lastIndex,
+                ) {
+                    Icon(
+                        Icons.Default.ArrowDownward,
+                        contentDescription = null,
+                        tint = if (index < draftOrder.lastIndex) mc.textPrimary else mc.textDisabled,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = { onReorderTurnOrder(draftOrder.map { it.id }) },
+            colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                stringResource(R.string.game_manage_apply_order),
+                color = mc.background,
+            )
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Interactive Preview
+//  Previews
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Preview(showBackground = true, device = "spec:width=411dp,height=891dp")
+@Preview(device = "spec:width=411dp,height=891dp", showBackground = true)
 @Composable
-private fun GamePlayInteractivePreview() {
-    // Initial dummy state
-    val initialPlayers = listOf(
-        Player(id = 0, name = "Miguel", life = 40, theme = PlayerTheme.ALL[0], isAppUser = true),
-        Player(id = 1, name = "Player 2", life = 38, theme = PlayerTheme.ALL[1]),
-
-        )
-
-    var uiState by remember {
-        mutableStateOf(
-            GameUiState(
-                players = initialPlayers,
-                mode = GameMode.COMMANDER,
-                activeLayout = LayoutTemplates.TWO_SIDE_BY_SIDE
-            )
-        )
-    }
-
-    var toolsState by remember { mutableStateOf(GlobalToolsState()) }
-
+fun GamePlay2PlayerPreview() {
+    val players = listOf(
+        Player(id = 0, name = "Player 1", life = 20, theme = PlayerTheme.ALL[0], isAppUser = true),
+        Player(id = 1, name = "Player 2", life = 20, theme = PlayerTheme.ALL[1])
+    )
+    val uiState = GameUiState(
+        players = players,
+        mode = GameMode.STANDARD,
+        activePlayerId = 0,
+        activeLayout = LayoutTemplates.TWO_SIDE_BY_SIDE,
+        isGameRunning = true
+    )
     MagicTheme {
         GamePlayContent(
             uiState = uiState,
-            toolsState = toolsState,
+            toolsState = GlobalToolsState(),
             onNewGame = {},
             onBackHome = {},
             onSurvey = {},
             onTournamentClick = {},
-            onResetGame = {
-                uiState = uiState.copy(
-                    players = initialPlayers.map {
-                        it.copy(
-                            life = 40, poison = 0, defeated = false
-                        )
-                    }, winner = null
-                )
-            },
-            onLifeChange = { pid, delta ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) p.copy(life = p.life + delta) else p
-                    })
-            },
-            onPoison = { pid, delta ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) p.copy(poison = (p.poison + delta).coerceIn(0, 10)) else p
-                    })
-            },
-            onCmdPanel = { pid -> uiState = uiState.copy(showCmdPanelForPlayerId = pid) },
-            onCtrPanel = { pid -> uiState = uiState.copy(showCounterPanelForPlayerId = pid) },
-            onEditName = { pid -> uiState = uiState.copy(editingNameForPlayerId = pid) },
-            onConfirmDefeat = { pid ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) p.copy(defeated = true, pendingDefeat = false) else p
-                    })
-            },
-            onRevokeDefeat = { pid ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) p.copy(pendingDefeat = false) else p
-                    })
-            },
-            onToggleTools = { toolsState = toolsState.copy(isExpanded = !toolsState.isExpanded) },
-            onRollDice = { toolsState = toolsState.copy(lastDiceResult = (1..20).random()) },
-            onFlipCoin = {
-                toolsState = toolsState.copy(lastCoinResult = listOf(true, false).random())
-            },
-            onLayoutEdit = { show -> uiState = uiState.copy(showLayoutEditor = show) },
-            onSelectLayout = { layout -> uiState = uiState.copy(activeLayout = layout) },
-            onRotatePlayer = { pid ->
-                val current = uiState.playerRotations[pid] ?: 0
-                uiState =
-                    uiState.copy(playerRotations = uiState.playerRotations + (pid to (current + 90) % 360))
-            },
-            onSwapPositions = { _, _ -> },
-            onRenamePlayer = { pid, name ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) p.copy(name = name) else p
-                    })
-            },
-            onCmdDamage = { targetId, srcId, delta ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == targetId) {
-                            val current = p.commanderDamage[srcId] ?: 0
-                            p.copy(
-                                commanderDamage = p.commanderDamage + (srcId to (current + delta).coerceAtLeast(
-                                    0
-                                ))
-                            )
-                        } else p
-                    })
-            },
-            onCounter = { pid, type, delta ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) {
-                            when (type) {
-                                CounterType.POISON -> p.copy(
-                                    poison = (p.poison + delta).coerceAtLeast(
-                                        0
-                                    )
-                                )
-
-                                CounterType.EXPERIENCE -> p.copy(
-                                    experience = (p.experience + delta).coerceAtLeast(
-                                        0
-                                    )
-                                )
-
-                                CounterType.ENERGY -> p.copy(
-                                    energy = (p.energy + delta).coerceAtLeast(
-                                        0
-                                    )
-                                )
-                            }
-                        } else p
-                    })
-            },
-            onCustomChange = { pid, cid, delta ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) {
-                            p.copy(customCounters = p.customCounters.map { c ->
-                                if (c.id == cid) c.copy(value = (c.value + delta).coerceAtLeast(0)) else c
-                            })
-                        } else p
-                    })
-            },
-            onCustomRemove = { pid, cid ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) {
-                            p.copy(customCounters = p.customCounters.filter { it.id != cid })
-                        } else p
-                    })
-            },
-            onAddCustom = { pid, name ->
-                uiState = uiState.copy(
-                    players = uiState.players.map { p ->
-                        if (p.id == pid) {
-                            p.copy(
-                                customCounters = p.customCounters + CustomCounter(
-                                    System.currentTimeMillis(), name, 0
-                                )
-                            )
-                        } else p
-                    })
-            })
+            onResetGame = {},
+            onAbandonGame = {},
+            onExitGame = {},
+            onLifeChange = { _, _ -> },
+            onCmdPanel = {},
+            onCtrPanel = {},
+            onConfirmDefeat = {},
+            onRevokeDefeat = {},
+            onToggleTools = {},
+            onRollDice = {},
+            onFlipCoin = {},
+            onSelectLayout = {},
+            onRenamePlayer = { _, _ -> },
+            onCmdDamage = { _, _, _ -> },
+            onCounter = { _, _, _ -> },
+            onCustomChange = { _, _, _ -> },
+            onCustomRemove = { _, _ -> },
+            onAddCustom = { _, _, _ -> },
+            onUpdateTheme = { _, _ -> },
+            onSwapGridSlots = { _, _ -> },
+            onReorderTurnOrder = {},
+            onEndTurn = {},
+            onToggleLand = {},
+        )
     }
 }
+

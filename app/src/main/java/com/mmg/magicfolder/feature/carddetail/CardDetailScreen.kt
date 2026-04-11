@@ -755,8 +755,11 @@ private fun AddToCollectionSheet(
     var language by remember { mutableStateOf("en") }
     var qty by remember { mutableIntStateOf(1) }
 
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
@@ -911,8 +914,11 @@ private fun AddToWishlistSheet(
     var language by remember { mutableStateOf("en") }
     var qty by remember { mutableIntStateOf(1) }
 
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
@@ -1534,6 +1540,7 @@ private data class TagItem(
     val key: String,
     val label: String,
     val isUserDefined: Boolean = false,
+    val isApplied: Boolean = false,
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -1597,6 +1604,7 @@ private fun TagPickerSheet(
                         if (customLabel.isNotBlank()) {
                             onSaveAndAddCustomTag(customLabel, selectedCategoryKey)
                             customLabel = ""
+                            onDismiss()
                         }
                     },
                 )
@@ -1642,9 +1650,9 @@ private fun TagPickerSheet(
                 val canonical =
                     CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
                 val userDefined =
-                    userDefinedTags.filter { it.categoryKey == category.name && it.key !in userTagKeys }
+                    userDefinedTags.filter { it.categoryKey == category.name }
                 val items = canonical.map { TagItem(it.key, it.label, isUserDefined = false) } +
-                        userDefined.map { TagItem(it.key, it.label, isUserDefined = true) }
+                        userDefined.map { TagItem(it.key, it.label, isUserDefined = true, isApplied = it.key in userTagKeys) }
                 if (items.isNotEmpty()) {
                     item(key = "cat_${category.name}") {
                         TagPickerSection(
@@ -1669,8 +1677,8 @@ private fun TagPickerSheet(
             // ── User custom categories ────────────────────────────────────────
             userCustomCategoryKeys.forEach { categoryKey ->
                 val items = userDefinedTags
-                    .filter { it.categoryKey == categoryKey && it.key !in userTagKeys }
-                    .map { TagItem(it.key, it.label, isUserDefined = true) }
+                    .filter { it.categoryKey == categoryKey }
+                    .map { TagItem(it.key, it.label, isUserDefined = true, isApplied = it.key in userTagKeys) }
                 if (items.isNotEmpty()) {
                     item(key = "custom_$categoryKey") {
                         TagPickerSection(
@@ -1843,9 +1851,19 @@ private fun TagPickerSection(
                             Text(
                                 tag.label,
                                 style    = ty.labelSmall,
-                                color    = mc.textPrimary,
-                                modifier = Modifier.clickable { onAdd(tag.key) },
+                                color    = if (tag.isApplied) mc.textDisabled else mc.textPrimary,
+                                modifier = if (!tag.isApplied) Modifier.clickable { onAdd(tag.key) } else Modifier,
                             )
+                            if (tag.isApplied) {
+                                Icon(
+                                    imageVector        = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint               = mc.lifePositive,
+                                    modifier           = Modifier
+                                        .padding(start = 4.dp)
+                                        .size(13.dp),
+                                )
+                            }
                             if (onEdit != null) {
                                 IconButton(
                                     onClick  = { onEdit(tag.key) },

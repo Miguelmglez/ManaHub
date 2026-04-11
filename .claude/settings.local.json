@@ -76,7 +76,12 @@
       "Bash(bash gradlew:*)",
       "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
       "Bash(java -version)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff --name-only HEAD)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" status --short)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff HEAD -- app/src/main/java/com/mmg/magicfolder/feature/game/GlobalToolsOverlay.kt)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff HEAD -- app/src/main/java/com/mmg/magicfolder/feature/game/GameViewModel.kt)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff HEAD -- app/src/main/java/com/mmg/magicfolder/feature/game/GamePlayScreen.kt)"
     ]
   }
 }

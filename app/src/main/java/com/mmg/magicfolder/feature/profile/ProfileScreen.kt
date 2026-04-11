@@ -48,6 +48,7 @@ import com.mmg.magicfolder.core.ui.components.ManaSymbol
 import com.mmg.magicfolder.core.ui.theme.MarcellusFontFamily
 import com.mmg.magicfolder.core.ui.theme.ThemeBackground
 import com.mmg.magicfolder.core.ui.theme.magicColors
+import com.mmg.magicfolder.core.util.PriceFormatter
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import java.text.SimpleDateFormat
 import java.util.*
@@ -840,8 +841,15 @@ private fun CollectionSummarySection(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(stringResource(R.string.profile_est_value), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
-                    val displayValue = if (currency == PreferredCurrency.EUR) stats.totalValueEur else stats.totalValueUsd
-                    Text(if (currency == PreferredCurrency.EUR) "${String.format("%.2f", displayValue)}${currency.symbol}" else "${currency.symbol}${String.format("%.2f", displayValue)}", style = MaterialTheme.magicTypography.titleMedium, color = mc.goldMtg)
+                    val formattedPrice = PriceFormatter.format(
+                        amount = if (currency == PreferredCurrency.EUR) stats.totalValueEur else stats.totalValueUsd,
+                        currency = currency
+                    )
+                    Text(
+                        text = formattedPrice,
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = mc.goldMtg
+                    )
                 }
             }
         }

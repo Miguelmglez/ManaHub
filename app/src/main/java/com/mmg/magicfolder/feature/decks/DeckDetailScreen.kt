@@ -2,6 +2,8 @@ package com.mmg.magicfolder.feature.decks
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
+import com.mmg.magicfolder.core.util.PriceFormatter
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -389,11 +391,18 @@ private fun CardDetailSheet(
                             color = mc.textDisabled,
                         )
                     }
-                    card.priceUsd?.let {
+
+                    val preferredCurrency = LocalPreferredCurrency.current
+                    val priceText = PriceFormatter.formatFromScryfall(
+                        priceUsd = card.priceUsd,
+                        priceEur = card.priceEur,
+                        preferredCurrency = preferredCurrency
+                    )
+                    if (priceText != "—") {
                         Text(
-                            "$${String.format("%.2f", it)}",
-                            style      = ty.labelMedium,
-                            color      = mc.goldMtg,
+                            text = priceText,
+                            style = ty.labelMedium,
+                            color = mc.goldMtg,
                             fontWeight = FontWeight.Medium,
                         )
                     }

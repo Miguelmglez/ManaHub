@@ -57,6 +57,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
+import com.mmg.magicfolder.core.ui.components.manaColorFor
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -134,7 +135,7 @@ fun AvatarPickerSheet(
                     )
                     listOf("W", "U", "B", "R", "G", "C").forEach { color ->
                         val isSelected = uiState.selectedColors.contains(color)
-                        val manaColor = viewModel.manaColor(color, MaterialTheme.magicColors)
+                        val manaColor = manaColorFor(color, MaterialTheme.magicColors)
                         Box(
                             modifier = Modifier
                                 .size(40.dp)

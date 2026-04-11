@@ -19,6 +19,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,9 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,12 +48,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.ui.theme.MarcellusFontFamily
 import com.mmg.magicfolder.core.ui.theme.magicColors
@@ -70,12 +75,30 @@ data class GlobalToolsState(
 //  Public overlay composable — state driven from outside (ViewModel)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Floating tools overlay that shows dice and coin tools plus game management actions.
+ *
+ * @param state          Current tools state (expanded, dice/coin results).
+ * @param onToggle       Toggle the expanded/collapsed state.
+ * @param onRollDice     Trigger a dice roll animation.
+ * @param onFlipCoin     Trigger a coin flip animation.
+ * @param onReset        Open the reset-game confirmation dialog.
+ * @param onAbandonGame  Abandon the game temporarily and navigate home without resetting.
+ * @param onExitGame     Exit and reset the game permanently.
+ * @param onManagePlayers Open the manage-players sheet.
+ * @param onTournament   Open tournament management. Null means not in a tournament — button hidden.
+ */
 @Composable
 fun GlobalToolsOverlay(
     state: GlobalToolsState,
     onToggle: () -> Unit,
     onRollDice: () -> Unit,
     onFlipCoin: () -> Unit,
+    onReset: () -> Unit,
+    onAbandonGame: () -> Unit,
+    onExitGame: () -> Unit,
+    onManagePlayers: () -> Unit,
+    onTournament: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -84,8 +107,6 @@ fun GlobalToolsOverlay(
         modifier = modifier,
     ) {
         // ── Central button — always visible ───────────────────────────────────
-        val buttonLabel = "✦"
-
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -103,7 +124,7 @@ fun GlobalToolsOverlay(
                 .clickable(onClick = onToggle),
         ) {
             Text(
-                text = buttonLabel,
+                text = "✦",
                 fontSize = 13.sp,
                 color = mc.primaryAccent,
                 fontFamily = MarcellusFontFamily,
@@ -127,53 +148,138 @@ fun GlobalToolsOverlay(
                 border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.30f)),
                 shadowElevation = 8.dp,
                 modifier = Modifier
-                    .widthIn(min = 180.dp)
+                    .widthIn(min = 200.dp)
                     .offset(y = (-72).dp),
             ) {
-                // Use a Box to allow the Close Icon to float independently
-                // while the main content stays centered
-                Box(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    // ── Close button (top-right) ──────────────────────────────
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = stringResource(R.string.game_tools_close_desc),
+                            tint = mc.primaryAccent.copy(alpha = 0.50f),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(24.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = onToggle,
+                                )
+                        )
+                    }
 
-                    // --- Close Button (Top-Left) ---
-                    Icon(
-                        painter = painterResource(R.drawable.ic_close),
-                        contentDescription = stringResource(R.string.game_tools_close_desc),
-                        tint = mc.primaryAccent.copy(alpha = 0.50f),
-                        modifier = Modifier
-                            .align(Alignment.TopStart) // Positions it at the top-left
-                            .size(24.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                onToggle()
-                            }
-                    )
-
-                    // --- Main Content (Dice & Coin) ---
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 32.dp), // Add padding so it doesn't overlap with the X
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    // ── Dice + Coin row ───────────────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AnimatedDice(
                             result = state.lastDiceResult,
                             isRolling = state.isRollingDice,
-                            onClick = onRollDice
+                            onClick = onRollDice,
                         )
-
-
                         AnimatedCoin(
                             result = state.lastCoinResult,
                             isFlipping = state.isFlippingCoin,
-                            onClick = onFlipCoin
+                            onClick = onFlipCoin,
                         )
                     }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = mc.primaryAccent.copy(alpha = 0.20f),
+                    )
+
+                    // ── Reset game ────────────────────────────────────────────
+                    ToolsActionRow(
+                        icon = Icons.Default.Refresh,
+                        label = stringResource(R.string.game_tools_reset),
+                        onClick = onReset,
+                    )
+
+                    // ── Abandonar temporalmente ───────────────────────────────
+                    ToolsActionRow(
+                        icon = Icons.Default.Pause,
+                        label = stringResource(R.string.game_tools_abandon),
+                        onClick = { onAbandonGame(); onToggle() },
+                    )
+
+                    // ── Exit game (permanent) ─────────────────────────────────
+                    ToolsActionRow(
+                        icon = Icons.Default.ExitToApp,
+                        label = stringResource(R.string.game_tools_exit_game),
+                        tint = mc.lifeNegative,
+                        onClick = { onExitGame(); onToggle() },
+                    )
+
+                    // ── Manage tournament (only if inside a tournament) ───────
+                    if (onTournament != null) {
+                        ToolsActionRow(
+                            icon = Icons.Default.EmojiEvents,
+                            label = stringResource(R.string.game_tools_tournament),
+                            onClick = onTournament,
+                        )
+                    }
+
+                    // ── Manage players ────────────────────────────────────────
+                    ToolsActionRow(
+                        icon = Icons.Default.People,
+                        label = stringResource(R.string.game_tools_manage_players),
+                        onClick = { onManagePlayers(); onToggle() },
+                    )
                 }
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Private action row composable
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Single tappable action row inside the tools panel.
+ *
+ * @param icon    Vector icon shown to the left.
+ * @param label   Text label shown next to the icon.
+ * @param onClick Action to execute when the row is tapped.
+ * @param tint    Color applied to both the icon and the label text. Defaults to [MagicColors.textPrimary].
+ */
+@Composable
+private fun ToolsActionRow(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.magicColors.textPrimary,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.magicTypography.labelMedium,
+            color = tint,
+        )
     }
 }
 

@@ -23,6 +23,7 @@ import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.feature.addcard.AdvancedSearchSheet
+import com.mmg.magicfolder.feature.addcard.AdvancedSearchViewModel
 import com.mmg.magicfolder.core.ui.components.CardGridItem
 import com.mmg.magicfolder.core.ui.components.CardListItem
 import com.mmg.magicfolder.core.ui.components.StaleWarningBanner
@@ -37,11 +38,12 @@ private const val TAB_DECKS = 1
 
 @Composable
 fun CollectionScreen(
-    onCardClick:       (scryfallId: String) -> Unit,
-    onScannerClick:    () -> Unit,
-    onDeckClick:       (deckId: Long) -> Unit,
-    onCreateDeckClick: () -> Unit,
-    viewModel:         CollectionViewModel = hiltViewModel(),
+    onCardClick:              (scryfallId: String) -> Unit,
+    onScannerClick:           () -> Unit,
+    onDeckClick:              (deckId: Long) -> Unit,
+    onCreateDeckClick:        () -> Unit,
+    viewModel:                CollectionViewModel = hiltViewModel(),
+    advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
@@ -55,7 +57,10 @@ fun CollectionScreen(
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
-        onClearFilters        = viewModel::clearAdvancedFilters,
+        onClearFilters        = {
+            viewModel.clearAdvancedFilters()
+            advancedSearchViewModel.clearAll()
+        },
         onErrorDismissed      = viewModel::onErrorDismissed,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
     )
@@ -96,7 +101,6 @@ private fun CollectionContent(
                 onViewModeToggle = onViewModeToggle,
                 onSortChange     = onSortChange,
                 currentSort      = uiState.sortOrder,
-                onScannerClick   = onScannerClick,
             )
         },
         floatingActionButton = {
@@ -304,7 +308,6 @@ private fun CollectionTopBar(
     onViewModeToggle: () -> Unit,
     onSortChange:     (SortOrder) -> Unit,
     currentSort:      SortOrder,
-    onScannerClick:   () -> Unit,
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors

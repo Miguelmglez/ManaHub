@@ -432,6 +432,20 @@
     <string name="tournament_match_play">Spielen</string>
     <string name="tournament_round_label">Runde %1$d</string>
     <string name="tournament_finished_label">Turnier beendet</string>
+    <string name="game_tools_reset">Spiel zurücksetzen</string>
+    <string name="game_tools_abandon">Temporär verlassen</string>
+    <string name="game_tools_tournament">Turnier verwalten</string>
+    <string name="game_tools_manage_players">Spieler verwalten</string>
+    <string name="game_manage_tab_layout">Layout</string>
+    <string name="game_manage_tab_players">Spieler</string>
+    <string name="game_manage_tab_turn_order">Zugreihenfolge</string>
+    <string name="game_manage_positions_title">Positionen</string>
+    <string name="game_manage_positions_hint">Tippe zwei Spieler an, um ihre Positionen zu tauschen</string>
+    <string name="game_manage_properties_title">Spieler-Eigenschaften</string>
+    <string name="game_manage_turn_order_title">Zugreihenfolge</string>
+    <string name="game_manage_apply_order">Anwenden</string>
+    <string name="game_manage_layout_title">Layout wählen</string>
+    <string name="game_pause_message">Spiel temporär verlassen. Kehre über Play zurück.</string>
 
     <!-- PROFILE SCREEN -->
     <string name="profile_title">Profil</string>
@@ -463,7 +477,7 @@
     <string name="profile_section_collection">Sammlung</string>
     <string name="profile_win_badge">S</string>
     <string name="profile_loss_badge">N</string>
-    <string name="profile_collection_summary">Collection Summary</string>
+    <string name="profile_collection_summary">Sammlungsübersicht</string>
 
     <!-- Play styles -->
     <string name="playstyle_aggro">Aggro</string>

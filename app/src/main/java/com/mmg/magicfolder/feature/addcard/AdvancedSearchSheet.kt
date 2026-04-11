@@ -38,6 +38,7 @@ import com.mmg.magicfolder.core.domain.model.ComparisonOperator
 import com.mmg.magicfolder.core.domain.model.SearchDirection
 import com.mmg.magicfolder.core.domain.model.SearchOrder
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
+import com.mmg.magicfolder.core.ui.components.manaColorFor
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
@@ -246,21 +247,20 @@ fun AdvancedSearchSheet(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
+
                             listOf("W", "U", "B", "R", "G", "C").forEach { color ->
                                 val isSelected = uiState.selectedColors.contains(color)
+                                val manaColor = manaColorFor(color, MaterialTheme.magicColors)
                                 Box(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(CircleShape)
-                                        .background(
-                                            if (isSelected)
-                                                mc.primaryAccent.copy(alpha = 0.2f)
-                                            else Color.Transparent,
-                                        )
-                                        .border(
-                                            width = if (isSelected) 2.dp else 0.dp,
-                                            color = mc.primaryAccent,
-                                            shape = CircleShape,
+                                        .then(
+                                            if (isSelected) {
+                                                Modifier
+                                                    .background(manaColor.copy(alpha = 0.2f))
+                                                    .border(2.dp, manaColor, CircleShape)
+                                            } else Modifier
                                         )
                                         .clickable { viewModel.toggleColor(color) },
                                     contentAlignment = Alignment.Center,

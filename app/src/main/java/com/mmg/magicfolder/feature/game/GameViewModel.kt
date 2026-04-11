@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.domain.repository.GameSessionRepository
 import com.mmg.magicfolder.core.domain.repository.TournamentRepository
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
+import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.feature.game.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +47,13 @@ data class GameUiState(
     // Per-player accumulated life deltas (cleared after 1.5s of inactivity)
     val lifeDeltas:   Map<Int, Int>     = emptyMap(),
     val isGameRunning: Boolean           = false,
+    /** Set of playerIds that have played a land in the current turn. Cleared on nextTurn(). */
+    val hasPlayedLand: Set<Int>          = emptySet(),
+    /**
+     * Maps a slot's playerId (from LayoutTemplate.slots) to the actual player id
+     * currently displayed in that slot. An empty map means identity (slot 0 → player 0, etc.).
+     */
+    val gridAssignment: Map<Int, Int>    = emptyMap(),
 ) {
     val appUserPlayer: Player? get() = players.firstOrNull { it.isAppUser }
     val appUserWon:    Boolean get() = winner?.isAppUser == true
@@ -106,14 +114,7 @@ class GameViewModel @Inject constructor(
         scheduleDeltaClear(playerId)
     }
 
-    fun changePoison(playerId: Int, delta: Int) {
-        _uiState.update { s ->
-            s.copy(players = s.players.map { p ->
-                if (p.id == playerId) p.copy(poison = (p.poison + delta).coerceAtLeast(0)) else p
-            })
-        }
-        checkPendingDefeat()
-    }
+
 
     // ── Counters ──────────────────────────────────────────────────────────────
 
@@ -132,15 +133,16 @@ class GameViewModel @Inject constructor(
         checkPendingDefeat()
     }
 
-    fun addCustomCounter(playerId: Int, name: String) {
+    fun addCustomCounter(playerId: Int, name: String, iconKey: String = "") {
         if (name.isBlank()) return
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
                 if (p.id != playerId) p else p.copy(
                     customCounters = p.customCounters + CustomCounter(
-                        id    = System.currentTimeMillis(),
-                        name  = name.trim(),
-                        value = 0,
+                        id      = System.currentTimeMillis(),
+                        name    = name.trim(),
+                        value   = 0,
+                        iconKey = iconKey,
                     )
                 )
             })
@@ -193,18 +195,44 @@ class GameViewModel @Inject constructor(
             val phases    = GamePhase.entries
             val nextIndex = (phases.indexOf(s.currentPhase) + 1) % phases.size
             val nextPhase = phases[nextIndex]
-            val newTurn   = if (nextIndex == 0) s.turnNumber + 1 else s.turnNumber
-            val newActive = if (nextIndex == 0) nextActivePlayer(s) else s.activePlayerId
-            s.copy(currentPhase = nextPhase, turnNumber = newTurn, activePlayerId = newActive)
+            if (nextIndex == 0) {
+                // Phase wrapped — player's turn ends, advance to next player
+                val nextId      = nextActivePlayer(s)
+                val isNewRound  = nextId == s.players.filter { !it.defeated }.firstOrNull()?.id
+                s.copy(
+                    currentPhase   = nextPhase,
+                    turnNumber     = if (isNewRound) s.turnNumber + 1 else s.turnNumber,
+                    activePlayerId = nextId,
+                )
+            } else {
+                s.copy(currentPhase = nextPhase)
+            }
         }
     }
 
     fun nextTurn() {
         _uiState.update { s ->
+            val nextId     = nextActivePlayer(s)
+            val alive      = s.players.filter { !it.defeated }
+            // Turn number only increments when a full round completes (back to first alive player)
+            val isNewRound = nextId == alive.firstOrNull()?.id
             s.copy(
-                activePlayerId = nextActivePlayer(s),
+                activePlayerId = nextId,
                 currentPhase   = GamePhase.UNTAP,
-                turnNumber     = s.turnNumber + 1,
+                turnNumber     = if (isNewRound) s.turnNumber + 1 else s.turnNumber,
+                hasPlayedLand  = emptySet(),
+            )
+        }
+    }
+
+    /** Toggles whether the given player has played a land this turn. */
+    fun toggleLandPlayed(playerId: Int) {
+        _uiState.update { s ->
+            s.copy(
+                hasPlayedLand = if (playerId in s.hasPlayedLand)
+                    s.hasPlayedLand - playerId
+                else
+                    s.hasPlayedLand + playerId
             )
         }
     }
@@ -280,11 +308,55 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    fun rotatePlayerClockwise(playerId: Int) {
-        val s       = _uiState.value
-        val slotPos = s.activeLayout.slots.find { it.playerId == playerId }?.position
-        val current = s.playerRotations[playerId] ?: slotPos.toDefaultDegrees()
-        setPlayerRotation(playerId, (current + 90) % 360)
+    /**
+     * Updates the color theme for a single player.
+     *
+     * @param playerId Target player id.
+     * @param theme    New [PlayerThemeColors] to apply.
+     */
+    fun updatePlayerTheme(playerId: Int, theme: PlayerThemeColors) {
+        _uiState.update { s ->
+            s.copy(players = s.players.map { p ->
+                if (p.id == playerId) p.copy(theme = theme) else p
+            })
+        }
+    }
+
+    /**
+     * Swaps two grid slot assignments so the players rendered in those slots switch positions.
+     *
+     * @param slotIdA First slot id (playerId field from LayoutTemplate.slots).
+     * @param slotIdB Second slot id.
+     */
+    fun swapGridSlots(slotIdA: Int, slotIdB: Int) {
+        _uiState.update { s ->
+            val assign = s.gridAssignment.toMutableMap()
+            val playerA = assign.getOrDefault(slotIdA, slotIdA)
+            val playerB = assign.getOrDefault(slotIdB, slotIdB)
+            assign[slotIdA] = playerB
+            assign[slotIdB] = playerA
+            s.copy(gridAssignment = assign)
+        }
+    }
+
+    /**
+     * Reorders the players list to match the given ordered player id list,
+     * effectively changing the turn order.
+     * If no full round has been completed yet (turnNumber == 1), also sets the
+     * active player to the first in the new order.
+     *
+     * @param orderedPlayerIds Player ids in the desired turn order.
+     */
+    fun reorderTurnOrder(orderedPlayerIds: List<Int>) {
+        _uiState.update { s ->
+            val playerMap = s.players.associateBy { it.id }
+            val reordered = orderedPlayerIds.mapNotNull { playerMap[it] }
+            val newActiveId = if (s.turnNumber == 1)
+                reordered.firstOrNull()?.id ?: s.activePlayerId
+            else
+                s.activePlayerId
+            s.copy(players = reordered, activePlayerId = newActiveId)
+        }
     }
 
     // ── Global tools (dice / coin) ────────────────────────────────────────────

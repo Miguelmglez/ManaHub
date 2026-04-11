@@ -404,9 +404,9 @@
     <string name="game_counters_desc">Counters</string>
     <string name="game_dice_label">d20</string>
     <string name="game_coin_label">¢</string>
-    <string name="game_poison_label">☠ Poison</string>
-    <string name="game_experience_label">✦ Experience</string>
-    <string name="game_energy_label">⚡ Energy</string>
+    <string name="game_poison_label">Poison</string>
+    <string name="game_experience_label">Experience</string>
+    <string name="game_energy_label">Energy</string>
     <string name="game_custom_counter_hint">Counter name…</string>
     <string name="game_reset_title">Reset game?</string>
     <string name="game_reset_message">All life totals and counters will reset.</string>
@@ -427,6 +427,25 @@
     <string name="game_tools_coin_flip_desc">Coin flip</string>
     <string name="game_tools_coin_heads_desc">Heads</string>
     <string name="game_tools_coin_tails_desc">Tails</string>
+    <string name="game_tools_reset">Reset game</string>
+    <string name="game_tools_abandon">Abandonar temporalmente</string>
+    <string name="game_tools_exit_game">Exit game</string>
+    <string name="game_tools_tournament">Manage tournament</string>
+    <string name="game_tools_manage_players">Manage players</string>
+    <string name="game_land_played_desc">Land drop used this turn</string>
+    <string name="game_end_turn">End Turn</string>
+    <string name="game_active_turn_label">T%1$d</string>
+    <string name="game_counter_choose_icon">Choose icon</string>
+    <string name="game_manage_tab_layout">Layout</string>
+    <string name="game_manage_tab_players">Players</string>
+    <string name="game_manage_tab_turn_order">Turn Order</string>
+    <string name="game_manage_positions_title">Positions</string>
+    <string name="game_manage_positions_hint">Tap two players to swap their positions</string>
+    <string name="game_manage_properties_title">Player Properties</string>
+    <string name="game_manage_turn_order_title">Turn Order</string>
+    <string name="game_manage_apply_order">Apply</string>
+    <string name="game_manage_layout_title">Select Layout</string>
+    <string name="game_pause_message">Partida abandonada temporalmente. Vuelve desde el botón Play.</string>
 
     <!-- Victory overlay -->
     <string name="game_wins_label">WINS!</string>
@@ -590,6 +609,7 @@
     <string name="profile_stat_win_rate">Win Rate</string>
     <string name="profile_stat_wins">Wins</string>
     <string name="profile_stat_win_pct">Win %</string>
+    <string name="profile_stat_streak">Streak</string>
     <string name="profile_stat_fav_color">Fav. Color</string>
     <string name="profile_stat_top_value">Top Value</string>
     <string name="profile_best_deck">Best Deck</string>
@@ -605,6 +625,7 @@
     <string name="profile_recent_games">Recent Games</string>
     <string name="profile_win">WIN</string>
     <string name="profile_loss">LOSS</string>
+    <string name="profile_collection_summary">Collection Summary</string>
     <string name="profile_total_cards">Total Cards</string>
     <string name="profile_est_value">Est. Value</string>
     <string name="profile_developed_by">Developed with ❤️ for the MTG community</string>
