@@ -427,9 +427,9 @@
     <string name="game_tools_coin_flip_desc">Coin flip</string>
     <string name="game_tools_coin_heads_desc">Heads</string>
     <string name="game_tools_coin_tails_desc">Tails</string>
-    <string name="game_tools_reset">Reset game</string>
-    <string name="game_tools_abandon">Abandonar temporalmente</string>
-    <string name="game_tools_exit_game">Exit game</string>
+    <string name="game_tools_reset">Reset</string>
+    <string name="game_tools_abandon">Pause</string>
+    <string name="game_tools_exit_game">Exit</string>
     <string name="game_tools_tournament">Manage tournament</string>
     <string name="game_tools_manage_players">Manage players</string>
     <string name="game_land_played_desc">Land drop used this turn</string>
