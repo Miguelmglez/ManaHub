@@ -13,3 +13,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+/.claude/agents/android-edge-case-tester.md
+/.claude/agents/android-kotlin-architect.md
+/.claude/agent-memory/android-kotlin-architect/feedback_gameplayscreen.md
+/.claude/agent-memory/mobile-game-ui-designer/design_system_neonvoid.md
+/.claude/agent-memory/android-kotlin-architect/project_architecture.md
+/.claude/agent-memory/mobile-game-ui-designer/playercard_spec.md
+/.claude/agent-memory/mobile-game-ui-designer/MEMORY.md
+/.claude/agents/mobile-game-ui-designer.md
+/.claude/agent-memory/android-kotlin-architect/MEMORY.md
