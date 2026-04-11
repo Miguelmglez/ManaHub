@@ -40,6 +40,7 @@ import com.mmg.magicfolder.feature.decks.components.BuildingFilters
 import com.mmg.magicfolder.feature.decks.components.CommanderBanner
 import com.mmg.magicfolder.feature.decks.components.CommanderSearchSheet
 import com.mmg.magicfolder.feature.decks.components.DeckCardRow
+import com.mmg.magicfolder.feature.decks.components.DeckImportSheet
 import com.mmg.magicfolder.feature.decks.components.LandsSection
 import com.mmg.magicfolder.feature.decks.components.ManaCurveChart
 
@@ -117,6 +118,10 @@ fun DeckBuilderScreen(
                 onBuild              = { name, format, commander ->
                     viewModel.setupDeck(name, format, commander)
                 },
+                onImportDeck         = { text, name, format ->
+                    viewModel.importDeckFromText(text, name, format, onDeckSaved)
+                },
+                isImporting          = state.isLoadingCollection,
                 modifier             = Modifier.padding(padding),
             )
             BuilderStep.BUILDING -> {
@@ -164,6 +169,8 @@ private fun SetupStep(
     onCommanderSearch:    (String) -> Unit,
     onCommanderClear:     () -> Unit,
     onBuild:              (String, DeckFormat, Card?) -> Unit,
+    onImportDeck:         (text: String, deckName: String, format: DeckFormat) -> Unit,
+    isImporting:          Boolean,
     modifier:             Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -171,6 +178,7 @@ private fun SetupStep(
     var selectedFormat    by remember { mutableStateOf(DeckFormat.STANDARD) }
     var selectedCommander by remember { mutableStateOf<Card?>(null) }
     var showCommanderSheet by remember { mutableStateOf(false) }
+    var showImportSheet   by remember { mutableStateOf(false) }
 
     val canBuild = deckName.isNotBlank() &&
         (!selectedFormat.requiresCommander || selectedCommander != null)
@@ -245,16 +253,17 @@ private fun SetupStep(
             }
         }
 
-        // Build button
-        Box(
+        // Bottom action buttons
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(mc.background)
                 .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Button(
                 onClick  = { onBuild(deckName, selectedFormat, selectedCommander) },
-                enabled  = canBuild,
+                enabled  = canBuild && !isImporting,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors   = ButtonDefaults.buttonColors(
                     containerColor         = mc.primaryAccent,
@@ -265,10 +274,52 @@ private fun SetupStep(
                 Text(
                     text  = stringResource(R.string.deckbuilder_setup_build_button),
                     style = MaterialTheme.magicTypography.titleMedium,
-                    color = if (canBuild) mc.background else mc.textDisabled,
+                    color = if (canBuild && !isImporting) mc.background else mc.textDisabled,
                 )
             }
+
+            OutlinedButton(
+                onClick  = { showImportSheet = true },
+                enabled  = !isImporting,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape    = RoundedCornerShape(8.dp),
+                border   = androidx.compose.foundation.BorderStroke(
+                    1.dp, mc.primaryAccent.copy(alpha = 0.5f)
+                ),
+            ) {
+                if (isImporting) {
+                    CircularProgressIndicator(
+                        color    = mc.primaryAccent,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text  = stringResource(R.string.deck_import_loading),
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.primaryAccent,
+                    )
+                } else {
+                    Text(
+                        text  = stringResource(R.string.deck_import_button_setup),
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.primaryAccent,
+                    )
+                }
+            }
         }
+    }
+
+    if (showImportSheet) {
+        DeckImportSheet(
+            isLoading = isImporting,
+            error     = null,
+            onImport  = { text ->
+                onImportDeck(text, deckName, selectedFormat)
+                showImportSheet = false
+            },
+            onDismiss = { showImportSheet = false },
+        )
     }
 
     if (showCommanderSheet) {

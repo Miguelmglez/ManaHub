@@ -75,6 +75,15 @@ sealed class SearchCriterion {
     data class Artist(val value: String) : SearchCriterion()
 
     data class FlavorText(val value: String) : SearchCriterion()
+
+    // ── Collection-local filters (not translated to Scryfall syntax) ──────────
+
+    data class IsInWishlist(val value: Boolean) : SearchCriterion()
+
+    data class IsForTrade(val value: Boolean) : SearchCriterion()
+
+    /** Matches cards that have ANY of the given tag keys (in auto-tags OR user-tags). */
+    data class HasTag(val keys: List<String>) : SearchCriterion()
 }
 
 data class AdvancedSearchQuery(

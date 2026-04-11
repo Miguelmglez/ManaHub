@@ -38,6 +38,7 @@ import com.mmg.magicfolder.core.domain.model.ComparisonOperator
 import com.mmg.magicfolder.core.domain.model.SearchDirection
 import com.mmg.magicfolder.core.domain.model.SearchOrder
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
+import com.mmg.magicfolder.core.ui.components.manaColorFor
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
@@ -46,6 +47,7 @@ import com.mmg.magicfolder.core.ui.theme.magicTypography
 fun AdvancedSearchSheet(
     onDismiss: () -> Unit,
     onSearch: (advancedQuery: AdvancedSearchQuery, rawScryfall: String) -> Unit,
+    isCollectionMode: Boolean = false,
     viewModel: AdvancedSearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -85,8 +87,8 @@ fun AdvancedSearchSheet(
                 }
             }
 
-            // ── Real-time query preview ─────────────────────────────────────────
-            AnimatedVisibility(visible = uiState.builtQuery.isNotBlank()) {
+            // ── Real-time query preview (Scryfall mode only) ───────────────────
+            AnimatedVisibility(visible = !isCollectionMode && uiState.builtQuery.isNotBlank()) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -230,7 +232,10 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(title = stringResource(R.string.advsearch_section_colors)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(false to "Color", true to "Identity").forEach { (isIdentity, label) ->
+                            listOf(
+                                false to stringResource(R.string.advsearch_color_mode_color),
+                                true to stringResource(R.string.advsearch_color_mode_identity)
+                            ).forEach { (isIdentity, label) ->
                                 FilterChip(
                                     selected = uiState.useColorIdentity == isIdentity,
                                     onClick = { viewModel.setUseColorIdentity(isIdentity) },
@@ -242,21 +247,20 @@ fun AdvancedSearchSheet(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
+
                             listOf("W", "U", "B", "R", "G", "C").forEach { color ->
                                 val isSelected = uiState.selectedColors.contains(color)
+                                val manaColor = manaColorFor(color, MaterialTheme.magicColors)
                                 Box(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(CircleShape)
-                                        .background(
-                                            if (isSelected)
-                                                mc.primaryAccent.copy(alpha = 0.2f)
-                                            else Color.Transparent,
-                                        )
-                                        .border(
-                                            width = if (isSelected) 2.dp else 0.dp,
-                                            color = mc.primaryAccent,
-                                            shape = CircleShape,
+                                        .then(
+                                            if (isSelected) {
+                                                Modifier
+                                                    .background(manaColor.copy(alpha = 0.2f))
+                                                    .border(2.dp, manaColor, CircleShape)
+                                            } else Modifier
                                         )
                                         .clickable { viewModel.toggleColor(color) },
                                     contentAlignment = Alignment.Center,
@@ -297,14 +301,18 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.manaCostValue,
                                 onValueChange = { v -> viewModel.setManaCost(v, uiState.manaCostOp) },
-                                placeholder = { Text("0..15", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_mana_hint), color = mc.textDisabled) },
                                 modifier = Modifier.width(80.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                             )
-                            Text("CMC", style = ty.bodySmall, color = mc.textDisabled)
+                            Text(
+                                stringResource(R.string.advsearch_sort_cmc),
+                                style = ty.bodySmall,
+                                color = mc.textDisabled
+                            )
                         }
                     }
                 }
@@ -523,7 +531,7 @@ fun AdvancedSearchSheet(
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                placeholder = { Text("*", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_power_hint), color = mc.textDisabled) },
                             )
                         }
                         Row(
@@ -549,7 +557,7 @@ fun AdvancedSearchSheet(
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                placeholder = { Text("*", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_toughness_hint), color = mc.textDisabled) },
                             )
                         }
                     }
@@ -569,7 +577,7 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.priceMax,
                                 onValueChange = { v -> viewModel.setPrice(v, uiState.priceCurrency) },
-                                placeholder = { Text("0.00", color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_price_hint), color = mc.textDisabled) },
                                 modifier = Modifier.width(100.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
@@ -577,7 +585,10 @@ fun AdvancedSearchSheet(
                                 singleLine = true,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("eur" to "€", "usd" to "$").forEach { (curr, symbol) ->
+                                listOf(
+                                    "eur" to stringResource(R.string.price_symbol_eur),
+                                    "usd" to stringResource(R.string.price_symbol_usd)
+                                ).forEach { (curr, symbol) ->
                                     FilterChip(
                                         selected = uiState.priceCurrency == curr,
                                         onClick = { viewModel.setPrice(uiState.priceMax, curr) },
@@ -709,8 +720,57 @@ fun AdvancedSearchSheet(
                     }
                 }
 
+                // ── Collection status (collection mode only) ──
+                if (isCollectionMode) {
+                    item {
+                        SearchSection(title = stringResource(R.string.advsearch_section_collection_status)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                listOf(
+                                    stringResource(R.string.advsearch_filter_wishlist) to (uiState.filterWishlist == true),
+                                    stringResource(R.string.advsearch_filter_for_trade) to (uiState.filterForTrade == true),
+                                ).forEachIndexed { index, (label, isSelected) ->
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            if (index == 0)
+                                                viewModel.setFilterWishlist(if (isSelected) null else true)
+                                            else
+                                                viewModel.setFilterForTrade(if (isSelected) null else true)
+                                        },
+                                        label = { Text(label, style = ty.labelSmall) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Tags (collection mode only) ──
+                if (isCollectionMode) {
+                    item {
+                        SearchSection(title = stringResource(R.string.advsearch_section_tags)) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                com.mmg.magicfolder.core.domain.model.CardTag.canonical.forEach { tag ->
+                                    val isSelected = uiState.filterTags.contains(tag.key)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { viewModel.toggleFilterTag(tag.key) },
+                                        label = { Text(tag.label, style = ty.labelSmall) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── Sort ──
-                item {
+                if (!isCollectionMode) item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_sort),
                         collapsedByDefault = true,
@@ -725,7 +785,14 @@ fun AdvancedSearchSheet(
                                     onClick = { viewModel.setOrder(order, uiState.orderDirection) },
                                     label = {
                                         Text(
-                                            order.name.lowercase().replaceFirstChar { it.uppercase() },
+                                            stringResource(when(order) {
+                                                SearchOrder.NAME -> R.string.advsearch_sort_name
+                                                SearchOrder.CMC -> R.string.advsearch_sort_cmc
+                                                SearchOrder.PRICE -> R.string.advsearch_sort_price
+                                                SearchOrder.RARITY -> R.string.advsearch_sort_rarity
+                                                SearchOrder.RELEASED -> R.string.advsearch_sort_released
+                                                SearchOrder.COLOR -> R.string.advsearch_sort_color
+                                            }),
                                             style = ty.labelSmall,
                                         )
                                     },
@@ -734,8 +801,8 @@ fun AdvancedSearchSheet(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(
-                                SearchDirection.ASC to "↑ ASC",
-                                SearchDirection.DESC to "↓ DESC",
+                                SearchDirection.ASC to stringResource(R.string.advsearch_dir_asc),
+                                SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
                             ).forEach { (dir, label) ->
                                 FilterChip(
                                     selected = uiState.orderDirection == dir,
@@ -748,7 +815,7 @@ fun AdvancedSearchSheet(
                 }
             }
 
-            // ── Search button ───────────────────────────────────────────────────
+            // ── Search / Apply button ───────────────────────────────────────────
             Button(
                 onClick = {
                     onSearch(uiState.currentQuery, uiState.builtQuery)
@@ -757,7 +824,8 @@ fun AdvancedSearchSheet(
                     .fillMaxWidth()
                     .padding(16.dp)
                     .height(52.dp),
-                enabled = uiState.builtQuery.isNotBlank(),
+                enabled = if (isCollectionMode) true
+                          else uiState.builtQuery.isNotBlank(),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = mc.primaryAccent,
@@ -765,7 +833,10 @@ fun AdvancedSearchSheet(
                 ),
             ) {
                 Text(
-                    stringResource(R.string.advsearch_search_button),
+                    stringResource(
+                        if (isCollectionMode) R.string.advsearch_apply_button
+                        else R.string.advsearch_search_button
+                    ),
                     style = ty.labelLarge,
                 )
             }

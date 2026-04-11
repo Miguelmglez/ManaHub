@@ -11,11 +11,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.mmg.magicfolder.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +30,7 @@ fun SynergyScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Synergies & decks") },
+                title = { Text(stringResource(R.string.synergy_title)) },
             )
         },
     ) { padding ->
@@ -73,7 +75,7 @@ private fun SynergyContent(
         // Deck suggestions
         if (uiState.suggestedDecks.isNotEmpty()) {
             item {
-                Text("Suggested decks", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.synergy_suggested_decks), style = MaterialTheme.typography.titleMedium)
             }
             items(uiState.suggestedDecks) { deck ->
                 DeckSuggestionCard(suggestion = deck, onCardClick = onCardClick)
@@ -83,7 +85,7 @@ private fun SynergyContent(
         // Synergy groups
         if (uiState.synergyGroups.isNotEmpty()) {
             item {
-                Text("Synergy groups", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.synergy_groups), style = MaterialTheme.typography.titleMedium)
             }
             items(uiState.synergyGroups) { group ->
                 SynergyGroupCard(group = group, onCardClick = onCardClick)
@@ -95,7 +97,7 @@ private fun SynergyContent(
 @Composable
 private fun FormatSelector(selected: DeckFormat, onChange: (DeckFormat) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Format", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.deckbuilder_format_label), style = MaterialTheme.typography.titleSmall)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(DeckFormat.entries) { format ->
                 FilterChip(
@@ -129,14 +131,14 @@ private fun DeckSuggestionCard(
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
-                        text     = "${suggestion.synergyScore}%",
+                        text     = stringResource(R.string.synergy_score_percent, suggestion.synergyScore),
                         style    = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
             }
             Text(
-                text  = "${suggestion.cards.size} cards · ${suggestion.format.name.lowercase()}",
+                text  = stringResource(R.string.synergy_deck_info, suggestion.cards.size, suggestion.format.name.lowercase()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -176,7 +178,7 @@ private fun DeckSuggestionCard(
                             shape    = MaterialTheme.shapes.extraSmall,
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("+${suggestion.cards.size - 8}",
+                                Text(stringResource(R.string.synergy_more_cards, (suggestion.cards.size - 8)),
                                     style = MaterialTheme.typography.labelSmall)
                             }
                         }
@@ -238,8 +240,8 @@ private fun EmptySynergyState(modifier: Modifier = Modifier) {
         Icon(Icons.Default.AutoAwesome, contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(16.dp))
-        Text("Add more cards to see synergies", style = MaterialTheme.typography.titleMedium)
-        Text("You need at least 10 cards", style = MaterialTheme.typography.bodyMedium,
+        Text(stringResource(R.string.synergy_empty_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.synergy_empty_subtitle), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

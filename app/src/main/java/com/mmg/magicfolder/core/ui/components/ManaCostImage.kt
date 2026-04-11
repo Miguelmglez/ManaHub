@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -12,6 +13,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -104,4 +110,66 @@ fun ManaCostImages(
             ManaSymbolImage(token = token, size = symbolSize)
         }
     }
+}
+
+// ── Oracle / card text with inline mana symbols ───────────────────────────────
+
+private val symbolRegex = Regex("\\{([^}]+)\\}")
+
+/**
+ * Renders oracle / printed card text with inline mana symbols.
+ *
+ * `{W}`, `{T}`, `{2/W}`, `{E}`, etc. are replaced by the corresponding
+ * Scryfall SVG images loaded via Coil; all other text renders normally.
+ */
+@Composable
+fun OracleText(
+    text:     String,
+    modifier: Modifier = Modifier,
+    style:    TextStyle = LocalTextStyle.current,
+) {
+    // Split the text into alternating plain-text and symbol segments
+    val segments = buildList {
+        var cursor = 0
+        symbolRegex.findAll(text).forEach { match ->
+            if (match.range.first > cursor) add(Pair(false, text.substring(cursor, match.range.first)))
+            add(Pair(true, match.groupValues[1]))   // true = symbol token
+            cursor = match.range.last + 1
+        }
+        if (cursor < text.length) add(Pair(false, text.substring(cursor)))
+    }
+
+    // One InlineTextContent entry per distinct symbol token
+    val symbolTokens = segments.filter { it.first }.map { it.second }.distinct()
+    val inlineContent = symbolTokens.associate { token ->
+        "sym_$token" to androidx.compose.foundation.text.InlineTextContent(
+            placeholder = Placeholder(
+                width  = style.fontSize.takeIf { it != TextStyle.Default.fontSize }
+                    ?.let { it * 1.15f } ?: 15.sp,
+                height = style.fontSize.takeIf { it != TextStyle.Default.fontSize }
+                    ?.let { it * 1.15f } ?: 15.sp,
+                placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+            ),
+        ) {
+            val sizeDp = with(androidx.compose.ui.platform.LocalDensity.current) {
+                (style.fontSize.takeIf { it != TextStyle.Default.fontSize } ?: 14.sp)
+                    .times(1.15f).toDp()
+            }
+            ManaSymbolImage(token = token, size = sizeDp)
+        }
+    }
+
+    val annotated = buildAnnotatedString {
+        segments.forEach { (isSymbol, value) ->
+            if (isSymbol) appendInlineContent("sym_$value", "[$value]")
+            else          append(value)
+        }
+    }
+
+    Text(
+        text          = annotated,
+        inlineContent = inlineContent,
+        modifier      = modifier,
+        style         = style,
+    )
 }

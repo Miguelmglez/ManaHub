@@ -85,6 +85,10 @@ class BuildScryfallQueryUseCase @Inject constructor() {
                 "a:${escapeValue(criterion.value)}"
             is SearchCriterion.FlavorText ->
                 "ft:${escapeValue(criterion.value)}"
+            // Collection-local filters have no Scryfall equivalent
+            is SearchCriterion.IsInWishlist,
+            is SearchCriterion.IsForTrade,
+            is SearchCriterion.HasTag -> null
         }
     }
 

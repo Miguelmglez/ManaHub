@@ -23,9 +23,10 @@ data class Player(
 )
 
 data class CustomCounter(
-    val id:    Long,
-    val name:  String,
-    val value: Int,
+    val id:      Long,
+    val name:    String,
+    val value:   Int,
+    val iconKey: String = "",   // empty = default counter icon
 )
 
 enum class CounterType { POISON, EXPERIENCE, ENERGY }

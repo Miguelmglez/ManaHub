@@ -35,6 +35,7 @@ class AddCardViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .combine(userPreferences.preferencesFlow) { query, prefs -> query to prefs }
                 .collectLatest { (query, prefs) ->
+                    _uiState.update { it.copy(preferredCurrency = prefs.preferredCurrency) }
                     if (query.length < 2) {
                         _uiState.update { it.copy(results = emptyList(), isSearching = false) }
                         return@collectLatest

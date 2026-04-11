@@ -18,17 +18,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mmg.magicfolder.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.feature.addcard.AdvancedSearchSheet
+import com.mmg.magicfolder.feature.addcard.AdvancedSearchViewModel
 import com.mmg.magicfolder.core.ui.components.CardGridItem
 import com.mmg.magicfolder.core.ui.components.CardListItem
-import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
 import com.mmg.magicfolder.core.ui.components.StaleWarningBanner
-import com.mmg.magicfolder.core.ui.theme.MagicColors
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.feature.decks.DeckListScreen
@@ -40,11 +38,12 @@ private const val TAB_DECKS = 1
 
 @Composable
 fun CollectionScreen(
-    onCardClick:       (scryfallId: String) -> Unit,
-    onScannerClick:    () -> Unit,
-    onDeckClick:       (deckId: Long) -> Unit,
-    onCreateDeckClick: () -> Unit,
-    viewModel:         CollectionViewModel = hiltViewModel(),
+    onCardClick:              (scryfallId: String) -> Unit,
+    onScannerClick:           () -> Unit,
+    onDeckClick:              (deckId: Long) -> Unit,
+    onCreateDeckClick:        () -> Unit,
+    viewModel:                CollectionViewModel = hiltViewModel(),
+    advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
@@ -58,13 +57,17 @@ fun CollectionScreen(
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
-        onToggleFilter        = viewModel::toggleColorFilter,
+        onClearFilters        = {
+            viewModel.clearAdvancedFilters()
+            advancedSearchViewModel.clearAll()
+        },
         onErrorDismissed      = viewModel::onErrorDismissed,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
     )
 
     if (showAdvancedSearch) {
         AdvancedSearchSheet(
+            isCollectionMode = true,
             onDismiss = { showAdvancedSearch = false },
             onSearch = { advancedQuery, _ ->
                 viewModel.applyAdvancedFilters(advancedQuery)
@@ -84,7 +87,7 @@ private fun CollectionContent(
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
-    onToggleFilter:       (ColorFilter) -> Unit,
+    onClearFilters:       () -> Unit,
     onErrorDismissed:     () -> Unit,
     onShowAdvancedSearch: () -> Unit,
 ) {
@@ -98,7 +101,6 @@ private fun CollectionContent(
                 onViewModeToggle = onViewModeToggle,
                 onSortChange     = onSortChange,
                 currentSort      = uiState.sortOrder,
-                onScannerClick   = onScannerClick,
             )
         },
         floatingActionButton = {
@@ -156,7 +158,7 @@ private fun CollectionContent(
                     onCardClick           = onCardClick,
                     onScannerClick        = onScannerClick,
                     onSearchQueryChange   = onSearchQueryChange,
-                    onToggleFilter        = onToggleFilter,
+                    onClearFilters        = onClearFilters,
                     onShowAdvancedSearch  = onShowAdvancedSearch,
                 )
                 TAB_DECKS -> DeckListScreen(
@@ -183,17 +185,18 @@ private fun CardsTabContent(
     onCardClick:          (String) -> Unit,
     onScannerClick:       () -> Unit,
     onSearchQueryChange:  (String) -> Unit,
-    onToggleFilter:       (ColorFilter) -> Unit,
+    onClearFilters:       () -> Unit,
     onShowAdvancedSearch: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val filterCount = uiState.activeFilterCount
     Column(modifier = Modifier.fillMaxSize()) {
         // Stale data warning
         AnimatedVisibility(visible = uiState.hasStaleCards) {
             StaleWarningBanner()
         }
 
-        // Search bar + advanced search button
+        // Search bar + advanced search button (with active-filter badge)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -206,34 +209,63 @@ private fun CardsTabContent(
                 onQueryChange = onSearchQueryChange,
                 modifier      = Modifier.weight(1f),
             )
-            IconButton(
-                onClick = onShowAdvancedSearch,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(mc.primaryAccent.copy(alpha = 0.1f)),
+            BadgedBox(
+                badge = {
+                    if (filterCount > 0) {
+                        Badge(
+                            containerColor = mc.primaryAccent,
+                            contentColor   = mc.background,
+                        ) { Text("$filterCount") }
+                    }
+                },
             ) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = stringResource(R.string.advsearch_button),
-                    tint = mc.primaryAccent,
-                )
+                IconButton(
+                    onClick = onShowAdvancedSearch,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (filterCount > 0) mc.primaryAccent.copy(alpha = 0.15f)
+                            else mc.primaryAccent.copy(alpha = 0.1f)
+                        ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = stringResource(R.string.advsearch_button),
+                        tint = mc.primaryAccent,
+                    )
+                }
             }
         }
 
-        // Color filter chips
-        ColorFilterRow(
-            activeFilters  = uiState.activeFilters,
-            onToggleFilter = onToggleFilter,
-        )
+        // Active filters indicator
+        AnimatedVisibility(visible = filterCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.collection_active_filters, filterCount),
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.primaryAccent,
+                )
+                TextButton(
+                    onClick = onClearFilters,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.collection_clear_filters),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.lifeNegative,
+                    )
+                }
+            }
+        }
 
-        // Active filter indicator
-        ActiveFiltersIndicator(
-            activeFilters  = uiState.activeFilters,
-            onClear        = { onToggleFilter(ColorFilter.ALL) },
-        )
-
-        // Card count (unique cards; total copies shown in each item)
+        // Card count
         val totalCopies = uiState.cards.sumOf { it.totalQuantity }
         Text(
             text     = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
@@ -267,7 +299,6 @@ private fun CardsTabContent(
                 onCardClick = onCardClick,
             )
         }
-
     }
 }
 
@@ -277,7 +308,6 @@ private fun CollectionTopBar(
     onViewModeToggle: () -> Unit,
     onSortChange:     (SortOrder) -> Unit,
     currentSort:      SortOrder,
-    onScannerClick:   () -> Unit,
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors
@@ -320,7 +350,7 @@ private fun CollectionTopBar(
                 ) {
                     SortOrder.entries.forEach { sort ->
                         DropdownMenuItem(
-                            text = { Text(sort.displayName) },
+                            text = { Text(stringResource(sort.displayResId)) },
                             onClick = {
                                 onSortChange(sort)
                                 showSortMenu = false
@@ -364,106 +394,6 @@ private fun SearchBar(
             cursorColor          = mc.primaryAccent,
         ),
     )
-}
-
-@Composable
-private fun ColorFilterRow(
-    activeFilters:  Set<ColorFilter>,
-    onToggleFilter: (ColorFilter) -> Unit,
-) {
-    val mc      = MaterialTheme.magicColors
-    val isAllActive = activeFilters.isEmpty()
-    LazyRow(
-        contentPadding        = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier              = Modifier.padding(vertical = 4.dp),
-    ) {
-        items(ColorFilter.entries) { filter ->
-            val manaCode  = filter.manaCode()
-            val manaColor = filter.manaColor(mc)
-            val isColor   = manaCode != null
-            val isSelected = if (filter == ColorFilter.ALL) isAllActive
-                             else activeFilters.contains(filter)
-            FilterChip(
-                selected = isSelected,
-                onClick  = { onToggleFilter(filter) },
-                label    = {
-                    if (isColor) {
-                        ManaSymbolImage(token = manaCode!!, size = 32.dp)
-                    } else {
-                        Text(filter.displayName, style = MaterialTheme.magicTypography.labelMedium)
-                    }
-                },
-                modifier = if (isColor) Modifier.size(48.dp) else Modifier.height(48.dp),
-                colors   = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = (manaColor ?: mc.primaryAccent).copy(alpha = 0.20f),
-                    selectedLabelColor     = manaColor ?: mc.primaryAccent,
-                    containerColor         = mc.surface,
-                    labelColor             = mc.textSecondary,
-                ),
-                border   = FilterChipDefaults.filterChipBorder(
-                    enabled             = true,
-                    selected            = isSelected,
-                    selectedBorderColor = (manaColor ?: mc.primaryAccent).copy(alpha = 0.60f),
-                    selectedBorderWidth = 2.dp,
-                    borderColor         = mc.surfaceVariant,
-                    borderWidth         = 0.5.dp,
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActiveFiltersIndicator(
-    activeFilters: Set<ColorFilter>,
-    onClear:       () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    AnimatedVisibility(visible = activeFilters.isNotEmpty()) {
-        Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically,
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment     = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.collection_filter_active),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textDisabled,
-                )
-                activeFilters.forEach { filter ->
-                    filter.manaCode()?.let { code ->
-                        ManaSymbolImage(token = code, size = 16.dp)
-                    }
-                }
-                if (activeFilters.size > 1 &&
-                    !activeFilters.contains(ColorFilter.COLORLESS)
-                ) {
-                    Text(
-                        stringResource(R.string.collection_filter_all_colors),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.textDisabled,
-                    )
-                }
-            }
-            TextButton(
-                onClick         = onClear,
-                contentPadding  = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-            ) {
-                Text(
-                    stringResource(R.string.collection_filter_clear),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.primaryAccent,
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -549,44 +479,13 @@ private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Display name / mana color extensions
+//  Display name extensions
 // ─────────────────────────────────────────────────────────────────────────────
 
-val SortOrder.displayName get() = when (this) {
-    SortOrder.DATE_ADDED -> "Date added"
-    SortOrder.NAME       -> "Name"
-    SortOrder.PRICE_DESC -> "Price: high to low"
-    SortOrder.PRICE_ASC  -> "Price: low to high"
-    SortOrder.RARITY     -> "Rarity"
-}
-
-val ColorFilter.displayName get() = when (this) {
-    ColorFilter.ALL        -> "All"
-    ColorFilter.W          -> "White"
-    ColorFilter.U          -> "Blue"
-    ColorFilter.B          -> "Black"
-    ColorFilter.R          -> "Red"
-    ColorFilter.G          -> "Green"
-    ColorFilter.COLORLESS  -> "Colorless"
-}
-
-/** Returns the Scryfall card-symbol token for mana filters, null for ALL. */
-private fun ColorFilter.manaCode(): String? = when (this) {
-    ColorFilter.W          -> "W"
-    ColorFilter.U          -> "U"
-    ColorFilter.B          -> "B"
-    ColorFilter.R          -> "R"
-    ColorFilter.G          -> "G"
-    ColorFilter.COLORLESS  -> "C"
-    else                   -> null
-}
-
-private fun ColorFilter.manaColor(mc: MagicColors) = when (this) {
-    ColorFilter.W          -> mc.manaW
-    ColorFilter.U          -> mc.manaU
-    ColorFilter.B          -> mc.manaB
-    ColorFilter.R          -> mc.manaR
-    ColorFilter.G          -> mc.manaG
-    ColorFilter.COLORLESS  -> mc.manaC
-    else                   -> null
+val SortOrder.displayResId get() = when (this) {
+    SortOrder.DATE_ADDED -> R.string.collection_sort_date
+    SortOrder.NAME       -> R.string.collection_sort_name
+    SortOrder.PRICE_DESC -> R.string.collection_sort_price_desc
+    SortOrder.PRICE_ASC  -> R.string.collection_sort_price_asc
+    SortOrder.RARITY     -> R.string.collection_sort_rarity
 }

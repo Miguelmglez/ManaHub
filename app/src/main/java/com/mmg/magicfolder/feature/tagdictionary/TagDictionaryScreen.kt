@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
+import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
 
@@ -49,7 +51,7 @@ fun TagDictionaryScreen(
                         )
                     }
                     Text(
-                        text = "Diccionario de etiquetas",
+                        text = stringResource(R.string.tagdictionary_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                         modifier = Modifier.weight(1f)
@@ -57,7 +59,7 @@ fun TagDictionaryScreen(
                     IconButton(onClick = viewModel::resetAll) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Restablecer todo",
+                            contentDescription = stringResource(R.string.tagdictionary_reset_all_description),
                             tint = mc.textPrimary,
                         )
                     }
@@ -82,7 +84,7 @@ fun TagDictionaryScreen(
                 onValueChange = viewModel::onQueryChange,
                 modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 singleLine    = true,
-                label         = { Text("Buscar tag…") },
+                label         = { Text(stringResource(R.string.tagdictionary_search_hint)) },
             )
 
             val filtered = remember(state.rows, state.query) {
@@ -132,16 +134,25 @@ private fun ThresholdsCard(
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Umbrales de precisión", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.tagdictionary_thresholds_title), style = MaterialTheme.typography.titleSmall)
             Text(
-                text  = "Etiquetas con confianza ≥ ${(auto * 100).toInt()}% se añaden automáticamente. " +
-                        "Entre ${(suggest * 100).toInt()}% y ${(auto * 100).toInt()}% se sugieren.",
+                text  = stringResource(
+                    R.string.tagdictionary_thresholds_description,
+                    (auto * 100).toInt(),
+                    (suggest * 100).toInt()
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text("Auto-añadir: ${(auto * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+            Text(
+                stringResource(R.string.tagdictionary_thresholds_auto, (auto * 100).toInt()),
+                style = MaterialTheme.typography.labelMedium
+            )
             Slider(value = auto, onValueChange = onAutoChange, valueRange = 0.5f..1f)
-            Text("Sugerir: ${(suggest * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+            Text(
+                stringResource(R.string.tagdictionary_thresholds_suggest, (suggest * 100).toInt()),
+                style = MaterialTheme.typography.labelMedium
+            )
             Slider(value = suggest, onValueChange = onSuggestChange, valueRange = 0f..0.95f)
         }
     }
@@ -167,14 +178,22 @@ private fun DictionaryRow(
                 fontFamily = FontFamily.Monospace,
             )
             Text(
-                text  = "EN: ${row.labelEn.ifBlank { "—" }}   ES: ${row.labelEs.ifBlank { "—" }}",
+                text  = stringResource(
+                    R.string.tagdictionary_row_labels,
+                    row.labelEn.ifBlank { "—" },
+                    row.labelEs.ifBlank { "—" }
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val patternCount = row.patternsEn.size + row.patternsEs.size + row.patternsDe.size
             if (patternCount > 0) {
                 Text(
-                    text  = "$patternCount patrones · ${row.category.name}",
+                    text  = stringResource(
+                        R.string.tagdictionary_row_patterns,
+                        patternCount,
+                        row.category.name
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -187,7 +206,7 @@ private fun DictionaryRow(
             }
         }
         IconButton(onClick = onReset) {
-            Icon(Icons.Default.Delete, contentDescription = "Restablecer")
+            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.tagdictionary_reset_description))
         }
     }
 }
@@ -205,23 +224,23 @@ private fun EditEntryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Editar: ${initial.key}") },
+        title = { Text(stringResource(R.string.tagdictionary_edit_title, initial.key)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Etiquetas", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.tagdictionary_labels_section), style = MaterialTheme.typography.labelMedium)
                 OutlinedTextField(value = labelEn, onValueChange = { labelEn = it }, label = { Text("EN") }, singleLine = true)
                 OutlinedTextField(value = labelEs, onValueChange = { labelEs = it }, label = { Text("ES") }, singleLine = true)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Patrones (uno por línea, en minúsculas — el motor busca coincidencias literales en el texto de la carta)",
+                    stringResource(R.string.tagdictionary_patterns_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedTextField(value = patternsEn, onValueChange = { patternsEn = it }, label = { Text("Patrones EN") }, minLines = 2)
-                OutlinedTextField(value = patternsEs, onValueChange = { patternsEs = it }, label = { Text("Patrones ES") }, minLines = 2)
+                OutlinedTextField(value = patternsEn, onValueChange = { patternsEn = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_en_label)) }, minLines = 2)
+                OutlinedTextField(value = patternsEs, onValueChange = { patternsEs = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_es_label)) }, minLines = 2)
             }
         },
         confirmButton = {
@@ -234,10 +253,10 @@ private fun EditEntryDialog(
                         patternsEs = patternsEs.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
                     )
                 )
-            }) { Text("Guardar") }
+            }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

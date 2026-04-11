@@ -19,12 +19,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.*
+import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.domain.model.Card
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
@@ -39,10 +41,10 @@ fun ScannerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Scan card") },
+                title = { Text(stringResource(R.string.scanner_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black),
@@ -77,7 +79,7 @@ fun ScannerScreen(
                 }
                 Snackbar(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                ) { Text("Card added to collection!") }
+                ) { Text(stringResource(R.string.scanner_card_added)) }
             }
         }
     }
@@ -196,7 +198,7 @@ private fun ScannerOverlay(
 
         // Top instruction label
         Text(
-            text     = "Point at the card name",
+            text     = stringResource(R.string.scanner_instruction_point),
             style    = MaterialTheme.typography.bodyMedium,
             color    = Color.White.copy(alpha = 0.85f),
             modifier = Modifier
@@ -257,7 +259,7 @@ private fun ScannerOverlay(
                         color = Color.Black.copy(alpha = 0.60f),
                     ) {
                         Text(
-                            text     = "Hold card steady in good light",
+                            text     = stringResource(R.string.scanner_instruction_steady),
                             style    = MaterialTheme.typography.bodySmall,
                             color    = Color.White.copy(alpha = 0.70f),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -287,9 +289,9 @@ private fun CameraPermissionRequest(onRequest: () -> Unit) {
             tint     = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
-        Text("Camera access needed to scan cards", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.scanner_permission_rationale), style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onRequest) { Text("Grant permission") }
+        Button(onClick = onRequest) { Text(stringResource(R.string.scanner_grant_permission)) }
     }
 }
 
@@ -311,6 +313,14 @@ private fun AddCardConfirmSheet(
     var language  by remember { mutableStateOf("en") }
     var qty       by remember { mutableIntStateOf(1) }
 
+    val conditionLabels = mapOf(
+        "NM" to stringResource(R.string.addcard_condition_nm),
+        "LP" to stringResource(R.string.addcard_condition_lp),
+        "MP" to stringResource(R.string.addcard_condition_mp),
+        "HP" to stringResource(R.string.addcard_condition_hp),
+        "DMG" to stringResource(R.string.addcard_condition_dmg)
+    )
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier            = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
@@ -324,14 +334,14 @@ private fun AddCardConfirmSheet(
             )
             card.priceUsd?.let {
                 Text(
-                    text  = "Market price: $${String.format("%.2f", it)}",
+                    text  = stringResource(R.string.scanner_market_price_usd, it),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
             }
             card.priceEur?.let {
                 Text(
-                    text  = "Market price: ${String.format("%.2f", it)}€",
+                    text  = stringResource(R.string.scanner_market_price_eur, it),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
@@ -339,25 +349,29 @@ private fun AddCardConfirmSheet(
             HorizontalDivider()
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Foil", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.addcard_confirm_foil), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = isFoil, onCheckedChange = { isFoil = it })
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Quantity", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.addcard_confirm_quantity), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Decrease")
+                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove))
                 }
                 Text("$qty", style = MaterialTheme.typography.titleMedium)
                 IconButton(onClick = { qty++ }) {
-                    Icon(Icons.Default.Add, contentDescription = "Increase")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
                 }
             }
 
-            Text("Condition", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.addcard_confirm_condition), style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 conditions.forEach { c ->
-                    FilterChip(selected = c == condition, onClick = { condition = c }, label = { Text(c) })
+                    FilterChip(
+                        selected = c == condition,
+                        onClick = { condition = c },
+                        label = { Text(conditionLabels[c] ?: c) }
+                    )
                 }
             }
 
@@ -367,7 +381,7 @@ private fun AddCardConfirmSheet(
                     value         = language.uppercase(),
                     onValueChange = {},
                     readOnly      = true,
-                    label         = { Text("Language") },
+                    label         = { Text(stringResource(R.string.scanner_language_label)) },
                     trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                     modifier      = Modifier.menuAnchor().fillMaxWidth(),
                 )
@@ -385,9 +399,9 @@ private fun AddCardConfirmSheet(
                 modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                 Button(onClick = { onConfirm(isFoil, condition, language, qty) }) {
-                    Text("Add to collection")
+                    Text(stringResource(R.string.scanner_add_to_collection))
                 }
             }
             Spacer(Modifier.height(16.dp))

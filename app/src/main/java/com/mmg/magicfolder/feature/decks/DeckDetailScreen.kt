@@ -2,6 +2,8 @@ package com.mmg.magicfolder.feature.decks
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
+import com.mmg.magicfolder.core.util.PriceFormatter
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,14 +14,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import android.content.Intent
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +49,7 @@ import com.mmg.magicfolder.core.ui.components.ManaCostImages
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
+import com.mmg.magicfolder.feature.decks.components.DeckImportSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,10 +60,13 @@ fun DeckDetailScreen(
     viewModel:   DeckDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
+    val mc      = MaterialTheme.magicColors
+    val ty      = MaterialTheme.magicTypography
+    val context = LocalContext.current
     var showAddCardsSheet  by remember { mutableStateOf(false) }
     var showCoverPicker    by remember { mutableStateOf(false) }
+    var showImportSheet    by remember { mutableStateOf(false) }
+    var showOverflowMenu   by remember { mutableStateOf(false) }
     var selectedCardId     by remember { mutableStateOf<String?>(null) }
 
     // Keep the selected card detail in sync with deck state changes
@@ -111,6 +120,46 @@ fun DeckDetailScreen(
                                 imageVector        = Icons.Default.Edit,
                                 contentDescription = "Change cover image",
                                 tint               = mc.textSecondary,
+                            )
+                        }
+                    }
+                    // Overflow menu: Share + Import
+                    Box {
+                        IconButton(onClick = { showOverflowMenu = true }) {
+                            Icon(
+                                imageVector        = Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint               = mc.textSecondary,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded         = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text    = { Text(stringResource(R.string.deck_import_title), style = ty.bodyMedium) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showImportSheet  = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text    = { Text(stringResource(R.string.action_share), style = ty.bodyMedium) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    val text = viewModel.exportDeckToText()
+                                    if (text != null) {
+                                        val intent = Intent(Intent.ACTION_SEND).apply {
+                                            type    = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, text)
+                                            putExtra(Intent.EXTRA_SUBJECT, uiState.deck?.name ?: "Deck")
+                                        }
+                                        context.startActivity(
+                                            Intent.createChooser(intent, context.getString(R.string.action_share))
+                                        )
+                                    }
+                                },
+                                enabled = uiState.cards.isNotEmpty(),
                             )
                         }
                     }
@@ -169,6 +218,26 @@ fun DeckDetailScreen(
                 showCoverPicker = false
             },
             onDismiss = { showCoverPicker = false },
+        )
+    }
+
+    // Close import sheet automatically once import finishes without error
+    LaunchedEffect(uiState.isImporting, uiState.importError) {
+        if (showImportSheet && !uiState.isImporting && uiState.importError == null) {
+            showImportSheet = false
+        }
+    }
+
+    // ── Import cards ModalBottomSheet ────────────────────────────────────────
+    if (showImportSheet) {
+        DeckImportSheet(
+            isLoading = uiState.isImporting,
+            error     = uiState.importError,
+            onImport  = { text -> viewModel.importCardsFromText(text) },
+            onDismiss = {
+                showImportSheet = false
+                viewModel.clearImportError()
+            },
         )
     }
 
@@ -322,11 +391,18 @@ private fun CardDetailSheet(
                             color = mc.textDisabled,
                         )
                     }
-                    card.priceUsd?.let {
+
+                    val preferredCurrency = LocalPreferredCurrency.current
+                    val priceText = PriceFormatter.formatFromScryfall(
+                        priceUsd = card.priceUsd,
+                        priceEur = card.priceEur,
+                        preferredCurrency = preferredCurrency
+                    )
+                    if (priceText != "—") {
                         Text(
-                            "$${String.format("%.2f", it)}",
-                            style      = ty.labelMedium,
-                            color      = mc.goldMtg,
+                            text = priceText,
+                            style = ty.labelMedium,
+                            color = mc.goldMtg,
                             fontWeight = FontWeight.Medium,
                         )
                     }

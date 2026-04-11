@@ -34,6 +34,7 @@ import com.mmg.magicfolder.core.ui.components.ManaCostImages
 import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
+import com.mmg.magicfolder.core.util.PriceFormatter
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  AddCardScreen — tabbed entry point for adding cards to the collection.
@@ -283,7 +284,11 @@ private fun SearchTab(
                     contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
                     items(uiState.results, key = { it.scryfallId }) { card ->
-                        SearchResultItem(card = card, onClick = { onCardSelected(card) })
+                        SearchResultItem(
+                            card = card,
+                            uiState = uiState,
+                            onClick = { onCardSelected(card) }
+                        )
                     }
                 }
             }
@@ -296,7 +301,11 @@ private fun SearchTab(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun SearchResultItem(card: Card, onClick: () -> Unit) {
+private fun SearchResultItem(
+    card: Card,
+    uiState: AddCardUiState,
+    onClick: () -> Unit
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
@@ -368,13 +377,14 @@ private fun SearchResultItem(card: Card, onClick: () -> Unit) {
                 card.manaCost?.let {
                     ManaCostImages(manaCost = it, symbolSize = 14.dp)
                 }
-                val price = card.priceEur ?: card.priceUsd
-                if (price != null && price > 0) {
+                val formattedPrice = PriceFormatter.formatFromScryfall(
+                    priceUsd = card.priceUsd,
+                    priceEur = card.priceEur,
+                    preferredCurrency = uiState.preferredCurrency
+                )
+                if (formattedPrice != "—") {
                     Text(
-                        text = if (card.priceEur != null)
-                            "€${"%.2f".format(price)}"
-                        else
-                            "${"$"}${"%.2f".format(price)}",
+                        text = formattedPrice,
                         style = ty.bodySmall,
                         color = mc.goldMtg,
                     )

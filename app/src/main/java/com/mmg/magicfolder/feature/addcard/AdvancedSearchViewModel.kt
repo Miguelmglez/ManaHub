@@ -59,7 +59,14 @@ class AdvancedSearchViewModel @Inject constructor(
         val isLoading: Boolean = false,
         val error: String? = null,
         val hasSearched: Boolean = false,
-    )
+        // ── Collection-local filters ──────────────────────────────────────────
+        val filterWishlist: Boolean? = null,
+        val filterForTrade: Boolean? = null,
+        val filterTags: Set<String> = emptySet(),
+    ) {
+        val hasAnyCollectionFilter: Boolean
+            get() = filterWishlist != null || filterForTrade != null || filterTags.isNotEmpty()
+    }
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -109,6 +116,12 @@ class AdvancedSearchViewModel @Inject constructor(
             criteria.add(SearchCriterion.Format(s.selectedFormat, s.formatLegal))
         if (s.keyword.isNotBlank())
             criteria.add(SearchCriterion.Keyword(s.keyword))
+        if (s.filterWishlist != null)
+            criteria.add(SearchCriterion.IsInWishlist(s.filterWishlist))
+        if (s.filterForTrade != null)
+            criteria.add(SearchCriterion.IsForTrade(s.filterForTrade))
+        if (s.filterTags.isNotEmpty())
+            criteria.add(SearchCriterion.HasTag(s.filterTags.toList()))
 
         return AdvancedSearchQuery(criteria, s.orderBy, s.orderDirection)
     }
@@ -212,8 +225,26 @@ class AdvancedSearchViewModel @Inject constructor(
         updateBuiltQuery()
     }
 
+    fun setFilterWishlist(value: Boolean?) {
+        _uiState.update { it.copy(filterWishlist = value) }
+        updateBuiltQuery()
+    }
+
+    fun setFilterForTrade(value: Boolean?) {
+        _uiState.update { it.copy(filterForTrade = value) }
+        updateBuiltQuery()
+    }
+
+    fun toggleFilterTag(key: String) {
+        val current = _uiState.value.filterTags.toMutableSet()
+        if (current.contains(key)) current.remove(key) else current.add(key)
+        _uiState.update { it.copy(filterTags = current) }
+        updateBuiltQuery()
+    }
+
     fun clearAll() {
         _uiState.value = UiState()
+        updateBuiltQuery()
     }
 
     fun search() {
@@ -230,4 +261,5 @@ class AdvancedSearchViewModel @Inject constructor(
             }
         }
     }
+
 }

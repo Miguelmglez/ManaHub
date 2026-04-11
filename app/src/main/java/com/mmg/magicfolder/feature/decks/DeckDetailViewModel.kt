@@ -11,6 +11,7 @@ import com.mmg.magicfolder.core.domain.repository.CardRepository
 import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository
 import com.mmg.magicfolder.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.magicfolder.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +59,9 @@ class DeckDetailViewModel @Inject constructor(
         val addCardsQuery: String = "",
         val addCardsResults: List<AddCardRow> = emptyList(),
         val isSearchingCards: Boolean = false,
+        // Import state
+        val isImporting: Boolean = false,
+        val importError: String? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -266,6 +270,83 @@ class DeckDetailViewModel @Inject constructor(
 
     fun clearAddCardsState() {
         _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList()) }
+    }
+
+    // ── Import / Export ──────────────────────────────────────────────────────
+
+    /**
+     * Parses [text] in Moxfield/Arena format and adds all resolved cards to this deck.
+     */
+    fun importCardsFromText(text: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImporting = true, importError = null) }
+            try {
+                val parsed = DeckImportExportHelper.parse(text)
+
+                val allLines = parsed.mainboard + parsed.sideboard +
+                    listOfNotNull(parsed.commander)
+
+                var failCount = 0
+                for (line in allLines) {
+                    val isSide = line in parsed.sideboard
+                    val result = cardRepository.searchCardByName(line.name)
+                    if (result is DataResult.Success) {
+                        val currentQty = deckCardsMap[result.data.scryfallId] ?: 0
+                        deckRepository.addCardToDeck(
+                            deckId      = deckId,
+                            scryfallId  = result.data.scryfallId,
+                            quantity    = currentQty + line.quantity,
+                            isSideboard = isSide,
+                        )
+                    } else {
+                        failCount++
+                    }
+                }
+
+                val msg = if (failCount > 0) "$failCount card(s) could not be found" else null
+                _uiState.update { it.copy(isImporting = false, importError = msg) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isImporting = false, importError = e.message) }
+            }
+        }
+    }
+
+    fun clearImportError() {
+        _uiState.update { it.copy(importError = null) }
+    }
+
+    /**
+     * Returns the deck as a Moxfield/Arena-compatible text string.
+     * Returns null if the deck has not loaded yet.
+     */
+    fun exportDeckToText(): String? {
+        val state = _uiState.value
+        val deck  = state.deck ?: return null
+
+        // Commander is identified by coverCardId, which is set to the commander's scryfallId on creation
+        val commanderCard = deck.coverCardId?.let { coverId ->
+            state.cards.firstOrNull { it.scryfallId == coverId }?.card
+        }
+        val commanderScryfallId = commanderCard?.scryfallId
+
+        val mainDeckCards = state.cards
+            .filter { !it.isSideboard && it.scryfallId != commanderScryfallId }
+            .mapNotNull { dc -> dc.card?.let { card ->
+                com.mmg.magicfolder.core.domain.model.DeckCard(card = card, quantity = dc.quantity)
+            }}
+
+        val sideboardCards = state.cards
+            .filter { it.isSideboard }
+            .mapNotNull { dc -> dc.card?.let { card ->
+                com.mmg.magicfolder.core.domain.model.DeckCard(card = card, quantity = dc.quantity)
+            }}
+
+        return DeckImportExportHelper.export(
+            deckName  = deck.name,
+            mainboard = mainDeckCards,
+            sideboard = sideboardCards,
+            commander = commanderCard,
+        )
     }
 
     fun setCoverCard(scryfallId: String) {

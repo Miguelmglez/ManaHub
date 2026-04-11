@@ -1,11 +1,14 @@
 package com.mmg.magicfolder.feature.carddetail
 
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -15,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -32,13 +36,20 @@ import com.mmg.magicfolder.core.domain.model.SuggestedTag
 import com.mmg.magicfolder.core.domain.model.TagCategory
 import com.mmg.magicfolder.core.domain.model.UserCard
 import com.mmg.magicfolder.core.domain.model.UserDefinedTag
+import com.mmg.magicfolder.core.domain.model.Deck
 import com.mmg.magicfolder.core.ui.components.CardRarity
 import com.mmg.magicfolder.core.ui.components.FoilBadge
+import com.mmg.magicfolder.core.ui.components.MagicToastHost
+import com.mmg.magicfolder.core.ui.components.MagicToastType
 import com.mmg.magicfolder.core.ui.components.ManaCostImages
+import com.mmg.magicfolder.core.ui.components.OracleText
 import com.mmg.magicfolder.core.ui.components.SetSymbol
 import com.mmg.magicfolder.core.ui.components.StaleBadge
+import com.mmg.magicfolder.core.ui.components.rememberMagicToastState
 import com.mmg.magicfolder.core.domain.model.PreferredCurrency
 import com.mmg.magicfolder.core.ui.theme.LocalPreferredCurrency
+import com.mmg.magicfolder.core.ui.theme.magicColors
+import com.mmg.magicfolder.core.ui.theme.magicTypography
 import com.mmg.magicfolder.core.util.PriceFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,9 +57,29 @@ import com.mmg.magicfolder.core.util.PriceFormatter
 fun CardDetailScreen(
     onBack: () -> Unit,
     onNavigateToAddCard: () -> Unit,
+    onNavigateToDeck: (Long) -> Unit = {},
     viewModel: CardDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val toastState = rememberMagicToastState()
+
+    // Collect one-shot events from the ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is CardDetailEvent.ShowToast -> toastState.show(
+                    event.message,
+                    when (event.severity) {
+                        ToastSeverity.SUCCESS -> MagicToastType.SUCCESS
+                        ToastSeverity.INFO    -> MagicToastType.INFO
+                        ToastSeverity.ERROR   -> MagicToastType.ERROR
+                    },
+                )
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
 
     Scaffold(
         topBar = {
@@ -93,6 +124,7 @@ fun CardDetailScreen(
             uiState.card != null -> CardDetailContent(
                 card = uiState.card!!,
                 userCards = uiState.userCards,
+                decksContainingCard = uiState.decksContainingCard,
                 isStale = uiState.isStale,
                 onRemoveAutoTag = viewModel::onRemoveTag,
                 onAddUserTag = viewModel::onAddUserTag,
@@ -105,10 +137,16 @@ fun CardDetailScreen(
                 onShowTradeSheet = viewModel::onShowTradeSheet,
                 onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
                 onRequestDelete = viewModel::onRequestDelete,
+                onNavigateToDeck = onNavigateToDeck,
                 modifier = Modifier.padding(padding),
             )
         }
     }
+
+    // Toast overlay — sits above the Scaffold
+    MagicToastHost(state = toastState)
+
+    } // end Box
 
     // Tag picker sheet
     if (uiState.showTagPicker) {
@@ -119,6 +157,8 @@ fun CardDetailScreen(
             userDefinedTags = uiState.userDefinedTags,
             onAddUserTag = viewModel::onAddUserTag,
             onSaveAndAddCustomTag = viewModel::onSaveAndAddCustomTag,
+            onDeleteUserDefinedTag = viewModel::onDeleteUserDefinedTag,
+            onUpdateUserDefinedTag = viewModel::onUpdateUserDefinedTag,
             onDismiss = viewModel::onDismissTagPicker,
         )
     }
@@ -185,6 +225,7 @@ fun CardDetailScreen(
 private fun CardDetailContent(
     card: Card,
     userCards: List<UserCard>,
+    decksContainingCard: List<Deck>,
     isStale: Boolean,
     onRemoveAutoTag: (CardTag) -> Unit,
     onAddUserTag: (CardTag) -> Unit,
@@ -197,6 +238,7 @@ private fun CardDetailContent(
     onShowTradeSheet: () -> Unit,
     onUpdateQuantity: (Long, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
+    onNavigateToDeck: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -240,7 +282,7 @@ private fun CardDetailContent(
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
-                        text = if (showBackFace) "Tap to see front" else "Tap to flip",
+                        text = if (showBackFace) stringResource(R.string.carddetail_flip_see_front) else stringResource(R.string.carddetail_flip_see_back),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
@@ -282,28 +324,21 @@ private fun CardDetailContent(
             }
         }
 
-        // Oracle text
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
-        ) {
-            if (card.printedText.isNullOrEmpty()) {
-                card.oracleText?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(12.dp),
-                    )
-                }
-            } else {
-                Text(
-                    text = card.printedText,
-                    style = MaterialTheme.typography.bodyMedium,
+        // Oracle / printed text with inline mana symbols
+        val oracleDisplayText = card.printedText.takeUnless { it.isNullOrEmpty() }
+            ?: card.oracleText
+        if (!oracleDisplayText.isNullOrEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            ) {
+                OracleText(
+                    text     = oracleDisplayText,
+                    style    = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(12.dp),
                 )
             }
-
         }
 
         // Flavor text
@@ -323,7 +358,10 @@ private fun CardDetailContent(
                 style = MaterialTheme.typography.titleMedium,
             )
         } else card.loyalty?.let {
-            Text("Loyalty: $it", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = stringResource(R.string.carddetail_loyalty_value, it),
+                style = MaterialTheme.typography.titleMedium
+            )
         }
 
         HorizontalDivider()
@@ -360,12 +398,21 @@ private fun CardDetailContent(
             onShowTagPicker = onShowTagPicker,
         )
 
-        // Suggested tags (confidence between suggest- and auto-thresholds)
-        if (card.suggestedTags.isNotEmpty()) {
+        // Suggested tags — only visible when card is in the user's collection
+        if (card.suggestedTags.isNotEmpty() && userCards.isNotEmpty()) {
             SuggestedTagsSection(
                 suggestions = card.suggestedTags,
                 onConfirm = onConfirmSuggestedTag,
                 onDismiss = onDismissSuggestedTag,
+            )
+        }
+
+        // Found in decks section
+        if (decksContainingCard.isNotEmpty()) {
+            HorizontalDivider()
+            FoundInDecksSection(
+                decks           = decksContainingCard,
+                onNavigateToDeck = onNavigateToDeck,
             )
         }
 
@@ -382,6 +429,103 @@ private fun CardDetailContent(
 
         // Extra bottom padding for FAB
         Spacer(Modifier.height(72.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Found in Decks section
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FoundInDecksSection(
+    decks:            List<Deck>,
+    onNavigateToDeck: (Long) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+
+    Column(
+        modifier            = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector        = Icons.Default.LibraryBooks,
+                contentDescription = null,
+                tint               = mc.primaryAccent,
+                modifier           = Modifier.size(16.dp),
+            )
+            Text(
+                text  = stringResource(
+                    R.string.carddetail_found_in_decks,
+                    decks.size,
+                    if (decks.size == 1) stringResource(R.string.carddetail_deck) else stringResource(R.string.carddetail_decks)
+                ),
+                style = MaterialTheme.typography.titleSmall,
+                color = mc.textPrimary,
+            )
+        }
+
+        decks.forEach { deck ->
+            DeckChip(deck = deck, onClick = { onNavigateToDeck(deck.id) })
+        }
+    }
+}
+
+@Composable
+private fun DeckChip(deck: Deck, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Surface(
+        onClick = onClick,
+        color   = mc.surface,
+        shape   = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+        border  = androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector        = Icons.Default.LibraryBooks,
+                contentDescription = null,
+                tint               = mc.primaryAccent,
+                modifier           = Modifier.size(18.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text     = deck.name,
+                    style    = ty.bodyMedium,
+                    color    = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+                Surface(
+                    color  = mc.primaryAccent.copy(alpha = 0.12f),
+                    shape  = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                ) {
+                    Text(
+                        text     = deck.format.replaceFirstChar { it.uppercase() },
+                        style    = ty.labelSmall,
+                        color    = mc.primaryAccent,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                    )
+                }
+            }
+            Icon(
+                imageVector        = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint               = mc.textDisabled,
+                modifier           = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
@@ -611,8 +755,11 @@ private fun AddToCollectionSheet(
     var language by remember { mutableStateOf("en") }
     var qty by remember { mutableIntStateOf(1) }
 
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
@@ -767,8 +914,11 @@ private fun AddToWishlistSheet(
     var language by remember { mutableStateOf("en") }
     var qty by remember { mutableIntStateOf(1) }
 
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
@@ -1048,10 +1198,10 @@ private fun LegalitySection(card: Card) {
             style = MaterialTheme.typography.titleSmall
         )
         val formats = listOf(
-            "Standard" to card.legalityStandard,
-            "Pioneer" to card.legalityPioneer,
-            "Modern" to card.legalityModern,
-            "Commander" to card.legalityCommander,
+            stringResource(R.string.format_standard) to card.legalityStandard,
+            stringResource(R.string.format_pioneer) to card.legalityPioneer,
+            stringResource(R.string.format_modern) to card.legalityModern,
+            stringResource(R.string.format_commander) to card.legalityCommander,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             formats.forEach { (format, legality) ->
@@ -1075,7 +1225,7 @@ private fun LegalityChip(format: String, legality: String) {
         ) {
             Text(format, style = MaterialTheme.typography.labelSmall)
             Text(
-                text = if (isLegal) "Legal" else "Not legal",
+                text = if (isLegal) stringResource(R.string.carddetail_legality_legal) else stringResource(R.string.carddetail_legality_not_legal),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isLegal) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1109,7 +1259,7 @@ private fun TagsSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Tags",
+                text = stringResource(R.string.carddetail_tags_section),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f),
             )
@@ -1123,7 +1273,7 @@ private fun TagsSection(
             // ── Auto-generated tags ──────────────────────────────────────────
             if (autoTags.isNotEmpty()) {
                 Text(
-                    text = "Etiquetas automáticas",
+                    text = stringResource(R.string.carddetail_tags_auto_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1145,7 +1295,7 @@ private fun TagsSection(
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Quitar ${tag.label}",
+                                        contentDescription = stringResource(R.string.carddetail_tags_remove_description, tag.label),
                                         modifier = Modifier.size(14.dp),
                                     )
                                 },
@@ -1171,7 +1321,7 @@ private fun TagsSection(
                     Spacer(Modifier.height(2.dp))
                 }
                 Text(
-                    text = "Mis etiquetas",
+                    text = stringResource(R.string.carddetail_tags_user_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1193,7 +1343,7 @@ private fun TagsSection(
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Quitar ${tag.label}",
+                                        contentDescription = stringResource(R.string.carddetail_tags_remove_description, tag.label),
                                         modifier = Modifier.size(14.dp),
                                     )
                                 },
@@ -1202,7 +1352,7 @@ private fun TagsSection(
                     }
                 } else {
                     Text(
-                        text = "Sin etiquetas personales — toca + para añadir",
+                        text = stringResource(R.string.carddetail_tags_user_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1219,11 +1369,11 @@ private fun TagsSection(
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("Añadir etiqueta", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.carddetail_tags_add_button), style = MaterialTheme.typography.labelSmall)
                 }
             } else if (!hasAnyTag) {
                 Text(
-                    text = "Sin etiquetas automáticas",
+                    text = stringResource(R.string.carddetail_tags_auto_empty),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1233,7 +1383,7 @@ private fun TagsSection(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Suggested tags section — chips with confirm (✓) / dismiss (✕)
+//  Suggested tags section — full-width cards with proper tap targets
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -1242,6 +1392,8 @@ private fun SuggestedTagsSection(
     onConfirm: (CardTag) -> Unit,
     onDismiss: (CardTag) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     var expanded by remember { mutableStateOf(true) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1251,33 +1403,40 @@ private fun SuggestedTagsSection(
                 .clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Accent dot
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(mc.primaryAccent.copy(alpha = 0.7f)),
+            )
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = "Etiquetas sugeridas",
+                text = stringResource(R.string.carddetail_tags_suggested_label),
                 style = MaterialTheme.typography.titleSmall,
+                color = mc.textPrimary,
                 modifier = Modifier.weight(1f),
             )
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = null,
+                tint = mc.textDisabled,
             )
         }
 
-        if (expanded) {
-            Text(
-                text = "Confirma las que apliquen o descártalas. No se añaden hasta que tú las apruebes.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            suggestions.chunked(2).forEach { rowItems ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    rowItems.forEach { sug ->
-                        SuggestedTagChip(
-                            suggestion = sug,
-                            onConfirm = { onConfirm(sug.tag) },
-                            onDismiss = { onDismiss(sug.tag) },
-                        )
-                    }
+        AnimatedVisibility(visible = expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.carddetail_tags_suggested_desc),
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                )
+                suggestions.forEach { sug ->
+                    SuggestedTagCard(
+                        suggestion = sug,
+                        onConfirm  = { onConfirm(sug.tag) },
+                        onDismiss  = { onDismiss(sug.tag) },
+                    )
                 }
             }
         }
@@ -1285,40 +1444,89 @@ private fun SuggestedTagsSection(
 }
 
 @Composable
-private fun SuggestedTagChip(
+private fun SuggestedTagCard(
     suggestion: SuggestedTag,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val pct = (suggestion.confidence * 100).toInt()
+
     Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
-        shape = MaterialTheme.shapes.small,
+        shape  = RoundedCornerShape(12.dp),
+        color  = mc.surface,
+        border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f)),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            Text(
-                text = "${suggestion.tag.label}  $pct%",
-                style = MaterialTheme.typography.labelSmall,
-            )
-            Spacer(Modifier.width(6.dp))
-            IconButton(onClick = onConfirm, modifier = Modifier.size(20.dp)) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = "Confirmar ${suggestion.tag.label}",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp),
-                )
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            // Tag name + confidence bar
+            Row(
+                verticalAlignment    = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Small tag icon dot
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(mc.primaryAccent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Label,
+                        contentDescription = null,
+                        tint = mc.primaryAccent,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(suggestion.tag.label, style = ty.bodyMedium, color = mc.textPrimary)
+                    Text(
+                        text = stringResource(R.string.carddetail_tags_confidence_value, pct),
+                        style = ty.labelSmall,
+                        color = mc.textDisabled
+                    )
+                }
             }
-            IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Descartar ${suggestion.tag.label}",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(14.dp),
-                )
+
+            Spacer(Modifier.height(10.dp))
+
+            // Action buttons — large enough to tap comfortably
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.lifeNegative),
+                    border = BorderStroke(0.8.dp, mc.lifeNegative.copy(alpha = 0.4f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.action_discard), style = ty.labelSmall)
+                }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = mc.lifePositive.copy(alpha = 0.15f),
+                        contentColor   = mc.lifePositive,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.carddetail_tags_suggested_confirm), style = ty.labelSmall)
+                }
             }
         }
     }
@@ -1328,7 +1536,12 @@ private fun SuggestedTagChip(
 //  Tag picker bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-private data class TagItem(val key: String, val label: String)
+private data class TagItem(
+    val key: String,
+    val label: String,
+    val isUserDefined: Boolean = false,
+    val isApplied: Boolean = false,
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -1339,6 +1552,8 @@ private fun TagPickerSheet(
     userDefinedTags: List<UserDefinedTag>,
     onAddUserTag: (CardTag) -> Unit,
     onSaveAndAddCustomTag: (label: String, categoryKey: String) -> Unit,
+    onDeleteUserDefinedTag: (key: String) -> Unit,
+    onUpdateUserDefinedTag: (key: String, newLabel: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val userTagKeys = currentUserTags.map { it.key }.toSet()
@@ -1357,6 +1572,10 @@ private fun TagPickerSheet(
     var selectedCategoryKey by remember { mutableStateOf(TagCategory.STRATEGY.name) }
     var showNewCategoryDialog by remember { mutableStateOf(false) }
 
+    // ── Edit user-defined tag state ───────────────────────────────────────────
+    var editingTagKey   by remember { mutableStateOf<String?>(null) }
+    var editingTagLabel by remember { mutableStateOf("") }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         contentWindowInsets = { WindowInsets(0) },
@@ -1368,7 +1587,7 @@ private fun TagPickerSheet(
         ) {
             // ── Header ──────────────────────────────────────────────────────
             item {
-                Text("Añadir etiqueta", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.carddetail_tags_picker_title), style = MaterialTheme.typography.titleMedium)
             }
 
             // ── Custom tag creator ───────────────────────────────────────────
@@ -1385,6 +1604,7 @@ private fun TagPickerSheet(
                         if (customLabel.isNotBlank()) {
                             onSaveAndAddCustomTag(customLabel, selectedCategoryKey)
                             customLabel = ""
+                            onDismiss()
                         }
                     },
                 )
@@ -1394,7 +1614,7 @@ private fun TagPickerSheet(
             if (cardAutoTags.isNotEmpty()) {
                 item {
                     TagPickerSection(
-                        title = "Auto-generadas para esta carta",
+                        title = stringResource(R.string.carddetail_tags_picker_auto),
                         tags = cardAutoTags.map { TagItem(it.key, it.label) },
                         onAdd = { key ->
                             val tag = cardAutoTags.find { it.key == key } ?: return@TagPickerSection
@@ -1409,7 +1629,7 @@ private fun TagPickerSheet(
             if (availableSuggestions.isNotEmpty()) {
                 item {
                     TagPickerSection(
-                        title = "Sugeridas para esta carta",
+                        title = stringResource(R.string.carddetail_tags_picker_suggested),
                         tags = availableSuggestions.map { sug ->
                             TagItem(
                                 sug.tag.key,
@@ -1430,9 +1650,9 @@ private fun TagPickerSheet(
                 val canonical =
                     CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
                 val userDefined =
-                    userDefinedTags.filter { it.categoryKey == category.name && it.key !in userTagKeys }
-                val items = canonical.map { TagItem(it.key, it.label) } +
-                        userDefined.map { TagItem(it.key, it.label) }
+                    userDefinedTags.filter { it.categoryKey == category.name }
+                val items = canonical.map { TagItem(it.key, it.label, isUserDefined = false) } +
+                        userDefined.map { TagItem(it.key, it.label, isUserDefined = true, isApplied = it.key in userTagKeys) }
                 if (items.isNotEmpty()) {
                     item(key = "cat_${category.name}") {
                         TagPickerSection(
@@ -1443,6 +1663,12 @@ private fun TagPickerSheet(
                                     ?: CardTag(key, category)
                                 onAddUserTag(tag); onDismiss()
                             },
+                            onEdit = { key ->
+                                val lbl = userDefinedTags.find { it.key == key }?.label ?: key
+                                editingTagKey = key
+                                editingTagLabel = lbl
+                            },
+                            onDelete = onDeleteUserDefinedTag,
                         )
                     }
                 }
@@ -1451,8 +1677,8 @@ private fun TagPickerSheet(
             // ── User custom categories ────────────────────────────────────────
             userCustomCategoryKeys.forEach { categoryKey ->
                 val items = userDefinedTags
-                    .filter { it.categoryKey == categoryKey && it.key !in userTagKeys }
-                    .map { TagItem(it.key, it.label) }
+                    .filter { it.categoryKey == categoryKey }
+                    .map { TagItem(it.key, it.label, isUserDefined = true, isApplied = it.key in userTagKeys) }
                 if (items.isNotEmpty()) {
                     item(key = "custom_$categoryKey") {
                         TagPickerSection(
@@ -1461,11 +1687,46 @@ private fun TagPickerSheet(
                             onAdd = { key ->
                                 onAddUserTag(CardTag(key, TagCategory.CUSTOM)); onDismiss()
                             },
+                            onEdit = { key ->
+                                val lbl = userDefinedTags.find { it.key == key }?.label ?: key
+                                editingTagKey = key
+                                editingTagLabel = lbl
+                            },
+                            onDelete = onDeleteUserDefinedTag,
                         )
                     }
                 }
             }
         }
+    }
+
+    // ── Edit tag label dialog ─────────────────────────────────────────────────
+    editingTagKey?.let { key ->
+        AlertDialog(
+            onDismissRequest = { editingTagKey = null },
+            title = { Text(stringResource(R.string.carddetail_rename_tag)) },
+            text = {
+                OutlinedTextField(
+                    value = editingTagLabel,
+                    onValueChange = { editingTagLabel = it },
+                    placeholder = { Text(stringResource(R.string.carddetail_new_name_hint)) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (editingTagLabel.isNotBlank()) {
+                            onUpdateUserDefinedTag(key, editingTagLabel)
+                        }
+                        editingTagKey = null
+                    },
+                ) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingTagKey = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
     }
 
     if (showNewCategoryDialog) {
@@ -1502,7 +1763,7 @@ private fun CustomTagCreatorSection(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "Nueva etiqueta personalizada",
+                stringResource(R.string.carddetail_new_custom_tag),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1511,14 +1772,14 @@ private fun CustomTagCreatorSection(
                 value = label,
                 onValueChange = onLabelChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Nombre de la etiqueta…") },
+                placeholder = { Text(stringResource(R.string.carddetail_tag_name_hint)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onAdd() }),
             )
 
             Text(
-                "Tipo:",
+                stringResource(R.string.carddetail_tag_type_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1537,7 +1798,7 @@ private fun CustomTagCreatorSection(
                 item {
                     SuggestionChip(
                         onClick = onNewCategoryClick,
-                        label = { Text("+ Nueva", style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(stringResource(R.string.carddetail_new_tag_button), style = MaterialTheme.typography.labelSmall) },
                     )
                 }
             }
@@ -1547,7 +1808,7 @@ private fun CustomTagCreatorSection(
                 enabled = label.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Añadir")
+                Text(stringResource(R.string.action_add))
             }
         }
     }
@@ -1559,22 +1820,85 @@ private fun TagPickerSection(
     title: String,
     tags: List<TagItem>,
     onAdd: (key: String) -> Unit,
+    onEdit: ((key: String) -> Unit)? = null,
+    onDelete: ((key: String) -> Unit)? = null,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text  = title,
+            style = ty.labelLarge,
+            color = mc.textSecondary,
         )
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement   = Arrangement.spacedBy(6.dp),
         ) {
             tags.forEach { tag ->
-                SuggestionChip(
-                    onClick = { onAdd(tag.key) },
-                    label = { Text(tag.label, style = MaterialTheme.typography.labelSmall) },
-                )
+                if (tag.isUserDefined && (onEdit != null || onDelete != null)) {
+                    // User-defined tag: chip + edit + delete icons in a small row
+                    Surface(
+                        shape  = RoundedCornerShape(20.dp),
+                        color  = mc.surface,
+                        border = BorderStroke(0.5.dp, mc.surfaceVariant),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
+                        ) {
+                            Text(
+                                tag.label,
+                                style    = ty.labelSmall,
+                                color    = if (tag.isApplied) mc.textDisabled else mc.textPrimary,
+                                modifier = if (!tag.isApplied) Modifier.clickable { onAdd(tag.key) } else Modifier,
+                            )
+                            if (tag.isApplied) {
+                                Icon(
+                                    imageVector        = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint               = mc.lifePositive,
+                                    modifier           = Modifier
+                                        .padding(start = 4.dp)
+                                        .size(13.dp),
+                                )
+                            }
+                            if (onEdit != null) {
+                                IconButton(
+                                    onClick  = { onEdit(tag.key) },
+                                    modifier = Modifier.size(28.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = stringResource(R.string.carddetail_edit_tag_description, tag.label),
+                                        tint     = mc.textSecondary,
+                                        modifier = Modifier.size(13.dp),
+                                    )
+                                }
+                            }
+                            if (onDelete != null) {
+                                IconButton(
+                                    onClick  = { onDelete(tag.key) },
+                                    modifier = Modifier.size(28.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.carddetail_delete_tag_description, tag.label),
+                                        tint     = mc.lifeNegative.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(13.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Built-in tag: standard suggestion chip
+                    SuggestionChip(
+                        onClick = { onAdd(tag.key) },
+                        label   = { Text(tag.label, style = ty.labelSmall) },
+                    )
+                }
             }
         }
     }
@@ -1588,20 +1912,20 @@ private fun NewCategoryDialog(
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nueva categoría") },
+        title = { Text(stringResource(R.string.carddetail_new_category_title)) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text("Nombre de la categoría…") },
+                placeholder = { Text(stringResource(R.string.carddetail_category_name_hint)) },
                 singleLine = true,
             )
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
-                Text("Crear")
+                Text(stringResource(R.string.carddetail_create_button))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

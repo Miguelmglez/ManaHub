@@ -68,7 +68,20 @@
       "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew :app:compileDebugKotlin)",
       "Bash(JAVA_HOME=\"C:\\\\\\\\Program Files\\\\\\\\Android\\\\\\\\Android Studio\\\\\\\\jbr\" ./gradlew.bat :app:compileDebugKotlin)",
       "Bash(\"/c/Users/Miguel/.jdks/jbr-17.0.14/bin/java\" -version)",
-      "Bash(JAVA_HOME=\"/c/Users/Miguel/.jdks/jbr-17.0.14\" ./gradlew :app:compileDebugKotlin)"
+      "Bash(JAVA_HOME=\"/c/Users/Miguel/.jdks/jbr-17.0.14\" ./gradlew :app:compileDebugKotlin)",
+      "Bash(\"/c/Users/Miguel/.jdks/jbr-17.0.14/bin/jar\" tf:*)",
+      "Bash(\"/c/Users/Miguel/.jdks/jbr-17.0.14/bin/jar\" xf:*)",
+      "Bash(\"./gradlew.bat\" :app:compileDebugKotlin)",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\")",
+      "Bash(bash gradlew:*)",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
+      "Bash(java -version)",
+      "Bash(grep -v \"^$\")",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff --name-only HEAD)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" status --short)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff HEAD -- app/src/main/java/com/mmg/magicfolder/feature/game/GlobalToolsOverlay.kt)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff HEAD -- app/src/main/java/com/mmg/magicfolder/feature/game/GameViewModel.kt)",
+      "Bash(git -C \"C:\\\\Users\\\\Miguel\\\\AndroidStudioProjects\\\\Magic_Folder\" diff HEAD -- app/src/main/java/com/mmg/magicfolder/feature/game/GamePlayScreen.kt)"
     ]
   }
 }

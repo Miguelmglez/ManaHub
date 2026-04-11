@@ -85,7 +85,7 @@ fun DeckListScreen(
             Icon(Icons.Default.Add, contentDescription = null, tint = mc.background)
             Spacer(Modifier.width(8.dp))
             Text(
-                "Create Deck",
+                stringResource(R.string.decklist_create_button),
                 style = MaterialTheme.magicTypography.labelLarge,
                 color = mc.background,
             )
@@ -389,7 +389,7 @@ private fun CreateDeckBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text  = "New Deck",
+                text  = stringResource(R.string.decklist_create_button),
                 style = ty.titleMedium,
                 color = mc.textPrimary,
             )
@@ -425,7 +425,7 @@ private fun CreateDeckBottomSheet(
                 Icon(Icons.Default.Add, contentDescription = null, tint = mc.background)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text  = "Create Deck",
+                    text  = stringResource(R.string.decklist_create_button),
                     style = ty.labelLarge,
                     color = mc.background,
                 )
@@ -440,7 +440,7 @@ private fun FormatSelector(selected: String, onSelect: (String) -> Unit) {
     val mc      = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text  = "Format",
+            text  = stringResource(R.string.deckbuilder_format_label),
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.textSecondary,
         )

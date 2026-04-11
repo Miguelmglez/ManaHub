@@ -1,6 +1,7 @@
 package com.mmg.magicfolder.feature.addcard
 
 import com.mmg.magicfolder.core.domain.model.Card
+import com.mmg.magicfolder.core.domain.model.PreferredCurrency
 
 data class AddCardUiState(
     val query:             String     = "",
@@ -10,4 +11,5 @@ data class AddCardUiState(
     val showConfirmSheet:  Boolean    = false,
     val addedSuccessfully: Boolean    = false,
     val error:             String?    = null,
+    val preferredCurrency: PreferredCurrency = PreferredCurrency.EUR,
 )

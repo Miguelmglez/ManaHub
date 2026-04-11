@@ -62,27 +62,6 @@ class CollectionViewModel @Inject constructor(
         applyFilters()
     }
 
-    fun toggleColorFilter(filter: ColorFilter) {
-        val current = _uiState.value.activeFilters.toMutableSet()
-        when (filter) {
-            ColorFilter.ALL -> current.clear()
-            ColorFilter.COLORLESS -> {
-                if (current.contains(ColorFilter.COLORLESS)) current.remove(ColorFilter.COLORLESS)
-                else { current.clear(); current.add(ColorFilter.COLORLESS) }
-            }
-            else -> {
-                // WUBRG — multi-selectable, exclusive with COLORLESS and MULTICOLOR
-                if (current.contains(filter)) current.remove(filter)
-                else {
-                    current.remove(ColorFilter.COLORLESS)
-                    current.add(filter)
-                }
-            }
-        }
-        _uiState.update { it.copy(activeFilters = current) }
-        applyFilters()
-    }
-
     fun onSortChange(sort: SortOrder) {
         _uiState.update { it.copy(sortOrder = sort) }
         applyFilters()
@@ -104,14 +83,50 @@ class CollectionViewModel @Inject constructor(
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 
     fun applyAdvancedFilters(query: AdvancedSearchQuery) {
-        val filtered = if (query.isEmpty()) {
-            _allCards.value
-        } else {
-            _allCards.value.filter { card ->
-                query.criteria.all { criterion -> matchesCriterion(card, criterion) }
+        _uiState.update { it.copy(activeQuery = if (query.isEmpty()) null else query) }
+        applyFilters()
+    }
+
+    fun clearAdvancedFilters() {
+        _uiState.update { it.copy(activeQuery = null) }
+        applyFilters()
+    }
+
+    // ── Filtering & sorting ───────────────────────────────────────────────
+
+    private fun applyFilters() {
+        val state = _uiState.value
+        var result = _allCards.value
+
+        // Text search
+        if (state.searchQuery.isNotBlank()) {
+            result = result.filter {
+                it.card.name.contains(state.searchQuery, ignoreCase = true)
             }
         }
-        _uiState.update { it.copy(cards = filtered.groupByCard()) }
+
+        // Advanced criteria
+        state.activeQuery?.let { query ->
+            if (!query.isEmpty()) {
+                result = result.filter { card ->
+                    query.criteria.all { criterion -> matchesCriterion(card, criterion) }
+                }
+            }
+        }
+
+        // Group copies of the same card into one entry
+        val grouped = result.groupByCard()
+
+        // Sort
+        val sorted = when (state.sortOrder) {
+            SortOrder.NAME        -> grouped.sortedBy { it.card.name }
+            SortOrder.PRICE_DESC  -> grouped.sortedByDescending { it.card.priceUsd ?: 0.0 }
+            SortOrder.PRICE_ASC   -> grouped.sortedBy { it.card.priceUsd ?: 0.0 }
+            SortOrder.RARITY      -> grouped.sortedByDescending { rarityWeight(it.card.rarity) }
+            SortOrder.DATE_ADDED  -> grouped.sortedByDescending { it.latestAddedAt }
+        }
+
+        _uiState.update { it.copy(cards = sorted) }
     }
 
     private fun matchesCriterion(card: UserCardWithCard, criterion: SearchCriterion): Boolean {
@@ -151,8 +166,44 @@ class CollectionViewModel @Inject constructor(
                 val price = if (criterion.currency == "eur") card.card.priceEur else card.card.priceUsd
                 price != null && compareDouble(price, criterion.value, criterion.operator)
             }
+            is SearchCriterion.CardSet ->
+                criterion.setCodes.contains(card.card.setCode.lowercase())
+            is SearchCriterion.Power -> {
+                val power = card.card.power?.toIntOrNull() ?: return false
+                compareInt(power, criterion.value, criterion.operator)
+            }
+            is SearchCriterion.Toughness -> {
+                val toughness = card.card.toughness?.toIntOrNull() ?: return false
+                compareInt(toughness, criterion.value, criterion.operator)
+            }
+            is SearchCriterion.Format ->
+                matchesFormat(card.card, criterion.format, criterion.legal)
+            is SearchCriterion.Keyword ->
+                card.card.keywords.any { it.equals(criterion.value, ignoreCase = true) } ||
+                    card.card.oracleText?.contains(criterion.value, ignoreCase = true) == true
+            // ── Collection-local ──────────────────────────────────────────────
+            is SearchCriterion.IsInWishlist ->
+                card.userCard.isInWishlist == criterion.value
+            is SearchCriterion.IsForTrade ->
+                card.userCard.isForTrade == criterion.value
+            is SearchCriterion.HasTag ->
+                criterion.keys.any { key ->
+                    card.card.tags.any { it.key == key } ||
+                        card.card.userTags.any { it.key == key }
+                }
             else -> true
         }
+    }
+
+    private fun matchesFormat(card: com.mmg.magicfolder.core.domain.model.Card, format: String, legal: Boolean): Boolean {
+        val isLegal = when (format.lowercase()) {
+            "standard"  -> card.legalityStandard  == "legal"
+            "pioneer"   -> card.legalityPioneer   == "legal"
+            "modern"    -> card.legalityModern    == "legal"
+            "commander" -> card.legalityCommander == "legal"
+            else        -> false
+        }
+        return isLegal == legal
     }
 
     private fun compareRarity(cardRarity: String, targetRarity: String, op: ComparisonOperator): Boolean {
@@ -186,50 +237,6 @@ class CollectionViewModel @Inject constructor(
         ComparisonOperator.GREATER           -> cardVal > target
         ComparisonOperator.GREATER_OR_EQUAL  -> cardVal >= target
         ComparisonOperator.NOT_EQUAL         -> cardVal != target
-    }
-
-    // ── Filtering & sorting (pure local, no suspend needed) ───────────────
-
-    private fun applyFilters() {
-        val state = _uiState.value
-        var result = _allCards.value
-
-        // Search
-        if (state.searchQuery.isNotBlank()) {
-            result = result.filter {
-                it.card.name.contains(state.searchQuery, ignoreCase = true)
-            }
-        }
-
-        // Color filter
-        val filters = state.activeFilters
-        if (filters.isNotEmpty()) {
-            result = result.filter { item ->
-                val identity = item.card.colorIdentity
-                when {
-                    filters.contains(ColorFilter.COLORLESS) -> identity.isEmpty()
-                    else -> {
-                        // OR logic: card is shown if it matches AT LEAST ONE selected color
-                        val selectedColors = filters.map { it.name }.toSet()
-                        selectedColors.any { identity.contains(it) }
-                    }
-                }
-            }
-        }
-
-        // Group copies of the same card into one entry
-        val grouped = result.groupByCard()
-
-        // Sort
-        val sorted = when (state.sortOrder) {
-            SortOrder.NAME        -> grouped.sortedBy { it.card.name }
-            SortOrder.PRICE_DESC  -> grouped.sortedByDescending { it.card.priceUsd ?: 0.0 }
-            SortOrder.PRICE_ASC   -> grouped.sortedBy { it.card.priceUsd ?: 0.0 }
-            SortOrder.RARITY      -> grouped.sortedByDescending { rarityWeight(it.card.rarity) }
-            SortOrder.DATE_ADDED  -> grouped.sortedByDescending { it.latestAddedAt }
-        }
-
-        _uiState.update { it.copy(cards = sorted) }
     }
 
     private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {

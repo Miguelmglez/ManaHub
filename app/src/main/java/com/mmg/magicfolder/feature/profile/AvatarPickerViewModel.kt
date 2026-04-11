@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.magicfolder.core.data.local.UserPreferencesDataStore
 import com.mmg.magicfolder.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.magicfolder.core.ui.theme.MagicColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -127,17 +126,4 @@ class AvatarPickerViewModel @Inject constructor(
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-//  Display name / mana color extensions
-// ─────────────────────────────────────────────────────────────────────────────
-
-    fun manaColor(mc: String, magicColors: MagicColors) = when (mc) {
-        "W" -> magicColors.manaW
-        "U" -> magicColors.manaU
-        "B" -> magicColors.manaB
-        "R" -> magicColors.manaR
-        "G" -> magicColors.manaG
-        "C" -> magicColors.manaC
-        else -> magicColors.primaryAccent
-    }
 }

@@ -67,8 +67,10 @@
     <string name="collection_empty_subtitle">Add your first card by tapping +</string>
     <string name="collection_empty_action">Add a card</string>
     <string name="collection_stale_banner">Prices may be outdated. Tap to refresh.</string>
+    <string name="collection_sort_date">Date added</string>
     <string name="collection_sort_name">Name</string>
-    <string name="collection_sort_price">Price</string>
+    <string name="collection_sort_price_desc">Price: high to low</string>
+    <string name="collection_sort_price_asc">Price: low to high</string>
     <string name="collection_sort_rarity">Rarity</string>
     <string name="collection_sort_cmc">Mana cost</string>
     <string name="collection_view_grid">Grid view</string>
@@ -147,6 +149,82 @@
     <string name="carddetail_trade_sheet_subtitle">Choose which copies you want to offer. They will remain in your collection.</string>
     <string name="carddetail_for_trade_badge">For trade</string>
     <string name="carddetail_no_copies_for_trade">You have no collection copies to offer for trade.</string>
+    <string name="carddetail_rename_tag">Rename tag</string>
+    <string name="carddetail_new_name_hint">New name…</string>
+    <string name="carddetail_new_custom_tag">New custom tag</string>
+    <string name="carddetail_tag_name_hint">Tag name…</string>
+    <string name="carddetail_tag_type_label">Type:</string>
+    <string name="carddetail_new_tag_button">+ New</string>
+    <string name="carddetail_edit_tag_description">Edit %1$s</string>
+    <string name="carddetail_delete_tag_description">Delete %1$s</string>
+    <string name="carddetail_new_category_title">New category</string>
+    <string name="carddetail_category_name_hint">Category name…</string>
+    <string name="carddetail_create_button">Create</string>
+    <string name="carddetail_flip_see_front">Tap to see front</string>
+    <string name="carddetail_flip_see_back">Tap to flip</string>
+    <string name="carddetail_loyalty_value">Loyalty: %1$s</string>
+    <string name="carddetail_found_in_decks">Found in %1$d %2$s</string>
+    <string name="carddetail_deck">Deck</string>
+    <string name="carddetail_decks">Decks</string>
+    <string name="carddetail_tags_auto_label">Auto-generated tags</string>
+    <string name="carddetail_tags_remove_description">Remove %1$s</string>
+    <string name="carddetail_tags_user_label">My tags</string>
+    <string name="carddetail_tags_user_empty">No personal tags — tap + to add</string>
+    <string name="carddetail_tags_add_button">Add tag</string>
+    <string name="carddetail_tags_auto_empty">No auto-generated tags</string>
+    <string name="carddetail_tags_suggested_label">Suggested tags</string>
+    <string name="carddetail_tags_suggested_desc">Confirm those that apply or discard them. They won\'t be added until you approve them.</string>
+    <string name="carddetail_tags_confidence_value">%1$d%% confidence</string>
+    <string name="carddetail_tags_suggested_confirm">Add tag</string>
+    <string name="carddetail_tags_picker_title">Add tag</string>
+    <string name="carddetail_tags_picker_auto">Auto-generated for this card</string>
+    <string name="carddetail_tags_picker_suggested">Suggested for this card</string>
+    <string name="action_discard">Discard</string>
+
+    <!-- ══════════════════════════════════════════
+         TAG DICTIONARY SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="tagdictionary_title">Tag Dictionary</string>
+    <string name="tagdictionary_reset_all_description">Reset all</string>
+    <string name="tagdictionary_search_hint">Search tag…</string>
+    <string name="tagdictionary_edit_title">Edit: %1$s</string>
+    <string name="tagdictionary_thresholds_title">Precision Thresholds</string>
+    <string name="tagdictionary_thresholds_description">Tags with confidence ≥ %1$d%% are added automatically. Between %2$d%% and %1$d%% they are suggested.</string>
+    <string name="tagdictionary_thresholds_auto">Auto-add: %1$d%%</string>
+    <string name="tagdictionary_thresholds_suggest">Suggest: %1$d%%</string>
+    <string name="tagdictionary_row_labels">EN: %1$s   ES: %2$s</string>
+    <string name="tagdictionary_row_patterns">%1$d patterns · %2$s</string>
+    <string name="tagdictionary_reset_description">Reset</string>
+    <string name="tagdictionary_labels_section">Labels</string>
+    <string name="tagdictionary_patterns_hint">Patterns (one per line, lowercase — the engine looks for literal matches in card text)</string>
+    <string name="tagdictionary_patterns_en_label">EN Patterns</string>
+    <string name="tagdictionary_patterns_es_label">ES Patterns</string>
+
+    <!-- ══════════════════════════════════════════
+         SCANNER SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="scanner_title">Scan card</string>
+    <string name="scanner_grant_permission">Grant permission</string>
+    <string name="scanner_permission_rationale">Camera access needed to scan cards</string>
+    <string name="scanner_instruction_point">Point at the card name</string>
+    <string name="scanner_instruction_steady">Hold card steady in good light</string>
+    <string name="scanner_market_price_usd">Market price: $%1$.2f</string>
+    <string name="scanner_market_price_eur">Market price: %1$.2f€</string>
+    <string name="scanner_language_label">Language</string>
+    <string name="scanner_card_added">Card added to collection!</string>
+    <string name="scanner_add_to_collection">Add to collection</string>
+
+    <!-- ══════════════════════════════════════════
+         SYNERGY SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="synergy_title">Synergies &amp; decks</string>
+    <string name="synergy_suggested_decks">Suggested decks</string>
+    <string name="synergy_groups">Synergy groups</string>
+    <string name="synergy_empty_title">Add more cards to see synergies</string>
+    <string name="synergy_empty_subtitle">You need at least 10 cards</string>
+    <string name="synergy_score_percent">%1$d%%</string>
+    <string name="synergy_deck_info">%1$d cards · %2$s</string>
+    <string name="synergy_more_cards">+%1$d</string>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN
@@ -307,6 +385,9 @@
          GAME SCREEN
     ═══════════════════════════════════════════ -->
     <string name="game_title">ManaHub</string>
+    <string name="game_turn_label">T%1$d</string>
+    <string name="game_tournament_badge">Tournament</string>
+    <string name="game_tournament_standings_desc">Tournament standings</string>
     <string name="game_mode_standard">STANDARD</string>
     <string name="game_mode_commander">COMMANDER</string>
     <string name="game_fallen_label">FALLEN</string>
@@ -318,11 +399,14 @@
     <string name="game_pending_defeat_revoke">Still alive!</string>
     <string name="game_commander_button">⚔ Commander damage</string>
     <string name="game_counters_button">◆ Counters</string>
+    <string name="game_life_icon_desc">Life Icon</string>
+    <string name="game_commander_damage_desc">Commander damage</string>
+    <string name="game_counters_desc">Counters</string>
     <string name="game_dice_label">d20</string>
     <string name="game_coin_label">¢</string>
-    <string name="game_poison_label">☠ Poison</string>
-    <string name="game_experience_label">✦ Experience</string>
-    <string name="game_energy_label">⚡ Energy</string>
+    <string name="game_poison_label">Poison</string>
+    <string name="game_experience_label">Experience</string>
+    <string name="game_energy_label">Energy</string>
     <string name="game_custom_counter_hint">Counter name…</string>
     <string name="game_reset_title">Reset game?</string>
     <string name="game_reset_message">All life totals and counters will reset.</string>
@@ -338,6 +422,30 @@
     <string name="game_rename_player">Rename Player</string>
     <string name="game_cmd_damage_title">Commander Damage → %1$s</string>
     <string name="game_counters_title">%1$s — Counters</string>
+    <string name="game_tools_close_desc">Close tools</string>
+    <string name="game_tools_dice_roll_desc">Dice roll</string>
+    <string name="game_tools_coin_flip_desc">Coin flip</string>
+    <string name="game_tools_coin_heads_desc">Heads</string>
+    <string name="game_tools_coin_tails_desc">Tails</string>
+    <string name="game_tools_reset">Reset game</string>
+    <string name="game_tools_abandon">Abandonar temporalmente</string>
+    <string name="game_tools_exit_game">Exit game</string>
+    <string name="game_tools_tournament">Manage tournament</string>
+    <string name="game_tools_manage_players">Manage players</string>
+    <string name="game_land_played_desc">Land drop used this turn</string>
+    <string name="game_end_turn">End Turn</string>
+    <string name="game_active_turn_label">T%1$d</string>
+    <string name="game_counter_choose_icon">Choose icon</string>
+    <string name="game_manage_tab_layout">Layout</string>
+    <string name="game_manage_tab_players">Players</string>
+    <string name="game_manage_tab_turn_order">Turn Order</string>
+    <string name="game_manage_positions_title">Positions</string>
+    <string name="game_manage_positions_hint">Tap two players to swap their positions</string>
+    <string name="game_manage_properties_title">Player Properties</string>
+    <string name="game_manage_turn_order_title">Turn Order</string>
+    <string name="game_manage_apply_order">Apply</string>
+    <string name="game_manage_layout_title">Select Layout</string>
+    <string name="game_pause_message">Partida abandonada temporalmente. Vuelve desde el botón Play.</string>
 
     <!-- Victory overlay -->
     <string name="game_wins_label">WINS!</string>
@@ -349,13 +457,26 @@
     ═══════════════════════════════════════════ -->
     <string name="gameresult_title">Game Result</string>
     <string name="gameresult_winner_label">VICTORY</string>
+    <string name="gameresult_life_remaining">%1$d life remaining</string>
+    <string name="gameresult_game_duration">Duration: %1$s</string>
+    <string name="gameresult_game_ended_turn">Game ended on turn %1$d</string>
     <string name="gameresult_standings_title">Final Standings</string>
+    <string name="gameresult_player_life_count">%1$d life</string>
+    <string name="gameresult_player_poison_count">☠ 10 poison</string>
+    <string name="gameresult_player_cmd_damage_count">⚔ 21 cmd dmg</string>
+    <string name="gameresult_player_conceded">conceded</string>
+    <string name="gameresult_cmd_damage_label">%1$d cmd</string>
     <string name="gameresult_highlights_title">Highlights</string>
     <string name="gameresult_most_damage">Most damage dealt</string>
+    <string name="gameresult_most_damage_desc">%1$s — %2$d cmd dmg</string>
     <string name="gameresult_closest_match">Closest match</string>
+    <string name="gameresult_closest_match_desc">Life difference of %1$d</string>
+    <string name="gameresult_poison_elimination">Poison elimination</string>
+    <string name="gameresult_poison_elimination_desc">A player was eliminated by poison counters</string>
     <string name="gameresult_duration_label">Duration</string>
     <string name="gameresult_turns_label">Turns</string>
     <string name="gameresult_review_button">✦ Review this game</string>
+    <string name="gameresult_back_home">Back to Home</string>
     <string name="gameresult_review_subtitle">~2 min · helps improve your deck</string>
     <string name="gameresult_elimination_life">0 life</string>
     <string name="gameresult_elimination_poison">☠ 10 poison</string>
@@ -439,6 +560,7 @@
          TOURNAMENT SCREEN
     ═══════════════════════════════════════════ -->
     <string name="tournament_setup_title">New Tournament</string>
+    <string name="tournament_name_label">Tournament Name</string>
     <string name="tournament_name_hint">Tournament name…</string>
     <string name="tournament_format_label">Format</string>
     <string name="tournament_structure_label">Structure</string>
@@ -485,27 +607,31 @@
     <string name="profile_section_game_stats">Game Stats</string>
     <string name="profile_stat_games">Games</string>
     <string name="profile_stat_win_rate">Win Rate</string>
+    <string name="profile_stat_wins">Wins</string>
+    <string name="profile_stat_win_pct">Win %</string>
     <string name="profile_stat_streak">Streak</string>
-    <string name="profile_stat_avg_life_won">Avg life won</string>
-    <string name="profile_stat_avg_duration">Avg duration</string>
-    <string name="profile_stat_avg_win_turn">Avg win turn</string>
-    <string name="profile_stat_turn_format">T%1$d</string>
-    <string name="profile_favourite_format">Favourite format</string>
-    <string name="profile_section_best_deck">Best Deck</string>
-    <string name="profile_deck_games">%1$d games played</string>
-    <string name="profile_deck_win_rate">win rate</string>
-    <string name="profile_section_insights">Game Insights</string>
-    <string name="profile_insights_based_on">Based on %1$d game reviews</string>
-    <string name="profile_insight_hand">Opening hand</string>
-    <string name="profile_insight_mana">Mana issues</string>
-    <string name="profile_insight_mana_value">%1$d%% of games</string>
-    <string name="profile_insight_win_style">How you win</string>
-    <string name="profile_section_achievements">Achievements (%1$d/%2$d)</string>
-    <string name="profile_section_recent_games">Recent Games</string>
-    <string name="profile_section_collection">Collection</string>
-    <string name="profile_win_badge">W</string>
-    <string name="profile_loss_badge">L</string>
+    <string name="profile_stat_fav_color">Fav. Color</string>
+    <string name="profile_stat_top_value">Top Value</string>
+    <string name="profile_best_deck">Best Deck</string>
+    <string name="profile_survey_insights">Survey Insights</string>
+    <string name="profile_insight_hand_quality">Hand Quality</string>
+    <string name="profile_insight_mana_issues">Mana Issues</string>
+    <string name="profile_insight_mana_games">%1$d games</string>
+    <string name="profile_achievements">Achievements</string>
+    <string name="profile_achievements_unlocked">Unlocked (%1$d)</string>
+    <string name="profile_achievements_in_progress">In Progress (%1$d)</string>
+    <string name="profile_achievements_hide_locked">Hide locked</string>
+    <string name="profile_achievements_locked_count">%1$d locked achievements</string>
+    <string name="profile_recent_games">Recent Games</string>
+    <string name="profile_win">WIN</string>
+    <string name="profile_loss">LOSS</string>
     <string name="profile_collection_summary">Collection Summary</string>
+    <string name="profile_total_cards">Total Cards</string>
+    <string name="profile_est_value">Est. Value</string>
+    <string name="profile_developed_by">Developed with ❤️ for the MTG community</string>
+    <string name="profile_progress">Progress</string>
+    <string name="profile_achievement_ok">OK</string>
+    <string name="profile_version">ManaHub v%1$s</string>
 
     <!-- Play styles -->
     <string name="playstyle_aggro">Aggro</string>
@@ -621,7 +747,10 @@
     <string name="advsearch_keyword_hint">e.g. Flying, Haste…</string>
     <string name="advsearch_section_sort">Sort results</string>
     <string name="advsearch_no_results">No cards found for this search</string>
-    <string name="advsearch_no_criteria">Add at least one criterion to search</string>
+    <string name="advsearch_mana_hint">0..15</string>
+    <string name="advsearch_power_hint">*</string>
+    <string name="advsearch_toughness_hint">*</string>
+    <string name="advsearch_price_hint">0.00</string>
 
     <!-- ══════════════════════════════════════════
          ERRORS Y MENSAJES GENÉRICOS
@@ -709,6 +838,14 @@
     <string name="set_type_other">Other</string>
     <string name="advsearch_set_selected_count">%1$d sets selected</string>
     <string name="advsearch_set_done">Done (%1$d sets)</string>
+    <string name="advsearch_apply_button">Apply filters</string>
+    <string name="advsearch_section_collection_status">Collection status</string>
+    <string name="advsearch_filter_wishlist">In wishlist</string>
+    <string name="advsearch_filter_for_trade">Marked for trade</string>
+    <string name="advsearch_section_tags">Tags</string>
+    <string name="advsearch_tags_hint">Any card or user tag</string>
+    <string name="collection_active_filters">%1$d active filter(s)</string>
+    <string name="collection_clear_filters">Clear filters</string>
 
     <!-- ══════════════════════════════════════════
          PRICE FORMATTING
@@ -716,6 +853,10 @@
     <string name="price_not_available">—</string>
     <string name="price_label_eur">EUR</string>
     <string name="price_label_usd">USD</string>
+    <string name="price_symbol_usd">$</string>
+    <string name="price_symbol_eur">€</string>
+    <string name="price_format_usd">$%1$.2f</string>
+    <string name="price_format_eur">%1$.2f€</string>
 
     <!-- ══════════════════════════════════════════
          NEWS SCREEN
@@ -794,6 +935,9 @@
     <string name="draft_videos_empty">No videos found for this set</string>
     <string name="draft_videos_error">Could not load videos</string>
     <string name="draft_key_cards">Key Cards</string>
+    <string name="draft_key_cards_label">Key Cards:</string>
+    <string name="draft_sort_by_label">Sort by:</string>
+    <string name="carddetail_back_face_description">%1$s (back)</string>
     <string name="draft_strategy">Strategy</string>
     <string name="draft_archetype_tier">Tier %1$s</string>
     <string name="draft_no_sets">No draftable sets found</string>
@@ -802,5 +946,14 @@
     <string name="draft_cards_all">All Cards</string>
     <string name="draft_guide_videos">Videos</string>
     <string name="draft_card_artist">Artist: %1$s</string>
+
+    <!-- Deck import / export -->
+    <string name="deck_import_title">Import Deck</string>
+    <string name="deck_import_hint">Paste a deck list in Moxfield or MTG Arena format. Each line should follow the pattern: 4 Lightning Bolt or 4 Lightning Bolt (M11) 163</string>
+    <string name="deck_import_placeholder">Deck\n4 Lightning Bolt\n2 Mountain\n\nSideboard\n2 Grafdigger\'s Cage</string>
+    <string name="deck_import_loading">Resolving cards…</string>
+    <string name="deck_import_button">Import</string>
+    <string name="deck_import_button_setup">Import deck list</string>
+    <string name="deck_export_share_label">Share deck list</string>
 
 </resources>

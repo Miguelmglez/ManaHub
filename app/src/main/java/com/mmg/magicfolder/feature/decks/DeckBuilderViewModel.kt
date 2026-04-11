@@ -19,6 +19,7 @@ import com.mmg.magicfolder.core.domain.repository.DeckRepository
 import com.mmg.magicfolder.core.domain.repository.UserCardRepository
 import com.mmg.magicfolder.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.magicfolder.core.network.ScryfallRequestQueue
+import com.mmg.magicfolder.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -372,6 +373,66 @@ class DeckBuilderViewModel @Inject constructor(
             val matchesPrice = s.filterMaxPrice == null || (cardPrice != null && cardPrice <= s.filterMaxPrice)
 
             matchesColor && matchesType && matchesCmc && matchesPrice
+        }
+    }
+
+    // ── Import ────────────────────────────────────────────────────────────────
+
+    /**
+     * Parses [text] in Moxfield/Arena format, resolves every card name via Scryfall,
+     * and creates a new deck — bypassing the manual builder steps.
+     */
+    fun importDeckFromText(
+        text:      String,
+        deckName:  String,
+        format:    DeckFormat,
+        onSuccess: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            _state.update { it.copy(error = null, isLoadingCollection = true) }
+            try {
+                val parsed = DeckImportExportHelper.parse(text)
+
+                // Resolve commander
+                val commanderCard: Card? = parsed.commander?.let { line ->
+                    scryfallDataSource.getCardByExactName(line.name).getOrNull()
+                }
+
+                // Resolve mainboard cards
+                val mainboard = parsed.mainboard.mapNotNull { line ->
+                    val card = scryfallDataSource.getCardByExactName(line.name).getOrNull()
+                    card?.let { DeckCard(card = it, quantity = line.quantity) }
+                }
+
+                // Resolve sideboard cards
+                val sideboard = parsed.sideboard.mapNotNull { line ->
+                    val card = scryfallDataSource.getCardByExactName(line.name).getOrNull()
+                    card?.let { DeckCard(card = it, quantity = line.quantity) }
+                }
+
+                val deckId = deckRepository.createDeck(
+                    Deck(
+                        name        = deckName.ifBlank { parsed.commander?.name ?: "Imported Deck" },
+                        format      = format.name.lowercase(),
+                        coverCardId = commanderCard?.scryfallId,
+                    )
+                )
+
+                commanderCard?.let {
+                    deckRepository.addCardToDeck(deckId, it.scryfallId, 1, false)
+                }
+                mainboard.forEach { dc ->
+                    deckRepository.addCardToDeck(deckId, dc.card.scryfallId, dc.quantity, false)
+                }
+                sideboard.forEach { dc ->
+                    deckRepository.addCardToDeck(deckId, dc.card.scryfallId, dc.quantity, true)
+                }
+
+                _state.update { it.copy(isLoadingCollection = false) }
+                onSuccess()
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoadingCollection = false, error = e.message) }
+            }
         }
     }
 
