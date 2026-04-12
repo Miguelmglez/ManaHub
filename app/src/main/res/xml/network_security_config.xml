@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Blocks all cleartext (HTTP) traffic at the OS level.
+    Only HTTPS is allowed in all build variants.
+    Certificate pinning is intentionally omitted: Scryfall rotates certs
+    regularly and pinning would break the app on each rotation.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
