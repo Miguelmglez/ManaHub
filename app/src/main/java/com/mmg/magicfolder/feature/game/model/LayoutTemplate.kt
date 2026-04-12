@@ -72,7 +72,7 @@ object LayoutTemplates {
         gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots2[0],slots2[1]))
     )
 
-    val layoutsFor2 = listOf( TWO_SIDE_BY_SIDE, TWO_TOP_BOTTOM)
+    val layoutsFor2 = listOf(TWO_TOP_BOTTOM, TWO_SIDE_BY_SIDE )
 
     // ─── 3 players ───────────────────────────────────────────────────────────
 

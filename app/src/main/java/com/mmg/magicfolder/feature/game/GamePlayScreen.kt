@@ -21,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -641,21 +642,6 @@ private fun PlayerCard(
         else -> mc.textPrimary
     }
 
-    // Active glow pulse — only computed for the active player
-    val glowAlpha: Float = if (isActive) {
-        val infiniteTransition = rememberInfiniteTransition(label = "activeGlow_${player.id}")
-        val anim by infiniteTransition.animateFloat(
-            initialValue = 0.40f,
-            targetValue = 0.75f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "glowAlpha_${player.id}",
-        )
-        anim
-    } else 0.25f
-
     BoxWithConstraints(
         modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
         contentAlignment = Alignment.Center,
@@ -678,21 +664,12 @@ private fun PlayerCard(
             CardTier.LARGE -> 6.dp; CardTier.SMALL -> 4.dp; CardTier.TINY -> 2.dp
         }
 
-        Box(
-            modifier = Modifier
-                .requiredSize(width = cardWidth, height = cardHeight)
-                .graphicsLayer { rotationZ = rotation.toFloat() }
-                .coloredShadow(
-                    color = theme.accent.copy(alpha = glowAlpha),
-                    blurRadius = if (isActive) 28.dp else 20.dp,
-                )
-                .clip(RoundedCornerShape(16.dp))
-                .background(theme.background)
-                .border(
-                    width = if (isActive) 2.5.dp else 0.5.dp,
-                    color = theme.accent.copy(alpha = if (isActive) 1.0f else 0.40f),
-                    shape = RoundedCornerShape(16.dp),
-                )
+        PlayerCardSurface(
+            isActive = isActive,
+            theme = theme,
+            rotation = rotation,
+            cardWidth = cardWidth,
+            cardHeight = cardHeight,
         ) {
             ThemeBackground(modifier = Modifier.matchParentSize())
 
@@ -778,14 +755,14 @@ private fun PlayerCard(
                         }
                     }
 
-                    // 2. Life group centered: Icons aligned to the Text (the largest element)
+                    // 2. Life group: Using weights to ensure the Text is ALWAYS at the absolute center
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
                     ) {
-                        // Left container for Landscape icon
+                        // Left container: occupies 1/2 of remaining space, icon aligned to end (near text)
                         Box(
-                            modifier = Modifier.width(iconSize + iconPadding),
+                            modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             if (isActive && tier != CardTier.TINY) {
@@ -825,16 +802,16 @@ private fun PlayerCard(
                             maxLines = 1,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
-                                .padding(horizontal = iconPadding)
+                                .padding(horizontal = 24.dp) // Gap between text and icons
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                 ) { onLife(-1) },
                         )
 
-                        // Right container for Heart icon
+                        // Right container: occupies 1/2 of remaining space, icon aligned to start (near text)
                         Box(
-                            modifier = Modifier.width(iconSize + iconPadding),
+                            modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.CenterStart
                         ) {
                             Icon(
@@ -942,6 +919,53 @@ private fun PlayerCard(
             }
         }
     }
+}
+
+/**
+ * Optimized surface for PlayerCard to isolate glow animations and avoid
+ * unnecessary recompositions of the entire card content.
+ */
+@Composable
+private fun PlayerCardSurface(
+    isActive: Boolean,
+    theme: PlayerThemeColors,
+    rotation: Int,
+    cardWidth: androidx.compose.ui.unit.Dp,
+    cardHeight: androidx.compose.ui.unit.Dp,
+    content: @Composable BoxScope.() -> Unit
+) {
+    // Active glow pulse — only computed for the active player
+    val glowAlpha: Float = if (isActive) {
+        val infiniteTransition = rememberInfiniteTransition(label = "activeGlow")
+        val anim by infiniteTransition.animateFloat(
+            initialValue = 0.40f,
+            targetValue = 0.75f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "glowAlpha",
+        )
+        anim
+    } else 0.25f
+
+    Box(
+        modifier = Modifier
+            .requiredSize(width = cardWidth, height = cardHeight)
+            .graphicsLayer { rotationZ = rotation.toFloat() }
+            .coloredShadow(
+                color = theme.accent.copy(alpha = glowAlpha),
+                blurRadius = if (isActive) 28.dp else 20.dp,
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .background(theme.background)
+            .border(
+                width = if (isActive) 2.5.dp else 0.5.dp,
+                color = theme.accent.copy(alpha = if (isActive) 1.0f else 0.40f),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        content = content
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
