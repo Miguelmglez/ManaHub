@@ -412,7 +412,7 @@ private fun ScannerTab(onNavigateToScanner: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(
-                imageVector = Icons.Default.QrCodeScanner,
+                imageVector = Icons.Default.CameraAlt,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = mc.primaryAccent,

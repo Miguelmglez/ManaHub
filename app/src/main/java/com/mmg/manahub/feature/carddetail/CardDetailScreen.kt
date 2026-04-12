@@ -46,6 +46,7 @@ import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.StaleBadge
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.AddToCollectionSheet
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -167,7 +168,9 @@ fun CardDetailScreen(
         uiState.card?.let { card ->
             AddToCollectionSheet(
                 cardName = card.name,
-                onConfirm = { isFoil, isAltArt, condition, language, qty ->
+                cardImage = null,
+                manaCost = card.manaCost,
+                onConfirm = { isFoil: Boolean, isAltArt: Boolean, condition: String, language: String, qty: Int ->
                     viewModel.onAddToCollection(isFoil, isAltArt, condition, language, qty)
                 },
                 onDismiss = viewModel::onDismissAddSheet,
@@ -751,160 +754,6 @@ private fun CopyBadge(label: String) {
 //  Add to collection bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddToCollectionSheet(
-    cardName: String,
-    onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    val languages = listOf("en", "es", "de", "fr", "it", "pt", "ja", "ko", "ru")
-
-    var isFoil by remember { mutableStateOf(false) }
-    var isAlternativeArt by remember { mutableStateOf(false) }
-    var condition by remember { mutableStateOf("NM") }
-    var language by remember { mutableStateOf("en") }
-    var qty by remember { mutableIntStateOf(1) }
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        contentWindowInsets = { WindowInsets(0) },
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.carddetail_add_copy),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = cardName,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            // Foil toggle
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.addcard_confirm_foil),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Switch(checked = isFoil, onCheckedChange = { isFoil = it })
-            }
-
-            // Alternative art toggle
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.carddetail_alternative_art),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Switch(checked = isAlternativeArt, onCheckedChange = { isAlternativeArt = it })
-            }
-
-            // Quantity stepper
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.addcard_confirm_quantity),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(
-                        Icons.Default.Remove,
-                        contentDescription = stringResource(R.string.action_remove)
-                    )
-                }
-                Text("$qty", style = MaterialTheme.typography.titleMedium)
-                IconButton(onClick = { qty++ }) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add)
-                    )
-                }
-            }
-
-            // Condition chips
-            Text(
-                stringResource(R.string.addcard_confirm_condition),
-                style = MaterialTheme.typography.labelLarge
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditions.forEach { c ->
-                    FilterChip(
-                        selected = c == condition,
-                        onClick = { condition = c },
-                        label = { Text(c) },
-                    )
-                }
-            }
-
-            // Language dropdown
-            var langExpanded by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
-                expanded = langExpanded,
-                onExpandedChange = { langExpanded = it },
-            ) {
-                OutlinedTextField(
-                    value = language.uppercase(),
-                    onValueChange = {},
-                    readOnly = true,
-                    label = {
-                        Text(
-                            stringResource(R.string.addcard_confirm_language),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth(),
-                )
-                ExposedDropdownMenu(
-                    expanded = langExpanded,
-                    onDismissRequest = { langExpanded = false },
-                ) {
-                    languages.forEach { lang ->
-                        DropdownMenuItem(
-                            text = { Text(lang.uppercase()) },
-                            onClick = { language = lang; langExpanded = false },
-                        )
-                    }
-                }
-            }
-
-            // Confirm / Cancel
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                Button(onClick = {
-                    onConfirm(
-                        isFoil,
-                        isAlternativeArt,
-                        condition,
-                        language,
-                        qty
-                    )
-                }) {
-                    Text(stringResource(R.string.action_add))
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-        }
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Add to wishlist bottom sheet

@@ -6,6 +6,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -27,7 +29,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.*
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.ui.components.AddToCollectionSheet
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -37,18 +42,65 @@ fun ScannerScreen(
 ) {
     val uiState          by viewModel.uiState.collectAsStateWithLifecycle()
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+    val toastState       = rememberMagicToastState()
+
+    // Auto-launch the system permission dialog the first time the screen opens,
+    // only when the permission has not been granted yet.
+    LaunchedEffect(Unit) {
+        if (!cameraPermission.status.isGranted) {
+            cameraPermission.launchPermissionRequest()
+        }
+    }
+
+    // Show MagicToast when a card has been successfully added.
+    val cardAddedMessage = stringResource(R.string.scanner_card_added)
+    LaunchedEffect(uiState.addedSuccessfully) {
+        if (uiState.addedSuccessfully) {
+            toastState.show(cardAddedMessage, MagicToastType.SUCCESS)
+            viewModel.onSuccessDismissed()
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.scanner_title)) },
-                navigationIcon = {
+            Surface(
+                color    = Color.Black,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                        Icon(
+                            imageVector        = Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            tint               = Color.White
+                        )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black),
-            )
+
+                    Text(
+                        text     = stringResource(R.string.scanner_title),
+                        style    = MaterialTheme.typography.titleLarge,
+                        color    = Color.White,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp)
+                    )
+
+                    IconButton(onClick = viewModel::onToggleFlash) {
+                        Icon(
+                            imageVector = if (uiState.isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                            contentDescription = stringResource(
+                                if (uiState.isFlashOn) R.string.action_flash_off else R.string.action_flash_on
+                            ),
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
         },
     ) { padding ->
         Box(
@@ -58,37 +110,47 @@ fun ScannerScreen(
                 .background(Color.Black),
         ) {
             when {
-                !cameraPermission.status.isGranted -> {
-                    CameraPermissionRequest(onRequest = { cameraPermission.launchPermissionRequest() })
-                }
-                else -> {
-                    CameraPreview(onCardNameDetected = viewModel::onCardNameDetected)
+                cameraPermission.status.isGranted -> {
+                    CameraPreview(
+                        isFlashOn          = uiState.isFlashOn,
+                        onCardNameDetected = viewModel::onCardNameDetected,
+                        onToggleOcr        = viewModel::onToggleOcr,
+                        isOcrEnabled       = uiState.isOcrEnabled,
+                    )
                     ScannerOverlay(
                         detectedName = uiState.detectedName,
                         isSearching  = uiState.isSearching,
                         error        = uiState.error,
+                        isOcrEnabled = uiState.isOcrEnabled,
+                        onToggleOcr  = viewModel::onToggleOcr,
+                    )
+                }
+                // Permission permanently denied — shouldShowRationale stays false after a denial.
+                cameraPermission.status.shouldShowRationale -> {
+                    CameraPermissionRequest(
+                        isPermanentlyDenied = false,
+                        onRequest           = { cameraPermission.launchPermissionRequest() },
+                    )
+                }
+                else -> {
+                    // Not granted and not asking for rationale: permanently denied.
+                    CameraPermissionRequest(
+                        isPermanentlyDenied = true,
+                        onRequest           = { cameraPermission.launchPermissionRequest() },
                     )
                 }
             }
 
-            // Success snackbar
-            if (uiState.addedSuccessfully) {
-                LaunchedEffect(Unit) {
-                    kotlinx.coroutines.delay(1_500)
-                    viewModel.onSuccessDismissed()
-                }
-                Snackbar(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                ) { Text(stringResource(R.string.scanner_card_added)) }
-            }
+            // MagicToast host replaces the old Snackbar
+            MagicToastHost(state = toastState)
         }
     }
 
     // Confirm sheet after successful OCR + Scryfall lookup
     if (uiState.showConfirmSheet && uiState.foundCard != null) {
-        AddCardConfirmSheet(
-            card      = uiState.foundCard!!,
-            onConfirm = { isFoil, condition, language, qty ->
+        AddToCollectionSheet(
+            cardName  = uiState.foundCard!!.name,
+            onConfirm = { isFoil: Boolean, _: Boolean, condition: String, language: String, qty: Int ->
                 viewModel.onConfirmAdd(
                     scryfallId = uiState.foundCard!!.scryfallId,
                     isFoil     = isFoil,
@@ -98,59 +160,105 @@ fun ScannerScreen(
                 )
             },
             onDismiss = viewModel::onDismissConfirmSheet,
+            manaCost  = uiState.foundCard!!.manaCost,
+            cardImage = uiState.foundCard!!.imageArtCrop,
+            closeButton = true
         )
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Camera preview wired to CardNameAnalyzer
+//  - Camera is bound once and held in state; flash uses a separate LaunchedEffect.
+//  - CardNameAnalyzer is created once via remember to avoid costly rebinds.
+//  - A transparent tap overlay drives focus metering and OCR toggle.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun CameraPreview(onCardNameDetected: (String) -> Unit) {
-    val context          = LocalContext.current
-    val lifecycleOwner   = LocalLifecycleOwner.current
+private fun CameraPreview(
+    isFlashOn:          Boolean,
+    onCardNameDetected: (String) -> Unit,
+    onToggleOcr:        () -> Unit,
+    isOcrEnabled:       Boolean,
+) {
+    val context              = LocalContext.current
+    val lifecycleOwner       = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
-    AndroidView(
-        factory = { ctx ->
-            PreviewView(ctx).apply {
-                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-            }
-        },
-        modifier = Modifier.fillMaxSize(),
-        update = { previewView ->
-            val cameraProvider = cameraProviderFuture.get()
+    // Hold camera and PreviewView references so we can control them without rebinding.
+    var camera        by remember { mutableStateOf<Camera?>(null) }
+    var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
 
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
+    // Stable reference to the latest callback — avoids recreating the analyzer on recomposition.
+    val currentOnDetected by rememberUpdatedState(onCardNameDetected)
+    val analyzer = remember { CardNameAnalyzer { name -> currentOnDetected(name) } }
 
-            val imageAnalyzer = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { analysis ->
-                    analysis.setAnalyzer(
-                        ContextCompat.getMainExecutor(previewView.context),
-                        CardNameAnalyzer { name -> onCardNameDetected(name) },
-                    )
+    // Apply torch changes reactively without touching the camera binding.
+    LaunchedEffect(isFlashOn) {
+        camera?.cameraControl?.enableTorch(isFlashOn)
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { ctx ->
+                PreviewView(ctx).apply {
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                }.also { pv ->
+                    previewViewRef = pv
+                    val cameraProvider = cameraProviderFuture.get()
+
+                    val preview = Preview.Builder().build().also {
+                        it.setSurfaceProvider(pv.surfaceProvider)
+                    }
+
+                    val imageAnalysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { analysis ->
+                            analysis.setAnalyzer(
+                                ContextCompat.getMainExecutor(ctx),
+                                analyzer,
+                            )
+                        }
+
+                    try {
+                        cameraProvider.unbindAll()
+                        camera = cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            imageAnalysis,
+                        )
+                    } catch (_: Exception) { }
                 }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
 
-            try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    imageAnalyzer,
-                )
-            } catch (_: Exception) { }
-        },
-    )
+        // Transparent tap overlay: focus camera at tap point + toggle OCR.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        val point = previewViewRef
+                            ?.meteringPointFactory
+                            ?.createPoint(offset.x, offset.y)
+                        if (point != null) {
+                            val action = FocusMeteringAction.Builder(point).build()
+                            camera?.cameraControl?.startFocusAndMetering(action)
+                        }
+                        if (!isOcrEnabled) {
+                            onToggleOcr()
+                        }
+                    }
+                }
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Scanner overlay — guide frame + status feedback
+//  Scanner overlay — guide frame + status feedback + OCR toggle button
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -158,7 +266,11 @@ private fun ScannerOverlay(
     detectedName: String?,
     isSearching:  Boolean,
     error:        String?,
+    isOcrEnabled: Boolean,
+    onToggleOcr:  () -> Unit,
 ) {
+    val accentColor = Color(0xFFC77DFF)
+
     Box(modifier = Modifier.fillMaxSize()) {
 
         // Corner guide frame
@@ -170,7 +282,6 @@ private fun ScannerOverlay(
 
             val cornerLen   = 40f
             val strokeWidth = 3f
-            val accentColor = Color(0xFFC77DFF)
 
             // Top-left
             drawLine(accentColor, Offset(left, top), Offset(left + cornerLen, top), strokeWidth)
@@ -209,13 +320,22 @@ private fun ScannerOverlay(
         )
 
         // Bottom status area
-        Box(
-            modifier        = Modifier
+        Column(
+            modifier          = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(bottom = 40.dp, start = 24.dp, end = 24.dp),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // OCR toggle button — sits above the status chip
+            OcrToggleButton(
+                isOcrEnabled = isOcrEnabled,
+                accentColor  = accentColor,
+                onClick      = onToggleOcr,
+            )
+
+            // Status chip
             when {
                 error != null -> {
                     Surface(
@@ -242,7 +362,7 @@ private fun ScannerOverlay(
                         ) {
                             CircularProgressIndicator(
                                 modifier    = Modifier.size(16.dp),
-                                color       = Color(0xFFC77DFF),
+                                color       = accentColor,
                                 strokeWidth = 2.dp,
                             )
                             Text(
@@ -272,11 +392,55 @@ private fun ScannerOverlay(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  OCR toggle button — shows scanning state and lets user pause/resume OCR
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun OcrToggleButton(
+    isOcrEnabled: Boolean,
+    accentColor:  Color,
+    onClick:      () -> Unit,
+) {
+    val iconTint   = if (isOcrEnabled) accentColor else Color.White.copy(alpha = 0.40f)
+    val labelColor = if (isOcrEnabled) accentColor else Color.White.copy(alpha = 0.40f)
+    val label      = stringResource(
+        if (isOcrEnabled) R.string.scanner_ocr_scanning else R.string.scanner_ocr_paused
+    )
+
+    Surface(
+        onClick = onClick,
+        shape   = RoundedCornerShape(20.dp),
+        color   = Color.Black.copy(alpha = 0.65f),
+    ) {
+        Row(
+            modifier              = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector        = Icons.Default.CropFree,
+                contentDescription = null,
+                tint               = iconTint,
+                modifier           = Modifier.size(18.dp),
+            )
+            Text(
+                text  = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = labelColor,
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Camera permission request
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun CameraPermissionRequest(onRequest: () -> Unit) {
+private fun CameraPermissionRequest(
+    isPermanentlyDenied: Boolean,
+    onRequest:           () -> Unit,
+) {
     Column(
         modifier            = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -289,122 +453,20 @@ private fun CameraPermissionRequest(onRequest: () -> Unit) {
             tint     = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.scanner_permission_rationale), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text  = if (isPermanentlyDenied) {
+                stringResource(R.string.scanner_permission_denied_settings)
+            } else {
+                stringResource(R.string.scanner_permission_rationale)
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onRequest) { Text(stringResource(R.string.scanner_grant_permission)) }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Confirm sheet — reused after OCR identifies the card
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddCardConfirmSheet(
-    card:      Card,
-    onConfirm: (isFoil: Boolean, condition: String, language: String, qty: Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    val languages  = listOf("en", "ja", "de", "fr", "es", "pt", "it", "ko", "ru")
-    var isFoil    by remember { mutableStateOf(false) }
-    var condition by remember { mutableStateOf("NM") }
-    var language  by remember { mutableStateOf("en") }
-    var qty       by remember { mutableIntStateOf(1) }
-
-    val conditionLabels = mapOf(
-        "NM" to stringResource(R.string.addcard_condition_nm),
-        "LP" to stringResource(R.string.addcard_condition_lp),
-        "MP" to stringResource(R.string.addcard_condition_mp),
-        "HP" to stringResource(R.string.addcard_condition_hp),
-        "DMG" to stringResource(R.string.addcard_condition_dmg)
-    )
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier            = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(card.name, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text  = "${card.setName} · ${card.rarity}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            card.priceUsd?.let {
-                Text(
-                    text  = stringResource(R.string.scanner_market_price_usd, it),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
+        // Only show the button when the user can still be prompted (not permanently denied).
+        if (!isPermanentlyDenied) {
+            Button(onClick = onRequest) {
+                Text(stringResource(R.string.scanner_grant_permission))
             }
-            card.priceEur?.let {
-                Text(
-                    text  = stringResource(R.string.scanner_market_price_eur, it),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
-            }
-            HorizontalDivider()
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.addcard_confirm_foil), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = isFoil, onCheckedChange = { isFoil = it })
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.addcard_confirm_quantity), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_remove))
-                }
-                Text("$qty", style = MaterialTheme.typography.titleMedium)
-                IconButton(onClick = { qty++ }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
-                }
-            }
-
-            Text(stringResource(R.string.addcard_confirm_condition), style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditions.forEach { c ->
-                    FilterChip(
-                        selected = c == condition,
-                        onClick = { condition = c },
-                        label = { Text(conditionLabels[c] ?: c) }
-                    )
-                }
-            }
-
-            var expanded by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                OutlinedTextField(
-                    value         = language.uppercase(),
-                    onValueChange = {},
-                    readOnly      = true,
-                    label         = { Text(stringResource(R.string.scanner_language_label)) },
-                    trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                    modifier      = Modifier.menuAnchor().fillMaxWidth(),
-                )
-                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    languages.forEach { lang ->
-                        DropdownMenuItem(
-                            text    = { Text(lang.uppercase()) },
-                            onClick = { language = lang; expanded = false },
-                        )
-                    }
-                }
-            }
-
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                Button(onClick = { onConfirm(isFoil, condition, language, qty) }) {
-                    Text(stringResource(R.string.scanner_add_to_collection))
-                }
-            }
-            Spacer(Modifier.height(16.dp))
         }
     }
 }
