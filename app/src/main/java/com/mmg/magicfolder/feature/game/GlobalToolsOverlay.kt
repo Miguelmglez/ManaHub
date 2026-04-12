@@ -101,6 +101,7 @@ fun GlobalToolsOverlay(
     onExitGame: () -> Unit,
     onManagePlayers: () -> Unit,
     onTournament: (() -> Unit)? = null,
+    turnNumber: Int,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -170,6 +171,13 @@ fun GlobalToolsOverlay(
                                     indication = null,
                                     onClick = onToggle,
                                 )
+                        )
+
+                        Text(
+                            text = "Turn: $turnNumber",
+                            style = MaterialTheme.magicTypography.labelMedium,
+                            color = MaterialTheme.magicColors.goldMtg,
+                            modifier = Modifier.align(Alignment.TopStart)
                         )
                     }
 
