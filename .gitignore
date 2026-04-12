@@ -13,6 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+google-services.json
+app/google-services.json
+GoogleService-Info.plist
 /.claude/agents/android-edge-case-tester.md
 /.claude/agents/android-kotlin-architect.md
 /.claude/agent-memory/android-kotlin-architect/feedback_gameplayscreen.md
