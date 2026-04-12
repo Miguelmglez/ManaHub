@@ -31,7 +31,7 @@ import com.mmg.magicfolder.feature.news.data.local.NewsVideoEntity
         ContentSourceEntity::class,
         DraftSetEntity::class,
     ],
-    version = 20,
+    version = 21,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -284,6 +284,86 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
             index_user_cards_scryfall_id_is_foil_condition_language_is_alternative_art_is_in_wishlist
             ON user_cards (scryfall_id, is_foil, condition, language, is_alternative_art, is_in_wishlist)
         """.trimIndent())
+    }
+}
+
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // Gap migration: version 10→11 had no schema changes recorded.
+        // This entry exists solely so Room does not fall back to destructive
+        // migration for users who happen to be on version 10 with real data.
+    }
+}
+
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // Change the FK on user_cards.scryfall_id from CASCADE to RESTRICT.
+        //
+        // Why: CASCADE silently deletes user collection entries whenever the parent
+        // CardEntity row is replaced (e.g. by an upsert using REPLACE strategy).
+        // RESTRICT makes any attempt to delete a referenced card fail with a
+        // SQLiteConstraintException, forcing the caller to handle the situation
+        // explicitly instead of silently destroying user data.
+        //
+        // SQLite does not support ALTER TABLE ... DROP/ADD FOREIGN KEY, so we
+        // must recreate the table using the standard 12-step SQLite procedure.
+
+        // Step 1 — disable FK enforcement during the operation.
+        database.execSQL("PRAGMA foreign_keys = OFF")
+
+        // Step 2 — create the new table with RESTRICT.
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS user_cards_new (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                scryfall_id       TEXT    NOT NULL,
+                quantity          INTEGER NOT NULL DEFAULT 1,
+                is_foil           INTEGER NOT NULL DEFAULT 0,
+                is_alternative_art INTEGER NOT NULL DEFAULT 0,
+                condition         TEXT    NOT NULL DEFAULT 'NM',
+                language          TEXT    NOT NULL DEFAULT 'en',
+                is_for_trade      INTEGER NOT NULL DEFAULT 0,
+                is_in_wishlist    INTEGER NOT NULL DEFAULT 0,
+                min_trade_value   REAL,
+                notes             TEXT,
+                acquired_at       INTEGER,
+                added_at          INTEGER NOT NULL,
+                FOREIGN KEY(scryfall_id) REFERENCES cards(scryfall_id) ON DELETE RESTRICT
+            )
+        """.trimIndent())
+
+        // Step 3 — copy all existing rows.
+        database.execSQL("""
+            INSERT INTO user_cards_new (
+                id, scryfall_id, quantity, is_foil, is_alternative_art,
+                condition, language, is_for_trade, is_in_wishlist,
+                min_trade_value, notes, acquired_at, added_at
+            )
+            SELECT
+                id, scryfall_id, quantity, is_foil, is_alternative_art,
+                condition, language, is_for_trade, is_in_wishlist,
+                min_trade_value, notes, acquired_at, added_at
+            FROM user_cards
+        """.trimIndent())
+
+        // Step 4 — drop the old table.
+        database.execSQL("DROP TABLE user_cards")
+
+        // Step 5 — rename the new table.
+        database.execSQL("ALTER TABLE user_cards_new RENAME TO user_cards")
+
+        // Step 6 — recreate all indices that were on the original table.
+        database.execSQL("CREATE INDEX IF NOT EXISTS index_user_cards_scryfall_id ON user_cards(scryfall_id)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS index_user_cards_is_for_trade ON user_cards(is_for_trade)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS index_user_cards_is_in_wishlist ON user_cards(is_in_wishlist)")
+        database.execSQL("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            index_user_cards_scryfall_id_is_foil_condition_language_is_alternative_art_is_in_wishlist
+            ON user_cards (scryfall_id, is_foil, condition, language, is_alternative_art, is_in_wishlist)
+        """.trimIndent())
+
+        // Step 7 — re-enable FK enforcement and verify integrity.
+        database.execSQL("PRAGMA foreign_keys = ON")
+        database.execSQL("PRAGMA foreign_key_check(user_cards)")
     }
 }
 

@@ -6,13 +6,38 @@ import com.mmg.magicfolder.core.data.local.entity.CardEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface CardDao {
+abstract class CardDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(card: CardEntity)
+    // ── Safe upsert: INSERT OR IGNORE + UPDATE ────────────────────────────────
+    // Using OnConflictStrategy.REPLACE would internally DELETE then INSERT the
+    // CardEntity row, which triggers the CASCADE DELETE FK on user_cards and
+    // silently wipes every UserCardEntity that references the refreshed card.
+    // INSERT OR IGNORE + @Update avoids the delete entirely.
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(cards: List<CardEntity>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun insertIgnore(card: CardEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun insertAllIgnore(cards: List<CardEntity>): List<Long>
+
+    @Update
+    protected abstract suspend fun updateCard(card: CardEntity)
+
+    @Update
+    protected abstract suspend fun updateAllCards(cards: List<CardEntity>)
+
+    @Transaction
+    open suspend fun upsert(card: CardEntity) {
+        val id = insertIgnore(card)
+        if (id == -1L) updateCard(card)
+    }
+
+    @Transaction
+    open suspend fun upsertAll(cards: List<CardEntity>) {
+        val ids = insertAllIgnore(cards)
+        val toUpdate = cards.filterIndexed { index, _ -> ids[index] == -1L }
+        if (toUpdate.isNotEmpty()) updateAllCards(toUpdate)
+    }
 
     @Query("SELECT * FROM cards WHERE scryfall_id = :id")
     suspend fun getById(id: String): CardEntity?

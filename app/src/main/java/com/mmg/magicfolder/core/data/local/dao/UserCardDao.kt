@@ -6,28 +6,28 @@ import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface UserCardDao {
+abstract class UserCardDao {
 
-    // Returns new row id, or -1 if (scryfall_id, is_foil, condition, language) already exists.
+    // Returns new row id, or -1 if (scryfall_id, is_foil, condition, language, ...) already exists.
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insert(userCard: UserCardEntity): Long
+    abstract suspend fun insert(userCard: UserCardEntity): Long
 
     @Update
-    suspend fun update(userCard: UserCardEntity)
+    abstract suspend fun update(userCard: UserCardEntity)
 
     @Delete
-    suspend fun delete(userCard: UserCardEntity)
+    abstract suspend fun delete(userCard: UserCardEntity)
 
     @Query("DELETE FROM user_cards WHERE id = :id")
-    suspend fun deleteById(id: Long)
+    abstract suspend fun deleteById(id: Long)
 
     @Query("UPDATE user_cards SET quantity = quantity + 1 WHERE id = :id")
-    suspend fun incrementQuantity(id: Long)
+    abstract suspend fun incrementQuantity(id: Long)
 
     @Query("UPDATE user_cards SET quantity = :qty WHERE id = :id")
-    suspend fun updateQuantity(id: Long, qty: Int)
+    abstract suspend fun updateQuantity(id: Long, qty: Int)
 
-    // Called when insert() returns -1 — increments the existing matching row.
+    // Private helper: increments the existing matching row by unique key.
     // is_in_wishlist is part of the unique key so collection and wishlist entries stay separate.
     @Query("""
         UPDATE user_cards SET quantity = quantity + 1
@@ -38,7 +38,7 @@ interface UserCardDao {
         AND   language           = :language
         AND   is_in_wishlist     = :isInWishlist
     """)
-    suspend fun incrementQuantityByUniqueKey(
+    protected abstract suspend fun incrementQuantityByUniqueKey(
         scryfallId:       String,
         isFoil:           Boolean,
         isAlternativeArt: Boolean,
@@ -46,6 +46,29 @@ interface UserCardDao {
         language:         String,
         isInWishlist:     Boolean,
     )
+
+    /**
+     * Atomically inserts the entry or increments its quantity if it already exists.
+     *
+     * The @Transaction ensures the INSERT and conditional UPDATE are executed as a
+     * single SQLite transaction, eliminating the race condition where two concurrent
+     * callers (e.g. double-tap, WorkManager sync) both receive -1L from insert()
+     * and then both fire the increment, resulting in a quantity inflated by 2.
+     */
+    @Transaction
+    open suspend fun insertOrIncrement(userCard: UserCardEntity) {
+        val insertedId = insert(userCard)
+        if (insertedId == -1L) {
+            incrementQuantityByUniqueKey(
+                scryfallId       = userCard.scryfallId,
+                isFoil           = userCard.isFoil,
+                isAlternativeArt = userCard.isAlternativeArt,
+                condition        = userCard.condition,
+                language         = userCard.language,
+                isInWishlist     = userCard.isInWishlist,
+            )
+        }
+    }
 
     // Plain query (no @Relation) so Room returns one row per UserCardEntity,
     // avoiding the collapse that @Transaction/@Relation causes when multiple rows

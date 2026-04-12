@@ -109,36 +109,46 @@ class CardRepositoryImpl @Inject constructor(
     override suspend fun refreshCollectionPrices() {
         val allIds = userCardDao.getAllScryfallIds()
         if (allIds.isEmpty()) return
-        val staleIds = allIds.filter { id ->
-            val c = cardDao.getById(id)
+
+        // Batch-load all cached entries in a single query instead of N getById() calls.
+        val cachedMap = cardDao.getByIds(allIds).associateBy { it.scryfallId }
+        val staleIds  = allIds.filter { id ->
+            val c = cachedMap[id]
             c == null || !CachePolicy.isFresh(c.cachedAt)
         }
         if (staleIds.isEmpty()) return
+
         val result = remote.getCardsBatch(staleIds)
         if (result.isSuccess) {
             val cards = result.getOrThrow()
-            cards.forEach { card ->
-                val existing = cardDao.getById(card.scryfallId)
+
+            // Build all entities first (reads only), then write in a single upsertAll
+            // transaction instead of N individual upsert() calls.
+            val entities = cards.map { card ->
+                val existing = cachedMap[card.scryfallId]
                 val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
-                cardDao.upsert(
-                    card.toEntity().copy(
-                        tags = tagsJson,
-                        userTags = existing?.userTags ?: "[]",
-                        suggestedTags = suggestedJson,
-                    )
+                card.toEntity().copy(
+                    tags          = tagsJson,
+                    userTags      = existing?.userTags ?: "[]",
+                    suggestedTags = suggestedJson,
                 )
             }
-            cards.forEach { cardDao.clearStale(it.scryfallId) }
+            cardDao.upsertAll(entities)
+
+            // Clear stale flag for every card we successfully refreshed.
             val refreshed = cards.map { it.scryfallId }.toSet()
-            (staleIds - refreshed).forEach { id ->
-                val c = cardDao.getById(id) ?: return@forEach
+            refreshed.forEach { cardDao.clearStale(it) }
+
+            // Mark cards that Scryfall did not return in the batch.
+            (staleIds.toSet() - refreshed).forEach { id ->
+                val c = cachedMap[id] ?: return@forEach
                 if (CachePolicy.isStale(c.cachedAt))
                     cardDao.markStale(id, "Not found in Scryfall batch response")
             }
         } else {
             val reason = buildStaleReason(result.exceptionOrNull())
             staleIds.forEach { id ->
-                val c = cardDao.getById(id) ?: return@forEach
+                val c = cachedMap[id] ?: return@forEach
                 if (CachePolicy.isStale(c.cachedAt)) cardDao.markStale(id, reason)
             }
         }

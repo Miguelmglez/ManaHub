@@ -32,17 +32,8 @@ class UserCardRepositoryImpl @Inject constructor(
         userCardDao.observeByScryfallId(scryfallId).map { it.map { entity -> entity.toDomain() } }
 
     override suspend fun addOrIncrement(userCard: UserCard) {
-        val inserted = userCardDao.insert(userCard.toEntity())
-        if (inserted == -1L) {
-            userCardDao.incrementQuantityByUniqueKey(
-                scryfallId       = userCard.scryfallId,
-                isFoil           = userCard.isFoil,
-                isAlternativeArt = userCard.isAlternativeArt,
-                condition        = userCard.condition,
-                language         = userCard.language,
-                isInWishlist     = userCard.isInWishlist,
-            )
-        }
+        // Atomicity is enforced inside UserCardDao.insertOrIncrement() via @Transaction.
+        userCardDao.insertOrIncrement(userCard.toEntity())
     }
 
     override suspend fun updateCard(userCard: UserCard) = userCardDao.update(userCard.toEntity())

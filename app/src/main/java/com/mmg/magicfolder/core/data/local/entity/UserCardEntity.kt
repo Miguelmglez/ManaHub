@@ -8,7 +8,11 @@ import androidx.room.*
         entity        = CardEntity::class,
         parentColumns = ["scryfall_id"],
         childColumns  = ["scryfall_id"],
-        onDelete      = ForeignKey.CASCADE,
+        // RESTRICT: any attempt to DELETE a card that is still referenced in the
+        // user's collection will throw a SQLiteConstraintException immediately,
+        // making data loss loud and explicit instead of silent (CASCADE would
+        // delete the user's collection entries without warning).
+        onDelete      = ForeignKey.RESTRICT,
     )],
     indices = [
         Index("scryfall_id"),
