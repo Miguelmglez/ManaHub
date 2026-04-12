@@ -38,7 +38,7 @@ abstract class UserCardDao {
         AND   language           = :language
         AND   is_in_wishlist     = :isInWishlist
     """)
-    protected abstract suspend fun incrementQuantityByUniqueKey(
+    abstract suspend fun incrementQuantityByUniqueKey(
         scryfallId:       String,
         isFoil:           Boolean,
         isAlternativeArt: Boolean,

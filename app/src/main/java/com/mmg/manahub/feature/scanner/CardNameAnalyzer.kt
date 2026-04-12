@@ -6,6 +6,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.util.concurrent.atomic.AtomicBoolean
 
 class CardNameAnalyzer(
     private val onCardNameDetected: (String) -> Unit,
@@ -15,27 +16,28 @@ class CardNameAnalyzer(
         TextRecognizerOptions.DEFAULT_OPTIONS
     )
 
-    private var isProcessing = false
-    private var lastDetectionTime = 0L
+    // AtomicBoolean ensures compareAndSet is used for the busy-flag check,
+    // avoiding a TOCTOU race between multiple camera background threads.
+    private val isProcessing = AtomicBoolean(false)
+    @Volatile private var lastDetectionTime = 0L
     private val DEBOUNCE_MS = 800L
 
     override fun analyze(imageProxy: ImageProxy) {
-        if (isProcessing) {
+        if (!isProcessing.compareAndSet(false, true)) {
             imageProxy.close()
             return
         }
 
         val now = System.currentTimeMillis()
         if (now - lastDetectionTime < DEBOUNCE_MS) {
+            isProcessing.set(false)
             imageProxy.close()
             return
         }
 
-        isProcessing = true
-
         val mediaImage = imageProxy.image
         if (mediaImage == null) {
-            isProcessing = false
+            isProcessing.set(false)
             imageProxy.close()
             return
         }
@@ -57,7 +59,7 @@ class CardNameAnalyzer(
                 // Ignore individual frame errors
             }
             .addOnCompleteListener {
-                isProcessing = false
+                isProcessing.set(false)
                 imageProxy.close()
             }
     }
@@ -105,16 +107,31 @@ class CardNameAnalyzer(
     }
 
     private fun isRulesText(text: String): Boolean {
-        val rulesKeywords = setOf(
+        // Multi-word phrases are unambiguous — match as substrings.
+        val phraseKeywords = setOf(
+            "when ", "whenever ", "at the beginning",
+            "draw a card", "you may", "each player", "all creatures",
+            "at the end", "at the start",
+        )
+        // Single-word keywords that could also be card names (e.g. "Flash",
+        // "Counter", "Reach") — only treat as rules text when they are NOT the
+        // entire trimmed string (i.e. the line has additional words around them).
+        val singleWordKeywords = setOf(
             "flying", "haste", "trample", "lifelink",
             "deathtouch", "vigilance", "reach", "flash",
-            "when", "whenever", "at the beginning",
             "target", "damage", "destroy", "exile",
-            "draw a card", "tap", "untap", "counter",
-            "you may", "each player", "all creatures",
+            "tap", "untap", "counter",
         )
-        val lower = text.lowercase()
-        return rulesKeywords.any { lower.contains(it) }
+        val lower = text.lowercase().trim()
+
+        // Phrase match — these are never standalone card names.
+        if (phraseKeywords.any { lower.contains(it) }) return true
+
+        // Single-word match — only flag as rules text when the line is NOT
+        // just that one word (pure "Flash" is a card name; "Flash: do X" is not).
+        return singleWordKeywords.any { kw ->
+            lower.contains(kw) && lower != kw
+        }
     }
 
     private fun cleanOcrText(text: String): String? {

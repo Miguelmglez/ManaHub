@@ -83,11 +83,13 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun setAppLanguage(language: AppLanguage) {
         context.userPrefsDataStore.edit { it[KEY_APP_LANGUAGE] = language.code }
-        // Also persist to SharedPreferences for synchronous access in attachBaseContext
+        // Use commit() (blocking) instead of apply() so the write is guaranteed to
+        // be on disk before SettingsViewModel emits appLanguageChanged and the
+        // Activity restarts and reads the value in attachBaseContext.
         context.getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
             .edit()
             .putString("app_language_sync", language.code)
-            .apply()
+            .commit()
     }
 
     override suspend fun setCardLanguage(language: CardLanguage) {

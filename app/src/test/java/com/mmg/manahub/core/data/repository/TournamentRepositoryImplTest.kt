@@ -174,7 +174,7 @@ class TournamentRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given 4 players and ROUND_ROBIN when createTournament then buildMatches generates N*(N-1)_div_2 matches`() = runTest {
+    fun `given 4 players and ROUND_ROBIN when createTournament then buildMatches generates correct match count`() = runTest {
         // Arrange — 4 players: 4*3/2 = 6 unique pairings
         val playerIds = listOf(10L, 20L, 30L, 40L)
         var capturedMatches: List<TournamentMatchEntity> = emptyList()

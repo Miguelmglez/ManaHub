@@ -1,8 +1,10 @@
 package com.mmg.manahub.feature.draft.di
 
 import com.google.gson.Gson
+import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
+import com.mmg.manahub.feature.draft.data.remote.YouTubeApiKeyInterceptor
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import dagger.Binds
 import dagger.Module
@@ -32,12 +34,18 @@ abstract class DraftModule {
         @Provides
         @Singleton
         @Named("youtube")
-        fun provideYouTubeRetrofit(client: OkHttpClient): Retrofit =
-            Retrofit.Builder()
+        fun provideYouTubeRetrofit(client: OkHttpClient): Retrofit {
+            // Build a dedicated OkHttpClient that adds the API key via an interceptor.
+            // This keeps the key out of Retrofit call signatures and Logcat URL logs.
+            val youtubeClient = client.newBuilder()
+                .addInterceptor(YouTubeApiKeyInterceptor(BuildConfig.YOUTUBE_API_KEY))
+                .build()
+            return Retrofit.Builder()
                 .baseUrl("https://www.googleapis.com/youtube/v3/")
-                .client(client)
+                .client(youtubeClient)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
+        }
 
         @Provides
         @Singleton

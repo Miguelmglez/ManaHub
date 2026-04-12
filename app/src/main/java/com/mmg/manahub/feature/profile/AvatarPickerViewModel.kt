@@ -60,8 +60,19 @@ class AvatarPickerViewModel @Inject constructor(
     }
 
     fun loadNextPage() {
-        if (!_uiState.value.hasMore || _uiState.value.isLoading) return
-        _uiState.update { it.copy(currentPage = it.currentPage + 1) }
+        // Guard and page-increment must both happen atomically via update{} so
+        // that two rapid taps cannot both pass the isLoading check and both
+        // increment the page counter before either coroutine sets isLoading=true.
+        var shouldLoad = false
+        _uiState.update { s ->
+            if (!s.hasMore || s.isLoading) {
+                s // leave state unchanged; shouldLoad stays false
+            } else {
+                shouldLoad = true
+                s.copy(currentPage = s.currentPage + 1, isLoading = true)
+            }
+        }
+        if (!shouldLoad) return
         loadPlaneswalkers(append = true)
     }
 

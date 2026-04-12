@@ -9,9 +9,7 @@ import com.mmg.manahub.feature.game.model.GameMode
 import com.mmg.manahub.feature.game.model.GameResult
 import com.mmg.manahub.feature.game.model.Player
 import com.mmg.manahub.feature.game.model.PlayerResult
-import io.mockk.coVerify
-import io.mockk.mockk
-import io.mockk.slot
+import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -295,7 +293,7 @@ class SurveyViewModelTest {
         val qs = newVm.uiState.value.questions
         if (qs.isEmpty()) return@runTest
 
-        io.mockk.coEvery { newDao.insertAnswers(io.mockk.capture(capturedEntities)) } returns Unit
+        coEvery { newDao.insertAnswers(capture(capturedEntities)) } returns Unit
 
         // Act
         qs.forEach { q -> newVm.answerAndAdvance(q.id, "DOMINANT") }
@@ -320,7 +318,7 @@ class SurveyViewModelTest {
         if (qs.isEmpty()) return@runTest
 
         val firstQuestion = qs.first()
-        io.mockk.coEvery { newDao.insertAnswers(io.mockk.capture(capturedEntities)) } returns Unit
+        coEvery { newDao.insertAnswers(capture(capturedEntities)) } returns Unit
 
         // Act
         newVm.answerAndAdvance(firstQuestion.id, "LUCKY")
