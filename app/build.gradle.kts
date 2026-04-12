@@ -15,7 +15,7 @@ if (localPropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.mmg.magicfolder"
+    namespace = "com.mmg.manahub"
     compileSdk = 36
 
     defaultConfig {
@@ -103,6 +103,8 @@ dependencies {
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.room.testing)
+    androidTestImplementation(libs.coroutines.test)
 
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)

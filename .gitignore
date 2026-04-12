@@ -22,3 +22,14 @@ local.properties
 /.claude/agent-memory/mobile-game-ui-designer/MEMORY.md
 /.claude/agents/mobile-game-ui-designer.md
 /.claude/agent-memory/android-kotlin-architect/MEMORY.md
+/.claude/agent-memory/android-db-architect/MEMORY.md
+/.claude/agent-memory/android-unit-test-writer/MEMORY.md
+/.claude/agent-memory/android-unit-test-writer/project_architecture.md
+/.claude/agent-memory/android-db-architect/project_data_safety_fixes.md
+/.claude/agent-memory/android-db-architect/project_db_schema.md
+/.claude/agent-memory/android-unit-test-writer/testing_conventions.md
+/.claude/agent-memory/android-db-architect/feedback_dao_patterns.md
+/.claude/agent-memory/android-unit-test-writer/cascade_bug.md
+/.claude/agents/android-unit-test-writer.md
+/.claude/agents/android-db-architect.md
+/.claude/
