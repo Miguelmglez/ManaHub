@@ -71,8 +71,8 @@ fun CardDetailScreen(
                     event.message,
                     when (event.severity) {
                         ToastSeverity.SUCCESS -> MagicToastType.SUCCESS
-                        ToastSeverity.INFO    -> MagicToastType.INFO
-                        ToastSeverity.ERROR   -> MagicToastType.ERROR
+                        ToastSeverity.INFO -> MagicToastType.INFO
+                        ToastSeverity.ERROR -> MagicToastType.ERROR
                     },
                 )
             }
@@ -81,70 +81,70 @@ fun CardDetailScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
-    Scaffold(
-        topBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+        Scaffold(
+            topBar = {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 3.dp
                 ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back)
+                            )
+                        }
+                        Text(
+                            text = uiState.card?.name ?: "",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Text(
-                        text = uiState.card?.name ?: "",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
+            }
+
+        ) { padding ->
+            when {
+                uiState.isLoading -> Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator() }
+
+                uiState.card != null -> CardDetailContent(
+                    card = uiState.card!!,
+                    userCards = uiState.userCards,
+                    decksContainingCard = uiState.decksContainingCard,
+                    isStale = uiState.isStale,
+                    onRemoveAutoTag = viewModel::onRemoveTag,
+                    onAddUserTag = viewModel::onAddUserTag,
+                    onRemoveUserTag = viewModel::onRemoveUserTag,
+                    onShowTagPicker = viewModel::onShowTagPicker,
+                    onConfirmSuggestedTag = viewModel::onConfirmSuggestedTag,
+                    onDismissSuggestedTag = viewModel::onDismissSuggestedTag,
+                    onShowAddSheet = viewModel::onShowAddSheet,
+                    onShowWishlistSheet = viewModel::onShowWishlistSheet,
+                    onShowTradeSheet = viewModel::onShowTradeSheet,
+                    onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
+                    onRequestDelete = viewModel::onRequestDelete,
+                    onNavigateToDeck = onNavigateToDeck,
+                    modifier = Modifier.padding(padding),
+                )
             }
         }
 
-    ) { padding ->
-        when {
-            uiState.isLoading -> Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
-
-            uiState.card != null -> CardDetailContent(
-                card = uiState.card!!,
-                userCards = uiState.userCards,
-                decksContainingCard = uiState.decksContainingCard,
-                isStale = uiState.isStale,
-                onRemoveAutoTag = viewModel::onRemoveTag,
-                onAddUserTag = viewModel::onAddUserTag,
-                onRemoveUserTag = viewModel::onRemoveUserTag,
-                onShowTagPicker = viewModel::onShowTagPicker,
-                onConfirmSuggestedTag = viewModel::onConfirmSuggestedTag,
-                onDismissSuggestedTag = viewModel::onDismissSuggestedTag,
-                onShowAddSheet = viewModel::onShowAddSheet,
-                onShowWishlistSheet = viewModel::onShowWishlistSheet,
-                onShowTradeSheet = viewModel::onShowTradeSheet,
-                onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
-                onRequestDelete = viewModel::onRequestDelete,
-                onNavigateToDeck = onNavigateToDeck,
-                modifier = Modifier.padding(padding),
-            )
-        }
-    }
-
-    // Toast overlay — sits above the Scaffold
-    MagicToastHost(state = toastState)
+        // Toast overlay — sits above the Scaffold
+        MagicToastHost(state = toastState)
 
     } // end Box
 
@@ -282,7 +282,9 @@ private fun CardDetailContent(
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
-                        text = if (showBackFace) stringResource(R.string.carddetail_flip_see_front) else stringResource(R.string.carddetail_flip_see_back),
+                        text = if (showBackFace) stringResource(R.string.carddetail_flip_see_front) else stringResource(
+                            R.string.carddetail_flip_see_back
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
@@ -334,8 +336,8 @@ private fun CardDetailContent(
                 ),
             ) {
                 OracleText(
-                    text     = oracleDisplayText,
-                    style    = MaterialTheme.typography.bodyMedium,
+                    text = oracleDisplayText,
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(12.dp),
                 )
             }
@@ -411,7 +413,7 @@ private fun CardDetailContent(
         if (decksContainingCard.isNotEmpty()) {
             HorizontalDivider()
             FoundInDecksSection(
-                decks           = decksContainingCard,
+                decks = decksContainingCard,
                 onNavigateToDeck = onNavigateToDeck,
             )
         }
@@ -438,30 +440,32 @@ private fun CardDetailContent(
 
 @Composable
 private fun FoundInDecksSection(
-    decks:            List<Deck>,
+    decks: List<Deck>,
     onNavigateToDeck: (Long) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
 
     Column(
-        modifier            = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            verticalAlignment     = Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
-                imageVector        = Icons.Default.LibraryBooks,
+                imageVector = Icons.Default.LibraryBooks,
                 contentDescription = null,
-                tint               = mc.primaryAccent,
-                modifier           = Modifier.size(16.dp),
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(16.dp),
             )
             Text(
-                text  = stringResource(
+                text = stringResource(
                     R.string.carddetail_found_in_decks,
                     decks.size,
-                    if (decks.size == 1) stringResource(R.string.carddetail_deck) else stringResource(R.string.carddetail_decks)
+                    if (decks.size == 1) stringResource(R.string.carddetail_deck) else stringResource(
+                        R.string.carddetail_decks
+                    )
                 ),
                 style = MaterialTheme.typography.titleSmall,
                 color = mc.textPrimary,
@@ -481,49 +485,49 @@ private fun DeckChip(deck: Deck, onClick: () -> Unit) {
 
     Surface(
         onClick = onClick,
-        color   = mc.surface,
-        shape   = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-        border  = androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
+        color = mc.surface,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier          = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Icon(
-                imageVector        = Icons.Default.LibraryBooks,
+                imageVector = Icons.Default.LibraryBooks,
                 contentDescription = null,
-                tint               = mc.primaryAccent,
-                modifier           = Modifier.size(18.dp),
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(18.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text     = deck.name,
-                    style    = ty.bodyMedium,
-                    color    = mc.textPrimary,
+                    text = deck.name,
+                    style = ty.bodyMedium,
+                    color = mc.textPrimary,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
                 Surface(
-                    color  = mc.primaryAccent.copy(alpha = 0.12f),
-                    shape  = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                    color = mc.primaryAccent.copy(alpha = 0.12f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
                 ) {
                     Text(
-                        text     = deck.format.replaceFirstChar { it.uppercase() },
-                        style    = ty.labelSmall,
-                        color    = mc.primaryAccent,
+                        text = deck.format.replaceFirstChar { it.uppercase() },
+                        style = ty.labelSmall,
+                        color = mc.primaryAccent,
                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                     )
                 }
             }
             Icon(
-                imageVector        = Icons.Default.ChevronRight,
+                imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint               = mc.textDisabled,
-                modifier           = Modifier.size(16.dp),
+                tint = mc.textDisabled,
+                modifier = Modifier.size(16.dp),
             )
         }
     }
@@ -558,32 +562,38 @@ private fun CollectionSection(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = onShowWishlistSheet,
+                border = BorderStroke(1.dp, MaterialTheme.magicColors.goldMtg),
                 modifier = Modifier.height(32.dp),
             ) {
                 Icon(
                     Icons.Default.Bookmark,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.magicColors.goldMtg
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
                     stringResource(R.string.carddetail_add_to_wishlist),
-                    style = MaterialTheme.typography.labelSmall
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.magicColors.goldMtg
                 )
             }
             OutlinedButton(
                 onClick = onShowAddSheet,
+                border = BorderStroke(1.dp, MaterialTheme.magicColors.primaryAccent),
                 modifier = Modifier.height(32.dp),
             ) {
                 Icon(
                     Icons.Default.Add,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp)
+                    tint = MaterialTheme.magicColors.primaryAccent,
+                    modifier = Modifier.size(14.dp),
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
                     stringResource(R.string.carddetail_add_copy),
-                    style = MaterialTheme.typography.labelSmall
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.magicColors.primaryAccent
                 )
             }
         }
@@ -608,17 +618,20 @@ private fun CollectionSection(
         // "Offer for trade" button — only shown when there are collection copies
         OutlinedButton(
             onClick = onShowTradeSheet,
+            border = BorderStroke(1.dp, MaterialTheme.magicColors.secondaryAccent),
             modifier = Modifier.height(32.dp),
         ) {
             Icon(
                 Icons.Default.SwapHoriz,
                 contentDescription = null,
+                tint = MaterialTheme.magicColors.secondaryAccent,
                 modifier = Modifier.size(14.dp)
             )
             Spacer(Modifier.width(4.dp))
             Text(
                 stringResource(R.string.carddetail_offer_for_trade),
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.magicColors.secondaryAccent
             )
         }
     }
@@ -1225,7 +1238,9 @@ private fun LegalityChip(format: String, legality: String) {
         ) {
             Text(format, style = MaterialTheme.typography.labelSmall)
             Text(
-                text = if (isLegal) stringResource(R.string.carddetail_legality_legal) else stringResource(R.string.carddetail_legality_not_legal),
+                text = if (isLegal) stringResource(R.string.carddetail_legality_legal) else stringResource(
+                    R.string.carddetail_legality_not_legal
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isLegal) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1295,7 +1310,10 @@ private fun TagsSection(
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.carddetail_tags_remove_description, tag.label),
+                                        contentDescription = stringResource(
+                                            R.string.carddetail_tags_remove_description,
+                                            tag.label
+                                        ),
                                         modifier = Modifier.size(14.dp),
                                     )
                                 },
@@ -1343,7 +1361,10 @@ private fun TagsSection(
                                 trailingIcon = {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.carddetail_tags_remove_description, tag.label),
+                                        contentDescription = stringResource(
+                                            R.string.carddetail_tags_remove_description,
+                                            tag.label
+                                        ),
                                         modifier = Modifier.size(14.dp),
                                     )
                                 },
@@ -1369,7 +1390,10 @@ private fun TagsSection(
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.carddetail_tags_add_button), style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        stringResource(R.string.carddetail_tags_add_button),
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
             } else if (!hasAnyTag) {
                 Text(
@@ -1434,8 +1458,8 @@ private fun SuggestedTagsSection(
                 suggestions.forEach { sug ->
                     SuggestedTagCard(
                         suggestion = sug,
-                        onConfirm  = { onConfirm(sug.tag) },
-                        onDismiss  = { onDismiss(sug.tag) },
+                        onConfirm = { onConfirm(sug.tag) },
+                        onDismiss = { onDismiss(sug.tag) },
                     )
                 }
             }
@@ -1454,15 +1478,15 @@ private fun SuggestedTagCard(
     val pct = (suggestion.confidence * 100).toInt()
 
     Surface(
-        shape  = RoundedCornerShape(12.dp),
-        color  = mc.surface,
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
         border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             // Tag name + confidence bar
             Row(
-                verticalAlignment    = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Small tag icon dot
@@ -1507,7 +1531,11 @@ private fun SuggestedTagCard(
                     border = BorderStroke(0.8.dp, mc.lifeNegative.copy(alpha = 0.4f)),
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.action_discard), style = ty.labelSmall)
                 }
@@ -1519,13 +1547,20 @@ private fun SuggestedTagCard(
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = mc.lifePositive.copy(alpha = 0.15f),
-                        contentColor   = mc.lifePositive,
+                        contentColor = mc.lifePositive,
                     ),
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.carddetail_tags_suggested_confirm), style = ty.labelSmall)
+                    Text(
+                        stringResource(R.string.carddetail_tags_suggested_confirm),
+                        style = ty.labelSmall
+                    )
                 }
             }
         }
@@ -1573,7 +1608,7 @@ private fun TagPickerSheet(
     var showNewCategoryDialog by remember { mutableStateOf(false) }
 
     // ── Edit user-defined tag state ───────────────────────────────────────────
-    var editingTagKey   by remember { mutableStateOf<String?>(null) }
+    var editingTagKey by remember { mutableStateOf<String?>(null) }
     var editingTagLabel by remember { mutableStateOf("") }
 
     ModalBottomSheet(
@@ -1587,7 +1622,10 @@ private fun TagPickerSheet(
         ) {
             // ── Header ──────────────────────────────────────────────────────
             item {
-                Text(stringResource(R.string.carddetail_tags_picker_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.carddetail_tags_picker_title),
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
 
             // ── Custom tag creator ───────────────────────────────────────────
@@ -1652,7 +1690,14 @@ private fun TagPickerSheet(
                 val userDefined =
                     userDefinedTags.filter { it.categoryKey == category.name }
                 val items = canonical.map { TagItem(it.key, it.label, isUserDefined = false) } +
-                        userDefined.map { TagItem(it.key, it.label, isUserDefined = true, isApplied = it.key in userTagKeys) }
+                        userDefined.map {
+                            TagItem(
+                                it.key,
+                                it.label,
+                                isUserDefined = true,
+                                isApplied = it.key in userTagKeys
+                            )
+                        }
                 if (items.isNotEmpty()) {
                     item(key = "cat_${category.name}") {
                         TagPickerSection(
@@ -1678,7 +1723,14 @@ private fun TagPickerSheet(
             userCustomCategoryKeys.forEach { categoryKey ->
                 val items = userDefinedTags
                     .filter { it.categoryKey == categoryKey }
-                    .map { TagItem(it.key, it.label, isUserDefined = true, isApplied = it.key in userTagKeys) }
+                    .map {
+                        TagItem(
+                            it.key,
+                            it.label,
+                            isUserDefined = true,
+                            isApplied = it.key in userTagKeys
+                        )
+                    }
                 if (items.isNotEmpty()) {
                     item(key = "custom_$categoryKey") {
                         TagPickerSection(
@@ -1724,7 +1776,9 @@ private fun TagPickerSheet(
                 ) { Text(stringResource(R.string.action_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { editingTagKey = null }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = {
+                    editingTagKey = null
+                }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -1798,7 +1852,12 @@ private fun CustomTagCreatorSection(
                 item {
                     SuggestionChip(
                         onClick = onNewCategoryClick,
-                        label = { Text(stringResource(R.string.carddetail_new_tag_button), style = MaterialTheme.typography.labelSmall) },
+                        label = {
+                            Text(
+                                stringResource(R.string.carddetail_new_tag_button),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        },
                     )
                 }
             }
@@ -1828,64 +1887,75 @@ private fun TagPickerSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text  = title,
+            text = title,
             style = ty.labelLarge,
             color = mc.textSecondary,
         )
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement   = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             tags.forEach { tag ->
                 if (tag.isUserDefined && (onEdit != null || onDelete != null)) {
                     // User-defined tag: chip + edit + delete icons in a small row
                     Surface(
-                        shape  = RoundedCornerShape(20.dp),
-                        color  = mc.surface,
+                        shape = RoundedCornerShape(20.dp),
+                        color = mc.surface,
                         border = BorderStroke(0.5.dp, mc.surfaceVariant),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
+                            modifier = Modifier.padding(
+                                start = 10.dp,
+                                end = 2.dp,
+                                top = 4.dp,
+                                bottom = 4.dp
+                            ),
                         ) {
                             Text(
                                 tag.label,
-                                style    = ty.labelSmall,
-                                color    = if (tag.isApplied) mc.textDisabled else mc.textPrimary,
+                                style = ty.labelSmall,
+                                color = if (tag.isApplied) mc.textDisabled else mc.textPrimary,
                                 modifier = if (!tag.isApplied) Modifier.clickable { onAdd(tag.key) } else Modifier,
                             )
                             if (tag.isApplied) {
                                 Icon(
-                                    imageVector        = Icons.Default.Check,
+                                    imageVector = Icons.Default.Check,
                                     contentDescription = null,
-                                    tint               = mc.lifePositive,
-                                    modifier           = Modifier
+                                    tint = mc.lifePositive,
+                                    modifier = Modifier
                                         .padding(start = 4.dp)
                                         .size(13.dp),
                                 )
                             }
                             if (onEdit != null) {
                                 IconButton(
-                                    onClick  = { onEdit(tag.key) },
+                                    onClick = { onEdit(tag.key) },
                                     modifier = Modifier.size(28.dp),
                                 ) {
                                     Icon(
                                         Icons.Default.Edit,
-                                        contentDescription = stringResource(R.string.carddetail_edit_tag_description, tag.label),
-                                        tint     = mc.textSecondary,
+                                        contentDescription = stringResource(
+                                            R.string.carddetail_edit_tag_description,
+                                            tag.label
+                                        ),
+                                        tint = mc.textSecondary,
                                         modifier = Modifier.size(13.dp),
                                     )
                                 }
                             }
                             if (onDelete != null) {
                                 IconButton(
-                                    onClick  = { onDelete(tag.key) },
+                                    onClick = { onDelete(tag.key) },
                                     modifier = Modifier.size(28.dp),
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.carddetail_delete_tag_description, tag.label),
-                                        tint     = mc.lifeNegative.copy(alpha = 0.7f),
+                                        contentDescription = stringResource(
+                                            R.string.carddetail_delete_tag_description,
+                                            tag.label
+                                        ),
+                                        tint = mc.lifeNegative.copy(alpha = 0.7f),
                                         modifier = Modifier.size(13.dp),
                                     )
                                 }
@@ -1896,7 +1966,7 @@ private fun TagPickerSection(
                     // Built-in tag: standard suggestion chip
                     SuggestionChip(
                         onClick = { onAdd(tag.key) },
-                        label   = { Text(tag.label, style = ty.labelSmall) },
+                        label = { Text(tag.label, style = ty.labelSmall) },
                     )
                 }
             }
