@@ -19,7 +19,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.mmg.magicfolder"
+        applicationId = "com.mmg.manahub"
         minSdk = 29
         targetSdk = 35
         versionCode = 1

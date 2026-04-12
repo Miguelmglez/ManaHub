@@ -13,6 +13,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -62,10 +64,15 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     var showAvatarPicker by remember { mutableStateOf(false) }
+    var showFeedbackSheet by remember { mutableStateOf(false) }
     // Recreate activity when app language changes
 
     if (showAvatarPicker) {
         AvatarPickerSheet(onDismiss = { showAvatarPicker = false })
+    }
+
+    if (showFeedbackSheet) {
+        FeedbackSheet(onDismiss = { showFeedbackSheet = false })
     }
 
     Scaffold(
@@ -173,6 +180,14 @@ fun ProfileScreen(
                         viewModel = viewModel
                     )
                 }
+            }
+
+            // ── Send feedback ─────────────────────────────────────────────────
+            item {
+                SendFeedbackRow(
+                    onClick  = { showFeedbackSheet = true },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
 
             // ── Footer ────────────────────────────────────────────────────────
@@ -876,6 +891,55 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
             color = mc.textDisabled,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+// ── Send Feedback row ─────────────────────────────────────────────────────────
+
+/**
+ * A tappable row that opens the feedback sheet.
+ *
+ * Styled consistently with the rest of the profile screen — icon on the left,
+ * label in the centre, and a chevron arrow on the right.
+ */
+@Composable
+private fun SendFeedbackRow(
+    onClick:  () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        onClick   = onClick,
+        modifier  = modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(12.dp),
+        color     = mc.surface,
+    ) {
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector        = Icons.AutoMirrored.Filled.Send,
+                contentDescription = null,
+                tint               = mc.primaryAccent,
+                modifier           = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text     = stringResource(R.string.feedback_title),
+                style    = MaterialTheme.magicTypography.bodyMedium,
+                color    = mc.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector        = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint               = mc.textDisabled,
+                modifier           = Modifier.size(20.dp),
+            )
+        }
     }
 }
 

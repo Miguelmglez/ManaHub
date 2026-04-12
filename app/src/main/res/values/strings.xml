@@ -30,6 +30,8 @@
     <string name="action_share">Share</string>
     <string name="action_copy">Copy</string>
     <string name="action_play_again">Play Again</string>
+    <string name="action_flash_on">Turn flash on</string>
+    <string name="action_flash_off">Turn flash off</string>
 
     <!-- Estados genéricos -->
     <string name="state_loading">Loading…</string>
@@ -86,8 +88,8 @@
     <string name="addcard_search_min_chars">Type at least 2 characters to search</string>
     <string name="addcard_no_results">No cards found</string>
     <string name="addcard_no_results_subtitle">Try searching in another language\nor check the spelling</string>
-    <string name="addcard_scanner_title">Scan card barcode</string>
-    <string name="addcard_scanner_subtitle">Point the camera at cards name</string>
+    <string name="addcard_scanner_title">Scan card</string>
+    <string name="addcard_scanner_subtitle">Point the camera at cards art</string>
     <string name="addcard_scanner_button">Open Scanner</string>
     <string name="addcard_confirm_title">Add</string>
     <string name="addcard_confirm_quantity">Quantity</string>
@@ -206,13 +208,16 @@
     <string name="scanner_title">Scan card</string>
     <string name="scanner_grant_permission">Grant permission</string>
     <string name="scanner_permission_rationale">Camera access needed to scan cards</string>
-    <string name="scanner_instruction_point">Point at the card name</string>
+    <string name="scanner_instruction_point">Hold the art card inside the box</string>
     <string name="scanner_instruction_steady">Hold card steady in good light</string>
     <string name="scanner_market_price_usd">Market price: $%1$.2f</string>
     <string name="scanner_market_price_eur">Market price: %1$.2f€</string>
     <string name="scanner_language_label">Language</string>
     <string name="scanner_card_added">Card added to collection!</string>
     <string name="scanner_add_to_collection">Add to collection</string>
+    <string name="scanner_ocr_scanning">Scanning</string>
+    <string name="scanner_ocr_paused">Paused</string>
+    <string name="scanner_permission_denied_settings">Camera permission denied. Open Settings to enable it.</string>
 
     <!-- ══════════════════════════════════════════
          SYNERGY SCREEN
@@ -964,5 +969,19 @@
     <string name="deck_import_button">Import</string>
     <string name="deck_import_button_setup">Import deck list</string>
     <string name="deck_export_share_label">Share deck list</string>
+
+    <!-- ══════════════════════════════════════════
+         FEEDBACK SHEET
+    ═══════════════════════════════════════════ -->
+    <string name="feedback_title">Send feedback</string>
+    <string name="feedback_hint">Describe your issue or suggestion…</string>
+    <string name="feedback_attach">Attach screenshot (optional)</string>
+    <string name="feedback_send">Send feedback</string>
+    <string name="feedback_cancel">Cancel</string>
+    <string name="feedback_char_count">%1$d / 2000</string>
+    <string name="feedback_empty_error">Please write a message before sending.</string>
+    <string name="feedback_invalid_file">Invalid file. Please select a JPG, PNG, or WebP image under 10 MB.</string>
+    <string name="feedback_sent">Feedback sent — thank you!</string>
+    <string name="feedback_chooser_title">Send feedback via…</string>
 
 </resources>

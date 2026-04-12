@@ -15,8 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ScannerViewModel @Inject constructor(
-    private val searchCards:    SearchCardsUseCase,
-    private val searchCard:     SearchCardUseCase,
+    private val searchCards:     SearchCardsUseCase,
+    private val searchCard:      SearchCardUseCase,
     private val addToCollection: AddCardToCollectionUseCase,
 ) : ViewModel() {
 
@@ -25,10 +25,14 @@ class ScannerViewModel @Inject constructor(
 
     private var searchJob: Job? = null
 
-    // Called by CardNameAnalyzer when a card name is detected via OCR
+    /**
+     * Called by CardNameAnalyzer when a card name is detected via OCR.
+     * Ignored when [ScannerUiState.isOcrEnabled] is false.
+     */
     fun onCardNameDetected(name: String) {
         val trimmed = name.trim()
         if (trimmed.isBlank()) return
+        if (!_uiState.value.isOcrEnabled) return
         val state = _uiState.value
         if (state.foundCard != null || state.showConfirmSheet) return
         if (trimmed == state.detectedName) return
@@ -66,8 +70,8 @@ class ScannerViewModel @Inject constructor(
                     }
                     is DataResult.Error -> {
                         _uiState.update { it.copy(
-                            isSearching  = false,
-                            error        = "Card not found: \"$trimmed\"",
+                            isSearching = false,
+                            error       = "Card not found: \"$trimmed\"",
                         )}
                         delay(2_000)
                         _uiState.update { it.copy(detectedName = null, error = null) }
@@ -89,7 +93,13 @@ class ScannerViewModel @Inject constructor(
         quantity:   Int,
     ) {
         viewModelScope.launch {
-            when (val result = addToCollection(scryfallId = scryfallId, isFoil = isFoil, condition = condition, language = language, quantity = quantity)) {
+            when (val result = addToCollection(
+                scryfallId = scryfallId,
+                isFoil     = isFoil,
+                condition  = condition,
+                language   = language,
+                quantity   = quantity,
+            )) {
                 is DataResult.Success -> _uiState.update {
                     it.copy(
                         showConfirmSheet  = false,
@@ -97,6 +107,8 @@ class ScannerViewModel @Inject constructor(
                         addedSuccessfully = true,
                         isScanning        = true,
                         detectedName      = null,
+                        // Disable OCR after adding to prevent immediately re-scanning the same card
+                        isOcrEnabled      = false,
                     )
                 }
                 is DataResult.Error -> _uiState.update {
@@ -106,8 +118,20 @@ class ScannerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Resets scanner state after dismiss, but preserves the flash torch preference.
+     */
     fun onDismissConfirmSheet() {
-        _uiState.update { ScannerUiState() }
+        _uiState.update { ScannerUiState(isFlashOn = it.isFlashOn) }
+    }
+
+    fun onToggleFlash() {
+        _uiState.update { it.copy(isFlashOn = !it.isFlashOn) }
+    }
+
+    /** Toggles OCR on/off — also wired to tap-to-focus gesture on the preview. */
+    fun onToggleOcr() {
+        _uiState.update { it.copy(isOcrEnabled = !it.isOcrEnabled) }
     }
 
     fun onSuccessDismissed() = _uiState.update { it.copy(addedSuccessfully = false) }
