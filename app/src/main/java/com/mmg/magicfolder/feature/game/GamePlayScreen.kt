@@ -15,12 +15,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -84,23 +86,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.magicfolder.R
 import com.mmg.magicfolder.core.ui.components.ManaSymbolImage
-import com.mmg.magicfolder.core.ui.theme.MagicTheme
 import com.mmg.magicfolder.core.ui.theme.MarcellusFontFamily
 import com.mmg.magicfolder.core.ui.theme.PlayerTheme
 import com.mmg.magicfolder.core.ui.theme.PlayerThemeColors
 import com.mmg.magicfolder.core.ui.theme.ThemeBackground
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.style.LineHeightStyle
 import com.mmg.magicfolder.core.ui.theme.coloredShadow
 import com.mmg.magicfolder.core.ui.theme.magicColors
 import com.mmg.magicfolder.core.ui.theme.magicTypography
@@ -598,6 +598,7 @@ private fun GamePlayerGrid(
             onExitGame = onExitGame,
             onManagePlayers = onManagePlayers,
             onTournament = onTournament,
+            turnNumber = turnNumber,
             modifier = Modifier
                 .align(Alignment.Center)
                 .wrapContentSize(),
@@ -641,21 +642,6 @@ private fun PlayerCard(
         else -> mc.textPrimary
     }
 
-    // Active glow pulse — only computed for the active player
-    val glowAlpha: Float = if (isActive) {
-        val infiniteTransition = rememberInfiniteTransition(label = "activeGlow_${player.id}")
-        val anim by infiniteTransition.animateFloat(
-            initialValue = 0.40f,
-            targetValue = 0.75f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "glowAlpha_${player.id}",
-        )
-        anim
-    } else 0.25f
-
     BoxWithConstraints(
         modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
         contentAlignment = Alignment.Center,
@@ -678,21 +664,12 @@ private fun PlayerCard(
             CardTier.LARGE -> 6.dp; CardTier.SMALL -> 4.dp; CardTier.TINY -> 2.dp
         }
 
-        Box(
-            modifier = Modifier
-                .requiredSize(width = cardWidth, height = cardHeight)
-                .graphicsLayer { rotationZ = rotation.toFloat() }
-                .coloredShadow(
-                    color = theme.accent.copy(alpha = glowAlpha),
-                    blurRadius = if (isActive) 28.dp else 20.dp,
-                )
-                .clip(RoundedCornerShape(16.dp))
-                .background(theme.background)
-                .border(
-                    width = if (isActive) 2.5.dp else 0.5.dp,
-                    color = theme.accent.copy(alpha = if (isActive) 1.0f else 0.40f),
-                    shape = RoundedCornerShape(16.dp),
-                )
+        PlayerCardSurface(
+            isActive = isActive,
+            theme = theme,
+            rotation = rotation,
+            cardWidth = cardWidth,
+            cardHeight = cardHeight,
         ) {
             ThemeBackground(modifier = Modifier.matchParentSize())
 
@@ -758,34 +735,15 @@ private fun PlayerCard(
                     val iconSize = when (tier) {
                         CardTier.LARGE -> 32.dp; CardTier.SMALL -> 24.dp; CardTier.TINY -> 18.dp
                     }
-                    val iconPadding = when (tier) {
-                        CardTier.LARGE -> 56.dp; CardTier.SMALL -> 36.dp; CardTier.TINY -> 24.dp
-                    }
 
-                    // 1. Chips aligned to start
-                    Column(
-                        modifier = Modifier.align(Alignment.CenterStart),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        horizontalAlignment = Alignment.Start,
-                    ) {
-                        if (tier != CardTier.TINY) {
-                            PlayerCounterChips(
-                                player = player,
-                                theme = theme,
-                                tier = tier,
-                                maxChips = if (tier == CardTier.LARGE) 3 else 2,
-                            )
-                        }
-                    }
-
-                    // 2. Life group centered: Icons aligned to the Text (the largest element)
+                    // 2. Life group: Using weights to ensure the Text is ALWAYS at the absolute center
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
                     ) {
-                        // Left container for Landscape icon
+                        // Left container: occupies 1/2 of remaining space, icon aligned to end (near text)
                         Box(
-                            modifier = Modifier.width(iconSize + iconPadding),
+                            modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             if (isActive && tier != CardTier.TINY) {
@@ -825,16 +783,16 @@ private fun PlayerCard(
                             maxLines = 1,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
-                                .padding(horizontal = iconPadding)
+                                .padding(horizontal = 24.dp) // Gap between text and icons
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                 ) { onLife(-1) },
                         )
 
-                        // Right container for Heart icon
+                        // Right container: occupies 1/2 of remaining space, icon aligned to start (near text)
                         Box(
-                            modifier = Modifier.width(iconSize + iconPadding),
+                            modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.CenterStart
                         ) {
                             Icon(
@@ -851,12 +809,12 @@ private fun PlayerCard(
                         }
                     }
                 }
-
                 // ── Footer: actions + active-player controls (Bottom) ─────────
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomCenter),
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val actionSize = when (tier) {
@@ -885,6 +843,17 @@ private fun PlayerCard(
                                 .clickable { onCtrPanel() },
                         )
                     }
+                }
+                if (tier != CardTier.TINY) {
+                    PlayerCounterChips(
+                        player = player,
+                        theme = theme,
+                        tier = tier,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = 8.dp),
+                        onCtl = { onCtrPanel() }
+                    )
                 }
             }
 
@@ -944,6 +913,53 @@ private fun PlayerCard(
     }
 }
 
+/**
+ * Optimized surface for PlayerCard to isolate glow animations and avoid
+ * unnecessary recompositions of the entire card content.
+ */
+@Composable
+private fun PlayerCardSurface(
+    isActive: Boolean,
+    theme: PlayerThemeColors,
+    rotation: Int,
+    cardWidth: androidx.compose.ui.unit.Dp,
+    cardHeight: androidx.compose.ui.unit.Dp,
+    content: @Composable BoxScope.() -> Unit
+) {
+    // Active glow pulse — only computed for the active player
+    val glowAlpha: Float = if (isActive) {
+        val infiniteTransition = rememberInfiniteTransition(label = "activeGlow")
+        val anim by infiniteTransition.animateFloat(
+            initialValue = 0.40f,
+            targetValue = 0.75f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "glowAlpha",
+        )
+        anim
+    } else 0.25f
+
+    Box(
+        modifier = Modifier
+            .requiredSize(width = cardWidth, height = cardHeight)
+            .graphicsLayer { rotationZ = rotation.toFloat() }
+            .coloredShadow(
+                color = theme.accent.copy(alpha = glowAlpha),
+                blurRadius = if (isActive) 28.dp else 20.dp,
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .background(theme.background)
+            .border(
+                width = if (isActive) 2.5.dp else 0.5.dp,
+                color = theme.accent.copy(alpha = if (isActive) 1.0f else 0.40f),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        content = content
+    )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  End turn button
 // ─────────────────────────────────────────────────────────────────────────────
@@ -958,7 +974,7 @@ private fun EndTurnButton(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .height(22.dp)
+                .height(36.dp)
                 .clip(RoundedCornerShape(5.dp))
                 .background(theme.accent.copy(alpha = 0.15f))
                 .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
@@ -973,7 +989,7 @@ private fun EndTurnButton(
                 text = stringResource(R.string.game_end_turn),
                 style = MaterialTheme.magicTypography.labelSmall,
                 color = theme.accent,
-                fontSize = 10.sp,
+                fontSize = 14.sp,
             )
         }
     } else {
@@ -1010,7 +1026,8 @@ private fun PlayerCounterChips(
     player: Player,
     theme: PlayerThemeColors,
     tier: CardTier,
-    maxChips: Int,
+    modifier: Modifier = Modifier,
+    onCtl: () -> Unit = {}
 ) {
     // Collect non-zero counters: (iconKey, value) pairs
     val activeCounters = buildList {
@@ -1024,21 +1041,22 @@ private fun PlayerCounterChips(
     if (activeCounters.isEmpty()) return
 
     val mc = MaterialTheme.magicColors
-    val chipHeight = if (tier == CardTier.LARGE) 18.dp else 14.dp
-    val iconSize = if (tier == CardTier.LARGE) 10.dp else 8.dp
-    val textSize = if (tier == CardTier.LARGE) 12.sp else 9.sp
-    val hPad = if (tier == CardTier.LARGE) 5.dp else 3.dp
+    val chipHeight = if (tier == CardTier.LARGE) 24.dp else 16.dp
+    val iconSize = if (tier == CardTier.LARGE) 16.dp else 14.dp
+    val textSize = if (tier == CardTier.LARGE) 16.sp else 12.sp
+    val hPad = if (tier == CardTier.LARGE) 4.dp else 4.dp
 
-    // Logic to decide how many items per row.
-    // "Uno debajo de otro" (1 per row) if few, "filas de 2 o 3" if many.
-    val maxItemsPerRow = when {
-        activeCounters.size <= 3 -> 1
-        activeCounters.size <= 6 -> 2
-        else -> 3
-    }
+    // Grow horizontally up to 4 items before wrapping
+    val maxItemsPerRow = if (tier == CardTier.LARGE) 4 else 3
 
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(if (tier == CardTier.LARGE) 4.dp else 3.dp),
+        modifier = modifier.clickable {
+            onCtl()
+        },
+        horizontalArrangement = Arrangement.spacedBy(
+            if (tier == CardTier.LARGE) 4.dp else 3.dp,
+            Alignment.End
+        ),
         verticalArrangement = Arrangement.spacedBy(if (tier == CardTier.LARGE) 4.dp else 3.dp),
         maxItemsInEachRow = maxItemsPerRow,
     ) {
@@ -1050,20 +1068,28 @@ private fun PlayerCounterChips(
                     .background(theme.accent.copy(alpha = 0.10f))
                     .padding(horizontal = hPad),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.Center,
             ) {
                 CounterIconView(
                     iconKey = key,
                     tint = theme.accent,
-                    modifier = Modifier.size(iconSize),
+                    modifier = Modifier
+                        .size(iconSize)
+                        .align(Alignment.CenterVertically) // Asegura el centro exacto
                 )
+                Spacer(modifier = Modifier.width(3.dp))
                 Text(
                     text = "$value",
                     color = mc.textPrimary,
                     fontSize = textSize,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterVertically), // Alineación explícita
                     style = LocalTextStyle.current.copy(
-                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        lineHeightStyle = LineHeightStyle(
+                            alignment = LineHeightStyle.Alignment.Center,
+                            trim = LineHeightStyle.Trim.Both // Cambia None por Both para eliminar espacios extra arriba/abajo
+                        )
                     )
                 )
             }
@@ -1104,10 +1130,9 @@ fun CounterIconView(
             )
 
         CounterIconKey.ENERGY ->
-            Icon(
+            Image(
                 painter = painterResource(R.drawable.ic_energy),
                 contentDescription = null,
-                tint = tint,
                 modifier = modifier
             )
 

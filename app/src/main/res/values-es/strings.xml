@@ -532,7 +532,14 @@
     <string name="settings_version_label">Versión</string>
     <string name="settings_data_source_label">Datos</string>
     <string name="settings_data_source_value">Scryfall API</string>
+    <string name="settings_tag_dictionary">Diccionario de etiquetas</string>
+    <string name="settings_tag_dictionary_subtitle">Edita las traducciones, los patrones de detección y los umbrales del auto-tagger.</string>
     <string name="settings_open_scryfall">Abrir web de Scryfall</string>
+
+    <!-- TEMAS -->
+    <string name="theme_neon_void">Neon Void</string>
+    <string name="theme_grimoire">Grimorio</string>
+    <string name="theme_cosmos">Cosmos</string>
 
     <!-- SIDEBOARD RECOMMENDATIONS -->
     <string name="sideboard_rec_title">Sugerencias para el banquillo</string>

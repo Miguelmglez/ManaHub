@@ -99,14 +99,14 @@ fun MagicBottomBar(
                 modifier = Modifier.weight(1f),
             )
 
-            // Slot 2 — Draft
+            /*// Slot 2 — Draft
             BottomBarTab(
                 label    = "DRAFT",
                 icon     = Icons.Default.Style,
                 selected = currentRoute == Screen.Draft.route,
                 onClick  = onDraftClick,
                 modifier = Modifier.weight(1f),
-            )
+            )*/
 
             // Slot 3 — Play FAB (overflows upward by 8 dp)
             Box(
@@ -121,7 +121,7 @@ fun MagicBottomBar(
                 )
             }
 
-            // Slot 4 — News
+            /*// Slot 4 — News
 
             BottomBarTab(
                 label    = "NEWS",
@@ -129,7 +129,7 @@ fun MagicBottomBar(
                 selected = currentRoute == Screen.News.route,
                 onClick  = onNewsClick,
                 modifier = Modifier.weight(1f),
-            )
+            )*/
             // Slot 5 — Profile
             BottomBarTab(
                 label    = "PROFILE",
@@ -209,7 +209,7 @@ private fun PlayFab(
     val colors    = MaterialTheme.magicColors
     val glowColor = colors.primaryAccent.copy(alpha = 0.35f)
     val gradient  = Brush.linearGradient(
-        colors = listOf(Color(0xFFE63946), Color(0xFFC77DFF)),
+        colors = listOf(colors.primaryAccent, colors.secondaryAccent),
         start  = Offset(0f, Float.POSITIVE_INFINITY),
         end    = Offset(Float.POSITIVE_INFINITY, 0f),
     )
