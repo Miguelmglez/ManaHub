@@ -1,10 +1,15 @@
 package com.mmg.manahub.feature.decks.components
 
+import android.graphics.Paint
+import android.graphics.Typeface
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -12,12 +17,24 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+
+// Height budget constants (all in dp, converted in Canvas scope)
+private val CANVAS_HEIGHT        = 96.dp
+private val AXIS_LABEL_ZONE_DP   = 20.dp  // reserved at bottom for "0 1 2 … 7+"
+private val COUNT_LABEL_ZONE_DP  = 14.dp  // reserved at top for card counts
+private val BAR_SPACING_DP       = 5.dp
+private val BAR_CORNER_DP        = 3.dp
+private val BASELINE_STROKE_DP   = 0.5.dp
 
 @Composable
 fun ManaCurveChart(
@@ -27,21 +44,49 @@ fun ManaCurveChart(
 ) {
     val mc = MaterialTheme.magicColors
 
-    // Bucket cards by CMC: 0..6 and 7+
-    val buckets = IntArray(8)
-    cards.forEach { dc ->
-        val cmc = dc.card.cmc.toInt().coerceIn(0, 7)
-        buckets[cmc] += dc.quantity
+    // --- Data buckets ---
+    val buckets = remember(cards) {
+        IntArray(8).also { b ->
+            cards.forEach { dc ->
+                b[dc.card.cmc.toInt().coerceIn(0, 7)] += dc.quantity
+            }
+        }
     }
-    val maxCount = buckets.max().coerceAtLeast(1)
+    val maxCount = remember(buckets) { buckets.max().coerceAtLeast(1) }
 
-    // Simplified ideal curve (non-land cards, standard 60-card deck)
-    val idealCurve = floatArrayOf(0f, 6f, 8f, 7f, 5f, 4f, 3f, 3f)
-    val idealMax   = idealCurve.max().coerceAtLeast(1f)
+    // Ideal curve for a standard 60-card deck
+    val idealCurve = remember { floatArrayOf(0f, 6f, 8f, 7f, 5f, 4f, 3f, 3f) }
+    val idealMax   = remember { idealCurve.max().coerceAtLeast(1f) }
+
+    // Animate bar proportions — reacts to deck changes
+    val animatedRatios = buckets.mapIndexed { i, count ->
+        val target = count.toFloat() / maxCount
+        animateFloatAsState(
+            targetValue = target,
+            animationSpec = tween(
+                durationMillis = 400,
+                delayMillis    = i * 25,  // stagger: bars grow left-to-right
+                easing         = FastOutSlowInEasing,
+            ),
+            label = "bar_ratio_$i",
+        )
+    }
+
+    // --- Color tokens ---
+    val barColorTop    = mc.primaryAccent.copy(alpha = 0.90f)
+    val barColorBottom = mc.primaryAccent.copy(alpha = 0.35f)
+    val barGlowColor   = mc.primaryAccent.copy(alpha = 0.18f)
+    val idealColor     = Color.White.copy(alpha = 0.35f)
+    val baselineColor  = Color.White.copy(alpha = 0.12f)
+    val countLabelArgb = Color.White.copy(alpha = 0.70f).toArgb()
+    val axisLabelArgb  = Color.White.copy(alpha = 0.30f).toArgb()
+
+    val axisLabels = remember { listOf("0", "1", "2", "3", "4", "5", "6", "7+") }
 
     Column(modifier = modifier) {
+        // --- Header row ---
         Row(
-            modifier              = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            modifier              = Modifier.fillMaxWidth().padding(bottom = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment     = Alignment.CenterVertically,
         ) {
@@ -55,10 +100,9 @@ fun ManaCurveChart(
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    val lineColor = Color.White.copy(alpha = 0.4f)
                     Canvas(modifier = Modifier.width(20.dp).height(2.dp)) {
                         drawLine(
-                            color       = lineColor,
+                            color       = idealColor,
                             start       = Offset(0f, size.height / 2),
                             end         = Offset(size.width, size.height / 2),
                             strokeWidth = 2f,
@@ -74,37 +118,70 @@ fun ManaCurveChart(
             }
         }
 
-        val barColor   = mc.primaryAccent.copy(alpha = 0.80f)
-        val idealColor = Color.White.copy(alpha = 0.35f)
-
+        // --- Single unified canvas: bars + labels ---
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp),
+                .height(CANVAS_HEIGHT),
         ) {
             val barCount = 8
-            val spacing  = 4.dp.toPx()
-            val barWidth = (size.width - spacing * (barCount - 1)) / barCount
-            val chartH   = size.height
+            val spacing       = BAR_SPACING_DP.toPx()
+            val axisZone      = AXIS_LABEL_ZONE_DP.toPx()
+            val countZone     = COUNT_LABEL_ZONE_DP.toPx()
+            val barWidth      = (size.width - spacing * (barCount - 1)) / barCount
+            // Effective drawing zone for bars (between count labels and axis labels)
+            val barZoneTop    = countZone
+            val barZoneBottom = size.height - axisZone
+            val barZoneHeight = barZoneBottom - barZoneTop
 
-            buckets.forEachIndexed { i, count ->
-                if (count > 0) {
-                    val barH = (count.toFloat() / maxCount) * chartH
-                    val x    = i * (barWidth + spacing)
+            // --- Baseline ---
+            drawLine(
+                color       = baselineColor,
+                start       = Offset(0f, barZoneBottom),
+                end         = Offset(size.width, barZoneBottom),
+                strokeWidth = BASELINE_STROKE_DP.toPx(),
+            )
+
+            // --- Bars ---
+            animatedRatios.forEachIndexed { i, ratioState ->
+                val ratio = ratioState.value
+                if (ratio > 0f) {
+                    val barH    = ratio * barZoneHeight
+                    val barX    = i * (barWidth + spacing)
+                    val barTop  = barZoneBottom - barH
+
+                    // Glow — slightly wider rect behind the real bar
                     drawRoundRect(
-                        color        = barColor,
-                        topLeft      = Offset(x, chartH - barH),
+                        color        = barGlowColor,
+                        topLeft      = Offset(barX - 2f, barTop - 2f),
+                        size         = Size(barWidth + 4f, barH + 4f),
+                        cornerRadius = CornerRadius(BAR_CORNER_DP.toPx() + 2f),
+                    )
+
+                    // Bar with vertical gradient simulation: draw two overlapping rects
+                    // Bottom half (dark base)
+                    drawRoundRect(
+                        color        = barColorBottom,
+                        topLeft      = Offset(barX, barTop),
                         size         = Size(barWidth, barH),
-                        cornerRadius = CornerRadius(3.dp.toPx()),
+                        cornerRadius = CornerRadius(BAR_CORNER_DP.toPx()),
+                    )
+                    // Top 60% overlay (bright accent) — simulates top-bright gradient
+                    drawRoundRect(
+                        color        = barColorTop,
+                        topLeft      = Offset(barX, barTop),
+                        size         = Size(barWidth, barH * 0.60f),
+                        cornerRadius = CornerRadius(BAR_CORNER_DP.toPx()),
                     )
                 }
             }
 
+            // --- Ideal curve line ---
             if (showIdealCurve) {
                 val pts = idealCurve.mapIndexed { i, ideal ->
                     Offset(
                         x = i * (barWidth + spacing) + barWidth / 2f,
-                        y = chartH - (ideal / idealMax) * chartH,
+                        y = barZoneBottom - (ideal / idealMax) * barZoneHeight,
                     )
                 }
                 val dash = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
@@ -118,19 +195,45 @@ fun ManaCurveChart(
                     )
                 }
             }
-        }
 
-        // CMC axis labels
-        Row(
-            modifier              = Modifier.fillMaxWidth().padding(top = 2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            listOf("0", "1", "2", "3", "4", "5", "6", "7+").forEach { label ->
-                Text(
-                    text  = label,
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textDisabled,
-                )
+            // --- Count labels (drawn ABOVE each bar) ---
+            val countPaint = Paint().apply {
+                isAntiAlias = true
+                textAlign   = Paint.Align.CENTER
+                textSize    = 10.sp.toPx()
+                color       = countLabelArgb
+                typeface    = Typeface.DEFAULT
+            }
+            buckets.forEachIndexed { i, count ->
+                if (count > 0) {
+                    val barX    = i * (barWidth + spacing)
+                    val centerX = barX + barWidth / 2f
+                    val ratio   = animatedRatios[i].value
+                    val barH    = ratio * barZoneHeight
+                    val labelY  = barZoneBottom - barH - 3.dp.toPx()  // 3dp gap above bar
+                    drawContext.canvas.nativeCanvas.drawText(
+                        count.toString(),
+                        centerX,
+                        labelY,
+                        countPaint,
+                    )
+                }
+            }
+
+            // --- Axis labels (drawn INSIDE bottom zone) ---
+            val axisPaint = Paint().apply {
+                isAntiAlias = true
+                textAlign   = Paint.Align.CENTER
+                textSize    = 11.sp.toPx()
+                color       = axisLabelArgb
+                typeface    = Typeface.DEFAULT
+            }
+            // Vertical center of the axis zone
+            val labelY = barZoneBottom + axisZone / 2f + axisPaint.textSize / 3f
+            axisLabels.forEachIndexed { i, label ->
+                val barX    = i * (barWidth + spacing)
+                val centerX = barX + barWidth / 2f
+                drawContext.canvas.nativeCanvas.drawText(label, centerX, labelY, axisPaint)
             }
         }
     }
