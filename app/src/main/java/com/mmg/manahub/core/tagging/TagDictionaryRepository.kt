@@ -7,6 +7,8 @@ import com.mmg.manahub.core.domain.model.TagCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,30 +29,38 @@ class TagDictionaryRepository @Inject constructor(
     private val gson = Gson()
     private val listType = object : TypeToken<List<OverrideRecord>>() {}.type
 
+    // Serializes all read-modify-write operations so concurrent upsert/delete
+    // calls don't silently clobber each other's changes.
+    private val writeMutex = Mutex()
+
     val overridesFlow: Flow<List<TagOverride>> = prefs.tagDictionaryOverridesFlow.map { json ->
         decode(json)
     }
 
-    suspend fun loadAndApply() {
+    /**
+     * Reads the persisted overrides and applies them to the singleton.
+     * Acquires [writeMutex] so this never races with an in-progress upsert/delete.
+     */
+    suspend fun loadAndApply() = writeMutex.withLock {
         val list = decode(prefs.tagDictionaryOverridesFlow.first())
         TagDictionary.applyOverrides(list)
     }
 
-    suspend fun upsert(override: TagOverride) {
+    suspend fun upsert(override: TagOverride) = writeMutex.withLock {
         val current = decode(prefs.tagDictionaryOverridesFlow.first())
             .filterNot { it.key == override.key } + override
         prefs.saveTagDictionaryOverrides(encode(current))
         TagDictionary.applyOverrides(current)
     }
 
-    suspend fun delete(key: String) {
+    suspend fun delete(key: String) = writeMutex.withLock {
         val current = decode(prefs.tagDictionaryOverridesFlow.first())
             .filterNot { it.key == key }
         prefs.saveTagDictionaryOverrides(encode(current))
         TagDictionary.applyOverrides(current)
     }
 
-    suspend fun resetAll() {
+    suspend fun resetAll() = writeMutex.withLock {
         prefs.saveTagDictionaryOverrides("[]")
         TagDictionary.applyOverrides(emptyList())
     }

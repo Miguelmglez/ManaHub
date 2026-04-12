@@ -168,6 +168,13 @@ class RssFeedParser @Inject constructor() {
             return 0L
         }
 
+        /**
+         * Produces a compact, stable Room primary key from an article URL.
+         * MD5 is used intentionally here for non-cryptographic deduplication only —
+         * no secret data is hashed and collision resistance is not a security requirement.
+         * Security scanners may flag MD5; this comment documents the deliberate choice.
+         */
+        @Suppress("InsecureCryptoUsage")
         fun hashUrl(url: String): String {
             val digest = MessageDigest.getInstance("MD5")
             return digest.digest(url.toByteArray())

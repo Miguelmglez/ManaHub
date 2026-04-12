@@ -92,6 +92,24 @@ class BuildScryfallQueryUseCase @Inject constructor() {
         }
     }
 
-    private fun escapeValue(value: String): String =
-        if (value.contains(' ')) "\"$value\"" else value
+    /**
+     * Sanitize a free-text value before embedding it in a Scryfall search expression.
+     *
+     * Scryfall's query language interprets several characters as operators or
+     * delimiters (quotes, parentheses, colons, comparison operators). Passing
+     * user-supplied input verbatim allows a search for `foo" OR -f:vintage` to
+     * inject an extra Scryfall clause and bypass format-legality filters or expose
+     * unintended search results.
+     *
+     * Strategy: strip every character that carries syntactic meaning in Scryfall
+     * queries, then wrap values containing spaces in double-quotes so multi-word
+     * names are matched as a phrase rather than being split into separate tokens.
+     *
+     * Allowed through: letters, digits, hyphens, apostrophes, commas, periods,
+     * and whitespace. Everything else is removed.
+     */
+    private fun escapeValue(value: String): String {
+        val sanitized = value.replace(Regex("""[^a-zA-Z0-9\-',.\s]"""), "")
+        return if (sanitized.contains(' ')) "\"$sanitized\"" else sanitized
+    }
 }

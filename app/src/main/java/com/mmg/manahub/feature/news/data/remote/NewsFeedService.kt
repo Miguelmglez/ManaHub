@@ -26,7 +26,9 @@ class NewsFeedService @Inject constructor(
                 Result.failure(Exception("HTTP ${response.code} for $url"))
             }
         } catch (e: Exception) {
-            Log.w("NewsFeedService", "Failed to fetch $url", e)
+            // Omit the raw URL from the log message to avoid leaking feed endpoints
+            // (including any user-added custom feed URLs) into Logcat.
+            Log.w("NewsFeedService", "Failed to fetch feed: ${e.message}")
             Result.failure(e)
         }
     }

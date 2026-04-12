@@ -50,8 +50,15 @@ class ScryfallRemoteDataSource @Inject constructor(
 
     suspend fun getCardsBatch(scryfallIds: List<String>): Result<List<Card>> =
         safeCall {
+            // Guard: Scryfall enforces a hard cap of 75 identifiers per /cards/collection
+            // request. We also apply an overall limit so a caller with a very large
+            // collection cannot trigger hundreds of consecutive API requests in a single
+            // call, which would exhaust the rate-limit budget and stall other operations.
+            val MAX_TOTAL = 1_000
+            val sanitized = scryfallIds.take(MAX_TOTAL)
+
             val allCards = mutableListOf<CardDto>()
-            scryfallIds.chunked(75).forEach { chunk ->
+            sanitized.chunked(75).forEach { chunk ->
                 val identifiers = chunk.map { CardIdentifierDto(id = it) }
                 val response = requestQueue.execute {
                     api.getCardCollection(CardCollectionRequestDto(identifiers))

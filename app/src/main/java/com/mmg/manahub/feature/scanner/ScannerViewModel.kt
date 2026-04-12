@@ -27,18 +27,20 @@ class ScannerViewModel @Inject constructor(
 
     // Called by CardNameAnalyzer when a card name is detected via OCR
     fun onCardNameDetected(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
         val state = _uiState.value
         if (state.foundCard != null || state.showConfirmSheet) return
-        if (name == state.detectedName) return
+        if (trimmed == state.detectedName) return
 
-        _uiState.update { it.copy(detectedName = name, isSearching = true, error = null) }
+        _uiState.update { it.copy(detectedName = trimmed, isSearching = true, error = null) }
 
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(200) // let OCR stabilize before hitting network
             try {
                 // First: full-text search for the detected name
-                when (val result = searchCards(name)) {
+                when (val result = searchCards(trimmed)) {
                     is DataResult.Success -> {
                         val cards = result.data
                         if (cards.isNotEmpty()) {
@@ -54,7 +56,7 @@ class ScannerViewModel @Inject constructor(
                 }
 
                 // Fallback: exact name lookup via SearchCardUseCase
-                when (val result = searchCard(name)) {
+                when (val result = searchCard(trimmed)) {
                     is DataResult.Success -> {
                         _uiState.update { it.copy(
                             foundCard        = result.data,
@@ -65,7 +67,7 @@ class ScannerViewModel @Inject constructor(
                     is DataResult.Error -> {
                         _uiState.update { it.copy(
                             isSearching  = false,
-                            error        = "Card not found: \"$name\"",
+                            error        = "Card not found: \"$trimmed\"",
                         )}
                         delay(2_000)
                         _uiState.update { it.copy(detectedName = null, error = null) }

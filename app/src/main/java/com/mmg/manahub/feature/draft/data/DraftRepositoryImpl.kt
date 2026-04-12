@@ -142,19 +142,18 @@ class DraftRepositoryImpl @Inject constructor(
                 return@withContext DataResult.Success(cached.second)
             }
 
-            val apiKey = BuildConfig.YOUTUBE_API_KEY
-            if (apiKey.isBlank()) {
+            if (BuildConfig.YOUTUBE_API_KEY.isBlank()) {
                 return@withContext DataResult.Error("YouTube API key not configured")
             }
 
             try {
                 val query = "$setName MTG draft guide"
                 val enResults = runCatching {
-                    youTubeApi.searchVideos(query = query, language = "en", apiKey = apiKey)
+                    youTubeApi.searchVideos(query = query, language = "en")
                 }.getOrNull()?.items ?: emptyList()
 
                 val esResults = runCatching {
-                    youTubeApi.searchVideos(query = query, language = "es", apiKey = apiKey)
+                    youTubeApi.searchVideos(query = query, language = "es")
                 }.getOrNull()?.items ?: emptyList()
 
                 val seenIds = mutableSetOf<String>()

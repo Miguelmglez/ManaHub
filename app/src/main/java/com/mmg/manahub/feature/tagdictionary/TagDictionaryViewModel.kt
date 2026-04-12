@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -67,7 +68,13 @@ class TagDictionaryViewModel @Inject constructor(
             // Keep auto > suggest by at least 0.05.
             val safe = value.coerceIn(0.05f, 1f)
             prefs.saveTagAutoThreshold(safe)
-            if (_state.value.suggestThreshold > safe - 0.05f) {
+            // Read the persisted suggest threshold directly from DataStore rather
+            // than from _state, which may lag behind if two rapid calls are in
+            // flight and the collector has not yet propagated the first write.
+            val persistedSuggest = prefs.tagSuggestThresholdFlow
+                .catch { emit(0.60f) }
+                .first()
+            if (persistedSuggest > safe - 0.05f) {
                 prefs.saveTagSuggestThreshold((safe - 0.05f).coerceAtLeast(0f))
             }
         }

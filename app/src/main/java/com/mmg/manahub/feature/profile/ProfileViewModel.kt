@@ -227,11 +227,29 @@ class ProfileViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         // ── Derived: achievements ─────────────────────────────────────────────
+        // Note: CheckAchievementsUseCase stamps unlocked achievements with NOW,
+        // so we suppress re-invocation by comparing only the inputs (currency +
+        // stats), not the output list which changes every millisecond.
         _uiState
             .map { s -> s.preferredCurrency to buildAchievementStats(s) }
             .distinctUntilChanged()
             .onEach { (currency, stats) ->
-                _uiState.update { it.copy(achievements = checkAchievementsUseCase(stats, currency)) }
+                val newAchievements = checkAchievementsUseCase(stats, currency)
+                _uiState.update { current ->
+                    // Preserve existing unlockedAt timestamps for achievements that
+                    // were already unlocked — only stamp NOW for newly-unlocked ones.
+                    val existingById = current.achievements.associateBy { it.id }
+                    val merged = newAchievements.map { achievement ->
+                        val existing = existingById[achievement.id]
+                        if (achievement.isUnlocked && existing?.isUnlocked == true) {
+                            // Already unlocked — keep the original timestamp.
+                            achievement.copy(unlockedAt = existing.unlockedAt)
+                        } else {
+                            achievement
+                        }
+                    }
+                    current.copy(achievements = merged)
+                }
             }
             .launchIn(viewModelScope)
     }
@@ -239,9 +257,19 @@ class ProfileViewModel @Inject constructor(
     // ── Public actions ────────────────────────────────────────────────────────
 
     fun savePlayerName(name: String) {
-        if (name.isBlank()) return
-        viewModelScope.launch { userPreferencesDataStore.savePlayerName(name.trim()) }
-        _uiState.update { it.copy(playerName = name) }
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+        val previousName = _uiState.value.playerName
+        _uiState.update { it.copy(playerName = trimmed) }
+        viewModelScope.launch {
+            try {
+                userPreferencesDataStore.savePlayerName(trimmed)
+            } catch (e: Exception) {
+                // DataStore write failed — roll back the optimistic update so
+                // the UI stays consistent with what is actually persisted.
+                _uiState.update { it.copy(playerName = previousName) }
+            }
+        }
     }
 
 
