@@ -3,4 +3,6 @@
     <exclude domain="file" path="datastore/" />
     <exclude domain="database" path="." />
     <exclude domain="sharedpref" path="user_prefs_lang_sync.xml" />
+    <!-- Exclude Crashlytics pending crash reports from backup -->
+    <exclude domain="file" path=".firebase" />
 </full-backup-content>

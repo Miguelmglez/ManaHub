@@ -69,8 +69,12 @@
 # ── Compose (R8 handles most, but keep Previews out of release) ───────────────
 -assumenosideeffects class androidx.compose.ui.tooling.preview.PreviewKt { *; }
 
-# ── Strip debug logs in release ───────────────────────────────────────────────
+# ── Strip all logs in release ─────────────────────────────────────────────────
 -assumenosideeffects class android.util.Log {
     public static int v(...);
     public static int d(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
+    public static boolean isLoggable(...);
 }

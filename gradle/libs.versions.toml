@@ -1,5 +1,6 @@
 [versions]
 accompanist-permissions = "0.37.3"
+firebase-bom = "34.12.0"
 gson = "2.13.2"
 kotlin               = "2.3.20"
 agp                  = "9.1.0"
@@ -14,9 +15,10 @@ lifecycle            = "2.10.0"
 coroutines           = "1.10.2"
 mlkit-text-recognition = "16.0.1"
 camerax              = "1.6.0"
+google-services      = "4.4.4"
 mockk                = "1.14.9"
 turbine              = "1.2.1"
-firebase-crashlytics-buildtools = "3.0.6"
+firebase-crashlytics = "19.4.0"
 foundation = "1.10.6"
 material3 = "1.4.0"
 datastore  = "1.2.1"
@@ -36,6 +38,8 @@ compose-ui              = { group = "androidx.compose.ui", name = "ui" }
 compose-material3       = { group = "androidx.compose.material3", name = "material3" }
 compose-tooling         = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 navigation-compose      = { group = "androidx.navigation", name = "navigation-compose",     version.ref = "navigation" }
@@ -60,7 +64,7 @@ mlkit-text-recognition  = { group = "com.google.mlkit", name = "text-recognition
 mockk                   = { group = "io.mockk", name = "mockk",                            version.ref = "mockk" }
 turbine                 = { group = "app.cash.turbine", name = "turbine",                  version.ref = "turbine" }
 coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebase-crashlytics-buildtools" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics-ktx", version.ref = "firebase-crashlytics" }
 foundation          = { group = "androidx.compose.foundation", name = "foundation",           version.ref = "foundation" }
 compose-googlefonts = { group = "androidx.compose.ui",         name = "ui-text-google-fonts" }
 material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
@@ -80,3 +84,5 @@ kotlin-android      = { id = "org.jetbrains.kotlin.android",       version.ref =
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt                = { id = "com.google.dagger.hilt.android",     version.ref = "hilt" }
 ksp                 = { id = "com.google.devtools.ksp",            version = "2.3.6" }
+google-services     = { id = "com.google.gms.google-services",     version.ref = "google-services" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics",    version = "3.0.4" }

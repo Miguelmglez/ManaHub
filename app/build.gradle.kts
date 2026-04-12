@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 
@@ -72,8 +74,10 @@ android {
     }
 }
 
+
+
 dependencies {
-    implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.firebase.crashlytics)
     implementation(libs.splashscreen)
     implementation(libs.foundation)
     implementation(libs.material3)
@@ -129,7 +133,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.browser)
     implementation(libs.guava)
-
-
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
 
 }
