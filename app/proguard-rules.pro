@@ -39,12 +39,12 @@
 -keep class * implements com.google.gson.JsonSerializer { *; }
 -keep class * implements com.google.gson.JsonDeserializer { *; }
 # Keep all model/data classes used with Gson (Scryfall API responses)
--keep class com.mmg.magicfolder.core.data.remote.** { *; }
+-keep class com.mmg.manahub.core.data.remote.** { *; }
 
 # ── App models (Room entities, domain models) ────────────────────────────────
--keep class com.mmg.magicfolder.core.data.local.entity.** { *; }
--keep class com.mmg.magicfolder.core.domain.model.** { *; }
--keep class com.mmg.magicfolder.feature.game.model.** { *; }
+-keep class com.mmg.manahub.core.data.local.entity.** { *; }
+-keep class com.mmg.manahub.core.domain.model.** { *; }
+-keep class com.mmg.manahub.feature.game.model.** { *; }
 
 # ── Coil ─────────────────────────────────────────────────────────────────────
 -keep class coil.** { *; }

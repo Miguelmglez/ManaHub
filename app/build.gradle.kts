@@ -15,7 +15,7 @@ if (localPropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.mmg.magicfolder"
+    namespace = "com.mmg.manahub"
     compileSdk = 36
 
     defaultConfig {
