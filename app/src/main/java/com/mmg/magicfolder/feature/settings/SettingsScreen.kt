@@ -141,7 +141,7 @@ fun SettingsScreen(
                 color = mc.textPrimary,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
-
+/*
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -167,9 +167,8 @@ fun SettingsScreen(
                     contentDescription = null,
                     tint = mc.textSecondary,
                 )
-            }
+            }*/
 
-            Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             Row(
                 modifier = Modifier
@@ -181,12 +180,12 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Diccionario de etiquetas",
+                        stringResource(R.string.settings_tag_dictionary),
                         style = MaterialTheme.magicTypography.bodyMedium,
                         color = mc.textPrimary,
                     )
                     Text(
-                        "Edita las traducciones, los patrones de detección y los umbrales del auto-tagger.",
+                        stringResource(R.string.settings_tag_dictionary_subtitle),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textSecondary,
                     )
@@ -332,7 +331,7 @@ private fun PreferencesSection(
                     }
                 }
             }
-
+/*
             // News Language — multi-select checkboxes
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -370,7 +369,7 @@ private fun PreferencesSection(
                         }
                     }
                 }
-            }
+            }*/
 
             // Currency — radio buttons
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -431,25 +430,25 @@ private fun ThemeSelectorSection(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ThemeTile(
-                name = "Neon Void",
+                name = stringResource(R.string.theme_neon_void),
                 emoji = "⚡",
-                previewColors = listOf(Color(0xFF030508), Color(0xFFC77DFF), Color(0xFF4CC9F0)),
+                previewColors = listOf(Color(0xFF0D0214), Color(0xFFBF00FF), Color(0xFFCCFF00)),
                 isSelected = currentTheme is AppTheme.NeonVoid,
                 onClick = { onThemeSelected(AppTheme.NeonVoid) },
                 modifier = Modifier.weight(1f),
             )
             ThemeTile(
-                name = "Grimoire",
+                name = stringResource(R.string.theme_grimoire),
                 emoji = "📜",
-                previewColors = listOf(Color(0xFF1A1208), Color(0xFFC9A84C), Color(0xFF7AB648)),
+                previewColors = listOf(Color(0xFF040D04), Color(0xFF39FF14), Color(0xFFFFA500)),
                 isSelected = currentTheme is AppTheme.MedievalGrimoire,
                 onClick = { onThemeSelected(AppTheme.MedievalGrimoire) },
                 modifier = Modifier.weight(1f),
             )
             ThemeTile(
-                name = "Cosmos",
+                name = stringResource(R.string.theme_cosmos),
                 emoji = "✨",
-                previewColors = listOf(Color(0xFF040812), Color(0xFF7B61FF), Color(0xFFFF61DC)),
+                previewColors = listOf(Color(0xFF010C14), Color(0xFF00F5FF), Color(0xFFFF7F50)),
                 isSelected = currentTheme is AppTheme.ArcaneCosmos,
                 onClick = { onThemeSelected(AppTheme.ArcaneCosmos) },
                 modifier = Modifier.weight(1f),

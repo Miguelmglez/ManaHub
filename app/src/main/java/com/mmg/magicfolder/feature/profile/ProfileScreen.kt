@@ -136,7 +136,7 @@ fun ProfileScreen(
                     )
                 }
             }
-
+/*
             // ── Achievements ──────────────────────────────────────────────────
             if (uiState.achievements.isNotEmpty()) {
                 item {
@@ -145,7 +145,7 @@ fun ProfileScreen(
                         modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
-            }
+            }*/
 
             // ── Recent games ──────────────────────────────────────────────────
             if (uiState.recentSessions.isNotEmpty()) {
