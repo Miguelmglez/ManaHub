@@ -732,30 +732,7 @@ private fun ColorStatCard(
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         if (colorCode != null) {
-            val manaColor = when (colorCode.uppercase()) {
-                "W" -> ManaColor.W
-                "U" -> ManaColor.U
-                "B" -> ManaColor.B
-                "R" -> ManaColor.R
-                "G" -> ManaColor.G
-                "C" -> ManaColor.C
-                else -> null
-            }
-            if (manaColor != null) {
-                ManaSymbol(color = manaColor, size = 26.dp)
-            } else {
-                // "M" multicolor — gold circle
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(Color(0xFFB8860B))
-                        .border(1.5.dp, Color(0xFFDAA520), androidx.compose.foundation.shape.CircleShape),
-                ) {
-                    Text("✦", fontSize = 13.sp, color = Color.White, textAlign = TextAlign.Center)
-                }
-            }
+            ManaSymbol(symbol = colorCode, size = 26.dp)
         } else {
             Text("—", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
         }
@@ -873,13 +850,32 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
+    val context = LocalContext.current
+    val appName = remember { context.applicationInfo.loadLabel(context.packageManager).toString() }
+    val version = remember { com.mmg.manahub.BuildConfig.VERSION_NAME }
+
     Column(
         modifier            = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(stringResource(R.string.profile_version, "1.0.0"), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
-        Text(stringResource(R.string.profile_developed_by), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled, textAlign = TextAlign.Center)
+        Text(
+            text = stringResource(R.string.profile_version, version),
+            style = MaterialTheme.magicTypography.labelSmall,
+            color = mc.textDisabled
+        )
+        Text(
+            text = appName,
+            style = MaterialTheme.magicTypography.labelSmall,
+            color = mc.textDisabled,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = stringResource(R.string.profile_developed_by),
+            style = MaterialTheme.magicTypography.labelSmall,
+            color = mc.textDisabled,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

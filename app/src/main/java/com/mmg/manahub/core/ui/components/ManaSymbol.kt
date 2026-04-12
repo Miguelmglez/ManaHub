@@ -110,25 +110,11 @@ fun ManaSymbolRow(
 // Converts "{2}{W}{U}" → list of rendered symbols
 
 @Composable
-fun ManaCost(
-    manaCost: String,
-    symbolSize: Dp = 18.dp,
+fun ManaSymbol(
+    symbol: String,
+    size: Dp = 24.dp,
     modifier: Modifier = Modifier,
 ) {
-    val symbols = parseManaString(manaCost)
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        symbols.forEach { symbol ->
-            ManaSymbolSingle(symbol = symbol, size = symbolSize)
-        }
-    }
-}
-
-@Composable
-private fun ManaSymbolSingle(symbol: String, size: Dp) {
     val manaColor = when (symbol.uppercase()) {
         "W" -> ManaColor.W
         "U" -> ManaColor.U
@@ -138,12 +124,35 @@ private fun ManaSymbolSingle(symbol: String, size: Dp) {
         "C" -> ManaColor.C
         else -> null
     }
+
     if (manaColor != null) {
-        ManaSymbol(color = manaColor, size = size)
-    } else {
+        ManaSymbol(color = manaColor, size = size, modifier = modifier)
+    } else if (symbol.uppercase() == "M") {
+        // Multicolor — gold circle with star
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
+            modifier = modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFFB8860B))
+                .border(
+                    width = (size.value * 0.06f).dp,
+                    color = Color(0xFFDAA520),
+                    shape = CircleShape,
+                ),
+        ) {
+            Text(
+                text = "✦",
+                fontSize = (size.value * 0.5f).sp,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+            )
+        }
+    } else {
+        // Generic/Numeric symbol
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
                 .size(size)
                 .clip(CircleShape)
                 .background(Color(0xFF555555))
@@ -161,6 +170,24 @@ private fun ManaSymbolSingle(symbol: String, size: Dp) {
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+@Composable
+fun ManaCost(
+    manaCost: String,
+    symbolSize: Dp = 18.dp,
+    modifier: Modifier = Modifier,
+) {
+    val symbols = parseManaString(manaCost)
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        symbols.forEach { symbol ->
+            ManaSymbol(symbol = symbol, size = symbolSize)
         }
     }
 }
