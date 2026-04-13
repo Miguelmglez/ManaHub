@@ -45,8 +45,7 @@ import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.domain.model.Achievement
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.ui.components.ManaColor
-import com.mmg.manahub.core.ui.components.ManaSymbol
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.MarcellusFontFamily
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -747,7 +746,7 @@ private fun ColorStatCard(
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         if (colorCode != null) {
-            ManaSymbol(symbol = colorCode, size = 26.dp)
+            ManaSymbolImage(token = colorCode, size = 26.dp)
         } else {
             Text("—", style = MaterialTheme.magicTypography.titleLarge, color = mc.primaryAccent)
         }
