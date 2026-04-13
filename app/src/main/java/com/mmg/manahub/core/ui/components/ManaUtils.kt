@@ -19,15 +19,15 @@ fun manaColorFor(code: String, magicColors: MagicColors): Color = when (code) {
 }
 
 /**
- * Maps a [CounterIconKey] mana key string (e.g. "mana_w") to the corresponding [ManaColor].
+ * Maps a [CounterIconKey] mana key string (e.g. "mana_w") to the corresponding mana symbol token.
  * Returns null if the key is not a mana key.
  */
-fun counterKeyToManaColor(key: String): ManaColor? = when (key) {
-    "mana_w" -> ManaColor.W
-    "mana_u" -> ManaColor.U
-    "mana_b" -> ManaColor.B
-    "mana_r" -> ManaColor.R
-    "mana_g" -> ManaColor.G
-    "mana_c" -> ManaColor.C
+fun counterKeyToManaToken(key: String): String? = when (key) {
+    "mana_w" -> "W"
+    "mana_u" -> "U"
+    "mana_b" -> "B"
+    "mana_r" -> "R"
+    "mana_g" -> "G"
+    "mana_c" -> "C"
     else     -> null
 }

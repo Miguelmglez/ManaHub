@@ -51,8 +51,14 @@ fun CollectionScreen(
         uiState               = uiState,
         onCardClick           = onCardClick,
         onScannerClick        = onScannerClick,
-        onDeckClick           = onDeckClick,
-        onCreateDeckClick     = onCreateDeckClick,
+        onDeckClick           = { id ->
+            viewModel.onTabSelected(CollectionTab.DECKS)
+            onDeckClick(id)
+        },
+        onCreateDeckClick     = {
+            viewModel.onTabSelected(CollectionTab.DECKS)
+            onCreateDeckClick()
+        },
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
@@ -62,6 +68,7 @@ fun CollectionScreen(
         },
         onErrorDismissed      = viewModel::onErrorDismissed,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
+        onTabSelected         = viewModel::onTabSelected,
     )
 
     if (showAdvancedSearch) {
@@ -89,8 +96,8 @@ private fun CollectionContent(
     onClearFilters:       () -> Unit,
     onErrorDismissed:     () -> Unit,
     onShowAdvancedSearch: () -> Unit,
+    onTabSelected:        (CollectionTab) -> Unit,
 ) {
-    var selectedTab by remember { mutableIntStateOf(TAB_CARDS) }
     val mc = MaterialTheme.magicColors
 
     Scaffold(
@@ -103,7 +110,7 @@ private fun CollectionContent(
             )
         },
         floatingActionButton = {
-            if (selectedTab == TAB_CARDS) {
+            if (uiState.selectedTab == CollectionTab.CARDS) {
                 FloatingActionButton(
                     onClick        = onScannerClick,
                     containerColor = mc.primaryAccent,
@@ -124,13 +131,13 @@ private fun CollectionContent(
         ) {
             // ── Cards / Decks sub-tabs ────────────────────────────────────────
             TabRow(
-                selectedTabIndex = selectedTab,
+                selectedTabIndex = if (uiState.selectedTab == CollectionTab.CARDS) TAB_CARDS else TAB_DECKS,
                 containerColor   = mc.backgroundSecondary,
                 contentColor     = mc.primaryAccent,
             ) {
                 Tab(
-                    selected = selectedTab == TAB_CARDS,
-                    onClick  = { selectedTab = TAB_CARDS },
+                    selected = uiState.selectedTab == CollectionTab.CARDS,
+                    onClick  = { onTabSelected(CollectionTab.CARDS) },
                     text     = {
                         Text(
                             text  = stringResource(R.string.collection_tab_cards).uppercase(Locale.getDefault()),
@@ -139,8 +146,8 @@ private fun CollectionContent(
                     },
                 )
                 Tab(
-                    selected = selectedTab == TAB_DECKS,
-                    onClick  = { selectedTab = TAB_DECKS },
+                    selected = uiState.selectedTab == CollectionTab.DECKS,
+                    onClick  = { onTabSelected(CollectionTab.DECKS) },
                     text     = {
                         Text(
                             text  = stringResource(R.string.collection_tab_decks).uppercase(Locale.getDefault()),
@@ -151,8 +158,8 @@ private fun CollectionContent(
             }
 
             // ── Tab content ───────────────────────────────────────────────────
-            when (selectedTab) {
-                TAB_CARDS -> CardsTabContent(
+            when (uiState.selectedTab) {
+                CollectionTab.CARDS -> CardsTabContent(
                     uiState               = uiState,
                     onCardClick           = onCardClick,
                     onScannerClick        = onScannerClick,
@@ -160,7 +167,7 @@ private fun CollectionContent(
                     onClearFilters        = onClearFilters,
                     onShowAdvancedSearch  = onShowAdvancedSearch,
                 )
-                TAB_DECKS -> DeckListScreen(
+                CollectionTab.DECKS -> DeckListScreen(
                     onDeckClick       = onDeckClick,
                     onCreateDeckClick = onCreateDeckClick,
                 )

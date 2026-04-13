@@ -29,8 +29,8 @@ import com.mmg.manahub.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.ui.components.ManaColor
-import com.mmg.manahub.core.ui.components.ManaSymbol
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.feature.decks.components.DeckImportSheet
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import java.text.SimpleDateFormat
@@ -97,6 +97,19 @@ fun DeckListScreen(
         CreateDeckBottomSheet(
             onDismiss = viewModel::onDismissCreateDialog,
             onCreate  = { name, format -> viewModel.createDeck(name, format) },
+            onImportClick = {
+                viewModel.onDismissCreateDialog()
+                viewModel.onShowImportSheet()
+            }
+        )
+    }
+
+    if (uiState.showImportSheet) {
+        DeckImportSheet(
+            isLoading = uiState.isImporting,
+            error     = uiState.importError,
+            onImport  = viewModel::importDeck,
+            onDismiss = viewModel::onDismissImportSheet,
         )
     }
 
@@ -217,6 +230,7 @@ private fun DeckItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(Modifier.height(4.dp))
 
                     // Card count + updated date
                     Row(
@@ -234,6 +248,7 @@ private fun DeckItem(
 
                     // Mana identity symbols
                     if (deck.colorIdentity.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
                         ColorIdentityRow(colorIdentity = deck.colorIdentity)
                     }
                 }
@@ -298,18 +313,10 @@ private fun ColorIdentityRow(colorIdentity: Set<String>) {
 
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         sorted.forEach { code ->
-            val manaColor = when (code.uppercase()) {
-                "W"  -> ManaColor.W
-                "U"  -> ManaColor.U
-                "B"  -> ManaColor.B
-                "R"  -> ManaColor.R
-                "G"  -> ManaColor.G
-                else -> ManaColor.C
-            }
-            ManaSymbol(color = manaColor, size = 18.dp)
+            ManaSymbolImage(token = code, size = 18.dp)
         }
         if (sorted.isEmpty()) {
-            ManaSymbol(color = ManaColor.C, size = 18.dp)
+            ManaSymbolImage(token = "C", size = 18.dp)
         }
     }
 }
@@ -368,6 +375,7 @@ private fun EmptyDecksState(
 private fun CreateDeckBottomSheet(
     onDismiss: () -> Unit,
     onCreate:  (name: String, format: String) -> Unit,
+    onImportClick: () -> Unit,
 ) {
     val mc         = MaterialTheme.magicColors
     val ty         = MaterialTheme.magicTypography
@@ -428,6 +436,25 @@ private fun CreateDeckBottomSheet(
                     text  = stringResource(R.string.decklist_create_button),
                     style = ty.labelLarge,
                     color = mc.background,
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                thickness = 0.5.dp,
+                color = mc.surfaceVariant
+            )
+
+            OutlinedButton(
+                onClick = onImportClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, mc.primaryAccent),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent)
+            ) {
+                Text(
+                    text = stringResource(R.string.deck_import_title),
+                    style = ty.labelLarge
                 )
             }
         }

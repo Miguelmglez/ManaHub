@@ -11,6 +11,7 @@ data class CollectionUiState(
     val sortOrder:     SortOrder                 = SortOrder.DATE_ADDED,
     val viewMode:      ViewMode                  = ViewMode.GRID,
     val hasStaleCards: Boolean                   = false,
+    val selectedTab:   CollectionTab             = CollectionTab.CARDS,
 )
 
 val CollectionUiState.activeFilterCount: Int
@@ -18,3 +19,4 @@ val CollectionUiState.activeFilterCount: Int
 
 enum class SortOrder { DATE_ADDED, NAME, PRICE_DESC, PRICE_ASC, RARITY }
 enum class ViewMode  { GRID, LIST }
+enum class CollectionTab { CARDS, DECKS }
