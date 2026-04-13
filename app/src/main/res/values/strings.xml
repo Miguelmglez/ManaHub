@@ -73,6 +73,7 @@
     <string name="collection_sort_name">Name</string>
     <string name="collection_sort_price_desc">Price: high to low</string>
     <string name="collection_sort_price_asc">Price: low to high</string>
+    <string name="collection_sort_price">Price</string>
     <string name="collection_sort_rarity">Rarity</string>
     <string name="collection_sort_cmc">Mana cost</string>
     <string name="collection_view_grid">Grid view</string>
@@ -267,7 +268,7 @@
     <string name="decklist_title">Decks</string>
     <string name="decklist_create_button">Create new deck</string>
     <string name="decklist_empty_title">No decks yet</string>
-    <string name="decklist_empty_subtitle">Create your first deck with the help of our smart builder</string>
+    <string name="decklist_empty_subtitle">Create your first deck with the help of our builder</string>
     <string name="decklist_empty_action">Create my first deck</string>
     <string name="decklist_delete_title">Delete deck</string>
     <string name="decklist_delete_message">Delete %1$s? This cannot be undone.</string>
@@ -511,6 +512,7 @@
 
     <!-- Avatar picker -->
     <string name="avatar_picker_title">Choose your Avatar</string>
+    <string name="avatar_picker_edit_hint">Edit profile photo</string>
     <string name="avatar_picker_filter_label">Filter by color</string>
     <string name="avatar_picker_confirm">Use this art</string>
     <string name="avatar_picker_remove">Remove photo</string>
@@ -625,21 +627,40 @@
     <string name="profile_stat_wins">Wins</string>
     <string name="profile_stat_win_pct">Win %</string>
     <string name="profile_stat_streak">Streak</string>
+    <string name="profile_stat_avg_life_won">Avg life when winning</string>
+    <string name="profile_stat_avg_duration">Avg duration</string>
+    <string name="profile_stat_avg_win_turn">Avg win turn</string>
+    <string name="profile_stat_turn_format">T%1$d</string>
+    <string name="profile_favourite_format">Favourite format</string>
     <string name="profile_stat_fav_color">Fav. Color</string>
     <string name="profile_stat_top_value">Top Value</string>
     <string name="profile_best_deck">Best Deck</string>
+    <string name="profile_section_best_deck">Best Deck</string>
+    <string name="profile_deck_games">%1$d games played</string>
+    <string name="profile_deck_win_rate">win rate</string>
+    <string name="profile_section_insights">Game Insights</string>
+    <string name="profile_insights_based_on">Based on %1$d game reviews</string>
+    <string name="profile_insight_hand">Starting Hand</string>
+    <string name="profile_insight_mana">Mana Issues</string>
+    <string name="profile_insight_mana_value">%1$d%% of games</string>
+    <string name="profile_insight_win_style">How you win</string>
     <string name="profile_survey_insights">Survey Insights</string>
     <string name="profile_insight_hand_quality">Hand Quality</string>
     <string name="profile_insight_mana_issues">Mana Issues</string>
     <string name="profile_insight_mana_games">%1$d games</string>
     <string name="profile_achievements">Achievements</string>
+    <string name="profile_section_achievements">Achievements (%1$d/%2$d)</string>
     <string name="profile_achievements_unlocked">Unlocked (%1$d)</string>
     <string name="profile_achievements_in_progress">In Progress (%1$d)</string>
     <string name="profile_achievements_hide_locked">Hide locked</string>
     <string name="profile_achievements_locked_count">%1$d locked achievements</string>
     <string name="profile_recent_games">Recent Games</string>
+    <string name="profile_section_recent_games">Recent Games</string>
     <string name="profile_win">WIN</string>
     <string name="profile_loss">LOSS</string>
+    <string name="profile_section_collection">Collection</string>
+    <string name="profile_win_badge">W</string>
+    <string name="profile_loss_badge">L</string>
     <string name="profile_collection_summary">Collection Summary</string>
     <string name="profile_total_cards">Total Cards</string>
     <string name="profile_est_value">Est. Value</string>
@@ -771,6 +792,7 @@
     <string name="advsearch_keyword_hint">e.g. Flying, Haste…</string>
     <string name="advsearch_section_sort">Sort results</string>
     <string name="advsearch_no_results">No cards found for this search</string>
+    <string name="advsearch_no_criteria">Add at least one criterion</string>
     <string name="advsearch_mana_hint">0..15</string>
     <string name="advsearch_power_hint">*</string>
     <string name="advsearch_toughness_hint">*</string>
