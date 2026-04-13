@@ -14,6 +14,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -56,11 +57,12 @@ class CardRepositoryImplTest {
         every { userPrefs.tagSuggestThresholdFlow } returns flowOf(SuggestTagsUseCase.DEFAULT_SUGGEST_THRESHOLD)
 
         repository = CardRepositoryImpl(
-            cardDao      = cardDao,
-            userCardDao  = userCardDao,
-            remote       = remote,
-            suggestTags  = suggestTags,
-            userPrefs    = userPrefs,
+            cardDao        = cardDao,
+            userCardDao    = userCardDao,
+            remote         = remote,
+            suggestTags    = suggestTags,
+            userPrefs      = userPrefs,
+            ioDispatcher   = UnconfinedTestDispatcher(),
         )
     }
 
