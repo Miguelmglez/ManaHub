@@ -1202,7 +1202,7 @@ private fun CoverPickerSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(cards, key = { it.scryfallId }) { deckCard ->
+                items(cards, key = { "cover_${it.scryfallId}" }) { deckCard ->
                     val artUrl = deckCard.card?.imageArtCrop ?: return@items
                     val isSelected = deckCard.scryfallId == currentCoverId
                     Box(

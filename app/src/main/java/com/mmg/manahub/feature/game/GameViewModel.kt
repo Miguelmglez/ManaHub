@@ -414,7 +414,33 @@ class GameViewModel @Inject constructor(
     fun resetGame() {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
-        _uiState.value = buildInitialState(initMode, initPlayerCount)
+        _uiState.update { s ->
+            val resetPlayers = s.players.map { p ->
+                p.copy(
+                    life            = s.mode.startingLife,
+                    poison          = 0,
+                    experience      = 0,
+                    energy          = 0,
+                    commanderDamage = emptyMap(),
+                    customCounters  = emptyList(),
+                    pendingDefeat   = false,
+                    defeated        = false
+                )
+            }
+            s.copy(
+                players        = resetPlayers,
+                activePlayerId = resetPlayers.firstOrNull()?.id ?: 0,
+                currentPhase   = GamePhase.UNTAP,
+                turnNumber     = 1,
+                winner         = null,
+                gameResult     = null,
+                gameStartTime  = System.currentTimeMillis(),
+                isGameRunning  = true,
+                hasPlayedLand  = emptySet(),
+                lifeDeltas     = emptyMap(),
+                phaseStops     = emptyList()
+            )
+        }
         _toolsState.value = GlobalToolsState()
     }
 

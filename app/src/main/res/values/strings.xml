@@ -146,11 +146,11 @@
     <string name="carddetail_delete_copy_message">Remove this copy from your collection?</string>
     <string name="carddetail_add_to_wishlist">Wishlist</string>
     <string name="carddetail_wishlist_sheet_title">Add to wishlist</string>
-    <string name="carddetail_offer_for_trade">Offer for trade</string>
-    <string name="carddetail_trade_sheet_title">Select copies to offer for trade</string>
-    <string name="carddetail_trade_sheet_subtitle">Choose which copies you want to offer. They will remain in your collection.</string>
+    <string name="carddetail_offer_for_trade">Mark for trade</string>
+    <string name="carddetail_trade_sheet_title">Select copies to mark for trade</string>
+    <string name="carddetail_trade_sheet_subtitle">Choose which copies you want to mark for trade. They will remain in your collection.</string>
     <string name="carddetail_for_trade_badge">For trade</string>
-    <string name="carddetail_no_copies_for_trade">You have no collection copies to offer for trade.</string>
+    <string name="carddetail_no_copies_for_trade">You have no collection copies to mark for trade.</string>
     <string name="carddetail_rename_tag">Rename tag</string>
     <string name="carddetail_new_name_hint">New name…</string>
     <string name="carddetail_new_custom_tag">New custom tag</string>

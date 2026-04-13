@@ -124,7 +124,7 @@ class DeckDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val owned = userCardRepository.observeCollection().first()
-                collectionCards = owned.map { it.card }.sortedBy { it.name }
+                collectionCards = owned.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
             } catch (_: Exception) {
             }
         }
