@@ -10,6 +10,12 @@ interface CardRepository {
     suspend fun searchCardByName(query: String): DataResult<Card>
     suspend fun searchCards(query: String, page: Int = 1): DataResult<List<Card>>
     suspend fun getCardById(scryfallId: String): DataResult<Card>
+
+    /** Fetches a card by its exact English name (e.g. "Lightning Bolt"). */
+    suspend fun getCardByExactName(name: String): Result<Card>
+
+    /** Executes a raw Scryfall query string and returns matching cards. */
+    suspend fun searchWithRawQuery(query: String): List<Card>
     fun observeCard(scryfallId: String): Flow<Card?>
     suspend fun refreshCollectionPrices()
     suspend fun updatePrices(

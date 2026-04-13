@@ -8,6 +8,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -72,7 +73,7 @@ class TournamentRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = TournamentRepositoryImpl(dao)
+        repository = TournamentRepositoryImpl(dao, UnconfinedTestDispatcher())
     }
 
     // ══════════════════════════════════════════════════════════════════════════

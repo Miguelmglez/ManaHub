@@ -14,11 +14,14 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.model.SuggestedTag
+import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,29 +35,32 @@ class CardRepositoryImpl @Inject constructor(
     private val remote:         ScryfallRemoteDataSource,
     private val suggestTags:    SuggestTagsUseCase,
     private val userPrefs:      UserPreferencesDataStore,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : CardRepository {
 
-    override suspend fun searchCardByName(query: String): DataResult<Card> {
-        val result = remote.searchCardByName(query)
-        return if (result.isSuccess) {
-            val card = result.getOrThrow()
-            cardDao.upsert(entityWithComputedTags(card))
-            DataResult.Success(card)
-        } else {
-            DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+    override suspend fun searchCardByName(query: String): DataResult<Card> =
+        withContext(ioDispatcher) {
+            val result = remote.searchCardByName(query)
+            if (result.isSuccess) {
+                val card = result.getOrThrow()
+                cardDao.upsert(entityWithComputedTags(card))
+                DataResult.Success(card)
+            } else {
+                DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+            }
         }
-    }
 
-    override suspend fun searchCards(query: String, page: Int): DataResult<List<Card>> {
-        val result = remote.searchCards(query, page)
-        return if (result.isSuccess) {
-            val cards = result.getOrThrow()
-            cardDao.upsertAll(cards.map { entityWithComputedTags(it) })
-            DataResult.Success(cards)
-        } else {
-            DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+    override suspend fun searchCards(query: String, page: Int): DataResult<List<Card>> =
+        withContext(ioDispatcher) {
+            val result = remote.searchCards(query, page)
+            if (result.isSuccess) {
+                val cards = result.getOrThrow()
+                cardDao.upsertAll(cards.map { entityWithComputedTags(it) })
+                DataResult.Success(cards)
+            } else {
+                DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+            }
         }
-    }
 
     private suspend fun entityWithComputedTags(card: Card) = run {
         val existing = cardDao.getById(card.scryfallId)
@@ -66,13 +72,19 @@ class CardRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun getCardById(scryfallId: String): DataResult<Card> {
+    override suspend fun getCardByExactName(name: String): Result<Card> =
+        withContext(ioDispatcher) { remote.getCardByExactName(name) }
+
+    override suspend fun searchWithRawQuery(query: String): List<Card> =
+        withContext(ioDispatcher) { remote.searchWithRawQuery(query) }
+
+    override suspend fun getCardById(scryfallId: String): DataResult<Card> = withContext(ioDispatcher) {
         val cached = cardDao.getById(scryfallId)
         if (cached != null && CachePolicy.isFresh(cached.cachedAt))
-            return DataResult.Success(cached.toDomain())
+            return@withContext DataResult.Success(cached.toDomain())
 
         val result = remote.getCardById(scryfallId)
-        return when {
+        return@withContext when {
             result.isSuccess -> {
                 val card = result.getOrThrow()
 
@@ -106,9 +118,9 @@ class CardRepositoryImpl @Inject constructor(
     override fun observeCard(scryfallId: String): Flow<Card?> =
         cardDao.observeById(scryfallId).map { it?.toDomain() }
 
-    override suspend fun refreshCollectionPrices() {
+    override suspend fun refreshCollectionPrices() = withContext(ioDispatcher) {
         val allIds = userCardDao.getAllScryfallIds()
-        if (allIds.isEmpty()) return
+        if (allIds.isEmpty()) return@withContext
 
         // Batch-load all cached entries in a single query instead of N getById() calls.
         val cachedMap = cardDao.getByIds(allIds).associateBy { it.scryfallId }
@@ -116,7 +128,7 @@ class CardRepositoryImpl @Inject constructor(
             val c = cachedMap[id]
             c == null || !CachePolicy.isFresh(c.cachedAt)
         }
-        if (staleIds.isEmpty()) return
+        if (staleIds.isEmpty()) return@withContext
 
         val result = remote.getCardsBatch(staleIds)
         if (result.isSuccess) {

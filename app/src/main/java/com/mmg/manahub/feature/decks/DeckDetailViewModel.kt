@@ -11,6 +11,7 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.domain.usecase.decks.DeckCardValidator
 import com.mmg.manahub.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class DeckCard(
+/**
+ * Represents a card slot inside a persisted deck.
+ *
+ * Named [DeckSlotEntry] to avoid collision with the domain-level
+ * [com.mmg.manahub.core.domain.model.DeckCard] used by the deck builder.
+ */
+data class DeckSlotEntry(
     val scryfallId: String,
     val quantity: Int,
     val isSideboard: Boolean,
@@ -50,7 +57,7 @@ class DeckDetailViewModel @Inject constructor(
 
     data class UiState(
         val deck: Deck? = null,
-        val cards: List<DeckCard> = emptyList(),
+        val cards: List<DeckSlotEntry> = emptyList(),
         val isLoading: Boolean = true,
         val totalCards: Int = 0,
         val manaCurve: Map<Int, Int> = emptyMap(),
@@ -99,7 +106,7 @@ class DeckDetailViewModel @Inject constructor(
                         is DataResult.Success -> r.data
                         else -> null
                     }
-                    DeckCard(slot.scryfallId, slot.quantity, isSideboard = false, card = card)
+                    DeckSlotEntry(slot.scryfallId, slot.quantity, isSideboard = false, card = card)
                 }
                 _uiState.update {
                     it.copy(
@@ -204,12 +211,8 @@ class DeckDetailViewModel @Inject constructor(
         val card = _uiState.value.addCardsResults.find { it.card.scryfallId == scryfallId }?.card
 
         if (format != null && card != null) {
-            val isBasic = BasicLandCalculator.isBasicLand(card)
-            if (!isBasic) {
-                // Commander: hard limit at 1
-                if (format.uniqueCards && currentQty >= 1) return
-                // Draft (maxCopies >= 99): unlimited, no check needed
-            }
+            val result = DeckCardValidator.canAddCard(card, format, currentQty)
+            if (result == DeckCardValidator.AddResult.BLOCKED) return
         }
 
         viewModelScope.launch {
@@ -358,13 +361,13 @@ class DeckDetailViewModel @Inject constructor(
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private fun buildManaCurve(cards: List<DeckCard>): Map<Int, Int> =
+    private fun buildManaCurve(cards: List<DeckSlotEntry>): Map<Int, Int> =
         cards
             .mapNotNull { it.card }
             .groupBy { minOf(it.cmc.toInt(), 7) }
             .mapValues { it.value.size }
 
-    private fun buildColorDist(cards: List<DeckCard>): Map<String, Int> =
+    private fun buildColorDist(cards: List<DeckSlotEntry>): Map<String, Int> =
         cards
             .mapNotNull { it.card }
             .flatMap { it.colors }

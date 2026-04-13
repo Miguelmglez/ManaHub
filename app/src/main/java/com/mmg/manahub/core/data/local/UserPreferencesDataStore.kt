@@ -104,7 +104,7 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_PREFERRED_CURRENCY] = currency.code }
     }
 
-    val preferredCurrencyFlow: Flow<PreferredCurrency> = preferencesFlow
+    override val preferredCurrencyFlow: Flow<PreferredCurrency> = preferencesFlow
         .map { it.preferredCurrency }
 
     suspend fun savePreferredCurrency(currency: PreferredCurrency) {
@@ -119,17 +119,17 @@ class UserPreferencesDataStore @Inject constructor(
     )
 
 
-    val lastPriceRefreshFlow: Flow<Long?> = context.userPrefsDataStore.data
+    override val lastPriceRefreshFlow: Flow<Long?> = context.userPrefsDataStore.data
         .map { it[LAST_PRICE_REFRESH_KEY] }
 
-    val autoRefreshPricesFlow: Flow<Boolean> = context.userPrefsDataStore.data
+    override val autoRefreshPricesFlow: Flow<Boolean> = context.userPrefsDataStore.data
         .map { it[AUTO_REFRESH_KEY] ?: false }
 
-    suspend fun saveLastPriceRefresh(timestamp: Long) {
+    override suspend fun saveLastPriceRefresh(timestamp: Long) {
         context.userPrefsDataStore.edit { it[LAST_PRICE_REFRESH_KEY] = timestamp }
     }
 
-    suspend fun saveAutoRefreshPrices(enabled: Boolean) {
+    override suspend fun saveAutoRefreshPrices(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[AUTO_REFRESH_KEY] = enabled }
     }
 
@@ -195,7 +195,7 @@ class UserPreferencesDataStore @Inject constructor(
 
     // ── User-defined tags ─────────────────────────────────────────────────────
 
-    val userDefinedTagsFlow: Flow<List<UserDefinedTag>> = context.userPrefsDataStore.data
+    override val userDefinedTagsFlow: Flow<List<UserDefinedTag>> = context.userPrefsDataStore.data
         .map { prefs ->
             val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
             runCatching<List<UserDefinedTag>> {
@@ -205,7 +205,7 @@ class UserPreferencesDataStore @Inject constructor(
         }
         .catch { emit(emptyList()) }
 
-    suspend fun saveUserDefinedTag(tag: UserDefinedTag) {
+    override suspend fun saveUserDefinedTag(tag: UserDefinedTag) {
         context.userPrefsDataStore.edit { prefs ->
             val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
             val records: MutableList<UdtRecord> = runCatching<List<UdtRecord>> {
@@ -217,7 +217,7 @@ class UserPreferencesDataStore @Inject constructor(
         }
     }
 
-    suspend fun deleteUserDefinedTag(key: String) {
+    override suspend fun deleteUserDefinedTag(key: String) {
         context.userPrefsDataStore.edit { prefs ->
             val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
             val records: MutableList<UdtRecord> = runCatching<List<UdtRecord>> {
