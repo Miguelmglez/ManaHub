@@ -13,6 +13,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -106,7 +107,7 @@ class DeckRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = DeckRepositoryImpl(deckDao, cardRepository)
+        repository = DeckRepositoryImpl(deckDao, cardRepository, UnconfinedTestDispatcher())
     }
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -79,7 +79,9 @@ fun ProfileScreen(
         topBar = {
             Surface(
                 color = mc.backgroundSecondary,
-                modifier = Modifier.fillMaxWidth().height(56.dp) // Forzamos 56dp para igualar a Settings (48dp del icono + 8dp de padding)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp) // Forzamos 56dp para igualar a Settings (48dp del icono + 8dp de padding)
             ) {
                 Row(
                     modifier = Modifier
@@ -93,33 +95,45 @@ fun ProfileScreen(
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = mc.textPrimary,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(24.dp)
+                            .clickable(onClick = onSettingsClick),
+                    )
+
                 }
             }
         },
     ) { padding ->
         LazyColumn(
-            modifier       = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
 
             // ── Hero ──────────────────────────────────────────────────────────
             item {
                 ProfileHeroSection(
-                    name          = uiState.playerName,
-                    avatarUrl     = uiState.avatarUrl,
+                    name = uiState.playerName,
+                    avatarUrl = uiState.avatarUrl,
                     onAvatarClick = { showAvatarPicker = true },
-                    onSettingsClick = onSettingsClick,
-                    savePlayerName     = viewModel::savePlayerName,
+                    savePlayerName = viewModel::savePlayerName,
                 )
             }
 
             // ── KPI grid ──────────────────────────────────────────────────────
             item {
                 ProfileKpiSection(
-                    uiState           = uiState,
-                    favouriteColor    = uiState.favouriteColor,
+                    uiState = uiState,
+                    favouriteColor = uiState.favouriteColor,
                     mostValuableColor = uiState.mostValuableColor,
-                    modifier          = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
 
@@ -127,7 +141,7 @@ fun ProfileScreen(
             if (uiState.deckStats.isNotEmpty()) {
                 item {
                     BestDeckSection(
-                        deck     = uiState.deckStats.first(),
+                        deck = uiState.deckStats.first(),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
@@ -137,35 +151,35 @@ fun ProfileScreen(
             if (uiState.surveyCount > 0) {
                 item {
                     SurveyInsightsSection(
-                        uiState  = uiState,
+                        uiState = uiState,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
             }
-/*
-            // ── Achievements ──────────────────────────────────────────────────
-            if (uiState.achievements.isNotEmpty()) {
-                item {
-                    AchievementsSection(
-                        achievements = uiState.achievements,
-                        modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-            }*/
+            /*
+                        // ── Achievements ──────────────────────────────────────────────────
+                        if (uiState.achievements.isNotEmpty()) {
+                            item {
+                                AchievementsSection(
+                                    achievements = uiState.achievements,
+                                    modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                )
+                            }
+                        }*/
 
             // ── Recent games ──────────────────────────────────────────────────
             if (uiState.recentSessions.isNotEmpty()) {
                 item {
                     SectionTitle(
-                        text     = stringResource(R.string.profile_recent_games),
+                        text = stringResource(R.string.profile_recent_games),
                         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
                     )
                 }
                 items(uiState.recentSessions) { session ->
                     RecentGameRow(
-                        session      = session,
-                        playerName   = uiState.playerName,
-                        modifier     = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
+                        session = session,
+                        playerName = uiState.playerName,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
                     )
                 }
             }
@@ -174,7 +188,7 @@ fun ProfileScreen(
             uiState.collectionStats?.let { stats ->
                 item {
                     CollectionSummarySection(
-                        stats    = stats,
+                        stats = stats,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         viewModel = viewModel
                     )
@@ -184,7 +198,7 @@ fun ProfileScreen(
             // ── Send feedback ─────────────────────────────────────────────────
             item {
                 SendFeedbackRow(
-                    onClick  = { showFeedbackSheet = true },
+                    onClick = { showFeedbackSheet = true },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
@@ -204,7 +218,6 @@ private fun ProfileHeroSection(
     name: String,
     avatarUrl: String?,
     onAvatarClick: () -> Unit,
-    onSettingsClick: () -> Unit,
     savePlayerName: (String) -> Unit
 ) {
     val mc = MaterialTheme.magicColors
@@ -226,13 +239,15 @@ private fun ProfileHeroSection(
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clickable{onAvatarClick()},
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onAvatarClick() },
             )
         } else {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable{onAvatarClick()}
+                    .clickable { onAvatarClick() }
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
@@ -270,24 +285,6 @@ private fun ProfileHeroSection(
                 ),
         )
 
-        // Edit button — top-right corner
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(onClick = onSettingsClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = "Settings",
-                tint = Color.White.copy(alpha = 0.85f),
-                modifier = Modifier.size(24.dp).clickable(onClick = onSettingsClick),
-            )
-        }
 
         // Name + play style badge — bottom
         Column(
@@ -301,10 +298,10 @@ private fun ProfileHeroSection(
                 value = localName,
                 onValueChange = { newName ->
                     localName = newName
-                    // Aquí se actualiza el nombre del usuario
+                    // Updates the player name on every keystroke
                     savePlayerName(newName)
                 },
-                // Aplicamos el mismo estilo que tenías en el Text
+                // Apply the same text style used in the original Text composable
                 textStyle = TextStyle(
                     fontFamily = MarcellusFontFamily,
                     fontWeight = FontWeight.Bold,
@@ -312,19 +309,18 @@ private fun ProfileHeroSection(
                     color = Color.White,
                     letterSpacing = 1.sp
                 ),
-                cursorBrush = SolidColor(Color.White), // Color de la rayita al escribir
+                cursorBrush = SolidColor(Color.White), // Cursor color while typing
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done // Cambia la tecla 'Enter' por 'Hecho/Ok'
+                    imeAction = ImeAction.Done // Shows 'Done' action instead of 'Enter'
                 ),
                 keyboardActions = KeyboardActions(
                     onDone = {
-                        focusManager.clearFocus() // <--- 3. QUITA EL FOCO Y EL CURSOR
-                        // Aquí podrías añadir lógica extra como guardar en DB si quieres
+                        focusManager.clearFocus() // Dismiss keyboard and remove cursor
                     }
                 ),
                 decorationBox = { innerTextField ->
-                    // Esto maneja el "placeholder" (el texto por defecto cuando está vacío)
+                    // Placeholder text shown when the field is empty
                     if (name.isEmpty()) {
                         Text(
                             text = stringResource(R.string.game_setup_default_player_name),
@@ -348,41 +344,66 @@ private fun ProfileHeroSection(
 
 @Composable
 private fun ProfileKpiSection(
-    uiState:           ProfileViewModel.UiState,
-    favouriteColor:    String?,
+    uiState: ProfileViewModel.UiState,
+    favouriteColor: String?,
     mostValuableColor: String?,
-    modifier:          Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier            = modifier.padding(top = 8.dp),
+        modifier = modifier.padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SectionTitle(stringResource(R.string.profile_section_game_stats))
         Row(
-            modifier              = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            KpiCell(stringResource(R.string.profile_stat_games),  uiState.totalGames.toString(),               Modifier.weight(1f))
-            KpiCell(stringResource(R.string.profile_stat_wins),   uiState.totalWins.toString(),                Modifier.weight(1f))
-            KpiCell(stringResource(R.string.profile_stat_win_pct),  "${(uiState.winRate * 100).roundToInt()}%",  Modifier.weight(1f))
+            KpiCell(
+                stringResource(R.string.profile_stat_games),
+                uiState.totalGames.toString(),
+                Modifier.weight(1f)
+            )
+            KpiCell(
+                stringResource(R.string.profile_stat_wins),
+                uiState.totalWins.toString(),
+                Modifier.weight(1f)
+            )
+            KpiCell(
+                stringResource(R.string.profile_stat_win_pct),
+                "${(uiState.winRate * 100).roundToInt()}%",
+                Modifier.weight(1f)
+            )
         }
         Row(
-            modifier              = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            KpiCell(stringResource(R.string.profile_stat_streak), uiState.currentStreak.toString(), Modifier.weight(1f), accent = true)
-            ColorStatCard(label = stringResource(R.string.profile_stat_fav_color),  colorCode = favouriteColor,    modifier = Modifier.weight(1f))
-            ColorStatCard(label = stringResource(R.string.profile_stat_top_value),   colorCode = mostValuableColor, modifier = Modifier.weight(1f))
+            KpiCell(
+                stringResource(R.string.profile_stat_streak),
+                uiState.currentStreak.toString(),
+                Modifier.weight(1f),
+                accent = true
+            )
+            ColorStatCard(
+                label = stringResource(R.string.profile_stat_fav_color),
+                colorCode = favouriteColor,
+                modifier = Modifier.weight(1f)
+            )
+            ColorStatCard(
+                label = stringResource(R.string.profile_stat_top_value),
+                colorCode = mostValuableColor,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
 
 @Composable
 private fun KpiCell(
-    label:    String,
-    value:    String,
+    label: String,
+    value: String,
     modifier: Modifier,
-    accent:   Boolean = false,
+    accent: Boolean = false,
 ) {
     val mc = MaterialTheme.magicColors
     Column(
@@ -400,8 +421,8 @@ private fun KpiCell(
         )
         Text(
             label,
-            style     = MaterialTheme.magicTypography.labelSmall,
-            color     = mc.textSecondary,
+            style = MaterialTheme.magicTypography.labelSmall,
+            color = mc.textSecondary,
             textAlign = TextAlign.Center,
         )
     }
@@ -411,13 +432,13 @@ private fun KpiCell(
 
 @Composable
 private fun BestDeckSection(
-    deck:     DeckStatsRow,
+    deck: DeckStatsRow,
     modifier: Modifier = Modifier,
 ) {
-    val mc      = MaterialTheme.magicColors
+    val mc = MaterialTheme.magicColors
     val winRate = if (deck.totalGames > 0) deck.wins.toFloat() / deck.totalGames else 0f
     Column(
-        modifier            = modifier,
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SectionTitle(stringResource(R.string.profile_best_deck))
@@ -429,28 +450,31 @@ private fun BestDeckSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    verticalAlignment     = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text     = deck.deckName ?: "???",
-                        style    = MaterialTheme.magicTypography.bodyMedium,
-                        color    = mc.textPrimary,
+                        text = deck.deckName ?: "???",
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textPrimary,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text  = "${deck.totalGames}G · ${(winRate * 100).roundToInt()}% WR",
+                        text = "${deck.totalGames}G · ${(winRate * 100).roundToInt()}% WR",
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.primaryAccent,
                     )
                 }
                 LinearProgressIndicator(
-                    progress   = { winRate },
-                    modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                    color      = mc.primaryAccent,
+                    progress = { winRate },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = mc.primaryAccent,
                     trackColor = mc.surfaceVariant,
                 )
             }
@@ -462,12 +486,12 @@ private fun BestDeckSection(
 
 @Composable
 private fun SurveyInsightsSection(
-    uiState:  ProfileViewModel.UiState,
+    uiState: ProfileViewModel.UiState,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     Column(
-        modifier            = modifier,
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SectionTitle(stringResource(R.string.profile_survey_insights))
@@ -478,8 +502,18 @@ private fun SurveyInsightsSection(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                InsightRow(stringResource(R.string.profile_insight_hand_quality),   "${(uiState.avgHandRating * 20).roundToInt()}%",  (uiState.avgHandRating / 5f).toFloat())
-                InsightRow(stringResource(R.string.profile_insight_mana_issues),  stringResource(R.string.profile_insight_mana_games, uiState.manaIssueCount),  (uiState.manaIssueCount.toFloat() / uiState.totalGames.coerceAtLeast(1)).coerceAtMost(1f))
+                InsightRow(
+                    stringResource(R.string.profile_insight_hand_quality),
+                    "${(uiState.avgHandRating * 20).roundToInt()}%",
+                    (uiState.avgHandRating / 5f).toFloat()
+                )
+                InsightRow(
+                    stringResource(R.string.profile_insight_mana_issues),
+                    stringResource(R.string.profile_insight_mana_games, uiState.manaIssueCount),
+                    (uiState.manaIssueCount.toFloat() / uiState.totalGames.coerceAtLeast(1)).coerceAtMost(
+                        1f
+                    )
+                )
             }
         }
     }
@@ -490,16 +524,19 @@ private fun InsightRow(label: String, value: String, progress: Float) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
-            modifier              = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
             Text(value, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
         }
         LinearProgressIndicator(
-            progress   = { progress },
-            modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-            color      = mc.primaryAccent,
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            color = mc.primaryAccent,
             trackColor = mc.surfaceVariant,
         )
     }
@@ -510,29 +547,36 @@ private fun InsightRow(label: String, value: String, progress: Float) {
 @Composable
 private fun AchievementsSection(
     achievements: List<Achievement>,
-    modifier:     Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
-    val mc       = MaterialTheme.magicColors
-    val unlocked   = achievements.filter { it.isUnlocked }
+    val mc = MaterialTheme.magicColors
+    val unlocked = achievements.filter { it.isUnlocked }
     val inProgress = achievements.filter { !it.isUnlocked && (it.progress ?: 0f) > 0f }
-    val locked     = achievements.filter { !it.isUnlocked && (it.progress ?: 0f) == 0f }
+    val locked = achievements.filter { !it.isUnlocked && (it.progress ?: 0f) == 0f }
 
     var selectedAchievement by remember { mutableStateOf<Achievement?>(null) }
-    var showLocked          by remember { mutableStateOf(false) }
+    var showLocked by remember { mutableStateOf(false) }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle(stringResource(R.string.profile_achievements), modifier = Modifier.padding(top = 8.dp))
+        SectionTitle(
+            stringResource(R.string.profile_achievements),
+            modifier = Modifier.padding(top = 8.dp)
+        )
 
         // Unlocked grid
         if (unlocked.isNotEmpty()) {
-            Text(stringResource(R.string.profile_achievements_unlocked, unlocked.size), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+            Text(
+                stringResource(R.string.profile_achievements_unlocked, unlocked.size),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textSecondary
+            )
             unlocked.chunked(4).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { ach ->
                         AchievementBadge(
                             achievement = ach,
-                            onClick     = { selectedAchievement = ach },
-                            modifier    = Modifier.weight(1f),
+                            onClick = { selectedAchievement = ach },
+                            modifier = Modifier.weight(1f),
                         )
                     }
                     repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
@@ -542,11 +586,15 @@ private fun AchievementsSection(
 
         // In-progress
         if (inProgress.isNotEmpty()) {
-            Text(stringResource(R.string.profile_achievements_in_progress, inProgress.size), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+            Text(
+                stringResource(R.string.profile_achievements_in_progress, inProgress.size),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textSecondary
+            )
             inProgress.forEach { ach ->
                 AchievementProgressRow(
                     achievement = ach,
-                    onClick     = { selectedAchievement = ach },
+                    onClick = { selectedAchievement = ach },
                 )
             }
         }
@@ -554,11 +602,14 @@ private fun AchievementsSection(
         // Locked — collapsed
         if (locked.isNotEmpty()) {
             TextButton(
-                onClick            = { showLocked = !showLocked },
-                contentPadding     = PaddingValues(0.dp),
+                onClick = { showLocked = !showLocked },
+                contentPadding = PaddingValues(0.dp),
             ) {
                 Text(
-                    text  = if (showLocked) stringResource(R.string.profile_achievements_hide_locked) else stringResource(R.string.profile_achievements_locked_count, locked.size),
+                    text = if (showLocked) stringResource(R.string.profile_achievements_hide_locked) else stringResource(
+                        R.string.profile_achievements_locked_count,
+                        locked.size
+                    ),
                     style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.textDisabled,
                 )
@@ -569,8 +620,8 @@ private fun AchievementsSection(
                         row.forEach { ach ->
                             AchievementBadge(
                                 achievement = ach,
-                                onClick     = { selectedAchievement = ach },
-                                modifier    = Modifier.weight(1f),
+                                onClick = { selectedAchievement = ach },
+                                modifier = Modifier.weight(1f),
                             )
                         }
                         repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
@@ -583,7 +634,7 @@ private fun AchievementsSection(
     selectedAchievement?.let { ach ->
         AchievementDetailDialog(
             achievement = ach,
-            onDismiss   = { selectedAchievement = null },
+            onDismiss = { selectedAchievement = null },
         )
     }
 }
@@ -591,36 +642,36 @@ private fun AchievementsSection(
 @Composable
 private fun AchievementBadge(
     achievement: Achievement,
-    onClick:     () -> Unit,
-    modifier:    Modifier = Modifier,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     Surface(
-        onClick  = onClick,
+        onClick = onClick,
         modifier = modifier,
-        shape    = RoundedCornerShape(12.dp),
-        color    = if (achievement.isUnlocked) mc.surface else mc.surface.copy(alpha = 0.4f),
-        border   = if (achievement.isUnlocked)
+        shape = RoundedCornerShape(12.dp),
+        color = if (achievement.isUnlocked) mc.surface else mc.surface.copy(alpha = 0.4f),
+        border = if (achievement.isUnlocked)
             BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f))
         else null,
     ) {
         Column(
-            modifier            = Modifier.padding(8.dp),
+            modifier = Modifier.padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text     = achievement.emoji,
+                text = achievement.emoji,
                 fontSize = 22.sp,
-                color    = if (achievement.isUnlocked) Color.Unspecified else mc.textDisabled,
+                color = if (achievement.isUnlocked) Color.Unspecified else mc.textDisabled,
             )
             Text(
-                text      = achievement.title,
-                style     = MaterialTheme.magicTypography.labelSmall,
-                color     = if (achievement.isUnlocked) mc.textPrimary else mc.textDisabled,
+                text = achievement.title,
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = if (achievement.isUnlocked) mc.textPrimary else mc.textDisabled,
                 textAlign = TextAlign.Center,
-                maxLines  = 2,
-                overflow  = TextOverflow.Ellipsis,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -629,36 +680,50 @@ private fun AchievementBadge(
 @Composable
 private fun AchievementProgressRow(
     achievement: Achievement,
-    onClick:     () -> Unit,
-    modifier:    Modifier = Modifier,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     Surface(
-        onClick  = onClick,
+        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(12.dp),
-        color    = mc.surface,
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
     ) {
         Row(
-            modifier          = Modifier.padding(12.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(achievement.emoji, fontSize = 20.sp, modifier = Modifier.padding(end = 12.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Row(
-                    modifier              = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(achievement.title, style = MaterialTheme.magicTypography.bodySmall, color = mc.textPrimary)
+                    Text(
+                        achievement.title,
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textPrimary
+                    )
                     achievement.progressLabel?.let {
-                        Text(it, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                        Text(
+                            it,
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.primaryAccent
+                        )
                     }
                 }
                 achievement.progress?.let { prog ->
                     LinearProgressIndicator(
-                        progress   = { prog },
-                        modifier   = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                        color      = mc.primaryAccent,
+                        progress = { prog },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = mc.primaryAccent,
                         trackColor = mc.surfaceVariant,
                     )
                 }
@@ -670,21 +735,25 @@ private fun AchievementProgressRow(
 @Composable
 private fun AchievementDetailDialog(
     achievement: Achievement,
-    onDismiss:   () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton    = {
+        confirmButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.profile_achievement_ok)) }
         },
         title = {
             Row(
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(achievement.emoji, fontSize = 28.sp)
-                Text(achievement.title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+                Text(
+                    achievement.title,
+                    style = MaterialTheme.magicTypography.titleMedium,
+                    color = mc.textPrimary
+                )
             }
         },
         text = {
@@ -694,29 +763,44 @@ private fun AchievementDetailDialog(
                     color = mc.primaryAccent.copy(alpha = 0.1f),
                 ) {
                     Text(
-                        text     = achievement.category.label,
-                        style    = MaterialTheme.magicTypography.labelSmall,
-                        color    = mc.primaryAccent,
+                        text = achievement.category.label,
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.primaryAccent,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
-                Text(achievement.description, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
+                Text(
+                    achievement.description,
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary
+                )
                 if (!achievement.isUnlocked) {
                     achievement.progress?.let { prog ->
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(
-                                modifier              = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text(stringResource(R.string.profile_progress), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+                                Text(
+                                    stringResource(R.string.profile_progress),
+                                    style = MaterialTheme.magicTypography.labelSmall,
+                                    color = mc.textDisabled
+                                )
                                 achievement.progressLabel?.let {
-                                    Text(it, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                                    Text(
+                                        it,
+                                        style = MaterialTheme.magicTypography.labelSmall,
+                                        color = mc.primaryAccent
+                                    )
                                 }
                             }
                             LinearProgressIndicator(
-                                progress   = { prog },
-                                modifier   = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                color      = mc.primaryAccent,
+                                progress = { prog },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = mc.primaryAccent,
                                 trackColor = mc.surfaceVariant,
                             )
                         }
@@ -732,9 +816,9 @@ private fun AchievementDetailDialog(
 
 @Composable
 private fun ColorStatCard(
-    label:     String,
+    label: String,
     colorCode: String?,
-    modifier:  Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     Column(
@@ -752,8 +836,8 @@ private fun ColorStatCard(
         }
         Text(
             label,
-            style     = MaterialTheme.magicTypography.labelSmall,
-            color     = mc.textSecondary,
+            style = MaterialTheme.magicTypography.labelSmall,
+            color = mc.textSecondary,
             textAlign = TextAlign.Center,
         )
     }
@@ -763,40 +847,40 @@ private fun ColorStatCard(
 
 @Composable
 private fun RecentGameRow(
-    session:    GameSessionWithPlayers,
+    session: GameSessionWithPlayers,
     playerName: String,
-    modifier:   Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
-    val dateStr    = dateFormat.format(Date(session.session.playedAt))
+    val dateStr = dateFormat.format(Date(session.session.playedAt))
 
     val myPlayer = session.players.find { it.playerName == playerName }
-    val isWin    = myPlayer?.isWinner == true
+    val isWin = myPlayer?.isWinner == true
 
     Surface(
-        shape  = RoundedCornerShape(12.dp),
-        color  = mc.surface,
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier          = Modifier.padding(12.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = session.session.mode,
+                    text = session.session.mode,
                     style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.textSecondary,
                 )
                 Text(
-                    text  = dateStr,
+                    text = dateStr,
                     style = MaterialTheme.magicTypography.bodySmall,
                     color = mc.textDisabled,
                 )
             }
             Text(
-                text  = if (isWin) stringResource(R.string.profile_win) else stringResource(R.string.profile_loss),
+                text = if (isWin) stringResource(R.string.profile_win) else stringResource(R.string.profile_loss),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = if (isWin) mc.primaryAccent else mc.textDisabled,
             )
@@ -817,21 +901,35 @@ private fun CollectionSummarySection(
     val currency = uiState.preferredCurrency
 
     Column(
-        modifier            = modifier,
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SectionTitle(stringResource(R.string.profile_collection_summary))
         Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
             Row(
-                modifier              = Modifier.fillMaxWidth().padding(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
-                    Text(stringResource(R.string.profile_total_cards), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
-                    Text(stats.totalCards.toString(), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+                    Text(
+                        stringResource(R.string.profile_total_cards),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textSecondary
+                    )
+                    Text(
+                        stats.totalCards.toString(),
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = mc.textPrimary
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(stringResource(R.string.profile_est_value), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text(
+                        stringResource(R.string.profile_est_value),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textSecondary
+                    )
                     val formattedPrice = PriceFormatter.format(
                         amount = if (currency == PreferredCurrency.EUR) stats.totalValueEur else stats.totalValueUsd,
                         currency = currency
@@ -853,7 +951,7 @@ private fun CollectionSummarySection(
 @Composable
 private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
-        text  = text,
+        text = text,
         style = MaterialTheme.magicTypography.labelLarge,
         color = MaterialTheme.magicColors.textSecondary,
         modifier = modifier,
@@ -869,7 +967,7 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val version = remember { com.mmg.manahub.BuildConfig.VERSION_NAME }
 
     Column(
-        modifier            = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -903,40 +1001,40 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
  */
 @Composable
 private fun SendFeedbackRow(
-    onClick:  () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     Surface(
-        onClick   = onClick,
-        modifier  = modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(12.dp),
-        color     = mc.surface,
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
     ) {
         Row(
-            modifier          = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector        = Icons.AutoMirrored.Filled.Send,
+                imageVector = Icons.AutoMirrored.Filled.Send,
                 contentDescription = null,
-                tint               = mc.primaryAccent,
-                modifier           = Modifier.size(20.dp),
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text     = stringResource(R.string.feedback_title),
-                style    = MaterialTheme.magicTypography.bodyMedium,
-                color    = mc.textPrimary,
+                text = stringResource(R.string.feedback_title),
+                style = MaterialTheme.magicTypography.bodyMedium,
+                color = mc.textPrimary,
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                imageVector        = Icons.Default.ChevronRight,
+                imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint               = mc.textDisabled,
-                modifier           = Modifier.size(20.dp),
+                tint = mc.textDisabled,
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -944,8 +1042,8 @@ private fun SendFeedbackRow(
 
 private fun formatDuration(ms: Long): String {
     val minutes = ms / 60_000L
-    val hours   = minutes / 60
-    val mins    = minutes % 60
+    val hours = minutes / 60
+    val mins = minutes % 60
     return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
 }
 

@@ -96,7 +96,8 @@ class CardNameAnalyzerRegressionTest {
     @Test
     fun `given plain boolean guard when concurrent threads race then multiple threads can enter critical section`() {
         // Arrange: simulate the OLD, broken non-atomic guard
-        @Volatile var isProcessing = false
+        @Suppress("VARIABLE_WITH_REDUNDANT_INITIALIZER")
+        var isProcessing = false
         val successCounter = AtomicInteger(0)
         val threadCount    = 50
         val executor       = Executors.newFixedThreadPool(threadCount)

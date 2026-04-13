@@ -2,8 +2,6 @@ package com.mmg.manahub.feature.decks
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.model.BuilderStep
 import com.mmg.manahub.core.domain.model.BuilderTab
 import com.mmg.manahub.core.domain.model.Card
@@ -14,10 +12,12 @@ import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.ReviewGroupBy
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
-import com.mmg.manahub.core.network.ScryfallRequestQueue
+import com.mmg.manahub.core.domain.usecase.decks.DeckCardValidator
 import com.mmg.manahub.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,16 +33,15 @@ import javax.inject.Inject
 @HiltViewModel
 class DeckBuilderViewModel @Inject constructor(
     private val userCardRepository: UserCardRepository,
-    private val scryfallDataSource: ScryfallRemoteDataSource,
+    private val cardRepository: CardRepository,
     private val deckRepository: DeckRepository,
-    private val requestQueue: ScryfallRequestQueue,
-    private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DeckBuilderState())
     val state: StateFlow<DeckBuilderState> = _state.asStateFlow()
 
-    val preferredCurrency: StateFlow<PreferredCurrency> = userPreferencesDataStore.preferredCurrencyFlow
+    val preferredCurrency: StateFlow<PreferredCurrency> = userPreferencesRepository.preferredCurrencyFlow
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -108,11 +107,9 @@ class DeckBuilderViewModel @Inject constructor(
             _state.update { it.copy(isLoadingSuggestions = true) }
             try {
                 val s = _state.value
-                val prefs = userPreferencesDataStore.preferencesFlow.first()
+                val prefs = userPreferencesRepository.preferencesFlow.first()
                 val query = buildSuggestionQuery(s, prefs.cardLanguage)
-                val results = requestQueue.execute {
-                    scryfallDataSource.searchWithRawQuery(query)
-                }
+                val results = cardRepository.searchWithRawQuery(query)
                 val ownedIds = s.collectionCards.map { it.card.scryfallId }.toSet()
                 val suggestions = results
                     .filter { card ->
@@ -140,7 +137,7 @@ class DeckBuilderViewModel @Inject constructor(
             append(" id:$colors")
         }
         append(" -t:land")
-        // Filtrar por el idioma preferido de las cartas
+        // Filter by the user's preferred card language
         append(" lang:${lang.code.split("-")[0]}")
         append(" order:edhrec")
     }
@@ -161,11 +158,9 @@ class DeckBuilderViewModel @Inject constructor(
         viewModelScope.launch {
             _isSearchingCommander.value = true
             try {
-                val results = requestQueue.execute {
-                    scryfallDataSource.searchWithRawQuery(
-                        "t:legendary t:creature $query"
-                    )
-                }
+                val results = cardRepository.searchWithRawQuery(
+                    "t:legendary t:creature $query"
+                )
                 _commanderResults.value = results
             } catch (e: Exception) {
                 _commanderResults.value = emptyList()
@@ -190,21 +185,10 @@ class DeckBuilderViewModel @Inject constructor(
             return
         }
 
-        // Basic lands are always unlimited — skip copy checks
-        val isBasic = BasicLandCalculator.isBasicLand(card)
-
-        if (!isBasic) {
-            // Commander: hard limit at 1 copy (unique cards)
-            if (s.format.uniqueCards) {
-                val alreadyIn = s.mainboard.any { it.card.scryfallId == card.scryfallId }
-                if (alreadyIn) return
-            }
-
-            // Draft (maxCopies >= 99): no limit — skip check
-            // Standard-like formats (maxCopies < 99): soft limit, allow but warn in review
-        }
-
         val existing = s.mainboard.find { it.card.scryfallId == card.scryfallId }
+        val currentQty = existing?.quantity ?: 0
+        val addResult = DeckCardValidator.canAddCard(card, s.format, currentQty)
+        if (addResult == DeckCardValidator.AddResult.BLOCKED) return
 
         val newMainboard = if (existing != null) {
             s.mainboard.map { dc ->
@@ -393,18 +377,18 @@ class DeckBuilderViewModel @Inject constructor(
 
                 // Resolve commander
                 val commanderCard: Card? = parsed.commander?.let { line ->
-                    scryfallDataSource.getCardByExactName(line.name).getOrNull()
+                    cardRepository.getCardByExactName(line.name).getOrNull()
                 }
 
                 // Resolve mainboard cards
                 val mainboard = parsed.mainboard.mapNotNull { line ->
-                    val card = scryfallDataSource.getCardByExactName(line.name).getOrNull()
+                    val card = cardRepository.getCardByExactName(line.name).getOrNull()
                     card?.let { DeckCard(card = it, quantity = line.quantity) }
                 }
 
                 // Resolve sideboard cards
                 val sideboard = parsed.sideboard.mapNotNull { line ->
-                    val card = scryfallDataSource.getCardByExactName(line.name).getOrNull()
+                    val card = cardRepository.getCardByExactName(line.name).getOrNull()
                     card?.let { DeckCard(card = it, quantity = line.quantity) }
                 }
 
@@ -492,7 +476,7 @@ class DeckBuilderViewModel @Inject constructor(
             if (count > 0) {
                 val landName = landNames[color] ?: return@forEach
                 try {
-                    val land = scryfallDataSource.getCardByExactName(landName).getOrThrow()
+                    val land = cardRepository.getCardByExactName(landName).getOrThrow()
                     result.add(DeckCard(card = land, quantity = count))
                 } catch (_: Exception) {
                     // Skip if lookup fails — land names are still saved as scryfallId in basic form

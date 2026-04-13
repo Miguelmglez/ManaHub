@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.carddetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.model.TagCategory
@@ -12,6 +11,7 @@ import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -25,7 +25,7 @@ class CardDetailViewModel @Inject constructor(
     private val userCardRepo:    UserCardRepository,
     private val deckRepo:        DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
-    private val userPrefs:       UserPreferencesDataStore,
+    private val userPrefs:       UserPreferencesRepository,
 ) : ViewModel() {
 
     private val scryfallId: String = checkNotNull(savedStateHandle["scryfallId"])

@@ -7,19 +7,23 @@ import com.mmg.manahub.core.data.local.dao.ModeCount
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
+import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.game.model.GameResult
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class GameSessionRepositoryImpl @Inject constructor(
     private val dao: GameSessionDao,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : GameSessionRepository {
 
-    override suspend fun saveGameSession(result: GameResult): Long {
+    override suspend fun saveGameSession(result: GameResult): Long = withContext(ioDispatcher) {
         val sessionEntity = GameSessionEntity(
             durationMs  = result.durationMs,
             mode        = result.gameMode.name,
@@ -42,11 +46,11 @@ class GameSessionRepositoryImpl @Inject constructor(
                 isWinner                = pr.player.id == result.winner.id,
             )
         }
-        return dao.insertSessionWithPlayers(sessionEntity, playerEntities)
+        dao.insertSessionWithPlayers(sessionEntity, playerEntities)
     }
 
     override suspend fun getSessionById(sessionId: Long): GameSessionWithPlayers? =
-        dao.getSessionById(sessionId)
+        withContext(ioDispatcher) { dao.getSessionById(sessionId) }
 
     override fun observeRecentSessions(limit: Int): Flow<List<GameSessionWithPlayers>> =
         dao.observeRecentSessions(limit)
