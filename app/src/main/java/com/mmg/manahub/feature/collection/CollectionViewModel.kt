@@ -80,6 +80,10 @@ class CollectionViewModel @Inject constructor(
         }
     }
 
+    fun onTabSelected(tab: CollectionTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 
     fun applyAdvancedFilters(query: AdvancedSearchQuery) {

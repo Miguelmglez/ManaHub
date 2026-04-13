@@ -49,25 +49,6 @@ fun ManaSymbolImage(
     size: Dp = 18.dp,
     modifier: Modifier = Modifier,
 ) {
-    /*// Scryfall has no M.svg for multicolor — render a gold circle manually
-    if (token.uppercase() == "M") {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(Color(0xFFB8860B))
-                .border((size.value * 0.06f).dp, Color(0xFFDAA520), CircleShape),
-        ) {
-            Text(
-                text       = "✦",
-                fontSize   = (size.value * 0.48f).sp,
-                color      = Color(0xFFFFF3CD),
-                textAlign  = TextAlign.Center,
-            )
-        }
-        return
-    }*/
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(tokenToSvgUrl(token))
@@ -81,9 +62,6 @@ fun ManaSymbolImage(
 
 /**
  * Renders a full mana-cost string (e.g. "{2}{W}{U}") as a row of SVG symbols.
- *
- * Falls back gracefully to the Mana-font [ManaCost] composable if a symbol
- * fails to load (Coil shows nothing on error by default).
  */
 @Composable
 fun ManaCostImages(
@@ -109,6 +87,12 @@ fun ManaCostImages(
 // ── Oracle / card text with inline mana symbols ───────────────────────────────
 
 private val symbolRegex = Regex("\\{([^}]+)\\}")
+
+fun parseManaString(manaCost: String): List<String> =
+    symbolRegex
+        .findAll(manaCost)
+        .map { it.groupValues[1] }
+        .toList()
 
 /**
  * Renders oracle / printed card text with inline mana symbols.

@@ -288,6 +288,15 @@
     <string name="deckdetail_sideboard_empty_title">No sideboard cards yet</string>
     <string name="deckdetail_sideboard_empty_subtitle">Add cards that could help in specific matchups</string>
     <string name="deckdetail_sideboard_add">Add sideboard cards</string>
+    <string name="deck_default_name">Deck</string>
+    <string name="deck_change_cover">Change cover image</string>
+    <string name="action_more_options">More options</string>
+    <string name="deckdetail_in_deck_label">In deck</string>
+    <string name="source_scryfall">Scryfall</string>
+    <string name="deck_total_cards">Total Cards</string>
+    <string name="deck_mana_curve_uppercase">MANA CURVE</string>
+    <string name="deck_cover_picker_title">Choose Cover Image</string>
+    <string name="deck_cover_picker_subtitle">Tap a card\'s art to use it as the deck cover</string>
     <string name="deckdetail_group_creatures">Creatures</string>
     <string name="deckdetail_group_instants">Instants</string>
     <string name="deckdetail_group_sorceries">Sorceries</string>
@@ -295,6 +304,7 @@
     <string name="deckdetail_group_artifacts">Artifacts</string>
     <string name="deckdetail_group_planeswalkers">Planeswalkers</string>
     <string name="deckdetail_group_lands">Lands</string>
+    <string name="deckdetail_group_other">Other</string>
     <string name="deckdetail_incomplete_banner">%1$d cards of %2$d</string>
     <string name="deckdetail_menu_rename">Rename</string>
     <string name="deckdetail_menu_export">Export</string>
