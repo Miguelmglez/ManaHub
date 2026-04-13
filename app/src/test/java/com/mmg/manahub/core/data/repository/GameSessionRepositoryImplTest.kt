@@ -13,6 +13,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -99,7 +100,7 @@ class GameSessionRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = GameSessionRepositoryImpl(dao)
+        repository = GameSessionRepositoryImpl(dao, UnconfinedTestDispatcher())
     }
 
     // ══════════════════════════════════════════════════════════════════════════

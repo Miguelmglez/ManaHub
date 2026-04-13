@@ -6,6 +6,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -31,7 +32,10 @@ class UserCardRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = UserCardRepositoryImpl(userCardDao = userCardDao)
+        repository = UserCardRepositoryImpl(
+            userCardDao  = userCardDao,
+            ioDispatcher = UnconfinedTestDispatcher(),
+        )
     }
 
     // ══════════════════════════════════════════════════════════════════════════

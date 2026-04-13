@@ -258,7 +258,7 @@ fun DeckDetailScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CardDetailSheet(
-    deckCard: DeckCard,
+    deckCard: DeckSlotEntry,
     deckFormat: com.mmg.manahub.core.domain.model.DeckFormat?,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
@@ -1040,7 +1040,7 @@ private fun TypeGroupHeader(typeResId: Int, count: Int) {
 
 @Composable
 private fun CardRow(
-    deckCard: DeckCard,
+    deckCard: DeckSlotEntry,
     onRemove: () -> Unit,
     onCardClick: () -> Unit,
 ) {
@@ -1121,7 +1121,7 @@ private fun CardRow(
 //  Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-private fun groupCardsByType(cards: List<DeckCard>): List<Pair<Int, List<DeckCard>>> {
+private fun groupCardsByType(cards: List<DeckSlotEntry>): List<Pair<Int, List<DeckSlotEntry>>> {
     val typeOrder = listOf(
         R.string.deckdetail_group_creatures,
         R.string.deckdetail_group_instants,
@@ -1132,7 +1132,7 @@ private fun groupCardsByType(cards: List<DeckCard>): List<Pair<Int, List<DeckCar
         R.string.deckdetail_group_lands,
         R.string.deckdetail_group_other,
     )
-    val groups = mutableMapOf<Int, MutableList<DeckCard>>()
+    val groups = mutableMapOf<Int, MutableList<DeckSlotEntry>>()
     cards.forEach { deckCard ->
         val typeLine = deckCard.card?.typeLine ?: ""
         val group = when {
@@ -1149,7 +1149,7 @@ private fun groupCardsByType(cards: List<DeckCard>): List<Pair<Int, List<DeckCar
     }
     return typeOrder
         .filter { it in groups }
-        .map { it to (groups[it]!! as List<DeckCard>) }
+        .map { it to (groups[it]!! as List<DeckSlotEntry>) }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1159,7 +1159,7 @@ private fun groupCardsByType(cards: List<DeckCard>): List<Pair<Int, List<DeckCar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CoverPickerSheet(
-    cards: List<DeckCard>,
+    cards: List<DeckSlotEntry>,
     currentCoverId: String?,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
