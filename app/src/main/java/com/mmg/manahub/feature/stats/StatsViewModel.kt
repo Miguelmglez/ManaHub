@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.stats
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +16,7 @@ import javax.inject.Inject
 class StatsViewModel @Inject constructor(
     private val getStats:            GetCollectionStatsUseCase,
     private val refreshPricesUseCase: RefreshCollectionPricesUseCase,
-    private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val userPreferencesDataStore: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StatsUiState())
@@ -67,7 +67,7 @@ class StatsViewModel @Inject constructor(
                 com.mmg.manahub.core.domain.model.PreferredCurrency.EUR
             else 
                 com.mmg.manahub.core.domain.model.PreferredCurrency.USD
-            userPreferencesDataStore.savePreferredCurrency(next)
+            userPreferencesDataStore.setPreferredCurrency(next)
         }
     }
 

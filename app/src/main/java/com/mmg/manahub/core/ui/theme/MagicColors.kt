@@ -50,24 +50,24 @@ data class MagicColors(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  NeonVoid — "Ultra Violet" (Púrpura Neón + Lima)
+//  NeonVoid — "Pink Nebula" (Rosa Neón + Cian)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 internal val NeonVoidColors = MagicColors(
-    background          = Color(0xFF0D0214),
-    backgroundSecondary = Color(0xFF160421),
-    surface             = Color(0xFF210633),
-    surfaceVariant      = Color(0xFF32094D),
-    primaryAccent       = Color(0xFFBF00FF),
-    secondaryAccent     = Color(0xFFCCFF00),
+    background          = Color(0xFF14020D),
+    backgroundSecondary = Color(0xFF210416),
+    surface             = Color(0xFF330621),
+    surfaceVariant      = Color(0xFF4D0932),
+    primaryAccent       = Color(0xFFFF6AD5),
+    secondaryAccent     = Color(0xFF00E5FF),
     goldMtg             = Color(0xFFFFD700),
-    textPrimary         = Color(0xFFF9F0FF),
-    textSecondary       = Color(0xFFA185B3),
-    textDisabled        = Color(0xFF5A4466),
+    textPrimary         = Color(0xFFFFF0F9),
+    textSecondary       = Color(0xFFB385A1),
+    textDisabled        = Color(0xFF66445A),
     lifePositive        = Color(0xFF00FF9F),
     lifeNegative        = Color(0xFFFF0055),
     poisonColor         = Color(0xFFCCFF00),
-    commanderAccent     = Color(0xFFBF00FF),
+    commanderAccent     = Color(0xFFFF6AD5),
     manaW               = Color(0xFFF9FAF4),
     manaU               = Color(0xFF00B2FF),
     manaB               = Color(0xFF1A1226),
@@ -75,7 +75,9 @@ internal val NeonVoidColors = MagicColors(
     manaG               = Color(0xFF00FF9F),
     manaC               = Color(0xFF444444),
     playerColors        = listOf(
-        PlayerThemeColors(Color(0xFFBF00FF), Color(0xFF1A0214), Color(0x66BF00FF), "Violet"),
+        PlayerThemeColors(Color(0xFFFF6AD5), Color(0xFF1A0210), Color(0x66FF6AD5), "Pink"),
+        PlayerThemeColors(Color(0xFF00E5FF), Color(0xFF00151A), Color(0x6600E5FF), "Cyan"),
+        PlayerThemeColors(Color(0xFFBF00FF), Color(0xFF12001A), Color(0x66BF00FF), "Violet"),
         PlayerThemeColors(Color(0xFFCCFF00), Color(0xFF141A00), Color(0x66CCFF00), "Lime"),
         PlayerThemeColors(Color(0xFF00FFCC), Color(0xFF001A15), Color(0x6600FFCC), "Aqua"),
         PlayerThemeColors(Color(0xFFFF007F), Color(0xFF1A000D), Color(0x66FF007F), "HotPink"),
@@ -83,30 +85,28 @@ internal val NeonVoidColors = MagicColors(
         PlayerThemeColors(Color(0xFFFF8800), Color(0xFF1A0E00), Color(0x66FF8800), "Orange"),
         PlayerThemeColors(Color(0xFFF0F0F0), Color(0xFF1A1A1A), Color(0x66FFFFFF), "White"),
         PlayerThemeColors(Color(0xFFFF4400), Color(0xFF1A0700), Color(0x66FF4400), "Magma"),
-        PlayerThemeColors(Color(0xFF8888FF), Color(0xFF0C0C1A), Color(0x668888FF), "Ghost"),
-        PlayerThemeColors(Color(0xFF88FF00), Color(0xFF0D1A00), Color(0x6688FF00), "Acid"),
     ),
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  MedievalGrimoire — "Toxic Alchemist" (Verde Neón + Ámbar)
+//  MedievalGrimoire — "Blood Rite" (Rojo Carmesí + Oro)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 internal val MedievalGrimoireColors = MagicColors(
-    background          = Color(0xFF040D04),
-    backgroundSecondary = Color(0xFF081A08),
-    surface             = Color(0xFF0E260E),
-    surfaceVariant      = Color(0xFF163D16),
-    primaryAccent       = Color(0xFF39FF14),
-    secondaryAccent     = Color(0xFFFFA500),
+    background          = Color(0xFF140202),
+    backgroundSecondary = Color(0xFF210404),
+    surface             = Color(0xFF330606),
+    surfaceVariant      = Color(0xFF4D0909),
+    primaryAccent       = Color(0xFFFF3131),
+    secondaryAccent     = Color(0xFFFFD700),
     goldMtg             = Color(0xFFFFD700),
-    textPrimary         = Color(0xFFE0FFE0),
-    textSecondary       = Color(0xFF88A688),
-    textDisabled        = Color(0xFF3A4D3A),
+    textPrimary         = Color(0xFFFFF0F0),
+    textSecondary       = Color(0xFFB38585),
+    textDisabled        = Color(0xFF664444),
     lifePositive        = Color(0xFF39FF14),
     lifeNegative        = Color(0xFFFF4400),
     poisonColor         = Color(0xFFCCFF00),
-    commanderAccent     = Color(0xFF39FF14),
+    commanderAccent     = Color(0xFFFF3131),
     manaW               = Color(0xFFF9FAF4),
     manaU               = Color(0xFF0077FF),
     manaB               = Color(0xFF121A12),
@@ -114,16 +114,16 @@ internal val MedievalGrimoireColors = MagicColors(
     manaG               = Color(0xFF00FF00),
     manaC               = Color(0xFF3D3322),
     playerColors        = listOf(
-        PlayerThemeColors(Color(0xFF39FF14), Color(0xFF050F05), Color(0x6639FF14), "Toxic"),
-        PlayerThemeColors(Color(0xFFFFA500), Color(0xFF0F0900), Color(0x66FFA500), "Amber"),
-        PlayerThemeColors(Color(0xFF00C853), Color(0xFF001A0B), Color(0x6600C853), "Emerald"),
-        PlayerThemeColors(Color(0xFFFFD600), Color(0xFF1A1600), Color(0x66FFD600), "Gold"),
-        PlayerThemeColors(Color(0xFF8BC34A), Color(0xFF0E1407), Color(0x668BC34A), "Moss"),
-        PlayerThemeColors(Color(0xFFD84315), Color(0xFF1A0804), Color(0x66D84315), "Rust"),
-        PlayerThemeColors(Color(0xFFAEEA00), Color(0xFF121A00), Color(0x66AEEA00), "Plague"),
-        PlayerThemeColors(Color(0xFF2E7D32), Color(0xFF071408), Color(0x662E7D32), "Forest"),
-        PlayerThemeColors(Color(0xFF795548), Color(0xFF140F0D), Color(0x66795548), "Earth"),
-        PlayerThemeColors(Color(0xFFB9F6CA), Color(0xFF121A15), Color(0x66B9F6CA), "Mist"),
+        PlayerThemeColors(Color(0xFFFF3131), Color(0xFF140202), Color(0x66FF3131), "Blood"),
+        PlayerThemeColors(Color(0xFFFFD700), Color(0xFF140F00), Color(0x66FFD700), "Gold"),
+        PlayerThemeColors(Color(0xFFB71C1C), Color(0xFF0F0202), Color(0x66B71C1C), "Crimson"),
+        PlayerThemeColors(Color(0xFF8D6E63), Color(0xFF0F0D0C), Color(0x668D6E63), "Tome"),
+        PlayerThemeColors(Color(0xFFFF5252), Color(0xFF140707), Color(0x66FF5252), "Ritual"),
+        PlayerThemeColors(Color(0xFFFFAB40), Color(0xFF140E00), Color(0x66FFAB40), "Flame"),
+        PlayerThemeColors(Color(0xFF795548), Color(0xFF0F0C0B), Color(0x66795548), "Leather"),
+        PlayerThemeColors(Color(0xFFD32F2F), Color(0xFF140404), Color(0x66D32F2F), "Scarlet"),
+        PlayerThemeColors(Color(0xFF3E2723), Color(0xFF0A0706), Color(0x663E2723), "Earth"),
+        PlayerThemeColors(Color(0xFFE0E0E0), Color(0xFF141414), Color(0x66E0E0E0), "Bone"),
     ),
 )
 

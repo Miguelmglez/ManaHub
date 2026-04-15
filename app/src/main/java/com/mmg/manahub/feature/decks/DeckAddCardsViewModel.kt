@@ -71,7 +71,7 @@ class DeckAddCardsViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val owned = userCardRepository.observeCollection().first()
-                collectionCards = owned.map { it.card }.sortedBy { it.name }
+                collectionCards = owned.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
                 _uiState.update { s ->
                     s.copy(
                         isLoading = false,

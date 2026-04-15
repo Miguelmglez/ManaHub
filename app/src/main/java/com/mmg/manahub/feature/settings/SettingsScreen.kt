@@ -430,7 +430,7 @@ private fun ThemeSelectorSection(
             ThemeTile(
                 name = stringResource(R.string.theme_neon_void),
                 emoji = "⚡",
-                previewColors = listOf(Color(0xFF0D0214), Color(0xFFBF00FF), Color(0xFFCCFF00)),
+                previewColors = listOf(Color(0xFF14020D), Color(0xFFFF6AD5), Color(0xFF00E5FF)),
                 isSelected = currentTheme is AppTheme.NeonVoid,
                 onClick = { onThemeSelected(AppTheme.NeonVoid) },
                 modifier = Modifier.weight(1f),
@@ -438,7 +438,7 @@ private fun ThemeSelectorSection(
             ThemeTile(
                 name = stringResource(R.string.theme_grimoire),
                 emoji = "📜",
-                previewColors = listOf(Color(0xFF040D04), Color(0xFF39FF14), Color(0xFFFFA500)),
+                previewColors = listOf(Color(0xFF140202), Color(0xFFFF3131), Color(0xFFFFD700)),
                 isSelected = currentTheme is AppTheme.MedievalGrimoire,
                 onClick = { onThemeSelected(AppTheme.MedievalGrimoire) },
                 modifier = Modifier.weight(1f),
