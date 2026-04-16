@@ -43,7 +43,7 @@ interface StatsDao {
             CASE WHEN :useEur = 1 THEN priceEur ELSE priceUsd END DESC 
         LIMIT :limit
     """)
-    fun observeMostValuableCards(limit: Int = 5, useEur: Boolean = false): Flow<List<CardValueProjection>>
+    fun observeMostValuableCards(limit: Int, useEur: Boolean): Flow<List<CardValueProjection>>
 
     @Query("""
         SELECT c.color_identity AS colorIdentity, SUM(uc.quantity) AS count

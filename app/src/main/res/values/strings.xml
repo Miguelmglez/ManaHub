@@ -1016,4 +1016,37 @@
     <string name="feedback_sent">Feedback sent — thank you!</string>
     <string name="feedback_chooser_title">Send feedback via…</string>
 
+    <!-- AUTH -->
+    <string name="auth_section_title">Sync Your Experience</string>
+    <string name="auth_section_subtitle">Create a free account to unlock cloud features</string>
+    <string name="auth_benefit_collection">Sync your collection across devices</string>
+    <string name="auth_benefit_decks">Save and access your decks anywhere</string>
+    <string name="auth_benefit_stats">Cloud game stats and history</string>
+    <string name="auth_benefit_profile">Customizable profile (name &amp; avatar)</string>
+    <string name="auth_benefit_future">More features coming soon, including the web version</string>
+    <string name="auth_cta_create">Create Account</string>
+    <string name="auth_cta_signin">Sign In</string>
+    <string name="auth_no_account_needed">You can use the app without an account</string>
+    <string name="auth_synced_chip">Synced</string>
+    <string name="auth_sign_out">Sign out</string>
+    <string name="auth_sheet_title">Welcome to ManaHub</string>
+    <string name="auth_tab_signin">Sign In</string>
+    <string name="auth_tab_signup">Create Account</string>
+    <string name="auth_field_email">Email</string>
+    <string name="auth_field_password">Password</string>
+    <string name="auth_btn_continue">Continue</string>
+    <string name="auth_btn_google">Continue with Google</string>
+    <string name="auth_link_forgot">Forgot your password?</string>
+    <string name="auth_reset_title">Reset Password</string>
+    <string name="auth_reset_subtitle">Enter your email to receive a reset link</string>
+    <string name="auth_reset_btn">Send reset link</string>
+    <string name="auth_reset_sent">Reset link sent! Check your inbox</string>
+    <string name="auth_or_divider">or</string>
+    <string name="auth_cancel">Cancel</string>
+    <string name="auth_delete_account">Delete Account</string>
+    <string name="auth_delete_account_confirm_title">Delete Account</string>
+    <string name="auth_delete_account_confirm_body">Are you sure? This action cannot be undone. All your synced data will be permanently deleted.</string>
+    <string name="auth_delete_account_confirm_btn">Delete Account</string>
+    <string name="auth_email_confirmation_sent">Check your inbox to confirm your email!</string>
+
 </resources>
