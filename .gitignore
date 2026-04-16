@@ -286,3 +286,5 @@ $RECYCLE.BIN/
 /supabase/migrations/001_initial_schema.sql
 /.mcp.json
 /SUPABASE_AUTH_SETUP.md
+
+/CLAUDE.md

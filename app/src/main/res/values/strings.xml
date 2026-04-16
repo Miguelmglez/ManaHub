@@ -298,6 +298,12 @@
     <string name="deck_mana_curve_uppercase">MANA CURVE</string>
     <string name="deck_cover_picker_title">Choose Cover Image</string>
     <string name="deck_cover_picker_subtitle">Tap a card\'s art to use it as the deck cover</string>
+    <string name="deck_edit_title">Edit Deck</string>
+    <string name="deck_edit_cover_section">Cover Image</string>
+    <string name="deckdetail_add_basic_lands">Add basic lands</string>
+    <string name="deckdetail_basic_lands_sheet_title">Basic Lands</string>
+    <string name="deckdetail_tab_scryfall">All Cards</string>
+    <string name="deckdetail_owned_icon_desc">In your collection</string>
     <string name="deckdetail_group_creatures">Creatures</string>
     <string name="deckdetail_group_instants">Instants</string>
     <string name="deckdetail_group_sorceries">Sorceries</string>
