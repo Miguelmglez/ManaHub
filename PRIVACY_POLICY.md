@@ -21,7 +21,6 @@ For questions or concerns about this policy, contact us at:
 ManaHub does **not** collect, transmit to its servers, or sell:
 
 - Your name, email address, or any account information (no account is required)
-- Device identifiers, advertising IDs, or fingerprints
 - Location data
 - Contacts or social graph data
 - Browsing history outside the App
