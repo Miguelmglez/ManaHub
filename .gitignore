@@ -285,3 +285,4 @@ $RECYCLE.BIN/
 # =============================================================================
 /supabase/migrations/001_initial_schema.sql
 /.mcp.json
+/CLAUDE.md
