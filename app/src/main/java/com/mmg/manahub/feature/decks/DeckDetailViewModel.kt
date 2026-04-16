@@ -66,6 +66,11 @@ class DeckDetailViewModel @Inject constructor(
         val addCardsQuery: String = "",
         val addCardsResults: List<AddCardRow> = emptyList(),
         val isSearchingCards: Boolean = false,
+        // Scryfall tab results (separate from collection tab)
+        val scryfallResults: List<AddCardRow> = emptyList(),
+        val isSearchingScryfall: Boolean = false,
+        // Collection ownership set (scryfallIds owned by the user)
+        val collectionIds: Set<String> = emptySet(),
         // Import state
         val isImporting: Boolean = false,
         val importError: String? = null,
@@ -99,6 +104,9 @@ class DeckDetailViewModel @Inject constructor(
                         addCardsResults = it.addCardsResults.map { row ->
                             row.copy(quantityInDeck = deckCardsMap[row.card.scryfallId] ?: 0)
                         },
+                        scryfallResults = it.scryfallResults.map { row ->
+                            row.copy(quantityInDeck = deckCardsMap[row.card.scryfallId] ?: 0)
+                        },
                     )
                 }
                 val mainboard = deckWithCards.mainboard.map { slot ->
@@ -125,6 +133,8 @@ class DeckDetailViewModel @Inject constructor(
             try {
                 val owned = userCardRepository.observeCollection().first()
                 collectionCards = owned.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                val ids = collectionCards.map { it.scryfallId }.toSet()
+                _uiState.update { it.copy(collectionIds = ids) }
             } catch (_: Exception) {
             }
         }
@@ -144,22 +154,18 @@ class DeckDetailViewModel @Inject constructor(
             showCollectionCards()
             return
         }
+        // Only filter the local collection — never fall back to Scryfall here.
         val filtered = collectionCards.filter { it.name.contains(query, ignoreCase = true) }
-        if (filtered.isNotEmpty()) {
-            val ownedIds = collectionCards.map { it.scryfallId }.toSet()
-            _uiState.update { s ->
-                s.copy(
-                    addCardsResults = filtered.map { card ->
-                        AddCardRow(
-                            card = card,
-                            quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
-                            isOwned = card.scryfallId in ownedIds,
-                        )
-                    },
-                )
-            }
-        } else {
-            searchScryfall(query)
+        _uiState.update { s ->
+            s.copy(
+                addCardsResults = filtered.map { card ->
+                    AddCardRow(
+                        card = card,
+                        quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
+                        isOwned = true,
+                    )
+                },
+            )
         }
     }
 
@@ -272,7 +278,51 @@ class DeckDetailViewModel @Inject constructor(
     }
 
     fun clearAddCardsState() {
-        _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList()) }
+        _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList(), scryfallResults = emptyList()) }
+    }
+
+    fun searchScryfallDirect(query: String) {
+        // Always sync the shared query field so the search bar stays up-to-date.
+        _uiState.update { it.copy(addCardsQuery = query) }
+        if (query.isBlank()) {
+            _uiState.update { it.copy(scryfallResults = emptyList(), isSearchingScryfall = false) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSearchingScryfall = true) }
+            try {
+                val result = cardRepository.searchCards(query)
+                val cards = when (result) {
+                    is DataResult.Success -> result.data
+                    is DataResult.Error -> emptyList()
+                }
+                val ownedIds = collectionCards.map { it.scryfallId }.toSet()
+                _uiState.update { s ->
+                    s.copy(
+                        isSearchingScryfall = false,
+                        scryfallResults = cards.map { card ->
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
+                                isOwned = card.scryfallId in ownedIds,
+                            )
+                        },
+                    )
+                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isSearchingScryfall = false) }
+            }
+        }
+    }
+
+    fun updateDeckName(name: String) {
+        viewModelScope.launch {
+            val deck = _uiState.value.deck ?: return@launch
+            val trimmed = name.trim()
+            if (trimmed.isNotEmpty()) {
+                runCatching { deckRepository.updateDeck(deck.copy(name = trimmed)) }
+            }
+        }
     }
 
     // ── Import / Export ──────────────────────────────────────────────────────
