@@ -51,6 +51,10 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.auth.presentation.AccountSection
+import com.mmg.manahub.feature.auth.presentation.AuthUiState
+import com.mmg.manahub.feature.auth.presentation.AuthViewModel
+import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
@@ -58,13 +62,16 @@ import kotlin.math.roundToInt
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
     onSettingsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showFeedbackSheet by remember { mutableStateOf(false) }
-    // Recreate activity when app language changes
+    var showLoginSheet by remember { mutableStateOf(false) }
 
     if (showAvatarPicker) {
         AvatarPickerSheet(onDismiss = { showAvatarPicker = false })
@@ -72,6 +79,21 @@ fun ProfileScreen(
 
     if (showFeedbackSheet) {
         FeedbackSheet(onDismiss = { showFeedbackSheet = false })
+    }
+
+    if (showLoginSheet) {
+        LoginSheet(
+            authViewModel = authViewModel,
+            onDismiss = { showLoginSheet = false },
+        )
+    }
+
+    // Reset ui state after account deletion so the screen returns to Idle cleanly.
+    // The sessionState Flow will automatically emit Unauthenticated after the account is removed.
+    LaunchedEffect(authUiState) {
+        if (authUiState is AuthUiState.AccountDeleted) {
+            authViewModel.resetUiState()
+        }
     }
 
     Scaffold(
@@ -124,6 +146,19 @@ fun ProfileScreen(
                     avatarUrl = uiState.avatarUrl,
                     onAvatarClick = { showAvatarPicker = true },
                     savePlayerName = viewModel::savePlayerName,
+                )
+            }
+
+            // ── Account section ───────────────────────────────────────────────
+            item {
+                AccountSection(
+                    sessionState = sessionState,
+                    authUiState = authUiState,
+                    onLoginClick = { showLoginSheet = true },
+                    onSignUpClick = { showLoginSheet = true },
+                    onSignOutClick = { authViewModel.signOut() },
+                    onDeleteAccountClick = { authViewModel.deleteAccount() },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
 

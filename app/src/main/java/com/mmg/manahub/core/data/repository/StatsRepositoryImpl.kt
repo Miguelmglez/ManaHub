@@ -21,7 +21,7 @@ class StatsRepositoryImpl @Inject constructor(
         statsDao.observeTotals(),
         statsDao.observeTotalValueUsd(),
         statsDao.observeTotalValueEur(),
-        statsDao.observeMostValuableCards(useEur = preferredCurrency == PreferredCurrency.EUR),
+        statsDao.observeMostValuableCards(limit = 10, useEur = preferredCurrency == PreferredCurrency.EUR),
         statsDao.observeCountByColorIdentity(),
         statsDao.observeCountByRarity(),
         statsDao.observeCountByTypeLine(),

@@ -747,4 +747,37 @@
     <string name="draft_guide_videos">Vídeos</string>
     <string name="draft_card_artist">Artista: %1$s</string>
 
+    <!-- AUTH -->
+    <string name="auth_section_title">Sincroniza tu Experiencia</string>
+    <string name="auth_section_subtitle">Crea una cuenta gratuita para acceder a las funciones en la nube</string>
+    <string name="auth_benefit_collection">Sincroniza tu colección en todos tus dispositivos</string>
+    <string name="auth_benefit_decks">Guarda y accede a tus decks desde cualquier lugar</string>
+    <string name="auth_benefit_stats">Estadísticas y partidas guardadas en la nube</string>
+    <string name="auth_benefit_profile">Perfil personalizable (nombre y avatar)</string>
+    <string name="auth_benefit_future">Más funcionalidades próximamente, incluida la versión web</string>
+    <string name="auth_cta_create">Crear Cuenta</string>
+    <string name="auth_cta_signin">Iniciar Sesión</string>
+    <string name="auth_no_account_needed">También puedes usar la app sin cuenta</string>
+    <string name="auth_synced_chip">Sincronizado</string>
+    <string name="auth_sign_out">Cerrar sesión</string>
+    <string name="auth_sheet_title">Bienvenido a ManaHub</string>
+    <string name="auth_tab_signin">Iniciar sesión</string>
+    <string name="auth_tab_signup">Crear Cuenta</string>
+    <string name="auth_field_email">Email</string>
+    <string name="auth_field_password">Contraseña</string>
+    <string name="auth_btn_continue">Continuar</string>
+    <string name="auth_btn_google">Continuar con Google</string>
+    <string name="auth_link_forgot">¿Olvidaste tu contraseña?</string>
+    <string name="auth_reset_title">Restablecer contraseña</string>
+    <string name="auth_reset_subtitle">Introduce tu email para recibir un enlace de restablecimiento</string>
+    <string name="auth_reset_btn">Enviar enlace</string>
+    <string name="auth_reset_sent">¡Enlace enviado! Revisa tu bandeja de entrada</string>
+    <string name="auth_or_divider">o</string>
+    <string name="auth_cancel">Cancelar</string>
+    <string name="auth_delete_account">Borrar cuenta</string>
+    <string name="auth_delete_account_confirm_title">Borrar cuenta</string>
+    <string name="auth_delete_account_confirm_body">¿Estás seguro? Esta acción no se puede deshacer. Todos tus datos de sincronización se eliminarán permanentemente.</string>
+    <string name="auth_delete_account_confirm_btn">Borrar cuenta</string>
+    <string name="auth_email_confirmation_sent">¡Revisa tu bandeja de entrada para confirmar tu email!</string>
+
 </resources>
