@@ -8,6 +8,13 @@ import javax.inject.Inject
 class SignUpWithEmailUseCase @Inject constructor(
     private val repository: AuthRepository
 ) {
-    suspend operator fun invoke(email: String, password: String): AuthResult<AuthUser> =
-        repository.signUpWithEmail(email.trim(), password)
+    /**
+     * Registers a new user with email and password.
+     * The [nickname] is stored in Supabase user metadata after sign-up.
+     */
+    suspend operator fun invoke(
+        email: String,
+        password: String,
+        nickname: String,
+    ): AuthResult<AuthUser> = repository.signUpWithEmail(email.trim(), password, nickname.trim())
 }

@@ -10,5 +10,7 @@ sealed class AuthUiState {
     data object EmailConfirmationSent : AuthUiState()
     /** Emitted after the user's account has been permanently deleted. */
     data object AccountDeleted : AuthUiState()
+    /** Emitted after [AuthViewModel.updateNickname] completes successfully. */
+    data object NicknameUpdated : AuthUiState()
     data class Error(val message: String) : AuthUiState()
 }

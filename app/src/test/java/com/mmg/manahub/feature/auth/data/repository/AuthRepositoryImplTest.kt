@@ -87,11 +87,12 @@ class AuthRepositoryImplTest {
         email: String? = "test@example.com",
         provider: String = "email",
     ) = AuthUser(
-        id          = id,
-        email       = email,
-        displayName = null,
-        avatarUrl   = null,
-        provider    = provider,
+        id       = id,
+        email    = email,
+        nickname = email?.substringBefore('@'),
+        gameTag  = null,
+        avatarUrl = null,
+        provider  = provider,
     )
 
     // ── Setup ─────────────────────────────────────────────────────────────────
@@ -99,6 +100,11 @@ class AuthRepositoryImplTest {
     @Before
     fun setUp() {
         every { supabaseAuth.sessionStatus } returns sessionStatusFlow
+
+        // Default stub: upsertUserProfile returns the user unchanged (non-blocking default).
+        coEvery { userProfileDataSource.upsertUserProfile(any()) } answers {
+            firstArg<AuthUser>()
+        }
 
         repository = AuthRepositoryImpl(
             supabaseClient        = supabaseClient,
@@ -209,12 +215,14 @@ class AuthRepositoryImplTest {
     fun `given valid new user when signUpWithEmail then calls upsertUserProfile and returns Success`() = runTest {
         // Arrange
         val userInfoMock = buildUserInfoMock()
+        val expectedUser = buildExpectedAuthUser()
         coEvery { supabaseAuth.signUpWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.Email.Config.() -> Unit>()) } just Runs
+        // currentUserOrNull() is called twice: once after signUp, once after updateNicknameInternal
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { userProfileDataSource.upsertUserProfile(any()) } just Runs
+        coEvery { userProfileDataSource.upsertUserProfile(any()) } returns expectedUser
 
         // Act
-        val result = repository.signUpWithEmail("new@example.com", "password123")
+        val result = repository.signUpWithEmail("new@example.com", "password123", "Hero")
 
         // Assert
         assertTrue(result is AuthResult.Success)
@@ -228,7 +236,7 @@ class AuthRepositoryImplTest {
         every { supabaseAuth.currentUserOrNull() } returns null
 
         // Act
-        val result = repository.signUpWithEmail("confirm@example.com", "password123")
+        val result = repository.signUpWithEmail("confirm@example.com", "password123", "Hero")
 
         // Assert
         assertTrue(result is AuthResult.Error)
@@ -244,7 +252,7 @@ class AuthRepositoryImplTest {
         coEvery { supabaseAuth.signUpWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.Email.Config.() -> Unit>()) } throws restException
 
         // Act
-        val result = repository.signUpWithEmail("existing@example.com", "password123")
+        val result = repository.signUpWithEmail("existing@example.com", "password123", "Hero")
 
         // Assert
         assertTrue(result is AuthResult.Error)
@@ -257,7 +265,7 @@ class AuthRepositoryImplTest {
         coEvery { supabaseAuth.signUpWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.Email.Config.() -> Unit>()) } throws IOException("Network down")
 
         // Act
-        val result = repository.signUpWithEmail("new@example.com", "password123")
+        val result = repository.signUpWithEmail("new@example.com", "password123", "Hero")
 
         // Assert
         assertTrue(result is AuthResult.Error)
@@ -272,9 +280,10 @@ class AuthRepositoryImplTest {
     fun `given valid Google ID token when signInWithGoogleIdToken then returns Success and calls upsertUserProfile`() = runTest {
         // Arrange
         val userInfoMock = buildUserInfoMock(provider = "google")
+        val expectedUser = buildExpectedAuthUser(provider = "google")
         coEvery { supabaseAuth.signInWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.IDToken.Config.() -> Unit>()) } just Runs
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { userProfileDataSource.upsertUserProfile(any()) } just Runs
+        coEvery { userProfileDataSource.upsertUserProfile(any()) } returns expectedUser
 
         // Act
         val result = repository.signInWithGoogleIdToken("valid-google-id-token", "raw-nonce-abc")

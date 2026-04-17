@@ -3,13 +3,20 @@
     <cloud-backup>
         <exclude domain="file" path="datastore/" />
         <exclude domain="database" path="." />
-        <exclude domain="sharedpref" path="user_prefs_lang_sync.xml" />
+        <!-- Exclude all SharedPreferences — includes Supabase session tokens -->
+        <exclude domain="sharedpref" path="." />
+        <!-- Exclude Supabase session DataStore (auth token, refresh token) -->
+        <exclude domain="file" path="datastore/supabase_session.preferences_pb" />
         <!-- Exclude Crashlytics pending crash reports from cloud backup -->
         <exclude domain="file" path=".firebase" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/" />
         <exclude domain="database" path="." />
+        <!-- Exclude all SharedPreferences — includes Supabase session tokens -->
+        <exclude domain="sharedpref" path="." />
+        <!-- Exclude Supabase session DataStore (auth token, refresh token) -->
+        <exclude domain="file" path="datastore/supabase_session.preferences_pb" />
         <!-- Exclude Crashlytics pending crash reports from device transfer -->
         <exclude domain="file" path=".firebase" />
     </device-transfer>

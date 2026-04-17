@@ -14,9 +14,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import com.mmg.manahub.feature.auth.domain.model.SessionState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +61,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
@@ -72,6 +75,8 @@ fun ProfileScreen(
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showFeedbackSheet by remember { mutableStateOf(false) }
     var showLoginSheet by remember { mutableStateOf(false) }
+    var loginSheetInitialTab by remember { mutableIntStateOf(0) }
+    var showAccountSheet by remember { mutableStateOf(false) }
 
     if (showAvatarPicker) {
         AvatarPickerSheet(onDismiss = { showAvatarPicker = false })
@@ -84,8 +89,37 @@ fun ProfileScreen(
     if (showLoginSheet) {
         LoginSheet(
             authViewModel = authViewModel,
+            initialTab = loginSheetInitialTab,
             onDismiss = { showLoginSheet = false },
         )
+    }
+
+    if (showAccountSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAccountSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = mc.backgroundSecondary,
+            dragHandle = { Spacer(modifier = Modifier.height(8.dp)) },
+        ) {
+            AccountSection(
+                sessionState = sessionState,
+                authUiState = authUiState,
+                onLoginClick = {
+                    showAccountSheet = false
+                    loginSheetInitialTab = 0
+                    showLoginSheet = true
+                },
+                onSignUpClick = {
+                    showAccountSheet = false
+                    loginSheetInitialTab = 1
+                    showLoginSheet = true
+                },
+                onSignOutClick = { authViewModel.signOut() },
+                onDeleteAccountClick = { authViewModel.deleteAccount() },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            Spacer(modifier = Modifier.navigationBarsPadding())
+        }
     }
 
     // Reset ui state after account deletion so the screen returns to Idle cleanly.
@@ -119,6 +153,15 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "Account",
+                        tint = if (sessionState is SessionState.Authenticated) mc.primaryAccent else mc.textPrimary,
+                        modifier = Modifier
+                            .padding(end = 16.dp)
+                            .size(24.dp)
+                            .clickable { showAccountSheet = true },
+                    )
+                    Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
                         tint = mc.textPrimary,
@@ -146,19 +189,11 @@ fun ProfileScreen(
                     avatarUrl = uiState.avatarUrl,
                     onAvatarClick = { showAvatarPicker = true },
                     savePlayerName = viewModel::savePlayerName,
-                )
-            }
-
-            // ── Account section ───────────────────────────────────────────────
-            item {
-                AccountSection(
-                    sessionState = sessionState,
-                    authUiState = authUiState,
-                    onLoginClick = { showLoginSheet = true },
-                    onSignUpClick = { showLoginSheet = true },
-                    onSignOutClick = { authViewModel.signOut() },
-                    onDeleteAccountClick = { authViewModel.deleteAccount() },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    onNicknameUpdate = if (sessionState is SessionState.Authenticated) {
+                        authViewModel::updateNickname
+                    } else {
+                        null
+                    },
                 )
             }
 
@@ -253,7 +288,9 @@ private fun ProfileHeroSection(
     name: String,
     avatarUrl: String?,
     onAvatarClick: () -> Unit,
-    savePlayerName: (String) -> Unit
+    savePlayerName: (String) -> Unit,
+    /** When non-null, the name edit also triggers a Supabase nickname update (fire-and-forget). */
+    onNicknameUpdate: ((String) -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     var localName by remember(name) { mutableStateOf(name) }
@@ -333,8 +370,11 @@ private fun ProfileHeroSection(
                 value = localName,
                 onValueChange = { newName ->
                     localName = newName
-                    // Updates the player name on every keystroke
+                    // Updates the local player name on every keystroke
                     savePlayerName(newName)
+                    // Fire-and-forget Supabase nickname update when the user is authenticated.
+                    // The local save always happens; the Supabase update is best-effort.
+                    onNicknameUpdate?.invoke(newName)
                 },
                 // Apply the same text style used in the original Text composable
                 textStyle = TextStyle(

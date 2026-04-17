@@ -13,6 +13,7 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineDispatcher
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import io.github.jan.supabase.auth.user.UserInfo
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -56,7 +56,8 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun signUpWithEmail(
         email: String,
-        password: String
+        password: String,
+        nickname: String,
     ): AuthResult<AuthUser> = withContext(ioDispatcher) {
         runCatching {
             supabaseAuth.signUpWith(Email) {
@@ -68,9 +69,16 @@ class AuthRepositoryImpl @Inject constructor(
             // so the ViewModel can show the email-confirmation flow instead of crashing.
             val userInfo = supabaseAuth.currentUserOrNull()
                 ?: return@runCatching AuthResult.Error(AuthError.EmailConfirmationRequired)
-            val user = userInfo.toAuthUser()
-            userProfileDataSource.upsertUserProfile(user)
-            AuthResult.Success(user)
+
+            // Attempt to persist the nickname. Non-fatal: if it fails, proceed with sign-up.
+            val nicknameResult = updateNicknameInternal(nickname)
+            val user = when (nicknameResult) {
+                is AuthResult.Success -> nicknameResult.data
+                is AuthResult.Error -> userInfo.toAuthUser().copy(nickname = nickname.ifBlank { null })
+            }
+
+            val profileUser = userProfileDataSource.upsertUserProfile(user)
+            AuthResult.Success(profileUser)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
 
@@ -84,10 +92,67 @@ class AuthRepositoryImpl @Inject constructor(
                 provider = Google
                 nonce = rawNonce
             }
-            val user = supabaseAuth.currentUserOrNull()!!.toAuthUser()
-            userProfileDataSource.upsertUserProfile(user)
-            AuthResult.Success(user)
+            val userInfo = supabaseAuth.currentUserOrNull()!!
+            var user = userInfo.toAuthUser()
+
+            // If Google user has no nickname yet, auto-generate one from their Google display name,
+            // truncated to NICKNAME_MAX_LENGTH chars. This avoids the nickname-selection prompt.
+            if (user.nickname == null) {
+                val googleName = userInfo.userMetadata
+                    ?.get("full_name")?.jsonPrimitive?.contentOrNull
+                    ?: userInfo.userMetadata?.get("name")?.jsonPrimitive?.contentOrNull
+                if (googleName != null) {
+                    val autoNickname = googleName.take(NICKNAME_MAX_LENGTH)
+                    val nicknameResult = updateNicknameInternal(autoNickname)
+                    user = when (nicknameResult) {
+                        is AuthResult.Success -> nicknameResult.data
+                        is AuthResult.Error -> user.copy(nickname = autoNickname)
+                    }
+                }
+            }
+
+            val profileUser = userProfileDataSource.upsertUserProfile(user)
+            AuthResult.Success(profileUser)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+    }
+
+    override suspend fun updateNickname(nickname: String): AuthResult<AuthUser> =
+        withContext(ioDispatcher) {
+            updateNicknameInternal(nickname)
+        }
+
+    // --- Private helpers ---
+
+    /**
+     * Calls the `update_user_nickname` Supabase RPC, then re-fetches the current user.
+     * Must be called from within a [withContext] block using [ioDispatcher].
+     *
+     * Maps HTTP 400 specifically to [AuthError.NicknameInappropriate] since the RPC returns
+     * 400 when the nickname contains inappropriate content.
+     */
+    private suspend fun updateNicknameInternal(nickname: String): AuthResult<AuthUser> {
+        if (nickname.length > NICKNAME_MAX_LENGTH) {
+            return AuthResult.Error(AuthError.NicknameTooLong)
+        }
+        return runCatching {
+            // Uses a parameterized RPC call — the nickname is passed as a named
+            // argument in the JSON body, NOT concatenated into any SQL string.
+            supabaseClient.postgrest.rpc(
+                "update_user_nickname",
+                mapOf("new_nickname" to nickname.trim())
+            )
+            val user = supabaseAuth.currentUserOrNull()
+                ?: return AuthResult.Error(AuthError.SessionExpired)
+            AuthResult.Success(user.toAuthUser().copy(nickname = nickname.trim()))
+        }.getOrElse { e ->
+            // HTTP 400 from the profanity/constraint trigger → NicknameInappropriate.
+            // The server's raw error message is intentionally not surfaced to the UI.
+            if (e is RestException && e.statusCode == 400) {
+                AuthResult.Error(AuthError.NicknameInappropriate)
+            } else {
+                AuthResult.Error(e.toAuthError())
+            }
+        }
     }
 
     override suspend fun deleteAccount(): AuthResult<Unit> = withContext(ioDispatcher) {
@@ -126,11 +191,17 @@ class AuthRepositoryImpl @Inject constructor(
 
     // --- Mappers ---
 
+    /**
+     * Maps a Supabase [UserInfo] to the domain [AuthUser].
+     * Reads [AuthUser.nickname] from `userMetadata["nickname"]` with fallback to email prefix.
+     * Reads [AuthUser.gameTag] from `userMetadata["game_tag"]`.
+     */
     private fun UserInfo.toAuthUser() = AuthUser(
         id = id,
         email = email,
-        displayName = userMetadata?.get("full_name")?.jsonPrimitive?.contentOrNull
-            ?: userMetadata?.get("name")?.jsonPrimitive?.contentOrNull,
+        nickname = userMetadata?.get("nickname")?.jsonPrimitive?.contentOrNull
+            ?: email?.substringBefore('@'),
+        gameTag = userMetadata?.get("game_tag")?.jsonPrimitive?.contentOrNull,
         avatarUrl = userMetadata?.get("avatar_url")?.jsonPrimitive?.contentOrNull,
         provider = identities?.firstOrNull()?.provider ?: "email"
     )
@@ -146,6 +217,11 @@ class AuthRepositoryImpl @Inject constructor(
         is HttpRequestTimeoutException,
         is IOException -> AuthError.NetworkError
         else -> AuthError.Unknown(message)
+    }
+
+    companion object {
+        /** Must match the CHECK constraint on the `user_profiles.nickname` column in Supabase. */
+        private const val NICKNAME_MAX_LENGTH = 30
     }
 
     private fun SessionStatus.toSessionState(): SessionState = when (this) {
