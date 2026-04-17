@@ -29,6 +29,8 @@ object SupabaseModule {
             // Token refresh automático viene habilitado por defecto
             alwaysAutoRefresh = true
             autoLoadFromStorage = true
+            scheme = "manahub"
+            host = "auth"
         }
         install(Postgrest)
         install(Realtime)

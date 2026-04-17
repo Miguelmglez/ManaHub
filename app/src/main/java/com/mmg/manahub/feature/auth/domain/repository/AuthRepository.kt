@@ -9,7 +9,7 @@ interface AuthRepository {
     val sessionState: Flow<SessionState>
 
     suspend fun signInWithEmail(email: String, password: String): AuthResult<AuthUser>
-    suspend fun signUpWithEmail(email: String, password: String): AuthResult<AuthUser>
+    suspend fun signUpWithEmail(email: String, password: String, nickname: String): AuthResult<AuthUser>
 
     /**
      * Signs in using a Google ID token obtained via Credential Manager.
@@ -37,4 +37,11 @@ interface AuthRepository {
      * ```
      */
     suspend fun deleteAccount(): AuthResult<Unit>
+
+    /**
+     * Updates the authenticated user's nickname in Supabase via the `update_user_nickname` RPC.
+     * Returns the updated [AuthUser] on success.
+     * May return [AuthError.NicknameInappropriate] if the server rejects the nickname.
+     */
+    suspend fun updateNickname(nickname: String): AuthResult<AuthUser>
 }

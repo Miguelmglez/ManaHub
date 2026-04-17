@@ -263,9 +263,10 @@ private fun AuthenticatedCard(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val displayName = user.displayName
+    val nickname = user.nickname
         ?: user.email?.substringBefore('@')
-        ?: "User"
+        ?: "Player"
+    val gameTag = user.gameTag
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -336,7 +337,7 @@ private fun AuthenticatedCard(
                 if (user.avatarUrl != null) {
                     AsyncImage(
                         model = user.avatarUrl,
-                        contentDescription = "Avatar of $displayName",
+                        contentDescription = "Avatar of $nickname",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(44.dp)
@@ -354,7 +355,7 @@ private fun AuthenticatedCard(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = displayName.take(1).uppercase(),
+                            text = nickname.take(1).uppercase(),
                             color = mc.primaryAccent,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
@@ -364,10 +365,10 @@ private fun AuthenticatedCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // ── Name + email ───────────────────────────────────────────────
+                // ── Nickname + email + game tag ────────────────────────────────
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = displayName,
+                        text = nickname,
                         color = mc.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
@@ -382,21 +383,44 @@ private fun AuthenticatedCard(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    // ── Synced chip ────────────────────────────────────────────
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                color = mc.lifePositive.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(6.dp),
-                            )
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = stringResource(R.string.auth_synced_chip),
-                            color = mc.lifePositive,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                        // ── Synced chip ────────────────────────────────────────
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = mc.lifePositive.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp),
+                                )
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.auth_synced_chip),
+                                color = mc.lifePositive,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        // ── Game tag chip (display-only, never editable) ───────
+                        if (gameTag != null) {
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = mc.primaryAccent.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(6.dp),
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                            ) {
+                                Text(
+                                    text = gameTag,
+                                    color = mc.primaryAccent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
                     }
                 }
 

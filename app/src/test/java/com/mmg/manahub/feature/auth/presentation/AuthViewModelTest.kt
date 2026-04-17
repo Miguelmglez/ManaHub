@@ -12,6 +12,7 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -64,6 +65,7 @@ class AuthViewModelTest {
     private val getSessionState         = mockk<GetSessionStateUseCase>()
     private val resetPasswordUseCase    = mockk<ResetPasswordUseCase>()
     private val deleteAccountUseCase    = mockk<DeleteAccountUseCase>()
+    private val updateNicknameUseCase   = mockk<UpdateNicknameUseCase>(relaxed = true)
 
     // Controls sessionState emissions
     private val sessionStateFlow = MutableStateFlow<SessionState>(SessionState.Loading)
@@ -71,11 +73,12 @@ class AuthViewModelTest {
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
     private val dummyAuthUser = AuthUser(
-        id          = "user-uuid-001",
-        email       = "test@example.com",
-        displayName = "Test User",
-        avatarUrl   = null,
-        provider    = "email",
+        id       = "user-uuid-001",
+        email    = "test@example.com",
+        nickname = "TestUser",
+        gameTag  = null,
+        avatarUrl = null,
+        provider  = "email",
     )
 
     // ── SUT ───────────────────────────────────────────────────────────────────
@@ -92,6 +95,7 @@ class AuthViewModelTest {
         getSessionState         = getSessionState,
         resetPasswordUseCase    = resetPasswordUseCase,
         deleteAccountUseCase    = deleteAccountUseCase,
+        updateNicknameUseCase   = updateNicknameUseCase,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -187,12 +191,12 @@ class AuthViewModelTest {
     @Test
     fun `given new user when signUpWithEmail then uiState transitions Loading then Success`() = runTest {
         // Arrange
-        coEvery { signUpWithEmailUseCase(any(), any()) } returns AuthResult.Success(dummyAuthUser)
+        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Success(dummyAuthUser)
 
         // Act & Assert
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.signUpWithEmail("new@example.com", "password123")
+            viewModel.signUpWithEmail("new@example.com", "password123", "Hero")
             assertEquals(AuthUiState.Loading, awaitItem())
             assertEquals(AuthUiState.Success, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -202,12 +206,12 @@ class AuthViewModelTest {
     @Test
     fun `given email confirmation required when signUpWithEmail then uiState emits EmailConfirmationSent`() = runTest {
         // Arrange
-        coEvery { signUpWithEmailUseCase(any(), any()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
+        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
 
         // Act & Assert
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.signUpWithEmail("confirm@example.com", "password123")
+            viewModel.signUpWithEmail("confirm@example.com", "password123", "Hero")
             assertEquals(AuthUiState.Loading, awaitItem())
             assertEquals(AuthUiState.EmailConfirmationSent, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -217,12 +221,12 @@ class AuthViewModelTest {
     @Test
     fun `given email already in use when signUpWithEmail then uiState emits Error with registration message`() = runTest {
         // Arrange
-        coEvery { signUpWithEmailUseCase(any(), any()) } returns AuthResult.Error(AuthError.EmailAlreadyInUse)
+        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.EmailAlreadyInUse)
 
         // Act & Assert
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.signUpWithEmail("existing@example.com", "password123")
+            viewModel.signUpWithEmail("existing@example.com", "password123", "Hero")
             assertEquals(AuthUiState.Loading, awaitItem())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals("Este email ya está registrado", errorState.message)
@@ -233,12 +237,12 @@ class AuthViewModelTest {
     @Test
     fun `given network error when signUpWithEmail then uiState emits Error`() = runTest {
         // Arrange
-        coEvery { signUpWithEmailUseCase(any(), any()) } returns AuthResult.Error(AuthError.NetworkError)
+        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.NetworkError)
 
         // Act & Assert
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.signUpWithEmail("new@example.com", "password123")
+            viewModel.signUpWithEmail("new@example.com", "password123", "Hero")
             assertEquals(AuthUiState.Loading, awaitItem())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals("Sin conexión. Verifica tu red", errorState.message)
@@ -249,12 +253,12 @@ class AuthViewModelTest {
     @Test
     fun `given unknown error when signUpWithEmail then uiState emits Error with custom message`() = runTest {
         // Arrange
-        coEvery { signUpWithEmailUseCase(any(), any()) } returns AuthResult.Error(AuthError.Unknown("Custom error message"))
+        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.Unknown("Custom error message"))
 
         // Act & Assert
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.signUpWithEmail("new@example.com", "password123")
+            viewModel.signUpWithEmail("new@example.com", "password123", "Hero")
             assertEquals(AuthUiState.Loading, awaitItem())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals("Custom error message", errorState.message)
@@ -458,8 +462,8 @@ class AuthViewModelTest {
     @Test
     fun `given EmailConfirmationSent state when resetUiState then uiState becomes Idle`() = runTest {
         // Arrange
-        coEvery { signUpWithEmailUseCase(any(), any()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
-        viewModel.signUpWithEmail("confirm@example.com", "password123")
+        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
+        viewModel.signUpWithEmail("confirm@example.com", "password123", "Hero")
         advanceUntilIdle()
         assertEquals(AuthUiState.EmailConfirmationSent, viewModel.uiState.value)
 

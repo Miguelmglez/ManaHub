@@ -36,11 +36,12 @@ class AuthUseCasesTest {
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
     private val dummyAuthUser = AuthUser(
-        id          = "user-uuid-001",
-        email       = "user@example.com",
-        displayName = "Test User",
-        avatarUrl   = null,
-        provider    = "email",
+        id       = "user-uuid-001",
+        email    = "user@example.com",
+        nickname = "TestUser",
+        gameTag  = null,
+        avatarUrl = null,
+        provider  = "email",
     )
 
     private val successUser    = AuthResult.Success(dummyAuthUser)
@@ -113,53 +114,53 @@ class AuthUseCasesTest {
     @Test
     fun `given email with leading and trailing spaces when SignUpWithEmailUseCase invoked then calls repository with trimmed email`() = runTest {
         // Arrange
-        coEvery { repository.signUpWithEmail("new@example.com", "password123") } returns successUser
+        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero") } returns successUser
         val useCase = SignUpWithEmailUseCase(repository)
 
         // Act
-        val result = useCase("  new@example.com  ", "password123")
+        val result = useCase("  new@example.com  ", "password123", "Hero")
 
         // Assert
-        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123") }
+        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero") }
         assertEquals(successUser, result)
     }
 
     @Test
     fun `given clean email when SignUpWithEmailUseCase invoked then delegates to repository unchanged`() = runTest {
         // Arrange
-        coEvery { repository.signUpWithEmail("new@example.com", "password123") } returns successUser
+        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero") } returns successUser
         val useCase = SignUpWithEmailUseCase(repository)
 
         // Act
-        val result = useCase("new@example.com", "password123")
+        val result = useCase("new@example.com", "password123", "Hero")
 
         // Assert
-        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123") }
+        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero") }
         assertEquals(successUser, result)
     }
 
     @Test
     fun `given password is NOT trimmed when SignUpWithEmailUseCase invoked then password is forwarded as-is`() = runTest {
-        // Arrange: password may legitimately contain spaces — only email is trimmed
-        coEvery { repository.signUpWithEmail(any(), "  pass with spaces  ") } returns successUser
+        // Arrange: password may legitimately contain spaces — only email and nickname are trimmed
+        coEvery { repository.signUpWithEmail(any(), "  pass with spaces  ", any()) } returns successUser
         val useCase = SignUpWithEmailUseCase(repository)
 
         // Act
-        useCase("new@example.com", "  pass with spaces  ")
+        useCase("new@example.com", "  pass with spaces  ", "Hero")
 
         // Assert: password is not touched
-        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "  pass with spaces  ") }
+        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "  pass with spaces  ", "Hero") }
     }
 
     @Test
     fun `given repository returns EmailConfirmationRequired when SignUpWithEmailUseCase invoked then propagates Error`() = runTest {
         // Arrange
         val errorResult = AuthResult.Error(AuthError.EmailConfirmationRequired)
-        coEvery { repository.signUpWithEmail(any(), any()) } returns errorResult
+        coEvery { repository.signUpWithEmail(any(), any(), any()) } returns errorResult
         val useCase = SignUpWithEmailUseCase(repository)
 
         // Act
-        val result = useCase("new@example.com", "password123")
+        val result = useCase("new@example.com", "password123", "Hero")
 
         // Assert
         assertTrue(result is AuthResult.Error)

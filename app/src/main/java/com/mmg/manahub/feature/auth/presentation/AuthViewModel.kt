@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.R
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -21,7 +22,9 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +43,8 @@ class AuthViewModel @Inject constructor(
     private val getSessionState: GetSessionStateUseCase,
     private val resetPasswordUseCase: ResetPasswordUseCase,
     private val deleteAccountUseCase: DeleteAccountUseCase,
+    private val updateNicknameUseCase: UpdateNicknameUseCase,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     /** Global session state — observed from MainActivity for navigation routing. */
@@ -68,20 +73,40 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signUpWithEmail(email: String, password: String) {
+    fun signUpWithEmail(email: String, password: String, nickname: String) {
         val validationError = validateEmailAndPassword(email, password, isSignUp = true)
+            ?: validateNickname(nickname)
         if (validationError != null) {
             _uiState.value = AuthUiState.Error(validationError)
             return
         }
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = signUpWithEmailUseCase(email.trim(), password)) {
+            _uiState.value = when (val result = signUpWithEmailUseCase(email.trim(), password, nickname.trim())) {
                 is AuthResult.Success -> AuthUiState.Success
                 is AuthResult.Error -> when (result.error) {
                     is AuthError.EmailConfirmationRequired -> AuthUiState.EmailConfirmationSent
                     else -> AuthUiState.Error(result.error.toUiMessage())
                 }
+            }
+        }
+    }
+
+    /**
+     * Updates the authenticated user's nickname in Supabase.
+     * Transitions to [AuthUiState.NicknameUpdated] on success.
+     */
+    fun updateNickname(nickname: String) {
+        val validationError = validateNickname(nickname)
+        if (validationError != null) {
+            _uiState.value = AuthUiState.Error(validationError)
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = updateNicknameUseCase(nickname.trim())) {
+                is AuthResult.Success -> AuthUiState.NicknameUpdated
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
             }
         }
     }
@@ -94,11 +119,11 @@ class AuthViewModel @Inject constructor(
      * Must be called from a UI event handler (e.g. button click) so that
      * [CredentialManager] has access to the foreground Activity context.
      */
-    fun signInWithGoogle(context: Context) {
+    fun signInWithGoogle(activityContext: Context) {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                val credentialManager = CredentialManager.create(context)
+                val credentialManager = CredentialManager.create(activityContext)
                 val rawNonce = generateNonce()
                 val hashedNonce = hashNonce(rawNonce)
 
@@ -112,7 +137,7 @@ class AuthViewModel @Inject constructor(
                     .addCredentialOption(googleIdOption)
                     .build()
 
-                val result = credentialManager.getCredential(context, request)
+                val result = credentialManager.getCredential(activityContext, request)
                 val credential = result.credential
 
                 if (credential is CustomCredential &&
@@ -125,12 +150,12 @@ class AuthViewModel @Inject constructor(
                         is AuthResult.Error -> AuthUiState.Error(r.error.toUiMessage())
                     }
                 } else {
-                    _uiState.value = AuthUiState.Error("Tipo de credencial no soportado")
+                    _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_credential_unsupported))
                 }
             } catch (e: GetCredentialException) {
-                _uiState.value = AuthUiState.Error("Google Sign-In cancelado o no disponible")
+                _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_cancelled))
             } catch (e: Exception) {
-                _uiState.value = AuthUiState.Error("Error al iniciar sesión con Google")
+                _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_failed))
             }
         }
     }
@@ -148,9 +173,14 @@ class AuthViewModel @Inject constructor(
      * Transitions to [AuthUiState.ResetSent] on success or [AuthUiState.Error] on failure.
      */
     fun resetPassword(email: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
+            return
+        }
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = resetPasswordUseCase(email)) {
+            _uiState.value = when (val result = resetPasswordUseCase(trimmedEmail)) {
                 is AuthResult.Success -> AuthUiState.ResetSent
                 is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
             }
@@ -187,7 +217,6 @@ class AuthViewModel @Inject constructor(
     private fun generateNonce(): String {
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
-        // Encode as hex — same character space as before, guaranteed uniform distribution
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
@@ -198,24 +227,29 @@ class AuthViewModel @Inject constructor(
     }
 
     private fun AuthError.toUiMessage(): String = when (this) {
-        is AuthError.InvalidCredentials -> "Email o contraseña incorrectos"
-        is AuthError.EmailAlreadyInUse -> "Este email ya está registrado"
-        is AuthError.NetworkError -> "Sin conexión. Verifica tu red"
-        is AuthError.SessionExpired -> "Sesión expirada. Inicia sesión de nuevo"
-        is AuthError.UserNotFound -> "Usuario no encontrado"
-        is AuthError.EmailConfirmationRequired -> "¡Revisa tu bandeja de entrada para confirmar tu email!"
+        is AuthError.InvalidCredentials -> appContext.getString(R.string.auth_error_invalid_credentials)
+        is AuthError.EmailAlreadyInUse -> appContext.getString(R.string.auth_error_email_in_use)
+        is AuthError.NetworkError -> appContext.getString(R.string.auth_error_network)
+        is AuthError.SessionExpired -> appContext.getString(R.string.auth_error_session_expired)
+        is AuthError.UserNotFound -> appContext.getString(R.string.auth_error_user_not_found)
+        is AuthError.EmailConfirmationRequired -> appContext.getString(R.string.auth_email_confirmation_sent)
+        is AuthError.NicknameInappropriate -> appContext.getString(R.string.auth_error_nickname_inappropriate)
+        is AuthError.NicknameTooLong -> appContext.getString(R.string.auth_error_nickname_too_long)
         // Never expose raw server error messages to the user — they may leak internal
         // stack traces, table names, or constraint names from Supabase/Postgres.
-        is AuthError.Unknown -> "Ha ocurrido un error inesperado. Inténtalo de nuevo"
+        is AuthError.Unknown -> appContext.getString(R.string.auth_error_unknown)
     }
 
     /**
      * Validates email format and password strength before sending credentials to the server.
      * Returns a user-facing error string if invalid, or null if validation passes.
      *
-     * Minimum password requirements (sign-up only):
-     *   - At least 8 characters (NIST SP 800-63B minimum)
-     * Email validation uses Android's built-in [Patterns.EMAIL_ADDRESS] matcher.
+     * Sign-up password requirements (must match [PasswordStrength] shown in the UI):
+     *   - At least 8 characters
+     *   - At least one lowercase letter
+     *   - At least one uppercase letter
+     *   - At least one digit
+     *   - At least one symbol
      */
     private fun validateEmailAndPassword(
         email: String,
@@ -223,14 +257,47 @@ class AuthViewModel @Inject constructor(
         isSignUp: Boolean,
     ): String? {
         val trimmedEmail = email.trim()
-        if (trimmedEmail.isBlank()) return "Introduce un email"
+        if (trimmedEmail.isBlank()) return appContext.getString(R.string.auth_validation_email_required)
         if (!Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
-            return "El formato del email no es válido"
+            return appContext.getString(R.string.auth_error_invalid_email)
         }
-        if (password.isBlank()) return "Introduce una contraseña"
-        if (isSignUp && password.length < 8) {
-            return "La contraseña debe tener al menos 8 caracteres"
+        if (password.isBlank()) return appContext.getString(R.string.auth_validation_password_required)
+        if (isSignUp && !isPasswordStrong(password)) {
+            return appContext.getString(R.string.auth_error_password_requirements)
         }
         return null
+    }
+
+    /**
+     * Validates the nickname before sending it to the server.
+     * Rules:
+     * - Must not be blank.
+     * - Must be 30 characters or fewer.
+     * - Must contain only letters, digits, spaces, hyphens, underscores, and apostrophes.
+     *   No leading or trailing spaces allowed.
+     *
+     * Returns a user-facing error string if invalid, or null if validation passes.
+     */
+    private fun validateNickname(nickname: String): String? {
+        val trimmed = nickname.trim()
+        if (trimmed.isBlank()) return appContext.getString(R.string.auth_error_nickname_required)
+        if (trimmed.length > NICKNAME_MAX_LENGTH) return appContext.getString(R.string.auth_error_nickname_too_long)
+        if (!NICKNAME_PATTERN.matches(trimmed)) return appContext.getString(R.string.auth_error_nickname_invalid)
+        return null
+    }
+
+    companion object {
+        /** Returns true when the password satisfies all sign-up requirements. */
+        fun isPasswordStrong(password: String): Boolean =
+            password.length >= 8 &&
+            password.any { it.isLowerCase() } &&
+            password.any { it.isUpperCase() } &&
+            password.any { it.isDigit() } &&
+            password.any { !it.isLetterOrDigit() }
+
+        private const val NICKNAME_MAX_LENGTH = 30
+
+        /** Alphanumeric, spaces, hyphens, underscores, apostrophes. No leading/trailing spaces. */
+        private val NICKNAME_PATTERN = Regex("^[\\w\\s'\\-]{1,30}$")
     }
 }
