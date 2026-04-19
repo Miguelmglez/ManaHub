@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,6 +71,9 @@ fun CollectionScreen(
         onErrorDismissed      = viewModel::onErrorDismissed,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
         onTabSelected         = viewModel::onTabSelected,
+        onPushCollection      = viewModel::onPushCollection,
+        onPullCollection      = viewModel::onPullCollection,
+        onSyncDismissed       = viewModel::onSyncDismissed,
     )
 
     if (showAdvancedSearch) {
@@ -97,16 +102,42 @@ private fun CollectionContent(
     onErrorDismissed:     () -> Unit,
     onShowAdvancedSearch: () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
+    onPushCollection:     () -> Unit,
+    onPullCollection:     () -> Unit,
+    onSyncDismissed:      () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val snackbarHostState = remember { SnackbarHostState() }
+    val syncSuccessMsg = stringResource(R.string.collection_sync_success)
+    val syncErrorMsg   = stringResource(R.string.collection_sync_error)
+
+    // Auto-dismiss sync success/error via snackbar
+    LaunchedEffect(uiState.syncState, uiState.syncError) {
+        when (uiState.syncState) {
+            SyncState.SUCCESS -> {
+                snackbarHostState.showSnackbar(message = syncSuccessMsg)
+                onSyncDismissed()
+            }
+            SyncState.ERROR -> {
+                snackbarHostState.showSnackbar(message = uiState.syncError ?: syncErrorMsg)
+                onSyncDismissed()
+            }
+            else -> Unit
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CollectionTopBar(
-                viewMode         = uiState.viewMode,
-                onViewModeToggle = onViewModeToggle,
-                onSortChange     = onSortChange,
-                currentSort      = uiState.sortOrder,
+                viewMode          = uiState.viewMode,
+                onViewModeToggle  = onViewModeToggle,
+                onSortChange      = onSortChange,
+                currentSort       = uiState.sortOrder,
+                isSyncing         = uiState.syncState == SyncState.SYNCING,
+                pendingCount      = uiState.pendingUploadCount,
+                onPushCollection  = onPushCollection,
+                onPullCollection  = onPullCollection,
             )
         },
         floatingActionButton = {
@@ -314,6 +345,10 @@ private fun CollectionTopBar(
     onViewModeToggle: () -> Unit,
     onSortChange:     (SortOrder) -> Unit,
     currentSort:      SortOrder,
+    isSyncing:        Boolean,
+    pendingCount:     Int,
+    onPushCollection: () -> Unit,
+    onPullCollection: () -> Unit,
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors
@@ -334,6 +369,52 @@ private fun CollectionTopBar(
                 color    = mc.textPrimary,
                 modifier = Modifier.weight(1f)
             )
+
+            // Sync indicators: spinning indicator while syncing, or push/pull buttons.
+            if (isSyncing) {
+                CircularProgressIndicator(
+                    modifier  = Modifier
+                        .size(24.dp)
+                        .padding(horizontal = 4.dp),
+                    strokeWidth = 2.dp,
+                    color     = mc.primaryAccent,
+                )
+            } else {
+                // Push button with badge when there are pending local changes.
+                Box {
+                    IconButton(
+                        onClick  = onPushCollection,
+                        enabled  = !isSyncing,
+                    ) {
+                        Icon(
+                            imageVector        = Icons.Default.CloudUpload,
+                            contentDescription = stringResource(R.string.collection_sync_push),
+                            tint               = if (pendingCount > 0) mc.primaryAccent else mc.textSecondary,
+                        )
+                    }
+                    if (pendingCount > 0) {
+                        Badge(
+                            modifier           = Modifier.align(Alignment.TopEnd),
+                            containerColor     = mc.primaryAccent,
+                        ) {
+                            Text(
+                                text  = if (pendingCount > 99) "99+" else pendingCount.toString(),
+                                style = MaterialTheme.magicTypography.labelSmall,
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick  = onPullCollection,
+                    enabled  = !isSyncing,
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.CloudDownload,
+                        contentDescription = stringResource(R.string.collection_sync_pull),
+                        tint               = mc.textSecondary,
+                    )
+                }
+            }
 
             IconButton(onClick = onViewModeToggle) {
                 Icon(

@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.profile
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -295,11 +296,17 @@ private fun ProfileHeroSection(
     val mc = MaterialTheme.magicColors
     var localName by remember(name) { mutableStateOf(name) }
     val focusManager = LocalFocusManager.current
+
+    // State to track the image's aspect ratio (defaults to 16:9)
+    var imageRatio by remember(avatarUrl) { mutableFloatStateOf(1.77f) }
+
     Box(
         modifier = Modifier
             .padding(horizontal = 8.dp, vertical = 8.dp)
             .fillMaxWidth()
-            .height(256.dp)
+            // Use a dynamic aspect ratio constrained to reasonable limits
+            .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
+            .animateContentSize()
             .clip(RoundedCornerShape(16.dp)),
     ) {
         // Background: planeswalker art or fallback gradient
@@ -311,6 +318,13 @@ private fun ProfileHeroSection(
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
+                onSuccess = { state ->
+                    val size = state.painter.intrinsicSize
+                    if (size.width > 0 && size.height > 0) {
+                        imageRatio = size.width / size.height
+                    }
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable { onAvatarClick() },
@@ -1037,8 +1051,6 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
-    val context = LocalContext.current
-    val appName = remember { context.applicationInfo.loadLabel(context.packageManager).toString() }
     val version = remember { com.mmg.manahub.BuildConfig.VERSION_NAME }
 
     Column(
@@ -1050,12 +1062,6 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
             text = stringResource(R.string.profile_version, version),
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.textDisabled
-        )
-        Text(
-            text = appName,
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.textDisabled,
-            fontWeight = FontWeight.Bold
         )
         Text(
             text = stringResource(R.string.profile_developed_by),

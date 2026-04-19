@@ -11,6 +11,7 @@ fun UserCardEntity.toDomain(): UserCard = UserCard(
     condition = condition, language = language, isForTrade = isForTrade,
     isInWishlist = isInWishlist, minTradeValue = minTradeValue,
     notes = notes, acquiredAt = acquiredAt, addedAt = addedAt,
+    syncStatus = syncStatus, remoteId = remoteId,
 )
 
 fun UserCardWithCardEntity.toDomain(): UserCardWithCard = UserCardWithCard(
@@ -24,4 +25,5 @@ fun UserCard.toEntity(): UserCardEntity = UserCardEntity(
     condition = condition, language = language, isForTrade = isForTrade,
     isInWishlist = isInWishlist, minTradeValue = minTradeValue,
     notes = notes, acquiredAt = acquiredAt, addedAt = addedAt,
+    syncStatus = syncStatus, remoteId = remoteId,
 )

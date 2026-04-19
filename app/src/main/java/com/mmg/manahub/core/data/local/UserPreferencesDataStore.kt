@@ -22,6 +22,7 @@ import com.mmg.manahub.core.util.PriceFormatter.isEuropeanLocale
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 import javax.inject.Inject
@@ -42,6 +43,11 @@ private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold"
 private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
+
+// ── Per-user sync keys (keyed by userId to handle multi-account scenarios) ───
+private fun syncTimestampKey(userId: String) = stringPreferencesKey("sync_ts_$userId")
+private fun syncDateKey(userId: String)      = stringPreferencesKey("sync_date_$userId")
+private fun pendingDeletesKey(userId: String) = stringSetPreferencesKey("sync_del_$userId")
 
 private data class UdtRecord(val k: String, val l: String, val c: String)
 private val udtListType = object : TypeToken<List<UdtRecord>>() {}.type
@@ -226,6 +232,39 @@ class UserPreferencesDataStore @Inject constructor(
             records.removeAll { it.k == key }
             prefs[KEY_USER_DEFINED_TAGS] = gson.toJson(records)
         }
+    }
+
+    // ── Sync metadata ─────────────────────────────────────────────────────────
+
+    suspend fun getLastSyncTimestamp(userId: String): String? {
+        return context.userPrefsDataStore.data.map { it[syncTimestampKey(userId)] }.first()
+    }
+
+    suspend fun saveLastSyncTimestamp(userId: String, isoTimestamp: String) {
+        context.userPrefsDataStore.edit { it[syncTimestampKey(userId)] = isoTimestamp }
+    }
+
+    suspend fun getLastSyncDate(userId: String): String? {
+        return context.userPrefsDataStore.data.map { it[syncDateKey(userId)] }.first()
+    }
+
+    suspend fun saveLastSyncDate(userId: String, isoDate: String) {
+        context.userPrefsDataStore.edit { it[syncDateKey(userId)] = isoDate }
+    }
+
+    suspend fun getPendingDeleteRemoteIds(userId: String): Set<String> {
+        return context.userPrefsDataStore.data.map { it[pendingDeletesKey(userId)] ?: emptySet() }.first()
+    }
+
+    suspend fun addPendingDeleteRemoteId(userId: String, remoteId: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            val current = prefs[pendingDeletesKey(userId)] ?: emptySet()
+            prefs[pendingDeletesKey(userId)] = current + remoteId
+        }
+    }
+
+    suspend fun clearPendingDeleteRemoteIds(userId: String) {
+        context.userPrefsDataStore.edit { it.remove(pendingDeletesKey(userId)) }
     }
 
     suspend fun saveTheme(theme: AppTheme) {

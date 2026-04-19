@@ -1,12 +1,16 @@
 package com.mmg.manahub.feature.collection
 
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchCriterion
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -51,9 +55,12 @@ class CollectionViewModelTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val getCollection  = mockk<GetCollectionUseCase>()
-    private val removeCard     = mockk<RemoveCardUseCase>(relaxed = true)
-    private val cardRepository = mockk<CardRepository>(relaxed = true)
+    private val getCollection     = mockk<GetCollectionUseCase>()
+    private val removeCard        = mockk<RemoveCardUseCase>(relaxed = true)
+    private val cardRepository    = mockk<CardRepository>(relaxed = true)
+    private val userCardRepository = mockk<UserCardRepository>(relaxed = true)
+    private val authRepository    = mockk<AuthRepository>(relaxed = true)
+    private val prefsDataStore    = mockk<UserPreferencesDataStore>(relaxed = true)
 
     private lateinit var viewModel: CollectionViewModel
 
@@ -111,10 +118,16 @@ class CollectionViewModelTest {
     private fun buildViewModel(entries: List<UserCardWithCard> = emptyList()): CollectionViewModel {
         every { getCollection() } returns flowOf(entries)
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
+        every { userCardRepository.observePendingCount() } returns flowOf(0)
+        coEvery { authRepository.getCurrentUser() } returns null
+        every { authRepository.sessionState } returns flowOf(SessionState.Unauthenticated)
         return CollectionViewModel(
-            getCollection  = getCollection,
-            removeCard     = removeCard,
-            cardRepository = cardRepository,
+            getCollection      = getCollection,
+            removeCard         = removeCard,
+            cardRepository     = cardRepository,
+            userCardRepository = userCardRepository,
+            authRepository     = authRepository,
+            prefsDataStore     = prefsDataStore,
         )
     }
 

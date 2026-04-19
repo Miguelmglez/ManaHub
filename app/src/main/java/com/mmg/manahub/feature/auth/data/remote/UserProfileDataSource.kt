@@ -43,7 +43,7 @@ class UserProfileDataSource(
                     "nickname" to user.nickname,
                     "avatar_url" to user.avatarUrl,
                     "provider" to user.provider,
-                    "updated_at" to System.currentTimeMillis()
+                    "updated_at" to java.time.Instant.now().toString()
                 )
             )
 

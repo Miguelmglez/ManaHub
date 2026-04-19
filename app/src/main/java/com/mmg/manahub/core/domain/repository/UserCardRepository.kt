@@ -16,4 +16,22 @@ interface UserCardRepository {
     suspend fun incrementQuantity(id: Long)
     suspend fun updateQuantity(id: Long, quantity: Int)
     suspend fun getScryfallIds(): List<String>
+
+    // ── Sync ──────────────────────────────────────────────────────────────────
+
+    /** Number of local rows not yet pushed to Supabase. */
+    fun observePendingCount(): Flow<Int>
+
+    /**
+     * Uploads all PENDING_UPLOAD rows to Supabase and processes any pending soft-deletes.
+     * No-op when the user is not authenticated.
+     */
+    suspend fun pushPendingChanges(userId: String): Result<Unit>
+
+    /**
+     * Downloads changes from Supabase that occurred after the last successful sync
+     * and merges them into the local Room database.
+     * No-op when the user is not authenticated or when local data is already up to date.
+     */
+    suspend fun pullChanges(userId: String): Result<Unit>
 }

@@ -54,6 +54,10 @@
     <string name="collection_search_hint">Search in collection…</string>
     <string name="collection_tab_cards">Cards</string>
     <string name="collection_tab_decks">Decks</string>
+    <string name="collection_sync_push">Upload to cloud</string>
+    <string name="collection_sync_pull">Download from cloud</string>
+    <string name="collection_sync_success">Collection synced</string>
+    <string name="collection_sync_error">Sync failed</string>
     <string name="collection_filter_all">All</string>
     <string name="collection_filter_white">White</string>
     <string name="collection_filter_blue">Blue</string>

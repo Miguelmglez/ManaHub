@@ -22,8 +22,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,8 +51,9 @@ class AuthRepositoryImpl @Inject constructor(
                 this.email = email
                 this.password = password
             }
-            val user = supabaseAuth.currentUserOrNull()!!.toAuthUser()
-            AuthResult.Success(user)
+            val userInfo = supabaseAuth.currentUserOrNull()
+                ?: return@runCatching AuthResult.Error(AuthError.SessionExpired)
+            AuthResult.Success(userInfo.toAuthUser())
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
 
@@ -92,7 +95,8 @@ class AuthRepositoryImpl @Inject constructor(
                 provider = Google
                 nonce = rawNonce
             }
-            val userInfo = supabaseAuth.currentUserOrNull()!!
+            val userInfo = supabaseAuth.currentUserOrNull()
+                ?: return@runCatching AuthResult.Error(AuthError.SessionExpired)
             var user = userInfo.toAuthUser()
 
             // If Google user has no nickname yet, auto-generate one from their Google display name,
@@ -139,7 +143,7 @@ class AuthRepositoryImpl @Inject constructor(
             // argument in the JSON body, NOT concatenated into any SQL string.
             supabaseClient.postgrest.rpc(
                 "update_user_nickname",
-                mapOf("new_nickname" to nickname.trim())
+                buildJsonObject { put("new_nickname", nickname.trim()) },
             )
             val user = supabaseAuth.currentUserOrNull()
                 ?: return AuthResult.Error(AuthError.SessionExpired)
@@ -166,7 +170,9 @@ class AuthRepositoryImpl @Inject constructor(
             // END;
             // $$;
             supabaseClient.postgrest.rpc("delete_current_user")
-            supabaseAuth.signOut()
+            // signOut may fail if the session is already invalidated server-side after deletion.
+            // The account is gone regardless — always return Success once the RPC call succeeds.
+            runCatching { supabaseAuth.signOut() }
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
@@ -225,9 +231,9 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     private fun SessionStatus.toSessionState(): SessionState = when (this) {
-        is SessionStatus.Authenticated -> SessionState.Authenticated(
-            session.user!!.toAuthUser()
-        )
+        is SessionStatus.Authenticated -> session.user
+            ?.let { SessionState.Authenticated(it.toAuthUser()) }
+            ?: SessionState.Unauthenticated
         is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
         is SessionStatus.Initializing -> SessionState.Loading
         is SessionStatus.RefreshFailure -> SessionState.Unauthenticated
