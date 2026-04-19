@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import android.content.Intent
 import androidx.compose.foundation.border
@@ -76,6 +77,15 @@ fun DeckDetailScreen(
     var showBasicLandsSheet by remember { mutableStateOf(false) }
     var selectedCardId by remember { mutableStateOf<String?>(null) }
 
+    // Sync deck to Supabase on any back navigation (system or top-bar button).
+    val handleBack = remember(viewModel) {
+        {
+            viewModel.onNavigatingBack()
+            onBack()
+        }
+    }
+    BackHandler(onBack = handleBack)
+
     // Keep the selected card detail in sync with deck state changes
     val selectedDeckCard = remember(selectedCardId, uiState.cards) {
         selectedCardId?.let { id -> uiState.cards.find { it.scryfallId == id } }
@@ -91,7 +101,7 @@ fun DeckDetailScreen(
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = handleBack) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),

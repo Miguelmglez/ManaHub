@@ -67,6 +67,9 @@ data class UserCard(
     val notes:         String? = null,
     val acquiredAt:    Long?   = null,
     val addedAt:       Long    = System.currentTimeMillis(),
+    // Sync metadata — carried through the domain layer so updateCard() preserves remote_id.
+    val syncStatus: Int     = 0,   // 0=SYNCED, 1=PENDING_UPLOAD
+    val remoteId:   String? = null,
 )
 
 data class UserCardWithCard(val userCard: UserCard, val card: Card)

@@ -105,7 +105,6 @@ abstract class TournamentDao {
      *                    without breaking the transaction boundary.
      * @return The auto-generated tournament id.
      */
-    @Transaction
     open suspend fun insertTournamentAtomically(
         tournament:   TournamentEntity,
         players:      List<TournamentPlayerEntity>,

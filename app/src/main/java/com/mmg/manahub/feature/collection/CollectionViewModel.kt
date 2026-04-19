@@ -2,16 +2,22 @@ package com.mmg.manahub.feature.collection
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchCriterion
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.ZoneOffset
 import javax.inject.Inject
 
 @HiltViewModel
@@ -19,6 +25,9 @@ class CollectionViewModel @Inject constructor(
     private val getCollection: GetCollectionUseCase,
     private val removeCard: RemoveCardUseCase,
     private val cardRepository: CardRepository,
+    private val userCardRepository: UserCardRepository,
+    private val authRepository: AuthRepository,
+    private val prefsDataStore: UserPreferencesDataStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CollectionUiState())
@@ -30,6 +39,9 @@ class CollectionViewModel @Inject constructor(
     init {
         observeCollection()
         refreshPrices()
+        observePendingCount()
+        autoSyncIfFirstRunOfDay()
+        observeSessionChanges()
     }
 
     private fun observeCollection() {
@@ -53,6 +65,70 @@ class CollectionViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { cardRepository.refreshCollectionPrices() }
         }
+    }
+
+    private fun observePendingCount() {
+        viewModelScope.launch {
+            userCardRepository.observePendingCount()
+                .collect { count -> _uiState.update { it.copy(pendingUploadCount = count) } }
+        }
+    }
+
+    private fun observeSessionChanges() {
+        viewModelScope.launch {
+            var previousUserId: String? = null
+            authRepository.sessionState.collect { state ->
+                when (state) {
+                    is SessionState.Authenticated -> previousUserId = state.user.id
+                    is SessionState.Unauthenticated -> {
+                        previousUserId?.let { prefsDataStore.clearPendingDeleteRemoteIds(it) }
+                        previousUserId = null
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    private fun autoSyncIfFirstRunOfDay() {
+        viewModelScope.launch {
+            val userId = authRepository.getCurrentUser()?.id ?: return@launch
+            val today = LocalDate.now(ZoneOffset.UTC).toString()
+            val lastDate = prefsDataStore.getLastSyncDate(userId)
+            if (lastDate != today) {
+                pushInternal(userId)
+            }
+        }
+    }
+
+    // ── Sync user actions ─────────────────────────────────────────────────────
+
+    fun onPushCollection() {
+        viewModelScope.launch {
+            val userId = authRepository.getCurrentUser()?.id ?: return@launch
+            pushInternal(userId)
+        }
+    }
+
+    fun onPullCollection() {
+        viewModelScope.launch {
+            val userId = authRepository.getCurrentUser()?.id ?: return@launch
+            _uiState.update { it.copy(syncState = SyncState.SYNCING, syncError = null) }
+            userCardRepository.pullChanges(userId)
+                .onSuccess { _uiState.update { it.copy(syncState = SyncState.SUCCESS) } }
+                .onFailure { e -> _uiState.update { it.copy(syncState = SyncState.ERROR, syncError = e.message) } }
+        }
+    }
+
+    fun onSyncDismissed() {
+        _uiState.update { it.copy(syncState = SyncState.IDLE, syncError = null) }
+    }
+
+    private suspend fun pushInternal(userId: String) {
+        _uiState.update { it.copy(syncState = SyncState.SYNCING, syncError = null) }
+        userCardRepository.pushPendingChanges(userId)
+            .onSuccess { _uiState.update { it.copy(syncState = SyncState.SUCCESS) } }
+            .onFailure { e -> _uiState.update { it.copy(syncState = SyncState.ERROR, syncError = e.message) } }
     }
 
     // ── User actions ──────────────────────────────────────────────────────

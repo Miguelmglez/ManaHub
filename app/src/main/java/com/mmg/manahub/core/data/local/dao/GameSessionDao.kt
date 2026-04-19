@@ -61,7 +61,7 @@ abstract class GameSessionDao {
 
     @Transaction
     @Query("SELECT * FROM game_sessions ORDER BY playedAt DESC LIMIT :limit")
-    abstract fun observeRecentSessions(limit: Int = 10): Flow<List<GameSessionWithPlayers>>
+    abstract fun observeRecentSessions(limit: Int): Flow<List<GameSessionWithPlayers>>
 
     @Transaction
     @Query("SELECT * FROM game_sessions WHERE id = :sessionId")

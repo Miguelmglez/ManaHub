@@ -3,16 +3,23 @@ package com.mmg.manahub.core.data.local.entity
 
 import androidx.room.*
 
-@Entity(tableName = "decks")
+@Entity(
+    tableName = "decks",
+    indices = [Index("sync_status")],
+)
 data class DeckEntity(
     @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id") val id: Long = 0,
-    @ColumnInfo(name = "name")          val name:        String,
-    @ColumnInfo(name = "description")   val description: String? = null,
-    @ColumnInfo(name = "format")        val format:      String  = "casual",
+    @ColumnInfo(name = "id")          val id:          Long    = 0,
+    @ColumnInfo(name = "name")        val name:        String,
+    @ColumnInfo(name = "description") val description: String? = null,
+    @ColumnInfo(name = "format")      val format:      String  = "casual",
     @ColumnInfo(name = "cover_card_id") val coverCardId: String? = null,
-    @ColumnInfo(name = "created_at")    val createdAt:   Long    = System.currentTimeMillis(),
-    @ColumnInfo(name = "updated_at")    val updatedAt:   Long    = System.currentTimeMillis(),
+    @ColumnInfo(name = "created_at")  val createdAt:   Long    = System.currentTimeMillis(),
+    @ColumnInfo(name = "updated_at")  val updatedAt:   Long    = System.currentTimeMillis(),
+    /** Mirrors [SyncStatus] constants — PENDING_UPLOAD(1) until pushed to Supabase. */
+    @ColumnInfo(name = "sync_status") val syncStatus:  Int     = SyncStatus.PENDING_UPLOAD,
+    /** UUID assigned by Supabase after the first successful push, null until then. */
+    @ColumnInfo(name = "remote_id")   val remoteId:    String? = null,
 )
 
 /** Cross-reference: which cards belong to which deck (mainboard + sideboard). */

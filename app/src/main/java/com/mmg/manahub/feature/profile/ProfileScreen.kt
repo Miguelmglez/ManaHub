@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.profile
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,9 +15,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import com.mmg.manahub.feature.auth.domain.model.SessionState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,20 +54,30 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.auth.presentation.AccountSection
+import com.mmg.manahub.feature.auth.presentation.AuthUiState
+import com.mmg.manahub.feature.auth.presentation.AuthViewModel
+import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
     onSettingsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showFeedbackSheet by remember { mutableStateOf(false) }
-    // Recreate activity when app language changes
+    var showLoginSheet by remember { mutableStateOf(false) }
+    var loginSheetInitialTab by remember { mutableIntStateOf(0) }
+    var showAccountSheet by remember { mutableStateOf(false) }
 
     if (showAvatarPicker) {
         AvatarPickerSheet(onDismiss = { showAvatarPicker = false })
@@ -72,6 +85,50 @@ fun ProfileScreen(
 
     if (showFeedbackSheet) {
         FeedbackSheet(onDismiss = { showFeedbackSheet = false })
+    }
+
+    if (showLoginSheet) {
+        LoginSheet(
+            authViewModel = authViewModel,
+            initialTab = loginSheetInitialTab,
+            onDismiss = { showLoginSheet = false },
+        )
+    }
+
+    if (showAccountSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAccountSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = mc.backgroundSecondary,
+            dragHandle = { Spacer(modifier = Modifier.height(8.dp)) },
+        ) {
+            AccountSection(
+                sessionState = sessionState,
+                authUiState = authUiState,
+                onLoginClick = {
+                    showAccountSheet = false
+                    loginSheetInitialTab = 0
+                    showLoginSheet = true
+                },
+                onSignUpClick = {
+                    showAccountSheet = false
+                    loginSheetInitialTab = 1
+                    showLoginSheet = true
+                },
+                onSignOutClick = { authViewModel.signOut() },
+                onDeleteAccountClick = { authViewModel.deleteAccount() },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            Spacer(modifier = Modifier.navigationBarsPadding())
+        }
+    }
+
+    // Reset ui state after account deletion so the screen returns to Idle cleanly.
+    // The sessionState Flow will automatically emit Unauthenticated after the account is removed.
+    LaunchedEffect(authUiState) {
+        if (authUiState is AuthUiState.AccountDeleted) {
+            authViewModel.resetUiState()
+        }
     }
 
     Scaffold(
@@ -96,6 +153,15 @@ fun ProfileScreen(
                         color = mc.textPrimary,
                     )
                     Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "Account",
+                        tint = if (sessionState is SessionState.Authenticated) mc.primaryAccent else mc.textPrimary,
+                        modifier = Modifier
+                            .padding(end = 16.dp)
+                            .size(24.dp)
+                            .clickable { showAccountSheet = true },
+                    )
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
@@ -124,6 +190,11 @@ fun ProfileScreen(
                     avatarUrl = uiState.avatarUrl,
                     onAvatarClick = { showAvatarPicker = true },
                     savePlayerName = viewModel::savePlayerName,
+                    onNicknameUpdate = if (sessionState is SessionState.Authenticated) {
+                        authViewModel::updateNickname
+                    } else {
+                        null
+                    },
                 )
             }
 
@@ -218,16 +289,24 @@ private fun ProfileHeroSection(
     name: String,
     avatarUrl: String?,
     onAvatarClick: () -> Unit,
-    savePlayerName: (String) -> Unit
+    savePlayerName: (String) -> Unit,
+    /** When non-null, the name edit also triggers a Supabase nickname update (fire-and-forget). */
+    onNicknameUpdate: ((String) -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     var localName by remember(name) { mutableStateOf(name) }
     val focusManager = LocalFocusManager.current
+
+    // State to track the image's aspect ratio (defaults to 16:9)
+    var imageRatio by remember(avatarUrl) { mutableFloatStateOf(1.77f) }
+
     Box(
         modifier = Modifier
             .padding(horizontal = 8.dp, vertical = 8.dp)
             .fillMaxWidth()
-            .height(256.dp)
+            // Use a dynamic aspect ratio constrained to reasonable limits
+            .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
+            .animateContentSize()
             .clip(RoundedCornerShape(16.dp)),
     ) {
         // Background: planeswalker art or fallback gradient
@@ -239,6 +318,13 @@ private fun ProfileHeroSection(
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
+                onSuccess = { state ->
+                    val size = state.painter.intrinsicSize
+                    if (size.width > 0 && size.height > 0) {
+                        imageRatio = size.width / size.height
+                    }
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable { onAvatarClick() },
@@ -298,8 +384,11 @@ private fun ProfileHeroSection(
                 value = localName,
                 onValueChange = { newName ->
                     localName = newName
-                    // Updates the player name on every keystroke
+                    // Updates the local player name on every keystroke
                     savePlayerName(newName)
+                    // Fire-and-forget Supabase nickname update when the user is authenticated.
+                    // The local save always happens; the Supabase update is best-effort.
+                    onNicknameUpdate?.invoke(newName)
                 },
                 // Apply the same text style used in the original Text composable
                 textStyle = TextStyle(
@@ -962,8 +1051,6 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
-    val context = LocalContext.current
-    val appName = remember { context.applicationInfo.loadLabel(context.packageManager).toString() }
     val version = remember { com.mmg.manahub.BuildConfig.VERSION_NAME }
 
     Column(
@@ -975,12 +1062,6 @@ private fun AppInfoFooter(modifier: Modifier = Modifier) {
             text = stringResource(R.string.profile_version, version),
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.textDisabled
-        )
-        Text(
-            text = appName,
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.textDisabled,
-            fontWeight = FontWeight.Bold
         )
         Text(
             text = stringResource(R.string.profile_developed_by),

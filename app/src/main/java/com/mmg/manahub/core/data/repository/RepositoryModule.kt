@@ -1,6 +1,10 @@
 package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
+import com.mmg.manahub.core.data.remote.collection.SupabaseCollectionDataSource
+import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
+import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
@@ -23,6 +27,12 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindUserCardRepository(impl: UserCardRepositoryImpl): UserCardRepository
+
+    @Binds @Singleton
+    abstract fun bindCollectionRemoteDataSource(impl: SupabaseCollectionDataSource): CollectionRemoteDataSource
+
+    @Binds @Singleton
+    abstract fun bindDeckRemoteDataSource(impl: SupabaseDeckDataSource): DeckRemoteDataSource
 
     @Binds @Singleton
     abstract fun bindDeckRepository(impl: DeckRepositoryImpl): DeckRepository

@@ -54,6 +54,10 @@
     <string name="collection_search_hint">Search in collection…</string>
     <string name="collection_tab_cards">Cards</string>
     <string name="collection_tab_decks">Decks</string>
+    <string name="collection_sync_push">Upload to cloud</string>
+    <string name="collection_sync_pull">Download from cloud</string>
+    <string name="collection_sync_success">Collection synced</string>
+    <string name="collection_sync_error">Sync failed</string>
     <string name="collection_filter_all">All</string>
     <string name="collection_filter_white">White</string>
     <string name="collection_filter_blue">Blue</string>
@@ -1021,5 +1025,79 @@
     <string name="feedback_invalid_file">Invalid file. Please select a JPG, PNG, or WebP image under 10 MB.</string>
     <string name="feedback_sent">Feedback sent — thank you!</string>
     <string name="feedback_chooser_title">Send feedback via…</string>
+
+    <!-- AUTH -->
+    <string name="auth_section_title">Sync Your Experience</string>
+    <string name="auth_section_subtitle">Create a free account to unlock cloud features</string>
+    <string name="auth_benefit_collection">Sync your collection across devices</string>
+    <string name="auth_benefit_decks">Save and access your decks anywhere</string>
+    <string name="auth_benefit_stats">Cloud game stats and history</string>
+    <string name="auth_benefit_profile">Customizable profile (name &amp; avatar)</string>
+    <string name="auth_benefit_future">More features coming soon, including the web version</string>
+    <string name="auth_cta_create">Create Account</string>
+    <string name="auth_cta_signin">Sign In</string>
+    <string name="auth_no_account_needed">You can use the app without an account</string>
+    <string name="auth_synced_chip">Synced</string>
+    <string name="auth_sign_out">Sign out</string>
+    <string name="auth_sheet_title">Welcome to ManaHub</string>
+    <string name="auth_tab_signin">Sign In</string>
+    <string name="auth_tab_signup">Create Account</string>
+    <string name="auth_field_email">Email</string>
+    <string name="auth_field_password">Password</string>
+    <string name="auth_btn_continue">Continue</string>
+    <string name="auth_btn_google">Continue with Google</string>
+    <string name="auth_link_forgot">Forgot your password?</string>
+    <string name="auth_reset_title">Reset Password</string>
+    <string name="auth_reset_subtitle">Enter your email to receive a reset link</string>
+    <string name="auth_reset_btn">Send reset link</string>
+    <string name="auth_reset_sent">Reset link sent! Check your inbox</string>
+    <string name="auth_or_divider">or</string>
+    <string name="auth_cancel">Cancel</string>
+    <string name="auth_delete_account">Delete Account</string>
+    <string name="auth_delete_account_confirm_title">Delete Account</string>
+    <string name="auth_delete_account_confirm_body">Are you sure? This action cannot be undone. All your synced data will be permanently deleted.</string>
+    <string name="auth_delete_account_confirm_btn">Delete Account</string>
+    <string name="auth_email_confirmation_sent">Check your inbox to confirm your email!</string>
+
+    <!-- Auth error messages (used by AuthViewModel.toUiMessage) -->
+    <string name="auth_error_invalid_credentials">Incorrect email or password</string>
+    <string name="auth_error_email_in_use">This email is already registered</string>
+    <string name="auth_error_network">No connection. Check your network</string>
+    <string name="auth_error_session_expired">Session expired. Sign in again</string>
+    <string name="auth_error_user_not_found">User not found</string>
+    <string name="auth_error_unknown">An unexpected error occurred. Try again</string>
+    <string name="auth_error_invalid_email">Invalid email format</string>
+    <string name="auth_error_credential_unsupported">Credential type not supported</string>
+    <string name="auth_error_google_cancelled">Google Sign-In cancelled</string>
+    <string name="auth_error_google_failed">Error signing in with Google</string>
+
+    <!-- Auth field validation -->
+    <string name="auth_validation_email_required">Enter an email address</string>
+    <string name="auth_validation_password_required">Enter a password</string>
+    <string name="auth_validation_password_too_short">Password must be at least 8 characters</string>
+    <string name="auth_error_password_requirements">Password must include uppercase, lowercase, a number and a symbol</string>
+
+    <!-- Nickname field -->
+    <string name="auth_field_nickname">Nickname</string>
+    <string name="auth_nickname_hint">Choose a nickname (max 30 chars)</string>
+    <string name="auth_nickname_char_count">%1$d/30</string>
+    <string name="auth_error_nickname_inappropriate">This nickname contains inappropriate content. Please choose another.</string>
+    <string name="auth_error_nickname_too_long">Nickname must be 30 characters or less.</string>
+    <string name="auth_error_nickname_required">Please enter a nickname.</string>
+    <string name="auth_error_nickname_invalid">Nickname can only contain letters, numbers, spaces and basic punctuation.</string>
+    <string name="auth_game_tag_label">Game Tag</string>
+
+    <!-- Password strength requirements (shown in real-time on sign-up) -->
+    <string name="auth_password_requirement_length">At least 8 characters</string>
+    <string name="auth_password_requirement_lowercase">Lowercase letter (a–z)</string>
+    <string name="auth_password_requirement_uppercase">Uppercase letter (A–Z)</string>
+    <string name="auth_password_requirement_digit">Number (0–9)</string>
+    <string name="auth_password_requirement_symbol">Symbol (!@#$…)</string>
+
+    <!-- Email confirmation screen -->
+    <string name="auth_email_confirm_title">Check your email</string>
+    <string name="auth_email_confirm_body">We sent a confirmation link to %1$s.\nTap it to activate your account.</string>
+    <string name="auth_email_confirm_open_app">Open email app</string>
+    <string name="auth_email_confirm_back">Back to Sign In</string>
 
 </resources>

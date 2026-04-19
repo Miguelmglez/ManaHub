@@ -31,7 +31,7 @@ import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
         ContentSourceEntity::class,
         DraftSetEntity::class,
     ],
-    version = 21,
+    version = 23,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -398,6 +398,38 @@ val MIGRATION_20_21 = object : Migration(20, 21) {
         // Step 7 — re-enable FK enforcement and verify integrity.
         database.execSQL("PRAGMA foreign_keys = ON")
         database.execSQL("PRAGMA foreign_key_check(user_cards)")
+    }
+}
+
+val MIGRATION_21_22 = object : Migration(21, 22) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // Add sync tracking columns. Existing rows default to PENDING_UPLOAD (1) so
+        // the first sync push uploads the full local collection to Supabase.
+        database.execSQL(
+            "ALTER TABLE user_cards ADD COLUMN sync_status INTEGER NOT NULL DEFAULT 1"
+        )
+        database.execSQL(
+            "ALTER TABLE user_cards ADD COLUMN remote_id TEXT"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_user_cards_sync_status ON user_cards(sync_status)"
+        )
+    }
+}
+
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // All existing decks default to PENDING_UPLOAD so the first sync push
+        // uploads the full local deck catalogue to Supabase.
+        database.execSQL(
+            "ALTER TABLE decks ADD COLUMN sync_status INTEGER NOT NULL DEFAULT 1"
+        )
+        database.execSQL(
+            "ALTER TABLE decks ADD COLUMN remote_id TEXT"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_decks_sync_status ON decks(sync_status)"
+        )
     }
 }
 
