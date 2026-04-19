@@ -78,6 +78,7 @@ class CollectionViewModel @Inject constructor(
         viewModelScope.launch {
             var previousUserId: String? = null
             authRepository.sessionState.collect { state ->
+                _uiState.update { it.copy(sessionState = state) }
                 when (state) {
                     is SessionState.Authenticated -> previousUserId = state.user.id
                     is SessionState.Unauthenticated -> {

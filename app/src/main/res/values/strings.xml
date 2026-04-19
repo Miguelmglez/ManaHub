@@ -58,6 +58,7 @@
     <string name="collection_sync_pull">Download from cloud</string>
     <string name="collection_sync_success">Collection synced</string>
     <string name="collection_sync_error">Sync failed</string>
+    <string name="collection_sync_pending">You have %1$d pending changes</string>
     <string name="collection_filter_all">All</string>
     <string name="collection_filter_white">White</string>
     <string name="collection_filter_blue">Blue</string>
@@ -632,11 +633,13 @@
     <string name="profile_play_since">Planeswalker since %1$s</string>
     <string name="profile_no_games_yet">Play your first game to unlock stats</string>
     <string name="profile_section_game_stats">Game Stats</string>
+    <string name="profile_section_collection_stats">Collection Stats</string>
     <string name="profile_stat_games">Games</string>
     <string name="profile_stat_win_rate">Win Rate</string>
     <string name="profile_stat_wins">Wins</string>
     <string name="profile_stat_win_pct">Win %</string>
     <string name="profile_stat_streak">Streak</string>
+    <string name="profile_stat_unique_cards">Unique Cards</string>
     <string name="profile_stat_avg_life_won">Avg life when winning</string>
     <string name="profile_stat_avg_duration">Avg duration</string>
     <string name="profile_stat_avg_win_turn">Avg win turn</string>
