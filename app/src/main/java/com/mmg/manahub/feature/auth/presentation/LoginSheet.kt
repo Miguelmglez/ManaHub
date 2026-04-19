@@ -90,11 +90,13 @@ fun LoginSheet(
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Dismiss automatically on successful authentication
+    // Dismiss automatically on successful authentication.
+    // onDismiss() is called first so the sheet is hidden before state resets to Idle,
+    // preventing a visible flash of the empty/idle form while the sheet is still animating out.
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Success) {
-            authViewModel.resetUiState()
             onDismiss()
+            authViewModel.resetUiState()
         }
     }
 
@@ -217,6 +219,7 @@ private fun LoginSheetContent(
                     selected = selectedTab == 0,
                     onClick = {
                         selectedTab = 0
+                        nicknameError = false
                         onResetUiState()
                     },
                     text = {
@@ -230,6 +233,7 @@ private fun LoginSheetContent(
                     selected = selectedTab == 1,
                     onClick = {
                         selectedTab = 1
+                        nicknameError = false
                         onResetUiState()
                     },
                     text = {

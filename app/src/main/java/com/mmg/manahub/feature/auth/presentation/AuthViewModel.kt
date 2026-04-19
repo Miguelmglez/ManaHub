@@ -25,6 +25,7 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -58,13 +59,17 @@ class AuthViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+    /** Guards against concurrent auth operations triggered by rapid double-taps. */
+    private var authJob: Job? = null
+
     fun signInWithEmail(email: String, password: String) {
         val validationError = validateEmailAndPassword(email, password, isSignUp = false)
         if (validationError != null) {
             _uiState.value = AuthUiState.Error(validationError)
             return
         }
-        viewModelScope.launch {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = signInWithEmailUseCase(email.trim(), password)) {
                 is AuthResult.Success -> AuthUiState.Success
@@ -80,7 +85,8 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState.Error(validationError)
             return
         }
-        viewModelScope.launch {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = signUpWithEmailUseCase(email.trim(), password, nickname.trim())) {
                 is AuthResult.Success -> AuthUiState.Success
@@ -102,7 +108,8 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState.Error(validationError)
             return
         }
-        viewModelScope.launch {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = updateNicknameUseCase(nickname.trim())) {
                 is AuthResult.Success -> AuthUiState.NicknameUpdated
@@ -120,7 +127,8 @@ class AuthViewModel @Inject constructor(
      * [CredentialManager] has access to the foreground Activity context.
      */
     fun signInWithGoogle(activityContext: Context) {
-        viewModelScope.launch {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
                 val credentialManager = CredentialManager.create(activityContext)
@@ -178,7 +186,8 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
             return
         }
-        viewModelScope.launch {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = resetPasswordUseCase(trimmedEmail)) {
                 is AuthResult.Success -> AuthUiState.ResetSent
@@ -193,7 +202,8 @@ class AuthViewModel @Inject constructor(
      * The [sessionState] will emit [SessionState.Unauthenticated] automatically after deletion.
      */
     fun deleteAccount() {
-        viewModelScope.launch {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = deleteAccountUseCase()) {
                 is AuthResult.Success -> AuthUiState.AccountDeleted
