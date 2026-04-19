@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 // resources), passed as a composable parameter, logged via Log.*, or stored
 // in any shared/exported state.
 // ---------------------------------------------------------------------------
-private const val FEEDBACK_EMAIL = "bluedabame@gmail.com"
+private const val FEEDBACK_EMAIL = "manahub@gmx.net"
 
 /** Maximum allowed message length in characters. */
 private const val MAX_CHARS = 2000
