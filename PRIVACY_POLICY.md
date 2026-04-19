@@ -13,7 +13,7 @@ This Privacy Policy describes how ManaHub ("the App", "we", "us") collects, uses
 ManaHub is an independent, unofficial fan application for Magic: The Gathering players. It is developed and maintained by Miguel M. González as a personal project and is not affiliated with Wizards of the Coast, Google, or any other company.
 
 For questions or concerns about this policy, contact us at:
-**miguel.mglez@gmail.com**
+**manahub@gmx.net**
 
 ---
 
@@ -232,7 +232,7 @@ Continued use of the App after an update constitutes your acceptance of the revi
 If you have any questions or concerns about this Privacy Policy, please contact:
 
 **Miguel M. González**
-Email: **miguel.mglez@gmail.com**
+Email: **manahub@gmx.net**
 
 ---
 
