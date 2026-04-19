@@ -68,6 +68,7 @@
     <string name="collection_sort_rarity">Rareza</string>
     <string name="collection_sort_cmc">Coste de maná</string>
     <string name="collection_view_grid">Vista de cuadrícula</string>
+    <string name="collection_sync_pending">Tienes %1$d cambios pendientes</string>
     <string name="collection_view_list">Vista de lista</string>
 
     <!-- ADD CARD SCREEN -->
@@ -443,6 +444,7 @@
     <string name="profile_stat_games">Partidas</string>
     <string name="profile_stat_win_rate">% Victorias</string>
     <string name="profile_stat_streak">Racha</string>
+    <string name="profile_stat_unique_cards">Cartas únicas</string>
     <string name="profile_stat_avg_life_won">Media vida al ganar</string>
     <string name="profile_stat_avg_duration">Duración media</string>
     <string name="profile_stat_avg_win_turn">Turno medio de victoria</string>

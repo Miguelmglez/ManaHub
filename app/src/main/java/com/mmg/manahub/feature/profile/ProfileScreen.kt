@@ -442,34 +442,37 @@ private fun ProfileKpiSection(
         modifier = modifier.padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SectionTitle(stringResource(R.string.profile_section_game_stats))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            KpiCell(
-                stringResource(R.string.profile_stat_games),
-                uiState.totalGames.toString(),
-                Modifier.weight(1f)
-            )
-            KpiCell(
-                stringResource(R.string.profile_stat_wins),
-                uiState.totalWins.toString(),
-                Modifier.weight(1f)
-            )
-            KpiCell(
-                stringResource(R.string.profile_stat_win_pct),
-                "${(uiState.winRate * 100).roundToInt()}%",
-                Modifier.weight(1f)
-            )
+        if (uiState.totalGames > 0) {
+            SectionTitle(stringResource(R.string.profile_section_game_stats))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                KpiCell(
+                    stringResource(R.string.profile_stat_games),
+                    uiState.totalGames.toString(),
+                    Modifier.weight(1f)
+                )
+                KpiCell(
+                    stringResource(R.string.profile_stat_wins),
+                    uiState.totalWins.toString(),
+                    Modifier.weight(1f)
+                )
+                KpiCell(
+                    stringResource(R.string.profile_stat_win_pct),
+                    "${(uiState.winRate * 100).roundToInt()}%",
+                    Modifier.weight(1f)
+                )
+            }
         }
+        SectionTitle(stringResource(R.string.profile_section_collection_stats))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             KpiCell(
-                stringResource(R.string.profile_stat_streak),
-                uiState.currentStreak.toString(),
+                stringResource(R.string.profile_stat_unique_cards),
+                (uiState.collectionStats?.uniqueCards ?: 0).toString(),
                 Modifier.weight(1f),
                 accent = true
             )

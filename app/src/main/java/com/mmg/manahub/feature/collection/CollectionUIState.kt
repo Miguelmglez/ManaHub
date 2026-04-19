@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.collection
 
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+
 enum class SyncState { IDLE, SYNCING, SUCCESS, ERROR }
 
 data class CollectionUiState(
@@ -17,6 +19,7 @@ data class CollectionUiState(
     val syncState:          SyncState                 = SyncState.IDLE,
     val pendingUploadCount: Int                       = 0,
     val syncError:          String?                   = null,
+    val sessionState:       SessionState              = SessionState.Loading,
 )
 
 val CollectionUiState.activeFilterCount: Int

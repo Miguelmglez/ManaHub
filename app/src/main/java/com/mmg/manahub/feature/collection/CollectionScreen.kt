@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
@@ -30,6 +31,7 @@ import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.StaleWarningBanner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.decks.DeckListScreen
 import java.util.Locale
 
@@ -48,6 +50,8 @@ fun CollectionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
+
+    var showSyncSheet by remember { mutableStateOf(false) }
 
     CollectionContent(
         uiState               = uiState,
@@ -70,9 +74,8 @@ fun CollectionScreen(
         },
         onErrorDismissed      = viewModel::onErrorDismissed,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
+        onShowSyncSheet       = { showSyncSheet = true },
         onTabSelected         = viewModel::onTabSelected,
-        onPushCollection      = viewModel::onPushCollection,
-        onPullCollection      = viewModel::onPullCollection,
         onSyncDismissed       = viewModel::onSyncDismissed,
     )
 
@@ -84,6 +87,16 @@ fun CollectionScreen(
                 viewModel.applyAdvancedFilters(advancedQuery)
                 showAdvancedSearch = false
             },
+        )
+    }
+
+    if (showSyncSheet) {
+        SyncBottomSheet(
+            isSyncing        = uiState.syncState == SyncState.SYNCING,
+            pendingCount     = uiState.pendingUploadCount,
+            onPushCollection = viewModel::onPushCollection,
+            onPullCollection = viewModel::onPullCollection,
+            onDismiss        = { showSyncSheet = false }
         )
     }
 }
@@ -101,9 +114,8 @@ private fun CollectionContent(
     onClearFilters:       () -> Unit,
     onErrorDismissed:     () -> Unit,
     onShowAdvancedSearch: () -> Unit,
+    onShowSyncSheet:      () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
-    onPushCollection:     () -> Unit,
-    onPullCollection:     () -> Unit,
     onSyncDismissed:      () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -130,14 +142,11 @@ private fun CollectionContent(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CollectionTopBar(
+                selectedTab       = uiState.selectedTab,
                 viewMode          = uiState.viewMode,
                 onViewModeToggle  = onViewModeToggle,
                 onSortChange      = onSortChange,
                 currentSort       = uiState.sortOrder,
-                isSyncing         = uiState.syncState == SyncState.SYNCING,
-                pendingCount      = uiState.pendingUploadCount,
-                onPushCollection  = onPushCollection,
-                onPullCollection  = onPullCollection,
             )
         },
         floatingActionButton = {
@@ -197,6 +206,7 @@ private fun CollectionContent(
                     onSearchQueryChange   = onSearchQueryChange,
                     onClearFilters        = onClearFilters,
                     onShowAdvancedSearch  = onShowAdvancedSearch,
+                    onShowSyncSheet       = onShowSyncSheet,
                 )
                 CollectionTab.DECKS -> DeckListScreen(
                     onDeckClick       = onDeckClick,
@@ -224,6 +234,7 @@ private fun CardsTabContent(
     onSearchQueryChange:  (String) -> Unit,
     onClearFilters:       () -> Unit,
     onShowAdvancedSearch: () -> Unit,
+    onShowSyncSheet:      () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val filterCount = uiState.activeFilterCount
@@ -304,12 +315,41 @@ private fun CardsTabContent(
 
         // Card count
         val totalCopies = uiState.cards.sumOf { it.totalQuantity }
-        Text(
-            text     = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
-            style    = MaterialTheme.magicTypography.labelSmall,
-            color    = mc.textSecondary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text     = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
+                style    = MaterialTheme.magicTypography.labelSmall,
+                color    = mc.textSecondary,
+            )
+
+            if (uiState.sessionState is SessionState.Authenticated) {
+                IconButton(
+                    onClick  = onShowSyncSheet,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    if (uiState.syncState == SyncState.SYNCING) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = mc.primaryAccent
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = stringResource(R.string.action_refresh),
+                            tint = if (uiState.pendingUploadCount > 0) mc.primaryAccent else mc.textSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
 
         // Loading
         if (uiState.isLoading) {
@@ -341,14 +381,11 @@ private fun CardsTabContent(
 
 @Composable
 private fun CollectionTopBar(
+    selectedTab:      CollectionTab,
     viewMode:         ViewMode,
     onViewModeToggle: () -> Unit,
     onSortChange:     (SortOrder) -> Unit,
     currentSort:      SortOrder,
-    isSyncing:        Boolean,
-    pendingCount:     Int,
-    onPushCollection: () -> Unit,
-    onPullCollection: () -> Unit,
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors
@@ -360,7 +397,8 @@ private fun CollectionTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
+                .heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -370,82 +408,38 @@ private fun CollectionTopBar(
                 modifier = Modifier.weight(1f)
             )
 
-            // Sync indicators: spinning indicator while syncing, or push/pull buttons.
-            if (isSyncing) {
-                CircularProgressIndicator(
-                    modifier  = Modifier
-                        .size(24.dp)
-                        .padding(horizontal = 4.dp),
-                    strokeWidth = 2.dp,
-                    color     = mc.primaryAccent,
-                )
-            } else {
-                // Push button with badge when there are pending local changes.
+            if (selectedTab == CollectionTab.CARDS) {
+                IconButton(onClick = onViewModeToggle) {
+                    Icon(
+                        imageVector = if (viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
+                        contentDescription = stringResource(R.string.collection_view_grid),
+                        tint = mc.textSecondary
+                    )
+                }
                 Box {
-                    IconButton(
-                        onClick  = onPushCollection,
-                        enabled  = !isSyncing,
-                    ) {
+                    IconButton(onClick = { showSortMenu = true }) {
                         Icon(
-                            imageVector        = Icons.Default.CloudUpload,
-                            contentDescription = stringResource(R.string.collection_sync_push),
-                            tint               = if (pendingCount > 0) mc.primaryAccent else mc.textSecondary,
+                            imageVector        = Icons.Default.Sort,
+                            contentDescription = stringResource(R.string.action_refresh),
+                            tint               = mc.textSecondary
                         )
                     }
-                    if (pendingCount > 0) {
-                        Badge(
-                            modifier           = Modifier.align(Alignment.TopEnd),
-                            containerColor     = mc.primaryAccent,
-                        ) {
-                            Text(
-                                text  = if (pendingCount > 99) "99+" else pendingCount.toString(),
-                                style = MaterialTheme.magicTypography.labelSmall,
+                    DropdownMenu(
+                        expanded         = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                    ) {
+                        SortOrder.entries.forEach { sort ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(sort.displayResId)) },
+                                onClick = {
+                                    onSortChange(sort)
+                                    showSortMenu = false
+                                },
+                                leadingIcon = if (sort == currentSort) {
+                                    { Icon(Icons.Default.Check, contentDescription = null) }
+                                } else null,
                             )
                         }
-                    }
-                }
-                IconButton(
-                    onClick  = onPullCollection,
-                    enabled  = !isSyncing,
-                ) {
-                    Icon(
-                        imageVector        = Icons.Default.CloudDownload,
-                        contentDescription = stringResource(R.string.collection_sync_pull),
-                        tint               = mc.textSecondary,
-                    )
-                }
-            }
-
-            IconButton(onClick = onViewModeToggle) {
-                Icon(
-                    imageVector        = if (viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
-                    contentDescription = stringResource(R.string.collection_view_grid),
-                    tint               = mc.textSecondary
-                )
-            }
-            Box {
-                IconButton(onClick = { showSortMenu = true }) {
-                    Icon(
-                        imageVector        = Icons.Default.Sort,
-                        contentDescription = stringResource(R.string.action_refresh),
-                        tint               = mc.textSecondary
-                    )
-                }
-                DropdownMenu(
-                    expanded         = showSortMenu,
-                    onDismissRequest = { showSortMenu = false },
-                ) {
-                    SortOrder.entries.forEach { sort ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(sort.displayResId)) },
-                            onClick = {
-                                onSortChange(sort)
-                                showSortMenu = false
-                            },
-                            leadingIcon = if (sort == currentSort) {
-                                { Icon(Icons.Default.Check, contentDescription = null) }
-                            } else null,
-                        )
                     }
                 }
             }
@@ -562,6 +556,118 @@ private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
             onClick = onAddCardClick,
             colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
         ) { Text(stringResource(R.string.collection_empty_action), color = mc.background) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SyncBottomSheet(
+    isSyncing:        Boolean,
+    pendingCount:     Int,
+    onPushCollection: () -> Unit,
+    onPullCollection: () -> Unit,
+    onDismiss:        () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = sheetState,
+        containerColor   = mc.backgroundSecondary,
+        contentColor     = mc.textPrimary,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+        ) {
+            Text(
+                text  = stringResource(R.string.auth_section_title),
+                style = MaterialTheme.magicTypography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Push Option
+            Surface(
+                onClick = {
+                    onPushCollection()
+                    onDismiss()
+                },
+                enabled = !isSyncing,
+                color   = Color.Transparent,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box {
+                        Icon(
+                            imageVector = Icons.Default.CloudUpload,
+                            contentDescription = null,
+                            tint = if (pendingCount > 0) mc.primaryAccent else mc.textSecondary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text  = stringResource(R.string.collection_sync_push),
+                            style = MaterialTheme.magicTypography.bodyLarge,
+                        )
+                        if (pendingCount > 0) {
+                            Text(
+                                text  = stringResource(R.string.collection_sync_pending, pendingCount),
+                                style = MaterialTheme.magicTypography.bodySmall,
+                                color = mc.primaryAccent,
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = mc.surfaceVariant, thickness = 0.5.dp)
+
+            // Pull Option
+            Surface(
+                onClick = {
+                    onPullCollection()
+                    onDismiss()
+                },
+                enabled = !isSyncing,
+                color   = Color.Transparent,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = null,
+                        tint = mc.textPrimary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        text  = stringResource(R.string.collection_sync_pull),
+                        style = MaterialTheme.magicTypography.bodyLarge,
+                    )
+                }
+            }
+
+            if (isSyncing) {
+                Spacer(Modifier.height(16.dp))
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color    = mc.primaryAccent,
+                    trackColor = mc.surfaceVariant
+                )
+            }
+        }
     }
 }
 
