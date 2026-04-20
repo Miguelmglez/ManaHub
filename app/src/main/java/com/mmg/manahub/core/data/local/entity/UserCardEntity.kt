@@ -2,6 +2,14 @@ package com.mmg.manahub.core.data.local.entity
 
 import androidx.room.*
 
+/** Values for [UserCardEntity.syncStatus]. */
+object SyncStatus {
+    /** Row is in sync with Supabase (or user is not logged in — no action needed). */
+    const val SYNCED = 0
+    /** Local change not yet pushed to Supabase. */
+    const val PENDING_UPLOAD = 1
+}
+
 @Entity(
     tableName = "user_cards",
     foreignKeys = [ForeignKey(
@@ -18,6 +26,7 @@ import androidx.room.*
         Index("scryfall_id"),
         Index("is_for_trade"),
         Index("is_in_wishlist"),
+        Index("sync_status"),
         // Prevents duplicate logical entries for the same physical card variant.
         // is_in_wishlist is included so the same copy can exist in both collection
         // (is_in_wishlist = 0) and wishlist (is_in_wishlist = 1) simultaneously.
@@ -45,4 +54,11 @@ data class UserCardEntity(
     @ColumnInfo(name = "notes")       val notes:      String? = null,
     @ColumnInfo(name = "acquired_at") val acquiredAt: Long?   = null,
     @ColumnInfo(name = "added_at")    val addedAt:    Long    = System.currentTimeMillis(),
+
+    // ── Sync metadata ─────────────────────────────────────────────────────────
+    // Defaults to PENDING_UPLOAD so all new/existing rows are queued for the
+    // first sync push after the user logs in.
+    @ColumnInfo(name = "sync_status") val syncStatus: Int    = SyncStatus.PENDING_UPLOAD,
+    // UUID assigned by Supabase after the row is successfully uploaded.
+    @ColumnInfo(name = "remote_id")   val remoteId:   String? = null,
 )

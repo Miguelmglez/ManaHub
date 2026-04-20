@@ -73,7 +73,6 @@ fun SurveyScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically,
@@ -112,7 +111,7 @@ fun SurveyScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 4.dp),
                 textAlign = TextAlign.End,
-                style     = ty.labelSmall,
+                style     = ty.labelLarge,
                 color     = mc.textDisabled,
             )
         }
@@ -170,7 +169,7 @@ private fun QuestionContent(
             ) {
                 Text(
                     text  = badge,
-                    style = ty.labelSmall,
+                    style = ty.labelLarge,
                     color = mc.goldMtg,
                 )
             }

@@ -30,6 +30,10 @@ guava          = "33.5.0-android"
 junit          = "4.13.2"
 androidx-test-ext-junit = "1.3.0"
 espresso-core  = "3.7.0"
+supabase-bom         = "3.1.4"
+ktor                 = "3.1.3"
+credentials          = "1.5.0"
+googleid             = "1.1.1"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -77,6 +81,15 @@ guava        = { group = "com.google.guava", name = "guava",               versi
 junit        = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso-core" }
+supabase-bom         = { module = "io.github.jan-tennert.supabase:bom",                    version.ref = "supabase-bom" }
+supabase-auth        = { module = "io.github.jan-tennert.supabase:auth-kt" }
+supabase-postgrest   = { module = "io.github.jan-tennert.supabase:postgrest-kt" }
+supabase-realtime    = { module = "io.github.jan-tennert.supabase:realtime-kt" }
+ktor-android         = { module = "io.ktor:ktor-client-android",                           version.ref = "ktor" }
+ktor-cio             = { module = "io.ktor:ktor-client-cio",                               version.ref = "ktor" }
+credentials          = { module = "androidx.credentials:credentials",                      version.ref = "credentials" }
+credentials-play     = { module = "androidx.credentials:credentials-play-services-auth",   version.ref = "credentials" }
+googleid             = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 
 [plugins]
 android-application = { id = "com.android.application",            version.ref = "agp" }

@@ -69,6 +69,40 @@
 # ── Compose (R8 handles most, but keep Previews out of release) ───────────────
 -assumenosideeffects class androidx.compose.ui.tooling.preview.PreviewKt { *; }
 
+# ── Supabase SDK (Ktor + kotlinx.serialization) ──────────────────────────────
+# Ktor HTTP client internals used by the Supabase SDK
+-keep class io.ktor.** { *; }
+-keepclassmembers class io.ktor.** { *; }
+-dontwarn io.ktor.**
+
+# Kotlin serialization — required for Supabase request/response models
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keep,includedescriptorclasses class com.mmg.manahub.**$$serializer { *; }
+-keepclassmembers class com.mmg.manahub.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.mmg.manahub.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+# Keep all @Serializable classes so Supabase can deserialize responses
+-keep @kotlinx.serialization.Serializable class * { *; }
+-keepclassmembers @kotlinx.serialization.Serializable class * {
+    static final kotlinx.serialization.descriptors.SerialDescriptor serialVersionUID;
+    *** Companion;
+    *** INSTANCE;
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-dontwarn kotlinx.serialization.**
+
+# Supabase Auth data models (session, user, token)
+-keep class io.github.jan.supabase.** { *; }
+-dontwarn io.github.jan.supabase.**
+
+# Auth feature domain models (used in Supabase JSON serialization)
+-keep class com.mmg.manahub.feature.auth.** { *; }
+-dontwarn com.mmg.manahub.feature.auth.**
+
 # ── Strip all logs in release ─────────────────────────────────────────────────
 -assumenosideeffects class android.util.Log {
     public static int v(...);

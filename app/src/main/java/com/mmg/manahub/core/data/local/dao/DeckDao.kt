@@ -81,6 +81,39 @@ interface DeckDao {
     @Transaction
     @Query("SELECT * FROM decks WHERE id = :deckId")
     fun observeDeckWithCards(deckId: Long): Flow<DeckWithCards?>
+
+    // ── Sync support ─────────────────────────────────────────────────────────
+
+    @Query("SELECT * FROM decks WHERE id = :deckId")
+    suspend fun getDeckById(deckId: Long): DeckEntity?
+
+    @Query("SELECT * FROM deck_cards WHERE deck_id = :deckId")
+    suspend fun getDeckCards(deckId: Long): List<DeckCardCrossRef>
+
+    @Query("SELECT * FROM decks WHERE sync_status = 1")
+    suspend fun getPendingUploadDecks(): List<DeckEntity>
+
+    @Query("SELECT * FROM decks WHERE remote_id = :remoteId LIMIT 1")
+    suspend fun getDeckByRemoteId(remoteId: String): DeckEntity?
+
+    @Query("SELECT MAX(updated_at) FROM decks")
+    suspend fun getMaxUpdatedAt(): Long?
+
+    @Query("""
+        UPDATE decks
+        SET sync_status = :status,
+            updated_at  = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun markDeckDirty(deckId: Long, status: Int, updatedAt: Long)
+
+    @Query("""
+        UPDATE decks
+        SET sync_status = :status,
+            remote_id   = :remoteId
+        WHERE id = :deckId
+    """)
+    suspend fun updateSyncStatusAndRemoteId(deckId: Long, status: Int, remoteId: String?)
 }
 
 data class DeckWithCards(

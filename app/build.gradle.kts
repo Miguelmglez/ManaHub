@@ -32,6 +32,21 @@ android {
             "YOUTUBE_API_KEY",
             "\"${localProperties.getProperty("YOUTUBE_API_KEY", "")}\""
         )
+        buildConfigField(
+            "String",
+            "SUPABASE_URL",
+            "\"${localProperties.getProperty("SUPABASE_URL", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "SUPABASE_ANON_KEY",
+            "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "GOOGLE_CLIENT_ID",
+            "\"${localProperties.getProperty("GOOGLE_CLIENT_ID", "")}\""
+        )
     }
 
     compileOptions {
@@ -77,6 +92,20 @@ android {
 
 
 dependencies {
+    // Supabase Auth & DB
+    val supabaseBom = platform(libs.supabase.bom)
+    implementation(supabaseBom)
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.realtime)
+    implementation(libs.ktor.android)
+
+    // Google Sign-In
+    implementation(libs.credentials)
+    implementation(libs.credentials.play)
+    implementation(libs.googleid)
+
+    // Firebase
     implementation(libs.firebase.crashlytics)
     implementation(libs.splashscreen)
     implementation(libs.foundation)

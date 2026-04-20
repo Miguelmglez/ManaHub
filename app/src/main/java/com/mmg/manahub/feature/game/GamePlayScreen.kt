@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -52,6 +53,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -64,6 +66,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -97,7 +100,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.theme.MarcellusFontFamily
+import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
@@ -205,6 +209,7 @@ private fun GamePlayContent(
     var showResetDialog by remember { mutableStateOf(false) }
     var showManagePlayersSheet by remember { mutableStateOf(false) }
     var managePlayersInitialTab by remember { mutableIntStateOf(0) }
+    var confirmDefeatPlayerId by remember { mutableStateOf<Int?>(null) }
 
     BackHandler(enabled = uiState.winner == null) {
         showExitDialog = true
@@ -229,7 +234,7 @@ private fun GamePlayContent(
                     onLifeChange = onLifeChange,
                     onCmdPanel = onCmdPanel,
                     onCtrPanel = onCtrPanel,
-                    onConfirmDefeat = onConfirmDefeat,
+                    onConfirmDefeat = { confirmDefeatPlayerId = it },
                     onRevokeDefeat = onRevokeDefeat,
                     onEndTurn = onEndTurn,
                     onToggleLand = onToggleLand,
@@ -291,6 +296,18 @@ private fun GamePlayContent(
             )
         }
 
+        confirmDefeatPlayerId?.let { playerId ->
+            val player = uiState.players.find { it.id == playerId } ?: return@let
+            ConfirmDefeatSheet(
+                player = player,
+                onConfirm = {
+                    onConfirmDefeat(playerId)
+                    confirmDefeatPlayerId = null
+                },
+                onDismiss = { confirmDefeatPlayerId = null }
+            )
+        }
+
         if (showExitDialog) {
             AlertDialog(
                 onDismissRequest = { showExitDialog = false },
@@ -339,20 +356,15 @@ private fun GamePlayContent(
             )
         }
 
-        AnimatedVisibility(
-            visible = uiState.winner != null && !showGameResult,
-            enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 3 },
-        ) {
-            uiState.winner?.let { winner ->
-                WinnerOverlay(
-                    winner = winner,
-                    onViewResults = { showGameResult = true },
-                    onPlayAgain = { onResetGame(); onNewGame() },
-                )
-            }
+
+
         }
 
-        if (showGameResult) {
+    uiState.winner?.let { winner ->
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 3 },
+        ) {
             uiState.gameResult?.let { result ->
                 GameResultScreen(
                     gameResult = result,
@@ -362,6 +374,7 @@ private fun GamePlayContent(
                 )
             }
         }
+
     }
 }
 
@@ -632,6 +645,7 @@ private fun PlayerCard(
     modifier: Modifier = Modifier,
     onPlayerNameClick: () -> Unit = {},
 ) {
+    val mt = MaterialTheme.magicTypography
     val mc = MaterialTheme.magicColors
     val theme = player.theme
     val startingLife = gameMode.startingLife
@@ -702,23 +716,29 @@ private fun PlayerCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(
-                            text = player.name,
-                            style = if (tier == CardTier.LARGE)
-                                MaterialTheme.magicTypography.titleLarge
-                            else
-                                MaterialTheme.magicTypography.labelMedium,
-                            color = theme.accent,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = onPlayerNameClick,
-                                ),
-                        )
+                        Column {
+                            Text(
+                                text = player.name,
+                                style = if (tier == CardTier.LARGE)
+                                    MaterialTheme.magicTypography.titleLarge
+                                else
+                                    MaterialTheme.magicTypography.labelMedium,
+                                color = theme.accent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onPlayerNameClick,
+                                    ),
+                            )
+                            Text(
+                                text = "Turn: $turnNumber",
+                                style = MaterialTheme.magicTypography.labelMedium,
+                                color = MaterialTheme.magicColors.goldMtg,
+                            )
+                        }
                         if (isActive) {
                             EndTurnButton(tier = tier, theme = theme, onClick = onEndTurn)
                         }
@@ -753,7 +773,7 @@ private fun PlayerCard(
                                     label = "landAlpha",
                                 )
                                 Icon(
-                                    imageVector = Icons.Default.Landscape,
+                                    imageVector = Icons.Default.Park,
                                     contentDescription = stringResource(R.string.game_counters_button),
                                     tint = theme.accent.copy(alpha = alpha),
                                     modifier = Modifier
@@ -808,6 +828,24 @@ private fun PlayerCard(
                             )
                         }
                     }
+
+                    // ── Confirm Defeat Button: Only if isSurviving ──────────────────
+                    if (player.isSurviving) {
+                        OutlinedButton(
+                            onClick  = onConfirmDefeat,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .offset(y = if (tier == CardTier.LARGE) 48.dp else 36.dp),
+                            border   = BorderStroke(1.dp, theme.accent),
+                        ) {
+                            Text(
+                                stringResource(R.string.game_pending_defeat_confirm),
+                                style = MaterialTheme.magicTypography.labelMedium,
+                                color = theme.accent
+                            )
+                        }
+                    }
                 }
                 // ── Footer: actions + active-player controls (Bottom) ─────────
                 Row(
@@ -818,13 +856,13 @@ private fun PlayerCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val actionSize = when (tier) {
-                        CardTier.LARGE -> 32.dp; CardTier.SMALL -> 24.dp; CardTier.TINY -> 18.dp
+                        CardTier.LARGE -> 28.dp; CardTier.SMALL -> 24.dp; CardTier.TINY -> 18.dp
                     }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (gameMode == GameMode.COMMANDER && tier != CardTier.TINY) {
+                        if (gameMode == GameMode.COMMANDER) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_battle),
                                 contentDescription = stringResource(R.string.game_commander_damage_desc),
@@ -859,7 +897,7 @@ private fun PlayerCard(
 
             // ── Pending defeat overlay ────────────────────────────────────────
             AnimatedVisibility(
-                visible = player.pendingDefeat,
+                visible = player.pendingDefeat && !player.isSurviving,
                 enter = fadeIn(tween(300)),
                 exit = fadeOut(tween(300)),
             ) {
@@ -874,28 +912,28 @@ private fun PlayerCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(12.dp),
                     ) {
-                        Text(
-                            text = stringResource(R.string.game_pending_defeat_title),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                        )
+                        Text(text = "💀", style = mt.titleMedium, textAlign = TextAlign.Center)
+
                         Button(
                             onClick = onConfirmDefeat,
                             colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text(
-                                stringResource(R.string.game_pending_defeat_confirm),
-                                fontSize = 11.sp
+                                text = stringResource(R.string.game_pending_defeat_confirm),
+                                style = mt.labelMedium
                             )
                         }
-                        TextButton(onClick = onRevokeDefeat) {
+                        OutlinedButton(
+                            onClick  = onRevokeDefeat,
+                            colors   = ButtonDefaults.outlinedButtonColors(
+                                contentColor = mc.lifePositive,
+                            ),
+                            border   = BorderStroke(1.dp, mc.lifePositive),
+                        ) {
                             Text(
                                 stringResource(R.string.game_pending_defeat_revoke),
-                                color = mc.lifePositive,
-                                fontSize = 11.sp,
+                                style = MaterialTheme.magicTypography.labelMedium,
                             )
                         }
                     }
@@ -970,7 +1008,7 @@ private fun EndTurnButton(
     theme: PlayerThemeColors,
     onClick: () -> Unit,
 ) {
-    if (tier == CardTier.LARGE) {
+    if (tier != CardTier.TINY) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -987,9 +1025,8 @@ private fun EndTurnButton(
         ) {
             Text(
                 text = stringResource(R.string.game_end_turn),
-                style = MaterialTheme.magicTypography.labelSmall,
+                style = MaterialTheme.magicTypography.labelLarge,
                 color = theme.accent,
-                fontSize = 14.sp,
             )
         }
     } else {
@@ -1006,11 +1043,10 @@ private fun EndTurnButton(
                     onClick = onClick,
                 ),
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = stringResource(R.string.game_end_turn),
-                tint = theme.accent,
-                modifier = Modifier.size(if (tier == CardTier.SMALL) 14.dp else 11.dp),
+            Text(
+                text = stringResource(R.string.game_end_turn),
+                style = MaterialTheme.magicTypography.labelMedium,
+                color = theme.accent,
             )
         }
     }
@@ -1041,9 +1077,9 @@ private fun PlayerCounterChips(
     if (activeCounters.isEmpty()) return
 
     val mc = MaterialTheme.magicColors
+    val mt = MaterialTheme.magicTypography
     val chipHeight = if (tier == CardTier.LARGE) 24.dp else 16.dp
     val iconSize = if (tier == CardTier.LARGE) 16.dp else 14.dp
-    val textSize = if (tier == CardTier.LARGE) 16.sp else 12.sp
     val hPad = if (tier == CardTier.LARGE) 4.dp else 4.dp
 
     // Grow horizontally up to 4 items before wrapping
@@ -1081,16 +1117,14 @@ private fun PlayerCounterChips(
                 Text(
                     text = "$value",
                     color = mc.textPrimary,
-                    fontSize = textSize,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.CenterVertically), // Alineación explícita
-                    style = LocalTextStyle.current.copy(
+                    style = (if (tier == CardTier.LARGE) mt.labelLarge else mt.labelSmall).copy(
                         platformStyle = PlatformTextStyle(includeFontPadding = false),
                         lineHeightStyle = LineHeightStyle(
                             alignment = LineHeightStyle.Alignment.Center,
-                            trim = LineHeightStyle.Trim.Both // Cambia None por Both para eliminar espacios extra arriba/abajo
+                            trim = LineHeightStyle.Trim.Both
                         )
-                    )
+                    ),
+                    modifier = Modifier.align(Alignment.CenterVertically),
                 )
             }
         }
@@ -1176,6 +1210,8 @@ fun CounterIconView(
 
 @Composable
 private fun EliminatedOverlay(player: Player, mode: GameMode) {
+    val mt = MaterialTheme.magicTypography
+    val mc = MaterialTheme.magicColors
     val reason = when {
         player.life <= 0 -> stringResource(R.string.game_fallen_life)
         player.poison >= 10 -> stringResource(R.string.game_fallen_poison)
@@ -1198,82 +1234,17 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
             Text(text = "💀", fontSize = 20.sp, textAlign = TextAlign.Center)
             Text(
                 text = stringResource(R.string.game_fallen_label),
-                color = Color(0xFFE63946),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 6.sp,
-                fontFamily = MarcellusFontFamily,
+                color = mc.lifeNegative,
+                style = mt.displayMedium.copy(letterSpacing = 6.sp),
                 textAlign = TextAlign.Center,
             )
             if (reason != null) {
                 Text(
                     text = reason,
                     color = Color.White.copy(alpha = 0.70f),
-                    fontSize = 11.sp,
+                    style = mt.labelSmall,
                     textAlign = TextAlign.Center,
                 )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Winner overlay
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun WinnerOverlay(
-    winner: Player,
-    onViewResults: () -> Unit,
-    onPlayAgain: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val theme = winner.theme
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.85f)),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(32.dp),
-        ) {
-            Text(text = "👑", fontSize = 48.sp, textAlign = TextAlign.Center)
-            Text(
-                text = winner.name,
-                color = theme.accent,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 2.sp,
-                fontFamily = MarcellusFontFamily,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(R.string.game_wins_label),
-                color = mc.goldMtg,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 6.sp,
-                fontFamily = MarcellusFontFamily,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(R.string.game_victory_life_remaining, winner.life),
-                color = mc.textSecondary,
-                style = MaterialTheme.magicTypography.bodyMedium,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onViewResults,
-                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.game_victory_view_results), color = mc.background)
-            }
-            TextButton(onClick = onPlayAgain) {
-                Text(stringResource(R.string.action_play_again), color = mc.textSecondary)
             }
         }
     }
@@ -1362,6 +1333,7 @@ private fun CountersPanel(
     onAddCustom: (name: String, iconKey: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val mt = MaterialTheme.magicTypography
     val mc = MaterialTheme.magicColors
     val theme = player.theme
     var newCounterName by remember { mutableStateOf("") }
@@ -1616,6 +1588,81 @@ private fun CounterRow(
 // ─────────────────────────────────────────────────────────────────────────────
 //  Manage players sheet
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Bottom sheet to confirm player elimination.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConfirmDefeatSheet(
+    player: Player,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "☠",
+                style = MaterialTheme.magicTypography.lifeNumberMd,
+                color = mc.lifeNegative
+            )
+            Text(
+                text = stringResource(R.string.game_pending_defeat_message, player.name),
+                style = MaterialTheme.magicTypography.titleLarge,
+                color = mc.textPrimary,
+                textAlign = TextAlign.Center
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = mc.lifePositive
+                    ),
+                    border = BorderStroke(1.dp, mc.lifePositive.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        stringResource(R.string.game_confirm_defeat_alive),
+                        style = MaterialTheme.magicTypography.labelLarge
+                    )
+                }
+
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = mc.lifeNegative
+                    )
+                ) {
+                    Text(
+                        stringResource(R.string.game_confirm_defeat_defeat),
+                        style = MaterialTheme.magicTypography.labelLarge
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
 
 /**
  * Bottom sheet with three tabs for managing layout, player properties, and turn order.
@@ -1923,19 +1970,39 @@ private fun PlayerPropertyRow(
             )
             OutlinedTextField(
                 value = nameText,
-                onValueChange = { nameText = it },
+                onValueChange = {
+                    nameText = it
+                    if (it.isNotBlank() && !player.isAppUser) {
+                        onRename(it)
+                    }
+                },
                 singleLine = true,
+                readOnly = player.isAppUser,
                 label = { Text(player.name, color = mc.textDisabled) },
+                trailingIcon = if (player.isAppUser) {
+                    {
+                        Surface(
+                            modifier = Modifier.padding(end = 8.dp),
+                            color = mc.primaryAccent.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f)),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.game_setup_you_badge),
+                                style = MaterialTheme.magicTypography.labelMedium.copy(fontSize = 10.sp),
+                                color = mc.primaryAccent,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                } else null,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = mc.primaryAccent,
+                    focusedBorderColor = if (player.isAppUser) mc.surfaceVariant else mc.primaryAccent,
                     unfocusedBorderColor = mc.surfaceVariant,
                     focusedTextColor = mc.textPrimary,
                     unfocusedTextColor = mc.textPrimary,
                 ),
                 modifier = Modifier.weight(1f),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                    onDone = { if (nameText.isNotBlank()) onRename(nameText) }
-                ),
             )
         }
         // Color swatches

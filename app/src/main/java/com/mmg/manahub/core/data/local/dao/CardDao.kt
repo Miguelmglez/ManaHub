@@ -15,16 +15,16 @@ abstract class CardDao {
     // INSERT OR IGNORE + @Update avoids the delete entirely.
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    protected abstract suspend fun insertIgnore(card: CardEntity): Long
+    abstract suspend fun insertIgnore(card: CardEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    protected abstract suspend fun insertAllIgnore(cards: List<CardEntity>): List<Long>
+    abstract suspend fun insertAllIgnore(cards: List<CardEntity>): List<Long>
 
     @Update
-    protected abstract suspend fun updateCard(card: CardEntity)
+    abstract suspend fun updateCard(card: CardEntity)
 
     @Update
-    protected abstract suspend fun updateAllCards(cards: List<CardEntity>)
+    abstract suspend fun updateAllCards(cards: List<CardEntity>)
 
     @Transaction
     open suspend fun upsert(card: CardEntity) {
@@ -98,6 +98,6 @@ abstract class CardDao {
         priceUsdFoil: Double?,
         priceEur:     Double?,
         priceEurFoil: Double?,
-        updatedAt:    Long = System.currentTimeMillis(),
+        updatedAt:    Long,
     )
 }
