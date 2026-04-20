@@ -88,8 +88,33 @@ fun DeckDetailScreen(
     BackHandler(onBack = handleBack)
 
     // Keep the selected card detail in sync with deck state changes
-    val selectedDeckCard = remember(selectedCardId, uiState.cards) {
-        selectedCardId?.let { id -> uiState.cards.find { it.scryfallId == id } }
+    val selectedDeckCard = remember(selectedCardId, uiState.cards, uiState.addCardsResults, uiState.scryfallResults) {
+        selectedCardId?.let { id ->
+            // 1. Try to find in current deck
+            uiState.cards.find { it.scryfallId == id }
+                ?: run {
+                    // 2. Try to find in search results (collection tab)
+                    uiState.addCardsResults.find { it.card.scryfallId == id }?.let { row ->
+                        DeckSlotEntry(
+                            scryfallId = row.card.scryfallId,
+                            quantity = row.quantityInDeck,
+                            isSideboard = false,
+                            card = row.card
+                        )
+                    }
+                }
+                ?: run {
+                    // 3. Try to find in search results (scryfall tab)
+                    uiState.scryfallResults.find { it.card.scryfallId == id }?.let { row ->
+                        DeckSlotEntry(
+                            scryfallId = row.card.scryfallId,
+                            quantity = row.quantityInDeck,
+                            isSideboard = false,
+                            card = row.card
+                        )
+                    }
+                }
+        }
     }
 
     Scaffold(
@@ -259,6 +284,7 @@ fun DeckDetailScreen(
             onScryfallSearch = viewModel::searchScryfallDirect,
             onAdd = viewModel::addCardToDeck,
             onRemove = viewModel::removeCardFromDeck,
+            onCardClick = { id -> selectedCardId = id },
             onDismiss = {
                 showAddCardsSheet = false
                 viewModel.clearAddCardsState()
@@ -547,6 +573,7 @@ private fun AddCardsSheet(
     onScryfallSearch: (String) -> Unit,
     onAdd: (String) -> Unit,
     onRemove: (String) -> Unit,
+    onCardClick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -707,6 +734,7 @@ private fun AddCardsSheet(
                             format = format,
                             onAdd = { onAdd(row.card.scryfallId) },
                             onRemove = { onRemove(row.card.scryfallId) },
+                            onClick = { onCardClick(row.card.scryfallId) },
                         )
                     }
                     if (uiState.addCardsResults.isEmpty() && !uiState.isSearchingCards) {
@@ -731,6 +759,7 @@ private fun AddCardsSheet(
                             format = format,
                             onAdd = { onAdd(row.card.scryfallId) },
                             onRemove = { onRemove(row.card.scryfallId) },
+                            onClick = { onCardClick(row.card.scryfallId) },
                         )
                     }
                     if (uiState.scryfallResults.isEmpty() && !uiState.isSearchingScryfall) {
@@ -829,6 +858,7 @@ private fun BasicLandRow(
                             text = "$quantityInDeck",
                             style = ty.labelMedium,
                             color = mc.primaryAccent,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                                 .widthIn(min = 24.dp),
@@ -854,6 +884,7 @@ private fun AddCardSheetRow(
     format: com.mmg.manahub.core.domain.model.DeckFormat?,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
+    onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -862,7 +893,11 @@ private fun AddCardSheetRow(
     val isCommander = format?.uniqueCards == true
     val addEnabled = if (isCommander) row.quantityInDeck < 1 else true
 
-    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = mc.surface
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -922,6 +957,7 @@ private fun AddCardSheetRow(
                             text = "${row.quantityInDeck}",
                             style = ty.labelMedium,
                             color = mc.primaryAccent,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                                 .widthIn(min = 24.dp),
