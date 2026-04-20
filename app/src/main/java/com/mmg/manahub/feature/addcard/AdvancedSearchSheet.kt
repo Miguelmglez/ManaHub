@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
+import kotlinx.coroutines.launch
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.ComparisonOperator
@@ -52,12 +53,27 @@ fun AdvancedSearchSheet(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val scope = rememberCoroutineScope()
+    var canDismiss by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { canDismiss }
+    )
+
+    fun handleDismiss() {
+        canDismiss = true
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        contentWindowInsets = { WindowInsets(0) }
+        sheetState = sheetState,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
@@ -69,14 +85,21 @@ fun AdvancedSearchSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(onClick = ::handleDismiss) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = mc.textPrimary
+                    )
+                }
                 Text(
                     stringResource(R.string.advsearch_title),
                     style = ty.titleMedium,
                     color = mc.textPrimary,
+                    modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = viewModel::clearAll) {
                     Text(
@@ -818,6 +841,7 @@ fun AdvancedSearchSheet(
             Button(
                 onClick = {
                     onSearch(uiState.currentQuery, uiState.builtQuery)
+                    handleDismiss()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -836,7 +860,7 @@ fun AdvancedSearchSheet(
                         if (isCollectionMode) R.string.advsearch_apply_button
                         else R.string.advsearch_search_button
                     ),
-                    style = ty.labelLarge,
+                    style = ty.titleLarge,
                 )
             }
         }

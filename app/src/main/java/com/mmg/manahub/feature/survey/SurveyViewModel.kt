@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.feature.game.model.GameResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -13,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -32,6 +34,7 @@ data class SurveyUiState(
 @HiltViewModel
 class SurveyViewModel @Inject constructor(
     private val surveyAnswerDao: SurveyAnswerDao,
+    private val userPreferencesRepository: UserPreferencesRepository,
     savedStateHandle:            SavedStateHandle,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
@@ -57,7 +60,15 @@ class SurveyViewModel @Inject constructor(
 
     fun initWithResult(result: GameResult) {
         if (_uiState.value.questions.isNotEmpty()) return
-        _uiState.update { it.copy(questions = SurveyQuestionEngine.buildQuestions(result, context)) }
+        
+        viewModelScope.launch {
+            val prefs = userPreferencesRepository.preferencesFlow.first()
+            val langCode = prefs.appLanguage.code
+            
+            _uiState.update { 
+                it.copy(questions = SurveyQuestionEngine.buildQuestions(result, context, langCode)) 
+            }
+        }
     }
 
     fun answerAndAdvance(questionId: String, answer: String) {

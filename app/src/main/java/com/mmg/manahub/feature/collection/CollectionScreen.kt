@@ -45,6 +45,8 @@ fun CollectionScreen(
     onScannerClick:           () -> Unit,
     onDeckClick:              (deckId: Long) -> Unit,
     onCreateDeckClick:        () -> Unit,
+    onSynergyClick:           () -> Unit,
+    onDeckBuilderClick:       () -> Unit,
     viewModel:                CollectionViewModel = hiltViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
@@ -77,6 +79,8 @@ fun CollectionScreen(
         onShowSyncSheet       = { showSyncSheet = true },
         onTabSelected         = viewModel::onTabSelected,
         onSyncDismissed       = viewModel::onSyncDismissed,
+        onSynergyClick        = onSynergyClick,
+        onDeckBuilderClick    = onDeckBuilderClick,
     )
 
     if (showAdvancedSearch) {
@@ -117,6 +121,8 @@ private fun CollectionContent(
     onShowSyncSheet:      () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
     onSyncDismissed:      () -> Unit,
+    onSynergyClick:       () -> Unit,
+    onDeckBuilderClick:   () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val snackbarHostState = remember { SnackbarHostState() }
@@ -211,6 +217,8 @@ private fun CollectionContent(
                 CollectionTab.DECKS -> DeckListScreen(
                     onDeckClick       = onDeckClick,
                     onCreateDeckClick = onCreateDeckClick,
+                    onSynergyClick    = onSynergyClick,
+                    onDeckBuilderClick= onDeckBuilderClick,
                 )
             }
         }
@@ -324,7 +332,7 @@ private fun CardsTabContent(
         ) {
             Text(
                 text     = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
-                style    = MaterialTheme.magicTypography.labelSmall,
+                style    = MaterialTheme.magicTypography.labelLarge,
                 color    = mc.textSecondary,
             )
 

@@ -361,9 +361,11 @@ private fun SearchResultItem(
                         size = 14.dp,
                     )
                     Text(
-                        text = card.setCode.uppercase(),
+                        text = card.setName,
                         style = ty.labelSmall,
-                        color = mc.textDisabled,
+                        color = mc.secondaryAccent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
