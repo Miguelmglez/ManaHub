@@ -606,7 +606,7 @@ private fun CollectionSection(
                 Spacer(Modifier.width(4.dp))
                 Text(
                     stringResource(R.string.carddetail_add_to_wishlist),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.magicColors.goldMtg
                 )
             }
@@ -624,7 +624,7 @@ private fun CollectionSection(
                 Spacer(Modifier.width(4.dp))
                 Text(
                     stringResource(R.string.carddetail_add_copy),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.magicColors.primaryAccent
                 )
             }
@@ -662,7 +662,7 @@ private fun CollectionSection(
             Spacer(Modifier.width(4.dp))
             Text(
                 stringResource(R.string.carddetail_offer_for_trade),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.magicColors.secondaryAccent
             )
         }
@@ -779,10 +779,6 @@ private fun CopyBadge(label: String) {
         )
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Add to collection bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
 
 
 // ─────────────────────────────────────────────────────────────────────────────
