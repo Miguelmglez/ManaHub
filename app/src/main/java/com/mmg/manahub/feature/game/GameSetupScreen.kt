@@ -208,14 +208,14 @@ private fun GameSetupScreenContent(
                 )
             }
 
-            TextButton(onClick = onNavigateToTournament) {
+            /*TextButton(onClick = onNavigateToTournament) {
                 Text(
                     stringResource(R.string.gamesetup_tournament_link),
                     color = mc.goldMtg,
                     style = MaterialTheme.magicTypography.bodySmall,
                     fontWeight = FontWeight.Bold
                 )
-            }
+            }*/
         }
     }
 }

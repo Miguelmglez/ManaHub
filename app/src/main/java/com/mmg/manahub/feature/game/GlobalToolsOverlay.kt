@@ -170,13 +170,6 @@ fun GlobalToolsOverlay(
                                     onClick = onToggle,
                                 )
                         )
-
-                        Text(
-                            text = "Turn: $turnNumber",
-                            style = MaterialTheme.magicTypography.labelMedium,
-                            color = MaterialTheme.magicColors.goldMtg,
-                            modifier = Modifier.align(Alignment.TopStart)
-                        )
                     }
 
                     // ── Dice + Coin row ───────────────────────────────────────

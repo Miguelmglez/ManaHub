@@ -39,21 +39,12 @@ class MainActivity : ComponentActivity() {
     lateinit var supabaseClient: SupabaseClient
 
     override fun attachBaseContext(newBase: Context) {
-        /*val langCode = newBase
+        val langCode = newBase
             .getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
-            .getString("app_language_sync", "")
-            .orEmpty()
+            .getString("app_language_sync", "en")
+            ?: "en"
 
-        val context = if (langCode.isNotEmpty()) {
-            val locale = Locale(langCode)
-            val config = Configuration(newBase.resources.configuration)
-            config.setLocale(locale)
-            newBase.createConfigurationContext(config)
-        } else {
-            newBase
-        }*/
-        // Forzamos el idioma a inglés ("en") ignorando las preferencias por ahora
-        val locale = Locale("en")
+        val locale = Locale(langCode)
         Locale.setDefault(locale)
 
         val config = Configuration(newBase.resources.configuration)

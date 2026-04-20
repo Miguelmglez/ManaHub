@@ -616,7 +616,7 @@
     <string name="advsearch_title">Búsqueda avanzada</string>
     <string name="advsearch_button">Búsqueda avanzada</string>
     <string name="advsearch_clear">Limpiar todo</string>
-    <string name="advsearch_search_button">Buscar cartas →</string>
+    <string name="advsearch_search_button">Buscar cartas</string>
     <string name="advsearch_query_preview">Consulta generada</string>
     <string name="advsearch_section_name">Nombre de la carta</string>
     <string name="advsearch_name_hint">ej. Rayo</string>

@@ -622,7 +622,7 @@
     <string name="advsearch_title">Erweiterte Suche</string>
     <string name="advsearch_button">Erweiterte Suche</string>
     <string name="advsearch_clear">Alles löschen</string>
-    <string name="advsearch_search_button">Karten suchen →</string>
+    <string name="advsearch_search_button">Karten suchen</string>
     <string name="advsearch_query_preview">Generierte Abfrage</string>
     <string name="advsearch_section_name">Kartenname</string>
     <string name="advsearch_name_hint">z.B. Blitzstrahl</string>
