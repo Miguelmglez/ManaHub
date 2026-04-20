@@ -422,6 +422,9 @@
     <string name="game_fallen_poison">Poison</string>
     <string name="game_fallen_commander">Commander damage</string>
     <string name="game_pending_defeat_title">Defeat condition met</string>
+    <string name="game_pending_defeat_message">Confirm defeat for %1$s?</string>
+    <string name="game_confirm_defeat_defeat">Defeat</string>
+    <string name="game_confirm_defeat_alive">Alive</string>
     <string name="game_pending_defeat_confirm">Confirm defeat</string>
     <string name="game_pending_defeat_revoke">Still alive!</string>
     <string name="game_commander_button">⚔ Commander damage</string>
