@@ -147,7 +147,7 @@ private fun GameSetupScreenContent(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     stringResource(R.string.gamesetup_mode_label),
-                    style = MaterialTheme.magicTypography.labelLarge,
+                    style = MaterialTheme.magicTypography.titleMedium,
                     color = mc.textSecondary,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -208,14 +208,14 @@ private fun GameSetupScreenContent(
                 )
             }
 
-            TextButton(onClick = onNavigateToTournament) {
+            /*TextButton(onClick = onNavigateToTournament) {
                 Text(
                     stringResource(R.string.gamesetup_tournament_link),
                     color = mc.goldMtg,
                     style = MaterialTheme.magicTypography.bodySmall,
                     fontWeight = FontWeight.Bold
                 )
-            }
+            }*/
         }
     }
 }
@@ -237,7 +237,7 @@ private fun PlayerCountStepper(
     ) {
         Text(
             stringResource(R.string.gamesetup_players_label),
-            style = MaterialTheme.magicTypography.labelLarge,
+            style = MaterialTheme.magicTypography.titleMedium,
             color = mc.textSecondary,
             modifier = Modifier.weight(1f),
         )

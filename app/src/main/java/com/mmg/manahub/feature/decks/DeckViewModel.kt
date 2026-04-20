@@ -25,6 +25,11 @@ class DeckViewModel @Inject constructor(
                 .catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
                 .collect { decks -> _uiState.update { it.copy(decks = decks, isLoading = false) } }
         }
+        // Push any decks that failed to sync in a previous session, then check for remote changes.
+        viewModelScope.launch {
+            runCatching { deckRepo.syncAllDirtyDecks() }
+            runCatching { deckRepo.pullIfStale() }
+        }
     }
 
     fun onShowCreateDialog() = _uiState.update { it.copy(showCreateDialog = true) }
@@ -36,14 +41,19 @@ class DeckViewModel @Inject constructor(
     fun createDeck(name: String, format: String = "casual") {
         if (name.isBlank()) return
         viewModelScope.launch {
-            runCatching { deckRepo.createDeck(Deck(name = name.trim(), format = format)) }
-                .onSuccess  { _uiState.update { it.copy(showCreateDialog = false) } }
-                .onFailure  { e -> _uiState.update { it.copy(error = e.message) } }
+            val deckId = runCatching { deckRepo.createDeck(Deck(name = name.trim(), format = format)) }
+                .onSuccess { _uiState.update { it.copy(showCreateDialog = false) } }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+                .getOrNull() ?: return@launch
+            // Immediately push the new deck to Supabase; failure is non-fatal since
+            // sync_status = PENDING_UPLOAD ensures a retry on the next app launch.
+            runCatching { deckRepo.syncDeckNow(deckId) }
         }
     }
 
     fun deleteDeck(deckId: Long) {
         viewModelScope.launch {
+            // deleteDeck handles the Supabase soft-delete internally (best-effort).
             runCatching { deckRepo.deleteDeck(deckId) }
                 .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
@@ -77,6 +87,7 @@ class DeckViewModel @Inject constructor(
                 }
 
                 _uiState.update { it.copy(isImporting = false, showImportSheet = false) }
+                runCatching { deckRepo.syncDeckNow(deckId) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isImporting = false, importError = e.message) }
             }

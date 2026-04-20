@@ -56,7 +56,7 @@ interface SurveyAnswerDao {
         ORDER BY avgScore ASC
         LIMIT :limit
     """)
-    fun observeWeakestCards(limit: Int = 5): Flow<List<CardScoreRow>>
+    fun observeWeakestCards(limit: Int): Flow<List<CardScoreRow>>
 
     // ── Profile insights ───────────────────────────────────────────────────────
 

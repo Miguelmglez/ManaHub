@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManaHub — Account Deletion Request</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            void:    { DEFAULT: '#0d0d1a', 50: '#1a1a2e', 100: '#16213e' },
+            arcane:  { DEFAULT: '#7c3aed', light: '#a78bfa', dim: '#4c1d95' },
+            mana:    { DEFAULT: '#06b6d4', dim: '#0e7490' },
+            ember:   { DEFAULT: '#f97316', dim: '#c2410c' },
+            parchment: '#e8d5b7',
+          },
+          fontFamily: {
+            serif: ['"Palatino Linotype"', 'Georgia', 'serif'],
+          },
+          boxShadow: {
+            arcane: '0 0 24px 4px rgba(124,58,237,0.35)',
+            mana:   '0 0 16px 2px rgba(6,182,212,0.30)',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      background: radial-gradient(ellipse at top, #1a1a2e 0%, #0d0d1a 70%);
+      min-height: 100vh;
+    }
+    .card-border {
+      border-image: linear-gradient(135deg, #7c3aed, #06b6d4, #7c3aed) 1;
+    }
+    .rune-divider {
+      background: linear-gradient(90deg, transparent, #7c3aed, #06b6d4, #7c3aed, transparent);
+      height: 1px;
+    }
+    @keyframes pulse-arcane {
+      0%, 100% { box-shadow: 0 0 16px 2px rgba(124,58,237,0.3); }
+      50%       { box-shadow: 0 0 28px 6px rgba(124,58,237,0.55); }
+    }
+    .btn-arcane:not(:disabled):hover { animation: pulse-arcane 1.5s ease-in-out infinite; }
+  </style>
+</head>
+<body class="flex items-center justify-center px-4 py-12 font-serif">
+
+  <div class="w-full max-w-md">
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <p class="text-arcane-light text-sm tracking-[0.3em] uppercase mb-2">ManaHub</p>
+      <h1 class="text-parchment text-3xl font-bold leading-tight">
+        Account Deletion
+      </h1>
+      <p class="text-parchment/50 text-sm mt-1 tracking-widest uppercase">Request</p>
+    </div>
+
+    <!-- Card -->
+    <div class="relative rounded-2xl bg-void-50 border border-arcane/40 p-8 shadow-arcane">
+
+      <!-- Top rune line -->
+      <div class="rune-divider mb-6 opacity-60"></div>
+
+      <p class="text-parchment/70 text-sm leading-relaxed mb-6 text-center">
+        Enter the email address linked to your ManaHub account. We will send you
+        a confirmation link to verify ownership before permanently deleting your data.
+      </p>
+
+      <!-- Form -->
+      <form id="deletionForm" novalidate>
+        <label for="email" class="block text-arcane-light text-xs tracking-widest uppercase mb-2">
+          Email Address
+        </label>
+        <input
+          id="email"
+          type="email"
+          required
+          autocomplete="email"
+          placeholder="your@email.com"
+          class="w-full rounded-lg bg-void px-4 py-3 text-parchment placeholder-parchment/30
+                 border border-arcane/30 focus:border-arcane focus:outline-none focus:ring-1
+                 focus:ring-arcane transition-colors text-sm mb-5"
+        />
+
+        <button
+          id="submitBtn"
+          type="submit"
+          class="btn-arcane w-full rounded-lg bg-arcane hover:bg-arcane-dim text-white
+                 font-semibold tracking-wider uppercase text-sm py-3 px-6
+                 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Request account deletion
+        </button>
+      </form>
+
+      <!-- Success message (hidden by default) -->
+      <div id="successMsg" class="hidden mt-5 rounded-lg border border-mana/40 bg-mana/10 px-4 py-4">
+        <p class="text-mana text-sm font-semibold mb-1">Request received</p>
+        <p id="successText" class="text-parchment/80 text-sm leading-relaxed"></p>
+      </div>
+
+      <!-- Error message (hidden by default) -->
+      <div id="errorMsg" class="hidden mt-5 rounded-lg border border-ember/40 bg-ember/10 px-4 py-4">
+        <p class="text-ember text-sm font-semibold mb-1">Something went wrong</p>
+        <p id="errorText" class="text-parchment/80 text-sm leading-relaxed"></p>
+      </div>
+
+      <!-- Bottom rune line -->
+      <div class="rune-divider mt-6 opacity-60"></div>
+
+      <p class="text-parchment/30 text-xs text-center mt-4 leading-relaxed">
+        After confirmation, all your data will be permanently removed within&nbsp;30&nbsp;days.<br/>
+        For support: <a href="mailto:manahub@gmx.net" class="text-arcane-light hover:underline">manahub@gmx.net</a>
+      </p>
+    </div>
+
+    <p class="text-parchment/20 text-xs text-center mt-6">
+      &copy; 2026 ManaHub. Magic: The Gathering is a trademark of Wizards of the Coast.
+    </p>
+  </div>
+
+  <script>
+    const EDGE_FUNCTION_URL =
+      "https://uimogilwuixgkgfcfmyb.supabase.co/functions/v1/request-account-deletion";
+
+    const form      = document.getElementById("deletionForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const successMsg  = document.getElementById("successMsg");
+    const successText = document.getElementById("successText");
+    const errorMsg    = document.getElementById("errorMsg");
+    const errorText   = document.getElementById("errorText");
+
+    function hideMessages() {
+      successMsg.classList.add("hidden");
+      errorMsg.classList.add("hidden");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hideMessages();
+
+      const email = document.getElementById("email").value.trim();
+
+      if (!email) {
+        errorText.textContent = "Please enter your email address.";
+        errorMsg.classList.remove("hidden");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending…";
+
+      try {
+        const res = await fetch(EDGE_FUNCTION_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          successText.textContent = data.message;
+          successMsg.classList.remove("hidden");
+          form.reset();
+        } else {
+          errorText.textContent = data.message || "An unexpected error occurred. Please try again.";
+          errorMsg.classList.remove("hidden");
+        }
+      } catch (err) {
+        errorText.textContent =
+          "Could not reach the server. Please check your connection and try again.";
+        errorMsg.classList.remove("hidden");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Solicitar borrado de cuenta";
+      }
+    });
+  </script>
+</body>
+</html>

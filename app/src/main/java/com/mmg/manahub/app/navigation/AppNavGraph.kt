@@ -50,6 +50,7 @@ import com.mmg.manahub.feature.settings.SettingsScreen
 import com.mmg.manahub.feature.tagdictionary.TagDictionaryScreen
 import com.mmg.manahub.feature.stats.StatsScreen
 import com.mmg.manahub.feature.survey.SurveyScreen
+import com.mmg.manahub.feature.synergy.SynergyScreen
 import com.mmg.manahub.feature.tournament.TournamentListScreen
 import com.mmg.manahub.feature.tournament.TournamentScreen
 import com.mmg.manahub.feature.tournament.TournamentSetupScreen
@@ -139,6 +140,8 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
                     onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
                     onCreateDeckClick = { navController.navigate(Screen.DeckBuilder.route) },
+                    onSynergyClick = { navController.navigate(Screen.Synergy.route) },
+                    onDeckBuilderClick = { navController.navigate(Screen.DeckBuilder.route) },
                 )
             }
 
@@ -196,6 +199,14 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                             popUpTo(Screen.DeckBuilder.route) { inclusive = true }
                         }
                     },
+                )
+            }
+
+            composable(Screen.Synergy.route) {
+                SynergyScreen(
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    }
                 )
             }
 
@@ -268,7 +279,8 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             composable(Screen.Profile.route) {
                 ProfileScreen(
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                    )
+                    onStatsClick = { navController.navigate(Screen.Stats.route) },
+                )
             }
 
             // ── Tournament flow ────────────────────────────────────────────────
@@ -361,9 +373,13 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     navArgument("mode") { type = NavType.StringType },
                     navArgument("playerCount") { type = NavType.IntType },
                 ),
-            ) {
+            ) { entry ->
                 val configs = pendingPlayerConfigs
                 val matchId = pendingTournamentMatchId
+                val routeMode = entry.arguments?.getString("mode")?.let { name ->
+                    try { GameMode.valueOf(name) } catch (e: Exception) { GameMode.STANDARD }
+                } ?: GameMode.STANDARD
+
                 LaunchedEffect(configs) {
                     if (configs != null) {
                         if (matchId != null) {
@@ -372,7 +388,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                                 tournamentId = pendingTournamentId ?: 0L,
                                 tournamentPlayerIds = pendingTournamentPlayers,
                                 configs = configs,
-                                mode = pendingTournamentMode ?: GameMode.COMMANDER,
+                                mode = pendingTournamentMode ?: routeMode,
                                 layout = pendingLayout,
                             )
                             pendingTournamentMatchId = null
@@ -380,7 +396,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                             pendingTournamentPlayers = emptyList()
                             pendingTournamentMode = null
                         } else {
-                            gameVm.initFromConfigs(configs, pendingLayout)
+                            gameVm.initFromConfigs(configs, routeMode, pendingLayout)
                         }
                         pendingPlayerConfigs = null
                         pendingLayout = null
@@ -399,10 +415,10 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                         }
                     },
                     onBackHome = {
-                        // Used from results screen: full reset + go home
-                        gameVm.resetGame()
-                        navController.navigate(Screen.Collection.route) {
-                            popUpTo(0) { inclusive = true }
+                        // Finish the current game and return to setup
+                        gameVm.finishGame()
+                        navController.navigate(Screen.GameSetup.route) {
+                            popUpTo(Screen.Collection.route) { inclusive = false }
                         }
                     },
                     onAbandonGame = {
@@ -412,9 +428,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                         }
                     },
                     onExitGame = {
-                        gameVm.resetGame()
-                        navController.navigate(Screen.Collection.route) {
-                            popUpTo(0) { inclusive = true }
+                        gameVm.finishGame()
+                        navController.navigate(Screen.GameSetup.route) {
+                            popUpTo(Screen.Collection.route) { inclusive = false }
                         }
                     },
                     onSurvey = { sessionId ->
@@ -435,9 +451,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                         sessionId = sessionId,
                         gameResult = gameResult,
                         onComplete = {
-                            gameVm.resetGame()
-                            navController.navigate(Screen.Collection.route) {
-                                popUpTo(0) { inclusive = true }
+                            gameVm.finishGame()
+                            navController.navigate(Screen.GameSetup.route) {
+                                popUpTo(Screen.Collection.route) { inclusive = false }
                             }
                         },
                     )

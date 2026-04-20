@@ -1,7 +1,10 @@
 package com.mmg.manahub.core.data.repository
 
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.UserCardDao
+import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.util.TestFixtures
+import io.github.jan.supabase.auth.Auth
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -24,7 +27,10 @@ class UserCardRepositoryImplTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val userCardDao = mockk<UserCardDao>(relaxed = true)
+    private val userCardDao      = mockk<UserCardDao>(relaxed = true)
+    private val remoteDataSource = mockk<CollectionRemoteDataSource>(relaxed = true)
+    private val prefsDataStore   = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val supabaseAuth     = mockk<Auth>(relaxed = true)
 
     private lateinit var repository: UserCardRepositoryImpl
 
@@ -33,8 +39,11 @@ class UserCardRepositoryImplTest {
     @Before
     fun setUp() {
         repository = UserCardRepositoryImpl(
-            userCardDao  = userCardDao,
-            ioDispatcher = UnconfinedTestDispatcher(),
+            userCardDao      = userCardDao,
+            remoteDataSource = remoteDataSource,
+            prefsDataStore   = prefsDataStore,
+            supabaseAuth     = supabaseAuth,
+            ioDispatcher     = UnconfinedTestDispatcher(),
         )
     }
 

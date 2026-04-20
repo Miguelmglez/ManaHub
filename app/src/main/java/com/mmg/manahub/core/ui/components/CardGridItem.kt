@@ -49,15 +49,6 @@ fun CardGridItem(
                         .aspectRatio(4f / 3f)
                         .clip(MaterialTheme.shapes.small),
                 )
-                // Set symbol (rarity-tinted)
-                SetSymbol(
-                    setCode  = card.setCode,
-                    rarity   = CardRarity.fromString(card.rarity),
-                    size     = 14.dp,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp),
-                )
                 // Quantity badge (total across all copies)
                 Surface(
                     modifier = Modifier
@@ -108,11 +99,22 @@ fun CardGridItem(
                         preferredCurrency = preferredCurrency
                     )
                 }
-                if (priceText != "—") {
-                    Text(
-                        text  = priceText,
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.goldMtg,
+                Row(
+                    modifier          = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (priceText != "—") {
+                        Text(
+                            text  = priceText,
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.goldMtg,
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    SetSymbol(
+                        setCode = card.setCode,
+                        rarity  = CardRarity.fromString(card.rarity),
+                        size    = 14.dp,
                     )
                 }
             }

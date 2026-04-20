@@ -2,16 +2,24 @@ package com.mmg.manahub.feature.collection
 
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+
+enum class SyncState { IDLE, SYNCING, SUCCESS, ERROR }
+
 data class CollectionUiState(
-    val cards:         List<CollectionCardGroup> = emptyList(),
-    val isLoading:     Boolean                   = false,
-    val error:         String?                   = null,
-    val searchQuery:   String                    = "",
-    val activeQuery:   AdvancedSearchQuery?      = null,
-    val sortOrder:     SortOrder                 = SortOrder.DATE_ADDED,
-    val viewMode:      ViewMode                  = ViewMode.GRID,
-    val hasStaleCards: Boolean                   = false,
-    val selectedTab:   CollectionTab             = CollectionTab.CARDS,
+    val cards:              List<CollectionCardGroup> = emptyList(),
+    val isLoading:          Boolean                   = false,
+    val error:              String?                   = null,
+    val searchQuery:        String                    = "",
+    val activeQuery:        AdvancedSearchQuery?      = null,
+    val sortOrder:          SortOrder                 = SortOrder.DATE_ADDED,
+    val viewMode:           ViewMode                  = ViewMode.GRID,
+    val hasStaleCards:      Boolean                   = false,
+    val selectedTab:        CollectionTab             = CollectionTab.CARDS,
+    val syncState:          SyncState                 = SyncState.IDLE,
+    val pendingUploadCount: Int                       = 0,
+    val syncError:          String?                   = null,
+    val sessionState:       SessionState              = SessionState.Loading,
 )
 
 val CollectionUiState.activeFilterCount: Int

@@ -71,9 +71,9 @@ fun CardListItem(
                     size     = 14.dp,
                 )
                 Text(
-                    text     = "${card.setCode.uppercase()} · ${card.printedTypeLine ?: card.typeLine.substringBefore(" —").trim()}",
+                    text     = "${card.setName.uppercase()}}",
                     style    = MaterialTheme.magicTypography.bodySmall,
-                    color    = mc.textSecondary,
+                    color    = mc.secondaryAccent,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

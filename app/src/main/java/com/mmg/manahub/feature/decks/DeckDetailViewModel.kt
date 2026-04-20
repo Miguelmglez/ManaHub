@@ -14,12 +14,14 @@ import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.DeckCardValidator
 import com.mmg.manahub.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -400,6 +402,20 @@ class DeckDetailViewModel @Inject constructor(
             sideboard = sideboardCards,
             commander = commanderCard,
         )
+    }
+
+    /**
+     * Called when the user navigates away from this screen (back button or system back).
+     * Triggers a best-effort push to Supabase if the deck has unsynchronised local changes.
+     * The sync_status field in Room is the durable retry mechanism if this coroutine is
+     * cancelled before completing.
+     */
+    fun onNavigatingBack() {
+        viewModelScope.launch {
+            withContext(NonCancellable) {
+                deckRepository.syncDeckNow(deckId)
+            }
+        }
     }
 
     fun setCoverCard(scryfallId: String) {

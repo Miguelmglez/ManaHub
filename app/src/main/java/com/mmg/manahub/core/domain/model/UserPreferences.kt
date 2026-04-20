@@ -38,8 +38,8 @@ enum class NewsLanguage(val code: String, val displayName: String) {
 }
 
 enum class PreferredCurrency(val code: String, val symbol: String, val displayName: String) {
-    USD("USD", "$", "USD ($)"),
-    EUR("EUR", "€", "EUR (€)");
+    EUR("EUR", "€", "EUR (€)"),
+    USD("USD", "$", "USD ($)");
 
     companion object {
         fun fromCode(code: String) = entries.find { it.code == code } ?: EUR
