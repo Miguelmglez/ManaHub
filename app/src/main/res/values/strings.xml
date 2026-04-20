@@ -780,7 +780,7 @@
     <string name="advsearch_title">Advanced Search</string>
     <string name="advsearch_button">Advanced search</string>
     <string name="advsearch_clear">Clear all</string>
-    <string name="advsearch_search_button">Search cards →</string>
+    <string name="advsearch_search_button">Search cards</string>
     <string name="advsearch_query_preview">Built query</string>
     <string name="advsearch_section_name">Card name</string>
     <string name="advsearch_name_hint">e.g. Lightning Bolt</string>
@@ -951,7 +951,7 @@
     ═══════════════════════════════════════════ -->
     <string name="preferences_title">Preferences</string>
     <string name="pref_app_language">App Language</string>
-    <string name="pref_card_language">Card Language</string>
+    <string name="pref_card_language">Card Language search</string>
     <string name="pref_news_language">News &amp; Videos Language</string>
     <string name="pref_currency">Currency</string>
     <string name="pref_language_english">English</string>
