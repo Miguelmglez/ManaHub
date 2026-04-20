@@ -176,17 +176,19 @@ private fun DictionaryRow(
                 style = MaterialTheme.typography.titleSmall,
                 fontFamily = FontFamily.Monospace,
             )
+            Spacer(Modifier.height(4.dp))
             Text(
                 text  = stringResource(
                     R.string.tagdictionary_row_labels,
                     row.labelEn.ifBlank { "—" },
-                    row.labelEs.ifBlank { "—" }
+                    //row.labelEs.ifBlank { "—" }
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val patternCount = row.patternsEn.size + row.patternsEs.size + row.patternsDe.size
             if (patternCount > 0) {
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text  = stringResource(
                         R.string.tagdictionary_row_patterns,
@@ -197,6 +199,7 @@ private fun DictionaryRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text  = row.category.name,
                     style = MaterialTheme.typography.labelSmall,
@@ -217,7 +220,7 @@ private fun EditEntryDialog(
     onSave: (TagDictionaryRow) -> Unit,
 ) {
     var labelEn by remember { mutableStateOf(initial.labelEn) }
-    var labelEs by remember { mutableStateOf(initial.labelEs) }
+    //var labelEs by remember { mutableStateOf(initial.labelEs) }
     var patternsEn by remember { mutableStateOf(initial.patternsEn.joinToString("\n")) }
     var patternsEs by remember { mutableStateOf(initial.patternsEs.joinToString("\n")) }
 
@@ -247,7 +250,7 @@ private fun EditEntryDialog(
                 onSave(
                     initial.copy(
                         labelEn    = labelEn.trim(),
-                        labelEs    = labelEs.trim(),
+                      //  labelEs    = labelEs.trim(),
                         patternsEn = patternsEn.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
                      //   patternsEs = patternsEs.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
                     )
