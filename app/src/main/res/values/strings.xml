@@ -201,7 +201,8 @@
     <string name="tagdictionary_thresholds_description">Tags with confidence ≥ %1$d%% are added automatically. Between %2$d%% and %1$d%% they are suggested.</string>
     <string name="tagdictionary_thresholds_auto">Auto-add: %1$d%%</string>
     <string name="tagdictionary_thresholds_suggest">Suggest: %1$d%%</string>
-    <string name="tagdictionary_row_labels">EN: %1$s   ES: %2$s</string>
+    <string name="tagdictionary_row_labels_2">EN: %1$s   ES: %2$s</string>
+    <string name="tagdictionary_row_labels">EN: %1$s</string>
     <string name="tagdictionary_row_patterns">%1$d patterns · %2$s</string>
     <string name="tagdictionary_reset_description">Reset</string>
     <string name="tagdictionary_labels_section">Labels</string>
