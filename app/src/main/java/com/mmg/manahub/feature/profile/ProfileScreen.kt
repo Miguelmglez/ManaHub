@@ -448,46 +448,50 @@ private fun ProfileKpiSection(
         if (uiState.totalGames > 0) {
             SectionTitle(stringResource(R.string.profile_section_game_stats))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 KpiCell(
                     stringResource(R.string.profile_stat_games),
                     uiState.totalGames.toString(),
-                    Modifier.weight(1f)
+                    Modifier.weight(1f).fillMaxHeight()
                 )
                 KpiCell(
                     stringResource(R.string.profile_stat_wins),
                     uiState.totalWins.toString(),
-                    Modifier.weight(1f)
+                    Modifier.weight(1f).fillMaxHeight()
                 )
                 KpiCell(
                     stringResource(R.string.profile_stat_win_pct),
                     "${(uiState.winRate * 100).roundToInt()}%",
-                    Modifier.weight(1f)
+                    Modifier.weight(1f).fillMaxHeight()
                 )
             }
         }
         SectionTitle(stringResource(R.string.profile_section_collection_stats))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             KpiCell(
                 stringResource(R.string.profile_stat_unique_cards),
                 (uiState.collectionStats?.uniqueCards ?: 0).toString(),
-                Modifier.weight(1f),
+                Modifier.weight(1f).fillMaxHeight(),
                 accent = true
             )
             ColorStatCard(
                 label = stringResource(R.string.profile_stat_fav_color),
                 colorCode = favouriteColor,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
             ColorStatCard(
                 label = stringResource(R.string.profile_stat_top_value),
                 colorCode = mostValuableColor,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
         }
     }
@@ -507,7 +511,7 @@ private fun KpiCell(
             .background(mc.surface)
             .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
     ) {
         Text(
             value,
@@ -922,7 +926,7 @@ private fun ColorStatCard(
             .background(mc.surface)
             .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
     ) {
         if (colorCode != null) {
             ManaSymbolImage(token = colorCode, size = 26.dp)
