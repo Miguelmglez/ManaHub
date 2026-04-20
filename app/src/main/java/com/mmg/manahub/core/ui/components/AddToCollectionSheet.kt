@@ -21,7 +21,7 @@ import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddToCollectionSheet(
     cardName: String,
@@ -31,8 +31,18 @@ fun AddToCollectionSheet(
     cardImage: String?,
     closeButton: Boolean = false,
 ) {
-    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    val languages = listOf("en", "es", "de", "fr", "it", "pt", "ja", "ko", "ru")
+    val conditions = listOf("Near Mint", "Slightly Played", "Played", "Heavily Played", "Damaged")
+    val languages = listOf(
+        "en" to "🇺🇸",
+        "es" to "🇪🇸",
+        "de" to "🇩🇪",
+        "fr" to "🇫🇷",
+        "it" to "🇮🇹",
+        "pt" to "🇵🇹",
+        "ja" to "🇯🇵",
+        "ko" to "🇰🇷",
+        "ru" to "🇷🇺"
+    )
 
     var isFoil by remember { mutableStateOf(false) }
     var isAlternativeArt by remember { mutableStateOf(false) }
@@ -162,7 +172,10 @@ fun AddToCollectionSheet(
                 stringResource(R.string.addcard_confirm_condition),
                 style = MaterialTheme.typography.labelLarge
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 conditions.forEach { c ->
                     FilterChip(
                         selected = c == condition,
@@ -179,7 +192,7 @@ fun AddToCollectionSheet(
                 onExpandedChange = { langExpanded = it },
             ) {
                 OutlinedTextField(
-                    value = language.uppercase(),
+                    value = "${languages.find { it.first == language }?.second ?: ""} ${language.uppercase()}",
                     onValueChange = {},
                     readOnly = true,
                     label = {
@@ -197,9 +210,9 @@ fun AddToCollectionSheet(
                     expanded = langExpanded,
                     onDismissRequest = { langExpanded = false },
                 ) {
-                    languages.forEach { lang ->
+                    languages.forEach { (lang, flag) ->
                         DropdownMenuItem(
-                            text = { Text(lang.uppercase()) },
+                            text = { Text("$flag ${lang.uppercase()}") },
                             onClick = { language = lang; langExpanded = false },
                         )
                     }
