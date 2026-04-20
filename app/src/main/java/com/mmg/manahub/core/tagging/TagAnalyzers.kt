@@ -17,7 +17,7 @@ import com.mmg.manahub.core.domain.model.TagCategory
 object KeywordAnalyzer {
     /** Each Scryfall keyword becomes a tag with confidence = 1.0. */
     fun analyze(card: Card): List<SuggestedTag> = card.keywords.map { raw ->
-        val key = raw.trim().lowercase().replace(' ', '_').replace("-", "_")
+        val key = raw.trim().lowercase().replace(' ', '_').replace("//", " ").replace("-", "_")
         SuggestedTag(
             tag        = CardTag(key, TagCategory.KEYWORD),
             confidence = 1.0f,
@@ -41,6 +41,7 @@ object TypeLineAnalyzer {
         val parts = card.typeLine
             .replace("—", " ")
             .replace("-", " ")
+            .replace("//", " ")
             .split(' ')
             .map { it.trim() }
             .filter { it.isNotEmpty() && it.length > 1 }
