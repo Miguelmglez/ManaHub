@@ -231,7 +231,7 @@ private fun EditEntryDialog(
             ) {
                 Text(stringResource(R.string.tagdictionary_labels_section), style = MaterialTheme.typography.labelMedium)
                 OutlinedTextField(value = labelEn, onValueChange = { labelEn = it }, label = { Text("EN") }, singleLine = true)
-                OutlinedTextField(value = labelEs, onValueChange = { labelEs = it }, label = { Text("ES") }, singleLine = true)
+            //    OutlinedTextField(value = labelEs, onValueChange = { labelEs = it }, label = { Text("ES") }, singleLine = true)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     stringResource(R.string.tagdictionary_patterns_hint),
@@ -239,7 +239,7 @@ private fun EditEntryDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(value = patternsEn, onValueChange = { patternsEn = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_en_label)) }, minLines = 2)
-                OutlinedTextField(value = patternsEs, onValueChange = { patternsEs = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_es_label)) }, minLines = 2)
+              //  OutlinedTextField(value = patternsEs, onValueChange = { patternsEs = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_es_label)) }, minLines = 2)
             }
         },
         confirmButton = {
@@ -249,7 +249,7 @@ private fun EditEntryDialog(
                         labelEn    = labelEn.trim(),
                         labelEs    = labelEs.trim(),
                         patternsEn = patternsEn.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
-                        patternsEs = patternsEs.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
+                     //   patternsEs = patternsEs.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
                     )
                 )
             }) { Text(stringResource(R.string.action_save)) }
