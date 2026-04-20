@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.carddetail
 
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -254,43 +257,70 @@ private fun CardDetailContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // Card image — tap to flip for DFC
-        Box(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val imageUrl = if (showBackFace && card.imageBackNormal != null)
-                card.imageBackNormal else card.imageNormal
+            val rotation by animateFloatAsState(
+                targetValue = if (showBackFace) -180f else 0f,
+                animationSpec = tween(durationMillis = 500),
+                label = "CardFlip"
+            )
 
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = card.name,
-                contentScale = ContentScale.FillWidth,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
+                    .aspectRatio(0.716f)
+                    .graphicsLayer {
+                        rotationY = rotation
+                        cameraDistance = 12f * density
+                    }
                     .clip(MaterialTheme.shapes.medium)
                     .then(
                         if (card.imageBackNormal != null)
                             Modifier.clickable { showBackFace = !showBackFace }
                         else Modifier
                     ),
-            )
-
-            if (card.imageBackNormal != null) {
-                Surface(
+                contentAlignment = Alignment.Center,
+            ) {
+                // Front Face
+                AsyncImage(
+                    model = card.imageNormal,
+                    contentDescription = card.name,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                    shape = MaterialTheme.shapes.small,
-                ) {
-                    Text(
-                        text = if (showBackFace) stringResource(R.string.carddetail_flip_see_front) else stringResource(
-                            R.string.carddetail_flip_see_back
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = if (rotation >= -90f) 1f else 0f
+                        },
+                )
+
+                // Back Face
+                if (card.imageBackNormal != null) {
+                    AsyncImage(
+                        model = card.imageBackNormal,
+                        contentDescription = card.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                rotationY = 180f
+                                alpha = if (rotation < -90f) 1f else 0f
+                            },
                     )
                 }
+            }
+
+            if (card.imageBackNormal != null) {
+                Text(
+                    text = if (showBackFace)
+                        stringResource(R.string.carddetail_flip_see_front)
+                    else
+                        stringResource(R.string.carddetail_flip_see_back),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
 
