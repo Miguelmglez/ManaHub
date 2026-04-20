@@ -164,10 +164,9 @@ private fun BottomBarTab(
                 interactionSource = interactionSource,
                 indication        = ripple(bounded = true),
                 onClick           = onClick,
-            )
-            .padding(bottom = 8.dp),
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Bottom,
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector        = icon,
@@ -183,15 +182,7 @@ private fun BottomBarTab(
             textAlign = TextAlign.Center,
             maxLines  = 1,
         )
-        Spacer(Modifier.height(3.dp))
-        // Active indicator line
-        Box(
-            modifier = Modifier
-                .width(24.dp)
-                .height(if (selected) 2.dp else 0.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(contentColor),
-        )
+        
     }
 }
 

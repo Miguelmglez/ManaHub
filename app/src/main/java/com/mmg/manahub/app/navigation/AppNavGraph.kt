@@ -373,9 +373,13 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     navArgument("mode") { type = NavType.StringType },
                     navArgument("playerCount") { type = NavType.IntType },
                 ),
-            ) {
+            ) { entry ->
                 val configs = pendingPlayerConfigs
                 val matchId = pendingTournamentMatchId
+                val routeMode = entry.arguments?.getString("mode")?.let { name ->
+                    try { GameMode.valueOf(name) } catch (e: Exception) { GameMode.STANDARD }
+                } ?: GameMode.STANDARD
+
                 LaunchedEffect(configs) {
                     if (configs != null) {
                         if (matchId != null) {
@@ -384,7 +388,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                                 tournamentId = pendingTournamentId ?: 0L,
                                 tournamentPlayerIds = pendingTournamentPlayers,
                                 configs = configs,
-                                mode = pendingTournamentMode ?: GameMode.COMMANDER,
+                                mode = pendingTournamentMode ?: routeMode,
                                 layout = pendingLayout,
                             )
                             pendingTournamentMatchId = null
@@ -392,7 +396,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                             pendingTournamentPlayers = emptyList()
                             pendingTournamentMode = null
                         } else {
-                            gameVm.initFromConfigs(configs, pendingLayout)
+                            gameVm.initFromConfigs(configs, routeMode, pendingLayout)
                         }
                         pendingPlayerConfigs = null
                         pendingLayout = null
