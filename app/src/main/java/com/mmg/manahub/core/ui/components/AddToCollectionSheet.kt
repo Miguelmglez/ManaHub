@@ -31,7 +31,7 @@ fun AddToCollectionSheet(
     cardImage: String?,
     closeButton: Boolean = false,
 ) {
-    val conditions = listOf("Near Mint", "Slightly Played", "Played", "Heavily Played", "Damaged")
+    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
     val languages = listOf(
         "en" to "🇺🇸",
         "es" to "🇪🇸",
