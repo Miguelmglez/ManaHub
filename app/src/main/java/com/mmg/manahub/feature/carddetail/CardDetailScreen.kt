@@ -1081,6 +1081,7 @@ private fun PricePill(label: String, price: Double?, currency: PreferredCurrency
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LegalitySection(card: Card) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1094,7 +1095,11 @@ private fun LegalitySection(card: Card) {
             stringResource(R.string.format_modern) to card.legalityModern,
             stringResource(R.string.format_commander) to card.legalityCommander,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             formats.forEach { (format, legality) ->
                 LegalityChip(format = format, legality = legality)
             }
@@ -1114,7 +1119,11 @@ private fun LegalityChip(format: String, legality: String) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
-            Text(format, style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = format,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1
+            )
             Text(
                 text = if (isLegal) stringResource(R.string.carddetail_legality_legal) else stringResource(
                     R.string.carddetail_legality_not_legal
@@ -1122,6 +1131,7 @@ private fun LegalityChip(format: String, legality: String) {
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isLegal) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
         }
     }

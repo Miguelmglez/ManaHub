@@ -530,7 +530,7 @@
     <string name="avatar_picker_title">Choose your Avatar</string>
     <string name="avatar_picker_edit_hint">Edit profile photo</string>
     <string name="avatar_picker_filter_label">Filter by color</string>
-    <string name="avatar_picker_confirm">Use this art</string>
+    <string name="avatar_picker_confirm">Confirm</string>
     <string name="avatar_picker_remove">Remove photo</string>
 
     <!-- Game setup -->
