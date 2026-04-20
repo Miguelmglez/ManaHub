@@ -1,10 +1,12 @@
 package com.mmg.manahub.feature.survey
 
 import android.content.Context
+import android.content.res.Configuration
 import com.mmg.manahub.R
 import com.mmg.manahub.feature.game.model.EliminationReason
 import com.mmg.manahub.feature.game.model.GameMode
 import com.mmg.manahub.feature.game.model.GameResult
+import java.util.Locale
 
 // ── Answer options ────────────────────────────────────────────────────────────
 
@@ -36,7 +38,20 @@ data class SurveyQuestion(
 
 object SurveyQuestionEngine {
 
-    fun buildQuestions(result: GameResult, context: Context): List<SurveyQuestion> {
+    fun buildQuestions(
+        result:   GameResult,
+        context:  Context,
+        langCode: String? = null
+    ): List<SurveyQuestion> {
+        val localizedContext = if (langCode != null) {
+            val locale = Locale.forLanguageTag(langCode)
+            val config = Configuration(context.resources.configuration)
+            config.setLocale(locale)
+            context.createConfigurationContext(config)
+        } else {
+            context
+        }
+
         val questions   = mutableListOf<SurveyQuestion>()
         val appUserWon  = result.appUserWon
 
@@ -45,24 +60,24 @@ object SurveyQuestionEngine {
             id           = "result_feel",
             type         = "RESULT_FEEL",
             contextBadge = if (appUserWon)
-                context.getString(R.string.survey_q_win_badge)
+                localizedContext.getString(R.string.survey_q_win_badge)
             else
-                context.getString(R.string.survey_q_loss_badge),
+                localizedContext.getString(R.string.survey_q_loss_badge),
             text         = if (appUserWon)
-                context.getString(R.string.survey_q_result_win)
+                localizedContext.getString(R.string.survey_q_result_win)
             else
-                context.getString(R.string.survey_q_result_loss),
+                localizedContext.getString(R.string.survey_q_result_loss),
             answerOption = AnswerOption.SingleChoice(
                 if (appUserWon) listOf(
-                    SurveyChoice("DOMINANT",  context.getString(R.string.survey_a_dominant),    "\uD83D\uDCAA"),
-                    SurveyChoice("CLOSE",     context.getString(R.string.survey_a_close),       "\uD83D\uDE05"),
-                    SurveyChoice("LUCKY",     context.getString(R.string.survey_a_lucky),       "\uD83C\uDF40"),
-                    SurveyChoice("SKILLFUL",  context.getString(R.string.survey_a_skillful),    "\uD83E\uDDE0"),
+                    SurveyChoice("DOMINANT",  localizedContext.getString(R.string.survey_a_dominant),    "\uD83D\uDCAA"),
+                    SurveyChoice("CLOSE",     localizedContext.getString(R.string.survey_a_close),       "\uD83D\uDE05"),
+                    SurveyChoice("LUCKY",     localizedContext.getString(R.string.survey_a_lucky),       "\uD83C\uDF40"),
+                    SurveyChoice("SKILLFUL",  localizedContext.getString(R.string.survey_a_skillful),    "\uD83E\uDDE0"),
                 ) else listOf(
-                    SurveyChoice("OVERWHELMED", context.getString(R.string.survey_a_overwhelmed), "\u26A1"),
-                    SurveyChoice("MANA",        context.getString(R.string.survey_a_mana_issues), "\uD83C\uDFD4"),
-                    SurveyChoice("NO_ANSWERS",  context.getString(R.string.survey_a_no_answers),  "\uD83D\uDEAB"),
-                    SurveyChoice("TOO_SLOW",    context.getString(R.string.survey_a_too_slow),    "\uD83D\uDC22"),
+                    SurveyChoice("OVERWHELMED", localizedContext.getString(R.string.survey_a_overwhelmed), "\u26A1"),
+                    SurveyChoice("MANA",        localizedContext.getString(R.string.survey_a_mana_issues), "\uD83C\uDFD4"),
+                    SurveyChoice("NO_ANSWERS",  localizedContext.getString(R.string.survey_a_no_answers),  "\uD83D\uDEAB"),
+                    SurveyChoice("TOO_SLOW",    localizedContext.getString(R.string.survey_a_too_slow),    "\uD83D\uDC22"),
                 )
             ),
         )
@@ -71,13 +86,13 @@ object SurveyQuestionEngine {
         questions += SurveyQuestion(
             id   = "mana_health",
             type = "MANA",
-            text = context.getString(R.string.survey_q_mana),
+            text = localizedContext.getString(R.string.survey_q_mana),
             answerOption = AnswerOption.MultiChoice(listOf(
-                SurveyChoice("SMOOTH",  context.getString(R.string.survey_a_mana_smooth),   "\u2705"),
-                SurveyChoice("FLOODED", context.getString(R.string.survey_a_mana_flooded),  "\uD83C\uDF0A"),
-                SurveyChoice("SCREWED", context.getString(R.string.survey_a_mana_screwed),  "\uD83C\uDFDC"),
-                SurveyChoice("COLORS",  context.getString(R.string.survey_a_mana_colors),   "\uD83C\uDFA8"),
-                SurveyChoice("NONE",    context.getString(R.string.survey_a_mana_none),     "\uD83D\uDC4D"),
+                SurveyChoice("SMOOTH",  localizedContext.getString(R.string.survey_a_mana_smooth),   "\u2705"),
+                SurveyChoice("FLOODED", localizedContext.getString(R.string.survey_a_mana_flooded),  "\uD83C\uDF0A"),
+                SurveyChoice("SCREWED", localizedContext.getString(R.string.survey_a_mana_screwed),  "\uD83C\uDFDC"),
+                SurveyChoice("COLORS",  localizedContext.getString(R.string.survey_a_mana_colors),   "\uD83C\uDFA8"),
+                SurveyChoice("NONE",    localizedContext.getString(R.string.survey_a_mana_none),     "\uD83D\uDC4D"),
             )),
         )
 
@@ -85,7 +100,7 @@ object SurveyQuestionEngine {
         questions += SurveyQuestion(
             id           = "hand_quality",
             type         = "HAND",
-            text         = context.getString(R.string.survey_q_hand),
+            text         = localizedContext.getString(R.string.survey_q_hand),
             answerOption = AnswerOption.StarRating(maxStars = 5),
         )
 
@@ -100,12 +115,12 @@ object SurveyQuestionEngine {
                 questions += SurveyQuestion(
                     id           = "commander_plan",
                     type         = "COMMANDER_DAMAGE",
-                    text         = context.getString(R.string.survey_q_commander_plan),
-                    contextBadge = context.getString(R.string.survey_q_commander_badge),
+                    text         = localizedContext.getString(R.string.survey_q_commander_plan),
+                    contextBadge = localizedContext.getString(R.string.survey_q_commander_badge),
                     answerOption = AnswerOption.SingleChoice(listOf(
-                        SurveyChoice("PLANNED",   context.getString(R.string.survey_a_planned),    "\uD83C\uDFAF"),
-                        SurveyChoice("DEVELOPED", context.getString(R.string.survey_a_developed),  "\uD83C\uDF31"),
-                        SurveyChoice("SURPRISE",  context.getString(R.string.survey_a_surprise),   "\uD83D\uDE2E"),
+                        SurveyChoice("PLANNED",   localizedContext.getString(R.string.survey_a_planned),    "\uD83C\uDFAF"),
+                        SurveyChoice("DEVELOPED", localizedContext.getString(R.string.survey_a_developed),  "\uD83C\uDF31"),
+                        SurveyChoice("SURPRISE",  localizedContext.getString(R.string.survey_a_surprise),   "\uD83D\uDE2E"),
                     )),
                 )
             }
@@ -114,8 +129,8 @@ object SurveyQuestionEngine {
             questions += SurveyQuestion(
                 id           = "win_improvement",
                 type         = "FREE_TEXT",
-                text         = context.getString(R.string.survey_q_win_improvement),
-                contextBadge = context.getString(R.string.survey_q_optional_badge),
+                text         = localizedContext.getString(R.string.survey_q_win_improvement),
+                contextBadge = localizedContext.getString(R.string.survey_q_optional_badge),
                 answerOption = AnswerOption.FreeText,
             )
 
@@ -126,13 +141,13 @@ object SurveyQuestionEngine {
             questions += SurveyQuestion(
                 id           = "loss_reason",
                 type         = "LOSS_REASON",
-                text         = context.getString(R.string.survey_q_loss_reason),
-                contextBadge = context.getString(R.string.survey_q_loss_reason_badge),
+                text         = localizedContext.getString(R.string.survey_q_loss_reason),
+                contextBadge = localizedContext.getString(R.string.survey_q_loss_reason_badge),
                 answerOption = AnswerOption.SingleChoice(listOf(
-                    SurveyChoice("REMOVAL",     context.getString(R.string.survey_a_more_removal),     "\u2694"),
-                    SurveyChoice("CURVE",       context.getString(R.string.survey_a_better_curve),     "\uD83D\uDCCA"),
-                    SurveyChoice("INTERACTION", context.getString(R.string.survey_a_more_interaction), "\uD83D\uDEE1"),
-                    SurveyChoice("NOTHING",     context.getString(R.string.survey_a_nothing),           "\uD83E\uDD1D"),
+                    SurveyChoice("REMOVAL",     localizedContext.getString(R.string.survey_a_more_removal),     "\u2694"),
+                    SurveyChoice("CURVE",       localizedContext.getString(R.string.survey_a_better_curve),     "\uD83D\uDCCA"),
+                    SurveyChoice("INTERACTION", localizedContext.getString(R.string.survey_a_more_interaction), "\uD83D\uDEE1"),
+                    SurveyChoice("NOTHING",     localizedContext.getString(R.string.survey_a_nothing),           "\uD83E\uDD1D"),
                 )),
             )
 
@@ -142,13 +157,13 @@ object SurveyQuestionEngine {
                 questions += SurveyQuestion(
                     id           = "sideboard",
                     type         = "SIDEBOARD",
-                    text         = context.getString(R.string.survey_q_sideboard),
-                    contextBadge = context.getString(R.string.survey_q_sideboard_badge),
+                    text         = localizedContext.getString(R.string.survey_q_sideboard),
+                    contextBadge = localizedContext.getString(R.string.survey_q_sideboard_badge),
                     answerOption = AnswerOption.SingleChoice(listOf(
-                        SurveyChoice("SIDE_HELPED",  context.getString(R.string.survey_a_side_helped),  "\uD83D\uDCAA"),
-                        SurveyChoice("SIDE_NO_HELP", context.getString(R.string.survey_a_side_no_help), "\uD83E\uDD37"),
-                        SurveyChoice("NO_SWAPS",     context.getString(R.string.survey_a_side_no_swaps),"\uD83D\uDEAB"),
-                        SurveyChoice("FORGOT",       context.getString(R.string.survey_a_side_forgot),  "\uD83E\uDD26"),
+                        SurveyChoice("SIDE_HELPED",  localizedContext.getString(R.string.survey_a_side_helped),  "\uD83D\uDCAA"),
+                        SurveyChoice("SIDE_NO_HELP", localizedContext.getString(R.string.survey_a_side_no_help), "\uD83E\uDD37"),
+                        SurveyChoice("NO_SWAPS",     localizedContext.getString(R.string.survey_a_side_no_swaps),"\uD83D\uDEAB"),
+                        SurveyChoice("FORGOT",       localizedContext.getString(R.string.survey_a_side_forgot),  "\uD83E\uDD26"),
                     )),
                 )
             }
@@ -158,8 +173,8 @@ object SurveyQuestionEngine {
         questions += SurveyQuestion(
             id           = "free_notes",
             type         = "FREE_TEXT",
-            text         = context.getString(R.string.survey_q_free_text),
-            contextBadge = context.getString(R.string.survey_q_free_text_badge),
+            text         = localizedContext.getString(R.string.survey_q_free_text),
+            contextBadge = localizedContext.getString(R.string.survey_q_free_text_badge),
             answerOption = AnswerOption.FreeText,
         )
 

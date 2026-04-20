@@ -444,6 +444,17 @@ class GameViewModel @Inject constructor(
         _toolsState.value = GlobalToolsState()
     }
 
+    fun finishGame() {
+        deltaJobs.values.forEach { it.cancel() }
+        deltaJobs.clear()
+        _uiState.update { it.copy(
+            isGameRunning = false,
+            winner        = null,
+            gameResult    = null
+        ) }
+        _toolsState.value = GlobalToolsState()
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun scheduleDeltaClear(playerId: Int) {
@@ -602,6 +613,7 @@ class GameViewModel @Inject constructor(
             activeLayout = layout,
             isGameRunning = true
         ) }
+        _toolsState.value = GlobalToolsState()
     }
 
     companion object {

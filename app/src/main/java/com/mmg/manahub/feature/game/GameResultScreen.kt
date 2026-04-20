@@ -34,7 +34,7 @@ fun GameResultScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        winnerTheme.accent.copy(alpha = 0.25f),
+                        winnerTheme.accent.copy(alpha = 0.85f),
                         mc.background,
                     )
                 )
@@ -60,7 +60,7 @@ fun GameResultScreen(
                     ) {
                         Text(
                             stringResource(R.string.gameresult_review_button),
-                            style = MaterialTheme.magicTypography.labelLarge,
+                            style = MaterialTheme.magicTypography.titleMedium,
                         )
                     }
                     Row(
@@ -70,11 +70,13 @@ fun GameResultScreen(
                         OutlinedButton(
                             onClick  = onBackHome,
                             modifier = Modifier.weight(1f),
+                            border   = androidx.compose.foundation.BorderStroke(1.dp, winnerTheme.accent)
                         ) {
                             Text(
                                 stringResource(R.string.gameresult_back_home),
-                                style = MaterialTheme.magicTypography.labelLarge
-                            )
+                                style = MaterialTheme.magicTypography.titleMedium,
+                                color = winnerTheme.accent
+                                )
                         }
                         Button(
                             onClick  = onNewGame,
@@ -83,7 +85,7 @@ fun GameResultScreen(
                         ) {
                             Text(
                                 stringResource(R.string.action_play_again),
-                                style = MaterialTheme.magicTypography.labelLarge,
+                                style = MaterialTheme.magicTypography.titleMedium,
                                 color = mc.background,
                             )
                         }

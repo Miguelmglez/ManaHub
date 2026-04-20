@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -97,7 +98,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.theme.MarcellusFontFamily
+import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
@@ -632,6 +634,7 @@ private fun PlayerCard(
     modifier: Modifier = Modifier,
     onPlayerNameClick: () -> Unit = {},
 ) {
+    val mt = MaterialTheme.magicTypography
     val mc = MaterialTheme.magicColors
     val theme = player.theme
     val startingLife = gameMode.startingLife
@@ -702,23 +705,29 @@ private fun PlayerCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(
-                            text = player.name,
-                            style = if (tier == CardTier.LARGE)
-                                MaterialTheme.magicTypography.titleLarge
-                            else
-                                MaterialTheme.magicTypography.labelMedium,
-                            color = theme.accent,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = onPlayerNameClick,
-                                ),
-                        )
+                        Column {
+                            Text(
+                                text = player.name,
+                                style = if (tier == CardTier.LARGE)
+                                    MaterialTheme.magicTypography.titleLarge
+                                else
+                                    MaterialTheme.magicTypography.labelMedium,
+                                color = theme.accent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onPlayerNameClick,
+                                    ),
+                            )
+                            Text(
+                                text = "Turn: $turnNumber",
+                                style = MaterialTheme.magicTypography.labelMedium,
+                                color = MaterialTheme.magicColors.goldMtg,
+                            )
+                        }
                         if (isActive) {
                             EndTurnButton(tier = tier, theme = theme, onClick = onEndTurn)
                         }
@@ -753,7 +762,7 @@ private fun PlayerCard(
                                     label = "landAlpha",
                                 )
                                 Icon(
-                                    imageVector = Icons.Default.Landscape,
+                                    imageVector = Icons.Default.Park,
                                     contentDescription = stringResource(R.string.game_counters_button),
                                     tint = theme.accent.copy(alpha = alpha),
                                     modifier = Modifier
@@ -874,28 +883,23 @@ private fun PlayerCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(12.dp),
                     ) {
-                        Text(
-                            text = stringResource(R.string.game_pending_defeat_title),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                        )
+                        Text(text = "💀", style = mt.titleMedium, textAlign = TextAlign.Center)
+
                         Button(
                             onClick = onConfirmDefeat,
                             colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text(
-                                stringResource(R.string.game_pending_defeat_confirm),
-                                fontSize = 11.sp
+                                text = stringResource(R.string.game_pending_defeat_confirm),
+                                style = mt.labelSmall
                             )
                         }
                         TextButton(onClick = onRevokeDefeat) {
                             Text(
-                                stringResource(R.string.game_pending_defeat_revoke),
+                                text = stringResource(R.string.game_pending_defeat_revoke),
                                 color = mc.lifePositive,
-                                fontSize = 11.sp,
+                                style = mt.labelSmall,
                             )
                         }
                     }
@@ -970,7 +974,7 @@ private fun EndTurnButton(
     theme: PlayerThemeColors,
     onClick: () -> Unit,
 ) {
-    if (tier == CardTier.LARGE) {
+    if (tier != CardTier.TINY) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -987,9 +991,8 @@ private fun EndTurnButton(
         ) {
             Text(
                 text = stringResource(R.string.game_end_turn),
-                style = MaterialTheme.magicTypography.labelSmall,
+                style = MaterialTheme.magicTypography.labelLarge,
                 color = theme.accent,
-                fontSize = 14.sp,
             )
         }
     } else {
@@ -1006,11 +1009,10 @@ private fun EndTurnButton(
                     onClick = onClick,
                 ),
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = stringResource(R.string.game_end_turn),
-                tint = theme.accent,
-                modifier = Modifier.size(if (tier == CardTier.SMALL) 14.dp else 11.dp),
+            Text(
+                text = stringResource(R.string.game_end_turn),
+                style = MaterialTheme.magicTypography.labelMedium,
+                color = theme.accent,
             )
         }
     }
@@ -1041,9 +1043,9 @@ private fun PlayerCounterChips(
     if (activeCounters.isEmpty()) return
 
     val mc = MaterialTheme.magicColors
+    val mt = MaterialTheme.magicTypography
     val chipHeight = if (tier == CardTier.LARGE) 24.dp else 16.dp
     val iconSize = if (tier == CardTier.LARGE) 16.dp else 14.dp
-    val textSize = if (tier == CardTier.LARGE) 16.sp else 12.sp
     val hPad = if (tier == CardTier.LARGE) 4.dp else 4.dp
 
     // Grow horizontally up to 4 items before wrapping
@@ -1081,16 +1083,14 @@ private fun PlayerCounterChips(
                 Text(
                     text = "$value",
                     color = mc.textPrimary,
-                    fontSize = textSize,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.CenterVertically), // Alineación explícita
-                    style = LocalTextStyle.current.copy(
+                    style = (if (tier == CardTier.LARGE) mt.labelLarge else mt.labelSmall).copy(
                         platformStyle = PlatformTextStyle(includeFontPadding = false),
                         lineHeightStyle = LineHeightStyle(
                             alignment = LineHeightStyle.Alignment.Center,
-                            trim = LineHeightStyle.Trim.Both // Cambia None por Both para eliminar espacios extra arriba/abajo
+                            trim = LineHeightStyle.Trim.Both
                         )
-                    )
+                    ),
+                    modifier = Modifier.align(Alignment.CenterVertically),
                 )
             }
         }
@@ -1176,6 +1176,8 @@ fun CounterIconView(
 
 @Composable
 private fun EliminatedOverlay(player: Player, mode: GameMode) {
+    val mt = MaterialTheme.magicTypography
+    val mc = MaterialTheme.magicColors
     val reason = when {
         player.life <= 0 -> stringResource(R.string.game_fallen_life)
         player.poison >= 10 -> stringResource(R.string.game_fallen_poison)
@@ -1198,18 +1200,15 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
             Text(text = "💀", fontSize = 20.sp, textAlign = TextAlign.Center)
             Text(
                 text = stringResource(R.string.game_fallen_label),
-                color = Color(0xFFE63946),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 6.sp,
-                fontFamily = MarcellusFontFamily,
+                color = mc.lifeNegative,
+                style = mt.displayMedium.copy(letterSpacing = 6.sp),
                 textAlign = TextAlign.Center,
             )
             if (reason != null) {
                 Text(
                     text = reason,
                     color = Color.White.copy(alpha = 0.70f),
-                    fontSize = 11.sp,
+                    style = mt.labelSmall,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -1227,6 +1226,7 @@ private fun WinnerOverlay(
     onViewResults: () -> Unit,
     onPlayAgain: () -> Unit,
 ) {
+    val mt = MaterialTheme.magicTypography
     val mc = MaterialTheme.magicColors
     val theme = winner.theme
     Box(
@@ -1244,25 +1244,19 @@ private fun WinnerOverlay(
             Text(
                 text = winner.name,
                 color = theme.accent,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 2.sp,
-                fontFamily = MarcellusFontFamily,
+                style = mt.displayMedium.copy(letterSpacing = 2.sp),
                 textAlign = TextAlign.Center,
             )
             Text(
                 text = stringResource(R.string.game_wins_label),
                 color = mc.goldMtg,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 6.sp,
-                fontFamily = MarcellusFontFamily,
+                style = mt.titleLarge.copy(letterSpacing = 6.sp),
                 textAlign = TextAlign.Center,
             )
             Text(
                 text = stringResource(R.string.game_victory_life_remaining, winner.life),
                 color = mc.textSecondary,
-                style = MaterialTheme.magicTypography.bodyMedium,
+                style = mt.bodyMedium,
             )
             Spacer(Modifier.height(8.dp))
             Button(
@@ -1270,10 +1264,18 @@ private fun WinnerOverlay(
                 colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(R.string.game_victory_view_results), color = mc.background)
+                Text(
+                    text = stringResource(R.string.game_victory_view_results),
+                    color = mc.background,
+                    style = mt.labelLarge
+                )
             }
             TextButton(onClick = onPlayAgain) {
-                Text(stringResource(R.string.action_play_again), color = mc.textSecondary)
+                Text(
+                    text = stringResource(R.string.action_play_again),
+                    color = mc.textSecondary,
+                    style = mt.labelLarge
+                )
             }
         }
     }
@@ -1362,6 +1364,7 @@ private fun CountersPanel(
     onAddCustom: (name: String, iconKey: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val mt = MaterialTheme.magicTypography
     val mc = MaterialTheme.magicColors
     val theme = player.theme
     var newCounterName by remember { mutableStateOf("") }
@@ -1923,19 +1926,39 @@ private fun PlayerPropertyRow(
             )
             OutlinedTextField(
                 value = nameText,
-                onValueChange = { nameText = it },
+                onValueChange = {
+                    nameText = it
+                    if (it.isNotBlank() && !player.isAppUser) {
+                        onRename(it)
+                    }
+                },
                 singleLine = true,
+                readOnly = player.isAppUser,
                 label = { Text(player.name, color = mc.textDisabled) },
+                trailingIcon = if (player.isAppUser) {
+                    {
+                        Surface(
+                            modifier = Modifier.padding(end = 8.dp),
+                            color = mc.primaryAccent.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f)),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.game_setup_you_badge),
+                                style = MaterialTheme.magicTypography.labelMedium.copy(fontSize = 10.sp),
+                                color = mc.primaryAccent,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                } else null,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = mc.primaryAccent,
+                    focusedBorderColor = if (player.isAppUser) mc.surfaceVariant else mc.primaryAccent,
                     unfocusedBorderColor = mc.surfaceVariant,
                     focusedTextColor = mc.textPrimary,
                     unfocusedTextColor = mc.textPrimary,
                 ),
                 modifier = Modifier.weight(1f),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                    onDone = { if (nameText.isNotBlank()) onRename(nameText) }
-                ),
             )
         }
         // Color swatches

@@ -68,6 +68,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     onSettingsClick: () -> Unit,
+    onStatsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
@@ -204,41 +205,43 @@ fun ProfileScreen(
                     uiState = uiState,
                     favouriteColor = uiState.favouriteColor,
                     mostValuableColor = uiState.mostValuableColor,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        //.clickable { onStatsClick() },
                 )
             }
-
-            // ── Best deck ─────────────────────────────────────────────────────
-            if (uiState.deckStats.isNotEmpty()) {
-                item {
-                    BestDeckSection(
-                        deck = uiState.deckStats.first(),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-            }
-
-            // ── Survey insights ───────────────────────────────────────────────
-            if (uiState.surveyCount > 0) {
-                item {
-                    SurveyInsightsSection(
-                        uiState = uiState,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-            }
             /*
-                        // ── Achievements ──────────────────────────────────────────────────
-                        if (uiState.achievements.isNotEmpty()) {
+                        // ── Best deck ─────────────────────────────────────────────────────
+                        if (uiState.deckStats.isNotEmpty()) {
                             item {
-                                AchievementsSection(
-                                    achievements = uiState.achievements,
-                                    modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                BestDeckSection(
+                                    deck = uiState.deckStats.first(),
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                                 )
                             }
-                        }*/
+                        }
 
-            // ── Recent games ──────────────────────────────────────────────────
+                                    // ── Survey insights ───────────────────────────────────────────────
+                                    if (uiState.surveyCount > 0) {
+                                        item {
+                                            SurveyInsightsSection(
+                                                uiState = uiState,
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                            )
+                                        }
+                                    }
+
+                                                // ── Achievements ──────────────────────────────────────────────────
+                                                if (uiState.achievements.isNotEmpty()) {
+                                                    item {
+                                                        AchievementsSection(
+                                                            achievements = uiState.achievements,
+                                                            modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                                        )
+                                                    }
+                                                }*/
+
+           /* // ── Recent games ──────────────────────────────────────────────────
             if (uiState.recentSessions.isNotEmpty()) {
                 item {
                     SectionTitle(
@@ -253,7 +256,7 @@ fun ProfileScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
                     )
                 }
-            }
+            }*/
 
             // ── Collection summary ────────────────────────────────────────────
             uiState.collectionStats?.let { stats ->
