@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -19,11 +20,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,16 +62,34 @@ fun AdvancedSearchSheet(
     val ty = MaterialTheme.magicTypography
     val scope = rememberCoroutineScope()
     var canDismiss by remember { mutableStateOf(false) }
+
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { canDismiss }
+        confirmValueChange = { newValue ->
+            newValue != SheetValue.Hidden || canDismiss
+        }
     )
 
     fun handleDismiss() {
+        if (canDismiss) return
         canDismiss = true
         scope.launch {
             sheetState.hide()
             onDismiss()
+        }
+    }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset = if (source == NestedScrollSource.UserInput) available else Offset.Zero
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                return available
+            }
         }
     }
 
@@ -79,12 +104,18 @@ fun AdvancedSearchSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.92f)
+                .nestedScroll(nestedScrollConnection)
                 .navigationBarsPadding(),
         ) {
             // ── Header ──────────────────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { change, _ ->
+                            change.consume()
+                        }
+                    }
                     .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

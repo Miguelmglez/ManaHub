@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
 import androidx.compose.material3.*
@@ -651,7 +652,7 @@ private fun AddCardsSheet(
                         .background(mc.surface),
                 ) {
                     Icon(
-                        Icons.Default.FilterList,
+                        Icons.Default.Tune,
                         contentDescription = stringResource(R.string.advsearch_title),
                         tint = mc.primaryAccent,
                     )
@@ -671,7 +672,7 @@ private fun AddCardsSheet(
                     text = {
                         Text(
                             stringResource(R.string.deckbuilder_tab_collection),
-                            style = ty.labelMedium,
+                            style = ty.labelLarge,
                             color = if (selectedTab == 0) mc.primaryAccent else mc.textSecondary,
                         )
                     },
@@ -685,7 +686,7 @@ private fun AddCardsSheet(
                     text = {
                         Text(
                             stringResource(R.string.deckdetail_tab_scryfall),
-                            style = ty.labelMedium,
+                            style = ty.labelLarge,
                             color = if (selectedTab == 1) mc.primaryAccent else mc.textSecondary,
                         )
                     },

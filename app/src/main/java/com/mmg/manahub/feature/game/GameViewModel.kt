@@ -595,8 +595,11 @@ class GameViewModel @Inject constructor(
 
     // ── Setup init from PlayerConfig ──────────────────────────────────────────
 
-    fun initFromConfigs(configs: List<PlayerConfig>, selectedLayout: LayoutTemplate? = null) {
-        val mode    = _uiState.value.mode
+    fun initFromConfigs(
+        configs: List<PlayerConfig>,
+        mode: GameMode,
+        selectedLayout: LayoutTemplate? = null
+    ) {
         val players = configs.mapIndexed { i, config ->
             Player(
                 id        = i,
@@ -608,6 +611,7 @@ class GameViewModel @Inject constructor(
         }
         val layout = selectedLayout ?: LayoutTemplates.getDefaultLayout(players.size)
         _uiState.update { it.copy(
+            mode = mode,
             players = players,
             activePlayerId = players.first().id,
             activeLayout = layout,
