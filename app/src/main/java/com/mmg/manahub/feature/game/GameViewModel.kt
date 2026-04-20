@@ -271,7 +271,7 @@ class GameViewModel @Inject constructor(
     fun checkPendingDefeat() {
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
-                if (p.defeated || p.pendingDefeat) p
+                if (p.defeated || p.pendingDefeat || p.isSurviving) p
                 else if (shouldEliminate(p, s.mode)) p.copy(pendingDefeat = true)
                 else p
             })
@@ -283,7 +283,7 @@ class GameViewModel @Inject constructor(
     fun confirmDefeat(playerId: Int) {
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
-                if (p.id == playerId) p.copy(defeated = true, pendingDefeat = false) else p
+                if (p.id == playerId) p.copy(defeated = true, pendingDefeat = false, isSurviving = false) else p
             })
         }
         checkWinner()
@@ -293,7 +293,7 @@ class GameViewModel @Inject constructor(
     fun revokeDefeat(playerId: Int) {
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
-                if (p.id == playerId) p.copy(pendingDefeat = false, defeated = false) else p
+                if (p.id == playerId) p.copy(pendingDefeat = false, isSurviving = true, defeated = false) else p
             })
         }
     }
@@ -595,8 +595,11 @@ class GameViewModel @Inject constructor(
 
     // ── Setup init from PlayerConfig ──────────────────────────────────────────
 
-    fun initFromConfigs(configs: List<PlayerConfig>, selectedLayout: LayoutTemplate? = null) {
-        val mode    = _uiState.value.mode
+    fun initFromConfigs(
+        configs: List<PlayerConfig>,
+        mode: GameMode,
+        selectedLayout: LayoutTemplate? = null
+    ) {
         val players = configs.mapIndexed { i, config ->
             Player(
                 id        = i,
@@ -608,6 +611,7 @@ class GameViewModel @Inject constructor(
         }
         val layout = selectedLayout ?: LayoutTemplates.getDefaultLayout(players.size)
         _uiState.update { it.copy(
+            mode = mode,
             players = players,
             activePlayerId = players.first().id,
             activeLayout = layout,

@@ -113,59 +113,58 @@ fun SettingsScreen(
                 onCardLanguage = viewModel::setCardLanguage,
                 onNewsLanguages = viewModel::setNewsLanguages,
                 onCurrency = viewModel::setPreferredCurrency,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-            Text(
-                stringResource(R.string.settings_section_prices),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
+            /* HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+             Text(
+                 stringResource(R.string.settings_section_prices),
+                 style = MaterialTheme.magicTypography.titleMedium,
+                 color = mc.textPrimary,
+                 modifier = Modifier.padding(horizontal = 16.dp),
+             )
 
-            SettingsToggleItem(
-                title = stringResource(R.string.settings_auto_refresh),
-                subtitle = stringResource(R.string.settings_auto_refresh_subtitle),
-                checked = uiState.autoRefreshPrices,
-                onCheckedChange = viewModel::onAutoRefreshChanged,
-            )
+             SettingsToggleItem(
+                 title = stringResource(R.string.settings_auto_refresh),
+                 subtitle = stringResource(R.string.settings_auto_refresh_subtitle),
+                 checked = uiState.autoRefreshPrices,
+                 onCheckedChange = viewModel::onAutoRefreshChanged,
+             )
 
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-            Text(
-                stringResource(R.string.settings_section_news),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-/*
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onManageNewsSources)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.settings_manage_news_sources),
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textPrimary,
-                    )
-                    Text(
-                        stringResource(R.string.settings_manage_news_sources_subtitle),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.textSecondary,
-                    )
-                }
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = mc.textSecondary,
-                )
-            }*/
+             Spacer(Modifier.height(16.dp))
+             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+             Text(
+                 stringResource(R.string.settings_section_news),
+                 style = MaterialTheme.magicTypography.titleMedium,
+                 color = mc.textPrimary,
+                 modifier = Modifier.padding(horizontal = 16.dp),
+             )
+
+             Row(
+                 modifier = Modifier
+                     .fillMaxWidth()
+                     .clickable(onClick = onManageNewsSources)
+                     .padding(horizontal = 16.dp, vertical = 12.dp),
+                 verticalAlignment = Alignment.CenterVertically,
+                 horizontalArrangement = Arrangement.SpaceBetween,
+             ) {
+                 Column(modifier = Modifier.weight(1f)) {
+                     Text(
+                         stringResource(R.string.settings_manage_news_sources),
+                         style = MaterialTheme.magicTypography.bodyMedium,
+                         color = mc.textPrimary,
+                     )
+                     Text(
+                         stringResource(R.string.settings_manage_news_sources_subtitle),
+                         style = MaterialTheme.magicTypography.bodySmall,
+                         color = mc.textSecondary,
+                     )
+                 }
+                 Icon(
+                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                     contentDescription = null,
+                     tint = mc.textSecondary,
+                 )
+             }*/
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             Row(
@@ -182,6 +181,7 @@ fun SettingsScreen(
                         style = MaterialTheme.magicTypography.bodyMedium,
                         color = mc.textPrimary,
                     )
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         stringResource(R.string.settings_tag_dictionary_subtitle),
                         style = MaterialTheme.magicTypography.bodySmall,
@@ -195,7 +195,6 @@ fun SettingsScreen(
                 )
             }
 
-            Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             ThemeSelectorSection(
                 currentTheme = uiState.currentTheme,
@@ -258,6 +257,8 @@ private fun PreferencesSection(
             style = MaterialTheme.magicTypography.titleMedium,
             color = mc.textPrimary,
         )
+        Spacer(Modifier.height(4.dp))
+
         Column(
             modifier = Modifier
                 .fillMaxWidth(),
@@ -325,6 +326,7 @@ private fun PreferencesSection(
                             text = language.displayName,
                             style = MaterialTheme.magicTypography.bodySmall,
                             color = if (selected) mc.textPrimary else mc.textSecondary,
+                            modifier = Modifier.padding(start = 4.dp)
                         )
                     }
                 }
@@ -395,6 +397,7 @@ private fun PreferencesSection(
                                 text = currency.displayName,
                                 style = MaterialTheme.magicTypography.bodySmall,
                                 color = if (selected) mc.textPrimary else mc.textSecondary,
+                                modifier = Modifier.padding(start = 4.dp)
                             )
                         }
                     }

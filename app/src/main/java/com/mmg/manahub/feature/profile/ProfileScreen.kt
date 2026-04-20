@@ -154,7 +154,7 @@ fun ProfileScreen(
                         color = mc.textPrimary,
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    Icon(
+                   /* Icon(
                         imageVector = Icons.Default.AccountCircle,
                         contentDescription = "Account",
                         tint = if (sessionState is SessionState.Authenticated) mc.primaryAccent else mc.textPrimary,
@@ -162,7 +162,7 @@ fun ProfileScreen(
                             .padding(end = 16.dp)
                             .size(24.dp)
                             .clickable { showAccountSheet = true },
-                    )
+                    )*/
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
