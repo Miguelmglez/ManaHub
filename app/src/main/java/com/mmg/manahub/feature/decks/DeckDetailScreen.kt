@@ -1,9 +1,9 @@
 package com.mmg.manahub.feature.decks
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
-import com.mmg.manahub.core.util.PriceFormatter
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
 import androidx.compose.material3.*
@@ -40,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,6 +58,8 @@ import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
+import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.decks.components.DeckImportSheet
@@ -87,8 +91,33 @@ fun DeckDetailScreen(
     BackHandler(onBack = handleBack)
 
     // Keep the selected card detail in sync with deck state changes
-    val selectedDeckCard = remember(selectedCardId, uiState.cards) {
-        selectedCardId?.let { id -> uiState.cards.find { it.scryfallId == id } }
+    val selectedDeckCard = remember(selectedCardId, uiState.cards, uiState.addCardsResults, uiState.scryfallResults) {
+        selectedCardId?.let { id ->
+            // 1. Try to find in current deck
+            uiState.cards.find { it.scryfallId == id }
+                ?: run {
+                    // 2. Try to find in search results (collection tab)
+                    uiState.addCardsResults.find { it.card.scryfallId == id }?.let { row ->
+                        DeckSlotEntry(
+                            scryfallId = row.card.scryfallId,
+                            quantity = row.quantityInDeck,
+                            isSideboard = false,
+                            card = row.card
+                        )
+                    }
+                }
+                ?: run {
+                    // 3. Try to find in search results (scryfall tab)
+                    uiState.scryfallResults.find { it.card.scryfallId == id }?.let { row ->
+                        DeckSlotEntry(
+                            scryfallId = row.card.scryfallId,
+                            quantity = row.quantityInDeck,
+                            isSideboard = false,
+                            card = row.card
+                        )
+                    }
+                }
+        }
     }
 
     Scaffold(
@@ -258,6 +287,7 @@ fun DeckDetailScreen(
             onScryfallSearch = viewModel::searchScryfallDirect,
             onAdd = viewModel::addCardToDeck,
             onRemove = viewModel::removeCardFromDeck,
+            onCardClick = { id -> selectedCardId = id },
             onDismiss = {
                 showAddCardsSheet = false
                 viewModel.clearAddCardsState()
@@ -300,6 +330,8 @@ private fun CardDetailSheet(
     val card = deckCard.card
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    var showBackFace by remember { mutableStateOf(false) }
+
     val isCommander = deckFormat?.uniqueCards == true
     val addEnabled = !isCommander || deckCard.quantity < 1
 
@@ -317,30 +349,79 @@ private fun CardDetailSheet(
         ) {
             if (card != null) {
                 // Card image
-                val frontImageUrl = card.imageNormal ?: card.imageArtCrop
-                if (!frontImageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(frontImageUrl).crossfade(true).build(),
-                        contentDescription = card.name,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(0.72f)
-                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                        contentScale = ContentScale.Fit,
+                val hasBackFace = !card.imageBackNormal.isNullOrBlank()
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val rotation by animateFloatAsState(
+                        targetValue = if (showBackFace) -180f else 0f,
+                        animationSpec = tween(durationMillis = 500),
+                        label = "CardFlip"
                     )
-                }
-                if (!card.imageBackNormal.isNullOrBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(card.imageBackNormal).crossfade(true).build(),
-                        contentDescription = stringResource(R.string.carddetail_back_face_description, card.name),
+
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(0.72f),
-                        contentScale = ContentScale.Fit,
-                    )
+                            .fillMaxWidth(0.75f)
+                            .aspectRatio(0.716f)
+                            .graphicsLayer {
+                                rotationY = rotation
+                                cameraDistance = 12f * density
+                            }
+                            .clip(RoundedCornerShape(12.dp))
+                            .then(
+                                if (hasBackFace)
+                                    Modifier.clickable { showBackFace = !showBackFace }
+                                else Modifier
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // Front Face
+                        val frontImageUrl = card.imageNormal ?: card.imageArtCrop
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(frontImageUrl).crossfade(true).build(),
+                            contentDescription = card.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    alpha = if (rotation >= -90f) 1f else 0f
+                                },
+                        )
+
+                        // Back Face
+                        if (hasBackFace) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(card.imageBackNormal).crossfade(true).build(),
+                                contentDescription = stringResource(
+                                    R.string.carddetail_back_face_description,
+                                    card.name
+                                ),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        rotationY = 180f
+                                        alpha = if (rotation < -90f) 1f else 0f
+                                    },
+                            )
+                        }
+                    }
+
+                    if (hasBackFace) {
+                        Text(
+                            text = if (showBackFace)
+                                stringResource(R.string.carddetail_flip_see_front)
+                            else
+                                stringResource(R.string.carddetail_flip_see_back),
+                            style = ty.labelMedium,
+                            color = mc.primaryAccent,
+                        )
+                    }
                 }
 
                 Column(
@@ -524,7 +605,7 @@ private fun CardDetailSheet(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = stringResource(R.string.action_remove),
+                    text = stringResource(R.string.action_remove_all),
                     color = mc.lifeNegative,
                     style = ty.labelLarge,
                 )
@@ -546,6 +627,7 @@ private fun AddCardsSheet(
     onScryfallSearch: (String) -> Unit,
     onAdd: (String) -> Unit,
     onRemove: (String) -> Unit,
+    onCardClick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -651,7 +733,7 @@ private fun AddCardsSheet(
                         .background(mc.surface),
                 ) {
                     Icon(
-                        Icons.Default.FilterList,
+                        Icons.Default.Tune,
                         contentDescription = stringResource(R.string.advsearch_title),
                         tint = mc.primaryAccent,
                     )
@@ -671,7 +753,7 @@ private fun AddCardsSheet(
                     text = {
                         Text(
                             stringResource(R.string.deckbuilder_tab_collection),
-                            style = ty.labelMedium,
+                            style = ty.labelLarge,
                             color = if (selectedTab == 0) mc.primaryAccent else mc.textSecondary,
                         )
                     },
@@ -685,7 +767,7 @@ private fun AddCardsSheet(
                     text = {
                         Text(
                             stringResource(R.string.deckdetail_tab_scryfall),
-                            style = ty.labelMedium,
+                            style = ty.labelLarge,
                             color = if (selectedTab == 1) mc.primaryAccent else mc.textSecondary,
                         )
                     },
@@ -706,6 +788,7 @@ private fun AddCardsSheet(
                             format = format,
                             onAdd = { onAdd(row.card.scryfallId) },
                             onRemove = { onRemove(row.card.scryfallId) },
+                            onClick = { onCardClick(row.card.scryfallId) },
                         )
                     }
                     if (uiState.addCardsResults.isEmpty() && !uiState.isSearchingCards) {
@@ -730,6 +813,7 @@ private fun AddCardsSheet(
                             format = format,
                             onAdd = { onAdd(row.card.scryfallId) },
                             onRemove = { onRemove(row.card.scryfallId) },
+                            onClick = { onCardClick(row.card.scryfallId) },
                         )
                     }
                     if (uiState.scryfallResults.isEmpty() && !uiState.isSearchingScryfall) {
@@ -828,6 +912,7 @@ private fun BasicLandRow(
                             text = "$quantityInDeck",
                             style = ty.labelMedium,
                             color = mc.primaryAccent,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                                 .widthIn(min = 24.dp),
@@ -853,6 +938,7 @@ private fun AddCardSheetRow(
     format: com.mmg.manahub.core.domain.model.DeckFormat?,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
+    onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -861,7 +947,11 @@ private fun AddCardSheetRow(
     val isCommander = format?.uniqueCards == true
     val addEnabled = if (isCommander) row.quantityInDeck < 1 else true
 
-    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = mc.surface
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -921,6 +1011,7 @@ private fun AddCardSheetRow(
                             text = "${row.quantityInDeck}",
                             style = ty.labelMedium,
                             color = mc.primaryAccent,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                                 .widthIn(min = 24.dp),

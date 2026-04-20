@@ -13,6 +13,7 @@ data class Player(
     val commanderDamage:  Map<Int, Int>       = emptyMap(),  // sourceId → damage taken
     val customCounters:   List<CustomCounter> = emptyList(),
     val pendingDefeat:    Boolean             = false,
+    val isSurviving:      Boolean             = false,
     val defeated:         Boolean             = false,
     val deckId:           Long?               = null,
     val commander:        Card?               = null,

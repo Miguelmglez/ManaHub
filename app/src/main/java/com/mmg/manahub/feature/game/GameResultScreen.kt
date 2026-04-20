@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -70,18 +71,18 @@ fun GameResultScreen(
                         OutlinedButton(
                             onClick  = onBackHome,
                             modifier = Modifier.weight(1f),
-                            border   = androidx.compose.foundation.BorderStroke(1.dp, winnerTheme.accent)
+                            border   = androidx.compose.foundation.BorderStroke(1.dp, mc.secondaryAccent)
                         ) {
                             Text(
                                 stringResource(R.string.gameresult_back_home),
                                 style = MaterialTheme.magicTypography.titleMedium,
-                                color = winnerTheme.accent
+                                color = mc.secondaryAccent
                                 )
                         }
                         Button(
                             onClick  = onNewGame,
                             modifier = Modifier.weight(1f),
-                            colors   = ButtonDefaults.buttonColors(containerColor = winnerTheme.accent),
+                            colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                         ) {
                             Text(
                                 stringResource(R.string.action_play_again),
@@ -107,10 +108,11 @@ private fun VictoryHeader(gameResult: GameResult, winnerColor: Color) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier            = Modifier.fillMaxWidth(),
     ) {
+        Text(text = "👑", fontSize = 48.sp, textAlign = TextAlign.Center)
         Text(
             text  = stringResource(R.string.gameresult_winner_label),
             style = MaterialTheme.magicTypography.labelLarge,
-            color = winnerColor,
+            color = mc.primaryAccent,
         )
         Spacer(Modifier.height(4.dp))
         Text(
@@ -216,13 +218,6 @@ private fun StandingRow(
                 style = MaterialTheme.magicTypography.bodyMedium,
                 color = mc.textSecondary,
             )
-            if (gameMode == GameMode.COMMANDER && result != null) {
-                Text(
-                    text  = stringResource(R.string.gameresult_cmd_damage_label, result.totalCommanderDamageDealt),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.commanderAccent,
-                )
-            }
         }
     }
 }
@@ -261,13 +256,14 @@ private fun HighlightsSection(gameResult: GameResult) {
                     mostDmg.totalCommanderDamageDealt
                 ),
             )
-        }
-        if (closestGap != null && closestGap <= 5) {
-            HighlightCard(
-                icon  = "\uD83C\uDFAF",
-                label = stringResource(R.string.gameresult_closest_match),
-                value = stringResource(R.string.gameresult_closest_match_desc, closestGap),
-            )
+        } else {
+            if (closestGap != null && closestGap <= 5) {
+                HighlightCard(
+                    icon = "\uD83C\uDFAF",
+                    label = stringResource(R.string.gameresult_closest_match),
+                    value = stringResource(R.string.gameresult_closest_match_desc, closestGap),
+                )
+            }
         }
         if (hasPoison) {
             HighlightCard(

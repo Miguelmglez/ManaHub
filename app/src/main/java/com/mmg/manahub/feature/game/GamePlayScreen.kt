@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -65,6 +66,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -207,6 +209,7 @@ private fun GamePlayContent(
     var showResetDialog by remember { mutableStateOf(false) }
     var showManagePlayersSheet by remember { mutableStateOf(false) }
     var managePlayersInitialTab by remember { mutableIntStateOf(0) }
+    var confirmDefeatPlayerId by remember { mutableStateOf<Int?>(null) }
 
     BackHandler(enabled = uiState.winner == null) {
         showExitDialog = true
@@ -231,7 +234,7 @@ private fun GamePlayContent(
                     onLifeChange = onLifeChange,
                     onCmdPanel = onCmdPanel,
                     onCtrPanel = onCtrPanel,
-                    onConfirmDefeat = onConfirmDefeat,
+                    onConfirmDefeat = { confirmDefeatPlayerId = it },
                     onRevokeDefeat = onRevokeDefeat,
                     onEndTurn = onEndTurn,
                     onToggleLand = onToggleLand,
@@ -293,6 +296,18 @@ private fun GamePlayContent(
             )
         }
 
+        confirmDefeatPlayerId?.let { playerId ->
+            val player = uiState.players.find { it.id == playerId } ?: return@let
+            ConfirmDefeatSheet(
+                player = player,
+                onConfirm = {
+                    onConfirmDefeat(playerId)
+                    confirmDefeatPlayerId = null
+                },
+                onDismiss = { confirmDefeatPlayerId = null }
+            )
+        }
+
         if (showExitDialog) {
             AlertDialog(
                 onDismissRequest = { showExitDialog = false },
@@ -341,20 +356,15 @@ private fun GamePlayContent(
             )
         }
 
-        AnimatedVisibility(
-            visible = uiState.winner != null && !showGameResult,
-            enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 3 },
-        ) {
-            uiState.winner?.let { winner ->
-                WinnerOverlay(
-                    winner = winner,
-                    onViewResults = { showGameResult = true },
-                    onPlayAgain = { onResetGame(); onNewGame() },
-                )
-            }
+
+
         }
 
-        if (showGameResult) {
+    uiState.winner?.let { winner ->
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 3 },
+        ) {
             uiState.gameResult?.let { result ->
                 GameResultScreen(
                     gameResult = result,
@@ -364,6 +374,7 @@ private fun GamePlayContent(
                 )
             }
         }
+
     }
 }
 
@@ -817,6 +828,24 @@ private fun PlayerCard(
                             )
                         }
                     }
+
+                    // ── Confirm Defeat Button: Only if isSurviving ──────────────────
+                    if (player.isSurviving) {
+                        OutlinedButton(
+                            onClick  = onConfirmDefeat,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .offset(y = if (tier == CardTier.LARGE) 48.dp else 36.dp),
+                            border   = BorderStroke(1.dp, theme.accent),
+                        ) {
+                            Text(
+                                stringResource(R.string.game_pending_defeat_confirm),
+                                style = MaterialTheme.magicTypography.labelMedium,
+                                color = theme.accent
+                            )
+                        }
+                    }
                 }
                 // ── Footer: actions + active-player controls (Bottom) ─────────
                 Row(
@@ -827,13 +856,13 @@ private fun PlayerCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val actionSize = when (tier) {
-                        CardTier.LARGE -> 32.dp; CardTier.SMALL -> 24.dp; CardTier.TINY -> 18.dp
+                        CardTier.LARGE -> 28.dp; CardTier.SMALL -> 24.dp; CardTier.TINY -> 18.dp
                     }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (gameMode == GameMode.COMMANDER && tier != CardTier.TINY) {
+                        if (gameMode == GameMode.COMMANDER) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_battle),
                                 contentDescription = stringResource(R.string.game_commander_damage_desc),
@@ -868,7 +897,7 @@ private fun PlayerCard(
 
             // ── Pending defeat overlay ────────────────────────────────────────
             AnimatedVisibility(
-                visible = player.pendingDefeat,
+                visible = player.pendingDefeat && !player.isSurviving,
                 enter = fadeIn(tween(300)),
                 exit = fadeOut(tween(300)),
             ) {
@@ -892,14 +921,19 @@ private fun PlayerCard(
                         ) {
                             Text(
                                 text = stringResource(R.string.game_pending_defeat_confirm),
-                                style = mt.labelSmall
+                                style = mt.labelMedium
                             )
                         }
-                        TextButton(onClick = onRevokeDefeat) {
+                        OutlinedButton(
+                            onClick  = onRevokeDefeat,
+                            colors   = ButtonDefaults.outlinedButtonColors(
+                                contentColor = mc.lifePositive,
+                            ),
+                            border   = BorderStroke(1.dp, mc.lifePositive),
+                        ) {
                             Text(
-                                text = stringResource(R.string.game_pending_defeat_revoke),
-                                color = mc.lifePositive,
-                                style = mt.labelSmall,
+                                stringResource(R.string.game_pending_defeat_revoke),
+                                style = MaterialTheme.magicTypography.labelMedium,
                             )
                         }
                     }
@@ -1210,71 +1244,6 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
                     color = Color.White.copy(alpha = 0.70f),
                     style = mt.labelSmall,
                     textAlign = TextAlign.Center,
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Winner overlay
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun WinnerOverlay(
-    winner: Player,
-    onViewResults: () -> Unit,
-    onPlayAgain: () -> Unit,
-) {
-    val mt = MaterialTheme.magicTypography
-    val mc = MaterialTheme.magicColors
-    val theme = winner.theme
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.85f)),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(32.dp),
-        ) {
-            Text(text = "👑", fontSize = 48.sp, textAlign = TextAlign.Center)
-            Text(
-                text = winner.name,
-                color = theme.accent,
-                style = mt.displayMedium.copy(letterSpacing = 2.sp),
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(R.string.game_wins_label),
-                color = mc.goldMtg,
-                style = mt.titleLarge.copy(letterSpacing = 6.sp),
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(R.string.game_victory_life_remaining, winner.life),
-                color = mc.textSecondary,
-                style = mt.bodyMedium,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onViewResults,
-                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = stringResource(R.string.game_victory_view_results),
-                    color = mc.background,
-                    style = mt.labelLarge
-                )
-            }
-            TextButton(onClick = onPlayAgain) {
-                Text(
-                    text = stringResource(R.string.action_play_again),
-                    color = mc.textSecondary,
-                    style = mt.labelLarge
                 )
             }
         }
@@ -1619,6 +1588,81 @@ private fun CounterRow(
 // ─────────────────────────────────────────────────────────────────────────────
 //  Manage players sheet
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Bottom sheet to confirm player elimination.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConfirmDefeatSheet(
+    player: Player,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "☠",
+                style = MaterialTheme.magicTypography.lifeNumberMd,
+                color = mc.lifeNegative
+            )
+            Text(
+                text = stringResource(R.string.game_pending_defeat_message, player.name),
+                style = MaterialTheme.magicTypography.titleLarge,
+                color = mc.textPrimary,
+                textAlign = TextAlign.Center
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = mc.lifePositive
+                    ),
+                    border = BorderStroke(1.dp, mc.lifePositive.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        stringResource(R.string.game_confirm_defeat_alive),
+                        style = MaterialTheme.magicTypography.labelLarge
+                    )
+                }
+
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = mc.lifeNegative
+                    )
+                ) {
+                    Text(
+                        stringResource(R.string.game_confirm_defeat_defeat),
+                        style = MaterialTheme.magicTypography.labelLarge
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
 
 /**
  * Bottom sheet with three tabs for managing layout, player properties, and turn order.

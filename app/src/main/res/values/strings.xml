@@ -14,6 +14,7 @@
     <string name="action_edit">Edit</string>
     <string name="action_add">Add</string>
     <string name="action_remove">Remove</string>
+    <string name="action_remove_all">Remove all</string>
     <string name="action_search">Search</string>
     <string name="action_close">Close</string>
     <string name="action_back">Back</string>
@@ -200,7 +201,8 @@
     <string name="tagdictionary_thresholds_description">Tags with confidence ≥ %1$d%% are added automatically. Between %2$d%% and %1$d%% they are suggested.</string>
     <string name="tagdictionary_thresholds_auto">Auto-add: %1$d%%</string>
     <string name="tagdictionary_thresholds_suggest">Suggest: %1$d%%</string>
-    <string name="tagdictionary_row_labels">EN: %1$s   ES: %2$s</string>
+    <string name="tagdictionary_row_labels_2">EN: %1$s   ES: %2$s</string>
+    <string name="tagdictionary_row_labels">EN: %1$s</string>
     <string name="tagdictionary_row_patterns">%1$d patterns · %2$s</string>
     <string name="tagdictionary_reset_description">Reset</string>
     <string name="tagdictionary_labels_section">Labels</string>
@@ -422,6 +424,9 @@
     <string name="game_fallen_poison">Poison</string>
     <string name="game_fallen_commander">Commander damage</string>
     <string name="game_pending_defeat_title">Defeat condition met</string>
+    <string name="game_pending_defeat_message">Confirm defeat for %1$s?</string>
+    <string name="game_confirm_defeat_defeat">Defeat</string>
+    <string name="game_confirm_defeat_alive">Alive</string>
     <string name="game_pending_defeat_confirm">Confirm defeat</string>
     <string name="game_pending_defeat_revoke">Still alive!</string>
     <string name="game_commander_button">⚔ Commander damage</string>
@@ -495,7 +500,7 @@
     <string name="gameresult_cmd_damage_label">%1$d cmd</string>
     <string name="gameresult_highlights_title">Highlights</string>
     <string name="gameresult_most_damage">Most damage dealt</string>
-    <string name="gameresult_most_damage_desc">%1$s — %2$d cmd dmg</string>
+    <string name="gameresult_most_damage_desc">%1$s — %2$d commander damage</string>
     <string name="gameresult_closest_match">Closest match</string>
     <string name="gameresult_closest_match_desc">Life difference of %1$d</string>
     <string name="gameresult_poison_elimination">Poison elimination</string>
@@ -507,7 +512,7 @@
     <string name="gameresult_review_subtitle">~2 min · helps improve your deck</string>
     <string name="gameresult_elimination_life">0 life</string>
     <string name="gameresult_elimination_poison">☠ 10 poison</string>
-    <string name="gameresult_elimination_commander">⚔ 21 cmd dmg</string>
+    <string name="gameresult_elimination_commander">⚔ 21 commander damage</string>
 
     <!-- ══════════════════════════════════════════
          SURVEY SCREEN

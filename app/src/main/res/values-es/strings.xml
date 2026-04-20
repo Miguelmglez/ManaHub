@@ -279,6 +279,9 @@
     <string name="game_fallen_poison">Veneno</string>
     <string name="game_fallen_commander">Daño de comandante</string>
     <string name="game_pending_defeat_title">Condición de derrota cumplida</string>
+    <string name="game_pending_defeat_message">¿Confirmar derrota de %1$s?</string>
+    <string name="game_confirm_defeat_defeat">Derrotar</string>
+    <string name="game_confirm_defeat_alive">Vivo</string>
     <string name="game_pending_defeat_confirm">Confirmar derrota</string>
     <string name="game_pending_defeat_revoke">¡Sigo vivo!</string>
     <string name="game_commander_button">⚔ Daño de cmd.</string>
