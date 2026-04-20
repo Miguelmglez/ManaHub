@@ -14,6 +14,9 @@ import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
 import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.settings.PreferencesState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
@@ -48,11 +52,13 @@ class ProfileViewModel @Inject constructor(
     private val gameSessionRepo: GameSessionRepository,
     private val surveyAnswerDao: SurveyAnswerDao,
     private val checkAchievementsUseCase: CheckAchievementsUseCase,
-    private val userPreferencesDataStore: UserPreferencesDataStore
+    private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val authRepository: AuthRepository,
+    private val friendRepository: FriendRepository,
 ) : ViewModel() {
 
     data class UiState(
-        val playerName: String = "Player 1",
+        val playerName: String = "Wizard",
         val playStyle: PlayStyle = PlayStyle.BALANCED,
         val isLoading: Boolean = true,
         val avatarUrl: String? = null,
@@ -81,6 +87,9 @@ class ProfileViewModel @Inject constructor(
         // Achievements
         val achievements: List<Achievement> = emptyList(),
         val preferredCurrency: com.mmg.manahub.core.domain.model.PreferredCurrency = com.mmg.manahub.core.domain.model.PreferredCurrency.USD,
+        // Friends
+        val friendCount: Int = 0,
+        val pendingFriendCount: Int = 0,
     ) {
         val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
     }
@@ -132,12 +141,24 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        userPreferencesDataStore.playerNameFlow
+        // ── Resolved Player Name (Auth > Local) ─────────────────────────────
+        val resolvedNameFlow = combine(
+            userPreferencesDataStore.playerNameFlow,
+            authRepository.sessionState
+        ) { localName, session ->
+            if (session is SessionState.Authenticated) {
+                session.user.nickname ?: localName
+            } else {
+                localName
+            }
+        }.distinctUntilChanged()
+
+        resolvedNameFlow
             .onEach { name -> _uiState.update { it.copy(playerName = name) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        userPreferencesDataStore.playerNameFlow
+        resolvedNameFlow
             .flatMapLatest { name -> gameSessionRepo.observeWins(name) }
             .onEach { wins -> _uiState.update { it.copy(totalWins = wins) } }
             .catch { /* ignore */ }
@@ -153,7 +174,7 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        userPreferencesDataStore.playerNameFlow
+        resolvedNameFlow
             .flatMapLatest { name -> gameSessionRepo.observeCurrentStreak(name) }
             .onEach { streak -> _uiState.update { it.copy(currentStreak = streak) } }
             .catch { /* ignore */ }
@@ -180,7 +201,7 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        userPreferencesDataStore.playerNameFlow
+        resolvedNameFlow
             .flatMapLatest { name -> gameSessionRepo.observeAvgWinTurn(name) }
             .onEach { v -> _uiState.update { it.copy(avgWinTurn = v ?: 0.0) } }
             .catch { /* ignore */ }
@@ -214,6 +235,17 @@ class ProfileViewModel @Inject constructor(
 
         surveyAnswerDao.observeFavoriteWinStyle()
             .onEach { ac -> _uiState.update { it.copy(favoriteWinStyle = ac?.answer ?: "") } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        // ── Friends ───────────────────────────────────────────────────────────
+        friendRepository.observeFriendCount()
+            .onEach { count -> _uiState.update { it.copy(friendCount = count) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        friendRepository.observePendingCount()
+            .onEach { count -> _uiState.update { it.copy(pendingFriendCount = count) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 

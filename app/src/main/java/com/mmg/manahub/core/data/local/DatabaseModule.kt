@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.mmg.manahub.core.data.local.dao.*
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
+import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
 import com.mmg.manahub.feature.news.data.local.NewsDao
 import dagger.Module
 import dagger.Provides
@@ -44,6 +45,7 @@ object DatabaseModule {
                 MIGRATION_20_21,
                 MIGRATION_21_22,
                 MIGRATION_22_23,
+                MIGRATION_23_24,
             )
             .fallbackToDestructiveMigration()
             .build()
@@ -58,4 +60,5 @@ object DatabaseModule {
     @Provides fun provideTournamentDao(db: MtgDatabase):   TournamentDao   = db.tournamentDao()
     @Provides fun provideNewsDao(db: MtgDatabase):         NewsDao         = db.newsDao()
     @Provides fun provideDraftSetDao(db: MtgDatabase):   DraftSetDao     = db.draftSetDao()
+    @Provides fun provideFriendDao(db: MtgDatabase):     FriendDao       = db.friendDao()
 }

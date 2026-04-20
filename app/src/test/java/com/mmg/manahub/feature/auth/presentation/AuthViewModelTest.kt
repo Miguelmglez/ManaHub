@@ -18,6 +18,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.anyNullable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -341,7 +342,7 @@ class AuthViewModelTest {
 
     @Test
     fun `given new user when signUpWithEmail then uiState transitions Loading then Success`() = runTest {
-        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Success(dummyAuthUser)
+        coEvery { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) } returns AuthResult.Success(dummyAuthUser)
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
@@ -354,7 +355,7 @@ class AuthViewModelTest {
 
     @Test
     fun `given email confirmation required when signUpWithEmail then uiState emits EmailConfirmationSent`() = runTest {
-        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
+        coEvery { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
@@ -367,7 +368,7 @@ class AuthViewModelTest {
 
     @Test
     fun `given email already in use when signUpWithEmail then uiState emits Error with registration message`() = runTest {
-        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.EmailAlreadyInUse)
+        coEvery { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) } returns AuthResult.Error(AuthError.EmailAlreadyInUse)
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
@@ -381,7 +382,7 @@ class AuthViewModelTest {
 
     @Test
     fun `given network error when signUpWithEmail then uiState emits Error with network message`() = runTest {
-        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.NetworkError)
+        coEvery { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) } returns AuthResult.Error(AuthError.NetworkError)
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
@@ -395,7 +396,7 @@ class AuthViewModelTest {
 
     @Test
     fun `given unknown error when signUpWithEmail then uiState emits generic error message not raw server text`() = runTest {
-        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.Unknown("pg: duplicate key"))
+        coEvery { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) } returns AuthResult.Error(AuthError.Unknown("pg: duplicate key"))
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
@@ -417,7 +418,7 @@ class AuthViewModelTest {
             assertEquals("Please enter a nickname.", errorState.message)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) }
     }
 
     @Test
@@ -430,13 +431,13 @@ class AuthViewModelTest {
             assertEquals("Nickname must be 30 characters or less.", errorState.message)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) }
     }
 
     @Test
     fun `given nickname with exactly 30 chars when signUpWithEmail then validation passes`() = runTest {
         val exactly30 = "A".repeat(30)
-        coEvery { signUpWithEmailUseCase(any(), any(), exactly30) } returns AuthResult.Success(dummyAuthUser)
+        coEvery { signUpWithEmailUseCase(any(), any(), exactly30, anyNullable()) } returns AuthResult.Success(dummyAuthUser)
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
@@ -457,7 +458,7 @@ class AuthViewModelTest {
             assertEquals("Nickname can only contain letters, numbers, spaces and basic punctuation.", errorState.message)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) }
     }
 
     @Test
@@ -470,7 +471,7 @@ class AuthViewModelTest {
             assertEquals("Password must include uppercase, lowercase, a number and a symbol", errorState.message)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) }
     }
 
     @Test
@@ -814,7 +815,7 @@ class AuthViewModelTest {
 
     @Test
     fun `given EmailConfirmationSent state when resetUiState then uiState becomes Idle`() = runTest {
-        coEvery { signUpWithEmailUseCase(any(), any(), any()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
+        coEvery { signUpWithEmailUseCase(any(), any(), any(), anyNullable()) } returns AuthResult.Error(AuthError.EmailConfirmationRequired)
         viewModel.signUpWithEmail("confirm@example.com", "Password1!", "Hero")
         advanceUntilIdle()
         assertEquals(AuthUiState.EmailConfirmationSent, viewModel.uiState.value)
