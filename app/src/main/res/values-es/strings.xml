@@ -337,16 +337,18 @@
     <string name="survey_save_button">Guardar →</string>
     <string name="survey_free_text_hint">Notas opcionales sobre la partida…</string>
 
-    <!-- Avatar picker -->
-    <string name="avatar_picker_title">Elige tu Avatar</string>
-    <string name="avatar_picker_filter_label">Filtrar por color</string>
-    <string name="avatar_picker_confirm">Usar este arte</string>
-    <string name="avatar_picker_remove">Quitar foto</string>
-    <string name="avatar_picker_edit_hint">Editar foto de perfil</string>
+    <!-- Profile Editing -->
+    <string name="profile_edit_title">Editar Perfil</string>
+    <string name="profile_edit_avatar_label">Avatar de Perfil</string>
+    <string name="profile_edit_avatar_filter_label">Filtrar planeswalkers por color</string>
+    <string name="profile_edit_avatar_remove">Quitar foto</string>
+
+    <string name="profile_edit_confirm">Guardar Cambios</string>
 
     <!-- Game setup -->
+    <string name="game_setup_player_name_label">Nombre del jugador</string>
     <string name="game_setup_you_badge">Tú</string>
-    <string name="game_setup_default_player_name">Jugador 1</string>
+    <string name="game_setup_default_player_name">Wizard</string>
     <string name="game_setup_set_name_hint">· Pon tu nombre en el Perfil</string>
 
     <!-- Survey questions -->
@@ -784,5 +786,8 @@
     <string name="auth_delete_account_confirm_body">¿Estás seguro? Esta acción no se puede deshacer. Todos tus datos de sincronización se eliminarán permanentemente.</string>
     <string name="auth_delete_account_confirm_btn">Borrar cuenta</string>
     <string name="auth_email_confirmation_sent">¡Revisa tu bandeja de entrada para confirmar tu email!</string>
+
+    <!-- Auth field validation -->
+    <string name="auth_error_name_too_short">El nombre es demasiado corto</string>
 
 </resources>

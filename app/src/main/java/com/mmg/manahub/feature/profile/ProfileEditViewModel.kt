@@ -14,9 +14,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class AvatarPickerViewModel @Inject constructor(
+class ProfileEditViewModel @Inject constructor(
     private val scryfallRemoteDataSource: ScryfallRemoteDataSource,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val authRepository: com.mmg.manahub.feature.auth.domain.repository.AuthRepository,
 ) : ViewModel() {
 
     data class PlaneswalkerArt(
@@ -34,7 +35,13 @@ class AvatarPickerViewModel @Inject constructor(
         val pendingSelection: String? = null,
         val hasMore: Boolean = false,
         val currentPage: Int = 1,
-    )
+        // Name editing
+        val currentName: String = "",
+        val pendingName: String = "",
+    ) {
+        val isNameValid: Boolean get() = pendingName.isNotBlank() && pendingName.length <= 30
+        val hasChanges: Boolean get() = (pendingName != currentName && isNameValid) || pendingSelection != null
+    }
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -42,9 +49,25 @@ class AvatarPickerViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val savedUrl = userPreferencesDataStore.avatarUrlFlow.first()
-            _uiState.update { it.copy(currentAvatarUrl = savedUrl) }
+            val localName = userPreferencesDataStore.playerNameFlow.first()
+            
+            // Priority: Authenticated Nickname > Local Name
+            val currentUser = authRepository.getCurrentUser()
+            val resolvedName = currentUser?.nickname ?: localName
+            
+            _uiState.update { it.copy(
+                currentAvatarUrl = savedUrl,
+                currentName = resolvedName,
+                pendingName = resolvedName
+            ) }
         }
         loadPlaneswalkers()
+    }
+
+    fun onNameChange(newName: String) {
+        if (newName.length <= 30) {
+            _uiState.update { it.copy(pendingName = newName) }
+        }
     }
 
     fun toggleColorFilter(color: String) {
@@ -60,13 +83,10 @@ class AvatarPickerViewModel @Inject constructor(
     }
 
     fun loadNextPage() {
-        // Guard and page-increment must both happen atomically via update{} so
-        // that two rapid taps cannot both pass the isLoading check and both
-        // increment the page counter before either coroutine sets isLoading=true.
         var shouldLoad = false
         _uiState.update { s ->
             if (!s.hasMore || s.isLoading) {
-                s // leave state unchanged; shouldLoad stays false
+                s
             } else {
                 shouldLoad = true
                 s.copy(currentPage = s.currentPage + 1, isLoading = true)
@@ -118,22 +138,40 @@ class AvatarPickerViewModel @Inject constructor(
         _uiState.update { it.copy(pendingSelection = artUrl) }
     }
 
-    fun confirmSelection() {
-        val url = _uiState.value.pendingSelection ?: return
+    fun confirmChanges(onNicknameUpdate: ((String) -> Unit)? = null) {
+        val state = _uiState.value
+        if (!state.isNameValid) return
+
         viewModelScope.launch {
-            userPreferencesDataStore.saveAvatarUrl(url)
-            _uiState.update { it.copy(currentAvatarUrl = url, pendingSelection = null) }
+            // Save Name
+            if (state.pendingName != state.currentName) {
+                userPreferencesDataStore.savePlayerName(state.pendingName)
+                onNicknameUpdate?.invoke(state.pendingName)
+            }
+            
+            // Save Avatar locally and push to Supabase
+            state.pendingSelection?.let { url ->
+                userPreferencesDataStore.saveAvatarUrl(url)
+                authRepository.updateAvatarUrl(url)
+            }
+            
+            _uiState.update { it.copy(
+                currentName = it.pendingName,
+                currentAvatarUrl = it.pendingSelection ?: it.currentAvatarUrl,
+                pendingSelection = null
+            ) }
         }
     }
 
     fun cancelSelection() {
-        _uiState.update { it.copy(pendingSelection = null) }
+        _uiState.update { it.copy(pendingSelection = null, pendingName = it.currentName) }
     }
 
     fun removeAvatar() {
         viewModelScope.launch {
             userPreferencesDataStore.saveAvatarUrl(null)
-            _uiState.update { it.copy(currentAvatarUrl = null) }
+            authRepository.updateAvatarUrl(null)
+            _uiState.update { it.copy(currentAvatarUrl = null, pendingSelection = null) }
         }
     }
 

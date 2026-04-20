@@ -286,3 +286,5 @@ $RECYCLE.BIN/
 /SUPABASE_AUTH_SETUP.md
 
 /CLAUDE.md
+/.claude/worktrees/agent-abd89b3b/
+/app/supabase/migrations/20260421_friends.sql

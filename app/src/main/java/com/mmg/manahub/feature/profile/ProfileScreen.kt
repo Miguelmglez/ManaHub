@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -69,19 +70,27 @@ fun ProfileScreen(
     authViewModel: AuthViewModel = hiltViewModel(),
     onSettingsClick: () -> Unit,
     onStatsClick: () -> Unit,
+    onFriendsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
-    var showAvatarPicker by remember { mutableStateOf(false) }
+    var showProfileEdit by remember { mutableStateOf(false) }
     var showFeedbackSheet by remember { mutableStateOf(false) }
     var showLoginSheet by remember { mutableStateOf(false) }
     var loginSheetInitialTab by remember { mutableIntStateOf(0) }
     var showAccountSheet by remember { mutableStateOf(false) }
 
-    if (showAvatarPicker) {
-        AvatarPickerSheet(onDismiss = { showAvatarPicker = false })
+    if (showProfileEdit) {
+        ProfileEditSheet(
+            onDismiss = { showProfileEdit = false },
+            onNicknameUpdate = if (sessionState is SessionState.Authenticated) {
+                authViewModel::updateNickname
+            } else {
+                null
+            }
+        )
     }
 
     if (showFeedbackSheet) {
@@ -92,6 +101,8 @@ fun ProfileScreen(
         LoginSheet(
             authViewModel = authViewModel,
             initialTab = loginSheetInitialTab,
+            initialNickname = uiState.playerName,
+            initialAvatarUrl = uiState.avatarUrl,
             onDismiss = { showLoginSheet = false },
         )
     }
@@ -128,6 +139,7 @@ fun ProfileScreen(
     // The sessionState Flow will automatically emit Unauthenticated after the account is removed.
     LaunchedEffect(authUiState) {
         if (authUiState is AuthUiState.AccountDeleted) {
+            showAccountSheet = false
             authViewModel.resetUiState()
         }
     }
@@ -154,7 +166,7 @@ fun ProfileScreen(
                         color = mc.textPrimary,
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                   /* Icon(
+                    Icon(
                         imageVector = Icons.Default.AccountCircle,
                         contentDescription = "Account",
                         tint = if (sessionState is SessionState.Authenticated) mc.primaryAccent else mc.textPrimary,
@@ -162,7 +174,7 @@ fun ProfileScreen(
                             .padding(end = 16.dp)
                             .size(24.dp)
                             .clickable { showAccountSheet = true },
-                    )*/
+                    )
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
@@ -189,14 +201,21 @@ fun ProfileScreen(
                 ProfileHeroSection(
                     name = uiState.playerName,
                     avatarUrl = uiState.avatarUrl,
-                    onAvatarClick = { showAvatarPicker = true },
-                    savePlayerName = viewModel::savePlayerName,
-                    onNicknameUpdate = if (sessionState is SessionState.Authenticated) {
-                        authViewModel::updateNickname
-                    } else {
-                        null
-                    },
+                    gameTag = (sessionState as? SessionState.Authenticated)?.user?.gameTag,
+                    onEditClick = { showProfileEdit = true },
                 )
+            }
+
+            // ── Friends ───────────────────────────────────────────────────────
+            if (sessionState is SessionState.Authenticated){
+                item {
+                    FriendsSummaryRow(
+                        friendCount = uiState.friendCount,
+                        pendingCount = uiState.pendingFriendCount,
+                        onClick = onFriendsClick,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
             }
 
             // ── KPI grid ──────────────────────────────────────────────────────
@@ -207,7 +226,7 @@ fun ProfileScreen(
                     mostValuableColor = uiState.mostValuableColor,
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
-                        //.clickable { onStatsClick() },
+                    //.clickable { onStatsClick() },
                 )
             }
             /*
@@ -241,22 +260,22 @@ fun ProfileScreen(
                                                     }
                                                 }*/
 
-           /* // ── Recent games ──────────────────────────────────────────────────
-            if (uiState.recentSessions.isNotEmpty()) {
-                item {
-                    SectionTitle(
-                        text = stringResource(R.string.profile_recent_games),
-                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
-                    )
-                }
-                items(uiState.recentSessions) { session ->
-                    RecentGameRow(
-                        session = session,
-                        playerName = uiState.playerName,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
-                    )
-                }
-            }*/
+            /* // ── Recent games ──────────────────────────────────────────────────
+             if (uiState.recentSessions.isNotEmpty()) {
+                 item {
+                     SectionTitle(
+                         text = stringResource(R.string.profile_recent_games),
+                         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
+                     )
+                 }
+                 items(uiState.recentSessions) { session ->
+                     RecentGameRow(
+                         session = session,
+                         playerName = uiState.playerName,
+                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
+                     )
+                 }
+             }*/
 
             // ── Collection summary ────────────────────────────────────────────
             uiState.collectionStats?.let { stats ->
@@ -291,14 +310,11 @@ fun ProfileScreen(
 private fun ProfileHeroSection(
     name: String,
     avatarUrl: String?,
-    onAvatarClick: () -> Unit,
-    savePlayerName: (String) -> Unit,
-    /** When non-null, the name edit also triggers a Supabase nickname update (fire-and-forget). */
-    onNicknameUpdate: ((String) -> Unit)? = null,
+    /** Server-generated game tag (e.g. "#A3KX9Z"). Displayed as a badge next to the name. */
+    gameTag: String? = null,
+    onEditClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    var localName by remember(name) { mutableStateOf(name) }
-    val focusManager = LocalFocusManager.current
 
     // State to track the image's aspect ratio (defaults to 16:9)
     var imageRatio by remember(avatarUrl) { mutableFloatStateOf(1.77f) }
@@ -310,7 +326,8 @@ private fun ProfileHeroSection(
             // Use a dynamic aspect ratio constrained to reasonable limits
             .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
             .animateContentSize()
-            .clip(RoundedCornerShape(16.dp)),
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onEditClick() },
     ) {
         // Background: planeswalker art or fallback gradient
         if (avatarUrl != null) {
@@ -328,15 +345,12 @@ private fun ProfileHeroSection(
                         imageRatio = size.width / size.height
                     }
                 },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { onAvatarClick() },
+                modifier = Modifier.fillMaxSize(),
             )
         } else {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable { onAvatarClick() }
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
@@ -375,59 +389,48 @@ private fun ProfileHeroSection(
         )
 
 
-        // Name + play style badge — bottom
-        Column(
+        // Name + game tag badge — bottom
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp, top = 0.dp)
+                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            BasicTextField(
-                value = localName,
-                onValueChange = { newName ->
-                    localName = newName
-                    // Updates the local player name on every keystroke
-                    savePlayerName(newName)
-                    // Fire-and-forget Supabase nickname update when the user is authenticated.
-                    // The local save always happens; the Supabase update is best-effort.
-                    onNicknameUpdate?.invoke(newName)
-                },
-                // Apply the same text style used in the original Text composable
-                textStyle = TextStyle(
+            Text(
+                text = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) },
+                style = TextStyle(
                     fontFamily = MarcellusFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 26.sp,
                     color = Color.White,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
                 ),
-                cursorBrush = SolidColor(Color.White), // Cursor color while typing
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done // Shows 'Done' action instead of 'Enter'
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        focusManager.clearFocus() // Dismiss keyboard and remove cursor
-                    }
-                ),
-                decorationBox = { innerTextField ->
-                    // Placeholder text shown when the field is empty
-                    if (name.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.game_setup_default_player_name),
-                            style = TextStyle(
-                                fontFamily = MarcellusFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 26.sp,
-                                color = Color.White.copy(alpha = 0.5f), // Más transparente
-                                letterSpacing = 1.sp
-                            )
-                        )
-                    }
-                    innerTextField()
-                }
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
+
+            // Game tag badge — displayed only when the user is authenticated and has a tag.
+            if (gameTag != null) {
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = mc.primaryAccent.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(6.dp),
+                        )
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = gameTag,
+                        color = mc.primaryAccent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = MarcellusFontFamily,
+                    )
+                }
+            }
         }
     }
 }
@@ -456,17 +459,23 @@ private fun ProfileKpiSection(
                 KpiCell(
                     stringResource(R.string.profile_stat_games),
                     uiState.totalGames.toString(),
-                    Modifier.weight(1f).fillMaxHeight()
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 )
                 KpiCell(
                     stringResource(R.string.profile_stat_wins),
                     uiState.totalWins.toString(),
-                    Modifier.weight(1f).fillMaxHeight()
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 )
                 KpiCell(
                     stringResource(R.string.profile_stat_win_pct),
                     "${(uiState.winRate * 100).roundToInt()}%",
-                    Modifier.weight(1f).fillMaxHeight()
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 )
             }
         }
@@ -480,18 +489,24 @@ private fun ProfileKpiSection(
             KpiCell(
                 stringResource(R.string.profile_stat_unique_cards),
                 (uiState.collectionStats?.uniqueCards ?: 0).toString(),
-                Modifier.weight(1f).fillMaxHeight(),
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
                 accent = true
             )
             ColorStatCard(
                 label = stringResource(R.string.profile_stat_fav_color),
                 colorCode = favouriteColor,
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             )
             ColorStatCard(
                 label = stringResource(R.string.profile_stat_top_value),
                 colorCode = mostValuableColor,
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             )
         }
     }
@@ -1121,6 +1136,65 @@ private fun SendFeedbackRow(
                 color = mc.textPrimary,
                 modifier = Modifier.weight(1f),
             )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FriendsSummaryRow(
+    friendCount: Int,
+    pendingCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Group,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = stringResource(R.string.friends_title),
+                style = MaterialTheme.magicTypography.bodyMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            if (pendingCount > 0) {
+                Badge(containerColor = mc.primaryAccent) {
+                    Text(
+                        pendingCount.toString(),
+                        color = Color.White,
+                        style = MaterialTheme.magicTypography.labelSmall,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = friendCount.toString(),
+                style = MaterialTheme.magicTypography.bodySmall,
+                color = mc.textSecondary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,

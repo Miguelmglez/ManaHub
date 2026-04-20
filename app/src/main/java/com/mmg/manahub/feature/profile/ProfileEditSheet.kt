@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,6 +36,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -44,12 +48,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,15 +66,17 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AvatarPickerSheet(
+fun ProfileEditSheet(
     onDismiss: () -> Unit,
-    viewModel: AvatarPickerViewModel = hiltViewModel(),
+    onNicknameUpdate: ((String) -> Unit)? = null,
+    viewModel: ProfileEditViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mc = MaterialTheme.magicColors
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.magicColors.backgroundSecondary,
+        containerColor = mc.backgroundSecondary,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         contentWindowInsets = { WindowInsets(0) }
     ) {
@@ -91,22 +95,68 @@ fun AvatarPickerSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    stringResource(R.string.avatar_picker_title),
+                    stringResource(R.string.profile_edit_title),
                     style = MaterialTheme.magicTypography.titleMedium,
-                    color = MaterialTheme.magicColors.textPrimary,
+                    color = mc.textPrimary,
                 )
                 if (uiState.currentAvatarUrl != null) {
                     TextButton(onClick = {
                         viewModel.removeAvatar()
-                        onDismiss()
                     }) {
                         Text(
-                            stringResource(R.string.avatar_picker_remove),
-                            color = MaterialTheme.magicColors.lifeNegative,
+                            stringResource(R.string.profile_edit_avatar_remove),
+                            color = mc.lifeNegative,
                             style = MaterialTheme.magicTypography.labelMedium,
                         )
                     }
                 }
+            }
+
+            // ── Name Edit Field ──────────────────────────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    stringResource(R.string.game_setup_player_name_label),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textDisabled,
+                )
+                OutlinedTextField(
+                    value = uiState.pendingName,
+                    onValueChange = viewModel::onNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.magicTypography.bodyMedium,
+                    isError = !uiState.isNameValid,
+                    supportingText = {
+                        if (!uiState.isNameValid) {
+                            Text(
+                                stringResource(R.string.auth_error_name_too_short), // Reusing error or creating new one
+                                style = MaterialTheme.magicTypography.labelSmall,
+                                color = mc.lifeNegative
+                            )
+                        } else {
+                            Text(
+                                "${uiState.pendingName.length}/30",
+                                style = MaterialTheme.magicTypography.labelSmall,
+                                color = mc.textDisabled,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                            )
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = mc.textPrimary,
+                        unfocusedTextColor = mc.textPrimary,
+                        cursorColor = mc.primaryAccent,
+                        focusedBorderColor = mc.primaryAccent,
+                        unfocusedBorderColor = mc.surfaceVariant,
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
             }
 
             // ── Color filters ─────────────────────────────────────────────────
@@ -115,9 +165,9 @@ fun AvatarPickerSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    stringResource(R.string.avatar_picker_filter_label),
+                    stringResource(R.string.profile_edit_avatar_filter_label),
                     style = MaterialTheme.magicTypography.labelSmall,
-                    color = MaterialTheme.magicColors.textDisabled,
+                    color = mc.textDisabled,
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -135,7 +185,7 @@ fun AvatarPickerSheet(
                     )
                     listOf("W", "U", "B", "R", "G", "C").forEach { color ->
                         val isSelected = uiState.selectedColors.contains(color)
-                        val manaColor = manaColorFor(color, MaterialTheme.magicColors)
+                        val manaColor = manaColorFor(color, mc)
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
@@ -158,7 +208,7 @@ fun AvatarPickerSheet(
 
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 8.dp),
-                color = MaterialTheme.magicColors.surfaceVariant,
+                color = mc.surfaceVariant,
             )
 
             // ── Artwork grid ──────────────────────────────────────────────────
@@ -191,7 +241,7 @@ fun AvatarPickerSheet(
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator(
-                            color = MaterialTheme.magicColors.primaryAccent,
+                            color = mc.primaryAccent,
                         )
                     }
                 }
@@ -205,7 +255,7 @@ fun AvatarPickerSheet(
                     ) {
                         Text(
                             stringResource(R.string.error_scryfall),
-                            color = MaterialTheme.magicColors.textSecondary,
+                            color = mc.textSecondary,
                         )
                     }
                 }
@@ -245,7 +295,7 @@ fun AvatarPickerSheet(
                                 ) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(24.dp),
-                                        color = MaterialTheme.magicColors.primaryAccent,
+                                        color = mc.primaryAccent,
                                         strokeWidth = 2.dp,
                                     )
                                 }
@@ -256,7 +306,7 @@ fun AvatarPickerSheet(
             }
 
             // ── Confirm bar ───────────────────────────────────────────────────
-            AnimatedVisibility(visible = uiState.pendingSelection != null) {
+            AnimatedVisibility(visible = uiState.hasChanges) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -267,25 +317,26 @@ fun AvatarPickerSheet(
                         onClick = viewModel::cancelSelection,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.magicColors.surfaceVariant),
+                        border = BorderStroke(1.dp, mc.surfaceVariant),
                     ) {
                         Text(
                             stringResource(R.string.action_cancel),
-                            color = MaterialTheme.magicColors.textSecondary,
+                            color = mc.textSecondary,
                         )
                     }
                     Button(
                         onClick = {
-                            viewModel.confirmSelection()
+                            viewModel.confirmChanges(onNicknameUpdate)
                             onDismiss()
                         },
+                        enabled = uiState.isNameValid,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.magicColors.primaryAccent,
+                            containerColor = mc.primaryAccent,
                         ),
                     ) {
-                        Text(stringResource(R.string.avatar_picker_confirm))
+                        Text(stringResource(R.string.profile_edit_confirm))
                     }
                 }
             }
@@ -295,10 +346,11 @@ fun AvatarPickerSheet(
 
 @Composable
 private fun ArtworkTile(
-    art: AvatarPickerViewModel.PlaneswalkerArt,
+    art: ProfileEditViewModel.PlaneswalkerArt,
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -308,7 +360,7 @@ private fun ArtworkTile(
                 if (isSelected) {
                     Modifier.border(
                         width = 3.dp,
-                        color = MaterialTheme.magicColors.primaryAccent,
+                        color = mc.primaryAccent,
                         shape = RoundedCornerShape(12.dp)
                     )
                 } else Modifier
@@ -324,26 +376,5 @@ private fun ArtworkTile(
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
-
-        // Gradient + name at bottom
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
-                    ),
-                )
-                .padding(horizontal = 6.dp, vertical = 4.dp),
-        ) {
-            Text(
-                text = art.name,
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
     }
 }

@@ -8,6 +8,9 @@ import com.mmg.manahub.core.data.local.dao.*
 import com.mmg.manahub.core.data.local.entity.*
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
 import com.mmg.manahub.feature.draft.data.local.DraftSetEntity
+import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
+import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
+import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
 import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
 import com.mmg.manahub.feature.news.data.local.NewsDao
@@ -30,8 +33,10 @@ import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
         NewsVideoEntity::class,
         ContentSourceEntity::class,
         DraftSetEntity::class,
+        FriendEntity::class,
+        FriendRequestEntity::class,
     ],
-    version = 23,
+    version = 24,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -46,6 +51,7 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun tournamentDao():     TournamentDao
     abstract fun newsDao():           NewsDao
     abstract fun draftSetDao():      DraftSetDao
+    abstract fun friendDao():        FriendDao
 }
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -475,6 +481,32 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
                 is_enabled INTEGER NOT NULL DEFAULT 1,
                 is_default INTEGER NOT NULL DEFAULT 1,
                 icon_url   TEXT
+            )
+        """.trimIndent())
+    }
+}
+
+val MIGRATION_23_24 = object : Migration(23, 24) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS friends (
+                id                TEXT NOT NULL PRIMARY KEY,
+                friend_user_id    TEXT NOT NULL,
+                friend_nickname   TEXT NOT NULL,
+                friend_game_tag   TEXT NOT NULL,
+                friend_avatar_url TEXT,
+                cached_at         INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS friend_requests (
+                id              TEXT NOT NULL PRIMARY KEY,
+                from_user_id    TEXT NOT NULL,
+                from_nickname   TEXT NOT NULL,
+                from_game_tag   TEXT NOT NULL,
+                from_avatar_url TEXT,
+                created_at      INTEGER NOT NULL,
+                cached_at       INTEGER NOT NULL
             )
         """.trimIndent())
     }
