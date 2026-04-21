@@ -6,7 +6,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:name="com.mmg.manahub.app.MagicFolderApp"
+        android:name="com.mmg.manahub.app.ManaHubApp"
         android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -15,7 +15,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MagicFolder">
+        android:theme="@style/Theme.ManaHub">
 
         <activity
             android:name="com.mmg.manahub.app.MainActivity"

@@ -544,9 +544,15 @@
     <string name="settings_open_scryfall">Abrir web de Scryfall</string>
 
     <!-- TEMAS -->
-    <string name="theme_neon_void">Neon Void</string>
+    <string name="theme_neon_void">Neón</string>
     <string name="theme_grimoire">Grimorio</string>
     <string name="theme_cosmos">Cosmos</string>
+    <string name="theme_shadow_essence">Sombra</string>
+    <string name="theme_forest_murmur">Bosque</string>
+    <string name="theme_mystic_echo">Eco</string>
+    <string name="theme_gilded_silver">Plata</string>
+    <string name="theme_ancient_oak">Roble</string>
+    <string name="theme_obsidian_chrome">Cromo</string>
 
     <!-- SIDEBOARD RECOMMENDATIONS -->
     <string name="sideboard_rec_title">Sugerencias para el banquillo</string>

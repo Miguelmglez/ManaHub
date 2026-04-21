@@ -160,12 +160,19 @@ class UserPreferencesDataStore @Inject constructor(
     val themeFlow: Flow<AppTheme> = context.userPrefsDataStore.data
         .map { prefs ->
             when (prefs[KEY_APP_THEME]) {
-                "MEDIEVAL_GRIMOIRE" -> AppTheme.MedievalGrimoire
                 "ARCANE_COSMOS"     -> AppTheme.ArcaneCosmos
-                else                -> AppTheme.NeonVoid
+                "NEON_VOID"         -> AppTheme.NeonVoid
+                "MEDIEVAL_GRIMOIRE" -> AppTheme.MedievalGrimoire
+                "SHADOW_ESSENCE"    -> AppTheme.ShadowEssence
+                "FOREST_MURMUR"     -> AppTheme.ForestMurmur
+                "MYSTIC_ECHO"       -> AppTheme.MysticEcho
+                "GILDED_SILVER"     -> AppTheme.GildedSilver
+                "ANCIENT_OAK"       -> AppTheme.AncientOak
+                "OBSIDIAN_CHROME"   -> AppTheme.ObsidianChrome
+                else                -> AppTheme.ArcaneCosmos
             }
         }
-        .catch { emit(AppTheme.NeonVoid) }
+        .catch { emit(AppTheme.ArcaneCosmos) }
 
     suspend fun savePlayerName(name: String) {
         context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
@@ -270,9 +277,15 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun saveTheme(theme: AppTheme) {
         context.userPrefsDataStore.edit { prefs ->
             prefs[KEY_APP_THEME] = when (theme) {
-                is AppTheme.NeonVoid         -> "NEON_VOID"
-                is AppTheme.MedievalGrimoire -> "MEDIEVAL_GRIMOIRE"
-                is AppTheme.ArcaneCosmos     -> "ARCANE_COSMOS"
+                AppTheme.NeonVoid         -> "NEON_VOID"
+                AppTheme.MedievalGrimoire -> "MEDIEVAL_GRIMOIRE"
+                AppTheme.ArcaneCosmos     -> "ARCANE_COSMOS"
+                AppTheme.ShadowEssence    -> "SHADOW_ESSENCE"
+                AppTheme.ForestMurmur     -> "FOREST_MURMUR"
+                AppTheme.MysticEcho       -> "MYSTIC_ECHO"
+                AppTheme.GildedSilver     -> "GILDED_SILVER"
+                AppTheme.AncientOak       -> "ANCIENT_OAK"
+                AppTheme.ObsidianChrome   -> "OBSIDIAN_CHROME"
             }
         }
     }

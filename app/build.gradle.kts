@@ -152,6 +152,7 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.coroutines.test)
+    androidTestImplementation(libs.turbine)
 
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)
