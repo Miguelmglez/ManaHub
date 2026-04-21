@@ -12,9 +12,15 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.AncientOakBackground
 import com.mmg.manahub.core.ui.components.ArcaneCosmosBackground
+import com.mmg.manahub.core.ui.components.ForestMurmurBackground
+import com.mmg.manahub.core.ui.components.GildedSilverBackground
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MedievalGrimoireBackground
+import com.mmg.manahub.core.ui.components.MysticEchoBackground
+import com.mmg.manahub.core.ui.components.ObsidianChromeBackground
+import com.mmg.manahub.core.ui.components.ShadowEssenceBackground
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  CompositionLocals
@@ -63,12 +69,24 @@ fun MagicTheme(
         is AppTheme.NeonVoid         -> NeonVoidColors
         is AppTheme.MedievalGrimoire -> MedievalGrimoireColors
         is AppTheme.ArcaneCosmos     -> ArcaneCosmosColors
+        is AppTheme.ShadowEssence    -> ShadowEssenceColors
+        is AppTheme.ForestMurmur     -> ForestMurmurColors
+        is AppTheme.MysticEcho       -> MysticEchoColors
+        is AppTheme.GildedSilver     -> GildedSilverColors
+        is AppTheme.AncientOak       -> AncientOakColors
+        is AppTheme.ObsidianChrome   -> ObsidianChromeColors
     }
 
     val magicTypography = when (theme) {
         is AppTheme.NeonVoid         -> NeonVoidTypography
         is AppTheme.MedievalGrimoire -> NeonVoidTypography
         is AppTheme.ArcaneCosmos     -> NeonVoidTypography
+        is AppTheme.ShadowEssence    -> NeonVoidTypography
+        is AppTheme.ForestMurmur     -> NeonVoidTypography
+        is AppTheme.MysticEcho       -> NeonVoidTypography
+        is AppTheme.GildedSilver     -> NeonVoidTypography
+        is AppTheme.AncientOak       -> NeonVoidTypography
+        is AppTheme.ObsidianChrome   -> NeonVoidTypography
     }
 
     CompositionLocalProvider(
@@ -158,5 +176,11 @@ fun ThemeBackground(
         is AppTheme.NeonVoid         -> HexGridBackground(modifier = modifier)
         is AppTheme.MedievalGrimoire -> MedievalGrimoireBackground(modifier = modifier)
         is AppTheme.ArcaneCosmos     -> ArcaneCosmosBackground(modifier = modifier)
+        is AppTheme.ForestMurmur     -> ForestMurmurBackground(modifier = modifier)
+        is AppTheme.MysticEcho       -> MysticEchoBackground(modifier = modifier)
+        is AppTheme.GildedSilver     -> GildedSilverBackground(modifier = modifier)
+        is AppTheme.AncientOak       -> AncientOakBackground(modifier = modifier)
+        is AppTheme.ShadowEssence    -> ShadowEssenceBackground(modifier = modifier)
+        is AppTheme.ObsidianChrome   -> ObsidianChromeBackground(modifier = modifier)
     }
 }

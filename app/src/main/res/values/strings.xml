@@ -766,9 +766,15 @@
     <!-- ══════════════════════════════════════════
          THEMES
     ═══════════════════════════════════════════ -->
-    <string name="theme_neon_void">Neon Void</string>
+    <string name="theme_neon_void">Neon</string>
     <string name="theme_grimoire">Grimoire</string>
     <string name="theme_cosmos">Cosmos</string>
+    <string name="theme_shadow_essence">Shadow</string>
+    <string name="theme_forest_murmur">Forest</string>
+    <string name="theme_mystic_echo">Echo</string>
+    <string name="theme_gilded_silver">Gilded</string>
+    <string name="theme_ancient_oak">Oak</string>
+    <string name="theme_obsidian_chrome">Chrome</string>
 
     <!-- ══════════════════════════════════════════
          SIDEBOARD RECOMMENDATIONS

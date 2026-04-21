@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -426,37 +427,56 @@ private fun ThemeSelectorSection(
             style = MaterialTheme.magicTypography.titleMedium,
             color = mc.textPrimary,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ThemeTile(
-                name = stringResource(R.string.theme_neon_void),
-                emoji = "⚡",
-                previewColors = listOf(Color(0xFF14020D), Color(0xFFFF6AD5), Color(0xFF00E5FF)),
-                isSelected = currentTheme is AppTheme.NeonVoid,
-                onClick = { onThemeSelected(AppTheme.NeonVoid) },
-                modifier = Modifier.weight(1f),
-            )
-            ThemeTile(
-                name = stringResource(R.string.theme_grimoire),
-                emoji = "📜",
-                previewColors = listOf(Color(0xFF140202), Color(0xFFFF3131), Color(0xFFFFD700)),
-                isSelected = currentTheme is AppTheme.MedievalGrimoire,
-                onClick = { onThemeSelected(AppTheme.MedievalGrimoire) },
-                modifier = Modifier.weight(1f),
-            )
-            ThemeTile(
-                name = stringResource(R.string.theme_cosmos),
-                emoji = "✨",
-                previewColors = listOf(Color(0xFF010C14), Color(0xFF00F5FF), Color(0xFFFF7F50)),
-                isSelected = currentTheme is AppTheme.ArcaneCosmos,
-                onClick = { onThemeSelected(AppTheme.ArcaneCosmos) },
-                modifier = Modifier.weight(1f),
-            )
+
+        // Organizamos los temas en filas de 3 para evitar desbordamientos
+        val themes = listOf(
+            Triple(stringResource(R.string.theme_cosmos), "✨", AppTheme.ArcaneCosmos),
+            Triple(stringResource(R.string.theme_neon_void), "⚡", AppTheme.NeonVoid),
+            Triple(stringResource(R.string.theme_grimoire), "📜", AppTheme.MedievalGrimoire),
+            Triple(stringResource(R.string.theme_shadow_essence), "🌑", AppTheme.ShadowEssence),
+            Triple(stringResource(R.string.theme_forest_murmur), "🍃", AppTheme.ForestMurmur),
+            Triple(stringResource(R.string.theme_mystic_echo), "🔮", AppTheme.MysticEcho),
+            Triple(stringResource(R.string.theme_gilded_silver), "👑", AppTheme.GildedSilver),
+            Triple(stringResource(R.string.theme_ancient_oak), "🪵", AppTheme.AncientOak),
+            Triple(stringResource(R.string.theme_obsidian_chrome), "🔗", AppTheme.ObsidianChrome)
+        )
+
+        themes.chunked(3).forEach { rowThemes ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                rowThemes.forEach { (name, emoji, theme) ->
+                    ThemeTile(
+                        name = name,
+                        emoji = emoji,
+                        previewColors = getPreviewColorsForTheme(theme),
+                        isSelected = currentTheme == theme,
+                        onClick = { onThemeSelected(theme) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // Rellenar con espacios vacíos si la fila no está completa para mantener el peso uniforme
+                repeat(3 - rowThemes.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }
+
+private fun getPreviewColorsForTheme(theme: AppTheme): List<Color> = when (theme) {
+    AppTheme.NeonVoid -> listOf(Color(0xFF14020D), Color(0xFFFF6AD5), Color(0xFF00E5FF))
+    AppTheme.MedievalGrimoire -> listOf(Color(0xFF140202), Color(0xFFFF3131), Color(0xFFFFD700))
+    AppTheme.ArcaneCosmos -> listOf(Color(0xFF010C14), Color(0xFF00F5FF), Color(0xFFFF7F50))
+    AppTheme.ShadowEssence -> listOf(Color(0xFF0F0214), Color(0xFFD500F9), Color(0xFF7B1FA2))
+    AppTheme.ForestMurmur -> listOf(Color(0xFF010A03), Color(0xFFCDDC39), Color(0xFF1B5E20))
+    AppTheme.MysticEcho -> listOf(Color(0xFF0D0A14), Color(0xFFBF00FF), Color(0xFF00E5FF))
+    AppTheme.GildedSilver -> listOf(Color(0xFF1A1A1A), Color(0xFFFFD700), Color(0xFFC0C0C0))
+    AppTheme.AncientOak -> listOf(Color(0xFF140D02), Color(0xFFFFD600), Color(0xFFFFAB00))
+    AppTheme.ObsidianChrome -> listOf(Color(0xFF121212), Color(0xFFE0E0E0), Color(0xFF757575))
+}
+
 
 @Composable
 private fun ThemeTile(
@@ -479,9 +499,11 @@ private fun ThemeTile(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.Center, // Center content vertically
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -505,11 +527,14 @@ private fun ThemeTile(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = name,
                 style = MaterialTheme.magicTypography.labelSmall,
                 color = if (isSelected) mc.primaryAccent else mc.textSecondary,
                 textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
         }
