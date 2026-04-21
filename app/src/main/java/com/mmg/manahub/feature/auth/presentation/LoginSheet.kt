@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.auth.presentation
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,10 +62,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.theme.MarcellusFontFamily
+import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -84,17 +82,27 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 fun LoginSheet(
     authViewModel: AuthViewModel,
     initialTab: Int = 0,
+    initialNickname: String = "",
+    initialAvatarUrl: String? = null,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Dismiss automatically on successful authentication.
-    // onDismiss() is called first so the sheet is hidden before state resets to Idle,
-    // preventing a visible flash of the empty/idle form while the sheet is still animating out.
+    // Dismiss on successful authentication (sign-in/sign-up flow).
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Success) {
+            onDismiss()
+            authViewModel.resetUiState()
+        }
+    }
+
+    // Dismiss when the session becomes Authenticated from any source, including
+    // the email-confirmation deep link which bypasses the normal uiState flow.
+    LaunchedEffect(sessionState) {
+        if (sessionState is SessionState.Authenticated) {
             onDismiss()
             authViewModel.resetUiState()
         }
@@ -112,8 +120,12 @@ fun LoginSheet(
         LoginSheetContent(
             uiState = uiState,
             initialTab = initialTab,
+            initialNickname = initialNickname,
+            initialAvatarUrl = initialAvatarUrl,
             onSignIn = { email, password -> authViewModel.signInWithEmail(email, password) },
-            onSignUp = { email, password, nickname -> authViewModel.signUpWithEmail(email, password, nickname) },
+            onSignUp = { email, password, nickname, avatarUrl ->
+                authViewModel.signUpWithEmail(email, password, nickname, avatarUrl)
+            },
             onGoogleSignIn = { context -> authViewModel.signInWithGoogle(context) },
             onResetPassword = { email -> authViewModel.resetPassword(email) },
             onResetUiState = { authViewModel.resetUiState() },
@@ -128,19 +140,22 @@ fun LoginSheet(
 private fun LoginSheetContent(
     uiState: AuthUiState,
     initialTab: Int = 0,
+    initialNickname: String = "",
+    initialAvatarUrl: String? = null,
     onSignIn: (String, String) -> Unit,
-    onSignUp: (String, String, String) -> Unit,
+    onSignUp: (String, String, String, String?) -> Unit,
     onGoogleSignIn: (android.content.Context) -> Unit,
     onResetPassword: (String) -> Unit,
     onResetUiState: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
     var email by remember { mutableStateOf("") }
-    var nickname by remember { mutableStateOf("") }
+    var nickname by remember(initialNickname) { mutableStateOf(initialNickname) }
     var nicknameError by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -181,6 +196,10 @@ private fun LoginSheetContent(
         cursorColor = mc.primaryAccent,
         focusedTextColor = mc.textPrimary,
         unfocusedTextColor = mc.textPrimary,
+        errorBorderColor = mc.lifeNegative,
+        errorLabelColor = mc.lifeNegative,
+        errorCursorColor = mc.lifeNegative,
+        errorSupportingTextColor = mc.lifeNegative,
     )
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -197,7 +216,7 @@ private fun LoginSheetContent(
             // ── Title ──────────────────────────────────────────────────────────
             Text(
                 text = stringResource(R.string.auth_sheet_title),
-                style = MaterialTheme.magicTypography.titleLarge,
+                style = ty.titleLarge,
                 color = mc.textPrimary,
             )
 
@@ -247,22 +266,6 @@ private fun LoginSheetContent(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Email field ────────────────────────────────────────────────────
-            OutlinedTextField(
-                value = email,
-                onValueChange = {
-                    email = it
-                    onResetUiState()
-                },
-                label = { Text(stringResource(R.string.auth_field_email)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                colors = fieldColors,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading,
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             // ── Nickname field (sign-up only) ──────────────────────────────────
             if (selectedTab == 1) {
@@ -291,7 +294,7 @@ private fun LoginSheetContent(
                                 Text(
                                     text = stringResource(R.string.auth_error_nickname_required),
                                     color = mc.lifeNegative,
-                                    fontSize = 12.sp,
+                                    style = ty.labelSmall,
                                 )
                             } else {
                                 Spacer(modifier = Modifier.weight(1f))
@@ -299,13 +302,30 @@ private fun LoginSheetContent(
                             Text(
                                 text = stringResource(R.string.auth_nickname_char_count, nickname.length),
                                 color = if (nickname.length == 30) mc.lifeNegative else mc.textSecondary,
-                                fontSize = 12.sp,
+                                style = ty.labelSmall,
                             )
                         }
                     },
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
+
+            // ── Email field ────────────────────────────────────────────────────
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = {
+                    email = it
+                    onResetUiState()
+                },
+                label = { Text(stringResource(R.string.auth_field_email)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                colors = fieldColors,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading,
+            )
+
 
             // ── Password field ─────────────────────────────────────────────────
             OutlinedTextField(
@@ -344,7 +364,7 @@ private fun LoginSheetContent(
                     Text(
                         text = stringResource(R.string.auth_link_forgot),
                         color = mc.secondaryAccent,
-                        fontSize = 13.sp,
+                        style = ty.labelMedium,
                     )
                 }
             } else {
@@ -357,7 +377,7 @@ private fun LoginSheetContent(
                 Text(
                     text = errorMessage,
                     color = mc.lifeNegative,
-                    fontSize = 13.sp,
+                    style = ty.labelMedium,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp),
@@ -373,7 +393,7 @@ private fun LoginSheetContent(
                         if (nickname.isBlank()) {
                             nicknameError = true
                         } else {
-                            onSignUp(email, password, nickname)
+                            onSignUp(email, password, nickname, initialAvatarUrl)
                         }
                     }
                 },
@@ -400,9 +420,8 @@ private fun LoginSheetContent(
                 } else {
                     Text(
                         text = stringResource(R.string.auth_btn_continue),
-                        fontFamily = MarcellusFontFamily,
+                        style = ty.labelLarge,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
                     )
                 }
             }
@@ -422,7 +441,7 @@ private fun LoginSheetContent(
                     text = stringResource(R.string.auth_or_divider),
                     color = mc.textSecondary,
                     modifier = Modifier.padding(horizontal = 12.dp),
-                    fontSize = 13.sp,
+                    style = ty.labelMedium,
                 )
                 HorizontalDivider(
                     modifier = Modifier.weight(1f),
@@ -458,17 +477,17 @@ private fun LoginSheetContent(
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = "G",
-                        color = Color(0xFF4285F4),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                    )
+                Text(
+                    text = "G",
+                    color = Color(0xFF4285F4),
+                    fontWeight = FontWeight.Bold,
+                    style = ty.bodyMedium,
+                )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = stringResource(R.string.auth_btn_google),
-                    fontSize = 15.sp,
+                    style = ty.bodyMedium,
                 )
             }
 
@@ -500,6 +519,7 @@ private fun EmailConfirmationContent(
     onBackToSignIn: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
 
     Column(
         modifier = Modifier
@@ -519,7 +539,7 @@ private fun EmailConfirmationContent(
 
         Text(
             text = stringResource(R.string.auth_email_confirm_title),
-            style = MaterialTheme.magicTypography.titleLarge,
+            style = ty.titleLarge,
             color = mc.textPrimary,
             textAlign = TextAlign.Center,
         )
@@ -529,7 +549,7 @@ private fun EmailConfirmationContent(
         Text(
             text = stringResource(R.string.auth_email_confirm_body, email),
             color = mc.textSecondary,
-            fontSize = 14.sp,
+            style = ty.bodyMedium,
             textAlign = TextAlign.Center,
         )
 
@@ -556,7 +576,7 @@ private fun EmailConfirmationContent(
             Text(
                 text = stringResource(R.string.auth_email_confirm_open_app),
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
+                style = ty.bodyMedium,
             )
         }
 
@@ -566,7 +586,7 @@ private fun EmailConfirmationContent(
             Text(
                 text = stringResource(R.string.auth_email_confirm_back),
                 color = mc.textSecondary,
-                fontSize = 14.sp,
+                style = ty.bodyMedium,
             )
         }
     }
@@ -603,22 +623,23 @@ private data class PasswordStrength(
 
 @Composable
 private fun PasswordStrengthIndicator(strength: PasswordStrength) {
+    val ty = MaterialTheme.magicTypography
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 10.dp, bottom = 2.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        RequirementRow(stringResource(R.string.auth_password_requirement_length),   strength.hasMinLength)
-        RequirementRow(stringResource(R.string.auth_password_requirement_uppercase), strength.hasUppercase)
-        RequirementRow(stringResource(R.string.auth_password_requirement_lowercase), strength.hasLowercase)
-        RequirementRow(stringResource(R.string.auth_password_requirement_digit),     strength.hasDigit)
-        RequirementRow(stringResource(R.string.auth_password_requirement_symbol),    strength.hasSymbol)
+        RequirementRow(stringResource(R.string.auth_password_requirement_length),   strength.hasMinLength, ty)
+        RequirementRow(stringResource(R.string.auth_password_requirement_uppercase), strength.hasUppercase, ty)
+        RequirementRow(stringResource(R.string.auth_password_requirement_lowercase), strength.hasLowercase, ty)
+        RequirementRow(stringResource(R.string.auth_password_requirement_digit),     strength.hasDigit, ty)
+        RequirementRow(stringResource(R.string.auth_password_requirement_symbol),    strength.hasSymbol, ty)
     }
 }
 
 @Composable
-private fun RequirementRow(label: String, met: Boolean) {
+private fun RequirementRow(label: String, met: Boolean, ty: com.mmg.manahub.core.ui.theme.MagicTypography) {
     val mc = MaterialTheme.magicColors
     val color = if (met) mc.lifePositive else mc.textDisabled
     Row(
@@ -635,7 +656,7 @@ private fun RequirementRow(label: String, met: Boolean) {
         Text(
             text = label,
             color = color,
-            fontSize = 12.sp,
+            style = ty.labelSmall,
         )
     }
 }
@@ -651,6 +672,7 @@ private fun ResetPasswordDialog(
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     var resetEmail by remember { mutableStateOf("") }
     val isLoading = uiState is AuthUiState.Loading
     val resetSent = uiState is AuthUiState.ResetSent
@@ -664,7 +686,7 @@ private fun ResetPasswordDialog(
         title = {
             Text(
                 text = stringResource(R.string.auth_reset_title),
-                style = MaterialTheme.magicTypography.titleLarge,
+                style = ty.titleLarge,
                 color = mc.textPrimary,
             )
         },
@@ -674,13 +696,13 @@ private fun ResetPasswordDialog(
                     Text(
                         text = stringResource(R.string.auth_reset_sent),
                         color = mc.lifePositive,
-                        fontSize = 14.sp,
+                        style = ty.bodyMedium,
                     )
                 } else {
                     Text(
                         text = stringResource(R.string.auth_reset_subtitle),
                         color = mc.textSecondary,
-                        fontSize = 14.sp,
+                        style = ty.bodyMedium,
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
@@ -706,7 +728,7 @@ private fun ResetPasswordDialog(
                         Text(
                             text = errorMessage,
                             color = mc.lifeNegative,
-                            fontSize = 13.sp,
+                            style = ty.labelMedium,
                         )
                     }
                 }
@@ -718,6 +740,7 @@ private fun ResetPasswordDialog(
                     Text(
                         text = stringResource(R.string.action_close),
                         color = mc.primaryAccent,
+                        style = ty.labelMedium,
                     )
                 }
             } else {
@@ -736,7 +759,11 @@ private fun ResetPasswordDialog(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text(stringResource(R.string.auth_reset_btn))
+                        Text(
+                            text = stringResource(R.string.auth_reset_btn),
+                            style = ty.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
             }
@@ -747,6 +774,7 @@ private fun ResetPasswordDialog(
                     Text(
                         text = stringResource(R.string.action_cancel),
                         color = mc.textSecondary,
+                        style = ty.labelMedium,
                     )
                 }
             }

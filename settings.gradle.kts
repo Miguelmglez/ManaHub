@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Magic Folder"
+rootProject.name = "ManaHub"
 include(":app")
  

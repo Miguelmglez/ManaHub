@@ -78,7 +78,7 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signUpWithEmail(email: String, password: String, nickname: String) {
+    fun signUpWithEmail(email: String, password: String, nickname: String, avatarUrl: String? = null) {
         val validationError = validateEmailAndPassword(email, password, isSignUp = true)
             ?: validateNickname(nickname)
         if (validationError != null) {
@@ -88,7 +88,7 @@ class AuthViewModel @Inject constructor(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = signUpWithEmailUseCase(email.trim(), password, nickname.trim())) {
+            _uiState.value = when (val result = signUpWithEmailUseCase(email.trim(), password, nickname.trim(), avatarUrl)) {
                 is AuthResult.Success -> AuthUiState.Success
                 is AuthResult.Error -> when (result.error) {
                     is AuthError.EmailConfirmationRequired -> AuthUiState.EmailConfirmationSent

@@ -1,12 +1,15 @@
 package com.mmg.manahub.feature.auth.data.repository
 
 import app.cash.turbine.test
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
+import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.auth.data.remote.UserProfileRetrofitDto
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
-import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
@@ -24,31 +27,27 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import retrofit2.Response
 import java.io.IOException
 
 /**
  * Unit tests for [AuthRepositoryImpl].
  *
  * Strategy:
- * - [Auth] and [SupabaseClient] are mocked with MockK.
+ * - [Auth] is mocked with MockK.
  * - [UserProfileDataSource] is mocked to isolate repository logic.
+ * - [SupabaseUserProfileService] is mocked for RPC-level tests (updateNickname, deleteAccount).
+ * - [UserPreferencesDataStore] is mocked (relaxed) to verify DataStore sync calls.
  * - [UnconfinedTestDispatcher] is used so withContext(ioDispatcher) runs synchronously,
  *   avoiding any need for advanceUntilIdle.
  * - Supabase's [Auth.sessionStatus] is backed by a [MutableStateFlow] so we can
  *   control emissions in Flow tests.
- *
- * Coverage added vs previous version:
- * - GROUP 8: getCurrentUser (authenticated + unauthenticated)
- * - GROUP 9: updateNickname (success, NicknameTooLong, NicknameInappropriate, SessionExpired,
- *             network error, nickname trimming)
- * - GROUP 10: signInWithGoogleIdToken auto-nickname from Google metadata
- * - GROUP 11: signUpWithEmail when nickname RPC fails (non-fatal fallback)
- * - Additional HTTP status code mappings (404, 500+)
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthRepositoryImplTest {
@@ -59,9 +58,10 @@ class AuthRepositoryImplTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val supabaseAuth          = mockk<Auth>()
-    private val supabaseClient        = mockk<SupabaseClient>(relaxed = true)
-    private val userProfileDataSource = mockk<UserProfileDataSource>(relaxed = true)
+    private val supabaseAuth                = mockk<Auth>()
+    private val userProfileDataSource       = mockk<UserProfileDataSource>(relaxed = true)
+    private val supabaseUserProfileService  = mockk<SupabaseUserProfileService>(relaxed = true)
+    private val userPreferencesDataStore    = mockk<UserPreferencesDataStore>(relaxed = true)
 
     // Controls the Auth.sessionStatus Flow across tests
     private val sessionStatusFlow = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
@@ -119,6 +119,13 @@ class AuthRepositoryImplTest {
         provider  = provider,
     )
 
+    /** Builds a successful Retrofit [Response] with no body. */
+    private fun successResponse(): Response<Unit> = Response.success(Unit)
+
+    /** Builds a failed Retrofit [Response] with the given HTTP status code. */
+    private fun errorResponse(code: Int): Response<Unit> =
+        Response.error(code, "".toResponseBody(null))
+
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     @Before
@@ -130,11 +137,21 @@ class AuthRepositoryImplTest {
             firstArg<AuthUser>()
         }
 
+        // Default stub: fetchUserProfile returns null (no enrichment by default).
+        coEvery { userProfileDataSource.fetchUserProfile(any()) } returns null
+
+        // Default stub: updateNickname returns success.
+        coEvery { supabaseUserProfileService.updateNickname(any()) } returns successResponse()
+
+        // Default stub: deleteCurrentUser returns success.
+        coEvery { supabaseUserProfileService.deleteCurrentUser() } returns successResponse()
+
         repository = AuthRepositoryImpl(
-            supabaseClient        = supabaseClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            supabaseUserProfileService = supabaseUserProfileService,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            ioDispatcher               = testDispatcher,
         )
     }
 
@@ -155,6 +172,17 @@ class AuthRepositoryImplTest {
         assertEquals("user-uuid-001", user.id)
         assertEquals("test@example.com", user.email)
         assertEquals("email", user.provider)
+    }
+
+    @Test
+    fun `given valid credentials when signInWithEmail then syncs to DataStore`() = runTest {
+        val userInfoMock = buildUserInfoMock(nicknameMetadata = "TestUser")
+        coEvery { supabaseAuth.signInWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.Email.Config.() -> Unit>()) } just Runs
+        every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+
+        repository.signInWithEmail("test@example.com", "password123")
+
+        coVerify(atLeast = 1) { userPreferencesDataStore.savePlayerName(any()) }
     }
 
     @Test
@@ -231,6 +259,29 @@ class AuthRepositoryImplTest {
         assertTrue((result as AuthResult.Error).error is AuthError.Unknown)
     }
 
+    @Test
+    fun `given user_profiles has richer data when signInWithEmail then returns enriched AuthUser`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        coEvery { supabaseAuth.signInWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.Email.Config.() -> Unit>()) } just Runs
+        every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns
+            com.mmg.manahub.feature.auth.data.remote.UserProfileDto(
+                id = "user-uuid-001",
+                nickname = "ServerNick",
+                gameTag = "#ABCD",
+                avatarUrl = "https://example.com/avatar.jpg",
+                provider = "email",
+            )
+
+        val result = repository.signInWithEmail("test@example.com", "password123")
+
+        assertTrue(result is AuthResult.Success)
+        val user = (result as AuthResult.Success).data
+        assertEquals("ServerNick", user.nickname)
+        assertEquals("#ABCD", user.gameTag)
+        assertEquals("https://example.com/avatar.jpg", user.avatarUrl)
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 2 — signUpWithEmail
     // ══════════════════════════════════════════════════════════════════════════
@@ -285,23 +336,19 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    fun `given nickname RPC fails during signUpWithEmail then sign-up still succeeds with email-prefix nickname fallback`() = runTest {
+    fun `given nickname service fails during signUpWithEmail then sign-up still succeeds`() = runTest {
         // The nickname RPC is non-fatal: a failure should not prevent the overall sign-up
         val userInfoMock = buildUserInfoMock()
         coEvery { supabaseAuth.signUpWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.Email.Config.() -> Unit>()) } just Runs
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+        coEvery { supabaseUserProfileService.updateNickname(any()) } throws IOException("RPC unreachable")
 
-        // Simulate RPC failure by making postgrest.rpc() throw
-        val postgrestMock = mockk<io.github.jan.supabase.postgrest.Postgrest>(relaxed = true)
-        coEvery { postgrestMock.rpc(any<String>(), any()) } throws IOException("RPC unreachable")
-        val strictClient = mockk<SupabaseClient> {
-            every { this@mockk.postgrest } returns postgrestMock
-        }
         val repo = AuthRepositoryImpl(
-            supabaseClient        = strictClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            supabaseUserProfileService = supabaseUserProfileService,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            ioDispatcher               = testDispatcher,
         )
 
         val result = repo.signUpWithEmail("new@example.com", "password123", "Hero")
@@ -343,23 +390,9 @@ class AuthRepositoryImplTest {
         )
         coEvery { supabaseAuth.signInWith(any(), any<suspend io.github.jan.supabase.auth.providers.builtin.IDToken.Config.() -> Unit>()) } just Runs
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+        coEvery { supabaseUserProfileService.updateNickname(any()) } returns successResponse()
 
-        // Stub the update_user_nickname RPC to succeed and return the same user
-        // with the nickname applied
-        val rpcResult = mockk<io.github.jan.supabase.postgrest.result.PostgrestResult>(relaxed = true)
-        val postgrestMock = mockk<io.github.jan.supabase.postgrest.Postgrest>(relaxed = true)
-        coEvery { postgrestMock.rpc("update_user_nickname", any()) } returns rpcResult
-        val strictClient = mockk<SupabaseClient> {
-            every { this@mockk.postgrest } returns postgrestMock
-        }
-        val repo = AuthRepositoryImpl(
-            supabaseClient        = strictClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
-        )
-
-        val result = repo.signInWithGoogleIdToken("google-token", "raw-nonce")
+        val result = repository.signInWithGoogleIdToken("google-token", "raw-nonce")
 
         assertTrue(result is AuthResult.Success)
         // The auto-generated nickname should start with the Google display name characters
@@ -380,8 +413,9 @@ class AuthRepositoryImplTest {
 
         repository.signInWithGoogleIdToken("google-token", "raw-nonce")
 
-        // RPC is proxied through supabaseClient.postgrest — the relaxed mock does nothing
-        // We verify upsertUserProfile was still called
+        // updateNickname service must NOT be called when nickname is already set
+        coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
+        // upsertUserProfile is still called
         coVerify(exactly = 1) { userProfileDataSource.upsertUserProfile(any()) }
     }
 
@@ -436,31 +470,21 @@ class AuthRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given authenticated user when deleteAccount then calls postgrest rpc and signOut and returns Success`() = runTest {
+    fun `given authenticated user when deleteAccount then calls service deleteCurrentUser and signOut and returns Success`() = runTest {
         coEvery { supabaseAuth.signOut(any()) } just Runs
 
         val result = repository.deleteAccount()
 
         assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { supabaseUserProfileService.deleteCurrentUser() }
         coVerify(exactly = 1) { supabaseAuth.signOut(any()) }
     }
 
     @Test
-    fun `given postgrest rpc throws when deleteAccount then returns Error and does NOT call signOut`() = runTest {
-        val postgrestMock = mockk<io.github.jan.supabase.postgrest.Postgrest>(relaxed = true)
-        coEvery { postgrestMock.rpc(any<String>(), any()) } throws RuntimeException("RPC failed")
+    fun `given deleteCurrentUser service throws when deleteAccount then returns Error and does NOT call signOut`() = runTest {
+        coEvery { supabaseUserProfileService.deleteCurrentUser() } throws RuntimeException("RPC failed")
 
-        val strictClient = mockk<SupabaseClient> {
-            every { this@mockk.postgrest } returns postgrestMock
-        }
-        val repoUnderTest = AuthRepositoryImpl(
-            supabaseClient        = strictClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
-        )
-
-        val result = repoUnderTest.deleteAccount()
+        val result = repository.deleteAccount()
 
         assertTrue(result is AuthResult.Error)
         // signOut must NOT be called if the RPC step fails — user account was not deleted
@@ -468,21 +492,19 @@ class AuthRepositoryImplTest {
     }
 
     @Test
+    fun `given deleteCurrentUser returns HTTP error when deleteAccount then returns Error`() = runTest {
+        coEvery { supabaseUserProfileService.deleteCurrentUser() } returns errorResponse(500)
+
+        val result = repository.deleteAccount()
+
+        assertTrue(result is AuthResult.Error)
+    }
+
+    @Test
     fun `given network failure when deleteAccount then returns Error with NetworkError`() = runTest {
-        val postgrestMock = mockk<io.github.jan.supabase.postgrest.Postgrest>(relaxed = true)
-        coEvery { postgrestMock.rpc(any<String>(), any()) } throws IOException("Offline")
+        coEvery { supabaseUserProfileService.deleteCurrentUser() } throws IOException("Offline")
 
-        val strictClient = mockk<SupabaseClient> {
-            every { this@mockk.postgrest } returns postgrestMock
-        }
-        val repoUnderTest = AuthRepositoryImpl(
-            supabaseClient        = strictClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
-        )
-
-        val result = repoUnderTest.deleteAccount()
+        val result = repository.deleteAccount()
 
         assertTrue(result is AuthResult.Error)
         assertEquals(AuthError.NetworkError, (result as AuthResult.Error).error)
@@ -565,6 +587,7 @@ class AuthRepositoryImplTest {
         sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
 
         repository.sessionState.test {
+            // Fast first emit (from auth metadata)
             val state = awaitItem()
             assertTrue(state is SessionState.Authenticated)
             assertEquals("user-uuid-001", (state as SessionState.Authenticated).user.id)
@@ -664,19 +687,20 @@ class AuthRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given valid nickname when updateNickname then calls RPC and returns Success with trimmed nickname`() = runTest {
+    fun `given valid nickname when updateNickname then calls service and returns Success with trimmed nickname`() = runTest {
         val userInfoMock = buildUserInfoMock()
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+        coEvery { supabaseUserProfileService.updateNickname(UpdateNicknameDto("Gandalf")) } returns successResponse()
 
         val result = repository.updateNickname("  Gandalf  ")
 
-        // Nickname must be trimmed before being sent to the RPC
+        // Nickname must be trimmed before being sent to the service
         assertTrue(result is AuthResult.Success)
         assertEquals("Gandalf", (result as AuthResult.Success).data.nickname)
     }
 
     @Test
-    fun `given nickname exceeding 30 chars when updateNickname then returns NicknameTooLong without calling RPC`() = runTest {
+    fun `given nickname exceeding 30 chars when updateNickname then returns NicknameTooLong without calling service`() = runTest {
         val tooLong = "A".repeat(31)
 
         val result = repository.updateNickname(tooLong)
@@ -684,6 +708,7 @@ class AuthRepositoryImplTest {
         assertTrue(result is AuthResult.Error)
         assertEquals(AuthError.NicknameTooLong, (result as AuthResult.Error).error)
         // Should not reach the network when local validation already rejects it
+        coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
     }
 
     @Test
@@ -698,54 +723,30 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    fun `given RPC returns HTTP 400 when updateNickname then returns NicknameInappropriate`() = runTest {
+    fun `given service returns HTTP 400 when updateNickname then returns NicknameInappropriate`() = runTest {
         // HTTP 400 from the profanity trigger → NicknameInappropriate (not InvalidCredentials)
-        val postgrestMock = mockk<io.github.jan.supabase.postgrest.Postgrest>(relaxed = true)
-        coEvery { postgrestMock.rpc("update_user_nickname", any()) } throws RestException(
-            error = "P0001", description = "Inappropriate content", statusCode = 400
-        )
-        val strictClient = mockk<SupabaseClient> {
-            every { this@mockk.postgrest } returns postgrestMock
-        }
-        val repo = AuthRepositoryImpl(
-            supabaseClient        = strictClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
-        )
+        coEvery { supabaseUserProfileService.updateNickname(any()) } returns errorResponse(400)
 
-        val result = repo.updateNickname("BadWord")
+        val result = repository.updateNickname("BadWord")
 
         assertTrue(result is AuthResult.Error)
         assertEquals(AuthError.NicknameInappropriate, (result as AuthResult.Error).error)
     }
 
     @Test
-    fun `given RPC returns HTTP 500 when updateNickname then returns Unknown not NicknameInappropriate`() = runTest {
+    fun `given service returns HTTP 500 when updateNickname then returns Unknown not NicknameInappropriate`() = runTest {
         // Only HTTP 400 maps to NicknameInappropriate; other codes map to Unknown
-        val postgrestMock = mockk<io.github.jan.supabase.postgrest.Postgrest>(relaxed = true)
-        coEvery { postgrestMock.rpc("update_user_nickname", any()) } throws RestException(
-            error = "internal_error", description = "Server error", statusCode = 500
-        )
-        val strictClient = mockk<SupabaseClient> {
-            every { this@mockk.postgrest } returns postgrestMock
-        }
-        val repo = AuthRepositoryImpl(
-            supabaseClient        = strictClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
-        )
+        coEvery { supabaseUserProfileService.updateNickname(any()) } returns errorResponse(500)
 
-        val result = repo.updateNickname("ValidName")
+        val result = repository.updateNickname("ValidName")
 
         assertTrue(result is AuthResult.Error)
         assertTrue((result as AuthResult.Error).error is AuthError.Unknown)
     }
 
     @Test
-    fun `given user session expired after RPC call when updateNickname then returns SessionExpired`() = runTest {
-        // RPC succeeds but currentUserOrNull() returns null (session expired between the calls)
+    fun `given user session expired after service call when updateNickname then returns SessionExpired`() = runTest {
+        // Service succeeds but currentUserOrNull() returns null (session expired between the calls)
         every { supabaseAuth.currentUserOrNull() } returns null
 
         val result = repository.updateNickname("Gandalf")
@@ -756,20 +757,9 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `given network failure during updateNickname then returns NetworkError`() = runTest {
-        val postgrestMock = mockk<io.github.jan.supabase.postgrest.Postgrest>(relaxed = true)
-        coEvery { postgrestMock.rpc("update_user_nickname", any()) } throws IOException("Offline")
+        coEvery { supabaseUserProfileService.updateNickname(any()) } throws IOException("Offline")
 
-        val strictClient = mockk<SupabaseClient> {
-            every { this@mockk.postgrest } returns postgrestMock
-        }
-        val repo = AuthRepositoryImpl(
-            supabaseClient        = strictClient,
-            supabaseAuth          = supabaseAuth,
-            userProfileDataSource = userProfileDataSource,
-            ioDispatcher          = testDispatcher,
-        )
-
-        val result = repo.updateNickname("Gandalf")
+        val result = repository.updateNickname("Gandalf")
 
         assertTrue(result is AuthResult.Error)
         assertEquals(AuthError.NetworkError, (result as AuthResult.Error).error)

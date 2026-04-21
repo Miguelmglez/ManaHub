@@ -526,16 +526,18 @@
     <string name="survey_save_button">Save →</string>
     <string name="survey_free_text_hint">Optional notes about this game…</string>
 
-    <!-- Avatar picker -->
-    <string name="avatar_picker_title">Choose your Avatar</string>
-    <string name="avatar_picker_edit_hint">Edit profile photo</string>
-    <string name="avatar_picker_filter_label">Filter by color</string>
-    <string name="avatar_picker_confirm">Confirm</string>
-    <string name="avatar_picker_remove">Remove photo</string>
+    <!-- Profile Editing -->
+    <string name="profile_edit_title">Edit Profile</string>
+    <string name="profile_edit_avatar_label">Profile Avatar</string>
+    <string name="profile_edit_avatar_filter_label">Filter planeswalkers by color</string>
+    <string name="profile_edit_avatar_remove">Remove photo</string>
+
+    <string name="profile_edit_confirm">Save Changes</string>
 
     <!-- Game setup -->
+    <string name="game_setup_player_name_label">Player Name</string>
     <string name="game_setup_you_badge">You</string>
-    <string name="game_setup_default_player_name">Player 1</string>
+    <string name="game_setup_default_player_name">Wizard</string>
     <string name="game_setup_set_name_hint">· Set your name in Profile</string>
 
     <!-- Survey questions -->
@@ -764,9 +766,15 @@
     <!-- ══════════════════════════════════════════
          THEMES
     ═══════════════════════════════════════════ -->
-    <string name="theme_neon_void">Neon Void</string>
+    <string name="theme_neon_void">Neon</string>
     <string name="theme_grimoire">Grimoire</string>
     <string name="theme_cosmos">Cosmos</string>
+    <string name="theme_shadow_essence">Shadow</string>
+    <string name="theme_forest_murmur">Forest</string>
+    <string name="theme_mystic_echo">Echo</string>
+    <string name="theme_gilded_silver">Gilded</string>
+    <string name="theme_ancient_oak">Oak</string>
+    <string name="theme_obsidian_chrome">Chrome</string>
 
     <!-- ══════════════════════════════════════════
          SIDEBOARD RECOMMENDATIONS
@@ -1081,6 +1089,7 @@
 
     <!-- Auth field validation -->
     <string name="auth_validation_email_required">Enter an email address</string>
+    <string name="auth_error_name_too_short">Name is too short</string>
     <string name="auth_validation_password_required">Enter a password</string>
     <string name="auth_validation_password_too_short">Password must be at least 8 characters</string>
     <string name="auth_error_password_requirements">Password must include uppercase, lowercase, a number and a symbol</string>
@@ -1107,5 +1116,23 @@
     <string name="auth_email_confirm_body">We sent a confirmation link to %1$s.\nTap it to activate your account.</string>
     <string name="auth_email_confirm_open_app">Open email app</string>
     <string name="auth_email_confirm_back">Back to Sign In</string>
+
+    <!-- Friends feature -->
+    <string name="friends_title">Friends</string>
+    <string name="friends_login_required">You need to be logged in to manage your friends.</string>
+    <string name="friends_section_pending">Pending Requests (%d)</string>
+    <string name="friends_section_search">Search Player</string>
+    <string name="friends_search_placeholder">Exact game tag (e.g. #A3KX9Z)</string>
+    <string name="friends_no_result">No player found with that game tag.</string>
+    <string name="friends_send_invitation">Send Invitation</string>
+    <string name="friends_section_friends">Friends (%d)</string>
+    <string name="friends_empty">No friends yet. Search by game tag to add someone!</string>
+    <string name="friends_remove_friend">Remove Friend</string>
+    <string name="friends_remove_confirm_title">Remove Friend</string>
+    <string name="friends_remove_confirm_body">Are you sure you want to remove %s from your friends?</string>
+    <string name="friends_remove_confirm_ok">Remove</string>
+    <string name="friends_remove_confirm_cancel">Cancel</string>
+    <string name="friends_error_generic">Something went wrong. Please try again.</string>
+    <string name="friends_error_send">Could not send friend request. Please try again.</string>
 
 </resources>

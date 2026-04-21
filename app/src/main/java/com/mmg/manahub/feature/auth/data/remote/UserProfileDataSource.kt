@@ -3,15 +3,15 @@ package com.mmg.manahub.feature.auth.data.remote
 import android.util.Log
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
-import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * DTO for reading back a row from the `user_profiles` table.
+ * Legacy DTO kept for backward compatibility with any callers that still reference
+ * [UserProfileDto] by name. New code should prefer [UserProfileRetrofitDto].
+ *
  * The [gameTag] column is auto-generated server-side and must never be sent by the client.
  */
 @Serializable
@@ -23,10 +23,40 @@ data class UserProfileDto(
     @SerialName("provider") val provider: String?,
 )
 
+/**
+ * Data source for the `user_profiles` Supabase table.
+ *
+ * All network calls are performed via [SupabaseUserProfileService] (Retrofit + OkHttp),
+ * which is authenticated through an OkHttp interceptor that injects the Supabase
+ * apikey and the current user's Bearer token.
+ */
 class UserProfileDataSource(
-    private val supabase: SupabaseClient,
-    private val ioDispatcher: CoroutineDispatcher
+    private val service: SupabaseUserProfileService,
+    private val ioDispatcher: CoroutineDispatcher,
 ) {
+
+    /**
+     * Fetches the full profile row for [userId] from `user_profiles`.
+     *
+     * Returns null when no row is found or on any network/parse failure (non-fatal).
+     * Callers should treat null as "no server profile available" and fall back to
+     * locally available data.
+     */
+    suspend fun fetchUserProfile(userId: String): UserProfileDto? = withContext(ioDispatcher) {
+        try {
+            service.fetchProfile("eq.$userId")
+                .firstOrNull()
+                ?.toUserProfileDto()
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "fetchUserProfile failed for user $userId", e)
+            } else {
+                Log.w(TAG, "fetchUserProfile failed: ${e.javaClass.simpleName}")
+            }
+            null
+        }
+    }
+
     /**
      * Upserts the user profile into `user_profiles` (including nickname), then reads back
      * the full row to capture the server-generated [AuthUser.gameTag].
@@ -36,24 +66,24 @@ class UserProfileDataSource(
      */
     suspend fun upsertUserProfile(user: AuthUser): AuthUser = withContext(ioDispatcher) {
         try {
-            supabase.from("user_profiles").upsert(
-                mapOf(
-                    "id" to user.id,
-                    "email" to user.email,
-                    "nickname" to user.nickname,
-                    "avatar_url" to user.avatarUrl,
-                    "provider" to user.provider,
-                    "updated_at" to java.time.Instant.now().toString()
-                )
+            service.upsertProfile(
+                profile = UpsertUserProfileDto(
+                    id = user.id,
+                    email = user.email,
+                    nickname = user.nickname,
+                    avatarUrl = user.avatarUrl,
+                    provider = user.provider,
+                    updatedAt = System.currentTimeMillis(),
+                ),
             )
 
             // Read back the full row to retrieve the server-generated game_tag.
-            val profile = supabase
-                .from("user_profiles")
-                .select { filter { eq("id", user.id) } }
-                .decodeSingle<UserProfileDto>()
-
-            user.copy(gameTag = profile.gameTag)
+            val profile = service.fetchProfile("eq.${user.id}").firstOrNull()
+            if (profile != null) {
+                user.copy(gameTag = profile.gameTag)
+            } else {
+                user
+            }
         } catch (e: Exception) {
             // Non-fatal: the user is already authenticated even if profile sync fails.
             // Only log the full stack trace in debug builds to avoid leaking internal
@@ -66,6 +96,16 @@ class UserProfileDataSource(
             user
         }
     }
+
+    // ── Mappers ───────────────────────────────────────────────────────────────
+
+    private fun UserProfileRetrofitDto.toUserProfileDto() = UserProfileDto(
+        id = id,
+        nickname = nickname,
+        gameTag = gameTag,
+        avatarUrl = avatarUrl,
+        provider = provider,
+    )
 
     private companion object {
         private const val TAG = "UserProfileDataSource"

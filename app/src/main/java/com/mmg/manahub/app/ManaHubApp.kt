@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
-class MagicFolderApp : Application() {
+class ManaHubApp : Application() {
 
     @Inject
     lateinit var syncManaSymbols: SyncManaSymbolsUseCase

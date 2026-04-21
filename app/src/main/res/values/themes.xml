@@ -1,12 +1,12 @@
 <resources>
-    <style name="Theme.MagicFolder" parent="Theme.SplashScreen">
+    <style name="Theme.ManaHub" parent="Theme.SplashScreen">
         <!-- Splash screen icon background (deep dark, matching NeonVoid) -->
         <item name="windowSplashScreenBackground">#0A0A14</item>
         <!-- Splash screen icon — uses the app launcher icon -->
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <!-- Theme to switch to once splash is done -->
-        <item name="postSplashScreenTheme">@style/Theme.MagicFolder.App</item>
+        <item name="postSplashScreenTheme">@style/Theme.ManaHub.App</item>
     </style>
 
-    <style name="Theme.MagicFolder.App" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.ManaHub.App" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

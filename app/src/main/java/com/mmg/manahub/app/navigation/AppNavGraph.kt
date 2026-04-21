@@ -42,6 +42,7 @@ import com.mmg.manahub.feature.game.PlayerConfig
 import com.mmg.manahub.feature.game.model.GameMode
 import com.mmg.manahub.feature.game.model.LayoutTemplate
 import com.mmg.manahub.feature.game.model.LayoutTemplates
+import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.profile.ProfileScreen
@@ -280,7 +281,12 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 ProfileScreen(
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStatsClick = { navController.navigate(Screen.Stats.route) },
+                    onFriendsClick = { navController.navigate(Screen.FriendsList.route) },
                 )
+            }
+
+            composable(Screen.FriendsList.route) {
+                FriendsScreen(onNavigateBack = { navController.popBackStack() })
             }
 
             // ── Tournament flow ────────────────────────────────────────────────
