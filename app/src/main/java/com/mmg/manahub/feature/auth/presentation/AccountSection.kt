@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -100,7 +101,7 @@ private fun UnauthenticatedCard(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-
+    val ty = MaterialTheme.magicTypography
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -121,7 +122,7 @@ private fun UnauthenticatedCard(
             // ── Header ─────────────────────────────────────────────────────────
             Text(
                 text = stringResource(R.string.auth_section_title),
-                style = MaterialTheme.magicTypography.titleLarge,
+                style = ty.titleLarge,
                 color = mc.textPrimary,
             )
 
@@ -129,8 +130,8 @@ private fun UnauthenticatedCard(
 
             Text(
                 text = stringResource(R.string.auth_section_subtitle),
+                style = ty.labelSmall,
                 color = mc.textSecondary,
-                fontSize = 13.sp,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -178,9 +179,8 @@ private fun UnauthenticatedCard(
                 ) {
                     Text(
                         text = stringResource(R.string.auth_cta_create),
+                        style = ty.titleMedium,
                         color = mc.background,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
                     )
                 }
             }
@@ -204,8 +204,7 @@ private fun UnauthenticatedCard(
             ) {
                 Text(
                     text = stringResource(R.string.auth_cta_signin),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
+                    style = ty.titleMedium,
                 )
             }
 
@@ -214,8 +213,8 @@ private fun UnauthenticatedCard(
             // ── No-account disclaimer ──────────────────────────────────────────
             Text(
                 text = stringResource(R.string.auth_no_account_needed),
-                color = mc.textDisabled,
-                fontSize = 12.sp,
+                style = ty.labelMedium,
+                color = mc.secondaryAccent,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
         }
@@ -232,6 +231,7 @@ private fun BenefitRow(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
@@ -247,8 +247,8 @@ private fun BenefitRow(
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = text,
+            style = ty.labelSmall,
             color = mc.textSecondary,
-            fontSize = 13.sp,
         )
     }
 }
@@ -263,6 +263,7 @@ private fun AuthenticatedCard(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val nickname = user.nickname
         ?: user.email?.substringBefore('@')
         ?: "Player"
@@ -276,12 +277,14 @@ private fun AuthenticatedCard(
             title = {
                 Text(
                     text = stringResource(R.string.auth_delete_account_confirm_title),
+                    style = ty.titleMedium,
                     color = mc.textPrimary,
                 )
             },
             text = {
                 Text(
                     text = stringResource(R.string.auth_delete_account_confirm_body),
+                    style = ty.bodySmall,
                     color = mc.textSecondary,
                 )
             },
@@ -294,8 +297,8 @@ private fun AuthenticatedCard(
                 ) {
                     Text(
                         text = stringResource(R.string.auth_delete_account_confirm_btn),
+                        style = ty.labelMedium,
                         color = Color.Red,
-                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             },
@@ -303,6 +306,7 @@ private fun AuthenticatedCard(
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text(
                         text = stringResource(R.string.auth_cancel),
+                        style = ty.labelMedium,
                         color = mc.textSecondary,
                     )
                 }
@@ -316,7 +320,7 @@ private fun AuthenticatedCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = mc.primaryAccent.copy(alpha = 0.3f),
+                color = mc.primaryAccent.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(16.dp),
             ),
         color = mc.surface,
@@ -325,125 +329,121 @@ private fun AuthenticatedCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(16.dp),
         ) {
-            // ── Identity row ───────────────────────────────────────────────────
+            // ── Identity Row ───────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-
                 // ── Avatar ─────────────────────────────────────────────────────
-                if (user.avatarUrl != null) {
-                    AsyncImage(
-                        model = user.avatarUrl,
-                        contentDescription = "Avatar of $nickname",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, mc.primaryAccent.copy(alpha = 0.5f), CircleShape),
-                    )
-                } else {
-                    // Fallback: initials circle
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(mc.primaryAccent.copy(alpha = 0.2f))
-                            .border(1.dp, mc.primaryAccent.copy(alpha = 0.5f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(mc.primaryAccent.copy(alpha = 0.1f))
+                        .border(1.dp, mc.primaryAccent.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (user.avatarUrl != null) {
+                        AsyncImage(
+                            model = user.avatarUrl,
+                            contentDescription = "Avatar of $nickname",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        // Fallback: initials circle
                         Text(
                             text = nickname.take(1).uppercase(),
+                            style = ty.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = mc.primaryAccent,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-                // ── Nickname + email + game tag ────────────────────────────────
+                // ── User Details ───────────────────────────────────────────────
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = nickname,
+                        style = ty.titleMedium,
                         color = mc.textPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
                         maxLines = 1,
                     )
+                    
                     if (user.email != null) {
                         Text(
                             text = user.email,
+                            style = ty.labelSmall,
                             color = mc.textSecondary,
-                            fontSize = 12.sp,
                             maxLines = 1,
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        // ── Synced chip ────────────────────────────────────────
+
+                    if (gameTag != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        // ── Game Tag Badge ─────────────────────────────────────
                         Box(
                             modifier = Modifier
                                 .background(
-                                    color = mc.lifePositive.copy(alpha = 0.15f),
+                                    color = mc.primaryAccent.copy(alpha = 0.1f),
                                     shape = RoundedCornerShape(6.dp),
                                 )
                                 .padding(horizontal = 8.dp, vertical = 2.dp),
                         ) {
                             Text(
-                                text = stringResource(R.string.auth_synced_chip),
-                                color = mc.lifePositive,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                text = gameTag,
+                                style = ty.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                ),
+                                color = mc.primaryAccent,
                             )
-                        }
-                        // ── Game tag chip (display-only, never editable) ───────
-                        if (gameTag != null) {
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = mc.primaryAccent.copy(alpha = 0.12f),
-                                        shape = RoundedCornerShape(6.dp),
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                            ) {
-                                Text(
-                                    text = gameTag,
-                                    color = mc.primaryAccent,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
                         }
                     }
                 }
-
-                // ── Sign out button ────────────────────────────────────────────
-                TextButton(onClick = onSignOutClick) {
-                    Text(
-                        text = stringResource(R.string.auth_sign_out),
-                        color = mc.textSecondary,
-                        fontSize = 13.sp,
-                    )
-                }
             }
 
-            // ── Delete account row ─────────────────────────────────────────────
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Action Buttons ─────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { showDeleteDialog = true }) {
+                // Sign Out (Primary Outlined)
+                OutlinedButton(
+                    onClick = onSignOutClick,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.5.dp,
+                        color = mc.primaryAccent,
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = mc.primaryAccent,
+                    ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.auth_sign_out),
+                        style = ty.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
+
+                // Delete Account (Ghost/Red)
+                TextButton(
+                    onClick = { showDeleteDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color.Red.copy(alpha = 0.7f)
+                    )
+                ) {
                     Text(
                         text = stringResource(R.string.auth_delete_account),
-                        color = Color.Red.copy(alpha = 0.8f),
-                        fontSize = 12.sp,
+                        style = ty.labelSmall,
                     )
                 }
             }

@@ -337,16 +337,18 @@
     <string name="survey_save_button">Speichern →</string>
     <string name="survey_free_text_hint">Optionale Notizen zum Spiel…</string>
 
-    <!-- Avatar picker -->
-    <string name="avatar_picker_title">Wähle deinen Avatar</string>
-    <string name="avatar_picker_filter_label">Nach Farbe filtern</string>
-    <string name="avatar_picker_confirm">Dieses Bild verwenden</string>
-    <string name="avatar_picker_remove">Foto entfernen</string>
-    <string name="avatar_picker_edit_hint">Profilbild bearbeiten</string>
+    <!-- Profile Editing -->
+    <string name="profile_edit_title">Profil bearbeiten</string>
+    <string name="profile_edit_avatar_label">Profil-Avatar</string>
+    <string name="profile_edit_avatar_filter_label">Planeswalker nach Farbe filtern</string>
+    <string name="profile_edit_avatar_remove">Foto entfernen</string>
+
+    <string name="profile_edit_confirm">Änderungen speichern</string>
 
     <!-- Game setup -->
+    <string name="game_setup_player_name_label">Spielername</string>
     <string name="game_setup_you_badge">Du</string>
-    <string name="game_setup_default_player_name">Spieler 1</string>
+    <string name="game_setup_default_player_name">Wizard</string>
     <string name="game_setup_set_name_hint">· Namen im Profil festlegen</string>
 
     <!-- Survey questions -->
@@ -757,5 +759,8 @@
     <string name="draft_cards_all">Alle Karten</string>
     <string name="draft_guide_videos">Videos</string>
     <string name="draft_card_artist">Künstler: %1$s</string>
+
+    <!-- Auth field validation -->
+    <string name="auth_error_name_too_short">Name ist zu kurz</string>
 
 </resources>

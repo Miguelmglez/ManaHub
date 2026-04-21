@@ -21,5 +21,23 @@ sealed class AppTheme {
     /** Deep-space star-chart aesthetic. */
     object ArcaneCosmos     : AppTheme()
 
+    /** Dark purple mystical aesthetic. */
+    object ShadowEssence    : AppTheme()
+
+    /** Dark green forest/nature aesthetic. */
+    object ForestMurmur     : AppTheme()
+
+    /** Purple mystical aesthetic with cyan accents. */
+    object MysticEcho       : AppTheme()
+
+    /** Gold and silver royal aesthetic. */
+    object GildedSilver     : AppTheme()
+
+    /** Dark brown earthy aesthetic. */
+    object AncientOak       : AppTheme()
+
+    /** Neon grey and black industrial aesthetic. */
+    object ObsidianChrome   : AppTheme()
+
     // PhyrexianOil — industrial oil-slick Phyrexian horror — reserved for v3
 }

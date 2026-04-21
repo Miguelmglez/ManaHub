@@ -34,6 +34,7 @@ sealed class Screen(val route: String) {
 
     // ── Profile (bottom tab 4) ───────────────────────────────────────────────
     object Profile : Screen("profile")
+    object FriendsList : Screen("profile/friends")
 
     // ── Game flow (central FAB) ───────────────────────────────────────────────
     object GameSetup  : Screen("game/setup")
