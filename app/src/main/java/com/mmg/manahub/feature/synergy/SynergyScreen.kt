@@ -13,11 +13,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.domain.model.MtgColor
+import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.domain.model.UserCardWithCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,5 +248,96 @@ private fun EmptySynergyState(modifier: Modifier = Modifier) {
         Text(stringResource(R.string.synergy_empty_title), style = MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.synergy_empty_subtitle), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SynergyScreenPreview() {
+    val mockCard = Card(
+        scryfallId      = "1",
+        name            = "Sol Ring",
+        printedName     = null,
+        manaCost        = "{1}",
+        cmc             = 1.0,
+        colors          = emptyList(),
+        colorIdentity   = emptyList(),
+        typeLine        = "Artifact",
+        printedTypeLine = null,
+        oracleText      = "{T}: Add {C}{C}.",
+        printedText     = null,
+        keywords        = emptyList(),
+        power           = null,
+        toughness       = null,
+        loyalty         = null,
+        setCode         = "LEA",
+        setName         = "Limited Edition Alpha",
+        collectorNumber = "232",
+        rarity          = "rare",
+        releasedAt      = "1993-08-05",
+        frameEffects    = emptyList(),
+        promoTypes      = emptyList(),
+        lang            = "en",
+        imageNormal     = null,
+        imageArtCrop    = "https://cards.scryfall.io/art_crop/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg",
+        imageBackNormal = null,
+        priceUsd        = 1.0,
+        priceUsdFoil    = null,
+        priceEur        = 1.0,
+        priceEurFoil    = null,
+        legalityStandard = "legal",
+        legalityPioneer  = "legal",
+        legalityModern   = "legal",
+        legalityCommander = "legal",
+        flavorText      = null,
+        artist          = "Mark Poole",
+        scryfallUri     = "https://scryfall.com",
+    )
+
+    val mockUserCard = UserCardWithCard(
+        userCard = UserCard(scryfallId = "1"),
+        card     = mockCard
+    )
+
+    var selectedFormat by remember { mutableStateOf(DeckFormat.COMMANDER) }
+
+    val uiState = remember(selectedFormat) {
+        SynergyUiState(
+            isLoading      = false,
+            selectedFormat = selectedFormat,
+            suggestedDecks = listOf(
+                DeckSuggestion(
+                    name         = "Artifact Ramp",
+                    format       = DeckFormat.COMMANDER,
+                    colors       = listOf(MtgColor.COLORLESS),
+                    cards        = List(10) { mockUserCard },
+                    coverCardId  = "1",
+                    synergyScore = 95
+                )
+            ),
+            synergyGroups = listOf(
+                SynergyGroup(
+                    label       = "Mana Rocks",
+                    description = "Essential artifacts for accelerating your mana production in any deck.",
+                    cards       = List(6) { mockUserCard }
+                )
+            )
+        )
+    }
+
+    MaterialTheme {
+        Scaffold(
+            topBar = {
+                @OptIn(ExperimentalMaterial3Api::class)
+                TopAppBar(title = { Text(stringResource(R.string.synergy_title)) })
+            }
+        ) { padding ->
+            SynergyContent(
+                uiState        = uiState,
+                onFormatChange = { selectedFormat = it },
+                onCardClick    = {},
+                modifier       = Modifier.padding(padding)
+            )
+        }
     }
 }

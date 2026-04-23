@@ -30,6 +30,8 @@ import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.feature.addcard.AddCardScreen
 import com.mmg.manahub.feature.carddetail.CardDetailScreen
 import com.mmg.manahub.feature.collection.CollectionScreen
+import com.mmg.manahub.feature.deckmagic.DeckMagicDetailScreen
+import com.mmg.manahub.feature.deckmagic.DeckMagicScreen
 import com.mmg.manahub.feature.decks.DeckBuilderScreen
 import com.mmg.manahub.feature.decks.DeckDetailScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
@@ -176,12 +178,12 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             composable(
                 route = Screen.DeckDetail.route,
                 arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
-            ) { entry ->
-                val deckId = entry.arguments?.getLong("deckId") ?: 0L
-                DeckDetailScreen(
-                    deckId = deckId,
+            ) {
+                DeckMagicDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onAddCards = { navController.navigate(Screen.DeckAddCards.createRoute(deckId)) },
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    }
                 )
             }
 
@@ -193,22 +195,11 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(Screen.DeckBuilder.route) {
-                DeckBuilderScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onDeckSaved = {
-                        navController.navigate(Screen.Collection.route) {
-                            popUpTo(Screen.DeckBuilder.route) { inclusive = true }
-                        }
-                    },
-                )
+                DeckMagicScreen()
             }
 
             composable(Screen.Synergy.route) {
-                SynergyScreen(
-                    onCardClick = { id ->
-                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
-                    }
-                )
+                DeckMagicScreen()
             }
 
             // ── Stats ─────────────────────────────────────────────────────────

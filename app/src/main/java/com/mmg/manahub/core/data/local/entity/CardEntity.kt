@@ -53,6 +53,7 @@ data class CardEntity(
     @ColumnInfo(name = "flavor_text")  val flavorText:  String?,
     @ColumnInfo(name = "artist")       val artist:      String?,
     @ColumnInfo(name = "scryfall_uri") val scryfallUri: String,
+    @ColumnInfo(name = "game_changer") val gameChanger: Boolean = false,
     @ColumnInfo(name = "cached_at")    val cachedAt:    Long    = System.currentTimeMillis(),
 
     // True when cachedAt > CachePolicy.STALE_MS AND last refresh failed.
