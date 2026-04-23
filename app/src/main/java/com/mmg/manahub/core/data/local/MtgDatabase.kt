@@ -36,7 +36,7 @@ import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
         FriendEntity::class,
         FriendRequestEntity::class,
     ],
-    version = 24,
+    version = 25,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -509,5 +509,13 @@ val MIGRATION_23_24 = object : Migration(23, 24) {
                 cached_at       INTEGER NOT NULL
             )
         """.trimIndent())
+    }
+}
+
+val MIGRATION_24_25 = object : Migration(24, 25) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE cards ADD COLUMN game_changer INTEGER NOT NULL DEFAULT 0"
+        )
     }
 }

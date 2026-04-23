@@ -1189,23 +1189,13 @@ private fun TagsSection(
                         if (isInCollection) {
                             InputChip(
                                 selected = true,
-                                onClick = { onRemoveAutoTag(tag) },
+                                onClick = {  },
                                 label = {
                                     Text(
                                         tag.label,
                                         style = MaterialTheme.typography.labelSmall
                                     )
-                                },
-                                trailingIcon = {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = stringResource(
-                                            R.string.carddetail_tags_remove_description,
-                                            tag.label
-                                        ),
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                },
+                                }
                             )
                         } else {
                             SuggestionChip(

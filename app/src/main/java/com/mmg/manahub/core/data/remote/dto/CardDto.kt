@@ -31,6 +31,7 @@ data class CardDto(
     @SerializedName("prices")           val prices:          PricesDto,
     @SerializedName("legalities")       val legalities:      LegalitiesDto,
     @SerializedName("scryfall_uri")     val scryfallUri:     String,
+    @SerializedName("game_changer")     val gameChanger:     Boolean = false,
     @SerializedName("flavor_text")      val flavorText:      String?,
     @SerializedName("artist")           val artist:          String?,
 )

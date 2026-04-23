@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -58,14 +59,14 @@ fun ManaCurveChart(
     val idealCurve = remember { floatArrayOf(0f, 6f, 8f, 7f, 5f, 4f, 3f, 3f) }
     val idealMax   = remember { idealCurve.max().coerceAtLeast(1f) }
 
-    // Animate bar proportions — reacts to deck changes
+    // Animate bar proportions
     val animatedRatios = buckets.mapIndexed { i, count ->
         val target = count.toFloat() / maxCount
         animateFloatAsState(
             targetValue = target,
             animationSpec = tween(
                 durationMillis = 400,
-                delayMillis    = i * 25,  // stagger: bars grow left-to-right
+                delayMillis    = i * 25,
                 easing         = FastOutSlowInEasing,
             ),
             label = "bar_ratio_$i",
@@ -73,9 +74,8 @@ fun ManaCurveChart(
     }
 
     // --- Color tokens ---
-    val barColorTop    = mc.primaryAccent.copy(alpha = 0.90f)
-    val barColorBottom = mc.primaryAccent.copy(alpha = 0.35f)
-    val barGlowColor   = mc.primaryAccent.copy(alpha = 0.18f)
+    val barColorTop    = mc.primaryAccent
+    val barColorBottom = mc.primaryAccent.copy(alpha = 0.4f)
     val idealColor     = Color.White.copy(alpha = 0.35f)
     val baselineColor  = Color.White.copy(alpha = 0.12f)
     val countLabelArgb = Color.White.copy(alpha = 0.70f).toArgb()
@@ -118,7 +118,7 @@ fun ManaCurveChart(
             }
         }
 
-        // --- Single unified canvas: bars + labels ---
+        // --- Canvas ---
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -129,10 +129,12 @@ fun ManaCurveChart(
             val axisZone      = AXIS_LABEL_ZONE_DP.toPx()
             val countZone     = COUNT_LABEL_ZONE_DP.toPx()
             val barWidth      = (size.width - spacing * (barCount - 1)) / barCount
-            // Effective drawing zone for bars (between count labels and axis labels)
-            val barZoneTop    = countZone
+            
+            // Drawing zones: 
+            // barZoneTop/Bottom are strictly to define the HEIGHT of the bars 
+            // so they don't overlap with labels above or below.
             val barZoneBottom = size.height - axisZone
-            val barZoneHeight = barZoneBottom - barZoneTop
+            val barZoneHeight = barZoneBottom - countZone
 
             // --- Baseline ---
             drawLine(
@@ -150,27 +152,15 @@ fun ManaCurveChart(
                     val barX    = i * (barWidth + spacing)
                     val barTop  = barZoneBottom - barH
 
-                    // Glow — slightly wider rect behind the real bar
+                    // Draw a single bar with a vertical gradient
                     drawRoundRect(
-                        color        = barGlowColor,
-                        topLeft      = Offset(barX - 2f, barTop - 2f),
-                        size         = Size(barWidth + 4f, barH + 4f),
-                        cornerRadius = CornerRadius(BAR_CORNER_DP.toPx() + 2f),
-                    )
-
-                    // Bar with vertical gradient simulation: draw two overlapping rects
-                    // Bottom half (dark base)
-                    drawRoundRect(
-                        color        = barColorBottom,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(barColorTop, barColorBottom),
+                            startY = barTop,
+                            endY   = barZoneBottom
+                        ),
                         topLeft      = Offset(barX, barTop),
                         size         = Size(barWidth, barH),
-                        cornerRadius = CornerRadius(BAR_CORNER_DP.toPx()),
-                    )
-                    // Top 60% overlay (bright accent) — simulates top-bright gradient
-                    drawRoundRect(
-                        color        = barColorTop,
-                        topLeft      = Offset(barX, barTop),
-                        size         = Size(barWidth, barH * 0.60f),
                         cornerRadius = CornerRadius(BAR_CORNER_DP.toPx()),
                     )
                 }
@@ -196,7 +186,7 @@ fun ManaCurveChart(
                 }
             }
 
-            // --- Count labels (drawn ABOVE each bar) ---
+            // --- Count labels (ABOVE) ---
             val countPaint = Paint().apply {
                 isAntiAlias = true
                 textAlign   = Paint.Align.CENTER
@@ -210,7 +200,7 @@ fun ManaCurveChart(
                     val centerX = barX + barWidth / 2f
                     val ratio   = animatedRatios[i].value
                     val barH    = ratio * barZoneHeight
-                    val labelY  = barZoneBottom - barH - 3.dp.toPx()  // 3dp gap above bar
+                    val labelY  = barZoneBottom - barH - 3.dp.toPx()
                     drawContext.canvas.nativeCanvas.drawText(
                         count.toString(),
                         centerX,
@@ -220,7 +210,7 @@ fun ManaCurveChart(
                 }
             }
 
-            // --- Axis labels (drawn INSIDE bottom zone) ---
+            // --- Axis labels (BELOW) ---
             val axisPaint = Paint().apply {
                 isAntiAlias = true
                 textAlign   = Paint.Align.CENTER
@@ -228,7 +218,6 @@ fun ManaCurveChart(
                 color       = axisLabelArgb
                 typeface    = Typeface.DEFAULT
             }
-            // Vertical center of the axis zone
             val labelY = barZoneBottom + axisZone / 2f + axisPaint.textSize / 3f
             axisLabels.forEachIndexed { i, label ->
                 val barX    = i * (barWidth + spacing)

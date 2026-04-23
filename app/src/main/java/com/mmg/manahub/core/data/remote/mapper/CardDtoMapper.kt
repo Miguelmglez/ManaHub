@@ -43,6 +43,7 @@ fun CardDto.toDomain(): Card {
         flavorText = flavorText,
         artist = artist,
         scryfallUri = scryfallUri,
+        gameChanger = gameChanger,
         isStale = false,
         staleReason = null,
         cachedAt = System.currentTimeMillis(),
