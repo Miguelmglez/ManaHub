@@ -104,12 +104,16 @@
     <string name="addcard_confirm_condition">Condition</string>
     <string name="addcard_confirm_language">Language</string>
     <string name="addcard_confirm_button">Add</string>
-    <string name="addcard_condition_nm">Near Mint</string>
-    <string name="addcard_condition_lp">Lightly Played</string>
-    <string name="addcard_condition_mp">Moderately Played</string>
-    <string name="addcard_condition_hp">Heavily Played</string>
-    <string name="addcard_condition_dmg">Damaged</string>
+
     <string name="addcard_added_success">%1$s added to collection</string>
+
+    <string name="card_condition_m">Mint (M)</string>
+    <string name="card_condition_nm">Near Mint (NM)</string>
+    <string name="card_condition_ex">Excellent (EX)</string>
+    <string name="card_condition_gd">Good (GD)</string>
+    <string name="card_condition_lp">Light Played (LP)</string>
+    <string name="card_condition_pl">Played (PL)</string>
+    <string name="card_condition_p">Poor (PO)</string>
 
     <!-- ══════════════════════════════════════════
          CARD DETAIL SCREEN
@@ -1123,6 +1127,7 @@
     <string name="friends_section_pending">Pending Requests (%d)</string>
     <string name="friends_section_search">Search Player</string>
     <string name="friends_search_placeholder">Exact game tag (e.g. #A3KX9Z)</string>
+    <string name="friends_search_btn_hint">Search</string>
     <string name="friends_no_result">No player found with that game tag.</string>
     <string name="friends_send_invitation">Send Invitation</string>
     <string name="friends_section_friends">Friends (%d)</string>

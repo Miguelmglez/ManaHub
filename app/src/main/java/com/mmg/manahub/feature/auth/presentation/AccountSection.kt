@@ -69,6 +69,8 @@ fun AccountSection(
     onSignOutClick: () -> Unit,
     onDeleteAccountClick: () -> Unit,
     modifier: Modifier = Modifier,
+    playerName: String? = null,
+    avatarUrl: String? = null,
 ) {
     when (sessionState) {
         SessionState.Loading -> Unit // Render nothing while session is resolving
@@ -87,6 +89,8 @@ fun AccountSection(
                 onSignOutClick = onSignOutClick,
                 onDeleteAccountClick = onDeleteAccountClick,
                 modifier = modifier,
+                displayName = playerName,
+                displayAvatarUrl = avatarUrl,
             )
         }
     }
@@ -261,12 +265,16 @@ private fun AuthenticatedCard(
     onSignOutClick: () -> Unit,
     onDeleteAccountClick: () -> Unit,
     modifier: Modifier = Modifier,
+    displayName: String? = null,
+    displayAvatarUrl: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val nickname = user.nickname
+    val nickname = displayName
+        ?: user.nickname
         ?: user.email?.substringBefore('@')
         ?: "Player"
+    val avatarUrl = displayAvatarUrl ?: user.avatarUrl
     val gameTag = user.gameTag
 
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -345,9 +353,9 @@ private fun AuthenticatedCard(
                         .border(1.dp, mc.primaryAccent.copy(alpha = 0.3f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (user.avatarUrl != null) {
+                    if (avatarUrl != null) {
                         AsyncImage(
-                            model = user.avatarUrl,
+                            model = avatarUrl,
                             contentDescription = "Avatar of $nickname",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),

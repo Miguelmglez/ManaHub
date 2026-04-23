@@ -172,6 +172,7 @@ class CardRepositoryImpl @Inject constructor(
         priceUsdFoil: Double?,
         priceEur:     Double?,
         priceEurFoil: Double?,
+        updatedAt:    Long,
     ) {
         cardDao.updatePrices(
             scryfallId = scryfallId,
@@ -179,7 +180,7 @@ class CardRepositoryImpl @Inject constructor(
             priceUsdFoil = priceUsdFoil,
             priceEur = priceEur,
             priceEurFoil = priceEurFoil,
-            updatedAt = TODO(),
+            updatedAt = updatedAt,
         )
     }
 

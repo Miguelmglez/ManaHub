@@ -6,6 +6,7 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.usecase.card.SearchCardUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.util.AnalyticsHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -18,6 +19,7 @@ class ScannerViewModel @Inject constructor(
     private val searchCards:     SearchCardsUseCase,
     private val searchCard:      SearchCardUseCase,
     private val addToCollection: AddCardToCollectionUseCase,
+    private val analyticsHelper: AnalyticsHelper
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScannerUiState())
@@ -101,6 +103,7 @@ class ScannerViewModel @Inject constructor(
                 quantity   = quantity,
             )) {
                 is DataResult.Success -> _uiState.update {
+                    analyticsHelper.logEvent("scanner_add_card", mapOf("card_id" to scryfallId))
                     it.copy(
                         showConfirmSheet  = false,
                         foundCard         = null,
@@ -112,6 +115,7 @@ class ScannerViewModel @Inject constructor(
                     )
                 }
                 is DataResult.Error -> _uiState.update {
+                    analyticsHelper.logEvent("error_scanner_add_card", mapOf("card_id" to scryfallId))
                     it.copy(error = result.message, showConfirmSheet = false)
                 }
             }

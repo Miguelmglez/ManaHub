@@ -9,6 +9,7 @@ import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
+import com.mmg.manahub.core.util.AnalyticsHelper
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -51,6 +52,7 @@ class SettingsViewModelTest {
 
     private val userPrefsDataStore  = mockk<UserPreferencesDataStore>(relaxed = true)
     private val userPreferencesRepo = mockk<UserPreferencesRepository>(relaxed = true)
+    private val analyticsHelper     = mockk<AnalyticsHelper>(relaxed = true)
 
     // In-memory flow emulators for DataStore-backed properties
     private val autoRefreshFlow  = MutableStateFlow(false)
@@ -83,6 +85,7 @@ class SettingsViewModelTest {
         return SettingsViewModel(
             userPrefsDataStore  = userPrefsDataStore,
             userPreferencesRepo = userPreferencesRepo,
+            analyticsHelper     = analyticsHelper,
         )
     }
 

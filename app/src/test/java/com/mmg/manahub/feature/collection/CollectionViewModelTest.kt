@@ -18,6 +18,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -120,7 +121,7 @@ class CollectionViewModelTest {
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
         every { userCardRepository.observePendingCount() } returns flowOf(0)
         coEvery { authRepository.getCurrentUser() } returns null
-        every { authRepository.sessionState } returns flowOf(SessionState.Unauthenticated)
+        every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         return CollectionViewModel(
             getCollection      = getCollection,
             removeCard         = removeCard,
@@ -178,11 +179,7 @@ class CollectionViewModelTest {
         every { getCollection() } returns flowOf(listOf(entry))
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
 
-        viewModel = CollectionViewModel(
-            getCollection  = getCollection,
-            removeCard     = removeCard,
-            cardRepository = cardRepository,
-        )
+        viewModel = buildViewModel(emptyList())
         advanceUntilIdle()
 
         // Assert
@@ -206,14 +203,11 @@ class CollectionViewModelTest {
     @Test
     fun `given refreshCollectionPrices throws when ViewModel initializes then state remains stable`() = runTest {
         // Arrange — even if the refresh crashes, the collection should still load
-        every { getCollection() } returns flowOf(listOf(buildEntry()))
+        val entries = listOf(buildEntry())
+        every { getCollection() } returns flowOf(entries)
         coEvery { cardRepository.refreshCollectionPrices() } throws RuntimeException("Network error")
 
-        viewModel = CollectionViewModel(
-            getCollection  = getCollection,
-            removeCard     = removeCard,
-            cardRepository = cardRepository,
-        )
+        viewModel = buildViewModel(entries)
         advanceUntilIdle()
 
         // Assert: cards are still present — refresh error is swallowed by runCatching
@@ -720,11 +714,7 @@ class CollectionViewModelTest {
         }
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
 
-        viewModel = CollectionViewModel(
-            getCollection  = getCollection,
-            removeCard     = removeCard,
-            cardRepository = cardRepository,
-        )
+        viewModel = buildViewModel(emptyList())
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)

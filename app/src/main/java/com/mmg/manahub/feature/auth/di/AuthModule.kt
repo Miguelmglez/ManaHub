@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.auth.di
 
+import com.google.gson.GsonBuilder
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.di.IoDispatcher
@@ -90,10 +91,14 @@ abstract class AuthModule {
         fun provideSupabaseRetrofit(
             @Named("supabase") client: OkHttpClient,
         ): Retrofit {
+            val gson = GsonBuilder()
+                .serializeNulls()
+                .create()
+
             return Retrofit.Builder()
                 .baseUrl("${BuildConfig.SUPABASE_URL}/rest/v1/")
                 .client(client)
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create(gson))
                 .build()
         }
 
