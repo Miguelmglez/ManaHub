@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -53,6 +54,7 @@ import com.mmg.manahub.core.ui.components.AddToCollectionSheet
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.PriceFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -785,15 +787,15 @@ private fun CopyBadge(label: String) {
 //  Add to wishlist bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun AddToWishlistSheet(
     cardName: String,
     onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    val languages = listOf("en", "es", "de", "fr", "it", "pt", "ja", "ko", "ru")
+    val conditions = CardConstants.conditions
+    val languages = CardConstants.languages
 
     var isFoil by remember { mutableStateOf(false) }
     var isAlternativeArt by remember { mutableStateOf(false) }
@@ -872,12 +874,15 @@ private fun AddToWishlistSheet(
                 stringResource(R.string.addcard_confirm_condition),
                 style = MaterialTheme.typography.labelLarge
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditions.forEach { c ->
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                conditions.forEach { (code, resId) ->
                     FilterChip(
-                        selected = c == condition,
-                        onClick = { condition = c },
-                        label = { Text(c) },
+                        selected = code == condition,
+                        onClick = { condition = code },
+                        label = { Text(stringResource(resId)) },
                     )
                 }
             }
@@ -889,7 +894,7 @@ private fun AddToWishlistSheet(
                 onExpandedChange = { langExpanded = it },
             ) {
                 OutlinedTextField(
-                    value = language.uppercase(),
+                    value = "${CardConstants.getFlag(language)} ${language.uppercase()}",
                     onValueChange = {},
                     readOnly = true,
                     label = {
@@ -907,9 +912,9 @@ private fun AddToWishlistSheet(
                     expanded = langExpanded,
                     onDismissRequest = { langExpanded = false },
                 ) {
-                    languages.forEach { lang ->
+                    languages.forEach { (lang, flag) ->
                         DropdownMenuItem(
-                            text = { Text(lang.uppercase()) },
+                            text = { Text("$flag ${lang.uppercase()}") },
                             onClick = { language = lang; langExpanded = false },
                         )
                     }

@@ -9,6 +9,7 @@ import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
+import com.mmg.manahub.core.util.AnalyticsHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val userPrefsDataStore: UserPreferencesDataStore,
     private val userPreferencesRepo:   UserPreferencesRepository,
+    private val analyticsHelper: AnalyticsHelper
 //    private val langPref:              LanguagePreference
 ) : ViewModel() {
 
@@ -66,6 +68,7 @@ class SettingsViewModel @Inject constructor(
     }
     fun selectTheme(theme: AppTheme) {
         viewModelScope.launch {
+            analyticsHelper.logEvent("theme_selected", mapOf("theme" to theme))
             userPrefsDataStore.saveTheme(theme)
         }
     }

@@ -35,9 +35,10 @@ class ProfileEditViewModel @Inject constructor(
         val pendingSelection: String? = null,
         val hasMore: Boolean = false,
         val currentPage: Int = 1,
-        // Name editing
+        // Profile Info
         val currentName: String = "",
         val pendingName: String = "",
+        val gameTag: String? = null,
     ) {
         val isNameValid: Boolean get() = pendingName.isNotBlank() && pendingName.length <= 30
         val hasChanges: Boolean get() = (pendingName != currentName && isNameValid) || pendingSelection != null
@@ -48,18 +49,31 @@ class ProfileEditViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val savedUrl = userPreferencesDataStore.avatarUrlFlow.first()
-            val localName = userPreferencesDataStore.playerNameFlow.first()
-            
-            // Priority: Authenticated Nickname > Local Name
-            val currentUser = authRepository.getCurrentUser()
-            val resolvedName = currentUser?.nickname ?: localName
-            
-            _uiState.update { it.copy(
-                currentAvatarUrl = savedUrl,
-                currentName = resolvedName,
-                pendingName = resolvedName
-            ) }
+            // Observe DataStore for Name
+            userPreferencesDataStore.playerNameFlow.collect { name ->
+                _uiState.update { it.copy(
+                    currentName = name,
+                    // If currentName changes (from server sync), we should likely update pendingName 
+                    // unless the user is currently editing it and it differs from the PREVIOUS currentName.
+                    // To keep it simple and fix the "stale nickname on login" issue:
+                    pendingName = name
+                ) }
+            }
+        }
+        viewModelScope.launch {
+            // Observe session for gameTag
+            authRepository.sessionState.collect { session ->
+                if (session is com.mmg.manahub.feature.auth.domain.model.SessionState.Authenticated) {
+                    _uiState.update { it.copy(gameTag = session.user.gameTag) }
+                } else {
+                    _uiState.update { it.copy(gameTag = null) }
+                }
+            }
+        }
+        viewModelScope.launch {
+            userPreferencesDataStore.avatarUrlFlow.collect { url ->
+                _uiState.update { it.copy(currentAvatarUrl = url) }
+            }
         }
         loadPlaneswalkers()
     }

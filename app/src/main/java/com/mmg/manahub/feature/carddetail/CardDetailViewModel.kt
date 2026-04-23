@@ -13,6 +13,7 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.util.AnalyticsHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,12 +21,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CardDetailViewModel @Inject constructor(
-    savedStateHandle:            SavedStateHandle,
-    private val cardRepo:        CardRepository,
-    private val userCardRepo:    UserCardRepository,
-    private val deckRepo:        DeckRepository,
+    savedStateHandle: SavedStateHandle,
+    private val cardRepo: CardRepository,
+    private val userCardRepo: UserCardRepository,
+    private val deckRepo: DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
-    private val userPrefs:       UserPreferencesRepository,
+    private val userPrefs: UserPreferencesRepository,
+    private val helper: AnalyticsHelper,
 ) : ViewModel() {
 
     private val scryfallId: String = checkNotNull(savedStateHandle["scryfallId"])
@@ -64,7 +66,8 @@ class CardDetailViewModel @Inject constructor(
                 is DataResult.Success -> _uiState.update {
                     it.copy(card = result.data, isLoading = false, isStale = result.isStale)
                 }
-                is DataResult.Error   -> _uiState.update {
+
+                is DataResult.Error -> _uiState.update {
                     it.copy(error = result.message, isLoading = false)
                 }
             }
@@ -72,7 +75,14 @@ class CardDetailViewModel @Inject constructor(
         viewModelScope.launch {
             cardRepo.observeCard(scryfallId)
                 .filterNotNull()
-                .collect { card -> _uiState.update { it.copy(card = card, isStale = card.isStale) } }
+                .collect { card ->
+                    _uiState.update {
+                        it.copy(
+                            card = card,
+                            isStale = card.isStale
+                        )
+                    }
+                }
         }
     }
 
@@ -87,17 +97,17 @@ class CardDetailViewModel @Inject constructor(
 
     // ── Sheet visibility ──────────────────────────────────────────────────────
 
-    fun onShowAddSheet()         = _uiState.update { it.copy(showAddSheet = true) }
-    fun onDismissAddSheet()      = _uiState.update { it.copy(showAddSheet = false) }
-    fun onShowWishlistSheet()    = _uiState.update { it.copy(showWishlistSheet = true) }
+    fun onShowAddSheet() = _uiState.update { it.copy(showAddSheet = true) }
+    fun onDismissAddSheet() = _uiState.update { it.copy(showAddSheet = false) }
+    fun onShowWishlistSheet() = _uiState.update { it.copy(showWishlistSheet = true) }
     fun onDismissWishlistSheet() = _uiState.update { it.copy(showWishlistSheet = false) }
-    fun onShowTradeSheet()       = _uiState.update { it.copy(showTradeSheet = true) }
-    fun onDismissTradeSheet()    = _uiState.update { it.copy(showTradeSheet = false) }
-    fun onShowTagPicker()        = _uiState.update { it.copy(showTagPicker = true) }
-    fun onDismissTagPicker()     = _uiState.update { it.copy(showTagPicker = false) }
+    fun onShowTradeSheet() = _uiState.update { it.copy(showTradeSheet = true) }
+    fun onDismissTradeSheet() = _uiState.update { it.copy(showTradeSheet = false) }
+    fun onShowTagPicker() = _uiState.update { it.copy(showTagPicker = true) }
+    fun onDismissTagPicker() = _uiState.update { it.copy(showTagPicker = false) }
     fun onRequestDelete(uc: UserCard) = _uiState.update { it.copy(cardToDelete = uc) }
     fun onDismissDeleteConfirm() = _uiState.update { it.copy(cardToDelete = null) }
-    fun onErrorDismissed()       = _uiState.update { it.copy(error = null) }
+    fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 
     // ── Collection mutations ──────────────────────────────────────────────────
 
@@ -107,19 +117,23 @@ class CardDetailViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val result = addToCollection(
-                scryfallId       = scryfallId,
-                isFoil           = isFoil,
+                scryfallId = scryfallId,
+                isFoil = isFoil,
                 isAlternativeArt = isAlternativeArt,
-                condition        = condition,
-                language         = language,
-                quantity         = quantity,
+                condition = condition,
+                language = language,
+                quantity = quantity,
             )
             if (result is DataResult.Error) {
                 _uiState.update { it.copy(error = result.message) }
-                _events.emit(CardDetailEvent.ShowToast(
-                    "Failed to add card", ToastSeverity.ERROR,
-                ))
+                helper.logEvent("error_add_card_collection", mapOf("card_id" to scryfallId))
+                _events.emit(
+                    CardDetailEvent.ShowToast(
+                        "Failed to add card", ToastSeverity.ERROR,
+                    )
+                )
             } else {
+                helper.logEvent("add_card_collection", mapOf("card_id" to scryfallId))
                 _events.emit(CardDetailEvent.ShowToast("Card added to your collection"))
             }
             _uiState.update { it.copy(showAddSheet = false) }
@@ -132,19 +146,28 @@ class CardDetailViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val wishlistCard = UserCard(
-                scryfallId       = scryfallId,
-                isFoil           = isFoil,
+                scryfallId = scryfallId,
+                isFoil = isFoil,
                 isAlternativeArt = isAlternativeArt,
-                condition        = condition,
-                language         = language,
-                quantity         = quantity,
-                isInWishlist     = true,
+                condition = condition,
+                language = language,
+                quantity = quantity,
+                isInWishlist = true,
             )
             runCatching { userCardRepo.addOrIncrement(wishlistCard) }
-                .onSuccess { _events.emit(CardDetailEvent.ShowToast("Added to wishlist")) }
+                .onSuccess {
+                    helper.logEvent("add_card_wishlist", mapOf("card_id" to scryfallId))
+                    _events.emit(CardDetailEvent.ShowToast("Added to wishlist"))
+                }
                 .onFailure { e ->
+                    helper.logEvent("error_add_card_wishlist", mapOf("card_id" to scryfallId))
                     _uiState.update { it.copy(error = e.message) }
-                    _events.emit(CardDetailEvent.ShowToast("Could not add to wishlist", ToastSeverity.ERROR))
+                    _events.emit(
+                        CardDetailEvent.ShowToast(
+                            "Could not add to wishlist",
+                            ToastSeverity.ERROR
+                        )
+                    )
                 }
             _uiState.update { it.copy(showWishlistSheet = false) }
         }
@@ -180,10 +203,12 @@ class CardDetailViewModel @Inject constructor(
             }
             if (!anyError) {
                 val tradeCount = selections.values.count { it }
-                _events.emit(CardDetailEvent.ShowToast(
-                    if (tradeCount > 0) "$tradeCount ${if (tradeCount == 1) "copy" else "copies"} offered for trade"
-                    else "Trade offers cleared"
-                ))
+                _events.emit(
+                    CardDetailEvent.ShowToast(
+                        if (tradeCount > 0) "$tradeCount ${if (tradeCount == 1) "copy" else "copies"} offered for trade"
+                        else "Trade offers cleared"
+                    )
+                )
             }
             _uiState.update { it.copy(showTradeSheet = false) }
         }
@@ -192,8 +217,12 @@ class CardDetailViewModel @Inject constructor(
     fun onDeleteCard(userCardId: Long) {
         viewModelScope.launch {
             runCatching { userCardRepo.deleteCard(userCardId) }
-                .onSuccess  { _uiState.update { it.copy(cardToDelete = null) } }
-                .onFailure  { e -> _uiState.update { it.copy(error = e.message) } }
+                .onSuccess {
+                    helper.logEvent("delete_card", mapOf("card_id" to userCardId))
+                    _uiState.update { it.copy(cardToDelete = null) } }
+                .onFailure { e ->
+                    helper.logEvent("error_delete_card", mapOf("card_id" to userCardId))
+                    _uiState.update { it.copy(error = e.message) } }
         }
     }
 
@@ -231,10 +260,18 @@ class CardDetailViewModel @Inject constructor(
         _uiState.update { it.copy(card = it.card?.copy(userTags = updated)) }
         viewModelScope.launch {
             runCatching { cardRepo.updateUserTags(scryfallId, updated) }
-                .onSuccess { _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label}' added")) }
+                .onSuccess {
+                    helper.logEvent("add_user_tag", mapOf("tag" to tag.label))
+                    _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label}' added")) }
                 .onFailure { e ->
                     // Roll back on failure
-                    _uiState.update { it.copy(card = it.card?.copy(userTags = current), error = e.message) }
+                    helper.logEvent("error_add_user_tag", mapOf("tag" to tag.label))
+                    _uiState.update {
+                        it.copy(
+                            card = it.card?.copy(userTags = current),
+                            error = e.message
+                        )
+                    }
                 }
         }
     }
@@ -245,8 +282,17 @@ class CardDetailViewModel @Inject constructor(
         _uiState.update { it.copy(card = it.card?.copy(userTags = updated)) }
         viewModelScope.launch {
             runCatching { cardRepo.updateUserTags(scryfallId, updated) }
+                .onSuccess {
+                    helper.logEvent("remove_user_tag", mapOf("tag" to tag.label))
+                }
                 .onFailure { e ->
-                    _uiState.update { it.copy(card = it.card?.copy(userTags = current), error = e.message) }
+                    helper.logEvent("error_remove_user_tag", mapOf("tag" to tag.label))
+                    _uiState.update {
+                        it.copy(
+                            card = it.card?.copy(userTags = current),
+                            error = e.message
+                        )
+                    }
                 }
         }
     }
@@ -269,8 +315,10 @@ class CardDetailViewModel @Inject constructor(
                 userPrefs.saveUserDefinedTag(userDefinedTag)
                 cardRepo.updateUserTags(scryfallId, updatedUserTags)
             }.onSuccess {
+                helper.logEvent("save_custom_tag", mapOf("label" to label, "category" to categoryKey))
                 _events.emit(CardDetailEvent.ShowToast("'$trimmed' tag created and added"))
             }.onFailure { e ->
+                helper.logEvent("error_save_custom_tag", mapOf("label" to label, "category" to categoryKey))
                 _uiState.update { it.copy(error = e.message) }
             }
         }
@@ -282,9 +330,17 @@ class CardDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { userPrefs.deleteUserDefinedTag(key) }
                 .onSuccess {
-                    _events.emit(CardDetailEvent.ShowToast("Custom tag deleted", ToastSeverity.INFO))
+                    helper.logEvent("delete_custom_tag", mapOf("key" to key))
+                    _events.emit(
+                        CardDetailEvent.ShowToast(
+                            "Custom tag deleted",
+                            ToastSeverity.INFO
+                        )
+                    )
                 }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+                .onFailure { e ->
+                    helper.logEvent("error_delete_custom_tag", mapOf("key" to key))
+                    _uiState.update { it.copy(error = e.message) } }
         }
     }
 
@@ -294,8 +350,12 @@ class CardDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val existing = _uiState.value.userDefinedTags.find { it.key == key } ?: return@launch
             runCatching { userPrefs.saveUserDefinedTag(existing.copy(label = trimmed)) }
-                .onSuccess { _events.emit(CardDetailEvent.ShowToast("Tag renamed to '$trimmed'")) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+                .onSuccess {
+                    helper.logEvent("update_custom_tag", mapOf("label" to newLabel, "key" to key))
+                    _events.emit(CardDetailEvent.ShowToast("Tag renamed to '$trimmed'")) }
+                .onFailure { e ->
+                    helper.logEvent("error_update_custom_tag", mapOf("label" to newLabel, "key" to key))
+                    _uiState.update { it.copy(error = e.message) } }
         }
     }
 
@@ -304,15 +364,24 @@ class CardDetailViewModel @Inject constructor(
     fun onConfirmSuggestedTag(tag: CardTag) {
         viewModelScope.launch {
             runCatching { cardRepo.confirmSuggestedTag(scryfallId, tag) }
-                .onSuccess { _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label}' confirmed")) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+                .onSuccess {
+                    helper.logEvent("confirm_suggested_tag", mapOf("tag" to tag.label))
+                    _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label}' confirmed")) }
+                .onFailure { e ->
+                    helper.logEvent("error_confirm_suggested_tag", mapOf("tag" to tag.label))
+                    _uiState.update { it.copy(error = e.message) } }
         }
     }
 
     fun onDismissSuggestedTag(tag: CardTag) {
         viewModelScope.launch {
             runCatching { cardRepo.dismissSuggestedTag(scryfallId, tag) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+                .onSuccess {
+                    helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.label))
+                }
+                .onFailure { e ->
+                    helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.label))
+                    _uiState.update { it.copy(error = e.message) } }
         }
     }
 }

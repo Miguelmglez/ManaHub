@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.survey
 import androidx.lifecycle.SavedStateHandle
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.model.EliminationReason
 import com.mmg.manahub.feature.game.model.GameMode
@@ -53,6 +54,7 @@ class SurveyViewModelTest {
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val surveyAnswerDao     = mockk<SurveyAnswerDao>(relaxed = true)
+    private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
     private val savedStateHandle    = SavedStateHandle(mapOf("sessionId" to 10L))
     private val context             = mockk<android.content.Context>(relaxed = true)
 
@@ -110,7 +112,12 @@ class SurveyViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = SurveyViewModel(surveyAnswerDao, savedStateHandle, context)
+        viewModel = SurveyViewModel(
+            surveyAnswerDao = surveyAnswerDao,
+            userPreferencesRepository = userPreferencesRepository,
+            savedStateHandle = savedStateHandle,
+            context = context,
+        )
     }
 
     @After
@@ -288,7 +295,12 @@ class SurveyViewModelTest {
         val capturedEntities = slot<List<SurveyAnswerEntity>>()
         // We need to capture the entities; re-init with capture mock
         val newDao   = mockk<SurveyAnswerDao>(relaxed = true)
-        val newVm    = SurveyViewModel(newDao, SavedStateHandle(mapOf("sessionId" to 99L)), context)
+        val newVm    = SurveyViewModel(
+            surveyAnswerDao = newDao,
+            userPreferencesRepository = userPreferencesRepository,
+            savedStateHandle = SavedStateHandle(mapOf("sessionId" to 99L)),
+            context = context
+        )
         newVm.initWithResult(buildGameResult())
         val qs = newVm.uiState.value.questions
         if (qs.isEmpty()) return@runTest
@@ -312,7 +324,12 @@ class SurveyViewModelTest {
 
         val capturedEntities = slot<List<SurveyAnswerEntity>>()
         val newDao = mockk<SurveyAnswerDao>(relaxed = true)
-        val newVm  = SurveyViewModel(newDao, SavedStateHandle(mapOf("sessionId" to 1L)), context)
+        val newVm  = SurveyViewModel(
+            surveyAnswerDao = newDao,
+            userPreferencesRepository = userPreferencesRepository,
+            savedStateHandle = SavedStateHandle(mapOf("sessionId" to 1L)),
+            context = context
+        )
         newVm.initWithResult(buildGameResult())
         val qs = newVm.uiState.value.questions
         if (qs.isEmpty()) return@runTest

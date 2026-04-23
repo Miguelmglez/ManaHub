@@ -1,7 +1,9 @@
 package com.mmg.manahub.core.util
 
 import android.os.Bundle
+import android.util.Log
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.mmg.manahub.BuildConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +22,10 @@ class AnalyticsHelper @Inject constructor(
      * @param params Mapa opcional de parámetros (String, Int, Long, Double, Boolean).
      */
     fun logEvent(name: String, params: Map<String, Any?>? = null) {
+        if (BuildConfig.DEBUG) {
+            Log.d("AnalyticsHelper", "Event: $name, Params: $params")
+        }
+
         val bundle = params?.let {
             Bundle().apply {
                 it.forEach { (key, value) ->
@@ -43,6 +49,9 @@ class AnalyticsHelper @Inject constructor(
      * Establece una propiedad de usuario persistente.
      */
     fun setUserProperty(name: String, value: String?) {
+        if (BuildConfig.DEBUG) {
+            Log.d("AnalyticsHelper", "UserProperty: $name = $value")
+        }
         firebaseAnalytics.setUserProperty(name, value)
     }
 
@@ -50,6 +59,9 @@ class AnalyticsHelper @Inject constructor(
      * Identifica al usuario para el seguimiento cross-device.
      */
     fun setUserId(id: String?) {
+        if (BuildConfig.DEBUG) {
+            Log.d("AnalyticsHelper", "UserId: $id")
+        }
         firebaseAnalytics.setUserId(id)
     }
 
