@@ -2,7 +2,8 @@ package com.mmg.manahub.feature.collection
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchCriterion
@@ -11,15 +12,26 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
+import com.mmg.manahub.core.sync.CollectionSyncWorker
+import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.ZoneOffset
 import javax.inject.Inject
 
+/**
+ * ViewModel for the collection screen.
+ *
+ * Sync is reduced to a single [onSync] action that triggers both push and pull
+ * via [SyncManager]. The periodic background sync is scheduled once via WorkManager
+ * when the user is authenticated.
+ *
+ * All push/pull details, watermarks, and LWW conflict resolution are handled
+ * internally by [SyncManager] — this ViewModel only reports the state to the UI.
+ */
 @HiltViewModel
 class CollectionViewModel @Inject constructor(
     private val getCollection: GetCollectionUseCase,
@@ -27,22 +39,24 @@ class CollectionViewModel @Inject constructor(
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
     private val authRepository: AuthRepository,
-    private val prefsDataStore: UserPreferencesDataStore,
+    private val syncManager: SyncManager,
+    private val workManager: WorkManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CollectionUiState())
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
 
-    // Raw unfiltered collection from Room
+    // Raw unfiltered collection from Room (non-deleted entries)
     private val _allCards = MutableStateFlow<List<UserCardWithCard>>(emptyList())
 
     init {
         observeCollection()
         refreshPrices()
-        observePendingCount()
-        autoSyncIfFirstRunOfDay()
+        observeSyncState()
         observeSessionChanges()
     }
+
+    // ── Collection observation ────────────────────────────────────────────────
 
     private fun observeCollection() {
         viewModelScope.launch {
@@ -53,7 +67,7 @@ class CollectionViewModel @Inject constructor(
                     applyFilters()
                     _uiState.update {
                         it.copy(
-                            isLoading    = false,
+                            isLoading = false,
                             hasStaleCards = cards.any { c -> c.card.isStale },
                         )
                     }
@@ -67,72 +81,60 @@ class CollectionViewModel @Inject constructor(
         }
     }
 
-    private fun observePendingCount() {
+    /** Forwards [SyncManager.syncState] into the UI state. */
+    private fun observeSyncState() {
         viewModelScope.launch {
-            userCardRepository.observePendingCount()
-                .collect { count -> _uiState.update { it.copy(pendingUploadCount = count) } }
+            syncManager.syncState.collect { state ->
+                _uiState.update { it.copy(syncState = state) }
+            }
         }
     }
 
     private fun observeSessionChanges() {
         viewModelScope.launch {
-            var previousUserId: String? = null
             authRepository.sessionState.collect { state ->
                 _uiState.update { it.copy(sessionState = state) }
-                when (state) {
-                    is SessionState.Authenticated -> previousUserId = state.user.id
-                    is SessionState.Unauthenticated -> {
-                        previousUserId?.let { prefsDataStore.clearPendingDeleteRemoteIds(it) }
-                        previousUserId = null
-                    }
-                    else -> Unit
+                if (state is SessionState.Authenticated) {
+                    // Schedule the recurring background sync once the user is logged in.
+                    // Uses KEEP policy so repeated calls (e.g. config changes) are no-ops.
+                    CollectionSyncWorker.schedulePeriodicSync(workManager)
                 }
             }
         }
     }
 
-    private fun autoSyncIfFirstRunOfDay() {
-        viewModelScope.launch {
-            val userId = authRepository.getCurrentUser()?.id ?: return@launch
-            val today = LocalDate.now(ZoneOffset.UTC).toString()
-            val lastDate = prefsDataStore.getLastSyncDate(userId)
-            if (lastDate != today) {
-                pushInternal(userId)
-            }
-        }
-    }
+    // ── Sync user action ──────────────────────────────────────────────────────
 
-    // ── Sync user actions ─────────────────────────────────────────────────────
-
-    fun onPushCollection() {
-        viewModelScope.launch {
-            val userId = authRepository.getCurrentUser()?.id ?: return@launch
-            pushInternal(userId)
-        }
-    }
-
-    fun onPullCollection() {
+    /**
+     * Triggers a one-shot full sync (push + pull) for the current user.
+     * Also enqueues a WorkManager one-time request so the sync survives if the
+     * app is backgrounded immediately after the user taps the sync button.
+     */
+    fun onSync() {
         viewModelScope.launch {
             val userId = authRepository.getCurrentUser()?.id ?: return@launch
             _uiState.update { it.copy(syncState = SyncState.SYNCING, syncError = null) }
-            userCardRepository.pullChanges(userId)
-                .onSuccess { _uiState.update { it.copy(syncState = SyncState.SUCCESS) } }
-                .onFailure { e -> _uiState.update { it.copy(syncState = SyncState.ERROR, syncError = e.message) } }
+
+            // Enqueue a one-time WorkManager request as a fallback in case the app
+            // is killed before the coroutine below finishes.
+            workManager.enqueueUniqueWork(
+                CollectionSyncWorker.WORK_NAME_ONE_TIME,
+                ExistingWorkPolicy.REPLACE,
+                CollectionSyncWorker.oneTimeWorkRequest(),
+            )
+
+            // Also run sync inline so the UI reflects the result immediately.
+            val result = syncManager.sync(userId)
+            _uiState.update { it.copy(syncError = result.error) }
         }
     }
 
+    /** Dismisses the sync status snackbar/banner. */
     fun onSyncDismissed() {
         _uiState.update { it.copy(syncState = SyncState.IDLE, syncError = null) }
     }
 
-    private suspend fun pushInternal(userId: String) {
-        _uiState.update { it.copy(syncState = SyncState.SYNCING, syncError = null) }
-        userCardRepository.pushPendingChanges(userId)
-            .onSuccess { _uiState.update { it.copy(syncState = SyncState.SUCCESS) } }
-            .onFailure { e -> _uiState.update { it.copy(syncState = SyncState.ERROR, syncError = e.message) } }
-    }
-
-    // ── User actions ──────────────────────────────────────────────────────
+    // ── User actions ──────────────────────────────────────────────────────────
 
     fun onSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
@@ -150,7 +152,7 @@ class CollectionViewModel @Inject constructor(
         }
     }
 
-    fun onDeleteCard(userCardId: Long) {
+    fun onDeleteCard(userCardId: String) {
         viewModelScope.launch {
             runCatching { removeCard(userCardId) }
                 .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
@@ -173,7 +175,7 @@ class CollectionViewModel @Inject constructor(
         applyFilters()
     }
 
-    // ── Filtering & sorting ───────────────────────────────────────────────
+    // ── Filtering & sorting ───────────────────────────────────────────────────
 
     private fun applyFilters() {
         val state = _uiState.value
@@ -200,11 +202,11 @@ class CollectionViewModel @Inject constructor(
 
         // Sort
         val sorted = when (state.sortOrder) {
-            SortOrder.NAME        -> grouped.sortedBy { it.card.name }
-            SortOrder.PRICE_DESC  -> grouped.sortedByDescending { it.card.priceUsd ?: 0.0 }
-            SortOrder.PRICE_ASC   -> grouped.sortedBy { it.card.priceUsd ?: 0.0 }
-            SortOrder.RARITY      -> grouped.sortedByDescending { rarityWeight(it.card.rarity) }
-            SortOrder.DATE_ADDED  -> grouped.sortedByDescending { it.latestAddedAt }
+            SortOrder.NAME       -> grouped.sortedBy { it.card.name }
+            SortOrder.PRICE_DESC -> grouped.sortedByDescending { it.card.priceUsd ?: 0.0 }
+            SortOrder.PRICE_ASC  -> grouped.sortedBy { it.card.priceUsd ?: 0.0 }
+            SortOrder.RARITY     -> grouped.sortedByDescending { rarityWeight(it.card.rarity) }
+            SortOrder.DATE_ADDED -> grouped.sortedByDescending { it.latestAddedAt }
         }
 
         _uiState.update { it.copy(cards = sorted) }
@@ -276,7 +278,11 @@ class CollectionViewModel @Inject constructor(
         }
     }
 
-    private fun matchesFormat(card: com.mmg.manahub.core.domain.model.Card, format: String, legal: Boolean): Boolean {
+    private fun matchesFormat(
+        card: com.mmg.manahub.core.domain.model.Card,
+        format: String,
+        legal: Boolean,
+    ): Boolean {
         val isLegal = when (format.lowercase()) {
             "standard"  -> card.legalityStandard  == "legal"
             "pioneer"   -> card.legalityPioneer   == "legal"
@@ -287,38 +293,43 @@ class CollectionViewModel @Inject constructor(
         return isLegal == legal
     }
 
-    private fun compareRarity(cardRarity: String, targetRarity: String, op: ComparisonOperator): Boolean {
+    private fun compareRarity(
+        cardRarity: String,
+        targetRarity: String,
+        op: ComparisonOperator,
+    ): Boolean {
         val order = listOf("common", "uncommon", "rare", "mythic")
         val cardIdx = order.indexOf(cardRarity.lowercase())
         val targetIdx = order.indexOf(targetRarity.lowercase())
         if (cardIdx < 0 || targetIdx < 0) return false
         return when (op) {
-            ComparisonOperator.EQUAL             -> cardIdx == targetIdx
-            ComparisonOperator.LESS              -> cardIdx < targetIdx
-            ComparisonOperator.LESS_OR_EQUAL     -> cardIdx <= targetIdx
-            ComparisonOperator.GREATER           -> cardIdx > targetIdx
-            ComparisonOperator.GREATER_OR_EQUAL  -> cardIdx >= targetIdx
-            ComparisonOperator.NOT_EQUAL         -> cardIdx != targetIdx
+            ComparisonOperator.EQUAL            -> cardIdx == targetIdx
+            ComparisonOperator.LESS             -> cardIdx < targetIdx
+            ComparisonOperator.LESS_OR_EQUAL    -> cardIdx <= targetIdx
+            ComparisonOperator.GREATER          -> cardIdx > targetIdx
+            ComparisonOperator.GREATER_OR_EQUAL -> cardIdx >= targetIdx
+            ComparisonOperator.NOT_EQUAL        -> cardIdx != targetIdx
         }
     }
 
     private fun compareInt(cardVal: Int, target: Int, op: ComparisonOperator): Boolean = when (op) {
-        ComparisonOperator.EQUAL             -> cardVal == target
-        ComparisonOperator.LESS              -> cardVal < target
-        ComparisonOperator.LESS_OR_EQUAL     -> cardVal <= target
-        ComparisonOperator.GREATER           -> cardVal > target
-        ComparisonOperator.GREATER_OR_EQUAL  -> cardVal >= target
-        ComparisonOperator.NOT_EQUAL         -> cardVal != target
+        ComparisonOperator.EQUAL            -> cardVal == target
+        ComparisonOperator.LESS             -> cardVal < target
+        ComparisonOperator.LESS_OR_EQUAL    -> cardVal <= target
+        ComparisonOperator.GREATER          -> cardVal > target
+        ComparisonOperator.GREATER_OR_EQUAL -> cardVal >= target
+        ComparisonOperator.NOT_EQUAL        -> cardVal != target
     }
 
-    private fun compareDouble(cardVal: Double, target: Double, op: ComparisonOperator): Boolean = when (op) {
-        ComparisonOperator.EQUAL             -> cardVal == target
-        ComparisonOperator.LESS              -> cardVal < target
-        ComparisonOperator.LESS_OR_EQUAL     -> cardVal <= target
-        ComparisonOperator.GREATER           -> cardVal > target
-        ComparisonOperator.GREATER_OR_EQUAL  -> cardVal >= target
-        ComparisonOperator.NOT_EQUAL         -> cardVal != target
-    }
+    private fun compareDouble(cardVal: Double, target: Double, op: ComparisonOperator): Boolean =
+        when (op) {
+            ComparisonOperator.EQUAL            -> cardVal == target
+            ComparisonOperator.LESS             -> cardVal < target
+            ComparisonOperator.LESS_OR_EQUAL    -> cardVal <= target
+            ComparisonOperator.GREATER          -> cardVal > target
+            ComparisonOperator.GREATER_OR_EQUAL -> cardVal >= target
+            ComparisonOperator.NOT_EQUAL        -> cardVal != target
+        }
 
     private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {
         "mythic"   -> 4

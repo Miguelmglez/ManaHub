@@ -1,171 +1,70 @@
 package com.mmg.manahub.core.data.local.dao
 
-import com.mmg.manahub.core.data.local.entity.CardEntity
-import com.mmg.manahub.core.data.local.entity.SyncStatus
-import com.mmg.manahub.core.data.local.entity.UserCardEntity
+import androidx.paging.PagingSource
 import androidx.room.*
+import com.mmg.manahub.core.data.local.entity.CardEntity
+import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-abstract class UserCardDao {
+interface UserCardCollectionDao {
 
-    // Returns new row id, or -1 if (scryfall_id, is_foil, condition, language, ...) already exists.
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    abstract suspend fun insert(userCard: UserCardEntity): Long
+    // ── Write operations ──────────────────────────────────────────────────────
 
-    @Update
-    abstract suspend fun update(userCard: UserCardEntity)
+    // Room 2.x @Upsert: inserts if the PK doesn't exist, updates otherwise.
+    @Upsert
+    fun upsert(entity: UserCardCollectionEntity): Long
 
-    @Delete
-    abstract suspend fun delete(userCard: UserCardEntity)
+    @Upsert
+    fun upsertAll(entities: List<UserCardCollectionEntity>)
 
-    @Query("DELETE FROM user_cards WHERE id = :id")
-    abstract suspend fun deleteById(id: Long)
+    // Soft-delete: sets is_deleted = 1 and bumps updated_at so the sync system
+    // picks up the tombstone and propagates the deletion to Supabase.
+    @Query("UPDATE user_card_collection SET is_deleted = 1, updated_at = :updatedAt WHERE id = :id")
+    fun softDelete(id: String, updatedAt: Long = System.currentTimeMillis())
 
-    @Query("UPDATE user_cards SET quantity = quantity + 1 WHERE id = :id")
-    abstract suspend fun incrementQuantity(id: Long)
+    // Assigns a real userId to all rows created during a guest session (user_id IS NULL or '').
+    // Called once on login/registration. Returns count of updated rows so the caller can
+    // decide whether to trigger a full sync.
+    @Query("UPDATE user_card_collection SET user_id = :newUserId, updated_at = :updatedAt WHERE user_id IS NULL OR user_id = ''")
+    fun assignUserId(newUserId: String, updatedAt: Long = System.currentTimeMillis()): Int
 
-    @Query("UPDATE user_cards SET quantity = :qty WHERE id = :id")
-    abstract suspend fun updateQuantity(id: Long, qty: Int)
+    // ── Read operations ───────────────────────────────────────────────────────
 
-    // Private helper: increments the existing matching row by unique key.
-    // is_in_wishlist is part of the unique key so collection and wishlist entries stay separate.
-    @Query("""
-        UPDATE user_cards SET quantity = quantity + 1
-        WHERE scryfall_id        = :scryfallId
-        AND   is_foil            = :isFoil
-        AND   is_alternative_art = :isAlternativeArt
-        AND   condition          = :condition
-        AND   language           = :language
-        AND   is_in_wishlist     = :isInWishlist
-    """)
-    abstract suspend fun incrementQuantityByUniqueKey(
-        scryfallId:       String,
-        isFoil:           Boolean,
-        isAlternativeArt: Boolean,
-        condition:        String,
-        language:         String,
-        isInWishlist:     Boolean,
-    )
+    @Query("SELECT * FROM user_card_collection WHERE id = :id AND is_deleted = 0")
+    fun getById(id: String): UserCardCollectionEntity?
 
-    /**
-     * Atomically inserts the entry or increments its quantity if it already exists.
-     * Either path also marks the row as PENDING_UPLOAD so the sync system picks it up.
-     *
-     * The @Transaction ensures the INSERT and conditional UPDATE are executed as a
-     * single SQLite transaction, eliminating the race condition where two concurrent
-     * callers (e.g. double-tap, WorkManager sync) both receive -1L from insert()
-     * and then both fire the increment, resulting in a quantity inflated by 2.
-     */
+    // Returns all rows modified after :since — includes is_deleted = 1 rows so tombstones
+    // are also pushed during incremental sync.
+    @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND updated_at > :since")
+    fun getAllSince(userId: String, since: Long): List<UserCardCollectionEntity>
+
+    // Reactive stream of all non-deleted entries for this user (or guest rows).
+    // @Transaction prevents inconsistent reads across the two Room-internal queries for @Relation.
     @Transaction
-    open suspend fun insertOrIncrement(userCard: UserCardEntity) {
-        val insertedId = insert(userCard)
-        if (insertedId == -1L) {
-            incrementQuantityByUniqueKey(
-                scryfallId       = userCard.scryfallId,
-                isFoil           = userCard.isFoil,
-                isAlternativeArt = userCard.isAlternativeArt,
-                condition        = userCard.condition,
-                language         = userCard.language,
-                isInWishlist     = userCard.isInWishlist,
-            )
-            markPendingUploadByUniqueKey(
-                scryfallId       = userCard.scryfallId,
-                isFoil           = userCard.isFoil,
-                isAlternativeArt = userCard.isAlternativeArt,
-                condition        = userCard.condition,
-                language         = userCard.language,
-                isInWishlist     = userCard.isInWishlist,
-            )
-        }
-    }
+    @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY created_at DESC")
+    fun observeAll(userId: String?): Flow<List<UserCardWithCard>>
 
-    @Query("""
-        UPDATE user_cards SET sync_status = ${SyncStatus.PENDING_UPLOAD}
-        WHERE scryfall_id        = :scryfallId
-        AND   is_foil            = :isFoil
-        AND   is_alternative_art = :isAlternativeArt
-        AND   condition          = :condition
-        AND   language           = :language
-        AND   is_in_wishlist     = :isInWishlist
-    """)
-    abstract suspend fun markPendingUploadByUniqueKey(
-        scryfallId:       String,
-        isFoil:           Boolean,
-        isAlternativeArt: Boolean,
-        condition:        String,
-        language:         String,
-        isInWishlist:     Boolean,
-    )
+    // Reactive stream for all variants of a single scryfall card.
+    @Query("SELECT * FROM user_card_collection WHERE scryfall_id = :scryfallId AND (user_id = :userId OR user_id IS NULL) AND is_deleted = 0")
+    fun observeByScryfall(scryfallId: String, userId: String?): Flow<List<UserCardCollectionEntity>>
 
-    @Query("UPDATE user_cards SET sync_status = ${SyncStatus.PENDING_UPLOAD} WHERE id = :id")
-    abstract suspend fun markPendingUpload(id: Long)
+    // Live count of non-deleted collection entries for UI display.
+    @Query("SELECT COUNT(*) FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0")
+    fun observeCount(userId: String?): Flow<Int>
 
-    @Query("UPDATE user_cards SET sync_status = ${SyncStatus.SYNCED}, remote_id = :remoteId WHERE id = :id")
-    abstract suspend fun markAsSynced(id: Long, remoteId: String)
+    // ── Paging 3 support ──────────────────────────────────────────────────────
 
-    @Query("SELECT * FROM user_cards WHERE sync_status = ${SyncStatus.PENDING_UPLOAD}")
-    abstract suspend fun getPendingUpload(): List<UserCardEntity>
-
-    @Query("SELECT * FROM user_cards WHERE remote_id = :remoteId LIMIT 1")
-    abstract suspend fun getByRemoteId(remoteId: String): UserCardEntity?
-
-    @Query("SELECT COUNT(*) FROM user_cards WHERE sync_status = ${SyncStatus.PENDING_UPLOAD}")
-    abstract fun observePendingCount(): Flow<Int>
-
-    /** Used during pull-sync: fully overwrites a local row with remote state. Safe because
-     *  no other table has a FK pointing at user_cards rows. */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    abstract suspend fun insertOrReplace(entity: UserCardEntity): Long
-
-    // Plain query (no @Relation) so Room returns one row per UserCardEntity,
-    // avoiding the collapse that @Transaction/@Relation causes when multiple rows
-    // share the same scryfall_id.
-    @Query("SELECT * FROM user_cards WHERE scryfall_id = :scryfallId ORDER BY added_at DESC")
-    abstract fun observeByScryfallId(scryfallId: String): Flow<List<UserCardEntity>>
-
+    // Returns a PagingSource backed by Room. Requires room-paging dependency.
+    // @Transaction ensures @Relation (card join) is consistent across paged loads.
     @Transaction
-    @Query("SELECT * FROM user_cards ORDER BY added_at DESC")
-    abstract fun observeCollection(): Flow<List<UserCardWithCard>>
-
-    @Transaction
-    @Query("""
-        SELECT uc.* FROM user_cards uc
-        INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
-        WHERE c.color_identity LIKE '%' || :color || '%'
-        ORDER BY c.name ASC
-    """)
-    abstract fun observeByColor(color: String): Flow<List<UserCardWithCard>>
-
-    @Transaction
-    @Query("""
-        SELECT uc.* FROM user_cards uc
-        INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
-        WHERE c.rarity = :rarity ORDER BY c.name ASC
-    """)
-    abstract fun observeByRarity(rarity: String): Flow<List<UserCardWithCard>>
-
-    @Transaction
-    @Query("""
-        SELECT uc.* FROM user_cards uc
-        INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
-        WHERE c.name LIKE '%' || :query || '%' ORDER BY c.name ASC
-    """)
-    abstract fun searchInCollection(query: String): Flow<List<UserCardWithCard>>
-
-    @Query("SELECT * FROM user_cards WHERE id = :id")
-    abstract suspend fun getById(id: Long): UserCardEntity?
-
-    @Query("SELECT DISTINCT scryfall_id FROM user_cards")
-    abstract suspend fun getAllScryfallIds(): List<String>
-
-    @Query("SELECT COUNT(*) FROM user_cards")
-    abstract fun observeCount(): Flow<Int>
+    @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY created_at DESC")
+    fun getCollectionPagingSource(userId: String?): PagingSource<Int, UserCardWithCard>
 }
 
-/** Room relation: user card entry joined with its full card metadata. */
+/** Room relation: one user_card_collection row joined with its card metadata. */
 data class UserCardWithCard(
-    @Embedded val userCard: UserCardEntity,
+    @Embedded val userCard: UserCardCollectionEntity,
     @Relation(parentColumn = "scryfall_id", entityColumn = "scryfall_id")
-    val card: CardEntity,
+    val card: CardEntity?
 )
