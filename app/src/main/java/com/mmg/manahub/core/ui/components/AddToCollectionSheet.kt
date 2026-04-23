@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.util.CardConstants
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -31,18 +32,8 @@ fun AddToCollectionSheet(
     cardImage: String?,
     closeButton: Boolean = false,
 ) {
-    val conditions = listOf("NM", "LP", "MP", "HP", "DMG")
-    val languages = listOf(
-        "en" to "🇺🇸",
-        "es" to "🇪🇸",
-        "de" to "🇩🇪",
-        "fr" to "🇫🇷",
-        "it" to "🇮🇹",
-        "pt" to "🇵🇹",
-        "ja" to "🇯🇵",
-        "ko" to "🇰🇷",
-        "ru" to "🇷🇺"
-    )
+    val conditions = CardConstants.conditions
+    val languages = CardConstants.languages
 
     var isFoil by remember { mutableStateOf(false) }
     var isAlternativeArt by remember { mutableStateOf(false) }
@@ -176,11 +167,11 @@ fun AddToCollectionSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                conditions.forEach { c ->
+                conditions.forEach { (code, resId) ->
                     FilterChip(
-                        selected = c == condition,
-                        onClick = { condition = c },
-                        label = { Text(c) },
+                        selected = code == condition,
+                        onClick = { condition = code },
+                        label = { Text(stringResource(resId)) },
                     )
                 }
             }

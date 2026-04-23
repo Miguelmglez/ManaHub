@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.di
 
 import android.content.Context
+import com.mmg.manahub.BuildConfig
 import com.google.firebase.analytics.FirebaseAnalytics
 import dagger.Module
 import dagger.Provides
@@ -16,6 +17,9 @@ object AnalyticsModule {
     @Provides
     @Singleton
     fun provideFirebaseAnalytics(@ApplicationContext context: Context): FirebaseAnalytics {
-        return FirebaseAnalytics.getInstance(context)
+        val analytics = FirebaseAnalytics.getInstance(context)
+        // Solo habilitar el envío de analíticas en builds de release
+        analytics.setAnalyticsCollectionEnabled(!BuildConfig.DEBUG)
+        return analytics
     }
 }

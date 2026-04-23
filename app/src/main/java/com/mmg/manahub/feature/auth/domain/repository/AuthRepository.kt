@@ -3,17 +3,17 @@ package com.mmg.manahub.feature.auth.domain.repository
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface AuthRepository {
-    val sessionState: Flow<SessionState>
+    val sessionState: StateFlow<SessionState>
 
     suspend fun signInWithEmail(email: String, password: String): AuthResult<AuthUser>
     suspend fun signUpWithEmail(
         email: String,
         password: String,
         nickname: String,
-        avatarUrl: String? = null,
+        avatarUrl: String?,
     ): AuthResult<AuthUser>
 
     /**
@@ -21,7 +21,24 @@ interface AuthRepository {
      * @param idToken The Google ID token from [GoogleIdTokenCredential].
      * @param rawNonce The raw (unhashed) nonce used to generate [hashedNonce] for the request.
      */
-    suspend fun signInWithGoogleIdToken(idToken: String, rawNonce: String): AuthResult<AuthUser>
+    suspend fun signInWithGoogle(
+        idToken: String,
+        rawNonce: String
+    ): AuthResult<AuthUser>
+
+    /**
+     * Signs up using a Google ID token obtained via Credential Manager.
+     * @param idToken The Google ID token from [GoogleIdTokenCredential].
+     * @param rawNonce The raw (unhashed) nonce used to generate [hashedNonce] for the request.
+     * @param nickname The nickname entered by the user.
+     * @param avatarUrl The avatar URL selected by the user.
+     */
+    suspend fun signUpWithGoogle(
+        idToken: String,
+        rawNonce: String,
+        nickname: String,
+        avatarUrl: String?
+    ): AuthResult<AuthUser>
 
     suspend fun signOut(): AuthResult<Unit>
     suspend fun getCurrentUser(): AuthUser?

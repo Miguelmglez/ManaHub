@@ -24,6 +24,7 @@ interface CardRepository {
         priceUsdFoil: Double?,
         priceEur:     Double?,
         priceEurFoil: Double?,
+        updatedAt:    Long,
     )
     suspend fun evictStaleCache()
 

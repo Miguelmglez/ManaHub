@@ -320,7 +320,7 @@ class CardRepositoryImplTest {
     @Test
     fun `given valid prices when updatePrices then delegates to cardDao updatePrices`() = runTest {
         // Arrange
-        coEvery { cardDao.updatePrices(any(), any(), any(), any(), any()) } returns Unit
+        coEvery { cardDao.updatePrices(any(), any(), any(), any(), any(), any()) } returns Unit
 
         // Act
         repository.updatePrices(
@@ -329,6 +329,7 @@ class CardRepositoryImplTest {
             priceUsdFoil = 5.00,
             priceEur     = 1.20,
             priceEurFoil = 4.00,
+            updatedAt    = 123456789L,
         )
 
         // Assert
@@ -339,6 +340,7 @@ class CardRepositoryImplTest {
                 priceUsdFoil = 5.00,
                 priceEur     = 1.20,
                 priceEurFoil = 4.00,
+                updatedAt    = 123456789L,
             )
         }
     }
@@ -346,7 +348,7 @@ class CardRepositoryImplTest {
     @Test
     fun `given null prices when updatePrices then null values are forwarded to dao`() = runTest {
         // Arrange
-        coEvery { cardDao.updatePrices(any(), any(), any(), any(), any()) } returns Unit
+        coEvery { cardDao.updatePrices(any(), any(), any(), any(), any(), any()) } returns Unit
 
         // Act
         repository.updatePrices(
@@ -355,6 +357,7 @@ class CardRepositoryImplTest {
             priceUsdFoil = null,
             priceEur     = null,
             priceEurFoil = null,
+            updatedAt    = 987654321L,
         )
 
         // Assert
@@ -365,6 +368,7 @@ class CardRepositoryImplTest {
                 priceUsdFoil = null,
                 priceEur     = null,
                 priceEurFoil = null,
+                updatedAt    = 987654321L,
             )
         }
     }

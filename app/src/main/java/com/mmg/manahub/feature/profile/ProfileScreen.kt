@@ -130,6 +130,8 @@ fun ProfileScreen(
                 onSignOutClick = { authViewModel.signOut() },
                 onDeleteAccountClick = { authViewModel.deleteAccount() },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                playerName = uiState.playerName,
+                avatarUrl = uiState.avatarUrl,
             )
             Spacer(modifier = Modifier.navigationBarsPadding())
         }

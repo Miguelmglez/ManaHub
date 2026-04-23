@@ -94,11 +94,37 @@ fun ProfileEditSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    stringResource(R.string.profile_edit_title),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.textPrimary,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.profile_edit_title),
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = mc.textPrimary,
+                    )
+                    
+                    // Game Tag Badge
+                    uiState.gameTag?.let { tag ->
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = mc.primaryAccent.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp),
+                                )
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = tag,
+                                color = mc.primaryAccent,
+                                style = MaterialTheme.magicTypography.labelSmall.copy(
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                ),
+                            )
+                        }
+                    }
+                }
+
                 if (uiState.currentAvatarUrl != null) {
                     TextButton(onClick = {
                         viewModel.removeAvatar()
