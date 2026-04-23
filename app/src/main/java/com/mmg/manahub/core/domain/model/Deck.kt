@@ -1,11 +1,13 @@
 package com.mmg.manahub.core.domain.model
 
 data class Deck(
-    val id:          Long    = 0,
+    val id:          String,                                   // UUID, client-generated
+    val userId:      String? = null,
     val name:        String,
-    val description: String? = null,
+    val description: String  = "",
     val format:      String  = "casual",
     val coverCardId: String? = null,
+    val isDeleted:   Boolean = false,
     val createdAt:   Long    = System.currentTimeMillis(),
     val updatedAt:   Long    = System.currentTimeMillis(),
 )
