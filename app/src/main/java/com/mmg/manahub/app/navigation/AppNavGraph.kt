@@ -30,6 +30,7 @@ import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.feature.addcard.AddCardScreen
 import com.mmg.manahub.feature.carddetail.CardDetailScreen
 import com.mmg.manahub.feature.collection.CollectionScreen
+import com.mmg.manahub.feature.deckmagic.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.deckmagic.DeckMagicDetailScreen
 import com.mmg.manahub.feature.deckmagic.DeckMagicScreen
 import com.mmg.manahub.feature.decks.DeckBuilderScreen
@@ -183,8 +184,18 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     onBack = { navController.popBackStack() },
                     onCardClick = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
+                    onImproveDeck = { id ->
+                        navController.navigate(Screen.DeckImprovement.createRoute(id))
                     }
                 )
+            }
+
+            composable(
+                route = Screen.DeckImprovement.route,
+                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
+            ) {
+                DeckImprovementScreen(onBack = { navController.popBackStack() })
             }
 
             composable(
