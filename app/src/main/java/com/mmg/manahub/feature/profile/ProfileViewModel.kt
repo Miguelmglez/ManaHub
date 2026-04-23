@@ -14,7 +14,6 @@ import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
 import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
-import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.settings.PreferencesState
@@ -53,7 +52,6 @@ class ProfileViewModel @Inject constructor(
     private val surveyAnswerDao: SurveyAnswerDao,
     private val checkAchievementsUseCase: CheckAchievementsUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
-    private val authRepository: AuthRepository,
     private val friendRepository: FriendRepository,
 ) : ViewModel() {
 
@@ -142,16 +140,8 @@ class ProfileViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         // ── Resolved Player Name (Auth > Local) ─────────────────────────────
-        val resolvedNameFlow = combine(
-            userPreferencesDataStore.playerNameFlow,
-            authRepository.sessionState
-        ) { localName, session ->
-            if (session is SessionState.Authenticated) {
-                session.user.nickname ?: localName
-            } else {
-                localName
-            }
-        }.distinctUntilChanged()
+        val resolvedNameFlow = userPreferencesDataStore.playerNameFlow
+            .distinctUntilChanged()
 
         resolvedNameFlow
             .onEach { name -> _uiState.update { it.copy(playerName = name) } }

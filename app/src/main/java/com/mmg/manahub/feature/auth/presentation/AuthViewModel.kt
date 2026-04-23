@@ -12,6 +12,8 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
+import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -22,6 +24,7 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -33,28 +36,45 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.security.SecureRandom
+import java.util.regex.Pattern
 import javax.inject.Inject
+import java.security.MessageDigest
+import java.util.UUID
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val signInWithEmailUseCase: SignInWithEmailUseCase,
     private val signUpWithEmailUseCase: SignUpWithEmailUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
+    private val signUpWithGoogleUseCase: SignUpWithGoogleUseCase,
     private val signOutUseCase: SignOutUseCase,
     private val getSessionState: GetSessionStateUseCase,
     private val resetPasswordUseCase: ResetPasswordUseCase,
     private val deleteAccountUseCase: DeleteAccountUseCase,
     private val updateNicknameUseCase: UpdateNicknameUseCase,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val analyticsHelper: AnalyticsHelper,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     /** Global session state — observed from MainActivity for navigation routing. */
     val sessionState: StateFlow<SessionState> = getSessionState()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = SessionState.Loading
-        )
+
+    init {
+        viewModelScope.launch {
+            sessionState.collect { state ->
+                when (state) {
+                    is SessionState.Authenticated -> {
+                        analyticsHelper.setUserId(state.user.id)
+                    }
+                    is SessionState.Unauthenticated -> {
+                        analyticsHelper.setUserId(null)
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
@@ -168,6 +188,64 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Initiates Google Sign-Up using Credential Manager on the main thread.
+     * Generates a nonce pair (raw + SHA-256 hashed), presents the account picker,
+     * then forwards the ID token to [SignUpWithGoogleUseCase] for Supabase auth.
+     *
+     * @param nickname The nickname entered by the user on the sign-up tab.
+     * @param avatarUrl The avatar URL selected by the user.
+     *
+     * Must be called from a UI event handler (e.g. button click) so that
+     * [CredentialManager] has access to the foreground Activity context.
+     */
+    fun signUpWithGoogle(activityContext: Context, nickname: String, avatarUrl: String?) {
+        val validationError = validateNickname(nickname)
+        if (validationError != null) {
+            _uiState.value = AuthUiState.Error(validationError)
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            try {
+                val credentialManager = CredentialManager.create(activityContext)
+                val rawNonce = generateNonce()
+                val hashedNonce = hashNonce(rawNonce)
+
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(BuildConfig.GOOGLE_CLIENT_ID)
+                    .setNonce(hashedNonce)
+                    .build()
+
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+
+                val result = credentialManager.getCredential(activityContext, request)
+                val credential = result.credential
+
+                if (credential is CustomCredential &&
+                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                ) {
+                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                    val idToken = googleIdTokenCredential.idToken
+                    _uiState.value = when (val r = signUpWithGoogleUseCase(idToken, rawNonce, nickname, avatarUrl)) {
+                        is AuthResult.Success -> AuthUiState.Success
+                        is AuthResult.Error -> AuthUiState.Error(r.error.toUiMessage())
+                    }
+                } else {
+                    _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_credential_unsupported))
+                }
+            } catch (e: GetCredentialException) {
+                _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_cancelled))
+            } catch (e: Exception) {
+                _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_failed))
+            }
+        }
+    }
+
     fun signOut() {
         viewModelScope.launch {
             signOutUseCase()
@@ -182,7 +260,7 @@ class AuthViewModel @Inject constructor(
      */
     fun resetPassword(email: String) {
         val trimmedEmail = email.trim()
-        if (trimmedEmail.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+        if (trimmedEmail.isBlank() || !EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
             _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
             return
         }
@@ -231,8 +309,11 @@ class AuthViewModel @Inject constructor(
     }
 
     private fun hashNonce(rawNonce: String): String {
-        val md = java.security.MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(rawNonce.toByteArray())
+        val bytes = rawNonce.toByteArray()
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(bytes)
+
+        // Convert to lowercase hex string — Google's nonce verification accepts this format.
         return digest.fold("") { str, it -> str + "%02x".format(it) }
     }
 
@@ -268,7 +349,7 @@ class AuthViewModel @Inject constructor(
     ): String? {
         val trimmedEmail = email.trim()
         if (trimmedEmail.isBlank()) return appContext.getString(R.string.auth_validation_email_required)
-        if (!Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+        if (!EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
             return appContext.getString(R.string.auth_error_invalid_email)
         }
         if (password.isBlank()) return appContext.getString(R.string.auth_validation_password_required)
@@ -309,5 +390,9 @@ class AuthViewModel @Inject constructor(
 
         /** Alphanumeric, spaces, hyphens, underscores, apostrophes. No leading/trailing spaces. */
         private val NICKNAME_PATTERN = Regex("^[\\w\\s'\\-]{1,30}$")
+
+        private val EMAIL_PATTERN: Pattern = Pattern.compile(
+            "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+        )
     }
 }

@@ -88,11 +88,6 @@
     <string name="addcard_confirm_condition">Estado</string>
     <string name="addcard_confirm_language">Idioma</string>
     <string name="addcard_confirm_button">Añadir</string>
-    <string name="addcard_condition_nm">Near Mint</string>
-    <string name="addcard_condition_lp">Lightly Played</string>
-    <string name="addcard_condition_mp">Moderately Played</string>
-    <string name="addcard_condition_hp">Heavily Played</string>
-    <string name="addcard_condition_dmg">Dañada</string>
     <string name="addcard_added_success">%1$s añadida a la colección</string>
 
     <!-- CARD DETAIL SCREEN -->

@@ -52,6 +52,7 @@ class RefreshCollectionPricesUseCase @Inject constructor(
                         priceUsdFoil = prices.usdFoil?.toDoubleOrNull(),
                         priceEur     = prices.eur?.toDoubleOrNull(),
                         priceEurFoil = prices.eurFoil?.toDoubleOrNull(),
+                        updatedAt    = System.currentTimeMillis(),
                     )
                     updatedCount++
                 }

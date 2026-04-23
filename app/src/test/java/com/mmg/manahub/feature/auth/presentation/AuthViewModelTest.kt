@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.auth.presentation
 
 import android.content.Context
+import android.util.Patterns
+import java.util.regex.Pattern
 import app.cash.turbine.test
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
@@ -13,12 +15,16 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.anyNullable
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.Runs
+import io.mockk.just
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +68,7 @@ class AuthViewModelTest {
     private val signInWithEmailUseCase  = mockk<SignInWithEmailUseCase>()
     private val signUpWithEmailUseCase  = mockk<SignUpWithEmailUseCase>()
     private val signInWithGoogleUseCase = mockk<SignInWithGoogleUseCase>()
+    private val signUpWithGoogleUseCase = mockk<SignUpWithGoogleUseCase>()
     private val signOutUseCase          = mockk<SignOutUseCase>()
     private val getSessionState         = mockk<GetSessionStateUseCase>()
     private val resetPasswordUseCase    = mockk<ResetPasswordUseCase>()
@@ -155,11 +162,14 @@ class AuthViewModelTest {
         signInWithEmailUseCase  = signInWithEmailUseCase,
         signUpWithEmailUseCase  = signUpWithEmailUseCase,
         signInWithGoogleUseCase = signInWithGoogleUseCase,
+        signUpWithGoogleUseCase = signUpWithGoogleUseCase,
         signOutUseCase          = signOutUseCase,
         getSessionState         = getSessionState,
         resetPasswordUseCase    = resetPasswordUseCase,
         deleteAccountUseCase    = deleteAccountUseCase,
         updateNicknameUseCase   = updateNicknameUseCase,
+        userPreferencesDataStore = mockk(relaxed = true),
+        analyticsHelper         = mockk(relaxed = true),
         appContext               = appContext,
     )
 
@@ -168,6 +178,7 @@ class AuthViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+
         every { getSessionState() } returns sessionStateFlow
         stubContextStrings()
         viewModel = buildViewModel()

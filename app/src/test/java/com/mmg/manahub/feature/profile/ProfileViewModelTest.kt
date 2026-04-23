@@ -12,6 +12,9 @@ import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
 import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -70,11 +73,14 @@ class ProfileViewModelTest {
     private val surveyAnswerDao          = mockk<SurveyAnswerDao>()
     private val checkAchievementsUseCase = mockk<CheckAchievementsUseCase>()
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val authRepository           = mockk<AuthRepository>(relaxed = true)
+    private val friendRepository         = mockk<FriendRepository>(relaxed = true)
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Player 1")
     private val avatarUrlFlow     = MutableStateFlow<String?>(null)
     private val preferencesFlow   = MutableStateFlow(TestFixtures.buildPreferences())
+    private val sessionStateFlow  = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
 
     private lateinit var viewModel: ProfileViewModel
 
@@ -122,6 +128,7 @@ class ProfileViewModelTest {
         every { userPreferencesDataStore.playerNameFlow }  returns playerNameFlow
         every { userPreferencesDataStore.avatarUrlFlow }   returns avatarUrlFlow
         every { userPreferencesDataStore.preferencesFlow } returns preferencesFlow
+        every { authRepository.sessionState }              returns sessionStateFlow
 
         every { statsRepo.observeCollectionStats(any()) }   returns flowOf(collectionStats)
         every { gameSessionRepo.observeTotalGames() }       returns flowOf(totalGames)
@@ -144,6 +151,9 @@ class ProfileViewModelTest {
         every { surveyAnswerDao.observeAvgHandRating() }    returns flowOf(null)
         every { surveyAnswerDao.observeFavoriteWinStyle() } returns flowOf(null)
 
+        every { friendRepository.observeFriendCount() }     returns flowOf(0)
+        every { friendRepository.observePendingCount() }    returns flowOf(0)
+
         every { checkAchievementsUseCase(any(), any()) } returns emptyList()
     }
 
@@ -153,6 +163,8 @@ class ProfileViewModelTest {
         surveyAnswerDao          = surveyAnswerDao,
         checkAchievementsUseCase = checkAchievementsUseCase,
         userPreferencesDataStore = userPreferencesDataStore,
+        authRepository           = authRepository,
+        friendRepository         = friendRepository,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────

@@ -127,6 +127,9 @@ fun LoginSheet(
                 authViewModel.signUpWithEmail(email, password, nickname, avatarUrl)
             },
             onGoogleSignIn = { context -> authViewModel.signInWithGoogle(context) },
+            onGoogleSignUp = { context, nick, avatarUrl -> 
+                authViewModel.signUpWithGoogle(context, nick, avatarUrl) 
+            },
             onResetPassword = { email -> authViewModel.resetPassword(email) },
             onResetUiState = { authViewModel.resetUiState() },
         )
@@ -145,6 +148,7 @@ private fun LoginSheetContent(
     onSignIn: (String, String) -> Unit,
     onSignUp: (String, String, String, String?) -> Unit,
     onGoogleSignIn: (android.content.Context) -> Unit,
+    onGoogleSignUp: (android.content.Context, String, String?) -> Unit,
     onResetPassword: (String) -> Unit,
     onResetUiState: () -> Unit,
 ) {
@@ -453,7 +457,17 @@ private fun LoginSheetContent(
 
             // ── Google button ──────────────────────────────────────────────────
             OutlinedButton(
-                onClick = { onGoogleSignIn(context) },
+                onClick = {
+                    if (selectedTab == 1) {
+                        if (nickname.isBlank()) {
+                            nicknameError = true
+                        } else {
+                            onGoogleSignUp(context, nickname, initialAvatarUrl)
+                        }
+                    } else {
+                        onGoogleSignIn(context)
+                    }
+                },
                 enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()

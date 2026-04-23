@@ -195,32 +195,45 @@ fun FriendsScreen(
                         stringResource(R.string.friends_section_search),
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                     )
-                    OutlinedTextField(
-                        value = uiState.searchQuery,
-                        onValueChange = viewModel::onSearchQueryChange,
-                        placeholder = {
-                            Text(
-                                stringResource(R.string.friends_search_placeholder),
-                                color = mc.textDisabled,
-                                style = MaterialTheme.magicTypography.bodySmall,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
-                        },
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = mc.textPrimary,
-                            unfocusedTextColor = mc.textPrimary,
-                            focusedBorderColor = mc.primaryAccent,
-                            unfocusedBorderColor = mc.surfaceVariant,
-                            cursorColor = mc.primaryAccent,
-                            focusedContainerColor = mc.surface,
-                            unfocusedContainerColor = mc.surface,
-                        ),
-                    )
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = viewModel::onSearchQueryChange,
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.friends_search_placeholder),
+                                    color = mc.textDisabled,
+                                    style = MaterialTheme.magicTypography.bodySmall,
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = mc.textPrimary,
+                                unfocusedTextColor = mc.textPrimary,
+                                focusedBorderColor = mc.primaryAccent,
+                                unfocusedBorderColor = mc.surfaceVariant,
+                                cursorColor = mc.primaryAccent,
+                                focusedContainerColor = mc.surface,
+                                unfocusedContainerColor = mc.surface,
+                            ),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(
+                            onClick = viewModel::triggerSearch,
+                            enabled = !uiState.isSearching,
+                        ) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = stringResource(R.string.friends_search_btn_hint),
+                                tint = if (uiState.isSearching) mc.textDisabled else mc.primaryAccent,
+                            )
+                        }
+                    }
                     if (uiState.isSearching) {
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),

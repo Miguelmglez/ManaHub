@@ -9,6 +9,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -116,50 +117,50 @@ class AuthUseCasesTest {
 
     @Test
     fun `given email with leading and trailing spaces when SignUpWithEmailUseCase invoked then calls repository with trimmed email`() = runTest {
-        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero") } returns successUser
+        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero", null) } returns successUser
         val useCase = SignUpWithEmailUseCase(repository)
 
         val result = useCase("  new@example.com  ", "password123", "Hero")
 
-        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero") }
+        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero", null) }
         assertEquals(successUser, result)
     }
 
     @Test
     fun `given nickname with leading spaces when SignUpWithEmailUseCase invoked then calls repository with trimmed nickname`() = runTest {
-        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero") } returns successUser
+        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero", null) } returns successUser
         val useCase = SignUpWithEmailUseCase(repository)
 
         useCase("new@example.com", "password123", "  Hero  ")
 
-        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero") }
+        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero", null) }
     }
 
     @Test
     fun `given clean email when SignUpWithEmailUseCase invoked then delegates to repository unchanged`() = runTest {
-        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero") } returns successUser
+        coEvery { repository.signUpWithEmail("new@example.com", "password123", "Hero", null) } returns successUser
         val useCase = SignUpWithEmailUseCase(repository)
 
         val result = useCase("new@example.com", "password123", "Hero")
 
-        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero") }
+        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "password123", "Hero", null) }
         assertEquals(successUser, result)
     }
 
     @Test
     fun `given password is NOT trimmed when SignUpWithEmailUseCase invoked then password is forwarded as-is`() = runTest {
-        coEvery { repository.signUpWithEmail(any(), "  pass with spaces  ", any()) } returns successUser
+        coEvery { repository.signUpWithEmail(any(), "  pass with spaces  ", any(), anyNullable()) } returns successUser
         val useCase = SignUpWithEmailUseCase(repository)
 
         useCase("new@example.com", "  pass with spaces  ", "Hero")
 
-        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "  pass with spaces  ", "Hero") }
+        coVerify(exactly = 1) { repository.signUpWithEmail("new@example.com", "  pass with spaces  ", "Hero", null) }
     }
 
     @Test
     fun `given repository returns EmailConfirmationRequired when SignUpWithEmailUseCase invoked then propagates Error`() = runTest {
         val errorResult = AuthResult.Error(AuthError.EmailConfirmationRequired)
-        coEvery { repository.signUpWithEmail(any(), any(), any()) } returns errorResult
+        coEvery { repository.signUpWithEmail(any(), any(), any(), anyNullable()) } returns errorResult
         val useCase = SignUpWithEmailUseCase(repository)
 
         val result = useCase("new@example.com", "password123", "Hero")
@@ -171,7 +172,7 @@ class AuthUseCasesTest {
     @Test
     fun `given repository returns EmailAlreadyInUse when SignUpWithEmailUseCase invoked then propagates Error`() = runTest {
         val errorResult = AuthResult.Error(AuthError.EmailAlreadyInUse)
-        coEvery { repository.signUpWithEmail(any(), any(), any()) } returns errorResult
+        coEvery { repository.signUpWithEmail(any(), any(), any(), anyNullable()) } returns errorResult
         val useCase = SignUpWithEmailUseCase(repository)
 
         val result = useCase("existing@example.com", "password123", "Hero")
@@ -181,23 +182,34 @@ class AuthUseCasesTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — SignInWithGoogleUseCase
+    //  GROUP 3 — SignInWithGoogleUseCase & SignUpWithGoogleUseCase
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given valid token and nonce when SignInWithGoogleUseCase invoked then delegates to repository with same arguments`() = runTest {
-        coEvery { repository.signInWithGoogleIdToken("google-id-token", "raw-nonce") } returns successUser
+    fun `given valid token and nonce when SignInWithGoogleUseCase invoked then delegates to repository`() = runTest {
+        coEvery { repository.signInWithGoogle("google-id-token", "raw-nonce") } returns successUser
         val useCase = SignInWithGoogleUseCase(repository)
 
         val result = useCase("google-id-token", "raw-nonce")
 
-        coVerify(exactly = 1) { repository.signInWithGoogleIdToken("google-id-token", "raw-nonce") }
+        coVerify(exactly = 1) { repository.signInWithGoogle("google-id-token", "raw-nonce") }
+        assertEquals(successUser, result)
+    }
+
+    @Test
+    fun `given valid arguments when SignUpWithGoogleUseCase invoked then delegates to repository`() = runTest {
+        coEvery { repository.signUpWithGoogle("google-id-token", "raw-nonce", "Hero", "url") } returns successUser
+        val useCase = SignUpWithGoogleUseCase(repository)
+
+        val result = useCase("google-id-token", "raw-nonce", "Hero", "url")
+
+        coVerify(exactly = 1) { repository.signUpWithGoogle("google-id-token", "raw-nonce", "Hero", "url") }
         assertEquals(successUser, result)
     }
 
     @Test
     fun `given repository returns Error when SignInWithGoogleUseCase invoked then propagates Error`() = runTest {
-        coEvery { repository.signInWithGoogleIdToken(any(), any()) } returns networkError
+        coEvery { repository.signInWithGoogle(any(), any()) } returns networkError
         val useCase = SignInWithGoogleUseCase(repository)
 
         val result = useCase("some-token", "some-nonce")
@@ -209,12 +221,23 @@ class AuthUseCasesTest {
     fun `given idToken is NOT modified when SignInWithGoogleUseCase invoked then token forwarded unchanged`() = runTest {
         // Tokens are opaque blobs — no trimming or mutation should occur
         val longToken = "eyJhb.eyJzdW.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-        coEvery { repository.signInWithGoogleIdToken(longToken, "nonce") } returns successUser
+        coEvery { repository.signInWithGoogle(longToken, "nonce") } returns successUser
         val useCase = SignInWithGoogleUseCase(repository)
 
         useCase(longToken, "nonce")
 
-        coVerify(exactly = 1) { repository.signInWithGoogleIdToken(longToken, "nonce") }
+        coVerify(exactly = 1) { repository.signInWithGoogle(longToken, "nonce") }
+    }
+
+    @Test
+    fun `given nickname with spaces when SignUpWithGoogleUseCase invoked then nickname forwarded as-is without trimming`() = runTest {
+        // The use case is a thin proxy — trimming is the ViewModel's responsibility
+        coEvery { repository.signUpWithGoogle(any(), any(), "  Hero  ", any()) } returns successUser
+        val useCase = SignUpWithGoogleUseCase(repository)
+
+        useCase("google-token", "nonce", "  Hero  ", "url")
+
+        coVerify(exactly = 1) { repository.signUpWithGoogle("google-token", "nonce", "  Hero  ", "url") }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -322,7 +345,7 @@ class AuthUseCasesTest {
 
     @Test
     fun `when GetSessionStateUseCase invoked then returns the repository sessionState flow`() = runTest {
-        val sessionFlow = flowOf(SessionState.Loading)
+        val sessionFlow = MutableStateFlow<SessionState>(SessionState.Loading)
         every { repository.sessionState } returns sessionFlow
         val useCase = GetSessionStateUseCase(repository)
 
@@ -333,7 +356,7 @@ class AuthUseCasesTest {
 
     @Test
     fun `given repository emits Unauthenticated when GetSessionStateUseCase flow collected then emits Unauthenticated`() = runTest {
-        every { repository.sessionState } returns flowOf(SessionState.Unauthenticated)
+        every { repository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         val useCase = GetSessionStateUseCase(repository)
 
         val result = useCase().first()
@@ -344,7 +367,7 @@ class AuthUseCasesTest {
     @Test
     fun `given repository emits Authenticated when GetSessionStateUseCase flow collected then emits Authenticated`() = runTest {
         val authenticatedState = SessionState.Authenticated(dummyAuthUser)
-        every { repository.sessionState } returns flowOf(authenticatedState)
+        every { repository.sessionState } returns MutableStateFlow(authenticatedState)
         val useCase = GetSessionStateUseCase(repository)
 
         val result = useCase().first()
@@ -356,7 +379,7 @@ class AuthUseCasesTest {
     @Test
     fun `given GetSessionStateUseCase invoked multiple times then each call returns the same flow reference`() = runTest {
         // Use case is a thin proxy — it must not create a new flow on each invocation
-        every { repository.sessionState } returns flowOf(SessionState.Loading)
+        every { repository.sessionState } returns MutableStateFlow(SessionState.Loading)
         val useCase = GetSessionStateUseCase(repository)
 
         useCase()
