@@ -38,10 +38,23 @@ object TypeLineAnalyzer {
      */
     fun analyze(card: Card): List<SuggestedTag> {
         val out = mutableListOf<SuggestedTag>()
-        val parts = card.typeLine
+        var typeLine = card.typeLine
             .replace("—", " ")
             .replace("-", " ")
             .replace("//", " ")
+
+        // Detect and consume "Basic Land" (including snow-covered) as a single combined tag.
+        val basicLandPattern = Regex("Basic (Snow )?Land", RegexOption.IGNORE_CASE)
+        if (basicLandPattern.containsMatchIn(typeLine)) {
+            out += SuggestedTag(
+                tag        = CardTag("basic_land", TagCategory.TYPE),
+                confidence = 1.0f,
+                source     = "type_line",
+            )
+            typeLine = typeLine.replace(basicLandPattern, "")
+        }
+
+        val parts = typeLine
             .split(' ')
             .map { it.trim() }
             .filter { it.isNotEmpty() && it.length > 1 }
@@ -95,6 +108,13 @@ object StrategyAnalyzer {
                 )
             }
         }
+
+        // Hot fix: Basic lands should not be tagged as "ramp"
+        if (card.typeLine.contains("Basic Land", ignoreCase = true) ||
+            card.typeLine.contains("Basic Snow Land", ignoreCase = true)) {
+            results.removeAll { it.tag.key == "ramp" }
+        }
+
         return results
     }
 }

@@ -49,9 +49,12 @@ object TagDictionary {
     /** Localize a CardTag for the current locale. Returns null if unknown. */
     fun localize(tag: CardTag, lang: String = currentLang()): String? = when (tag.category) {
         TagCategory.TYPE -> {
+            // "basic_land" -> "Basic Land"
+            val words = tag.key.split("_")
+                .joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
+
             // Delegate to the type translator (single source of truth).
-            val word = tag.key.replaceFirstChar { it.uppercase() }
-            CardTypeTranslator.translateWord(word).takeIf { it.isNotBlank() }
+            CardTypeTranslator.translateTypeLine(words, lang).takeIf { it.isNotBlank() }
         }
         else -> entries[tag.key]?.labels?.get(lang)
             ?: entries[tag.key]?.labels?.get("en")
