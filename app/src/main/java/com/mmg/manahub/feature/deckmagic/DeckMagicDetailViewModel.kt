@@ -3,24 +3,26 @@ package com.mmg.manahub.feature.deckmagic
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.model.*
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.DeckCardValidator
-import com.mmg.manahub.feature.decks.DeckSlotEntry
-import com.mmg.manahub.feature.decks.DeckDetailViewModel.AddCardRow
+import com.mmg.manahub.core.sync.CollectionSyncWorker
+import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.SyncState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class GroupingMode { TYPE, COLOR, COST, TAG }
-enum class DetailStep { VIEW, REVIEW }
 
 data class LandDelta(
     val landName: String,
@@ -33,7 +35,6 @@ data class DeckMagicDetailUiState(
     val cards: List<DeckSlotEntry> = emptyList(),
     val isLoading: Boolean = true,
     val groupingMode: GroupingMode = GroupingMode.TYPE,
-    val step: DetailStep = DetailStep.VIEW,
     val landDeltas: List<LandDelta> = emptyList(),
     val showLandSuggestions: Boolean = true,
     val totalCards: Int = 0,
@@ -41,6 +42,9 @@ data class DeckMagicDetailUiState(
     val collectionIds: Set<String> = emptySet(),
     val error: String? = null,
     
+    val mainboardExpanded: Boolean = true,
+    val sideboardExpanded: Boolean = false,
+
     // Search / Add cards state
     val addCardsQuery: String = "",
     val addCardsResults: List<AddCardRow> = emptyList(),
@@ -52,7 +56,11 @@ data class DeckMagicDetailUiState(
     val overLimitCards: Set<String> = emptySet(),
     val acknowledgedOverLimitCards: Set<String> = emptySet(),
     
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val isImporting: Boolean = false,
+    val importError: String? = null,
+    val syncState: SyncState = SyncState.IDLE,
+    val syncError: String? = null
 )
 
 @HiltViewModel
@@ -60,11 +68,15 @@ class DeckMagicDetailViewModel @Inject constructor(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
+    private val authRepository: AuthRepository,
+    private val syncManager: SyncManager,
+    private val workManager: WorkManager,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    val deckId: Long = checkNotNull(savedStateHandle["deckId"])
+   // val deckId: Long = checkNotNull(savedStateHandle["deckId"])
 
+    val deckId: String = checkNotNull(savedStateHandle["deckId"])
     private val _uiState = MutableStateFlow(DeckMagicDetailUiState())
     val uiState: StateFlow<DeckMagicDetailUiState> = _uiState.asStateFlow()
 
@@ -79,6 +91,15 @@ class DeckMagicDetailViewModel @Inject constructor(
     init {
         observeDeck()
         observeCollection()
+        observeSyncState()
+    }
+
+    private fun observeSyncState() {
+        viewModelScope.launch {
+            syncManager.syncState.collect { state ->
+                _uiState.update { it.copy(syncState = state) }
+            }
+        }
     }
 
     private fun observeDeck() {
@@ -150,8 +171,8 @@ class DeckMagicDetailViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    fun setStep(step: DetailStep) = _uiState.update { it.copy(step = step) }
-    fun goBackToView() = setStep(DetailStep.VIEW)
+    fun toggleMainboard() = _uiState.update { it.copy(mainboardExpanded = !it.mainboardExpanded) }
+    fun toggleSideboard() = _uiState.update { it.copy(sideboardExpanded = !it.sideboardExpanded) }
     fun setGroupingMode(mode: GroupingMode) = _uiState.update { it.copy(groupingMode = mode) }
     fun toggleLandSuggestions() = _uiState.update { it.copy(showLandSuggestions = !it.showLandSuggestions) }
 
@@ -165,7 +186,7 @@ class DeckMagicDetailViewModel @Inject constructor(
     }
 
     private fun calculateLandDeltas(entries: List<DeckSlotEntry>, formatName: String): List<LandDelta> {
-        val format = DeckFormat.entries.find { it.name.lowercase() == formatName.lowercase() } 
+        val format = DeckFormat.entries.find { it.name.equals(formatName, ignoreCase = true) }
             ?: DeckFormat.STANDARD
         
         val deckCards = entries.filter { it.card != null && !it.isSideboard }.map { 
@@ -376,8 +397,7 @@ class DeckMagicDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSearchingScryfall = true) }
             try {
-                val result = cardRepository.searchCards(query)
-                val cards = when (result) {
+                val cards = when (val result = cardRepository.searchCards(query)) {
                     is DataResult.Success -> result.data
                     is DataResult.Error -> emptyList()
                 }
@@ -433,13 +453,13 @@ class DeckMagicDetailViewModel @Inject constructor(
         val mainDeckCards = state.cards
             .filter { !it.isSideboard && it.scryfallId != commanderScryfallId }
             .mapNotNull { dc -> dc.card?.let { card ->
-                com.mmg.manahub.core.domain.model.DeckCard(card = card, quantity = dc.quantity)
+                DeckCard(card = card, quantity = dc.quantity)
             }}
 
         val sideboardCards = state.cards
             .filter { it.isSideboard }
             .mapNotNull { dc -> dc.card?.let { card ->
-                com.mmg.manahub.core.domain.model.DeckCard(card = card, quantity = dc.quantity)
+                DeckCard(card = card, quantity = dc.quantity)
             }}
 
         return DeckImportExportHelper.export(
@@ -451,17 +471,26 @@ class DeckMagicDetailViewModel @Inject constructor(
     }
 
     fun onNavigatingBack() {
-        viewModelScope.launch {
-            withContext(NonCancellable) {
-                deckRepository.syncDeckNow(deckId)
-            }
-        }
+        // Sync is handled by SyncManager / WorkManager — no inline sync needed here.
     }
 
     fun saveDeck(onComplete: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
-            deckRepository.syncDeckNow(deckId)
+            _uiState.update { it.copy(isSaving = true, syncError = null) }
+
+            val userId = authRepository.getCurrentUser()?.id
+            if (userId != null) {
+                // Enqueue background sync as fallback
+                workManager.enqueueUniqueWork(
+                    CollectionSyncWorker.WORK_NAME_ONE_TIME,
+                    ExistingWorkPolicy.REPLACE,
+                    CollectionSyncWorker.oneTimeWorkRequest()
+                )
+                // Run inline sync for immediate feedback
+                val result = syncManager.sync(userId)
+                _uiState.update { it.copy(syncError = result.error) }
+            }
+
             _uiState.update { it.copy(isSaving = false) }
             onComplete()
         }

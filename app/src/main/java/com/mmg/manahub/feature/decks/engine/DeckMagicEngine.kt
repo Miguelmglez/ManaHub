@@ -1,4 +1,10 @@
-package com.mmg.manahub.feature.deckmagic.engine
+package com.mmg.manahub.feature.decks.engine
+
+import com.mmg.manahub.core.domain.model.DeckSlotEntry
+
+
+
+
 
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
@@ -6,7 +12,7 @@ import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
+
 import com.mmg.manahub.feature.decks.engine.GameFormat
 import com.mmg.manahub.feature.decks.engine.ManaColor
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +72,7 @@ data class MagicDiscovery(
 
 /**
  * Unified engine for collection analysis (Discovery) and deck creation (Creator).
- * This is a singleton-friendly logic class, not a ViewModel.
+ * This is a singleton-friendly logic class, not a ViewModel .
  */
 @Singleton
 class DeckMagicEngine @Inject constructor() {
@@ -165,6 +171,13 @@ class DeckMagicEngine @Inject constructor() {
             landDiff > 2 -> weaknesses.add(AnalysisPoint(R.string.deck_improve_lands_many, R.string.deck_improve_lands_many, AnalysisSeverity.WARNING))
         }
 
+        // ── 1b. Total Card Count Analysis ───────────────────────────────────
+        if (totalCards > targetDeckSize) {
+            weaknesses.add(AnalysisPoint(R.string.deckbuilder_too_many_cards, R.string.deckbuilder_too_many_cards, AnalysisSeverity.ERROR))
+        } else if (totalCards < targetDeckSize) {
+            weaknesses.add(AnalysisPoint(R.string.deckbuilder_deck_empty, R.string.deckbuilder_deck_empty, AnalysisSeverity.WARNING))
+        }
+
         // ── 2. Mana Curve Analysis ──────────────────────────────────────────
         val avgCmc = if (nonLands.isEmpty()) 0.0 else nonLands.sumOf { it.card!!.cmc * it.quantity } / nonLands.sumOf { it.quantity }
         when {
@@ -215,3 +228,26 @@ class DeckMagicEngine @Inject constructor() {
         DeckImprovementReport(strengths, weaknesses, suggestions.distinctBy { it.magicCard.card.scryfallId })
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

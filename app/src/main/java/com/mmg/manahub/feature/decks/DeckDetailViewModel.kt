@@ -3,10 +3,7 @@ package com.mmg.manahub.feature.decks
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.domain.model.*
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -22,18 +19,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Represents a card slot inside a persisted deck.
- *
- * Named [DeckSlotEntry] to avoid collision with the domain-level
- * [com.mmg.manahub.core.domain.model.DeckCard] used by the deck builder.
- */
-data class DeckSlotEntry(
-    val scryfallId: String,
-    val quantity: Int,
-    val isSideboard: Boolean,
-    val card: Card?,
-)
 
 @HiltViewModel
 class DeckDetailViewModel @Inject constructor(
@@ -48,12 +33,6 @@ class DeckDetailViewModel @Inject constructor(
     }
 
     private val deckId: String = checkNotNull(savedStateHandle["deckId"])
-
-    data class AddCardRow(
-        val card: Card,
-        val quantityInDeck: Int,
-        val isOwned: Boolean,
-    )
 
     data class UiState(
         val deck: Deck? = null,

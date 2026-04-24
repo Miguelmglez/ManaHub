@@ -41,6 +41,10 @@ class DeckViewModel @Inject constructor(
         }
     }
 
+    fun onCreatedDeckNavigated() {
+        _uiState.update { it.copy(createdDeckId = null) }
+    }
+
     fun deleteDeck(deckId: String) {
         viewModelScope.launch {
             runCatching { deckRepo.deleteDeck(deckId) }
@@ -104,4 +108,5 @@ data class DeckListUiState(
     val isImporting:      Boolean           = false,
     val importError:      String?           = null,
     val error:            String?           = null,
+    val createdDeckId:    String?           = null,
 )

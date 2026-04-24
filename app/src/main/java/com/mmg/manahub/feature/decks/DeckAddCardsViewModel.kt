@@ -3,8 +3,7 @@ package com.mmg.manahub.feature.decks
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.model.*
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -27,16 +26,10 @@ class DeckAddCardsViewModel @Inject constructor(
 
     private val deckId: String = checkNotNull(savedStateHandle["deckId"])
 
-    data class CardRow(
-        val card:           Card,
-        val quantityInDeck: Int,
-        val isOwned:        Boolean,
-    )
-
     data class UiState(
         val deckName:   String       = "",
         val query:      String       = "",
-        val cards:      List<CardRow> = emptyList(),
+        val cards:      List<AddCardRow> = emptyList(),
         val isLoading:  Boolean      = true,
         val isSearching: Boolean     = false,
     )
@@ -76,7 +69,7 @@ class DeckAddCardsViewModel @Inject constructor(
                     s.copy(
                         isLoading = false,
                         cards     = collectionCards.map { card ->
-                            CardRow(
+                            AddCardRow(
                                 card           = card,
                                 quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
                                 isOwned        = true,
@@ -101,7 +94,7 @@ class DeckAddCardsViewModel @Inject constructor(
             _uiState.update { s ->
                 s.copy(
                     cards = filtered.map { card ->
-                        CardRow(
+                        AddCardRow(
                             card           = card,
                             quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
                             isOwned        = true,
@@ -118,7 +111,7 @@ class DeckAddCardsViewModel @Inject constructor(
         _uiState.update { s ->
             s.copy(
                 cards = collectionCards.map { card ->
-                    CardRow(
+                    AddCardRow(
                         card           = card,
                         quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
                         isOwned        = true,
@@ -142,7 +135,7 @@ class DeckAddCardsViewModel @Inject constructor(
                     s.copy(
                         isSearching = false,
                         cards       = cards.map { card ->
-                            CardRow(
+                            AddCardRow(
                                 card           = card,
                                 quantityInDeck = deckCardsMap[card.scryfallId] ?: 0,
                                 isOwned        = card.scryfallId in ownedIds,
