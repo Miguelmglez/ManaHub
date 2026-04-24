@@ -24,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.decks.improvement.DeckImprovementViewModel
 import com.mmg.manahub.feature.decks.engine.AnalysisPoint
 import com.mmg.manahub.feature.decks.engine.AnalysisSeverity
 import com.mmg.manahub.feature.decks.engine.ImprovementSuggestion
@@ -64,17 +65,6 @@ fun DeckImprovementScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item {
-                    DeckSummaryCard(
-                        totalCards = uiState.totalCards,
-                        targetCount = uiState.targetCount,
-                        manaCurve = uiState.manaCurve,
-                        maxInCurve = uiState.maxInCurve,
-                        deckCards = uiState.cards,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
                 uiState.report?.let { report ->
                     if (report.strengths.isNotEmpty()) {
                         item { SectionHeader(stringResource(R.string.deck_improve_strengths), mc.lifePositive) }
@@ -88,7 +78,7 @@ fun DeckImprovementScreen(
 
                     if (report.suggestions.isNotEmpty()) {
                         item { SectionHeader(stringResource(R.string.deck_improve_suggestions), mc.goldMtg) }
-                        items(report.suggestions) { suggestion ->
+                        items(report.suggestions, key = { it.magicCard.card.scryfallId }) { suggestion ->
                             SuggestionItem(
                                 suggestion = suggestion,
                                 isApplied = suggestion.magicCard.card.scryfallId in uiState.appliedSuggestions,
@@ -166,7 +156,7 @@ private fun SuggestionItem(
                     color = mc.textSecondary
                 )
             }
-            
+
             if (isApplied) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = mc.lifePositive)
             } else {

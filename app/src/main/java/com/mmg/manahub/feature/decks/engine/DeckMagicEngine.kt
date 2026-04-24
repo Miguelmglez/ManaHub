@@ -2,19 +2,12 @@ package com.mmg.manahub.feature.decks.engine
 
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
 
-
-
-
-
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
-
-import com.mmg.manahub.feature.decks.engine.GameFormat
-import com.mmg.manahub.feature.decks.engine.ManaColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -72,7 +65,7 @@ data class MagicDiscovery(
 
 /**
  * Unified engine for collection analysis (Discovery) and deck creation (Creator).
- * This is a singleton-friendly logic class, not a ViewModel .
+ * This is a singleton-friendly logic class, not a ViewModel.
  */
 @Singleton
 class DeckMagicEngine @Inject constructor() {
@@ -95,7 +88,7 @@ class DeckMagicEngine @Inject constructor() {
                 .filter { tag in it.card.tags || tag in it.card.userTags }
                 .take(12)
                 .map { MagicCard(it.card, isOwned = true) }
-            
+
             MagicDiscovery(
                 label = tag.label,
                 cards = matchingCards,
@@ -116,9 +109,9 @@ class DeckMagicEngine @Inject constructor() {
         format: GameFormat
     ): List<MagicSuggestion> = withContext(Dispatchers.Default) {
         val alreadyIn = mainboard.map { it.card.scryfallId }.toSet()
-        val avgCmc = if (mainboard.isEmpty()) 3.0 
-                     else mainboard.sumOf { it.card.cmc * it.quantity } / 
-                          mainboard.sumOf { it.quantity }.coerceAtLeast(1)
+        val avgCmc = if (mainboard.isEmpty()) 3.0
+        else mainboard.sumOf { it.card.cmc * it.quantity } /
+                mainboard.sumOf { it.quantity }.coerceAtLeast(1)
 
         collection
             .filter { it.card.scryfallId !in alreadyIn }
@@ -171,13 +164,6 @@ class DeckMagicEngine @Inject constructor() {
             landDiff > 2 -> weaknesses.add(AnalysisPoint(R.string.deck_improve_lands_many, R.string.deck_improve_lands_many, AnalysisSeverity.WARNING))
         }
 
-        // ── 1b. Total Card Count Analysis ───────────────────────────────────
-        if (totalCards > targetDeckSize) {
-            weaknesses.add(AnalysisPoint(R.string.deckbuilder_too_many_cards, R.string.deckbuilder_too_many_cards, AnalysisSeverity.ERROR))
-        } else if (totalCards < targetDeckSize) {
-            weaknesses.add(AnalysisPoint(R.string.deckbuilder_deck_empty, R.string.deckbuilder_deck_empty, AnalysisSeverity.WARNING))
-        }
-
         // ── 2. Mana Curve Analysis ──────────────────────────────────────────
         val avgCmc = if (nonLands.isEmpty()) 0.0 else nonLands.sumOf { it.card!!.cmc * it.quantity } / nonLands.sumOf { it.quantity }
         when {
@@ -196,12 +182,12 @@ class DeckMagicEngine @Inject constructor() {
             strengths.add(AnalysisPoint(R.string.deck_improve_interaction_good, R.string.deck_improve_interaction_good, AnalysisSeverity.INFO))
         } else {
             weaknesses.add(AnalysisPoint(R.string.deck_improve_interaction_low, R.string.deck_improve_interaction_low, AnalysisSeverity.WARNING))
-            
+
             // Suggest interaction from sideboard or collection
             val sideboardInteraction = sideboard.filter { entry ->
                 entry.card!!.tags.any { it.key in interactionTags } || entry.card.userTags.any { it.key in interactionTags }
             }.take(3)
-            
+
             sideboardInteraction.forEach { entry ->
                 suggestions.add(ImprovementSuggestion(
                     magicCard = MagicCard(entry.card!!, isOwned = true),
@@ -215,7 +201,7 @@ class DeckMagicEngine @Inject constructor() {
         val allTags = nonLands.flatMap { entry -> (entry.card!!.tags + entry.card.userTags).map { it to entry.quantity } }
             .groupBy { it.first }
             .mapValues { it.value.sumOf { p -> p.second } }
-        
+
         val topSynergy = allTags.entries.filter { it.key.category == com.mmg.manahub.core.domain.model.TagCategory.STRATEGY || it.key.category == com.mmg.manahub.core.domain.model.TagCategory.TRIBAL }
             .maxByOrNull { it.value }
 

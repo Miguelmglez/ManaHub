@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.deckmagic
+package com.mmg.manahub.feature.decks
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -19,7 +19,6 @@ import com.mmg.manahub.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class GroupingMode { TYPE, COLOR, COST, TAG }
@@ -124,17 +123,12 @@ class DeckMagicDetailViewModel @Inject constructor(
 
                 // Explicit validation based on requirements
                 val format = deckFormat
-                val overLimit = entries
+                val overLimit = mainEntries
                     .groupBy { it.scryfallId }
                     .filter { (_, slots) ->
                         val card = slots.first().card
                         card != null && !BasicLandCalculator.isBasicLand(card) && run {
-                            val limit = when (format) {
-                                DeckFormat.COMMANDER -> 1
-                                DeckFormat.STANDARD -> 4
-                                DeckFormat.DRAFT -> Int.MAX_VALUE
-                                else -> 4 // Fallback
-                            }
+                            val limit = format?.maxCopies ?: 4
                             slots.sumOf { it.quantity } > limit
                         }
                     }

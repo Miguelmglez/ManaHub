@@ -1,10 +1,11 @@
-package com.mmg.manahub.feature.deckmagic
+package com.mmg.manahub.feature.decks
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,11 +32,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.feature.decks.components.DeckSummaryCard
@@ -46,6 +45,9 @@ import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.domain.model.DeckCard
+import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -56,7 +58,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
-import com.mmg.manahub.feature.deckmagic.components.MagicLandSuggestionStatic
+import com.mmg.manahub.feature.decks.components.MagicLandSuggestionStatic
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -247,12 +249,12 @@ private fun ViewStepContent(
             ) {
                 item {
                     val targetCount = when (viewModel.deckFormat) {
-                        com.mmg.manahub.core.domain.model.DeckFormat.COMMANDER -> 100
+                        DeckFormat.COMMANDER -> 100
                         else -> 60
                     }
                     val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
                     val deckCards = uiState.cards.filter { it.card != null && !it.isSideboard && !BasicLandCalculator.isLand(it.card!!) }.map {
-                        com.mmg.manahub.core.domain.model.DeckCard(it.card!!, it.quantity, it.scryfallId in uiState.collectionIds)
+                        DeckCard(it.card!!, it.quantity, it.scryfallId in uiState.collectionIds)
                     }
                     
                     DeckSummaryCard(
@@ -435,10 +437,7 @@ private fun WarningOverlay(
     
     if (entry.scryfallId in uiState.overLimitCards) {
         val isAck = entry.scryfallId in uiState.acknowledgedOverLimitCards
-        val limitInt = when (viewModel.deckFormat) {
-            com.mmg.manahub.core.domain.model.DeckFormat.COMMANDER -> 1
-            else -> 4
-        }
+        val limitInt = viewModel.deckFormat?.maxCopies ?: 4
         Surface(
             shape = RoundedCornerShape(6.dp),
             color = if (isAck) mc.surface else mc.lifeNegative.copy(alpha = 0.1f),
@@ -691,7 +690,7 @@ private fun CardRow(
 @Composable
 private fun CardDetailSheet(
     deckCard: DeckSlotEntry,
-    deckFormat: com.mmg.manahub.core.domain.model.DeckFormat?,
+    deckFormat: DeckFormat?,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onDelete: () -> Unit,
@@ -791,7 +790,7 @@ private fun CardDetailSheet(
             OutlinedButton(
                 onClick = onDelete,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
+                border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
@@ -806,7 +805,7 @@ private fun CardDetailSheet(
 @Composable
 private fun AddCardsSheet(
     uiState: DeckMagicDetailUiState,
-    format: com.mmg.manahub.core.domain.model.DeckFormat?,
+    format: DeckFormat?,
     onQueryChange: (String) -> Unit,
     onScryfallSearch: (String) -> Unit,
     onAdd: (String) -> Unit,
@@ -915,7 +914,7 @@ private fun AddCardsSheet(
 @Composable
 private fun AddCardSheetRow(
     row: AddCardRow,
-    format: com.mmg.manahub.core.domain.model.DeckFormat?,
+    format: DeckFormat?,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onClick: () -> Unit,
@@ -1021,7 +1020,7 @@ private fun AddBasicLandsRow(onClick: () -> Unit, modifier: Modifier = Modifier)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditDeckSheet(
-    deck: com.mmg.manahub.core.domain.model.Deck?,
+    deck: Deck?,
     cards: List<DeckSlotEntry>,
     onSave: (newName: String?, newCoverId: String?) -> Unit,
     onDismiss: () -> Unit,
@@ -1056,7 +1055,9 @@ private fun EditDeckSheet(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = mc.primaryAccent, cursorColor = mc.primaryAccent)
             )
             
-            val coverCards = cards.filter { it.card?.imageArtCrop != null }
+            val coverCards = remember(cards) {
+                cards.filter { it.card?.imageArtCrop != null }.distinctBy { it.scryfallId }
+            }
             if (coverCards.isNotEmpty()) {
                 Text(stringResource(R.string.deck_edit_cover_section), style = ty.labelMedium, modifier = Modifier.padding(16.dp))
                 LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
