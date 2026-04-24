@@ -50,7 +50,7 @@ class CollectionUseCasesTest {
         val expected: List<UserCardWithCard> = listOf(
             TestFixtures.buildUserCardWithCard(),
             TestFixtures.buildUserCardWithCard(
-                userCard = TestFixtures.buildUserCard(id = 2L, scryfallId = "id-002"),
+                userCard = TestFixtures.buildUserCard(id = "id-002", scryfallId = "id-002"),
                 card     = TestFixtures.buildCard(scryfallId = "id-002", name = "Counterspell"),
             ),
         )
@@ -84,7 +84,7 @@ class CollectionUseCasesTest {
         // Arrange — simulates a card being added mid-observation
         val initial  = listOf(TestFixtures.buildUserCardWithCard())
         val updated  = initial + TestFixtures.buildUserCardWithCard(
-            userCard = TestFixtures.buildUserCard(id = 2L, scryfallId = "id-002"),
+            userCard = TestFixtures.buildUserCard(id = "id-002", scryfallId = "id-002"),
             card     = TestFixtures.buildCard(scryfallId = "id-002"),
         )
         every { userCardRepository.observeCollection() } returns flowOf(initial, updated)
@@ -107,10 +107,10 @@ class CollectionUseCasesTest {
         coEvery { userCardRepository.deleteCard(any()) } returns Unit
 
         // Act
-        removeCard(userCardId = 5L)
+        removeCard(userCardId = "id-5")
 
         // Assert
-        coVerify(exactly = 1) { userCardRepository.deleteCard(5L) }
+        coVerify(exactly = 1) { userCardRepository.deleteCard("id-5") }
     }
 
     @Test
@@ -119,10 +119,10 @@ class CollectionUseCasesTest {
         coEvery { userCardRepository.deleteCard(any()) } returns Unit
 
         // Act
-        removeCard(userCardId = 0L)
+        removeCard(userCardId = "id-0")
 
         // Assert
-        coVerify(exactly = 1) { userCardRepository.deleteCard(0L) }
+        coVerify(exactly = 1) { userCardRepository.deleteCard("id-0") }
     }
 
     @Test
@@ -131,11 +131,11 @@ class CollectionUseCasesTest {
         coEvery { userCardRepository.deleteCard(any()) } returns Unit
 
         // Act
-        removeCard(userCardId = 1L)
-        removeCard(userCardId = 2L)
+        removeCard(userCardId = "id-1")
+        removeCard(userCardId = "id-2")
 
         // Assert
-        coVerify(exactly = 1) { userCardRepository.deleteCard(1L) }
-        coVerify(exactly = 1) { userCardRepository.deleteCard(2L) }
+        coVerify(exactly = 1) { userCardRepository.deleteCard("id-1") }
+        coVerify(exactly = 1) { userCardRepository.deleteCard("id-2") }
     }
 }
