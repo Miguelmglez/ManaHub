@@ -54,6 +54,13 @@ data class DeckMagicDetailUiState(
     // Format validation
     val overLimitCards: Set<String> = emptySet(),
     val acknowledgedOverLimitCards: Set<String> = emptySet(),
+    val invalidColorIdentityCards: Set<String> = emptySet(),
+    
+    // Commander specific
+    val commanderCard: DeckSlotEntry? = null,
+    val isCommanderInvalid: Boolean = false,
+    val isSearchingCommander: Boolean = false,
+    val commanderSearchResults: List<Card> = emptyList(),
     
     val isSaving: Boolean = false,
     val isImporting: Boolean = false,
@@ -121,8 +128,20 @@ class DeckMagicDetailViewModel @Inject constructor(
 
                 deckCardsMap = entries.associate { (it.scryfallId to it.isSideboard) to it.quantity }
 
-                // Explicit validation based on requirements
                 val format = deckFormat
+                val isCommanderFormat = format == DeckFormat.COMMANDER
+                val commanderId = deckWithCards.deck.coverCardId
+                
+                var commanderEntry: DeckSlotEntry? = null
+                val otherEntries = if (isCommanderFormat && commanderId != null) {
+                    commanderEntry = entries.find { it.scryfallId == commanderId && !it.isSideboard }
+                    // Robust filtering: remove ALL entries matching commanderId in mainboard
+                    entries.filter { it.scryfallId != commanderId || it.isSideboard }
+                } else {
+                    entries
+                }
+
+                // Explicit validation based on requirements
                 val overLimit = mainEntries
                     .groupBy { it.scryfallId }
                     .filter { (_, slots) ->
@@ -133,16 +152,31 @@ class DeckMagicDetailViewModel @Inject constructor(
                         }
                     }
                     .keys
+                
+                val invalidIdentity = if (isCommanderFormat && commanderEntry?.card != null) {
+                    val identity = commanderEntry.card.colorIdentity.toSet()
+                    otherEntries.filter { entry ->
+                        entry.card != null && !identity.containsAll(entry.card.colorIdentity)
+                    }.map { it.scryfallId }.toSet()
+                } else {
+                    emptySet()
+                }
+
+                val isCommanderInvalid = isCommanderFormat && commanderEntry?.card != null &&
+                        !commanderEntry.card.typeLine.contains("Legendary", ignoreCase = true)
 
                 _uiState.update { s ->
                     s.copy(
                         deck = deckWithCards.deck,
-                        cards = entries,
+                        cards = otherEntries,
+                        commanderCard = commanderEntry,
+                        isCommanderInvalid = isCommanderInvalid,
                         isLoading = false,
                         totalCards = deckWithCards.totalCards,
                         manaCurve = calculateManaCurve(entries),
                         landDeltas = calculateLandDeltas(entries, deckWithCards.deck.format),
                         overLimitCards = overLimit,
+                        invalidColorIdentityCards = invalidIdentity,
                         addCardsResults = s.addCardsResults.map { row ->
                             row.copy(quantityInDeck = deckCardsMap[row.card.scryfallId to false] ?: 0)
                         },
@@ -284,7 +318,7 @@ class DeckMagicDetailViewModel @Inject constructor(
             if (entry.quantity == toMove) {
                 deckRepository.removeCardFromDeck(deckId, scryfallId, false)
             } else {
-                deckRepository.addCardToDeck(deckId, scryfallId, entry.quantity - toMove, false)
+                deckRepository.addCardToDeck(deckId, entry.scryfallId, entry.quantity - toMove, false)
             }
             
             // Update sideboard (increment or add)
@@ -432,6 +466,93 @@ class DeckMagicDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val deck = _uiState.value.deck ?: return@launch
             runCatching { deckRepository.updateDeck(deck.copy(coverCardId = scryfallId)) }
+        }
+    }
+
+    fun searchCommander(query: String) {
+        _uiState.update { it.copy(addCardsQuery = query) }
+        if (query.isBlank()) {
+            showCollectionCards()
+            _uiState.update { it.copy(scryfallResults = emptyList(), isSearchingScryfall = false) }
+            return
+        }
+
+        // Local search for commander
+        val filteredLocal = collectionCards.filter { it.name.contains(query, ignoreCase = true) }
+        _uiState.update { it.copy(
+            addCardsResults = filteredLocal.map { card ->
+                AddCardRow(
+                    card = card,
+                    quantityInDeck = if (deckCardsMap[card.scryfallId to false] != null) 1 else 0,
+                    isOwned = true
+                )
+            }
+        )}
+
+        // Scryfall search for commander
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSearchingScryfall = true) }
+            try {
+                // We keep the legendary filter as a suggestion, but allow other results if they match exactly
+                val results = cardRepository.searchCards(query)
+                val cards = when (results) {
+                    is DataResult.Success -> results.data
+                    is DataResult.Error -> emptyList()
+                }
+                val ownedIds = _uiState.value.collectionIds
+                _uiState.update { s ->
+                    s.copy(
+                        isSearchingScryfall = false,
+                        scryfallResults = cards.map { card ->
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = if (deckCardsMap[card.scryfallId to false] != null) 1 else 0,
+                                isOwned = card.scryfallId in ownedIds,
+                            )
+                        },
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSearchingScryfall = false) }
+            }
+        }
+    }
+
+    fun clearCommanderSearch() {
+        _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList(), scryfallResults = emptyList()) }
+    }
+
+    fun setCommander(card: Card) {
+        viewModelScope.launch {
+            val deck = _uiState.value.deck ?: return@launch
+            val oldCommanderId = deck.coverCardId
+            
+            // 1. Set as cover card
+            deckRepository.updateDeck(deck.copy(coverCardId = card.scryfallId))
+            
+            // 2. Add new commander to deck (mainboard, qty 1)
+            deckRepository.addCardToDeck(deckId, card.scryfallId, 1, false)
+            
+            // 3. Remove old commander from deck if it's different
+            if (oldCommanderId != null && oldCommanderId != card.scryfallId) {
+                deckRepository.removeCardFromDeck(deckId, oldCommanderId, false)
+            }
+            
+            // 4. Ensure it's not in sideboard
+            if (deckCardsMap[card.scryfallId to true] != null) {
+                deckRepository.removeCardFromDeck(deckId, card.scryfallId, true)
+            }
+        }
+    }
+
+    fun removeCommander() {
+        viewModelScope.launch {
+            val deck = _uiState.value.deck ?: return@launch
+            val commanderId = deck.coverCardId ?: return@launch
+            // 1. Clear cover card
+            deckRepository.updateDeck(deck.copy(coverCardId = null))
+            // 2. Remove from deck
+            deckRepository.removeCardFromDeck(deckId, commanderId, false)
         }
     }
 
