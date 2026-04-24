@@ -139,10 +139,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                         )
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
-                    onCreateDeckClick = { navController.navigate(Screen.DeckBuilder.route) },
-                    onSynergyClick = { navController.navigate(Screen.Synergy.route) },
-                    onDeckBuilderClick = { navController.navigate(Screen.DeckBuilder.route) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) }
                 )
             }
 

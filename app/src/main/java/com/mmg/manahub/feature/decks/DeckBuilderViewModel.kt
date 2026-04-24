@@ -9,6 +9,8 @@ import com.mmg.manahub.core.domain.model.*
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.DeckCardValidator
 import com.mmg.manahub.core.sync.CollectionSyncWorker
@@ -62,6 +64,8 @@ data class DeckMagicDetailUiState(
     val isSearchingCommander: Boolean = false,
     val commanderSearchResults: List<Card> = emptyList(),
     
+    val detailTags: List<CardTag> = emptyList(),
+    
     val isSaving: Boolean = false,
     val isImporting: Boolean = false,
     val importError: String? = null,
@@ -75,6 +79,8 @@ class DeckMagicDetailViewModel @Inject constructor(
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
     private val authRepository: AuthRepository,
+    private val suggestTagsUseCase: SuggestTagsUseCase,
+    private val userPreferencesRepo: UserPreferencesRepository,
     private val syncManager: SyncManager,
     private val workManager: WorkManager,
     savedStateHandle: SavedStateHandle,
@@ -130,7 +136,7 @@ class DeckMagicDetailViewModel @Inject constructor(
 
                 val format = deckFormat
                 val isCommanderFormat = format == DeckFormat.COMMANDER
-                val commanderId = deckWithCards.deck.coverCardId
+                val commanderId = deckWithCards.deck.commanderCardId
                 
                 var commanderEntry: DeckSlotEntry? = null
                 val otherEntries = if (isCommanderFormat && commanderId != null) {
@@ -525,10 +531,10 @@ class DeckMagicDetailViewModel @Inject constructor(
     fun setCommander(card: Card) {
         viewModelScope.launch {
             val deck = _uiState.value.deck ?: return@launch
-            val oldCommanderId = deck.coverCardId
+            val oldCommanderId = deck.commanderCardId
             
-            // 1. Set as cover card
-            deckRepository.updateDeck(deck.copy(coverCardId = card.scryfallId))
+            // 1. Set as commander card AND cover card (usually desired for commander)
+            deckRepository.updateDeck(deck.copy(commanderCardId = card.scryfallId, coverCardId = card.scryfallId))
             
             // 2. Add new commander to deck (mainboard, qty 1)
             deckRepository.addCardToDeck(deckId, card.scryfallId, 1, false)
@@ -548,11 +554,26 @@ class DeckMagicDetailViewModel @Inject constructor(
     fun removeCommander() {
         viewModelScope.launch {
             val deck = _uiState.value.deck ?: return@launch
-            val commanderId = deck.coverCardId ?: return@launch
-            // 1. Clear cover card
-            deckRepository.updateDeck(deck.copy(coverCardId = null))
+            val commanderId = deck.commanderCardId ?: return@launch
+            // 1. Clear commander card
+            deckRepository.updateDeck(deck.copy(commanderCardId = null))
             // 2. Remove from deck
             deckRepository.removeCardFromDeck(deckId, commanderId, false)
+        }
+    }
+
+    fun loadCardDetails(scryfallId: String) {
+        viewModelScope.launch {
+            val card = (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data ?: return@launch
+            
+            // If card already has confirmed tags (from collection), use them.
+            // Otherwise run suggestTagsUseCase to get high-confidence auto-tags.
+            val tags = if (card.tags.isNotEmpty() || card.userTags.isNotEmpty()) {
+                card.tags + card.userTags
+            } else {
+                suggestTagsUseCase(card).confirmed
+            }
+            _uiState.update { it.copy(detailTags = tags.distinctBy { t -> t.key }) }
         }
     }
 
@@ -560,8 +581,8 @@ class DeckMagicDetailViewModel @Inject constructor(
         val state = _uiState.value
         val deck  = state.deck ?: return null
 
-        val commanderCard = deck.coverCardId?.let { coverId ->
-            state.cards.firstOrNull { it.scryfallId == coverId }?.card
+        val commanderCard = deck.commanderCardId?.let { cmdId ->
+            state.cards.firstOrNull { it.scryfallId == cmdId }?.card ?: state.commanderCard?.card
         }
         val commanderScryfallId = commanderCard?.scryfallId
 

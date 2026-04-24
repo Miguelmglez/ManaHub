@@ -45,9 +45,6 @@ fun CollectionScreen(
     onCardClick:              (scryfallId: String) -> Unit,
     onScannerClick:           () -> Unit,
     onDeckClick:              (deckId: String) -> Unit,
-    onCreateDeckClick:        () -> Unit,
-    onSynergyClick:           () -> Unit,
-    onDeckBuilderClick:       () -> Unit,
     viewModel:                CollectionViewModel = hiltViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
@@ -64,10 +61,6 @@ fun CollectionScreen(
             viewModel.onTabSelected(CollectionTab.DECKS)
             onDeckClick(id)
         },
-        onCreateDeckClick     = {
-            viewModel.onTabSelected(CollectionTab.DECKS)
-            onCreateDeckClick()
-        },
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
@@ -79,9 +72,7 @@ fun CollectionScreen(
         onShowAdvancedSearch  = { showAdvancedSearch = true },
         onShowSyncSheet       = { showSyncSheet = true },
         onTabSelected         = viewModel::onTabSelected,
-        onSyncDismissed       = viewModel::onSyncDismissed,
-        onSynergyClick        = onSynergyClick,
-        onDeckBuilderClick    = onDeckBuilderClick,
+        onSyncDismissed       = viewModel::onSyncDismissed
     )
 
     if (showAdvancedSearch) {
@@ -110,7 +101,6 @@ private fun CollectionContent(
     onCardClick:          (String) -> Unit,
     onScannerClick:       () -> Unit,
     onDeckClick:          (String) -> Unit,
-    onCreateDeckClick:    () -> Unit,
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
@@ -120,8 +110,6 @@ private fun CollectionContent(
     onShowSyncSheet:      () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
     onSyncDismissed:      () -> Unit,
-    onSynergyClick:       () -> Unit,
-    onDeckBuilderClick:   () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val snackbarHostState = remember { SnackbarHostState() }
@@ -214,10 +202,7 @@ private fun CollectionContent(
                     onShowSyncSheet       = onShowSyncSheet,
                 )
                 CollectionTab.DECKS -> DeckListScreen(
-                    onDeckClick       = onDeckClick,
-                    onCreateDeckClick = onCreateDeckClick,
-                    onSynergyClick    = onSynergyClick,
-                    onDeckBuilderClick= onDeckBuilderClick,
+                    onDeckClick       = onDeckClick
                 )
             }
         }

@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
@@ -42,9 +43,6 @@ import java.util.*
 @Composable
 fun DeckListScreen(
     onDeckClick:       (deckId: String) -> Unit,
-    onCreateDeckClick: () -> Unit,
-    onSynergyClick:    () -> Unit,
-    onDeckBuilderClick:() -> Unit,
     viewModel:         DeckViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -117,6 +115,13 @@ fun DeckListScreen(
         )
     }
 
+    LaunchedEffect(uiState.createdDeckId) {
+        uiState.createdDeckId?.let { id ->
+            onDeckClick(id)
+            viewModel.onCreatedDeckNavigated()
+        }
+    }
+
     uiState.error?.let {
         LaunchedEffect(it) { viewModel.onErrorDismissed() }
     }
@@ -151,7 +156,7 @@ private fun DeckItem(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
+                    .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
             ) {
                 if (deck.coverImageUrl != null) {
@@ -168,41 +173,53 @@ private fun DeckItem(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight(0.55f)
+                            .fillMaxHeight(0.6f)
                             .align(Alignment.BottomCenter)
                             .background(
                                 Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, mc.surface.copy(alpha = 0.85f)),
+                                    colors = listOf(Color.Transparent, mc.surface.copy(alpha = 0.9f)),
                                 ),
                             ),
                     )
                 } else {
-                    // Placeholder
+                    // Aesthetic Placeholder
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier         = Modifier
                             .fillMaxSize()
                             .background(
-                                Brush.verticalGradient(
+                                Brush.linearGradient(
                                     colors = listOf(
-                                        mc.primaryAccent.copy(alpha = 0.10f),
+                                        mc.primaryAccent.copy(alpha = 0.15f),
                                         mc.surfaceVariant,
+                                        mc.secondaryAccent.copy(alpha = 0.05f),
                                     ),
                                 ),
                             ),
                     ) {
-                        Icon(
-                            imageVector        = Icons.Default.LibraryBooks,
-                            contentDescription = null,
-                            tint               = mc.textDisabled,
-                            modifier           = Modifier.size(36.dp),
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector        = Icons.Default.LibraryBooks,
+                                contentDescription = null,
+                                tint               = mc.primaryAccent.copy(alpha = 0.4f),
+                                modifier           = Modifier.size(48.dp),
+                            )
+                            Text(
+                                text = deck.format.uppercase(),
+                                style = ty.labelSmall,
+                                color = mc.textDisabled.copy(alpha = 0.6f),
+                                letterSpacing = 2.sp
+                            )
+                        }
                     }
                 }
 
                 // Format badge — top-right overlay
                 Surface(
-                    color  = mc.primaryAccent.copy(alpha = 0.85f),
+                    color  = mc.primaryAccent.copy(alpha = 0.9f),
                     shape  = RoundedCornerShape(bottomStart = 8.dp),
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {
@@ -210,7 +227,7 @@ private fun DeckItem(
                         text     = deck.format.replaceFirstChar { it.uppercase() },
                         style    = ty.labelSmall,
                         color    = mc.background,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
             }
@@ -335,36 +352,56 @@ private fun EmptyDecksState(
     modifier:      Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Column(
         modifier            = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(
-            imageVector        = Icons.Default.LibraryBooks,
-            contentDescription = null,
-            tint               = mc.textDisabled,
-            modifier           = Modifier.size(64.dp),
-        )
+        // Aesthetic Placeholder for empty state
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            mc.primaryAccent.copy(alpha = 0.2f),
+                            mc.background,
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector        = Icons.Default.LibraryBooks,
+                contentDescription = null,
+                tint               = mc.textDisabled,
+                modifier           = Modifier.size(64.dp),
+            )
+        }
+        
         Text(
             stringResource(R.string.decklist_empty_title),
-            style = MaterialTheme.magicTypography.titleMedium,
+            style = ty.titleMedium,
             color = mc.textPrimary,
         )
         Text(
             stringResource(R.string.decklist_empty_subtitle),
-            style = MaterialTheme.magicTypography.bodyMedium,
+            style = ty.bodyMedium,
             color = mc.textSecondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         Spacer(Modifier.height(4.dp))
         OutlinedButton(
             onClick = onCreateClick,
             colors  = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
             border  = BorderStroke(1.dp, mc.primaryAccent),
+            shape   = RoundedCornerShape(12.dp)
         ) {
             Text(
                 stringResource(R.string.decklist_empty_action),
-                style = MaterialTheme.magicTypography.labelLarge,
+                style = ty.labelLarge,
             )
         }
     }
@@ -391,7 +428,7 @@ private fun CreateDeckBottomSheet(
         onDismissRequest = onDismiss,
         sheetState       = sheetState,
         containerColor   = mc.backgroundSecondary,
-        dragHandle       = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
     ) {
         Column(
             modifier            = Modifier

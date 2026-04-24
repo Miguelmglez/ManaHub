@@ -200,7 +200,6 @@ fun DeckMagicDetailScreen(
     if (showAddCardsSheet) {
         CardSearchSheet(
             uiState = uiState,
-            format = viewModel.deckFormat,
             isCommanderMode = false,
             onQueryChange = viewModel::onAddCardsQueryChange,
             onScryfallSearch = viewModel::searchScryfallDirect,
@@ -217,7 +216,6 @@ fun DeckMagicDetailScreen(
     if (showCommanderSearchSheet) {
         CardSearchSheet(
             uiState = uiState,
-            format = viewModel.deckFormat,
             isCommanderMode = true,
             onQueryChange = viewModel::searchCommander,
             onScryfallSearch = viewModel::searchCommander,
@@ -237,9 +235,15 @@ fun DeckMagicDetailScreen(
     }
 
     if (selectedDeckCard != null) {
+        // Load tags and other details
+        LaunchedEffect(selectedDeckCard.scryfallId) {
+            viewModel.loadCardDetails(selectedDeckCard.scryfallId)
+        }
+        
         CardDetailSheet(
             deckCard = selectedDeckCard,
-            deckFormat = viewModel.deckFormat,
+            isCommander = uiState.commanderCard?.scryfallId == selectedDeckCard.scryfallId,
+            tags = uiState.detailTags,
             onAdd = { viewModel.addCardToDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
             onRemove = { viewModel.removeCardFromDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
             onDelete = {
@@ -355,6 +359,8 @@ private fun ViewStepContent(
                         title = stringResource(R.string.deckdetail_tab_mainboard, mainboardCards.sumOf { it.quantity }),
                         expanded = uiState.mainboardExpanded,
                         onToggle = viewModel::toggleMainboard,
+                        showChooseCommander = isCommanderFormat && uiState.commanderCard == null,
+                        onChooseCommander = onChooseCommander,
                         modifier = Modifier.padding(horizontal = 0.dp)
                     )
                 }
@@ -549,6 +555,8 @@ private fun MainSectionHeader(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    showChooseCommander: Boolean = false,
+    onChooseCommander: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val mc = MaterialTheme.magicColors
@@ -567,6 +575,24 @@ private fun MainSectionHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = ty.titleMedium, color = mc.primaryAccent, fontWeight = FontWeight.Bold)
+        
+        if (showChooseCommander) {
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                onClick = onChooseCommander,
+                shape = RoundedCornerShape(4.dp),
+                color = mc.primaryAccent.copy(alpha = 0.1f),
+                border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.3f))
+            ) {
+                Text(
+                    "Choose Commander", 
+                    style = ty.labelSmall, 
+                    color = mc.primaryAccent,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
+
         Spacer(Modifier.weight(1f))
         Icon(
             Icons.Default.ExpandMore,
@@ -774,7 +800,8 @@ private fun CardRow(
 @Composable
 private fun CardDetailSheet(
     deckCard: DeckSlotEntry,
-    deckFormat: DeckFormat?,
+    isCommander: Boolean,
+    tags: List<com.mmg.manahub.core.domain.model.CardTag>,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onDelete: () -> Unit,
@@ -786,8 +813,8 @@ private fun CardDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var showBackFace by remember { mutableStateOf(false) }
-    val isCommander = deckFormat?.uniqueCards == true
-    val addEnabled = !isCommander || deckCard.quantity < 1
+    // Always allow adding in search/detail, the deck list will show warnings
+    val addEnabled = true 
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -849,6 +876,31 @@ private fun CardDetailSheet(
                     
                     val oracleDisplayText = card.oracleText?.takeIf { it.isNotBlank() } ?: card.printedText ?: ""
                     OracleText(text = oracleDisplayText, style = MaterialTheme.typography.bodySmall)
+
+                    // Tag Section
+                    if (tags.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            tags.forEach { tag ->
+                                Surface(
+                                    color = mc.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(4.dp),
+                                    border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f))
+                                ) {
+                                    Text(
+                                        text = tag.label,
+                                        style = ty.labelSmall,
+                                        color = mc.textSecondary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                     
                     val preferredCurrency = LocalPreferredCurrency.current
                     val priceText = PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur, preferredCurrency)
@@ -858,16 +910,36 @@ private fun CardDetailSheet(
                 }
             }
 
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.deckdetail_in_deck_label), style = ty.labelMedium, color = mc.textSecondary, modifier = Modifier.weight(1f))
-                IconButton(onClick = onRemove, enabled = deckCard.quantity > 0) {
-                    Icon(Icons.Default.Remove, contentDescription = null, tint = if (deckCard.quantity > 0) mc.primaryAccent else mc.textDisabled)
+            if (isCommander) {
+                // Large Gold button for Commander
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = mc.goldMtg.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Star, null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("COMMANDER", style = ty.labelLarge, color = mc.goldMtg, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Surface(shape = RoundedCornerShape(8.dp), color = mc.primaryAccent.copy(alpha = 0.15f)) {
-                    Text("${deckCard.quantity}", style = ty.titleMedium, color = mc.primaryAccent, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
-                }
-                IconButton(onClick = onAdd, enabled = addEnabled) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = if (addEnabled) mc.primaryAccent else mc.textDisabled)
+            } else {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.deckdetail_in_deck_label), style = ty.labelMedium, color = mc.textSecondary, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onRemove, enabled = deckCard.quantity > 0) {
+                        Icon(Icons.Default.Remove, contentDescription = null, tint = if (deckCard.quantity > 0) mc.primaryAccent else mc.textDisabled)
+                    }
+                    Surface(shape = RoundedCornerShape(8.dp), color = mc.primaryAccent.copy(alpha = 0.15f)) {
+                        Text("${deckCard.quantity}", style = ty.titleMedium, color = mc.primaryAccent, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                    }
+                    IconButton(onClick = onAdd, enabled = addEnabled) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = if (addEnabled) mc.primaryAccent else mc.textDisabled)
+                    }
                 }
             }
 
@@ -889,7 +961,6 @@ private fun CardDetailSheet(
 @Composable
 private fun CardSearchSheet(
     uiState: DeckMagicDetailUiState,
-    format: DeckFormat?,
     isCommanderMode: Boolean,
     onQueryChange: (String) -> Unit,
     onScryfallSearch: (String) -> Unit,
@@ -960,8 +1031,8 @@ private fun CardSearchSheet(
                 items(results, key = { it.card.scryfallId }) { row ->
                     AddCardSheetRow(
                         row = row,
-                        format = format,
                         isCommanderMode = isCommanderMode,
+                        isCurrentCommander = uiState.commanderCard?.scryfallId == row.card.scryfallId,
                         onAdd = { onAdd(row.card.scryfallId) },
                         onRemove = { onRemove(row.card.scryfallId) },
                         onClick = { onCardClick(row.card.scryfallId) }
@@ -1001,8 +1072,8 @@ private fun CardSearchSheet(
 @Composable
 private fun AddCardSheetRow(
     row: AddCardRow,
-    format: DeckFormat?,
     isCommanderMode: Boolean = false,
+    isCurrentCommander: Boolean = false,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onClick: () -> Unit,
@@ -1010,14 +1081,19 @@ private fun AddCardSheetRow(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val card = row.card
-    val isCommanderFormat = format?.uniqueCards == true
-    val addEnabled = if (isCommanderFormat) row.quantityInDeck < 1 else true
+    // Always allow adding, warning overlay handles limits
+    val addEnabled = true 
 
-    Surface(onClick = onClick, shape = RoundedCornerShape(8.dp), color = mc.surface) {
+    Surface(
+        onClick = onClick, 
+        shape = RoundedCornerShape(8.dp), 
+        color = if (isCurrentCommander) mc.goldMtg.copy(alpha = 0.1f) else mc.surface,
+        border = if (isCurrentCommander) BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)) else null
+    ) {
         Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AsyncImage(model = card.imageArtCrop, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(RoundedCornerShape(4.dp)))
             Column(modifier = Modifier.weight(1f)) {
-                Text(card.name, style = ty.bodyMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(card.name, style = ty.bodyMedium, color = if (isCurrentCommander) mc.goldMtg else mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(card.typeLine, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1029,11 +1105,11 @@ private fun AddCardSheetRow(
                 }
                 
                 val icon = if (isCommanderMode) {
-                    if (row.quantityInDeck > 0) Icons.Default.Check else Icons.Default.Add
+                    if (isCurrentCommander) Icons.Default.Check else Icons.Default.Add
                 } else Icons.Default.Add
 
                 IconButton(onClick = onAdd, enabled = addEnabled || isCommanderMode, modifier = Modifier.size(32.dp)) {
-                    Icon(icon, null, tint = if (addEnabled || isCommanderMode) mc.primaryAccent else mc.textDisabled, modifier = Modifier.size(16.dp))
+                    Icon(icon, null, tint = if (isCurrentCommander) mc.goldMtg else if (addEnabled || isCommanderMode) mc.primaryAccent else mc.textDisabled, modifier = Modifier.size(16.dp))
                 }
             }
         }
