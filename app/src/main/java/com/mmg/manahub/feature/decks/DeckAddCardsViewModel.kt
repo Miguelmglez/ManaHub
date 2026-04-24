@@ -25,7 +25,7 @@ class DeckAddCardsViewModel @Inject constructor(
     savedStateHandle:               SavedStateHandle,
 ) : ViewModel() {
 
-    private val deckId: Long = checkNotNull(savedStateHandle["deckId"])
+    private val deckId: String = checkNotNull(savedStateHandle["deckId"])
 
     data class CardRow(
         val card:           Card,

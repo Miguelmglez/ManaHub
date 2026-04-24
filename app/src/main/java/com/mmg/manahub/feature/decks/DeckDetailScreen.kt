@@ -67,7 +67,7 @@ import com.mmg.manahub.feature.decks.components.DeckImportSheet
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckDetailScreen(
-    deckId: Long,
+    deckId: String,
     onBack: () -> Unit,
     onAddCards: () -> Unit,
     viewModel: DeckDetailViewModel = hiltViewModel(),

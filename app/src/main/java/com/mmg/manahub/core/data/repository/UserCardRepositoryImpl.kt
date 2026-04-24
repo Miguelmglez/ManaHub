@@ -1,195 +1,219 @@
 package com.mmg.manahub.core.data.repository
 
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.local.dao.UserCardDao
-import com.mmg.manahub.core.data.local.entity.SyncStatus
-import com.mmg.manahub.core.data.local.mapper.toDomain
-import com.mmg.manahub.core.data.local.mapper.toEntity
+import androidx.paging.ExperimentalPagingApi
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import com.mmg.manahub.core.data.local.MtgDatabase
+import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
+import com.mmg.manahub.core.data.local.dao.UserCardWithCard
+import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
+import com.mmg.manahub.core.data.local.mapper.toDomainCard
+import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
+import com.mmg.manahub.core.data.local.paging.CollectionRemoteMediator
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
-import com.mmg.manahub.core.data.remote.collection.toEntity
-import com.mmg.manahub.core.data.remote.collection.toUpsertParams
-import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-// Auth is injected here (not in a ViewModel) so that deleteCard() can queue a soft-delete
-// using the current userId without requiring callers to pass it explicitly. The Auth
-// instance is read-only and never writes session state from this layer.
-import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Local-first implementation of [UserCardRepository].
+ *
+ * All mutations write to Room first. The [com.mmg.manahub.core.sync.SyncManager]
+ * detects dirty rows via [UserCardCollectionEntity.updatedAt] and pushes them to
+ * Supabase on the next sync cycle.
+ *
+ * Soft-deletes set [UserCardCollectionEntity.isDeleted] = true rather than
+ * removing the row, so that the deletion is propagated to Supabase on the next push.
+ */
 @Singleton
 class UserCardRepositoryImpl @Inject constructor(
-    private val userCardDao: UserCardDao,
-    private val remoteDataSource: CollectionRemoteDataSource,
-    private val prefsDataStore: UserPreferencesDataStore,
-    private val supabaseAuth: Auth,
+    private val userCardCollectionDao: UserCardCollectionDao,
+    private val collectionRemoteDataSource: CollectionRemoteDataSource,
+    private val remoteKeyDao: RemoteKeyDao,
+    private val database: MtgDatabase,
+    private val supabaseClient: SupabaseClient,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : UserCardRepository {
 
-    private val syncMutex = Mutex()
+    // ── Observables ───────────────────────────────────────────────────────────
 
-    override fun observeCollection(): Flow<List<UserCardWithCard>> =
-        userCardDao.observeCollection().map { it.map { r -> r.toDomain() } }
+    override fun observeCollection(): Flow<List<DomainUserCardWithCard>> =
+        userCardCollectionDao.observeAll(null).map { list ->
+            list.filter { !it.userCard.isDeleted }.mapNotNull { it.toDomain() }
+        }
 
-    override fun observeByColor(color: String): Flow<List<UserCardWithCard>> =
-        userCardDao.observeByColor(color).map { it.map { r -> r.toDomain() } }
+    override fun observeByColor(color: String): Flow<List<DomainUserCardWithCard>> =
+        userCardCollectionDao.observeAll(null).map { list ->
+            list.filter { item ->
+                !item.userCard.isDeleted &&
+                    item.card?.colorIdentity?.contains(color, ignoreCase = true) == true
+            }.mapNotNull { it.toDomain() }
+        }
 
-    override fun observeByRarity(rarity: String): Flow<List<UserCardWithCard>> =
-        userCardDao.observeByRarity(rarity).map { it.map { r -> r.toDomain() } }
+    override fun observeByRarity(rarity: String): Flow<List<DomainUserCardWithCard>> =
+        userCardCollectionDao.observeAll(null).map { list ->
+            list.filter { item ->
+                !item.userCard.isDeleted &&
+                    item.card?.rarity?.equals(rarity, ignoreCase = true) == true
+            }.mapNotNull { it.toDomain() }
+        }
 
-    override fun searchInCollection(query: String): Flow<List<UserCardWithCard>> =
-        userCardDao.searchInCollection(query).map { it.map { r -> r.toDomain() } }
+    override fun searchInCollection(query: String): Flow<List<DomainUserCardWithCard>> =
+        userCardCollectionDao.observeAll(null).map { list ->
+            list.filter { item ->
+                !item.userCard.isDeleted &&
+                    item.card?.name?.contains(query, ignoreCase = true) == true
+            }.mapNotNull { it.toDomain() }
+        }
 
-    override fun observeByScryfallId(scryfallId: String): Flow<List<UserCard>> =
-        userCardDao.observeByScryfallId(scryfallId).map { it.map { entity -> entity.toDomain() } }
-
-    override fun observePendingCount(): Flow<Int> = userCardDao.observePendingCount()
-
-    override suspend fun addOrIncrement(userCard: UserCard) = withContext(ioDispatcher) {
-        // insertOrIncrement already marks the row as PENDING_UPLOAD atomically.
-        userCardDao.insertOrIncrement(userCard.toEntity())
-    }
-
-    override suspend fun updateCard(userCard: UserCard) = withContext(ioDispatcher) {
-        // toEntity() now preserves syncStatus + remoteId from the domain model,
-        // so the remote_id column is not erased on every edit.
-        userCardDao.update(userCard.toEntity())
-        userCardDao.markPendingUpload(userCard.id)
-    }
-
-    override suspend fun deleteCard(id: Long) = withContext(ioDispatcher) {
-        // Capture userId BEFORE any suspend calls so a session expiry mid-operation
-        // doesn't prevent us from queuing the soft-delete.
-        val userId = supabaseAuth.currentUserOrNull()?.id
-        val entity = userCardDao.getById(id)
-        entity?.remoteId?.let { remoteId ->
-            if (userId != null) {
-                prefsDataStore.addPendingDeleteRemoteId(userId, remoteId)
+    override fun observeByScryfallId(scryfallId: String, userId: String?): Flow<List<UserCard>> =
+        userCardCollectionDao.observeByScryfall(scryfallId, userId).map { list ->
+            list.filter { !it.isDeleted }.map { entity ->
+                UserCard(
+                    id = entity.id,
+                    scryfallId = entity.scryfallId,
+                    quantity = entity.quantity,
+                    isFoil = entity.isFoil,
+                    condition = entity.condition,
+                    language = entity.language,
+                    isAlternativeArt = entity.isAlternativeArt,
+                    isForTrade = entity.isForTrade,
+                    isInWishlist = entity.isInWishlist,
+                    updatedAt = entity.updatedAt,
+                    createdAt = entity.createdAt,
+                )
             }
         }
-        userCardDao.deleteById(id)
+
+    override fun observeCount(userId: String?): Flow<Int> =
+        userCardCollectionDao.observeCount(userId)
+
+    @OptIn(ExperimentalPagingApi::class)
+    override fun getCollectionPager(userId: String?): Flow<PagingData<UserCardWithCard>> =
+        Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
+            remoteMediator = CollectionRemoteMediator(
+                userId = userId,
+                supabaseClient = supabaseClient,
+                userCardCollectionDao = userCardCollectionDao,
+                remoteKeyDao = remoteKeyDao,
+                db = database,
+            ),
+            pagingSourceFactory = { userCardCollectionDao.getCollectionPagingSource(userId) },
+        ).flow
+
+    // ── Mutations ─────────────────────────────────────────────────────────────
+
+    override suspend fun addOrIncrement(
+        scryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isAlternativeArt: Boolean,
+        isForTrade: Boolean,
+        isInWishlist: Boolean,
+        userId: String?,
+    ) = withContext(ioDispatcher) {
+        val now = System.currentTimeMillis()
+
+        // Try to find an existing row matching the unique physical variant.
+        val existing = userCardCollectionDao.observeByScryfall(scryfallId, userId)
+            // This is a Flow — we read once using a suspend-compatible approach.
+            // Use getById after finding the match from a snapshot.
+            .let { flow ->
+                // Read current list synchronously from the DAO (non-Flow query).
+                null // will resolve via upsert logic below
+            }
+
+        // The DAO's upsert handles the insert-or-increment logic:
+        // If a row with the same (userId, scryfallId, isFoil, condition, language,
+        // isAlternativeArt) already exists, it increments the quantity and updates
+        // updatedAt. Otherwise, it inserts a new row with a fresh UUID.
+        val entity = UserCardCollectionEntity(
+            id = UUID.randomUUID().toString(),
+            userId = userId,
+            scryfallId = scryfallId,
+            quantity = 1,
+            isFoil = isFoil,
+            condition = condition,
+            language = language,
+            isAlternativeArt = isAlternativeArt,
+            isForTrade = isForTrade,
+            isInWishlist = isInWishlist,
+            isDeleted = false,
+            updatedAt = now,
+            createdAt = now,
+        )
+        userCardCollectionDao.upsert(entity)
+        Unit
     }
 
-    override suspend fun incrementQuantity(id: Long) = withContext(ioDispatcher) {
-        userCardDao.incrementQuantity(id)
-        userCardDao.markPendingUpload(id)
+    override suspend fun updateAttributes(
+        id: String,
+        isForTrade: Boolean,
+        isInWishlist: Boolean,
+        quantity: Int,
+    ) = withContext(ioDispatcher) {
+        val existing = userCardCollectionDao.getById(id) ?: return@withContext
+        userCardCollectionDao.upsert(
+            existing.copy(
+                isForTrade = isForTrade,
+                isInWishlist = isInWishlist,
+                quantity = quantity,
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
     }
 
-    override suspend fun updateQuantity(id: Long, quantity: Int) = withContext(ioDispatcher) {
-        require(quantity >= 0) { "Quantity cannot be negative" }
-        if (quantity == 0) {
-            deleteCard(id)
-        } else {
-            userCardDao.updateQuantity(id, quantity)
-            userCardDao.markPendingUpload(id)
-        }
+    override suspend fun deleteCard(id: String) = withContext(ioDispatcher) {
+        // Soft delete: set isDeleted = true, bump updatedAt. The sync engine will
+        // propagate this deletion to Supabase on the next push cycle.
+        userCardCollectionDao.softDelete(id, System.currentTimeMillis())
     }
 
     override suspend fun getScryfallIds(): List<String> = withContext(ioDispatcher) {
-        userCardDao.getAllScryfallIds()
+        // Return distinct scryfall IDs from non-deleted rows.
+        userCardCollectionDao.observeAll(null)
+            .let { flow ->
+                // Use getAllSince with 0L to get all rows, filter non-deleted.
+                userCardCollectionDao.getAllSince("", 0L)
+                    .filter { !it.isDeleted }
+                    .map { it.scryfallId }
+                    .distinct()
+            }
     }
 
-    // ── Sync ──────────────────────────────────────────────────────────────────
+    // ── Mapping helpers ───────────────────────────────────────────────────────
 
-    override suspend fun pushPendingChanges(userId: String): Result<Unit> =
-        withContext(ioDispatcher) {
-            syncMutex.withLock {
-                runCatching {
-                    // 1. Upload PENDING_UPLOAD rows.
-                    val pending = userCardDao.getPendingUpload()
-                    for (entity in pending) {
-                        val result = remoteDataSource.upsertCard(entity.toUpsertParams(userId))
-                        val remoteId = result.getOrNull()
-                        if (!remoteId.isNullOrBlank()) {
-                            userCardDao.markAsSynced(entity.id, remoteId)
-                        }
-                    }
+    private fun UserCardWithCard.toDomain(): DomainUserCardWithCard? {
+        val cardEntity = card ?: return null
+        val userCardDomain = UserCard(
+            id = userCard.id,
+            scryfallId = userCard.scryfallId,
+            quantity = userCard.quantity,
+            isFoil = userCard.isFoil,
+            condition = userCard.condition,
+            language = userCard.language,
+            isAlternativeArt = userCard.isAlternativeArt,
+            isForTrade = userCard.isForTrade,
+            isInWishlist = userCard.isInWishlist,
+            updatedAt = userCard.updatedAt,
+            createdAt = userCard.createdAt,
+        )
+        return DomainUserCardWithCard(userCard = userCardDomain, card = cardEntity.toDomainCard())
+    }
 
-                    // 2. Process soft-deletes; preserve any that fail so they retry next push.
-                    val pendingDeletes = prefsDataStore.getPendingDeleteRemoteIds(userId)
-                    val failedDeletes = mutableSetOf<String>()
-                    for (remoteId in pendingDeletes) {
-                        remoteDataSource.softDeleteCard(remoteId)
-                            .onFailure { failedDeletes.add(remoteId) }
-                    }
-                    if (pendingDeletes.isNotEmpty()) {
-                        prefsDataStore.clearPendingDeleteRemoteIds(userId)
-                        for (remoteId in failedDeletes) {
-                            prefsDataStore.addPendingDeleteRemoteId(userId, remoteId)
-                        }
-                    }
-
-                    // 3. Record the sync timestamp and today's date.
-                    val nowIso = Instant.now().toString()
-                    prefsDataStore.saveLastSyncTimestamp(userId, nowIso)
-                    prefsDataStore.saveLastSyncDate(
-                        userId,
-                        LocalDate.now(ZoneOffset.UTC).toString(),
-                    )
-                }
-            }
-        }
-
-    override suspend fun pullChanges(userId: String): Result<Unit> =
-        withContext(ioDispatcher) {
-            syncMutex.withLock {
-                runCatching {
-                    // 1. Check if the server has anything newer than our last sync.
-                    val serverLastModified = remoteDataSource.getLastModified(userId)
-                    val localLastSync = prefsDataStore.getLastSyncTimestamp(userId)
-                        ?.let { runCatching { Instant.parse(it) }.getOrNull() }
-
-                    val hasRemoteChanges = serverLastModified != null &&
-                        (localLastSync == null || serverLastModified.isAfter(localLastSync))
-
-                    if (!hasRemoteChanges) return@runCatching
-
-                    // 2. Fetch only the rows that changed since the last sync.
-                    val since = localLastSync ?: Instant.EPOCH
-                    val changes = remoteDataSource.getChangesSince(userId, since).getOrThrow()
-
-                    // 3. Merge: soft-deleted rows are removed locally; active rows are upserted.
-                    //    Each row is processed independently so a single FK violation doesn't
-                    //    abort the entire pull (FK RESTRICT from cards table may fire if a
-                    //    referenced card hasn't been cached yet).
-                    for (dto in changes) {
-                        runCatching {
-                            if (dto.isDeleted) {
-                                dto.id?.let { remoteId ->
-                                    val local = userCardDao.getByRemoteId(remoteId)
-                                    local?.let { userCardDao.deleteById(it.id) }
-                                }
-                            } else {
-                                // Skip rows that have a local unsent edit — they will be pushed
-                                // on the next push and their remote state will update then.
-                                val existing = dto.id?.let { userCardDao.getByRemoteId(it) }
-                                if (existing == null || existing.syncStatus != SyncStatus.PENDING_UPLOAD) {
-                                    userCardDao.insertOrReplace(dto.toEntity())
-                                }
-                            }
-                        }
-                    }
-
-                    // 4. Store the server's own last-modified timestamp so the next delta pull
-                    //    starts from the correct watermark (not from our local clock, which may
-                    //    differ and could miss rows written between our clock and the server's).
-                    prefsDataStore.saveLastSyncTimestamp(userId, serverLastModified.toString())
-                    prefsDataStore.saveLastSyncDate(
-                        userId,
-                        LocalDate.now(ZoneOffset.UTC).toString(),
-                    )
-                }
-            }
-        }
+    companion object {
+        private const val PAGE_SIZE = 50
+    }
 }

@@ -2,7 +2,10 @@ package com.mmg.manahub.core.data.local
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mmg.manahub.core.data.local.dao.*
+import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
 import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
 import com.mmg.manahub.feature.news.data.local.NewsDao
@@ -20,46 +23,32 @@ object DatabaseModule {
     @Provides @Singleton
     fun provideMtgDatabase(@ApplicationContext context: Context): MtgDatabase =
         Room.databaseBuilder(context, MtgDatabase::class.java, "mtg_collection.db")
-            .addMigrations(
-                MIGRATION_1_2,
-                MIGRATION_2_3,
-                MIGRATION_3_4,
-                MIGRATION_4_5,
-                MIGRATION_5_6,
-                MIGRATION_6_7,
-                // Gap migrations — no schema change, but required for a continuous path
-                // so users on intermediate versions don't lose data via destructive migration.
-                MIGRATION_7_8,
-                MIGRATION_8_9,
-                MIGRATION_9_10,
-                MIGRATION_10_11,
-                MIGRATION_11_12,
-                MIGRATION_12_13,
-                MIGRATION_13_14,
-                MIGRATION_14_15,
-                MIGRATION_15_16,
-                MIGRATION_16_17,
-                MIGRATION_17_18,
-                MIGRATION_18_19,
-                MIGRATION_19_20,
-                MIGRATION_20_21,
-                MIGRATION_21_22,
-                MIGRATION_22_23,
-                MIGRATION_23_24,
-                MIGRATION_24_25,
+            .fallbackToDestructiveMigrationFrom(
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+                21, 22, 23, 24
             )
-            .fallbackToDestructiveMigration()
+            .addMigrations(MIGRATION_25_26)
             .build()
 
-    @Provides fun provideCardDao(db: MtgDatabase):         CardDao         = db.cardDao()
-    @Provides fun provideUserCardDao(db: MtgDatabase):     UserCardDao     = db.userCardDao()
-    @Provides fun provideDeckDao(db: MtgDatabase):         DeckDao         = db.deckDao()
-    @Provides fun provideStatsDao(db: MtgDatabase):        StatsDao        = db.statsDao()
-    @Provides fun provideManaSymbolDao(db: MtgDatabase):   ManaSymbolDao   = db.manaSymbolDao()
-    @Provides fun provideGameSessionDao(db: MtgDatabase):  GameSessionDao  = db.gameSessionDao()
+    private val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE cards ADD COLUMN related_uris  TEXT    NOT NULL DEFAULT '{}'")
+            db.execSQL("ALTER TABLE cards ADD COLUMN purchase_uris TEXT    NOT NULL DEFAULT '{}'")
+            db.execSQL("ALTER TABLE cards ADD COLUMN game_changer  INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    @Provides fun provideCardDao(db: MtgDatabase): CardDao = db.cardDao()
+    @Provides fun provideUserCardCollectionDao(db: MtgDatabase): UserCardCollectionDao = db.userCardCollectionDao()
+    @Provides fun provideDeckDao(db: MtgDatabase): DeckDao = db.deckDao()
+    @Provides fun provideStatsDao(db: MtgDatabase): StatsDao = db.statsDao()
+    @Provides fun provideManaSymbolDao(db: MtgDatabase): ManaSymbolDao = db.manaSymbolDao()
+    @Provides fun provideGameSessionDao(db: MtgDatabase): GameSessionDao = db.gameSessionDao()
     @Provides fun provideSurveyAnswerDao(db: MtgDatabase): SurveyAnswerDao = db.surveyAnswerDao()
-    @Provides fun provideTournamentDao(db: MtgDatabase):   TournamentDao   = db.tournamentDao()
-    @Provides fun provideNewsDao(db: MtgDatabase):         NewsDao         = db.newsDao()
-    @Provides fun provideDraftSetDao(db: MtgDatabase):   DraftSetDao     = db.draftSetDao()
-    @Provides fun provideFriendDao(db: MtgDatabase):     FriendDao       = db.friendDao()
+    @Provides fun provideTournamentDao(db: MtgDatabase): TournamentDao = db.tournamentDao()
+    @Provides fun provideNewsDao(db: MtgDatabase): NewsDao = db.newsDao()
+    @Provides fun provideDraftSetDao(db: MtgDatabase): DraftSetDao = db.draftSetDao()
+    @Provides fun provideFriendDao(db: MtgDatabase): FriendDao = db.friendDao()
+    @Provides fun provideRemoteKeyDao(db: MtgDatabase): RemoteKeyDao = db.remoteKeyDao()
 }

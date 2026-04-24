@@ -1,5 +1,8 @@
 [versions]
 accompanist-permissions = "0.37.3"
+paging = "3.3.6"
+work = "2.10.1"
+hilt-work = "1.2.0"
 firebase-bom = "34.12.0"
 gson = "2.13.2"
 kotlin               = "2.3.20"
@@ -37,6 +40,12 @@ googleid             = "1.1.1"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
+paging-runtime   = { group = "androidx.paging", name = "paging-runtime-ktx",  version.ref = "paging" }
+paging-compose   = { group = "androidx.paging", name = "paging-compose",       version.ref = "paging" }
+room-paging      = { group = "androidx.room",   name = "room-paging",          version.ref = "room" }
+work-runtime     = { group = "androidx.work",   name = "work-runtime-ktx",     version.ref = "work" }
+hilt-work        = { group = "androidx.hilt",   name = "hilt-work",            version.ref = "hilt-work" }
+hilt-work-compiler = { group = "androidx.hilt", name = "hilt-compiler",        version.ref = "hilt-work" }
 compose-bom             = { group = "androidx.compose", name = "compose-bom",              version.ref = "compose-bom" }
 compose-ui              = { group = "androidx.compose.ui", name = "ui" }
 compose-material3       = { group = "androidx.compose.material3", name = "material3" }

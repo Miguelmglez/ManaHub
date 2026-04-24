@@ -133,7 +133,7 @@ data class DeckBuilderUiState(
 
     // ── REVIEW fields ─────────────────────────────────────────────────────────
     val isSaving:    Boolean = false,
-    val savedDeckId: Long?   = null,
+    val savedDeckId: String? = null,
     val error:       String? = null,
 ) {
     val mainboardCount: Int   get() = mainboard.sumOf { it.quantity }

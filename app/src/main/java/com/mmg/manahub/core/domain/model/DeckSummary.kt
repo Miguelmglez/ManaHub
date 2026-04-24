@@ -2,7 +2,7 @@ package com.mmg.manahub.core.domain.model
 
 /** Lightweight deck info used in the deck list — includes aggregated card data. */
 data class DeckSummary(
-    val id: Long,
+    val id: String,
     val name: String,
     val description: String?,
     val format: String,

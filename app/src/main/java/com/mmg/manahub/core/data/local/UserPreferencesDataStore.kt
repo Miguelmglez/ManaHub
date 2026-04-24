@@ -46,6 +46,7 @@ private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags"
 
 // ── Per-user sync keys (keyed by userId to handle multi-account scenarios) ───
 private fun syncTimestampKey(userId: String) = stringPreferencesKey("sync_ts_$userId")
+private fun syncTimestampMillisKey(userId: String) = longPreferencesKey("sync_ts_ms_$userId")
 private fun syncDateKey(userId: String)      = stringPreferencesKey("sync_date_$userId")
 private fun pendingDeletesKey(userId: String) = stringSetPreferencesKey("sync_del_$userId")
 
@@ -242,6 +243,21 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     // ── Sync metadata ─────────────────────────────────────────────────────────
+
+    // ── Delta-sync epoch millis watermark (new system — Last Write Wins) ────────
+
+    suspend fun getLastSyncTimestampMillis(userId: String): Long =
+        context.userPrefsDataStore.data.map { it[syncTimestampMillisKey(userId)] ?: 0L }.first()
+
+    suspend fun saveLastSyncTimestampMillis(userId: String, millis: Long) {
+        context.userPrefsDataStore.edit { it[syncTimestampMillisKey(userId)] = millis }
+    }
+
+    suspend fun clearLastSyncTimestampMillis(userId: String) {
+        context.userPrefsDataStore.edit { it.remove(syncTimestampMillisKey(userId)) }
+    }
+
+    // ── Legacy ISO-string sync keys (kept for backward-compat, not used by SyncManager) ─
 
     suspend fun getLastSyncTimestamp(userId: String): String? {
         return context.userPrefsDataStore.data.map { it[syncTimestampKey(userId)] }.first()

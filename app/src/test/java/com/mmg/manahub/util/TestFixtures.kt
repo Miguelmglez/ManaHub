@@ -114,7 +114,7 @@ object TestFixtures {
     // ── UserCards ─────────────────────────────────────────────────────────────
 
     fun buildUserCard(
-        id:               Long    = 1L,
+        id:               String  = "test-uuid-001",
         scryfallId:       String  = "test-scryfall-id-001",
         quantity:         Int     = 1,
         isFoil:           Boolean = false,
@@ -123,7 +123,7 @@ object TestFixtures {
         language:         String  = "en",
         isForTrade:       Boolean = false,
         isInWishlist:     Boolean = false,
-        addedAt:          Long    = System.currentTimeMillis(),
+        createdAt:        Long    = System.currentTimeMillis(),
     ) = UserCard(
         id               = id,
         scryfallId       = scryfallId,
@@ -134,7 +134,7 @@ object TestFixtures {
         language         = language,
         isForTrade       = isForTrade,
         isInWishlist     = isInWishlist,
-        addedAt          = addedAt,
+        createdAt        = createdAt,
     )
 
     fun buildUserCardWithCard(
