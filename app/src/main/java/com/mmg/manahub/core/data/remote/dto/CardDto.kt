@@ -34,6 +34,9 @@ data class CardDto(
     @SerializedName("game_changer")     val gameChanger:     Boolean = false,
     @SerializedName("flavor_text")      val flavorText:      String?,
     @SerializedName("artist")           val artist:          String?,
+    @SerializedName("related_uris")     val relatedUris:     Map<String, String>? = null,
+    @SerializedName("purchase_uris")    val purchaseUris:    Map<String, String>? = null,
+    @SerializedName("game_changer")     val gameChanger:     Boolean? = null,
 )
 
 data class ImageUrisDto(

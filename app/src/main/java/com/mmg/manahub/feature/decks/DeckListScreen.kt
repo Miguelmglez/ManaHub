@@ -41,7 +41,7 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckListScreen(
-    onDeckClick:       (deckId: Long) -> Unit,
+    onDeckClick:       (deckId: String) -> Unit,
     onCreateDeckClick: () -> Unit,
     onSynergyClick:    () -> Unit,
     onDeckBuilderClick:() -> Unit,

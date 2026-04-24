@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.data.repository
 
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.SupabaseCollectionDataSource
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
@@ -47,5 +46,5 @@ abstract class RepositoryModule {
     abstract fun bindTournamentRepository(impl: TournamentRepositoryImpl): TournamentRepository
 
     @Binds @Singleton
-    abstract fun bindUserPreferencesRepository(impl: UserPreferencesDataStore): UserPreferencesRepository
+    abstract fun bindUserPreferencesRepository(impl: com.mmg.manahub.core.data.local.UserPreferencesDataStore): UserPreferencesRepository
 }

@@ -72,4 +72,16 @@ data class CardEntity(
     /** JSON array of `{key, category, confidence, source}` objects. */
     @ColumnInfo(name = "suggested_tags", defaultValue = "[]")
     val suggestedTags: String = "[]",
+
+    /** JSON object mapping site name → URL (Gatherer, EDHREC, TCGPlayer articles…). */
+    @ColumnInfo(name = "related_uris", defaultValue = "{}")
+    val relatedUris: String = "{}",
+
+    /** JSON object mapping site name → purchase URL (TCGPlayer, Cardmarket…). */
+    @ColumnInfo(name = "purchase_uris", defaultValue = "{}")
+    val purchaseUris: String = "{}",
+
+    /** True when Scryfall marks this card as a Game Changer in its format. */
+    @ColumnInfo(name = "game_changer", defaultValue = "0")
+    val gameChanger: Boolean = false,
 )

@@ -70,6 +70,20 @@ object TypeLineAnalyzer {
     }
 }
 
+object GameChangerAnalyzer {
+    /** Emits a "Game Changer" tag with full confidence when the card carries the Scryfall flag. */
+    fun analyze(card: Card): List<SuggestedTag> {
+        if (!card.gameChanger) return emptyList()
+        return listOf(
+            SuggestedTag(
+                tag        = CardTag.GAME_CHANGER,
+                confidence = 1.0f,
+                source     = "scryfall",
+            )
+        )
+    }
+}
+
 object StrategyAnalyzer {
 
     /**

@@ -178,6 +178,26 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // ── Decks ─────────────────────────────────────────────────────────
             composable(
                 route = Screen.DeckDetail.route,
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
+            ) { entry ->
+                val deckId = entry.arguments?.getString("deckId") ?: ""
+                DeckDetailScreen(
+                    deckId = deckId,
+                    onBack = { navController.popBackStack() },
+                    onAddCards = { navController.navigate(Screen.DeckAddCards.createRoute(deckId)) },
+                )
+            }
+
+            composable(
+                route = Screen.DeckImprovement.route,
+                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
+            ) {
+                DeckImprovementScreen(onBack = { navController.popBackStack() })
+            }
+
+            // ── Decks ─────────────────────────────────────────────────────────
+            composable(
+                route = Screen.DeckDetail.route,
                 arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
             ) {
                 DeckMagicDetailScreen(
@@ -190,17 +210,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                     }
                 )
             }
-
-            composable(
-                route = Screen.DeckImprovement.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
-            ) {
-                DeckImprovementScreen(onBack = { navController.popBackStack() })
-            }
-
             composable(
                 route = Screen.DeckAddCards.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
             ) {
                 //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
             }

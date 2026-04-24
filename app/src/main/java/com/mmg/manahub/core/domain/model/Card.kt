@@ -52,25 +52,26 @@ data class Card(
      * confirm or dismiss; never auto-applied to [tags].
      */
     val suggestedTags: List<SuggestedTag> = emptyList(),
+    /** Links to this card on external sites (Gatherer, EDHREC, TCGPlayer articles…). */
+    val relatedUris: Map<String, String> = emptyMap(),
+    /** Purchase links for this card (TCGPlayer, Cardmarket, Cardhoarder). */
+    val purchaseUris: Map<String, String> = emptyMap(),
+    /** True when Scryfall marks this card as a "Game Changer" in its format. */
+    val gameChanger: Boolean = false,
 )
 
 data class UserCard(
-    val id:               Long    = 0,
+    val id:               String,                              // UUID, client-generated
     val scryfallId:       String,
     val quantity:         Int     = 1,
     val isFoil:           Boolean = false,
     val isAlternativeArt: Boolean = false,
     val condition:        String  = "NM",
     val language:         String  = "en",
-    val isForTrade:    Boolean = false,
-    val isInWishlist:  Boolean = false,
-    val minTradeValue: Double? = null,
-    val notes:         String? = null,
-    val acquiredAt:    Long?   = null,
-    val addedAt:       Long    = System.currentTimeMillis(),
-    // Sync metadata — carried through the domain layer so updateCard() preserves remote_id.
-    val syncStatus: Int     = 0,   // 0=SYNCED, 1=PENDING_UPLOAD
-    val remoteId:   String? = null,
+    val isForTrade:       Boolean = false,
+    val isInWishlist:     Boolean = false,
+    val updatedAt:        Long    = System.currentTimeMillis(),
+    val createdAt:        Long    = System.currentTimeMillis(),
 )
 
 data class UserCardWithCard(val userCard: UserCard, val card: Card)

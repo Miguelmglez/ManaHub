@@ -3,6 +3,7 @@ package com.mmg.manahub.core.domain.usecase.card
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.SuggestedTag
+import com.mmg.manahub.core.tagging.GameChangerAnalyzer
 import com.mmg.manahub.core.tagging.KeywordAnalyzer
 import com.mmg.manahub.core.tagging.StrategyAnalyzer
 import com.mmg.manahub.core.tagging.TypeLineAnalyzer
@@ -37,6 +38,7 @@ class SuggestTagsUseCase @Inject constructor() {
         KeywordAnalyzer.analyze(card).forEach(::consider)
         TypeLineAnalyzer.analyze(card).forEach(::consider)
         StrategyAnalyzer.analyze(card).forEach(::consider)
+        GameChangerAnalyzer.analyze(card).forEach(::consider)
 
         val confirmed = mutableListOf<CardTag>()
         val suggested = mutableListOf<SuggestedTag>()

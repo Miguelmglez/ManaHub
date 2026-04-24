@@ -55,7 +55,8 @@ data class CardTag(
         val TUTOR        = CardTag("tutor",        TagCategory.ROLE)
         val PROTECTION   = CardTag("protection",   TagCategory.ROLE)
         val WIN_CON      = CardTag("win_con",      TagCategory.ROLE)
-        val COUNTERSPELL = CardTag("counterspell", TagCategory.ROLE)
+        val COUNTERSPELL  = CardTag("counterspell",  TagCategory.ROLE)
+        val GAME_CHANGER  = CardTag("game_changer",  TagCategory.ROLE)
 
         // ── Tribal (canonical, common tribes) ─────────────────────────────────
         val GOBLIN  = CardTag("goblin",  TagCategory.TRIBAL)
@@ -71,7 +72,7 @@ data class CardTag(
             TOKENS, PLUS_COUNTERS, PROLIFERATE, GRAVEYARD, ENCHANTRESS, TRIBAL,
             BURN, LIFEGAIN, SACRIFICE, BLINK, INFINITE, STAX,
             MANA_ROCK, MANA_DORK, DRAW_ENGINE, REMOVAL, WRATH, TUTOR,
-            PROTECTION, WIN_CON, COUNTERSPELL,
+            PROTECTION, WIN_CON, COUNTERSPELL, GAME_CHANGER,
             GOBLIN, ELF, DRAGON, ZOMBIE, WIZARD, VAMPIRE,
         )
     }

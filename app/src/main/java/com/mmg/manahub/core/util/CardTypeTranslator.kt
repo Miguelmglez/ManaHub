@@ -96,15 +96,24 @@ object CardTypeTranslator {
         "Clue"       to mapOf("es" to "Pista",     "de" to "Hinweis")
     )
 
+    // Tipos complejos o combinados
+    private val complexTypes = mapOf(
+        "Basic Land" to mapOf("es" to "Tierra Básica", "de" to "Standardland")
+    )
+
     // Diccionario combinado de todos los tipos
     private val allTypes: Map<String, Map<String, String>> by lazy {
-        supertypes + mainTypes + creatureSubtypes + landSubtypes + artifactSubtypes
+        supertypes + mainTypes + creatureSubtypes + landSubtypes + artifactSubtypes + complexTypes
     }
 
-    // Traduce una palabra de la type_line al idioma especificado
-    fun translateWord(word: String, lang: String = currentLang()): String {
-        if (lang == "en") return word
-        return allTypes[word]?.get(lang) ?: word
+    // Traduce una palabra de la type_line al idioma del dispositivo
+    fun translateWord(word: String): String {
+        val sanitized = word.replace('_', ' ')
+        val lang = java.util.Locale.getDefault().language.lowercase()
+        if (lang == "en") return sanitized
+
+        val capitalized = sanitized.split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        return allTypes[capitalized]?.get(lang) ?: sanitized
     }
 
     // Traduce la type_line completa
