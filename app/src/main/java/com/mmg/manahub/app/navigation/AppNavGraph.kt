@@ -30,7 +30,7 @@ import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.feature.addcard.AddCardScreen
 import com.mmg.manahub.feature.carddetail.CardDetailScreen
 import com.mmg.manahub.feature.collection.CollectionScreen
-import com.mmg.manahub.feature.deckmagic.DeckMagicDetailScreen
+import com.mmg.manahub.feature.decks.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.DeckMagicScreen
 import com.mmg.manahub.feature.decks.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen

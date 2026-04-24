@@ -1457,7 +1457,9 @@ private fun EditDeckSheet(
             }
 
             // Cover image section (only if deck has cards with art)
-            val coverCards = cards.filter { it.card?.imageArtCrop != null }
+            val coverCards = remember(cards) { 
+                cards.filter { it.card?.imageArtCrop != null }.distinctBy { it.scryfallId }
+            }
             if (coverCards.isNotEmpty()) {
                 HorizontalDivider(color = mc.surfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
                 Text(

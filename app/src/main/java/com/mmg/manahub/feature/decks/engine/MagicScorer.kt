@@ -82,13 +82,13 @@ object MagicScorer {
 
         // Check Suggested Tags
         card.suggestedTags.filter { it.tag.key in targetKeys }.forEach { suggestion ->
-            if (card.userTags.none { it.key == suggestion.tag.key } && 
+            if (card.userTags.none { it.key == suggestion.tag.key } &&
                 card.tags.none { it.key == suggestion.tag.key }) {
-                
+
                 // If confidence is high or confirmed (this logic might be extended)
-                val weight = if (suggestion.confidence >= 0.8f) WEIGHT_SUGGESTED_TAG_CONFIRMED 
-                             else WEIGHT_SUGGESTED_TAG_UNCONFIRMED
-                
+                val weight = if (suggestion.confidence >= 0.8f) WEIGHT_SUGGESTED_TAG_CONFIRMED
+                else WEIGHT_SUGGESTED_TAG_UNCONFIRMED
+
                 matchWeight += weight
                 reasons.add("Suggested: ${suggestion.tag.label}")
             }
@@ -123,7 +123,7 @@ object MagicScorer {
         reasons: MutableList<String>
     ): Float {
         if (selectedColors.isEmpty()) return 1.0f
-        
+
         val cardColorIdentity = card.colorIdentity
         if (cardColorIdentity.isEmpty()) {
             reasons.add("Colorless fit")
@@ -132,7 +132,7 @@ object MagicScorer {
 
         val allowedSymbols = selectedColors.map { it.symbol }.toSet()
         val isCompatible = cardColorIdentity.all { it in allowedSymbols }
-        
+
         return if (isCompatible) 1.0f else 0.0f
     }
 }

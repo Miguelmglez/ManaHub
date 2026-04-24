@@ -1,7 +1,5 @@
 package com.mmg.manahub.feature.decks.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -10,15 +8,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.deckmagic.LandDelta
+import com.mmg.manahub.feature.decks.LandDelta
 
 @Composable
 fun MagicLandSuggestionStatic(
@@ -63,41 +59,7 @@ fun MagicLandSuggestionStatic(
     }
 }
 
-@Composable
-fun MagicLandSuggestionFloating(
-    deltas: List<LandDelta>,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
 
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = mc.primaryAccent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.background)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Optimized Mana Base Available",
-                    style = ty.labelLarge,
-                    color = mc.background,
-                    fontWeight = FontWeight.Bold
-                )
-                DeltaList(deltas = deltas, textColor = mc.background.copy(alpha = 0.8f))
-            }
-        }
-    }
-}
 
 @Composable
 private fun DeltaList(
