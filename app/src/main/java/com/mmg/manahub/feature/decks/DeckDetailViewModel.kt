@@ -14,14 +14,12 @@ import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.DeckCardValidator
 import com.mmg.manahub.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -49,7 +47,7 @@ class DeckDetailViewModel @Inject constructor(
         val BASIC_LAND_NAMES = listOf("Plains", "Island", "Swamp", "Mountain", "Forest")
     }
 
-    private val deckId: Long = checkNotNull(savedStateHandle["deckId"])
+    private val deckId: String = checkNotNull(savedStateHandle["deckId"])
 
     data class AddCardRow(
         val card: Card,
@@ -411,11 +409,7 @@ class DeckDetailViewModel @Inject constructor(
      * cancelled before completing.
      */
     fun onNavigatingBack() {
-        viewModelScope.launch {
-            withContext(NonCancellable) {
-                deckRepository.syncDeckNow(deckId)
-            }
-        }
+        // Sync is handled by SyncManager / WorkManager — no inline sync needed here.
     }
 
     fun setCoverCard(scryfallId: String) {

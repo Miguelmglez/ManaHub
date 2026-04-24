@@ -9,6 +9,7 @@ import com.mmg.manahub.core.data.remote.collection.toEntity
 import com.mmg.manahub.core.data.remote.decks.DeckCardSyncDto
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.toDto
+import com.mmg.manahub.core.data.remote.decks.toEntity
 import com.mmg.manahub.core.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow

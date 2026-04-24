@@ -23,6 +23,6 @@ fun List<UserCardWithCard>.groupByCard(): List<CollectionCardGroup> =
                 totalQuantity  = copies.sumOf { it.userCard.quantity },
                 hasFoil        = copies.any  { it.userCard.isFoil },
                 distinctCopies = copies.size,
-                latestAddedAt  = copies.maxOf { it.userCard.addedAt },
+                latestAddedAt  = copies.maxOf { it.userCard.createdAt },
             )
         }

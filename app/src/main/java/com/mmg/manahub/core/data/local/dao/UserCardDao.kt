@@ -53,6 +53,9 @@ interface UserCardCollectionDao {
     @Query("SELECT COUNT(*) FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0")
     fun observeCount(userId: String?): Flow<Int>
 
+    @Query("SELECT DISTINCT scryfall_id FROM user_card_collection WHERE is_deleted = 0")
+    fun getAllScryfallIds(): List<String>
+
     // ── Paging 3 support ──────────────────────────────────────────────────────
 
     // Returns a PagingSource backed by Room. Requires room-paging dependency.

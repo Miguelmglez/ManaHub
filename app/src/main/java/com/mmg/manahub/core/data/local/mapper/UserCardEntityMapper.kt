@@ -19,10 +19,12 @@ fun UserCardCollectionEntity.toDomain(): UserCard = UserCard(
     createdAt = createdAt,
 )
 
-fun UserCardWithCardEntity.toDomain(): UserCardWithCard = UserCardWithCard(
-    userCard = userCard.toDomain(),
-    card = card.toDomainCard(),
-)
+fun UserCardWithCardEntity.toDomain(): UserCardWithCard? = card?.let { cardEntity ->
+    UserCardWithCard(
+        userCard = userCard.toDomain(),
+        card = cardEntity.toDomainCard(),
+    )
+}
 
 fun UserCard.toEntity(userId: String?): UserCardCollectionEntity = UserCardCollectionEntity(
     id = id,

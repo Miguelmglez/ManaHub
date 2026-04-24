@@ -40,6 +40,8 @@ class CollectionRemoteMediator(
 
         /** Number of rows to fetch per page from Supabase. */
         private const val PAGE_SIZE = 50
+
+        const val TABLE = "user_card_collection"
     }
 
     /**
@@ -60,7 +62,7 @@ class CollectionRemoteMediator(
         // Guest users have no Supabase rows — signal end of pagination immediately.
         val safeUserId = userId ?: return MediatorResult.Success(endOfPaginationReached = true)
 
-        val offset = when (loadType) {
+        val currentOffset = when (loadType) {
             LoadType.REFRESH -> 0
             LoadType.APPEND -> {
                 val key = remoteKeyDao.getByLabel(LABEL)
@@ -78,8 +80,7 @@ class CollectionRemoteMediator(
                         eq("is_deleted", false)
                     }
                     order("updated_at", Order.DESCENDING)
-                    limit(PAGE_SIZE.toLong())
-                    offset(offset.toLong())
+                    range(currentOffset.toLong(), (currentOffset + PAGE_SIZE - 1).toLong())
                 }
                 .decodeList<UserCardCollectionDto>()
 
@@ -95,7 +96,7 @@ class CollectionRemoteMediator(
                 userCardCollectionDao.upsertAll(remoteRows.map { it.toEntity() })
 
                 if (!endOfPaginationReached) {
-                    remoteKeyDao.upsert(RemoteKeyEntity(LABEL, offset + remoteRows.size))
+                    remoteKeyDao.upsert(RemoteKeyEntity(LABEL, currentOffset + remoteRows.size))
                 }
             }
 
@@ -105,7 +106,4 @@ class CollectionRemoteMediator(
         }
     }
 
-    private companion object {
-        const val TABLE = "user_card_collection"
-    }
 }

@@ -393,11 +393,9 @@ class DeckBuilderViewModel @Inject constructor(
                 }
 
                 val deckId = deckRepository.createDeck(
-                    Deck(
-                        name        = deckName.ifBlank { parsed.commander?.name ?: "Imported Deck" },
-                        format      = format.name.lowercase(),
-                        coverCardId = commanderCard?.scryfallId,
-                    )
+                    name        = deckName.ifBlank { parsed.commander?.name ?: "Imported Deck" },
+                    description = "",
+                    format      = format.name.lowercase(),
                 )
 
                 commanderCard?.let {
@@ -435,11 +433,9 @@ class DeckBuilderViewModel @Inject constructor(
             // don't leave a nameless, empty deck in the list.
             val deckId = try {
                 deckRepository.createDeck(
-                    Deck(
-                        name = s.deckName,
-                        format = s.format.name.lowercase(),
-                        coverCardId = s.commander?.scryfallId,
-                    )
+                    name        = s.deckName,
+                    description = "",
+                    format      = s.format.name.lowercase(),
                 )
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }

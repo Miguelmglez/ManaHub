@@ -100,7 +100,6 @@ class ScannerViewModel @Inject constructor(
                 isFoil     = isFoil,
                 condition  = condition,
                 language   = language,
-                quantity   = quantity,
             )) {
                 is DataResult.Success -> _uiState.update {
                     analyticsHelper.logEvent("scanner_add_card", mapOf("card_id" to scryfallId))

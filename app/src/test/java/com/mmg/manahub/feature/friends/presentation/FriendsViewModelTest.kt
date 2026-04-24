@@ -8,6 +8,7 @@ import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.model.FriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import io.mockk.coEvery
@@ -54,10 +55,11 @@ class FriendsViewModelTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val friendRepo       = mockk<FriendRepository>(relaxed = true)
-    private val authRepo         = mockk<AuthRepository>()
-    private val searchUseCase    = mockk<SearchUserByGameTagUseCase>()
+    private val friendRepo         = mockk<FriendRepository>(relaxed = true)
+    private val authRepo           = mockk<AuthRepository>()
+    private val searchUseCase      = mockk<SearchUserByGameTagUseCase>()
     private val sendRequestUseCase = mockk<SendFriendRequestUseCase>()
+    private val analyticsHelper    = mockk<AnalyticsHelper>(relaxed = true)
 
     // Controls sessionState emissions
     private val sessionStateFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
@@ -107,6 +109,7 @@ class FriendsViewModelTest {
             authRepo           = authRepo,
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
+            analyticsHelper    = analyticsHelper,
         )
     }
 
