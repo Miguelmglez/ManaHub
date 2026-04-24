@@ -65,7 +65,6 @@ import com.mmg.manahub.feature.decks.components.MagicLandSuggestionStatic
 @Composable
 fun DeckMagicDetailScreen(
     onBack: () -> Unit,
-    onCardClick: (String) -> Unit,
     onImproveDeck: (String) -> Unit,
     viewModel: DeckMagicDetailViewModel = hiltViewModel()
 ) {
@@ -359,8 +358,6 @@ private fun ViewStepContent(
                         title = stringResource(R.string.deckdetail_tab_mainboard, mainboardCards.sumOf { it.quantity }),
                         expanded = uiState.mainboardExpanded,
                         onToggle = viewModel::toggleMainboard,
-                        showChooseCommander = isCommanderFormat && uiState.commanderCard == null,
-                        onChooseCommander = onChooseCommander,
                         modifier = Modifier.padding(horizontal = 0.dp)
                     )
                 }
@@ -555,8 +552,6 @@ private fun MainSectionHeader(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
-    showChooseCommander: Boolean = false,
-    onChooseCommander: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val mc = MaterialTheme.magicColors
@@ -575,23 +570,6 @@ private fun MainSectionHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = ty.titleMedium, color = mc.primaryAccent, fontWeight = FontWeight.Bold)
-        
-        if (showChooseCommander) {
-            Spacer(Modifier.width(8.dp))
-            Surface(
-                onClick = onChooseCommander,
-                shape = RoundedCornerShape(4.dp),
-                color = mc.primaryAccent.copy(alpha = 0.1f),
-                border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.3f))
-            ) {
-                Text(
-                    "Choose Commander", 
-                    style = ty.labelSmall, 
-                    color = mc.primaryAccent,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-            }
-        }
 
         Spacer(Modifier.weight(1f))
         Icon(
