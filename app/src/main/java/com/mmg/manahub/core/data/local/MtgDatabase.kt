@@ -37,7 +37,7 @@ import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
         FriendEntity::class,
         FriendRequestEntity::class,
     ],
-    version = 25,
+    version = 26,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

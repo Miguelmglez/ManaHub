@@ -10,9 +10,15 @@ import com.mmg.manahub.core.domain.model.TagCategory
 
 private val gson = Gson()
 private val listType = object : TypeToken<List<String>>() {}.type
+private val mapType  = object : TypeToken<Map<String, String>>() {}.type
 
 internal fun String.toStringList(): List<String> = gson.fromJson(this, listType) ?: emptyList()
 internal fun List<String>.toJsonString(): String  = gson.toJson(this)
+
+internal fun String.toStringMap(): Map<String, String> =
+    runCatching { gson.fromJson<Map<String, String>>(this, mapType) ?: emptyMap() }
+        .getOrDefault(emptyMap())
+internal fun Map<String, String>.toMapJsonString(): String = gson.toJson(this)
 
 // ── Tag persistence ───────────────────────────────────────────────────────────
 //
@@ -96,7 +102,10 @@ fun CardEntity.toDomainCard(): Card = Card(
     suggestedTags = suggestedTags.toSuggestedTagList(),
     printedName = printedName,
     printedText = printedText,
-    printedTypeLine = printedTypeLine
+    printedTypeLine = printedTypeLine,
+    relatedUris = relatedUris.toStringMap(),
+    purchaseUris = purchaseUris.toStringMap(),
+    gameChanger = gameChanger,
 )
 
 fun Card.toEntityCard(): CardEntity = CardEntity(
@@ -142,7 +151,10 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     suggestedTags = suggestedTags.toSuggestedTagsJson(),
     printedName = printedName,
     printedText = printedText,
-    printedTypeLine =  printedTypeLine
+    printedTypeLine = printedTypeLine,
+    relatedUris = relatedUris.toMapJsonString(),
+    purchaseUris = purchaseUris.toMapJsonString(),
+    gameChanger = gameChanger,
 )
 
 fun List<CardEntity>.toDomainCardList(): List<Card> = map { it.toDomainCard() }

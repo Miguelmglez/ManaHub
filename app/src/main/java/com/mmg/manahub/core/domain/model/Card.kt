@@ -51,6 +51,12 @@ data class Card(
      * confirm or dismiss; never auto-applied to [tags].
      */
     val suggestedTags: List<SuggestedTag> = emptyList(),
+    /** Links to this card on external sites (Gatherer, EDHREC, TCGPlayer articles…). */
+    val relatedUris: Map<String, String> = emptyMap(),
+    /** Purchase links for this card (TCGPlayer, Cardmarket, Cardhoarder). */
+    val purchaseUris: Map<String, String> = emptyMap(),
+    /** True when Scryfall marks this card as a "Game Changer" in its format. */
+    val gameChanger: Boolean = false,
 )
 
 data class UserCard(

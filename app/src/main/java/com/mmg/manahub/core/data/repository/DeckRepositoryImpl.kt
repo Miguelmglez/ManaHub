@@ -124,18 +124,19 @@ class DeckRepositoryImpl @Inject constructor(
         scryfallId: String,
         quantity: Int,
         isSideboard: Boolean,
-    ) = withContext(ioDispatcher) {
-        deckDao.upsertDeckCard(
-            DeckCardEntity(
-                deckId = deckId,
-                scryfallId = scryfallId,
-                quantity = quantity,
-                isSideboard = isSideboard,
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.upsertDeckCard(
+                DeckCardEntity(
+                    deckId = deckId,
+                    scryfallId = scryfallId,
+                    quantity = quantity,
+                    isSideboard = isSideboard,
+                )
             )
-        )
-        // Bump deck updatedAt so the sync engine knows the deck is dirty.
-        deckDao.getDeckById(deckId)?.let { deck ->
-            deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+            deckDao.getDeckById(deckId)?.let { deck ->
+                deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+            }
         }
     }
 
@@ -143,17 +144,21 @@ class DeckRepositoryImpl @Inject constructor(
         deckId: String,
         scryfallId: String,
         isSideboard: Boolean,
-    ) = withContext(ioDispatcher) {
-        deckDao.removeDeckCard(deckId, scryfallId, isSideboard)
-        deckDao.getDeckById(deckId)?.let { deck ->
-            deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.removeDeckCard(deckId, scryfallId, isSideboard)
+            deckDao.getDeckById(deckId)?.let { deck ->
+                deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+            }
         }
     }
 
-    override suspend fun clearDeck(deckId: String) = withContext(ioDispatcher) {
-        deckDao.clearDeckCards(deckId)
-        deckDao.getDeckById(deckId)?.let { deck ->
-            deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+    override suspend fun clearDeck(deckId: String) {
+        withContext(ioDispatcher) {
+            deckDao.clearDeckCards(deckId)
+            deckDao.getDeckById(deckId)?.let { deck ->
+                deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+            }
         }
     }
 

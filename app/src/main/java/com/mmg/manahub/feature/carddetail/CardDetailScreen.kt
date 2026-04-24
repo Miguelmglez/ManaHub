@@ -62,7 +62,7 @@ import com.mmg.manahub.core.util.PriceFormatter
 fun CardDetailScreen(
     onBack: () -> Unit,
     onNavigateToAddCard: () -> Unit,
-    onNavigateToDeck: (Long) -> Unit = {},
+    onNavigateToDeck: (String) -> Unit = {},
     viewModel: CardDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -243,9 +243,9 @@ private fun CardDetailContent(
     onShowAddSheet: () -> Unit,
     onShowWishlistSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
-    onUpdateQuantity: (Long, Int) -> Unit,
+    onUpdateQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
-    onNavigateToDeck: (Long) -> Unit,
+    onNavigateToDeck: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -475,7 +475,7 @@ private fun CardDetailContent(
 @Composable
 private fun FoundInDecksSection(
     decks: List<Deck>,
-    onNavigateToDeck: (Long) -> Unit,
+    onNavigateToDeck: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -577,7 +577,7 @@ private fun CollectionSection(
     onShowAddSheet: () -> Unit,
     onShowWishlistSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
-    onUpdateQuantity: (Long, Int) -> Unit,
+    onUpdateQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
 ) {
     Column(
@@ -675,7 +675,7 @@ private fun CollectionSection(
 @Composable
 private fun CollectionCopyRow(
     userCard: UserCard,
-    onUpdateQuantity: (Long, Int) -> Unit,
+    onUpdateQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
 ) {
     Surface(
@@ -953,11 +953,11 @@ private fun AddToWishlistSheet(
 @Composable
 private fun MarkAsTradeableSheet(
     userCards: List<UserCard>,
-    onConfirm: (Map<Long, Boolean>) -> Unit,
+    onConfirm: (Map<String, Boolean>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val tradeState = remember(userCards) {
-        mutableStateMapOf<Long, Boolean>().also { map ->
+        mutableStateMapOf<String, Boolean>().also { map ->
             userCards.forEach { map[it.id] = it.isForTrade }
         }
     }

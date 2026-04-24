@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.local.MtgDatabase
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.dao.UserCardWithCard
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
+import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.local.paging.CollectionRemoteMediator
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
@@ -48,31 +49,31 @@ class UserCardRepositoryImpl @Inject constructor(
 
     override fun observeCollection(): Flow<List<DomainUserCardWithCard>> =
         userCardCollectionDao.observeAll(null).map { list ->
-            list.filter { !it.userCard.isDeleted }.map { it.toDomain() }
+            list.filter { !it.userCard.isDeleted }.mapNotNull { it.toDomain() }
         }
 
     override fun observeByColor(color: String): Flow<List<DomainUserCardWithCard>> =
         userCardCollectionDao.observeAll(null).map { list ->
             list.filter { item ->
                 !item.userCard.isDeleted &&
-                    item.card.colorIdentity.contains(color, ignoreCase = true)
-            }.map { it.toDomain() }
+                    item.card?.colorIdentity?.contains(color, ignoreCase = true) == true
+            }.mapNotNull { it.toDomain() }
         }
 
     override fun observeByRarity(rarity: String): Flow<List<DomainUserCardWithCard>> =
         userCardCollectionDao.observeAll(null).map { list ->
             list.filter { item ->
                 !item.userCard.isDeleted &&
-                    item.card.rarity.equals(rarity, ignoreCase = true)
-            }.map { it.toDomain() }
+                    item.card?.rarity?.equals(rarity, ignoreCase = true) == true
+            }.mapNotNull { it.toDomain() }
         }
 
     override fun searchInCollection(query: String): Flow<List<DomainUserCardWithCard>> =
         userCardCollectionDao.observeAll(null).map { list ->
             list.filter { item ->
                 !item.userCard.isDeleted &&
-                    item.card.name.contains(query, ignoreCase = true)
-            }.map { it.toDomain() }
+                    item.card?.name?.contains(query, ignoreCase = true) == true
+            }.mapNotNull { it.toDomain() }
         }
 
     override fun observeByScryfallId(scryfallId: String, userId: String?): Flow<List<UserCard>> =
@@ -154,6 +155,7 @@ class UserCardRepositoryImpl @Inject constructor(
             createdAt = now,
         )
         userCardCollectionDao.upsert(entity)
+        Unit
     }
 
     override suspend fun updateAttributes(
@@ -193,7 +195,8 @@ class UserCardRepositoryImpl @Inject constructor(
 
     // ── Mapping helpers ───────────────────────────────────────────────────────
 
-    private fun UserCardWithCard.toDomain(): DomainUserCardWithCard {
+    private fun UserCardWithCard.toDomain(): DomainUserCardWithCard? {
+        val cardEntity = card ?: return null
         val userCardDomain = UserCard(
             id = userCard.id,
             scryfallId = userCard.scryfallId,
@@ -207,7 +210,7 @@ class UserCardRepositoryImpl @Inject constructor(
             updatedAt = userCard.updatedAt,
             createdAt = userCard.createdAt,
         )
-        return DomainUserCardWithCard(userCard = userCardDomain, card = card.toDomainCard())
+        return DomainUserCardWithCard(userCard = userCardDomain, card = cardEntity.toDomainCard())
     }
 
     companion object {

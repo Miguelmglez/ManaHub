@@ -175,9 +175,9 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // ── Decks ─────────────────────────────────────────────────────────
             composable(
                 route = Screen.DeckDetail.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
             ) { entry ->
-                val deckId = entry.arguments?.getLong("deckId") ?: 0L
+                val deckId = entry.arguments?.getString("deckId") ?: ""
                 DeckDetailScreen(
                     deckId = deckId,
                     onBack = { navController.popBackStack() },
@@ -187,7 +187,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
 
             composable(
                 route = Screen.DeckAddCards.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
             ) {
                 //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
             }

@@ -4,8 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,18 +19,13 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for the sync-related behaviour of [DeckDetailViewModel].
+ * Unit tests for [DeckDetailViewModel].
  *
- * Covers:
- *  - onNavigatingBack: triggers syncDeckNow with the deckId extracted from SavedStateHandle
- *
- * The ViewModel init block collects observeDeckWithCards() and observeCollection();
- * both are stubbed with flowOf(null) / flowOf(emptyList()) to prevent hanging.
+ * Sync is now handled by [com.mmg.manahub.core.sync.SyncManager] via WorkManager —
+ * the ViewModel no longer calls any sync method on navigation back.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeckDetailViewModelSyncTest {
-
-    // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val deckRepository     = mockk<DeckRepository>(relaxed = true)
     private val cardRepository     = mockk<CardRepository>(relaxed = true)
@@ -38,29 +33,20 @@ class DeckDetailViewModelSyncTest {
 
     private lateinit var viewModel: DeckDetailViewModel
 
-    private val DECK_ID = 1L
-
-    // ── Setup / Teardown ──────────────────────────────────────────────────────
+    private val DECK_ID = "550e8400-e29b-41d4-a716-446655440000"
 
     @Before
     fun setUp() {
-        // Replace Main dispatcher so viewModelScope.launch {} runs deterministically.
         Dispatchers.setMain(UnconfinedTestDispatcher())
 
-        // Stub the flow observed in the init block. flowOf(null) means "deck not found",
-        // which causes a safe early-return inside the collector — no crash.
-        coEvery { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(null)
-
-        // Stub the collection load in loadCollection() to prevent a hanging first()
-        coEvery { userCardRepository.observeCollection() } returns flowOf(emptyList())
-
-        val savedStateHandle = SavedStateHandle(mapOf("deckId" to DECK_ID))
+        every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(null)
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
 
         viewModel = DeckDetailViewModel(
             deckRepository     = deckRepository,
             cardRepository     = cardRepository,
             userCardRepository = userCardRepository,
-            savedStateHandle   = savedStateHandle,
+            savedStateHandle   = SavedStateHandle(mapOf("deckId" to DECK_ID)),
         )
     }
 
@@ -69,16 +55,21 @@ class DeckDetailViewModelSyncTest {
         Dispatchers.resetMain()
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — onNavigatingBack
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── onNavigatingBack ──────────────────────────────────────────────────────
 
     @Test
-    fun `given deckId when onNavigatingBack then syncDeckNow is called with deckId`() = runTest {
-        // Act: simulates the user pressing back after editing the deck
+    fun `onNavigatingBack does not mutate the deck`() = runTest {
         viewModel.onNavigatingBack()
 
-        // Assert: the repository must receive a sync request for this exact deck
-        coVerify(exactly = 1) { deckRepository.syncDeckNow(DECK_ID) }
+        // Sync is now SyncManager's responsibility — the VM must not trigger
+        // any deck mutation (updateDeck, addCardToDeck…) on navigation back.
+        coVerify(exactly = 0) { deckRepository.updateDeck(any()) }
+        coVerify(exactly = 0) { deckRepository.addCardToDeck(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `onNavigatingBack does not throw`() = runTest {
+        // Verify it is safe to call when the deck hasn't loaded yet.
+        viewModel.onNavigatingBack()
     }
 }

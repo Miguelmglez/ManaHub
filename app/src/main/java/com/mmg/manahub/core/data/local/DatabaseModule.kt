@@ -2,6 +2,8 @@ package com.mmg.manahub.core.data.local
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mmg.manahub.core.data.local.dao.*
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
@@ -21,16 +23,21 @@ object DatabaseModule {
     @Provides @Singleton
     fun provideMtgDatabase(@ApplicationContext context: Context): MtgDatabase =
         Room.databaseBuilder(context, MtgDatabase::class.java, "mtg_collection.db")
-            // All versions 1–24 are incompatible with the v25 schema (table renames,
-            // PK type changes from Long to String UUID, new entities). Destructive migration
-            // wipes local data and lets it rebuild from the server sync on next login.
-            // Do NOT remove this without a proper migration path for production builds.
             .fallbackToDestructiveMigrationFrom(
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
                 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                 21, 22, 23, 24
             )
+            .addMigrations(MIGRATION_25_26)
             .build()
+
+    private val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE cards ADD COLUMN related_uris  TEXT    NOT NULL DEFAULT '{}'")
+            db.execSQL("ALTER TABLE cards ADD COLUMN purchase_uris TEXT    NOT NULL DEFAULT '{}'")
+            db.execSQL("ALTER TABLE cards ADD COLUMN game_changer  INTEGER NOT NULL DEFAULT 0")
+        }
+    }
 
     @Provides fun provideCardDao(db: MtgDatabase): CardDao = db.cardDao()
     @Provides fun provideUserCardCollectionDao(db: MtgDatabase): UserCardCollectionDao = db.userCardCollectionDao()

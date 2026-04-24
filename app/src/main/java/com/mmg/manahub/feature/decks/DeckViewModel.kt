@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.decks
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,11 +24,6 @@ class DeckViewModel @Inject constructor(
                 .catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
                 .collect { decks -> _uiState.update { it.copy(decks = decks, isLoading = false) } }
         }
-        // Push any decks that failed to sync in a previous session, then check for remote changes.
-        viewModelScope.launch {
-            runCatching { deckRepo.syncAllDirtyDecks() }
-            runCatching { deckRepo.pullIfStale() }
-        }
     }
 
     fun onShowCreateDialog() = _uiState.update { it.copy(showCreateDialog = true) }
@@ -41,19 +35,14 @@ class DeckViewModel @Inject constructor(
     fun createDeck(name: String, format: String = "casual") {
         if (name.isBlank()) return
         viewModelScope.launch {
-            val deckId = runCatching { deckRepo.createDeck(Deck(name = name.trim(), format = format)) }
+            runCatching { deckRepo.createDeck(name = name.trim(), description = "", format = format) }
                 .onSuccess { _uiState.update { it.copy(showCreateDialog = false) } }
                 .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
-                .getOrNull() ?: return@launch
-            // Immediately push the new deck to Supabase; failure is non-fatal since
-            // sync_status = PENDING_UPLOAD ensures a retry on the next app launch.
-            runCatching { deckRepo.syncDeckNow(deckId) }
         }
     }
 
-    fun deleteDeck(deckId: Long) {
+    fun deleteDeck(deckId: String) {
         viewModelScope.launch {
-            // deleteDeck handles the Supabase soft-delete internally (best-effort).
             runCatching { deckRepo.deleteDeck(deckId) }
                 .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
@@ -65,36 +54,34 @@ class DeckViewModel @Inject constructor(
             _uiState.update { it.copy(isImporting = true, importError = null) }
             try {
                 val parsed = com.mmg.manahub.feature.decks.engine.DeckImportExportHelper.parse(text)
-                val deckId = deckRepo.createDeck(Deck(name = "Imported Deck", format = "casual"))
-                
+                val deckId = deckRepo.createDeck(name = "Imported Deck", description = "", format = "casual")
+
                 val mainboard = parsed.mainboard
                 val sideboard = parsed.sideboard
                 val commander = parsed.commander
-                
-                // Process mainboard
+
                 for (line in mainboard) {
                     addParsedLineToDeck(deckId, line, isSideboard = false)
                 }
-                
-                // Process sideboard
                 for (line in sideboard) {
                     addParsedLineToDeck(deckId, line, isSideboard = true)
                 }
-                
-                // Process commander
-                commander?.let { 
+                commander?.let {
                     addParsedLineToDeck(deckId, it, isSideboard = false)
                 }
 
                 _uiState.update { it.copy(isImporting = false, showImportSheet = false) }
-                runCatching { deckRepo.syncDeckNow(deckId) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isImporting = false, importError = e.message) }
             }
         }
     }
 
-    private suspend fun addParsedLineToDeck(deckId: Long, line: com.mmg.manahub.feature.decks.engine.DeckImportExportHelper.ParsedLine, isSideboard: Boolean) {
+    private suspend fun addParsedLineToDeck(
+        deckId: String,
+        line: com.mmg.manahub.feature.decks.engine.DeckImportExportHelper.ParsedLine,
+        isSideboard: Boolean,
+    ) {
         val result = cardRepo.searchCardByName(line.name)
         if (result is com.mmg.manahub.core.domain.model.DataResult.Success) {
             deckRepo.addCardToDeck(
