@@ -36,7 +36,7 @@ class DeckViewModel @Inject constructor(
         if (name.isBlank()) return
         viewModelScope.launch {
             runCatching { deckRepo.createDeck(name = name.trim(), description = "", format = format) }
-                .onSuccess { _uiState.update { it.copy(showCreateDialog = false) } }
+                .onSuccess { id -> _uiState.update { it.copy(showCreateDialog = false, createdDeckId = id) } }
                 .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
     }

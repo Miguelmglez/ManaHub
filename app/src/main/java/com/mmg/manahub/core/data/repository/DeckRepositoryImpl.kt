@@ -93,6 +93,7 @@ class DeckRepositoryImpl @Inject constructor(
                 description = description,
                 format = format,
                 coverCardId = null,
+                commanderCardId = null,
                 isDeleted = false,
                 updatedAt = now,
                 createdAt = now,
@@ -109,6 +110,7 @@ class DeckRepositoryImpl @Inject constructor(
                 description = deck.description,
                 format = deck.format,
                 coverCardId = deck.coverCardId,
+                commanderCardId = deck.commanderCardId,
                 updatedAt = System.currentTimeMillis(),
             )
         )
@@ -170,6 +172,7 @@ class DeckRepositoryImpl @Inject constructor(
         description = description,
         format = format,
         coverCardId = coverCardId,
+        commanderCardId = commanderCardId,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

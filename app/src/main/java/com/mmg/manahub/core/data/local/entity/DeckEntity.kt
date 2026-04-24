@@ -11,6 +11,7 @@ data class DeckEntity(
     @ColumnInfo(name = "description") val description: String = "",
     @ColumnInfo(name = "format") val format: String = "casual",
     @ColumnInfo(name = "cover_card_id") val coverCardId: String? = null,
+    @ColumnInfo(name = "commander_card_id") val commanderCardId: String? = null,
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
