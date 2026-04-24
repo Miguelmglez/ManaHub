@@ -216,10 +216,9 @@ private fun DeckItem(
                         }
                     }
                 }
-
                 // Format badge — top-right overlay
                 Surface(
-                    color  = mc.primaryAccent.copy(alpha = 0.9f),
+                    color  = if (deck.format == "commander") mc.primaryAccent.copy(alpha = 0.9f) else mc.secondaryAccent.copy(alpha = 0.9f),
                     shape  = RoundedCornerShape(bottomStart = 8.dp),
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {

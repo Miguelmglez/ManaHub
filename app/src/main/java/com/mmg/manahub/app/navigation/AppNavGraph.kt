@@ -176,9 +176,6 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             ) {
                 DeckMagicDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onCardClick = { id ->
-                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
-                    },
                     onImproveDeck = { id ->
                         navController.navigate(Screen.DeckImprovement.createRoute(id))
                     }
