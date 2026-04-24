@@ -106,7 +106,6 @@ fun CardEntity.toDomainCard(): Card = Card(
     printedTypeLine = printedTypeLine,
     relatedUris = relatedUris.toStringMap(),
     purchaseUris = purchaseUris.toStringMap(),
-    gameChanger = gameChanger,
 )
 
 fun Card.toEntityCard(): CardEntity = CardEntity(
@@ -144,7 +143,6 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     flavorText = flavorText,
     artist = artist,
     scryfallUri = scryfallUri,
-    gameChanger = gameChanger,
     isStale = isStale,
     staleReason = staleReason,
     cachedAt = cachedAt,
@@ -156,7 +154,7 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     printedTypeLine = printedTypeLine,
     relatedUris = relatedUris.toMapJsonString(),
     purchaseUris = purchaseUris.toMapJsonString(),
-    gameChanger = gameChanger,
+    gameChanger = gameChanger
 )
 
 fun List<CardEntity>.toDomainCardList(): List<Card> = map { it.toDomainCard() }

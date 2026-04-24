@@ -125,13 +125,13 @@ object CardTypeTranslator {
         val parts = typeLine.split(" — ", " - ")
         return if (parts.size >= 2) {
             val mainPart = parts[0].split(" ")
-                .joinToString(" ") { translateWord(it, lang) }
+                .joinToString(" ") { translateWord(it) }
             val subPart = parts[1].split(" ")
-                .joinToString(" ") { translateWord(it, lang) }
+                .joinToString(" ") { translateWord(it) }
             "$mainPart — $subPart"
         } else {
             typeLine.split(" ")
-                .joinToString(" ") { translateWord(it, lang) }
+                .joinToString(" ") { translateWord(it) }
         }
     }
 

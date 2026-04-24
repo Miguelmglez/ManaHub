@@ -18,15 +18,15 @@ sealed class Screen(val route: String) {
 
     // ── Decks (sub-section of Collection) ────────────────────────────────────
     object DeckList    : Screen("collection/decks")
-    object DeckDetail  : Screen("collection/decks/{deckId}") {
-        fun createRoute(deckId: String) = "collection/decks/$deckId"
+    object DeckDetail  : Screen("collection/deckmagic/{deckId}") {
+        fun createRoute(deckId: String) = "collection/deckmagic/$deckId"
     }
     object DeckBuilder : Screen("collection/decks/builder")
     object DeckAddCards : Screen("collection/decks/{deckId}/add") {
         fun createRoute(deckId: String) = "collection/decks/$deckId/add"
     }
     object DeckImprovement : Screen("collection/decks/{deckId}/improvement") {
-        fun createRoute(deckId: Long) = "collection/decks/$deckId/improvement"
+        fun createRoute(deckId: String) = "collection/decks/$deckId/improvement"
     }
     object Synergy : Screen("collection/decks/synergy")
 
@@ -74,3 +74,4 @@ sealed class Screen(val route: String) {
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Puzzle : Screen("puzzle")
 }
+

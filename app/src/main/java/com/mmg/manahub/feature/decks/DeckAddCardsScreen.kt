@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.mmg.manahub.core.domain.model.*
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -138,7 +139,7 @@ fun DeckAddCardsScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(uiState.cards, key = { it.card.scryfallId }) { row ->
-                        AddCardRow(
+                        AddCardSheetRow(
                             row      = row,
                             onAdd    = { viewModel.addCard(row.card.scryfallId) },
                             onRemove = { viewModel.removeCard(row.card.scryfallId) },
@@ -152,8 +153,8 @@ fun DeckAddCardsScreen(
 }
 
 @Composable
-private fun AddCardRow(
-    row:      DeckAddCardsViewModel.CardRow,
+private fun AddCardSheetRow(
+    row:      AddCardRow,
     onAdd:    () -> Unit,
     onRemove: () -> Unit,
 ) {

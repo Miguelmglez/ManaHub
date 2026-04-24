@@ -33,10 +33,27 @@ object DatabaseModule {
 
     private val MIGRATION_25_26 = object : Migration(25, 26) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE cards ADD COLUMN related_uris  TEXT    NOT NULL DEFAULT '{}'")
-            db.execSQL("ALTER TABLE cards ADD COLUMN purchase_uris TEXT    NOT NULL DEFAULT '{}'")
-            db.execSQL("ALTER TABLE cards ADD COLUMN game_changer  INTEGER NOT NULL DEFAULT 0")
+            if (!columnExists(db, "cards", "related_uris")) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN related_uris  TEXT    NOT NULL DEFAULT '{}'")
+            }
+            if (!columnExists(db, "cards", "purchase_uris")) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN purchase_uris TEXT    NOT NULL DEFAULT '{}'")
+            }
+            if (!columnExists(db, "cards", "game_changer")) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN game_changer  INTEGER NOT NULL DEFAULT 0")
+            }
         }
+    }
+
+    private fun columnExists(db: SupportSQLiteDatabase, tableName: String, columnName: String): Boolean {
+        db.query("PRAGMA table_info($tableName)").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            if (nameIndex == -1) return false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(nameIndex) == columnName) return true
+            }
+        }
+        return false
     }
 
     @Provides fun provideCardDao(db: MtgDatabase): CardDao = db.cardDao()

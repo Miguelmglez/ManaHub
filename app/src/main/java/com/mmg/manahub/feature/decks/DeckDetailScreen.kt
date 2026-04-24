@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.mmg.manahub.core.domain.model.*
 import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -934,7 +935,7 @@ private fun BasicLandRow(
 
 @Composable
 private fun AddCardSheetRow(
-    row: DeckDetailViewModel.AddCardRow,
+    row: AddCardRow,
     format: com.mmg.manahub.core.domain.model.DeckFormat?,
     onAdd: () -> Unit,
     onRemove: () -> Unit,

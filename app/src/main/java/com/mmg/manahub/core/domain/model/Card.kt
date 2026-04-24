@@ -38,7 +38,6 @@ data class Card(
     val flavorText: String?,
     val artist: String?,
     val scryfallUri: String,
-    val gameChanger: Boolean = false,
     val isStale: Boolean = false,
     val staleReason: String? = null,
     val cachedAt: Long = 0L,
