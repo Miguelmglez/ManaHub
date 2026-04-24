@@ -233,7 +233,7 @@ class AddCardViewModelTest {
     @Test
     fun `given successful add when onConfirmAdd then addedSuccessfully is true and sheet closes`() = runTest {
         // Arrange
-        coEvery { addToCollection(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { addToCollection(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 DataResult.Success(Unit)
 
         // Act
@@ -257,7 +257,7 @@ class AddCardViewModelTest {
     @Test
     fun `given failed add when onConfirmAdd then error is set and sheet closes`() = runTest {
         // Arrange
-        coEvery { addToCollection(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { addToCollection(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 DataResult.Error("Card not found")
 
         // Act
@@ -280,7 +280,7 @@ class AddCardViewModelTest {
     @Test
     fun `given foil card when onConfirmAdd then addToCollection is called with isFoil true`() = runTest {
         // Arrange
-        coEvery { addToCollection(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { addToCollection(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 DataResult.Success(Unit)
 
         // Act
@@ -296,11 +296,14 @@ class AddCardViewModelTest {
         // Assert
         coVerify(exactly = 1) {
             addToCollection(
-                scryfallId = "id-001",
-                isFoil     = true,
-                condition  = any(),
-                language   = any(),
-                quantity   = any(),
+                scryfallId       = "id-001",
+                isFoil           = true,
+                isAlternativeArt = any(),
+                condition        = any(),
+                language         = any(),
+                isForTrade       = any(),
+                isInWishlist     = any(),
+                userId           = any(),
             )
         }
     }
@@ -375,7 +378,7 @@ class AddCardViewModelTest {
     @Test
     fun `given addedSuccessfully true when onSuccessDismissed then flag is reset`() = runTest {
         // Arrange — simulate a successful add
-        coEvery { addToCollection(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { addToCollection(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 DataResult.Success(Unit)
         viewModel.onConfirmAdd("id-001", false, "NM", "en", 1)
         advanceUntilIdle()
