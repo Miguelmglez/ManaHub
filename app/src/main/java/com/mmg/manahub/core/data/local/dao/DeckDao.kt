@@ -77,8 +77,19 @@ interface DeckDao {
     @Query("SELECT * FROM decks WHERE id = :deckId AND is_deleted = 0")
     fun getDeckById(deckId: String): DeckEntity?
 
+    // Includes soft-deleted rows — used by SyncManager PULL to avoid falsely overwriting local tombstones.
+    @Query("SELECT * FROM decks WHERE id = :deckId")
+    fun getDeckByIdForSync(deckId: String): DeckEntity?
+
     @Query("SELECT * FROM deck_cards WHERE deck_id = :deckId")
     fun getDeckCards(deckId: String): List<DeckCardEntity>
+
+    // Atomically replaces all card slots for a deck — used by the sync PULL phase.
+    @Transaction
+    fun replaceAllCards(deckId: String, cards: List<DeckCardEntity>) {
+        clearDeckCards(deckId)
+        if (cards.isNotEmpty()) upsertDeckCards(cards)
+    }
 
     // ── Stats / other features ─────────────────────────────────────────────────
 

@@ -37,4 +37,14 @@ interface DeckRemoteDataSource {
      * @param cards  New list of card slots for the deck.
      */
     suspend fun upsertDeckCards(deckId: String, cards: List<DeckCardSyncDto>): Result<Unit>
+
+    /**
+     * Fetches all card slots for a single deck from Supabase.
+     *
+     * Delegates to the `get_deck_cards_for_deck` RPC, which enforces RLS via `auth.uid()`.
+     * Used during the sync PULL phase to restore card slots alongside deck metadata.
+     *
+     * @param deckId UUID of the deck whose cards should be fetched.
+     */
+    suspend fun getDeckCardsForDeck(deckId: String): Result<List<DeckCardSyncDto>>
 }

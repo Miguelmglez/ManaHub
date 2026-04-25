@@ -72,4 +72,18 @@ class SupabaseDeckDataSource @Inject constructor(
                 Unit
             }
         }
+
+    /**
+     * Calls `get_deck_cards_for_deck` RPC to fetch all card slots for a single deck.
+     * Used during the PULL phase so card slots are restored alongside deck metadata.
+     */
+    override suspend fun getDeckCardsForDeck(deckId: String): Result<List<DeckCardSyncDto>> =
+        withContext(ioDispatcher) {
+            runCatching {
+                val params = buildJsonObject { put("p_deck_id", deckId) }
+                supabaseClient.postgrest
+                    .rpc("get_deck_cards_for_deck", params)
+                    .decodeList<DeckCardSyncDto>()
+            }
+        }
 }

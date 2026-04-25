@@ -92,12 +92,22 @@ class CollectionViewModel @Inject constructor(
 
     private fun observeSessionChanges() {
         viewModelScope.launch {
+            var previouslyAuthenticated = false
             authRepository.sessionState.collect { state ->
                 _uiState.update { it.copy(sessionState = state) }
                 if (state is SessionState.Authenticated) {
-                    // Schedule the recurring background sync once the user is logged in.
-                    // Uses KEEP policy so repeated calls (e.g. config changes) are no-ops.
                     CollectionSyncWorker.schedulePeriodicSync(workManager)
+                    if (!previouslyAuthenticated) {
+                        // First transition to authenticated in this session.
+                        // Migrate any offline (guest) data and sync.
+                        // assignUserIdAndSync is a no-op if no orphaned rows exist.
+                        viewModelScope.launch {
+                            syncManager.assignUserIdAndSync(state.user.id)
+                        }
+                    }
+                    previouslyAuthenticated = true
+                } else {
+                    previouslyAuthenticated = false
                 }
             }
         }

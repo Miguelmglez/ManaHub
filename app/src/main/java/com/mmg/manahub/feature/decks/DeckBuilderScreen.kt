@@ -78,12 +78,12 @@ fun DeckMagicDetailScreen(
     var showEditDeckSheet by remember { mutableStateOf(false) }
     var showCommanderSearchSheet by remember { mutableStateOf(false) }
     var selectedCardId by remember { mutableStateOf<String?>(null) }
+    // Tracks whether the CardDetailSheet was opened from the commander-selection flow,
+    // so it can display the commander-specific action buttons instead of the +/- counter.
+    var isCardDetailInCommanderContext by remember { mutableStateOf(false) }
 
-    val handleBack = remember(viewModel) {
-        {
-            viewModel.onNavigatingBack()
-            onBack()
-        }
+    val handleBack: () -> Unit = {
+        if (viewModel.onNavigatingBack()) onBack()
     }
     BackHandler(onBack = handleBack)
 
@@ -163,13 +163,38 @@ fun DeckMagicDetailScreen(
         ViewStepContent(
             uiState = uiState,
             viewModel = viewModel,
-            onCardClick = { selectedCardId = it },
+            onCardClick = { id ->
+                // Cards tapped from the main deck list are never in commander-selection context.
+                isCardDetailInCommanderContext = false
+                selectedCardId = id
+            },
             onAddBasicLands = { showBasicLandsSheet = true },
-            onChooseCommander = { 
+            onChooseCommander = {
                 viewModel.showCollectionCards()
-                showCommanderSearchSheet = true 
+                showCommanderSearchSheet = true
             },
             modifier = Modifier.padding(padding)
+        )
+    }
+
+    if (uiState.showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDiscardDialog,
+            title = { Text(stringResource(R.string.deckbuilder_discard_dialog_title)) },
+            text = { Text(stringResource(R.string.deckbuilder_discard_dialog_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.discardChanges { onBack() } }) {
+                    Text(stringResource(R.string.deckbuilder_discard_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDiscardDialog) {
+                    Text(stringResource(R.string.deckbuilder_discard_cancel))
+                }
+            },
+            containerColor = mc.backgroundSecondary,
+            titleContentColor = mc.textPrimary,
+            textContentColor = mc.textSecondary,
         )
     }
 
@@ -204,7 +229,11 @@ fun DeckMagicDetailScreen(
             onScryfallSearch = viewModel::searchScryfallDirect,
             onAdd = viewModel::addCardToDeck,
             onRemove = viewModel::removeCardFromDeck,
-            onCardClick = { id -> selectedCardId = id },
+            onCardClick = { id ->
+                // Regular add-cards flow: no commander context.
+                isCardDetailInCommanderContext = false
+                selectedCardId = id
+            },
             onDismiss = {
                 showAddCardsSheet = false
                 viewModel.clearAddCardsState()
@@ -219,13 +248,18 @@ fun DeckMagicDetailScreen(
             onQueryChange = viewModel::searchCommander,
             onScryfallSearch = viewModel::searchCommander,
             onAdd = { id ->
+                // Direct add from the list row: resolve card and assign as commander.
                 (uiState.addCardsResults + uiState.scryfallResults).find { it.card.scryfallId == id }?.card?.let { card ->
                     viewModel.setCommander(card)
                     showCommanderSearchSheet = false
                 }
             },
-            onRemove = { /* No-op for commander search */ },
-            onCardClick = { id -> selectedCardId = id },
+            onRemove = { /* No-op in commander selection mode */ },
+            onCardClick = { id ->
+                // Open detail sheet with the commander-selection context flag active.
+                isCardDetailInCommanderContext = true
+                selectedCardId = id
+            },
             onDismiss = {
                 showCommanderSearchSheet = false
                 viewModel.clearCommanderSearch()
@@ -238,18 +272,36 @@ fun DeckMagicDetailScreen(
         LaunchedEffect(selectedDeckCard.scryfallId) {
             viewModel.loadCardDetails(selectedDeckCard.scryfallId)
         }
-        
+
+        val isAlreadyCommander = uiState.commanderCard?.scryfallId == selectedDeckCard.scryfallId
+
         CardDetailSheet(
             deckCard = selectedDeckCard,
-            isCommander = uiState.commanderCard?.scryfallId == selectedDeckCard.scryfallId,
+            isCommander = isAlreadyCommander,
+            isCommanderSelectionContext = isCardDetailInCommanderContext,
             tags = uiState.detailTags,
             onAdd = { viewModel.addCardToDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
             onRemove = { viewModel.removeCardFromDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
             onDelete = {
                 viewModel.removeCard(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard)
                 selectedCardId = null
+                isCardDetailInCommanderContext = false
             },
-            onDismiss = { selectedCardId = null },
+            onChooseAsCommander = { card ->
+                viewModel.setCommander(card)
+                selectedCardId = null
+                isCardDetailInCommanderContext = false
+                showCommanderSearchSheet = false
+            },
+            onRemoveCommander = {
+                viewModel.removeCommander()
+                selectedCardId = null
+                isCardDetailInCommanderContext = false
+            },
+            onDismiss = {
+                selectedCardId = null
+                isCardDetailInCommanderContext = false
+            },
         )
     }
 }
@@ -475,23 +527,32 @@ private fun ViewStepContent(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Reactive save button:
+                        // - Dirty state  (hasUnsavedChanges=true):  highlighted with primaryAccent, label "Save changes"
+                        // - Clean state  (hasUnsavedChanges=false): visually neutral, label "Saved", disabled
+                        val hasDirtyChanges = uiState.hasUnsavedChanges
+                        val saveEnabled = uiState.totalCards > 0 && !uiState.isSaving && hasDirtyChanges
                         Button(
-                            onClick = { viewModel.saveDeck { /* No-op, we stay on screen */ } },
-                            enabled = uiState.totalCards > 0 && !uiState.isSaving,
+                            onClick = { viewModel.saveDeck { /* Stay on screen after save */ } },
+                            enabled = saveEnabled,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = mc.primaryAccent,
-                                disabledContainerColor = mc.surfaceVariant,
+                                disabledContainerColor = if (hasDirtyChanges) mc.surfaceVariant else mc.surfaceVariant.copy(alpha = 0.5f),
                             ),
                             shape = RoundedCornerShape(8.dp),
                         ) {
                             if (uiState.isSaving) {
                                 CircularProgressIndicator(color = mc.background, modifier = Modifier.size(24.dp))
                             } else {
+                                val saveLabel = when {
+                                    hasDirtyChanges -> stringResource(R.string.deckbuilder_save_changes_button)
+                                    else -> stringResource(R.string.deckbuilder_saved_button)
+                                }
                                 Text(
-                                    text = stringResource(R.string.deckbuilder_save_button),
+                                    text = saveLabel,
                                     style = ty.titleMedium,
-                                    color = if (uiState.totalCards > 0) mc.background else mc.textDisabled,
+                                    color = if (saveEnabled) mc.background else mc.textDisabled,
                                 )
                             }
                         }
@@ -774,15 +835,26 @@ private fun CardRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun CardDetailSheet(
     deckCard: DeckSlotEntry,
+    /** True when this card IS the current deck commander. */
     isCommander: Boolean,
+    /**
+     * True when the sheet was opened from the "Choose Commander" search flow.
+     * In this context the +/- counter is hidden and commander-specific action
+     * buttons are shown instead.
+     */
+    isCommanderSelectionContext: Boolean,
     tags: List<com.mmg.manahub.core.domain.model.CardTag>,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onDelete: () -> Unit,
+    /** Called with the resolved Card when the user taps "Choose as commander". */
+    onChooseAsCommander: (com.mmg.manahub.core.domain.model.Card) -> Unit,
+    /** Called when the user taps "Remove commander" inside the commander-selection context. */
+    onRemoveCommander: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -791,8 +863,6 @@ private fun CardDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var showBackFace by remember { mutableStateOf(false) }
-    // Always allow adding in search/detail, the deck list will show warnings
-    val addEnabled = true 
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -851,11 +921,11 @@ private fun CardDetailSheet(
                     val typeLine = card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
                     Text(typeLine, style = ty.labelMedium, color = mc.textSecondary)
                     HorizontalDivider(color = mc.surfaceVariant)
-                    
+
                     val oracleDisplayText = card.oracleText?.takeIf { it.isNotBlank() } ?: card.printedText ?: ""
                     OracleText(text = oracleDisplayText, style = MaterialTheme.typography.bodySmall)
 
-                    // Tag Section
+                    // Tag section
                     if (tags.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         FlowRow(
@@ -879,57 +949,153 @@ private fun CardDetailSheet(
                             }
                         }
                     }
-                    
-                    val preferredCurrency = LocalPreferredCurrency.current
-                    val priceText = PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur, preferredCurrency)
-                    if (priceText != "—") {
-                        Text(priceText, style = ty.labelMedium, color = mc.goldMtg, fontWeight = FontWeight.Medium)
-                    }
                 }
             }
 
-            if (isCommander) {
-                // Large Gold button for Commander
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = mc.goldMtg.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+            // ── Action area ───────────────────────────────────────────────────
+            when {
+                // Case 1: This sheet is in the "Choose Commander" search flow.
+                isCommanderSelectionContext -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.Star, null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("COMMANDER", style = ty.labelLarge, color = mc.goldMtg, fontWeight = FontWeight.Bold)
+                        if (isCommander) {
+                            // Card is already the commander — show current status badge.
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = mc.goldMtg.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(Icons.Default.Star, null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.deckbuilder_commander_label).uppercase(),
+                                        style = ty.labelLarge,
+                                        color = mc.goldMtg,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            // Remove commander option below the status badge.
+                            OutlinedButton(
+                                onClick = onRemoveCommander,
+                                modifier = Modifier.fillMaxWidth(),
+                                border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.deckbuilder_remove_commander),
+                                    color = mc.lifeNegative,
+                                    style = ty.labelLarge
+                                )
+                            }
+                        } else {
+                            // Card is not yet the commander — golden "Choose as commander" CTA.
+                            if (card != null) {
+                                Button(
+                                    onClick = { onChooseAsCommander(card) },
+                                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Star, null, tint = mc.background, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.deckbuilder_choose_as_commander),
+                                        style = ty.titleMedium,
+                                        color = mc.background,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-            } else {
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.deckdetail_in_deck_label), style = ty.labelMedium, color = mc.textSecondary, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onRemove, enabled = deckCard.quantity > 0) {
-                        Icon(Icons.Default.Remove, contentDescription = null, tint = if (deckCard.quantity > 0) mc.primaryAccent else mc.textDisabled)
+
+                // Case 2: Card is the current commander, viewed from the normal deck list.
+                isCommander -> {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = mc.goldMtg.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Star, null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.deckbuilder_commander_label).uppercase(),
+                                style = ty.labelLarge,
+                                color = mc.goldMtg,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
-                    Surface(shape = RoundedCornerShape(8.dp), color = mc.primaryAccent.copy(alpha = 0.15f)) {
-                        Text("${deckCard.quantity}", style = ty.titleMedium, color = mc.primaryAccent, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
-                    }
-                    IconButton(onClick = onAdd, enabled = addEnabled) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = if (addEnabled) mc.primaryAccent else mc.textDisabled)
+                }
+
+                // Case 3: Regular card in the deck — show the +/- quantity counter.
+                else -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.deckdetail_in_deck_label),
+                            style = ty.labelMedium,
+                            color = mc.textSecondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onRemove, enabled = deckCard.quantity > 0) {
+                            Icon(
+                                Icons.Default.Remove,
+                                contentDescription = null,
+                                tint = if (deckCard.quantity > 0) mc.primaryAccent else mc.textDisabled
+                            )
+                        }
+                        Surface(shape = RoundedCornerShape(8.dp), color = mc.primaryAccent.copy(alpha = 0.15f)) {
+                            Text(
+                                text = "${deckCard.quantity}",
+                                style = ty.titleMedium,
+                                color = mc.primaryAccent,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
+                        }
+                        IconButton(onClick = onAdd) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = mc.primaryAccent)
+                        }
                     }
                 }
             }
 
-            OutlinedButton(
-                onClick = onDelete,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.action_remove_all), color = mc.lifeNegative, style = ty.labelLarge)
+            // Delete / remove-all button — always visible except in pure commander-selection context.
+            if (!isCommanderSelectionContext) {
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.action_remove_all), color = mc.lifeNegative, style = ty.labelLarge)
+                }
             }
         }
     }

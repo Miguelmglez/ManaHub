@@ -57,4 +57,11 @@ interface DeckRepository {
 
     /** Removes all card slots from the deck (does NOT delete the deck itself). */
     suspend fun clearDeck(deckId: String)
+
+    /**
+     * Atomically replaces the entire card list for a deck.
+     * Used by [saveDeck] in the ViewModel to flush the in-memory draft to Room in one transaction.
+     * @param slots List of (scryfallId, quantity, isSideboard) triples.
+     */
+    suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>)
 }
