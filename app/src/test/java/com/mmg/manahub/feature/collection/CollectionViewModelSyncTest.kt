@@ -1,11 +1,17 @@
 package com.mmg.manahub.feature.collection
 
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
+import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.SyncResult
+import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
+import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -25,24 +31,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import java.time.LocalDate
-import java.time.ZoneOffset
 
 /**
- * Unit tests for the sync-related behaviour in [CollectionViewModel].
+ * Unit tests for sync-related behaviour in [CollectionViewModel].
  *
- * These tests focus exclusively on:
- *  - autoSyncIfFirstRunOfDay() triggered during init
- *  - onPushCollection() / onPullCollection() state transitions
+ * Focuses on:
+ *  - onSync() state transitions (success / error / no-user guard)
  *  - onSyncDismissed() reset
- *  - observePendingCount() propagation to uiState
+ *  - syncState starts as IDLE
+ *  - Guest → Authenticated transition triggers assignUserIdAndSync()
  *
  * Non-sync behaviour is covered by [CollectionViewModelTest].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionViewModelSyncTest {
-
-    // ── Test dispatcher ───────────────────────────────────────────────────────
 
     private val testDispatcher = StandardTestDispatcher()
 
@@ -53,13 +55,12 @@ class CollectionViewModelSyncTest {
     private val cardRepository     = mockk<CardRepository>(relaxed = true)
     private val userCardRepository = mockk<UserCardRepository>(relaxed = true)
     private val authRepository     = mockk<AuthRepository>(relaxed = true)
-    private val prefsDataStore     = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val syncManager        = mockk<SyncManager>(relaxed = true)
+    private val workManager        = mockk<WorkManager>(relaxed = true)
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
-    private val USER_ID   = "user-uuid-001"
-    private val TODAY     = LocalDate.now(ZoneOffset.UTC).toString()
-    private val YESTERDAY = LocalDate.now(ZoneOffset.UTC).minusDays(1).toString()
+    private val USER_ID = "user-uuid-001"
 
     private val loggedInUser = AuthUser(
         id        = USER_ID,
@@ -75,9 +76,10 @@ class CollectionViewModelSyncTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        // Default: empty collection, pending count 0
         every { getCollection() } returns flowOf(emptyList())
-        every { userCardRepository.observePendingCount() } returns flowOf(0)
+        every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
+        every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
+        coEvery { authRepository.getCurrentUser() } returns null
     }
 
     @After
@@ -93,294 +95,169 @@ class CollectionViewModelSyncTest {
         cardRepository     = cardRepository,
         userCardRepository = userCardRepository,
         authRepository     = authRepository,
-        prefsDataStore     = prefsDataStore,
+        syncManager        = syncManager,
+        workManager        = workManager,
     )
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — autoSyncIfFirstRunOfDay
+    //  GROUP 1 — syncState starts as IDLE
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given logged-in user and last sync was yesterday when ViewModel inits then pushPendingChanges is called`() = runTest {
-        // Arrange
-        coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns YESTERDAY
-        coEvery { userCardRepository.pushPendingChanges(USER_ID) } returns Result.success(Unit)
-
-        // Act
-        buildViewModel()
+    fun `given ViewModel just initialised then syncState is IDLE and syncError is null`() = runTest {
+        val vm = buildViewModel()
         advanceUntilIdle()
 
-        // Assert
-        coVerify(exactly = 1) { userCardRepository.pushPendingChanges(USER_ID) }
-    }
-
-    @Test
-    fun `given logged-in user and last sync was today when ViewModel inits then pushPendingChanges is NOT called`() = runTest {
-        // Arrange: already synced today — skip auto-sync
-        coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns TODAY
-
-        // Act
-        buildViewModel()
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 0) { userCardRepository.pushPendingChanges(any()) }
-    }
-
-    @Test
-    fun `given no logged-in user when ViewModel inits then pushPendingChanges is NOT called`() = runTest {
-        // Arrange: user is not authenticated
-        coEvery { authRepository.getCurrentUser() } returns null
-
-        // Act
-        buildViewModel()
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 0) { userCardRepository.pushPendingChanges(any()) }
-    }
-
-    @Test
-    fun `given logged-in user and no prior sync date when ViewModel inits then pushPendingChanges IS called`() = runTest {
-        // null last sync date means first ever run → must sync
-        coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns null
-        coEvery { userCardRepository.pushPendingChanges(USER_ID) } returns Result.success(Unit)
-
-        buildViewModel()
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { userCardRepository.pushPendingChanges(USER_ID) }
+        assertEquals(SyncState.IDLE, vm.uiState.value.syncState)
+        assertNull(vm.uiState.value.syncError)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 2 — onPushCollection: state transitions
+    //  GROUP 2 — onSync: state transitions
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given logged-in user when onPushCollection called and push succeeds then syncState transitions to SUCCESS`() = runTest {
-        // Arrange
+    fun `given logged-in user when onSync called and sync succeeds then syncError is null`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns TODAY  // skip auto-sync
-        coEvery { userCardRepository.pushPendingChanges(USER_ID) } returns Result.success(Unit)
+        coEvery { syncManager.sync(USER_ID) } returns SyncResult(state = SyncState.SUCCESS)
 
         val vm = buildViewModel()
         advanceUntilIdle()
 
-        // Act
-        vm.onPushCollection()
+        vm.onSync()
         advanceUntilIdle()
 
-        // Assert
-        assertEquals(SyncState.SUCCESS, vm.uiState.value.syncState)
         assertNull(vm.uiState.value.syncError)
     }
 
     @Test
-    fun `given logged-in user when onPushCollection called and push fails then syncState transitions to ERROR`() = runTest {
-        // Arrange
+    fun `given logged-in user when onSync called and sync fails then syncError is populated`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns TODAY
-        coEvery { userCardRepository.pushPendingChanges(USER_ID) } returns
-            Result.failure(RuntimeException("network timeout"))
+        coEvery { syncManager.sync(USER_ID) } returns SyncResult(
+            state = SyncState.ERROR,
+            error = "network timeout",
+        )
 
         val vm = buildViewModel()
         advanceUntilIdle()
 
-        // Act
-        vm.onPushCollection()
+        vm.onSync()
         advanceUntilIdle()
 
-        // Assert
-        assertEquals(SyncState.ERROR, vm.uiState.value.syncState)
         assertEquals("network timeout", vm.uiState.value.syncError)
     }
 
     @Test
-    fun `given no logged-in user when onPushCollection called then pushPendingChanges is NOT called`() = runTest {
-        // Arrange
+    fun `given no logged-in user when onSync called then syncManager sync is NOT called`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns null
 
         val vm = buildViewModel()
         advanceUntilIdle()
 
-        // Act
-        vm.onPushCollection()
+        vm.onSync()
         advanceUntilIdle()
 
-        // Assert: auth guard returns early
-        coVerify(exactly = 0) { userCardRepository.pushPendingChanges(any()) }
+        coVerify(exactly = 0) { syncManager.sync(any()) }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — onPullCollection: state transitions
-    // ══════════════════════════════════════════════════════════════════════════
-
     @Test
-    fun `given logged-in user when onPullCollection called and pull succeeds then syncState transitions to SUCCESS`() = runTest {
-        // Arrange
+    fun `given logged-in user when onSync called then workManager enqueues fallback work`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns TODAY
-        coEvery { userCardRepository.pullChanges(USER_ID) } returns Result.success(Unit)
+        coEvery { syncManager.sync(USER_ID) } returns SyncResult(state = SyncState.SUCCESS)
 
         val vm = buildViewModel()
         advanceUntilIdle()
 
-        // Act
-        vm.onPullCollection()
+        vm.onSync()
         advanceUntilIdle()
 
-        // Assert
-        assertEquals(SyncState.SUCCESS, vm.uiState.value.syncState)
-        assertNull(vm.uiState.value.syncError)
-    }
-
-    @Test
-    fun `given logged-in user when onPullCollection called and pull fails then syncState transitions to ERROR`() = runTest {
-        // Arrange
-        coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns TODAY
-        coEvery { userCardRepository.pullChanges(USER_ID) } returns
-            Result.failure(RuntimeException("server unavailable"))
-
-        val vm = buildViewModel()
-        advanceUntilIdle()
-
-        // Act
-        vm.onPullCollection()
-        advanceUntilIdle()
-
-        // Assert
-        assertEquals(SyncState.ERROR, vm.uiState.value.syncState)
-        assertEquals("server unavailable", vm.uiState.value.syncError)
-    }
-
-    @Test
-    fun `given no logged-in user when onPullCollection called then pullChanges is NOT called`() = runTest {
-        // Arrange
-        coEvery { authRepository.getCurrentUser() } returns null
-
-        val vm = buildViewModel()
-        advanceUntilIdle()
-
-        // Act
-        vm.onPullCollection()
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 0) { userCardRepository.pullChanges(any()) }
+        coVerify(exactly = 1) {
+            workManager.enqueueUniqueWork(
+                any<String>(),
+                eq(ExistingWorkPolicy.REPLACE),
+                any<OneTimeWorkRequest>(),
+            )
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — onSyncDismissed
+    //  GROUP 3 — onSyncDismissed
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
     fun `given syncState is ERROR when onSyncDismissed then syncState resets to IDLE and syncError is cleared`() = runTest {
-        // Arrange: force an error state first
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns TODAY
-        coEvery { userCardRepository.pushPendingChanges(USER_ID) } returns
-            Result.failure(RuntimeException("some error"))
+        coEvery { syncManager.sync(USER_ID) } returns SyncResult(
+            state = SyncState.ERROR,
+            error = "some error",
+        )
 
         val vm = buildViewModel()
         advanceUntilIdle()
-        vm.onPushCollection()
+        vm.onSync()
         advanceUntilIdle()
-        assertEquals(SyncState.ERROR, vm.uiState.value.syncState)
+        assertEquals("some error", vm.uiState.value.syncError)
 
-        // Act
         vm.onSyncDismissed()
 
-        // Assert: state and error are both cleared
         assertEquals(SyncState.IDLE, vm.uiState.value.syncState)
         assertNull(vm.uiState.value.syncError)
     }
 
     @Test
-    fun `given syncState is SUCCESS when onSyncDismissed then syncState resets to IDLE`() = runTest {
-        // Arrange: force a success state
-        coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { prefsDataStore.getLastSyncDate(USER_ID) } returns TODAY
-        coEvery { userCardRepository.pushPendingChanges(USER_ID) } returns Result.success(Unit)
-
+    fun `given syncState is IDLE when onSyncDismissed called then state remains IDLE`() = runTest {
         val vm = buildViewModel()
         advanceUntilIdle()
-        vm.onPushCollection()
-        advanceUntilIdle()
-        assertEquals(SyncState.SUCCESS, vm.uiState.value.syncState)
 
-        // Act
         vm.onSyncDismissed()
-
-        // Assert
-        assertEquals(SyncState.IDLE, vm.uiState.value.syncState)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — observePendingCount: propagation to uiState
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given repository emits pending count 3 when ViewModel inits then pendingUploadCount is 3`() = runTest {
-        // Arrange
-        coEvery { authRepository.getCurrentUser() } returns null
-        every { userCardRepository.observePendingCount() } returns flowOf(3)
-
-        // Act
-        val vm = buildViewModel()
-        advanceUntilIdle()
-
-        // Assert
-        assertEquals(3, vm.uiState.value.pendingUploadCount)
-    }
-
-    @Test
-    fun `given pending count updates from 2 to 0 when rows are synced then uiState reflects the new count`() = runTest {
-        // Arrange: simulate flow emitting 2 then 0
-        coEvery { authRepository.getCurrentUser() } returns null
-        val countFlow = MutableStateFlow(2)
-        every { userCardRepository.observePendingCount() } returns countFlow
-
-        val vm = buildViewModel()
-        advanceUntilIdle()
-        assertEquals(2, vm.uiState.value.pendingUploadCount)
-
-        // Act: simulate sync completing — pending count drops to 0
-        countFlow.value = 0
-        advanceUntilIdle()
-
-        // Assert
-        assertEquals(0, vm.uiState.value.pendingUploadCount)
-    }
-
-    @Test
-    fun `given repository emits pending count 0 when ViewModel inits then pendingUploadCount is 0`() = runTest {
-        // Arrange
-        coEvery { authRepository.getCurrentUser() } returns null
-        every { userCardRepository.observePendingCount() } returns flowOf(0)
-
-        val vm = buildViewModel()
-        advanceUntilIdle()
-
-        assertEquals(0, vm.uiState.value.pendingUploadCount)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — syncState starts as IDLE
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given ViewModel just initialized then syncState is IDLE and syncError is null`() = runTest {
-        // Arrange: no user so auto-sync won't fire
-        coEvery { authRepository.getCurrentUser() } returns null
-
-        val vm = buildViewModel()
-        advanceUntilIdle()
 
         assertEquals(SyncState.IDLE, vm.uiState.value.syncState)
         assertNull(vm.uiState.value.syncError)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 4 — Guest → Authenticated migration
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given guest user when they first authenticate then assignUserIdAndSync is called once`() = runTest {
+        val sessionFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+        every { authRepository.sessionState } returns sessionFlow
+
+        buildViewModel()
+        advanceUntilIdle()
+
+        // Simulate login
+        sessionFlow.value = SessionState.Authenticated(loggedInUser)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { syncManager.assignUserIdAndSync(USER_ID) }
+    }
+
+    @Test
+    fun `given already authenticated user when session emits authenticated again then assignUserIdAndSync is called only once`() = runTest {
+        val sessionFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+        every { authRepository.sessionState } returns sessionFlow
+
+        buildViewModel()
+        advanceUntilIdle()
+
+        // First login
+        sessionFlow.value = SessionState.Authenticated(loggedInUser)
+        advanceUntilIdle()
+
+        // Re-emit same authenticated state (e.g. config change)
+        sessionFlow.value = SessionState.Authenticated(loggedInUser)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { syncManager.assignUserIdAndSync(USER_ID) }
+    }
+
+    @Test
+    fun `given unauthenticated user then assignUserIdAndSync is never called`() = runTest {
+        buildViewModel()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { syncManager.assignUserIdAndSync(any()) }
     }
 }

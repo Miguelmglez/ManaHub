@@ -103,7 +103,7 @@ class DeckRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateDeck(deck: Deck) = withContext(ioDispatcher) {
-        val existing = deckDao.getDeckById(deck.id) ?: return@withContext
+        val existing = deckDao.getDeckByIdForSync(deck.id) ?: return@withContext
         deckDao.upsertDeck(
             existing.copy(
                 name = deck.name,
@@ -111,6 +111,7 @@ class DeckRepositoryImpl @Inject constructor(
                 format = deck.format,
                 coverCardId = deck.coverCardId,
                 commanderCardId = deck.commanderCardId,
+                isDeleted = false,
                 updatedAt = System.currentTimeMillis(),
             )
         )
@@ -158,6 +159,18 @@ class DeckRepositoryImpl @Inject constructor(
     override suspend fun clearDeck(deckId: String) {
         withContext(ioDispatcher) {
             deckDao.clearDeckCards(deckId)
+            deckDao.getDeckById(deckId)?.let { deck ->
+                deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
+    override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) {
+        withContext(ioDispatcher) {
+            val entities = slots.map { (scryfallId, quantity, isSideboard) ->
+                DeckCardEntity(deckId = deckId, scryfallId = scryfallId, quantity = quantity, isSideboard = isSideboard)
+            }
+            deckDao.replaceAllCards(deckId, entities)
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }

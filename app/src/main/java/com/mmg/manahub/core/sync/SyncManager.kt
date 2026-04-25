@@ -104,7 +104,10 @@ class SyncManager @Inject constructor(
 
                 // ── PUSH: decks ──────────────────────────────────────────────────
 
+                // Only push rows that have a real userId — orphaned (null) rows must be
+                // migrated first via assignUserIdAndSync before they are safe to push.
                 val localDecks = deckDao.getDecksSince(userId, lastSync)
+                    .filter { it.userId?.isNotEmpty() == true }
                 var decksPushed = 0
                 if (localDecks.isNotEmpty()) {
                     deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }).getOrThrow()
@@ -139,10 +142,27 @@ class SyncManager @Inject constructor(
                 val remoteDecks = deckRemote.getDeckChangesSince(lastSync).getOrThrow()
                 var decksPulled = 0
                 for (dto in remoteDecks) {
-                    val local = deckDao.getDeckById(dto.id)
+                    // Use getDeckByIdForSync so local soft-deletes are visible and not
+                    // falsely overwritten by an older remote row (bug: LWW tombstone reversal).
+                    val local = deckDao.getDeckByIdForSync(dto.id)
                     // LWW: skip if local row is strictly newer.
                     if (local != null && dto.updatedAt <= local.updatedAt) continue
                     deckDao.upsertDeck(dto.toEntity())
+                    // Also replace card slots so the pulled deck is fully usable on this device.
+                    if (!dto.isDeleted) {
+                        val remoteCards = deckRemote.getDeckCardsForDeck(dto.id).getOrThrow()
+                        deckDao.replaceAllCards(
+                            dto.id,
+                            remoteCards.map {
+                                com.mmg.manahub.core.data.local.entity.DeckCardEntity(
+                                    deckId = dto.id,
+                                    scryfallId = it.scryfallId,
+                                    quantity = it.quantity,
+                                    isSideboard = it.isSideboard,
+                                )
+                            }
+                        )
+                    }
                     decksPulled++
                 }
 
@@ -172,17 +192,67 @@ class SyncManager @Inject constructor(
      * This is the entry point for the offline-to-online transition: when a guest
      * creates local data and then logs in, all their local rows must be uploaded
      * and associated with their new account.
+     *
+     * Safe to call even if there are no orphaned rows — in that case it runs a
+     * normal incremental sync without clearing the watermark.
      */
     suspend fun assignUserIdAndSync(newUserId: String): SyncResult = withContext(ioDispatcher) {
-        val now = System.currentTimeMillis()
+        // Protected by the same mutex as sync() to prevent concurrent execution.
+        syncMutex.withLock {
+            val now = System.currentTimeMillis()
 
-        // Assign userId to all orphaned rows so the push query can find them.
-        collectionDao.assignUserId(newUserId, now)
-        deckDao.assignDeckUserId(newUserId, now)
+            val collectionMigrated = collectionDao.assignUserId(newUserId, now)
+            val decksMigrated = deckDao.assignDeckUserId(newUserId, now)
 
-        // Clear the watermark so the push phase sends all rows (full upload).
-        syncPrefs.clearLastSyncMillis(newUserId)
+            // Only clear the watermark when there were orphaned rows to migrate.
+            // Avoids forcing an unnecessary full re-upload on every app startup for
+            // users who are already authenticated.
+            if (collectionMigrated > 0 || decksMigrated > 0) {
+                syncPrefs.clearLastSyncMillis(newUserId)
+            }
 
-        sync(newUserId)
+            _syncState.value = SyncState.SYNCING
+            runCatching {
+                val lastSync = syncPrefs.getLastSyncMillis(newUserId)
+
+                val localCollection = collectionDao.getAllSince(newUserId, lastSync)
+                    .filter { it.userId?.isNotEmpty() == true }
+                var collectionPushed = 0
+                if (localCollection.isNotEmpty()) {
+                    collectionRemote.batchUpsert(localCollection.map { it.toDto() }).getOrThrow()
+                    collectionPushed = localCollection.size
+                }
+
+                val localDecks = deckDao.getDecksSince(newUserId, lastSync)
+                    .filter { it.userId?.isNotEmpty() == true }
+                var decksPushed = 0
+                if (localDecks.isNotEmpty()) {
+                    deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }).getOrThrow()
+                    for (deck in localDecks) {
+                        val cards = deckDao.getDeckCards(deck.id).map { card ->
+                            DeckCardSyncDto(
+                                scryfallId = card.scryfallId,
+                                quantity = card.quantity,
+                                isSideboard = card.isSideboard,
+                            )
+                        }
+                        deckRemote.upsertDeckCards(deck.id, cards).getOrThrow()
+                    }
+                    decksPushed = localDecks.size
+                }
+
+                syncPrefs.saveLastSyncMillis(newUserId, System.currentTimeMillis())
+
+                SyncResult(
+                    state = SyncState.SUCCESS,
+                    collectionPushed = collectionPushed,
+                    decksPushed = decksPushed,
+                )
+            }.getOrElse { error ->
+                SyncResult(state = SyncState.ERROR, error = error.message)
+            }.also { result ->
+                _syncState.value = result.state
+            }
+        }
     }
 }

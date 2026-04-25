@@ -318,6 +318,7 @@ class FriendsViewModelTest {
             authRepo           = authRepo,
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
+            analyticsHelper    = analyticsHelper,
         )
         advanceUntilIdle()
 
