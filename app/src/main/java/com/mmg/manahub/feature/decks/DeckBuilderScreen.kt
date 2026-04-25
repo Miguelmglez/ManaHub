@@ -280,7 +280,17 @@ fun DeckMagicDetailScreen(
             isCommander = isAlreadyCommander,
             isCommanderSelectionContext = isCardDetailInCommanderContext,
             tags = uiState.detailTags,
-            onAdd = { viewModel.addCardToDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
+            onAdd = {
+                // In commander-selection context, "add" means "set as commander", not add to mainboard.
+                if (isCardDetailInCommanderContext) {
+                    selectedDeckCard.card?.let { card -> viewModel.setCommander(card) }
+                    selectedCardId = null
+                    isCardDetailInCommanderContext = false
+                    showCommanderSearchSheet = false
+                } else {
+                    viewModel.addCardToDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard)
+                }
+            },
             onRemove = { viewModel.removeCardFromDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
             onDelete = {
                 viewModel.removeCard(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard)
