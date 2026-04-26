@@ -183,16 +183,23 @@ class SyncManager @Inject constructor(
                     // Also replace card slots so the pulled deck is fully usable on this device.
                     if (!dto.isDeleted) {
                         val remoteCards = deckRemote.getDeckCardsForDeck(dto.id).getOrThrow()
+                        // Pre-fetch any cards missing from Room so deck images resolve correctly.
+                        // deck_cards has a FK to cards (scryfallId), and coverImageUrl is derived
+                        // from a JOIN — missing card rows silently produce null images.
+                        val deckCardIds = remoteCards.map { it.scryfallId }.distinct()
+                        val cachedDeckIds = ensureCardsExist(deckCardIds)
                         deckDao.replaceAllCards(
                             dto.id,
-                            remoteCards.map {
-                                DeckCardEntity(
-                                    deckId = dto.id,
-                                    scryfallId = it.scryfallId,
-                                    quantity = it.quantity,
-                                    isSideboard = it.isSideboard,
-                                )
-                            }
+                            remoteCards
+                                .filter { it.scryfallId in cachedDeckIds }
+                                .map {
+                                    DeckCardEntity(
+                                        deckId = dto.id,
+                                        scryfallId = it.scryfallId,
+                                        quantity = it.quantity,
+                                        isSideboard = it.isSideboard,
+                                    )
+                                }
                         )
                     }
                     decksPulled++
@@ -322,16 +329,20 @@ class SyncManager @Inject constructor(
                     deckDao.upsertDeck(dto.toEntity())
                     if (!dto.isDeleted) {
                         val remoteCards = deckRemote.getDeckCardsForDeck(dto.id).getOrThrow()
+                        val deckCardIds = remoteCards.map { it.scryfallId }.distinct()
+                        val cachedDeckIds = ensureCardsExist(deckCardIds)
                         deckDao.replaceAllCards(
                             dto.id,
-                            remoteCards.map {
-                                DeckCardEntity(
-                                    deckId = dto.id,
-                                    scryfallId = it.scryfallId,
-                                    quantity = it.quantity,
-                                    isSideboard = it.isSideboard,
-                                )
-                            }
+                            remoteCards
+                                .filter { it.scryfallId in cachedDeckIds }
+                                .map {
+                                    DeckCardEntity(
+                                        deckId = dto.id,
+                                        scryfallId = it.scryfallId,
+                                        quantity = it.quantity,
+                                        isSideboard = it.isSideboard,
+                                    )
+                                }
                         )
                     }
                     decksPulled++
