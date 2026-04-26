@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.ui.components
 
+import androidx.activity.ComponentActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -12,13 +13,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -160,6 +165,32 @@ fun StaleWarningBanner() {
                 style = MaterialTheme.typography.bodySmall,
                 color = mc.lifeNegative,
             )
+        }
+    }
+}
+
+/**
+ * Utility to hide system bars and suppress popup notifications (heads-up)
+ * during gameplay by using transient behavior.
+ */
+@Composable
+fun ImmersiveSystemBars() {
+    val context = LocalContext.current
+    val window = (context as? ComponentActivity)?.window ?: return
+    val controller = remember(window) { WindowInsetsControllerCompat(window, window.decorView) }
+
+    DisposableEffect(controller) {
+        val originalBehavior = controller.systemBarsBehavior
+        
+        // Hide both status bar and navigation bar
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        
+        // Set behavior to Transient: swipes show bars temporarily, and heads-up notifications are suppressed
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        
+        onDispose {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = originalBehavior
         }
     }
 }

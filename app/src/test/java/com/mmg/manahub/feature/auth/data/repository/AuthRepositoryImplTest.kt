@@ -5,7 +5,10 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import okhttp3.Call
 import okhttp3.OkHttpClient
+import okhttp3.Response as OkHttpResponse
+import okhttp3.ResponseBody.Companion.toResponseBody as okHttpToResponseBody
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
@@ -21,6 +24,7 @@ import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.verify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -35,7 +39,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -143,7 +146,32 @@ class AuthRepositoryImplTest {
 
     /** Builds a failed Retrofit [Response] with the given HTTP status code. */
     private fun errorResponse(code: Int): Response<Unit> =
-        Response.error(code, "".toResponseBody(null))
+        Response.error(code, "".okHttpToResponseBody(null))
+
+    /**
+     * Stubs the OkHttp client used by [deleteAccount] to simulate the
+     * `delete-current-user` Edge Function response.
+     * Also stubs [Auth.currentSessionOrNull] to return a fake access token so the
+     * repository can build the Authorization header.
+     */
+    private fun stubDeleteEdgeFunction(success: Boolean, httpCode: Int = if (success) 200 else 500) {
+        // Stub currentSessionOrNull() -> UserSession with a fake token
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+
+        // Build a minimal OkHttp Response mock. relaxed=true means body returns null by default.
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns success
+            every { code } returns httpCode
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+    }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
@@ -162,8 +190,8 @@ class AuthRepositoryImplTest {
         // Default stub: updateNickname returns success.
         coEvery { supabaseUserProfileService.updateNickname(any()) } returns successResponse()
 
-        // Default stub: deleteCurrentUser returns success.
-        coEvery { supabaseUserProfileService.deleteCurrentUser() } returns successResponse()
+        // Default stub for deleteAccount: Edge Function returns HTTP 200.
+        stubDeleteEdgeFunction(success = true)
 
         repository = spyk(AuthRepositoryImpl(
             supabaseAuth               = supabaseAuth,
@@ -485,43 +513,57 @@ class AuthRepositoryImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — deleteAccount
+    //  GROUP 5 — deleteAccount (calls Edge Function delete-current-user via OkHttp)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given authenticated user when deleteAccount then calls service deleteCurrentUser and signOut and returns Success`() = runTest {
+    fun `given authenticated user when deleteAccount then calls Edge Function and signOut and returns Success`() = runTest {
+        // stubDeleteEdgeFunction(success=true) is set as the default in setUp().
         coEvery { supabaseAuth.signOut(any()) } just Runs
 
         val result = repository.deleteAccount()
 
         assertTrue(result is AuthResult.Success)
-        coVerify(exactly = 1) { supabaseUserProfileService.deleteCurrentUser() }
+        // OkHttp client must have been called (Edge Function, not old Retrofit RPC)
+        verify(atLeast = 1) { supabaseOkHttpClient.newCall(any()) }
         coVerify(exactly = 1) { supabaseAuth.signOut(any()) }
     }
 
     @Test
-    fun `given deleteCurrentUser service throws when deleteAccount then returns Error and does NOT call signOut`() = runTest {
-        coEvery { supabaseUserProfileService.deleteCurrentUser() } throws RuntimeException("RPC failed")
+    fun `given no active session when deleteAccount then returns SessionExpired without calling Edge Function`() = runTest {
+        // Override: no active session
+        every { supabaseAuth.currentSessionOrNull() } returns null
 
         val result = repository.deleteAccount()
 
         assertTrue(result is AuthResult.Error)
-        // signOut must NOT be called if the RPC step fails — user account was not deleted
+        assertEquals(AuthError.SessionExpired, (result as AuthResult.Error).error)
+        // signOut must NOT be called when there is no session
         coVerify(exactly = 0) { supabaseAuth.signOut(any()) }
     }
 
     @Test
-    fun `given deleteCurrentUser returns HTTP error when deleteAccount then returns Error`() = runTest {
-        coEvery { supabaseUserProfileService.deleteCurrentUser() } returns errorResponse(500)
+    fun `given Edge Function returns HTTP 500 when deleteAccount then returns Error`() = runTest {
+        stubDeleteEdgeFunction(success = false, httpCode = 500)
 
         val result = repository.deleteAccount()
 
         assertTrue(result is AuthResult.Error)
+        // signOut must NOT be called if the deletion failed server-side
+        coVerify(exactly = 0) { supabaseAuth.signOut(any()) }
     }
 
     @Test
     fun `given network failure when deleteAccount then returns Error with NetworkError`() = runTest {
-        coEvery { supabaseUserProfileService.deleteCurrentUser() } throws IOException("Offline")
+        // Simulate OkHttp throwing IOException (no network)
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } throws IOException("Offline")
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
 
         val result = repository.deleteAccount()
 
