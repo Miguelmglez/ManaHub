@@ -58,6 +58,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -103,6 +104,8 @@ private fun GameSetupScreenContent(
     val gameUiState by gameVm.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val hasActiveGame = gameUiState.players.isNotEmpty() && gameUiState.winner == null
+
+    ImmersiveSystemBars()
 
     Scaffold(
         containerColor = mc.background,

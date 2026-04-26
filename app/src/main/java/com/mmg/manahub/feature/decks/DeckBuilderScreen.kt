@@ -329,241 +329,250 @@ private fun ViewStepContent(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
-    if (uiState.isLoading) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = mc.primaryAccent)
-        }
-    } else {
-        Box(modifier.fillMaxSize()) {
-            val mainboardCards = uiState.cards.filter { !it.isSideboard }
-            val sideboardCards = uiState.cards.filter { it.isSideboard }.sortedBy { it.card?.name }
-            val isCommanderFormat = viewModel.deckFormat == DeckFormat.COMMANDER
-            
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    val targetCount = when (viewModel.deckFormat) {
-                        DeckFormat.COMMANDER -> 100
-                        else -> 60
-                    }
-                    val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
-                    val deckCards = (uiState.cards + listOfNotNull(uiState.commanderCard))
-                        .filter { it.card != null && !it.isSideboard && !BasicLandCalculator.isLand(it.card!!) }
-                        .map { DeckCard(it.card!!, it.quantity, it.scryfallId in uiState.collectionIds) }
-                    
-                    DeckSummaryCard(
-                        totalCards = uiState.totalCards,
-                        targetCount = targetCount,
-                        manaCurve = uiState.manaCurve,
-                        maxInCurve = maxInCurve,
-                        deckCards = deckCards,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                    )
-                }
-
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        GroupingFlowSelector(
-                            selected = uiState.groupingMode,
-                            onSelect = viewModel::setGroupingMode
+    AnimatedContent(
+        targetState = uiState.isLoading,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+        },
+        label = "LoadingTransition"
+    ) { isLoading ->
+        if (isLoading) {
+            Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = mc.primaryAccent)
+            }
+        } else {
+            Box(modifier.fillMaxSize()) {
+                val mainboardCards = uiState.cards.filter { !it.isSideboard }
+                val sideboardCards = uiState.cards.filter { it.isSideboard }.sortedBy { it.card?.name }
+                val isCommanderFormat = viewModel.deckFormat == DeckFormat.COMMANDER
+                
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    item(key = "summary") {
+                        val targetCount = when (viewModel.deckFormat) {
+                            DeckFormat.COMMANDER -> 100
+                            else -> 60
+                        }
+                        val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
+                        val deckCards = (uiState.cards + listOfNotNull(uiState.commanderCard))
+                            .filter { it.card != null && !it.isSideboard && !BasicLandCalculator.isLand(it.card!!) }
+                            .map { DeckCard(it.card!!, it.quantity, it.scryfallId in uiState.collectionIds) }
+                        
+                        DeckSummaryCard(
+                            totalCards = uiState.totalCards,
+                            targetCount = targetCount,
+                            manaCurve = uiState.manaCurve,
+                            maxInCurve = maxInCurve,
+                            deckCards = deckCards,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).animateItem()
                         )
                     }
-                }
 
-                // ── Commander Section ─────────────────────────────────────────
-                if (isCommanderFormat) {
-                    item {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            Text(
-                                text = "Commander",
-                                style = ty.titleMedium,
-                                color = mc.goldMtg,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                    item(key = "grouping_selector") {
+                        Column(Modifier.padding(horizontal = 16.dp).animateItem()) {
+                            GroupingFlowSelector(
+                                selected = uiState.groupingMode,
+                                onSelect = viewModel::setGroupingMode
                             )
-                            if (uiState.commanderCard != null) {
-                                uiState.commanderCard.card?.let { card ->
-                                    CommanderBanner(
-                                        commander = card,
-                                        modifier = Modifier.clickable { onCardClick(uiState.commanderCard.scryfallId) }
-                                    )
-                                }
-                                WarningOverlay(uiState.commanderCard, uiState, viewModel, isCommander = true)
-                                TextButton(
-                                    onClick = viewModel::removeCommander,
-                                    modifier = Modifier.align(Alignment.End)
-                                ) {
-                                    Text("Remove Commander", style = ty.labelSmall, color = mc.lifeNegative)
-                                }
-                            } else {
-                                OutlinedButton(
-                                    onClick = onChooseCommander,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Choose Commander", style = ty.labelLarge)
-                                }
-                            }
                         }
                     }
-                }
 
-                // ── Mainboard Section ─────────────────────────────────────────
-                item {
-                    MainSectionHeader(
-                        title = stringResource(R.string.deckdetail_tab_mainboard, mainboardCards.sumOf { it.quantity }),
-                        expanded = uiState.mainboardExpanded,
-                        onToggle = viewModel::toggleMainboard,
-                        modifier = Modifier.padding(horizontal = 0.dp)
-                    )
-                }
-
-                if (uiState.mainboardExpanded) {
-                    val groupedMain = groupCards(mainboardCards, uiState.groupingMode)
-                    groupedMain.forEach { (groupLabel, cards) ->
-                        val isLandGroup = groupLabel == "Lands" || groupLabel == "Land"
-                        item(key = "main_header_$groupLabel") {
-                            GroupHeader(
-                                label = groupLabel, 
-                                count = cards.sumOf { it.quantity },
-                                showSuggestionToggle = isLandGroup,
-                                isSuggestionEnabled = uiState.showLandSuggestions,
-                                onToggleSuggestion = viewModel::toggleLandSuggestions,
-                                modifier = Modifier.padding(horizontal = 16.dp).animateItem()
-                            )
-                        }
-                        
-                        if (isLandGroup) {
-                            item(key = "main_lands_logic") {
-                                Column(Modifier.animateItem()) {
-                                    AnimatedVisibility(
-                                        visible = uiState.showLandSuggestions && uiState.landDeltas.isNotEmpty(),
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        MagicLandSuggestionStatic(
-                                            deltas = uiState.landDeltas,
-                                            onClick = viewModel::applyLandSuggestions,
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    // ── Commander Section ─────────────────────────────────────────
+                    if (isCommanderFormat) {
+                        item(key = "commander_section") {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp).animateItem()) {
+                                Text(
+                                    text = "Commander",
+                                    style = ty.titleMedium,
+                                    color = mc.goldMtg,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                                if (uiState.commanderCard != null) {
+                                    uiState.commanderCard.card?.let { card ->
+                                        CommanderBanner(
+                                            commander = card,
+                                            modifier = Modifier.clickable { onCardClick(uiState.commanderCard.scryfallId) }
                                         )
                                     }
-                                    AddBasicLandsRow(onClick = onAddBasicLands, modifier = Modifier.padding(horizontal = 16.dp))
+                                    WarningOverlay(uiState.commanderCard, uiState, viewModel, isCommander = true)
+                                    TextButton(
+                                        onClick = viewModel::removeCommander,
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("Remove Commander", style = ty.labelSmall, color = mc.lifeNegative)
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = onChooseCommander,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Choose Commander", style = ty.labelLarge)
+                                    }
                                 }
                             }
                         }
-
-                        items(cards, key = { "main_" + it.scryfallId + groupLabel }) { entry ->
-                            Column(Modifier.animateItem()) {
-                                CardRow(
-                                    entry = entry,
-                                    isInCollection = entry.scryfallId in uiState.collectionIds,
-                                    onClick = { onCardClick(entry.scryfallId) },
-                                    onRemove = { viewModel.removeCard(entry.scryfallId) },
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
-                                
-                                val qtyInSideboard = uiState.cards.find { it.scryfallId == entry.scryfallId && it.isSideboard }?.quantity ?: 0
-                                MovementRow(
-                                    labelTo = "1x To Sideboard",
-                                    onMoveTo = { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) },
-                                    labelFrom = if (qtyInSideboard > 0) "1x From Sideboard" else null,
-                                    onMoveFrom = if (qtyInSideboard > 0) {
-                                        { viewModel.moveQuantityToMainboard(entry.scryfallId, 1) }
-                                    } else null,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
-                                
-                                WarningOverlay(entry, uiState, viewModel)
-                            }
-                        }
                     }
-                }
 
-                // ── Sideboard Section ─────────────────────────────────────────
-                item {
-                    MainSectionHeader(
-                        title = stringResource(R.string.deckdetail_tab_sideboard, sideboardCards.sumOf { it.quantity }),
-                        expanded = uiState.sideboardExpanded,
-                        onToggle = viewModel::toggleSideboard,
-                        modifier = Modifier.padding(horizontal = 0.dp)
-                    )
-                }
+                    // ── Mainboard Section ─────────────────────────────────────────
+                    item(key = "mainboard_header") {
+                        MainSectionHeader(
+                            title = stringResource(R.string.deckdetail_tab_mainboard, mainboardCards.sumOf { it.quantity }),
+                            expanded = uiState.mainboardExpanded,
+                            onToggle = viewModel::toggleMainboard,
+                            modifier = Modifier.padding(horizontal = 0.dp).animateItem()
+                        )
+                    }
 
-                if (uiState.sideboardExpanded) {
-                    if (sideboardCards.isEmpty()) {
-                        item {
-                            Text(
-                                text = "No cards in sideboard",
-                                style = ty.labelSmall,
-                                color = mc.textDisabled,
-                                modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp).animateItem()
-                            )
-                        }
-                    } else {
-                        items(sideboardCards, key = { "side_" + it.scryfallId }) { entry ->
-                            Column(Modifier.animateItem()) {
-                                CardRow(
-                                    entry = entry,
-                                    isInCollection = entry.scryfallId in uiState.collectionIds,
-                                    onClick = { onCardClick(entry.scryfallId) },
-                                    onRemove = { viewModel.removeCard(entry.scryfallId, true) },
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
-                                val qtyInMainboard = uiState.cards.find { it.scryfallId == entry.scryfallId && !it.isSideboard }?.quantity ?: 0
-                                MovementRow(
-                                    labelTo = "1x To Mainboard",
-                                    onMoveTo = { viewModel.moveQuantityToMainboard(entry.scryfallId, 1) },
-                                    labelFrom = if (qtyInMainboard > 0) "1x From Mainboard" else null,
-                                    onMoveFrom = if (qtyInMainboard > 0) {
-                                        { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) }
-                                    } else null,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
+                    if (uiState.mainboardExpanded) {
+                        val groupedMain = groupCards(mainboardCards, uiState.groupingMode)
+                        groupedMain.forEach { (groupLabel, cards) ->
+                            val isLandGroup = groupLabel == "Lands" || groupLabel == "Land"
+                            item(key = "main_header_$groupLabel") {
+                                GroupHeader(
+                                    label = groupLabel, 
+                                    count = cards.sumOf { it.quantity },
+                                    showSuggestionToggle = isLandGroup,
+                                    isSuggestionEnabled = uiState.showLandSuggestions,
+                                    onToggleSuggestion = viewModel::toggleLandSuggestions,
+                                    modifier = Modifier.padding(horizontal = 16.dp).animateItem()
                                 )
                             }
-                        }
-                    }
-                }
-
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Reactive save button:
-                        // - Dirty state  (hasUnsavedChanges=true):  highlighted with primaryAccent, label "Save changes"
-                        // - Clean state  (hasUnsavedChanges=false): visually neutral, label "Saved", disabled
-                        val hasDirtyChanges = uiState.hasUnsavedChanges
-                        val saveEnabled = uiState.totalCards > 0 && !uiState.isSaving && hasDirtyChanges
-                        Button(
-                            onClick = { viewModel.saveDeck { /* Stay on screen after save */ } },
-                            enabled = saveEnabled,
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = mc.primaryAccent,
-                                disabledContainerColor = if (hasDirtyChanges) mc.surfaceVariant else mc.surfaceVariant.copy(alpha = 0.5f),
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                        ) {
-                            if (uiState.isSaving) {
-                                CircularProgressIndicator(color = mc.background, modifier = Modifier.size(24.dp))
-                            } else {
-                                val saveLabel = when {
-                                    hasDirtyChanges -> stringResource(R.string.deckbuilder_save_changes_button)
-                                    else -> stringResource(R.string.deckbuilder_saved_button)
+                            
+                            if (isLandGroup) {
+                                item(key = "main_lands_logic") {
+                                    Column(Modifier.animateItem()) {
+                                        AnimatedVisibility(
+                                            visible = uiState.showLandSuggestions && uiState.landDeltas.isNotEmpty(),
+                                            enter = expandVertically() + fadeIn(),
+                                            exit = shrinkVertically() + fadeOut()
+                                        ) {
+                                            MagicLandSuggestionStatic(
+                                                deltas = uiState.landDeltas,
+                                                onClick = viewModel::applyLandSuggestions,
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                        AddBasicLandsRow(onClick = onAddBasicLands, modifier = Modifier.padding(horizontal = 16.dp))
+                                    }
                                 }
+                            }
+
+                            items(cards, key = { "main_" + it.scryfallId + groupLabel }) { entry ->
+                                Column(Modifier.animateItem()) {
+                                    CardRow(
+                                        entry = entry,
+                                        isInCollection = entry.scryfallId in uiState.collectionIds,
+                                        onClick = { onCardClick(entry.scryfallId) },
+                                        onRemove = { viewModel.removeCard(entry.scryfallId) },
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    
+                                    val qtyInSideboard = uiState.cards.find { it.scryfallId == entry.scryfallId && it.isSideboard }?.quantity ?: 0
+                                    MovementRow(
+                                        labelTo = "1x To Sideboard",
+                                        onMoveTo = { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) },
+                                        labelFrom = if (qtyInSideboard > 0) "1x From Sideboard" else null,
+                                        onMoveFrom = if (qtyInSideboard > 0) {
+                                            { viewModel.moveQuantityToMainboard(entry.scryfallId, 1) }
+                                        } else null,
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    
+                                    WarningOverlay(entry, uiState, viewModel)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Sideboard Section ─────────────────────────────────────────
+                    item(key = "sideboard_header") {
+                        MainSectionHeader(
+                            title = stringResource(R.string.deckdetail_tab_sideboard, sideboardCards.sumOf { it.quantity }),
+                            expanded = uiState.sideboardExpanded,
+                            onToggle = viewModel::toggleSideboard,
+                            modifier = Modifier.padding(horizontal = 0.dp).animateItem()
+                        )
+                    }
+
+                    if (uiState.sideboardExpanded) {
+                        if (sideboardCards.isEmpty()) {
+                            item(key = "sideboard_empty") {
                                 Text(
-                                    text = saveLabel,
-                                    style = ty.titleMedium,
-                                    color = if (saveEnabled) mc.background else mc.textDisabled,
+                                    text = "No cards in sideboard",
+                                    style = ty.labelSmall,
+                                    color = mc.textDisabled,
+                                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp).animateItem()
                                 )
+                            }
+                        } else {
+                            items(sideboardCards, key = { "side_" + it.scryfallId }) { entry ->
+                                Column(Modifier.animateItem()) {
+                                    CardRow(
+                                        entry = entry,
+                                        isInCollection = entry.scryfallId in uiState.collectionIds,
+                                        onClick = { onCardClick(entry.scryfallId) },
+                                        onRemove = { viewModel.removeCard(entry.scryfallId, true) },
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    val qtyInMainboard = uiState.cards.find { it.scryfallId == entry.scryfallId && !it.isSideboard }?.quantity ?: 0
+                                    MovementRow(
+                                        labelTo = "1x To Mainboard",
+                                        onMoveTo = { viewModel.moveQuantityToMainboard(entry.scryfallId, 1) },
+                                        labelFrom = if (qtyInMainboard > 0) "1x From Sideboard" else null,
+                                        onMoveFrom = if (qtyInMainboard > 0) {
+                                            { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) }
+                                        } else null,
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item(key = "save_section") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .animateItem(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Reactive save button:
+                            // - Dirty state  (hasUnsavedChanges=true):  highlighted with primaryAccent, label "Save changes"
+                            // - Clean state  (hasUnsavedChanges=false): visually neutral, label "Saved", disabled
+                            val hasDirtyChanges = uiState.hasUnsavedChanges
+                            val saveEnabled = uiState.totalCards > 0 && !uiState.isSaving && hasDirtyChanges
+                            Button(
+                                onClick = { viewModel.saveDeck { /* Stay on screen after save */ } },
+                                enabled = saveEnabled,
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = mc.primaryAccent,
+                                    disabledContainerColor = if (hasDirtyChanges) mc.surfaceVariant else mc.surfaceVariant.copy(alpha = 0.5f),
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                            ) {
+                                if (uiState.isSaving) {
+                                    CircularProgressIndicator(color = mc.background, modifier = Modifier.size(24.dp))
+                                } else {
+                                    val saveLabel = when {
+                                        hasDirtyChanges -> stringResource(R.string.deckbuilder_save_changes_button)
+                                        else -> stringResource(R.string.deckbuilder_saved_button)
+                                    }
+                                    Text(
+                                        text = saveLabel,
+                                        style = ty.titleMedium,
+                                        color = if (saveEnabled) mc.background else mc.textDisabled,
+                                    )
+                                }
                             }
                         }
                     }
@@ -587,7 +596,11 @@ private fun WarningOverlay(
     val isInvalidIdentity = entry.scryfallId in uiState.invalidColorIdentityCards
     val isNonLegendaryCommander = isCommander && uiState.isCommanderInvalid
 
-    if (isOverLimit || isInvalidIdentity || isNonLegendaryCommander) {
+    AnimatedVisibility(
+        visible = isOverLimit || isInvalidIdentity || isNonLegendaryCommander,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut()
+    ) {
         val isAck = entry.scryfallId in uiState.acknowledgedOverLimitCards
         val limitInt = viewModel.deckFormat?.maxCopies ?: 4
         Surface(

@@ -34,6 +34,23 @@ interface UserCardCollectionDao {
     @Query("SELECT * FROM user_card_collection WHERE id = :id AND is_deleted = 0")
     fun getById(id: String): UserCardCollectionEntity?
 
+    // Used by the sync PULL loop for LWW comparison. Unlike getById, this includes
+    // soft-deleted rows (tombstones) so a local deletion is never overwritten by an
+    // older remote row that hasn't been deleted yet.
+    @Query("SELECT * FROM user_card_collection WHERE id = :id")
+    fun getByIdIncludingDeleted(id: String): UserCardCollectionEntity?
+
+    // UUID reconciliation: finds a local row that matches the Supabase composite key but
+    // may have a different UUID (guest-generated vs. Supabase-canonical). Used in the
+    // PULL loop to detect and fix UUID mismatches before upserting the remote row.
+    @Query("SELECT * FROM user_card_collection WHERE user_id = :userId AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language AND is_alternative_art = :isAlternativeArt LIMIT 1")
+    fun getByCompositeKey(userId: String, scryfallId: String, isFoil: Boolean, condition: String, language: String, isAlternativeArt: Boolean): UserCardCollectionEntity?
+
+    // Hard-delete used only for UUID reconciliation: removes the stale guest-UUID row so
+    // the Supabase-canonical UUID row can be inserted without a composite UNIQUE conflict.
+    @Query("DELETE FROM user_card_collection WHERE id = :id")
+    fun deleteById(id: String)
+
     // Returns all rows modified after :since — includes is_deleted = 1 rows so tombstones
     // are also pushed during incremental sync.
     @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND updated_at > :since")

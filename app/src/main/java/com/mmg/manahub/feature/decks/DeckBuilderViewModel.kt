@@ -231,7 +231,11 @@ class DeckMagicDetailViewModel @Inject constructor(
                 isLoading = false,
                 totalCards = mainEntries.sumOf { it.quantity },
                 manaCurve = calculateManaCurve(entries),
-                landDeltas = calculateLandDeltas(entries, deck.format),
+                landDeltas = calculateLandDeltas(
+                    entries = entries,
+                    formatName = deck.format,
+                    commanderIdentity = commanderEntry?.card?.colorIdentity?.toSet()
+                ),
                 overLimitCards = overLimit,
                 invalidColorIdentityCards = invalidIdentity,
                 hasUnsavedChanges = hasChanges,
@@ -261,7 +265,11 @@ class DeckMagicDetailViewModel @Inject constructor(
         return curve
     }
 
-    private fun calculateLandDeltas(entries: List<DeckSlotEntry>, formatName: String): List<LandDelta> {
+    private fun calculateLandDeltas(
+        entries: List<DeckSlotEntry>,
+        formatName: String,
+        commanderIdentity: Set<String>? = null
+    ): List<LandDelta> {
         val format = DeckFormat.entries.find { it.name.equals(formatName, ignoreCase = true) }
             ?: DeckFormat.STANDARD
 
@@ -272,7 +280,12 @@ class DeckMagicDetailViewModel @Inject constructor(
         val nonBasicLands = deckCards.filter { !BasicLandCalculator.isBasicLand(it.card) && BasicLandCalculator.isLand(it.card) }
         val mainboardNonLands = deckCards.filter { !BasicLandCalculator.isLand(it.card) }
 
-        val suggested = BasicLandCalculator.calculate(mainboardNonLands, nonBasicLands, format)
+        val suggested = BasicLandCalculator.calculate(
+            mainboard = mainboardNonLands,
+            nonBasicLands = nonBasicLands,
+            format = format,
+            commanderIdentity = commanderIdentity
+        )
         val suggestedMap = suggested.toMap()
 
         val currentBasics = entries.filter { it.card != null && !it.isSideboard && BasicLandCalculator.isBasicLand(it.card!!) }

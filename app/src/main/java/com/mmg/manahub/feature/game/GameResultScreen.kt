@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.game.model.*
@@ -28,6 +29,8 @@ fun GameResultScreen(
 ) {
     val mc          = MaterialTheme.magicColors
     val winnerTheme = gameResult.winner.theme
+
+    ImmersiveSystemBars()
 
     Box(
         modifier = Modifier

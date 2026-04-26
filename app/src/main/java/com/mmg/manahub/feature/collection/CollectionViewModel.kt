@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.collection
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.ComparisonOperator
@@ -49,6 +48,12 @@ class CollectionViewModel @Inject constructor(
     // Raw unfiltered collection from Room (non-deleted entries)
     private val _allCards = MutableStateFlow<List<UserCardWithCard>>(emptyList())
 
+    // ViewModel-scoped field (not a local var) so it survives config changes.
+    // Reset only on genuine Unauthenticated transitions, never on Loading, so
+    // that token-refresh cycles (Authenticated → Loading → Authenticated) don't
+    // re-trigger assignUserIdAndSync on every screen rotation.
+    private var previouslyAuthenticated = false
+
     init {
         observeCollection()
         refreshPrices()
@@ -92,22 +97,29 @@ class CollectionViewModel @Inject constructor(
 
     private fun observeSessionChanges() {
         viewModelScope.launch {
-            var previouslyAuthenticated = false
             authRepository.sessionState.collect { state ->
                 _uiState.update { it.copy(sessionState = state) }
-                if (state is SessionState.Authenticated) {
-                    CollectionSyncWorker.schedulePeriodicSync(workManager)
-                    if (!previouslyAuthenticated) {
-                        // First transition to authenticated in this session.
-                        // Migrate any offline (guest) data and sync.
-                        // assignUserIdAndSync is a no-op if no orphaned rows exist.
-                        viewModelScope.launch {
-                            syncManager.assignUserIdAndSync(state.user.id)
+                when (state) {
+                    is SessionState.Authenticated -> {
+                        CollectionSyncWorker.schedulePeriodicSync(workManager)
+                        if (!previouslyAuthenticated) {
+                            // First transition to authenticated in this session.
+                            // Set the flag BEFORE launching so a rapid second Authenticated
+                            // emit (profile enrichment) doesn't fire a second sync.
+                            previouslyAuthenticated = true
+                            viewModelScope.launch {
+                                syncManager.assignUserIdAndSync(state.user.id)
+                            }
                         }
                     }
-                    previouslyAuthenticated = true
-                } else {
-                    previouslyAuthenticated = false
+                    is SessionState.Unauthenticated -> {
+                        // Cancel background sync — stale/missing session would cause
+                        // Supabase RPC failures if the worker ran now.
+                        workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
+                        workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
+                        previouslyAuthenticated = false
+                    }
+                    is SessionState.Loading -> { /* no-op — wait for final state */ }
                 }
             }
         }
@@ -117,23 +129,12 @@ class CollectionViewModel @Inject constructor(
 
     /**
      * Triggers a one-shot full sync (push + pull) for the current user.
-     * Also enqueues a WorkManager one-time request so the sync survives if the
-     * app is backgrounded immediately after the user taps the sync button.
+     * Runs inline so the UI reflects the result immediately via [SyncManager.syncState].
      */
     fun onSync() {
         viewModelScope.launch {
             val userId = authRepository.getCurrentUser()?.id ?: return@launch
-            _uiState.update { it.copy(syncState = SyncState.SYNCING, syncError = null) }
-
-            // Enqueue a one-time WorkManager request as a fallback in case the app
-            // is killed before the coroutine below finishes.
-            workManager.enqueueUniqueWork(
-                CollectionSyncWorker.WORK_NAME_ONE_TIME,
-                ExistingWorkPolicy.REPLACE,
-                CollectionSyncWorker.oneTimeWorkRequest(),
-            )
-
-            // Also run sync inline so the UI reflects the result immediately.
+            _uiState.update { it.copy(syncError = null) }
             val result = syncManager.sync(userId)
             _uiState.update { it.copy(syncError = result.error) }
         }

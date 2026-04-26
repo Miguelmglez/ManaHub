@@ -16,9 +16,12 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -42,57 +45,89 @@ class UserCardRepositoryImpl @Inject constructor(
     private val remoteKeyDao: RemoteKeyDao,
     private val database: MtgDatabase,
     private val supabaseClient: SupabaseClient,
+    private val authRepository: AuthRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : UserCardRepository {
 
+    // Emits null for unauthenticated/loading, userId for authenticated.
+    // Used by all observe methods so they re-subscribe when the user changes.
+    @Suppress("OPT_IN_USAGE")
+    private val currentUserIdFlow = authRepository.sessionState.map { state ->
+        (state as? SessionState.Authenticated)?.user?.id
+    }
+
     // ── Observables ───────────────────────────────────────────────────────────
 
+    @Suppress("OPT_IN_USAGE")
     override fun observeCollection(): Flow<List<DomainUserCardWithCard>> =
-        userCardCollectionDao.observeAll(null).map { list ->
-            list.filter { !it.userCard.isDeleted }.mapNotNull { it.toDomain() }
-        }
-
-    override fun observeByColor(color: String): Flow<List<DomainUserCardWithCard>> =
-        userCardCollectionDao.observeAll(null).map { list ->
-            list.filter { item ->
-                !item.userCard.isDeleted &&
-                    item.card?.colorIdentity?.contains(color, ignoreCase = true) == true
-            }.mapNotNull { it.toDomain() }
-        }
-
-    override fun observeByRarity(rarity: String): Flow<List<DomainUserCardWithCard>> =
-        userCardCollectionDao.observeAll(null).map { list ->
-            list.filter { item ->
-                !item.userCard.isDeleted &&
-                    item.card?.rarity?.equals(rarity, ignoreCase = true) == true
-            }.mapNotNull { it.toDomain() }
-        }
-
-    override fun searchInCollection(query: String): Flow<List<DomainUserCardWithCard>> =
-        userCardCollectionDao.observeAll(null).map { list ->
-            list.filter { item ->
-                !item.userCard.isDeleted &&
-                    item.card?.name?.contains(query, ignoreCase = true) == true
-            }.mapNotNull { it.toDomain() }
-        }
-
-    override fun observeByScryfallId(scryfallId: String, userId: String?): Flow<List<UserCard>> =
-        userCardCollectionDao.observeByScryfall(scryfallId, userId).map { list ->
-            list.filter { !it.isDeleted }.map { entity ->
-                UserCard(
-                    id = entity.id,
-                    scryfallId = entity.scryfallId,
-                    quantity = entity.quantity,
-                    isFoil = entity.isFoil,
-                    condition = entity.condition,
-                    language = entity.language,
-                    isAlternativeArt = entity.isAlternativeArt,
-                    isForTrade = entity.isForTrade,
-                    isInWishlist = entity.isInWishlist,
-                    updatedAt = entity.updatedAt,
-                    createdAt = entity.createdAt,
-                )
+        currentUserIdFlow.flatMapLatest { userId ->
+            userCardCollectionDao.observeAll(userId).map { list ->
+                list.filter { !it.userCard.isDeleted }.mapNotNull { it.toDomain() }
             }
+        }
+
+    @Suppress("OPT_IN_USAGE")
+    override fun observeByColor(color: String): Flow<List<DomainUserCardWithCard>> =
+        currentUserIdFlow.flatMapLatest { userId ->
+            userCardCollectionDao.observeAll(userId).map { list ->
+                list.filter { item ->
+                    !item.userCard.isDeleted &&
+                        item.card?.colorIdentity?.contains(color, ignoreCase = true) == true
+                }.mapNotNull { it.toDomain() }
+            }
+        }
+
+    @Suppress("OPT_IN_USAGE")
+    override fun observeByRarity(rarity: String): Flow<List<DomainUserCardWithCard>> =
+        currentUserIdFlow.flatMapLatest { userId ->
+            userCardCollectionDao.observeAll(userId).map { list ->
+                list.filter { item ->
+                    !item.userCard.isDeleted &&
+                        item.card?.rarity?.equals(rarity, ignoreCase = true) == true
+                }.mapNotNull { it.toDomain() }
+            }
+        }
+
+    @Suppress("OPT_IN_USAGE")
+    override fun searchInCollection(query: String): Flow<List<DomainUserCardWithCard>> =
+        currentUserIdFlow.flatMapLatest { userId ->
+            userCardCollectionDao.observeAll(userId).map { list ->
+                list.filter { item ->
+                    !item.userCard.isDeleted &&
+                        item.card?.name?.contains(query, ignoreCase = true) == true
+                }.mapNotNull { it.toDomain() }
+            }
+        }
+
+    @Suppress("OPT_IN_USAGE")
+    override fun observeByScryfallId(scryfallId: String, userId: String?): Flow<List<UserCard>> {
+        // If caller passes an explicit userId, use it directly.
+        // If null, follow the current session so logged-in users see their cards.
+        val resolvedFlow: Flow<List<UserCard>> = if (userId != null) {
+            userCardCollectionDao.observeByScryfall(scryfallId, userId).map { it.toUserCards() }
+        } else {
+            currentUserIdFlow.flatMapLatest { resolvedId ->
+                userCardCollectionDao.observeByScryfall(scryfallId, resolvedId).map { it.toUserCards() }
+            }
+        }
+        return resolvedFlow
+    }
+
+    private fun List<UserCardCollectionEntity>.toUserCards() =
+        filter { !it.isDeleted }.map { entity ->
+            UserCard(
+                id = entity.id,
+                scryfallId = entity.scryfallId,
+                quantity = entity.quantity,
+                isFoil = entity.isFoil,
+                condition = entity.condition,
+                language = entity.language,
+                isAlternativeArt = entity.isAlternativeArt,
+                isForTrade = entity.isForTrade,
+                isInWishlist = entity.isInWishlist,
+                updatedAt = entity.updatedAt,
+                createdAt = entity.createdAt,
+            )
         }
 
     override fun observeCount(userId: String?): Flow<Int> =
@@ -182,15 +217,11 @@ class UserCardRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getScryfallIds(): List<String> = withContext(ioDispatcher) {
-        // Return distinct scryfall IDs from non-deleted rows.
-        userCardCollectionDao.observeAll(null)
-            .let { flow ->
-                // Use getAllSince with 0L to get all rows, filter non-deleted.
-                userCardCollectionDao.getAllSince("", 0L)
-                    .filter { !it.isDeleted }
-                    .map { it.scryfallId }
-                    .distinct()
-            }
+        val userId = authRepository.getCurrentUser()?.id ?: ""
+        userCardCollectionDao.getAllSince(userId, 0L)
+            .filter { !it.isDeleted }
+            .map { it.scryfallId }
+            .distinct()
     }
 
     // ── Mapping helpers ───────────────────────────────────────────────────────
