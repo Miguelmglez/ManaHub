@@ -14,11 +14,15 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CardDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -27,6 +31,7 @@ class CardDetailViewModel @Inject constructor(
     private val deckRepo: DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
     private val userPrefs: UserPreferencesRepository,
+    private val authRepository: AuthRepository,
     private val helper: AnalyticsHelper,
 ) : ViewModel() {
 
@@ -88,7 +93,11 @@ class CardDetailViewModel @Inject constructor(
 
     private fun observeUserCards() {
         viewModelScope.launch {
-            userCardRepo.observeByScryfallId(scryfallId, null)
+            authRepository.sessionState
+                .flatMapLatest { state ->
+                    val userId = (state as? SessionState.Authenticated)?.user?.id
+                    userCardRepo.observeByScryfallId(scryfallId, userId)
+                }
                 .collect { cards ->
                     _uiState.update { it.copy(userCards = cards.filter { c -> !c.isInWishlist }) }
                 }
