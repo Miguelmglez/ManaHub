@@ -30,10 +30,12 @@ import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.feature.addcard.AddCardScreen
 import com.mmg.manahub.feature.carddetail.CardDetailScreen
 import com.mmg.manahub.feature.collection.CollectionScreen
-import com.mmg.manahub.feature.decks.DeckBuilderScreen
-import com.mmg.manahub.feature.decks.DeckDetailScreen
+import com.mmg.manahub.feature.decks.DeckMagicDetailScreen
+import com.mmg.manahub.feature.decks.DeckMagicScreen
+import com.mmg.manahub.feature.decks.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.SetDraftDetailScreen
+import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.game.GamePlayScreen
 import com.mmg.manahub.feature.game.GameSetupScreen
 import com.mmg.manahub.feature.game.GameSetupViewModel
@@ -42,16 +44,14 @@ import com.mmg.manahub.feature.game.PlayerConfig
 import com.mmg.manahub.feature.game.model.GameMode
 import com.mmg.manahub.feature.game.model.LayoutTemplate
 import com.mmg.manahub.feature.game.model.LayoutTemplates
-import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.profile.ProfileScreen
 import com.mmg.manahub.feature.scanner.ScannerScreen
 import com.mmg.manahub.feature.settings.SettingsScreen
-import com.mmg.manahub.feature.tagdictionary.TagDictionaryScreen
 import com.mmg.manahub.feature.stats.StatsScreen
 import com.mmg.manahub.feature.survey.SurveyScreen
-import com.mmg.manahub.feature.synergy.SynergyScreen
+import com.mmg.manahub.feature.tagdictionary.TagDictionaryScreen
 import com.mmg.manahub.feature.tournament.TournamentListScreen
 import com.mmg.manahub.feature.tournament.TournamentScreen
 import com.mmg.manahub.feature.tournament.TournamentSetupScreen
@@ -139,10 +139,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                         )
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
-                    onCreateDeckClick = { navController.navigate(Screen.DeckBuilder.route) },
-                    onSynergyClick = { navController.navigate(Screen.Synergy.route) },
-                    onDeckBuilderClick = { navController.navigate(Screen.DeckBuilder.route) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) }
                 )
             }
 
@@ -175,40 +172,37 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             // ── Decks ─────────────────────────────────────────────────────────
             composable(
                 route = Screen.DeckDetail.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
-            ) { entry ->
-                val deckId = entry.arguments?.getLong("deckId") ?: 0L
-                DeckDetailScreen(
-                    deckId = deckId,
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
+            ) {
+                DeckMagicDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onAddCards = { navController.navigate(Screen.DeckAddCards.createRoute(deckId)) },
+                    onImproveDeck = { id ->
+                        navController.navigate(Screen.DeckImprovement.createRoute(id))
+                    }
                 )
             }
 
             composable(
+                route = Screen.DeckImprovement.route,
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
+            ) {
+                DeckImprovementScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
                 route = Screen.DeckAddCards.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.LongType }),
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
             ) {
                 //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Screen.DeckBuilder.route) {
-                DeckBuilderScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onDeckSaved = {
-                        navController.navigate(Screen.Collection.route) {
-                            popUpTo(Screen.DeckBuilder.route) { inclusive = true }
-                        }
-                    },
-                )
+                DeckMagicScreen()
             }
 
             composable(Screen.Synergy.route) {
-                SynergyScreen(
-                    onCardClick = { id ->
-                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
-                    }
-                )
+                DeckMagicScreen()
             }
 
             // ── Stats ─────────────────────────────────────────────────────────
@@ -481,3 +475,5 @@ private fun NavController.navigateTab(route: String) {
         restoreState = true
     }
 }
+
+

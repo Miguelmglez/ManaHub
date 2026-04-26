@@ -2,9 +2,12 @@ package com.mmg.manahub.feature.game
 
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -14,6 +17,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -99,6 +104,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -210,6 +216,8 @@ private fun GamePlayContent(
     var showManagePlayersSheet by remember { mutableStateOf(false) }
     var managePlayersInitialTab by remember { mutableIntStateOf(0) }
     var confirmDefeatPlayerId by remember { mutableStateOf<Int?>(null) }
+
+    ImmersiveSystemBars()
 
     BackHandler(enabled = uiState.winner == null) {
         showExitDialog = true
@@ -413,7 +421,7 @@ private fun GamePlayerGrid(
     modifier: Modifier = Modifier,
 ) {
     MaterialTheme.magicColors
-    val sizeLayout = when (activeLayout.gridRows.keys.size) {
+    val (targetFirst, targetSecond) = when (activeLayout.gridRows.keys.size) {
         2 -> {
             if (activeLayout.gridRows.keys.contains(ScreenedGridSlotPosition.MID)) {
                 Pair(0.34f, 0.66f)
@@ -430,6 +438,18 @@ private fun GamePlayerGrid(
             Pair(0f, 1f)
         }
     }
+
+    val firstWeight by animateFloatAsState(
+        targetValue = targetFirst,
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "firstWeight"
+    )
+    val secondWeight by animateFloatAsState(
+        targetValue = targetSecond,
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "secondWeight"
+    )
+
     Box(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.weight(1f)) {
@@ -441,7 +461,7 @@ private fun GamePlayerGrid(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .weight(sizeLayout.first)
+                                    .weight(firstWeight.coerceAtLeast(0.01f))
                                     .padding(bottom = extraPad)
                             ) {
                                 val slot = slots[0]
@@ -478,7 +498,7 @@ private fun GamePlayerGrid(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .weight(sizeLayout.first)
+                                    .weight(firstWeight.coerceAtLeast(0.01f))
                                     .padding(top = extraPad)
                             ) {
                                 val slot = slots[0]
@@ -516,7 +536,7 @@ private fun GamePlayerGrid(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .weight(sizeLayout.second)
+                                    .weight(secondWeight.coerceAtLeast(0.01f))
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     leftPlayers.forEachIndexed { index, slot ->
@@ -787,28 +807,44 @@ private fun PlayerCard(
                             }
                         }
 
-                        Text(
-                            text = player.life.toString(),
-                            style = (if (tier == CardTier.LARGE)
-                                MaterialTheme.magicTypography.lifeNumber
-                            else
-                                MaterialTheme.magicTypography.lifeNumberMd).copy(
-                                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                lineHeightStyle = LineHeightStyle(
-                                    alignment = LineHeightStyle.Alignment.Center,
-                                    trim = LineHeightStyle.Trim.None
+                        AnimatedContent(
+                            targetState = player.life,
+                            transitionSpec = {
+                                if (targetState > initialState) {
+                                    (slideInVertically { height -> -height } + fadeIn()) togetherWith
+                                            (slideOutVertically { height -> height } + fadeOut())
+                                } else {
+                                    (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                            (slideOutVertically { height -> -height } + fadeOut())
+                                }.using(
+                                    SizeTransform(clip = false)
                                 )
-                            ),
-                            color = lifeColor,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .padding(horizontal = 24.dp) // Gap between text and icons
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) { onLife(-1) },
-                        )
+                            },
+                            label = "lifeAnimation"
+                        ) { targetLife ->
+                            Text(
+                                text = targetLife.toString(),
+                                style = (if (tier == CardTier.LARGE)
+                                    MaterialTheme.magicTypography.lifeNumber
+                                else
+                                    MaterialTheme.magicTypography.lifeNumberMd).copy(
+                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                    lineHeightStyle = LineHeightStyle(
+                                        alignment = LineHeightStyle.Alignment.Center,
+                                        trim = LineHeightStyle.Trim.None
+                                    )
+                                ),
+                                color = lifeColor,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .padding(horizontal = 24.dp) // Gap between text and icons
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) { onLife(-1) },
+                            )
+                        }
 
                         // Right container: occupies 1/2 of remaining space, icon aligned to start (near text)
                         Box(
@@ -979,10 +1015,32 @@ private fun PlayerCardSurface(
         anim
     } else 0.25f
 
+    val scale by animateFloatAsState(
+        targetValue = if (isActive) 1.03f else 1.0f,
+        animationSpec = tween(400, easing = FastOutSlowInEasing),
+        label = "cardScale"
+    )
+
+    val borderAlpha by animateFloatAsState(
+        targetValue = if (isActive) 1.0f else 0.40f,
+        animationSpec = tween(400),
+        label = "borderAlpha"
+    )
+
+    val borderWidth by animateDpAsState(
+        targetValue = if (isActive) 2.5.dp else 0.5.dp,
+        animationSpec = tween(400),
+        label = "borderWidth"
+    )
+
     Box(
         modifier = Modifier
             .requiredSize(width = cardWidth, height = cardHeight)
-            .graphicsLayer { rotationZ = rotation.toFloat() }
+            .graphicsLayer {
+                rotationZ = rotation.toFloat()
+                scaleX = scale
+                scaleY = scale
+            }
             .coloredShadow(
                 color = theme.accent.copy(alpha = glowAlpha),
                 blurRadius = if (isActive) 28.dp else 20.dp,
@@ -990,8 +1048,8 @@ private fun PlayerCardSurface(
             .clip(RoundedCornerShape(16.dp))
             .background(theme.background)
             .border(
-                width = if (isActive) 2.5.dp else 0.5.dp,
-                color = theme.accent.copy(alpha = if (isActive) 1.0f else 0.40f),
+                width = borderWidth,
+                color = theme.accent.copy(alpha = borderAlpha),
                 shape = RoundedCornerShape(16.dp),
             ),
         content = content

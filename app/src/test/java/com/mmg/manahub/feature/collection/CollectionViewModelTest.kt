@@ -1,6 +1,6 @@
-package com.mmg.manahub.feature.collection
+﻿package com.mmg.manahub.feature.collection
 
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchCriterion
@@ -9,6 +9,8 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
+import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.util.TestFixtures
@@ -61,21 +63,22 @@ class CollectionViewModelTest {
     private val cardRepository    = mockk<CardRepository>(relaxed = true)
     private val userCardRepository = mockk<UserCardRepository>(relaxed = true)
     private val authRepository    = mockk<AuthRepository>(relaxed = true)
-    private val prefsDataStore    = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val syncManager       = mockk<SyncManager>(relaxed = true)
+    private val workManager       = mockk<WorkManager>(relaxed = true)
 
     private lateinit var viewModel: CollectionViewModel
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun buildEntry(
-        id:         Long   = 1L,
-        scryfallId: String = "id-001",
-        name:       String = "Lightning Bolt",
-        rarity:     String = "common",
+        id:         String  = "id-001",
+        scryfallId: String  = "id-001",
+        name:       String  = "Lightning Bolt",
+        rarity:     String  = "common",
         priceUsd:   Double? = 1.00,
         colors:     List<String> = listOf("R"),
-        cmc:        Double = 1.0,
-        addedAt:    Long   = 1_000L,
+        cmc:        Double  = 1.0,
+        createdAt:  Long    = 1_000L,
         isFoil:     Boolean = false,
         isInWishlist: Boolean = false,
         isForTrade:   Boolean = false,
@@ -84,7 +87,7 @@ class CollectionViewModelTest {
         legalityModern:    String = "legal",
         legalityCommander: String = "legal",
         oracleText: String? = null,
-        typeLine:   String = "Instant",
+        typeLine:   String  = "Instant",
         keywords:   List<String> = emptyList(),
         power:      String? = null,
         toughness:  String? = null,
@@ -94,7 +97,7 @@ class CollectionViewModelTest {
             scryfallId   = scryfallId,
             isInWishlist = isInWishlist,
             isForTrade   = isForTrade,
-            addedAt      = addedAt,
+            createdAt    = createdAt,
             isFoil       = isFoil,
         ),
         card = TestFixtures.buildCard(
@@ -119,16 +122,17 @@ class CollectionViewModelTest {
     private fun buildViewModel(entries: List<UserCardWithCard> = emptyList()): CollectionViewModel {
         every { getCollection() } returns flowOf(entries)
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
-        every { userCardRepository.observePendingCount() } returns flowOf(0)
         coEvery { authRepository.getCurrentUser() } returns null
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
+        every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
         return CollectionViewModel(
             getCollection      = getCollection,
             removeCard         = removeCard,
             cardRepository     = cardRepository,
             userCardRepository = userCardRepository,
             authRepository     = authRepository,
-            prefsDataStore     = prefsDataStore,
+            syncManager        = syncManager,
+            workManager        = workManager,
         )
     }
 
@@ -152,8 +156,8 @@ class CollectionViewModelTest {
     fun `given collection has entries when ViewModel initializes then cards are loaded into state`() = runTest {
         // Arrange
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Lightning Bolt"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Counterspell"),
+            buildEntry(id = "id-001", scryfallId = "id-001", name = "Lightning Bolt"),
+            buildEntry(id = "id-002", scryfallId = "id-002", name = "Counterspell"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -176,10 +180,11 @@ class CollectionViewModelTest {
         // Arrange
         val staleCard = TestFixtures.buildStaleCard("id-001")
         val entry = TestFixtures.buildUserCardWithCard(card = staleCard)
-        every { getCollection() } returns flowOf(listOf(entry))
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
 
         viewModel = buildViewModel(emptyList())
+        // Override after buildViewModel so init coroutine picks up the stale-card flow
+        every { getCollection() } returns flowOf(listOf(entry))
         advanceUntilIdle()
 
         // Assert
@@ -222,8 +227,8 @@ class CollectionViewModelTest {
     @Test
     fun `given cards in collection when onSearchQueryChange with matching name then filtered results are returned`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Lightning Bolt"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Counterspell"),
+            buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+            buildEntry(scryfallId = "id-002", name = "Counterspell"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -251,8 +256,8 @@ class CollectionViewModelTest {
     @Test
     fun `given filtered results when onSearchQueryChange cleared then all cards are shown again`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Lightning Bolt"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Counterspell"),
+            buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+            buildEntry(scryfallId = "id-002", name = "Counterspell"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -285,9 +290,9 @@ class CollectionViewModelTest {
     @Test
     fun `given multiple cards when sorted by NAME then alphabetical order is applied`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Zap"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Aura"),
-            buildEntry(id = 3L, scryfallId = "id-003", name = "Millstone"),
+            buildEntry(scryfallId = "id-001", name = "Zap"),
+            buildEntry(scryfallId = "id-002", name = "Aura"),
+            buildEntry(scryfallId = "id-003", name = "Millstone"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -302,9 +307,9 @@ class CollectionViewModelTest {
     @Test
     fun `given multiple cards when sorted by PRICE_DESC then most expensive is first`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Cheap",    priceUsd = 0.50),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Expensive", priceUsd = 99.99),
-            buildEntry(id = 3L, scryfallId = "id-003", name = "Mid",      priceUsd = 5.00),
+            buildEntry(scryfallId = "id-001", name = "Cheap",    priceUsd = 0.50),
+            buildEntry(scryfallId = "id-002", name = "Expensive", priceUsd = 99.99),
+            buildEntry(scryfallId = "id-003", name = "Mid",      priceUsd = 5.00),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -320,8 +325,8 @@ class CollectionViewModelTest {
     @Test
     fun `given multiple cards when sorted by PRICE_ASC then cheapest is first`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Cheap",    priceUsd = 0.50),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Expensive", priceUsd = 99.99),
+            buildEntry(scryfallId = "id-001", name = "Cheap",    priceUsd = 0.50),
+            buildEntry(scryfallId = "id-002", name = "Expensive", priceUsd = 99.99),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -335,10 +340,10 @@ class CollectionViewModelTest {
     @Test
     fun `given mixed rarities when sorted by RARITY then mythic comes before common`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Common Card",  rarity = "common"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Mythic Card",  rarity = "mythic"),
-            buildEntry(id = 3L, scryfallId = "id-003", name = "Rare Card",    rarity = "rare"),
-            buildEntry(id = 4L, scryfallId = "id-004", name = "Uncommon Card", rarity = "uncommon"),
+            buildEntry(scryfallId = "id-001", name = "Common Card",  rarity = "common"),
+            buildEntry(scryfallId = "id-002", name = "Mythic Card",  rarity = "mythic"),
+            buildEntry(scryfallId = "id-003", name = "Rare Card",    rarity = "rare"),
+            buildEntry(scryfallId = "id-004", name = "Uncommon Card", rarity = "uncommon"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -354,9 +359,9 @@ class CollectionViewModelTest {
     @Test
     fun `given different addedAt timestamps when sorted by DATE_ADDED then newest is first`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Old",    addedAt = 1_000L),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Newest", addedAt = 9_000L),
-            buildEntry(id = 3L, scryfallId = "id-003", name = "Mid",    addedAt = 5_000L),
+            buildEntry(scryfallId = "id-001", name = "Old",    createdAt = 1_000L),
+            buildEntry(scryfallId = "id-002", name = "Newest", createdAt = 9_000L),
+            buildEntry(scryfallId = "id-003", name = "Mid",    createdAt = 5_000L),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -403,10 +408,10 @@ class CollectionViewModelTest {
         advanceUntilIdle()
         coEvery { removeCard(any()) } returns Unit
 
-        viewModel.onDeleteCard(7L)
+        viewModel.onDeleteCard("id-007")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { removeCard(7L) }
+        coVerify(exactly = 1) { removeCard("id-007") }
     }
 
     @Test
@@ -415,7 +420,7 @@ class CollectionViewModelTest {
         advanceUntilIdle()
         coEvery { removeCard(any()) } throws RuntimeException("FK violation")
 
-        viewModel.onDeleteCard(7L)
+        viewModel.onDeleteCard("id-007")
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)
@@ -428,8 +433,8 @@ class CollectionViewModelTest {
     @Test
     fun `given Name criterion when applyAdvancedFilters then only matching cards are shown`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Lightning Bolt"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Counterspell"),
+            buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+            buildEntry(scryfallId = "id-002", name = "Counterspell"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -445,8 +450,8 @@ class CollectionViewModelTest {
     @Test
     fun `given exact Name criterion when applyAdvancedFilters then partial match is excluded`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Lightning Bolt"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Bolt of Lightning"),
+            buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+            buildEntry(scryfallId = "id-002", name = "Bolt of Lightning"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -464,8 +469,8 @@ class CollectionViewModelTest {
     @Test
     fun `given Colors criterion non-exactly when applyAdvancedFilters then mono-red card passes`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Red Card",   colors = listOf("R")),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Blue Card",  colors = listOf("U")),
+            buildEntry(scryfallId = "id-001", name = "Red Card",   colors = listOf("R")),
+            buildEntry(scryfallId = "id-002", name = "Blue Card",  colors = listOf("U")),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -483,8 +488,8 @@ class CollectionViewModelTest {
     @Test
     fun `given Rarity EQUAL criterion when applyAdvancedFilters then only matching rarity cards are shown`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Common",  rarity = "common"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Mythic",  rarity = "mythic"),
+            buildEntry(scryfallId = "id-001", name = "Common",  rarity = "common"),
+            buildEntry(scryfallId = "id-002", name = "Mythic",  rarity = "mythic"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -502,9 +507,9 @@ class CollectionViewModelTest {
     @Test
     fun `given Rarity GREATER_OR_EQUAL rare when applyAdvancedFilters then rare and mythic are included`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Common",   rarity = "common"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Rare",     rarity = "rare"),
-            buildEntry(id = 3L, scryfallId = "id-003", name = "Mythic",   rarity = "mythic"),
+            buildEntry(scryfallId = "id-001", name = "Common",   rarity = "common"),
+            buildEntry(scryfallId = "id-002", name = "Rare",     rarity = "rare"),
+            buildEntry(scryfallId = "id-003", name = "Mythic",   rarity = "mythic"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -524,8 +529,8 @@ class CollectionViewModelTest {
     @Test
     fun `given ManaCost criterion when applyAdvancedFilters then only cards with matching cmc are shown`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "1-drop", cmc = 1.0),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "3-drop", cmc = 3.0),
+            buildEntry(scryfallId = "id-001", name = "1-drop", cmc = 1.0),
+            buildEntry(scryfallId = "id-002", name = "3-drop", cmc = 3.0),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -543,8 +548,8 @@ class CollectionViewModelTest {
     @Test
     fun `given Price criterion when applyAdvancedFilters then cards over the threshold are excluded`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Cheap",    priceUsd = 0.50),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Expensive", priceUsd = 200.0),
+            buildEntry(scryfallId = "id-001", name = "Cheap",    priceUsd = 0.50),
+            buildEntry(scryfallId = "id-002", name = "Expensive", priceUsd = 200.0),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -564,8 +569,8 @@ class CollectionViewModelTest {
     @Test
     fun `given Format legal criterion when applyAdvancedFilters then legal cards are included`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Modern Legal",   legalityModern = "legal"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Modern Banned",  legalityModern = "banned"),
+            buildEntry(scryfallId = "id-001", name = "Modern Legal",   legalityModern = "legal"),
+            buildEntry(scryfallId = "id-002", name = "Modern Banned",  legalityModern = "banned"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -583,8 +588,8 @@ class CollectionViewModelTest {
     @Test
     fun `given IsForTrade criterion when applyAdvancedFilters then only trade cards are shown`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "For Trade",  isForTrade = true),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Not Trade",  isForTrade = false),
+            buildEntry(scryfallId = "id-001", name = "For Trade",  isForTrade = true),
+            buildEntry(scryfallId = "id-002", name = "Not Trade",  isForTrade = false),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -602,8 +607,8 @@ class CollectionViewModelTest {
     @Test
     fun `given OracleText criterion when applyAdvancedFilters then only matching oracle text cards are shown`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Deals Damage", oracleText = "deals 3 damage to any target"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Draws Card",   oracleText = "draw a card"),
+            buildEntry(scryfallId = "id-001", name = "Deals Damage", oracleText = "deals 3 damage to any target"),
+            buildEntry(scryfallId = "id-002", name = "Draws Card",   oracleText = "draw a card"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -621,9 +626,9 @@ class CollectionViewModelTest {
     @Test
     fun `given multiple criteria when applyAdvancedFilters then all criteria must match (AND logic)`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Red Instant", colors = listOf("R"), typeLine = "Instant"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Red Sorcery", colors = listOf("R"), typeLine = "Sorcery"),
-            buildEntry(id = 3L, scryfallId = "id-003", name = "Blue Instant", colors = listOf("U"), typeLine = "Instant"),
+            buildEntry(scryfallId = "id-001", name = "Red Instant", colors = listOf("R"), typeLine = "Instant"),
+            buildEntry(scryfallId = "id-002", name = "Red Sorcery", colors = listOf("R"), typeLine = "Sorcery"),
+            buildEntry(scryfallId = "id-003", name = "Blue Instant", colors = listOf("U"), typeLine = "Instant"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -644,8 +649,8 @@ class CollectionViewModelTest {
     @Test
     fun `given active filters when clearAdvancedFilters then all cards are shown again`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Lightning Bolt"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "Counterspell"),
+            buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+            buildEntry(scryfallId = "id-002", name = "Counterspell"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -683,11 +688,11 @@ class CollectionViewModelTest {
     fun `given two copies of same card when collection loads then they are grouped into one entry`() = runTest {
         val entries = listOf(
             TestFixtures.buildUserCardWithCard(
-                userCard = TestFixtures.buildUserCard(id = 1L, scryfallId = "id-001", quantity = 1, isFoil = false),
+                userCard = TestFixtures.buildUserCard(id = "uc-001", scryfallId = "id-001", quantity = 1, isFoil = false),
                 card     = TestFixtures.buildCard("id-001", name = "Lightning Bolt"),
             ),
             TestFixtures.buildUserCardWithCard(
-                userCard = TestFixtures.buildUserCard(id = 2L, scryfallId = "id-001", quantity = 2, isFoil = true),
+                userCard = TestFixtures.buildUserCard(id = "uc-002", scryfallId = "id-001", quantity = 2, isFoil = true),
                 card     = TestFixtures.buildCard("id-001", name = "Lightning Bolt"),
             ),
         )
@@ -709,12 +714,13 @@ class CollectionViewModelTest {
     @Test
     fun `given collection flow throws when observeCollection then error is set in state`() = runTest {
         // Arrange
-        every { getCollection() } returns kotlinx.coroutines.flow.flow {
-            throw RuntimeException("DB error")
-        }
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
 
         viewModel = buildViewModel(emptyList())
+        // Override after buildViewModel so init coroutine picks up the throwing flow
+        every { getCollection() } returns kotlinx.coroutines.flow.flow {
+            throw RuntimeException("DB error")
+        }
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)
@@ -726,7 +732,7 @@ class CollectionViewModelTest {
         viewModel = buildViewModel()
         advanceUntilIdle()
         coEvery { removeCard(any()) } throws RuntimeException("error")
-        viewModel.onDeleteCard(1L)
+        viewModel.onDeleteCard("id-001")
         advanceUntilIdle()
 
         viewModel.onErrorDismissed()
@@ -741,8 +747,8 @@ class CollectionViewModelTest {
     @Test
     fun `given Power criterion when applyAdvancedFilters then only creatures with matching power are shown`() = runTest {
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "2-2 Creature", power = "2", toughness = "2"),
-            buildEntry(id = 2L, scryfallId = "id-002", name = "4-4 Creature", power = "4", toughness = "4"),
+            buildEntry(scryfallId = "id-001", name = "2-2 Creature", power = "2", toughness = "2"),
+            buildEntry(scryfallId = "id-002", name = "4-4 Creature", power = "4", toughness = "4"),
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -761,7 +767,7 @@ class CollectionViewModelTest {
     fun `given Power criterion on non-creature card when applyAdvancedFilters then card is excluded`() = runTest {
         // Non-creature cards have null power
         val entries = listOf(
-            buildEntry(id = 1L, scryfallId = "id-001", name = "Instant Spell", power = null)
+            buildEntry(scryfallId = "id-001", name = "Instant Spell", power = null)
         )
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
@@ -776,3 +782,4 @@ class CollectionViewModelTest {
         assertTrue(viewModel.uiState.value.cards.isEmpty())
     }
 }
+

@@ -1,51 +1,97 @@
 package com.mmg.manahub.core.data.local.dao
 
 import androidx.room.*
-import com.mmg.manahub.core.data.local.entity.*
+import com.mmg.manahub.core.data.local.entity.DeckCardEntity
+import com.mmg.manahub.core.data.local.entity.DeckEntity
 import kotlinx.coroutines.flow.Flow
 
-/** Flat row returned by the deck-summary JOIN query — one row per deck×card. */
+/** Flat row returned by the deck-summary JOIN — one row per deck x card combination. */
 data class DeckSummaryRow(
-    @ColumnInfo(name = "deckId")        val deckId:        Long,
-    @ColumnInfo(name = "name")          val name:          String,
-    @ColumnInfo(name = "format")        val format:        String,
-    @ColumnInfo(name = "description")   val description:   String?,
-    @ColumnInfo(name = "coverCardId")   val coverCardId:   String?,
-    @ColumnInfo(name = "createdAt")     val createdAt:     Long,
-    @ColumnInfo(name = "updatedAt")     val updatedAt:     Long,
-    @ColumnInfo(name = "scryfallId")    val scryfallId:    String?,
-    @ColumnInfo(name = "isSideboard")   val isSideboard:   Boolean,
-    @ColumnInfo(name = "quantity")      val quantity:      Int,
+    @ColumnInfo(name = "deckId") val deckId: String,
+    @ColumnInfo(name = "name") val name: String,
+    @ColumnInfo(name = "format") val format: String,
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "coverCardId") val coverCardId: String?,
+    @ColumnInfo(name = "createdAt") val createdAt: Long,
+    @ColumnInfo(name = "updatedAt") val updatedAt: Long,
+    @ColumnInfo(name = "scryfallId") val scryfallId: String?,
+    @ColumnInfo(name = "isSideboard") val isSideboard: Boolean,
+    @ColumnInfo(name = "quantity") val quantity: Int,
     @ColumnInfo(name = "colorIdentity") val colorIdentity: String?,
-    @ColumnInfo(name = "imageArtCrop")  val imageArtCrop:  String?,
+    @ColumnInfo(name = "imageArtCrop") val imageArtCrop: String?,
 )
 
 @Dao
 interface DeckDao {
 
-    @Insert
-    suspend fun insertDeck(deck: DeckEntity): Long
+    // ── Write operations ──────────────────────────────────────────────────────
 
-    @Update
-    suspend fun updateDeck(deck: DeckEntity)
+    @Upsert
+    fun upsertDeck(deck: DeckEntity)
 
-    @Query("DELETE FROM decks WHERE id = :deckId")
-    suspend fun deleteDeck(deckId: Long)
+    @Upsert
+    fun upsertDeckCard(card: DeckCardEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertDeckCard(ref: DeckCardCrossRef)
+    @Upsert
+    fun upsertDeckCards(cards: List<DeckCardEntity>)
 
-    @Query("""
-        DELETE FROM deck_cards
-        WHERE deck_id = :deckId AND scryfall_id = :scryfallId AND is_sideboard = :isSideboard
-    """)
-    suspend fun removeDeckCard(deckId: Long, scryfallId: String, isSideboard: Boolean)
-
+    // Wipes all card rows for a deck before re-inserting — used when replacing
+    // the full card list atomically (e.g. import, sync pull).
     @Query("DELETE FROM deck_cards WHERE deck_id = :deckId")
-    suspend fun clearDeck(deckId: Long)
+    fun clearDeckCards(deckId: String)
 
-    @Query("SELECT * FROM decks ORDER BY updated_at DESC")
-    fun observeAllDecks(): Flow<List<DeckEntity>>
+    @Query("DELETE FROM deck_cards WHERE deck_id = :deckId AND scryfall_id = :scryfallId AND is_sideboard = :isSideboard")
+    fun removeDeckCard(deckId: String, scryfallId: String, isSideboard: Boolean)
+
+    // Soft-delete: preserves the row so the tombstone can be synced to Supabase.
+    @Query("UPDATE decks SET is_deleted = 1, updated_at = :updatedAt WHERE id = :deckId")
+    fun softDeleteDeck(deckId: String, updatedAt: Long = System.currentTimeMillis())
+
+    // Assigns real userId to all guest-owned decks on login.
+    // Returns count of updated rows so caller can decide whether to trigger a sync.
+    @Query("UPDATE decks SET user_id = :newUserId, updated_at = :updatedAt WHERE user_id IS NULL OR user_id = ''")
+    fun assignDeckUserId(newUserId: String, updatedAt: Long = System.currentTimeMillis()): Int
+
+    // ── Reactive read operations ───────────────────────────────────────────────
+
+    // All non-deleted decks for this user, ordered most-recently-modified first.
+    @Query("SELECT * FROM decks WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY updated_at DESC")
+    fun observeAllDecks(userId: String?): Flow<List<DeckEntity>>
+
+    @Query("SELECT * FROM decks WHERE id = :deckId")
+    fun observeDeckById(deckId: String): Flow<DeckEntity?>
+
+    // @Transaction is required by Room whenever a @Relation is involved, to
+    // prevent inconsistent reads across the two queries Room issues internally.
+    @Transaction
+    @Query("SELECT * FROM decks WHERE id = :deckId AND is_deleted = 0")
+    fun observeDeckWithCards(deckId: String): Flow<DeckWithCards?>
+
+    // ── Sync / pull operations ─────────────────────────────────────────────────
+
+    // Returns all decks modified after :since — includes is_deleted = 1 rows
+    // so tombstones are pushed to Supabase during incremental sync.
+    @Query("SELECT * FROM decks WHERE (user_id = :userId OR user_id IS NULL) AND updated_at > :since")
+    fun getDecksSince(userId: String, since: Long): List<DeckEntity>
+
+    @Query("SELECT * FROM decks WHERE id = :deckId AND is_deleted = 0")
+    fun getDeckById(deckId: String): DeckEntity?
+
+    // Includes soft-deleted rows — used by SyncManager PULL to avoid falsely overwriting local tombstones.
+    @Query("SELECT * FROM decks WHERE id = :deckId")
+    fun getDeckByIdForSync(deckId: String): DeckEntity?
+
+    @Query("SELECT * FROM deck_cards WHERE deck_id = :deckId")
+    fun getDeckCards(deckId: String): List<DeckCardEntity>
+
+    // Atomically replaces all card slots for a deck — used by the sync PULL phase.
+    @Transaction
+    fun replaceAllCards(deckId: String, cards: List<DeckCardEntity>) {
+        clearDeckCards(deckId)
+        if (cards.isNotEmpty()) upsertDeckCards(cards)
+    }
+
+    // ── Stats / other features ─────────────────────────────────────────────────
 
     @Query("""
         SELECT d.id            AS deckId,
@@ -63,61 +109,28 @@ interface DeckDao {
         FROM decks d
         LEFT JOIN deck_cards dc ON d.id = dc.deck_id
         LEFT JOIN cards c ON dc.scryfall_id = c.scryfall_id
+        WHERE d.is_deleted = 0
         ORDER BY d.updated_at DESC
     """)
     fun observeDeckSummaryRows(): Flow<List<DeckSummaryRow>>
 
-    @Query("SELECT COUNT(*) FROM decks")
+    @Query("SELECT COUNT(*) FROM decks WHERE is_deleted = 0")
     fun observeDeckCount(): Flow<Int>
 
     @Query("""
         SELECT d.* FROM decks d
         INNER JOIN deck_cards dc ON d.id = dc.deck_id
-        WHERE dc.scryfall_id = :scryfallId
+        WHERE dc.scryfall_id = :scryfallId AND d.is_deleted = 0
         ORDER BY d.updated_at DESC
     """)
     fun observeDecksContainingCard(scryfallId: String): Flow<List<DeckEntity>>
 
-    @Transaction
-    @Query("SELECT * FROM decks WHERE id = :deckId")
-    fun observeDeckWithCards(deckId: Long): Flow<DeckWithCards?>
-
-    // ── Sync support ─────────────────────────────────────────────────────────
-
-    @Query("SELECT * FROM decks WHERE id = :deckId")
-    suspend fun getDeckById(deckId: Long): DeckEntity?
-
-    @Query("SELECT * FROM deck_cards WHERE deck_id = :deckId")
-    suspend fun getDeckCards(deckId: Long): List<DeckCardCrossRef>
-
-    @Query("SELECT * FROM decks WHERE sync_status = 1")
-    suspend fun getPendingUploadDecks(): List<DeckEntity>
-
-    @Query("SELECT * FROM decks WHERE remote_id = :remoteId LIMIT 1")
-    suspend fun getDeckByRemoteId(remoteId: String): DeckEntity?
-
     @Query("SELECT MAX(updated_at) FROM decks")
-    suspend fun getMaxUpdatedAt(): Long?
-
-    @Query("""
-        UPDATE decks
-        SET sync_status = :status,
-            updated_at  = :updatedAt
-        WHERE id = :deckId
-    """)
-    suspend fun markDeckDirty(deckId: Long, status: Int, updatedAt: Long)
-
-    @Query("""
-        UPDATE decks
-        SET sync_status = :status,
-            remote_id   = :remoteId
-        WHERE id = :deckId
-    """)
-    suspend fun updateSyncStatusAndRemoteId(deckId: Long, status: Int, remoteId: String?)
+    fun getMaxUpdatedAt(): Long?
 }
 
 data class DeckWithCards(
     @Embedded val deck: DeckEntity,
-    @Relation(parentColumn = "id", entityColumn = "deck_id", entity = DeckCardCrossRef::class)
-    val cards: List<DeckCardCrossRef>
+    @Relation(parentColumn = "id", entityColumn = "deck_id", entity = DeckCardEntity::class)
+    val cards: List<DeckCardEntity>
 )

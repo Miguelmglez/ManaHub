@@ -1,755 +1,972 @@
 package com.mmg.manahub.feature.decks
 
+import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mmg.manahub.feature.decks.components.DeckSummaryCard
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.BuilderStep
-import com.mmg.manahub.core.domain.model.BuilderTab
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DeckBuilderState
+import com.mmg.manahub.core.domain.model.AddCardRow
+import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.core.domain.model.ReviewGroupBy
+import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.ui.components.ManaCostImages
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.decks.components.BuildingFilters
+import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
+import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.components.CommanderBanner
-import com.mmg.manahub.feature.decks.components.CommanderSearchSheet
-import com.mmg.manahub.feature.decks.components.DeckCardRow
-import com.mmg.manahub.feature.decks.components.DeckImportSheet
-import com.mmg.manahub.feature.decks.components.LandsSection
-import com.mmg.manahub.feature.decks.components.ManaCurveChart
+import com.mmg.manahub.feature.decks.components.MagicLandSuggestionStatic
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeckBuilderScreen(
-    onNavigateBack: () -> Unit,
-    onDeckSaved:    () -> Unit,
-    viewModel:      DeckBuilderViewModel = hiltViewModel(),
+fun DeckMagicDetailScreen(
+    onBack: () -> Unit,
+    onImproveDeck: (String) -> Unit,
+    viewModel: DeckMagicDetailViewModel = hiltViewModel()
 ) {
-    val state                by viewModel.state.collectAsStateWithLifecycle()
-    val commanderResults     by viewModel.commanderResults.collectAsStateWithLifecycle()
-    val isSearchingCommander by viewModel.isSearchingCommander.collectAsStateWithLifecycle()
-    val preferredCurrency    by viewModel.preferredCurrency.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val context = LocalContext.current
+
+    var showAddCardsSheet by remember { mutableStateOf(false) }
+    var showBasicLandsSheet by remember { mutableStateOf(false) }
+    var showEditDeckSheet by remember { mutableStateOf(false) }
+    var showCommanderSearchSheet by remember { mutableStateOf(false) }
+    var selectedCardId by remember { mutableStateOf<String?>(null) }
+    // Tracks whether the CardDetailSheet was opened from the commander-selection flow,
+    // so it can display the commander-specific action buttons instead of the +/- counter.
+    var isCardDetailInCommanderContext by remember { mutableStateOf(false) }
+
+    val handleBack: () -> Unit = {
+        if (viewModel.onNavigatingBack()) onBack()
+    }
+    BackHandler(onBack = handleBack)
+
+    val selectedDeckCard = remember(selectedCardId, uiState.cards, uiState.addCardsResults, uiState.scryfallResults, uiState.commanderCard) {
+        selectedCardId?.let { id ->
+            uiState.cards.find { it.scryfallId == id }
+                ?: (if (uiState.commanderCard?.scryfallId == id) uiState.commanderCard else null)
+                ?: (uiState.addCardsResults + uiState.scryfallResults).find { it.card.scryfallId == id }?.let { row ->
+                    DeckSlotEntry(row.card.scryfallId, row.quantityInDeck, false, row.card)
+                }
+        }
+    }
 
     Scaffold(
         containerColor = mc.background,
         topBar = {
             Surface(color = mc.backgroundSecondary) {
                 Row(
-                    modifier          = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = {
-                        when (state.step) {
-                            BuilderStep.SETUP    -> onNavigateBack()
-                            BuilderStep.BUILDING -> onNavigateBack()
-                            BuilderStep.REVIEW   -> viewModel.goBackToBuilding()
-                        }
-                    }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                            tint               = mc.textSecondary,
-                        )
+                    IconButton(onClick = handleBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = mc.textSecondary)
                     }
-                    Text(
-                        text = when (state.step) {
-                            BuilderStep.SETUP    -> stringResource(R.string.deckbuilder_title)
-                            BuilderStep.BUILDING -> "${state.totalCardCount} / ${state.format.targetDeckSize}"
-                            BuilderStep.REVIEW   -> stringResource(R.string.deckbuilder_step_review)
-                        },
-                        style    = ty.titleLarge,
-                        color    = mc.textPrimary,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (state.step == BuilderStep.BUILDING) {
-                        TextButton(onClick = viewModel::goToReview) {
-                            Text(
-                                text  = stringResource(R.string.deckbuilder_step_review),
-                                color = mc.primaryAccent,
-                                style = ty.labelLarge,
-                            )
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                        Text(
+                            text = uiState.deck?.name ?: "Deck Magic",
+                            style = ty.titleMedium,
+                            color = mc.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        uiState.deck?.format?.let { fmt ->
+                            Surface(shape = RoundedCornerShape(4.dp), color = mc.goldMtg.copy(alpha = 0.15f)) {
+                                Text(
+                                    text = fmt.uppercase(),
+                                    style = ty.labelSmall,
+                                    color = mc.goldMtg,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                )
+                            }
                         }
+                    }
+                    
+                    IconButton(onClick = { showEditDeckSheet = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = mc.textSecondary)
+                    }
+                    IconButton(onClick = {
+                        val text = viewModel.exportDeckToText()
+                        if (text != null) {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, text)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Share Deck"))
+                        }
+                    }, enabled = uiState.cards.isNotEmpty()) {
+                        Icon(Icons.Default.Share, contentDescription = null, tint = mc.textSecondary)
                     }
                 }
             }
         },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    viewModel.showCollectionCards()
+                    showAddCardsSheet = true
+                },
+                containerColor = mc.primaryAccent,
+                contentColor = mc.background,
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+            }
+        }
     ) { padding ->
-        when (state.step) {
-            BuilderStep.SETUP -> SetupStep(
-                state                = state,
-                commanderResults     = commanderResults,
-                isSearchingCommander = isSearchingCommander,
-                onCommanderSearch    = viewModel::searchCommander,
-                onCommanderClear     = viewModel::clearCommanderSearch,
-                onBuild              = { name, format, commander ->
-                    viewModel.setupDeck(name, format, commander)
-                },
-                onImportDeck         = { text, name, format ->
-                    viewModel.importDeckFromText(text, name, format, onDeckSaved)
-                },
-                isImporting          = state.isLoadingCollection,
-                modifier             = Modifier.padding(padding),
-            )
-            BuilderStep.BUILDING -> {
-                BuildingStep(
-                    state                 = state,
-                    onAddToMainboard      = viewModel::addToMainboard,
-                    onAddToSideboard      = viewModel::addToSideboard,
-                    onRemoveFromMainboard = viewModel::removeFromMainboard,
-                    onRemoveNonBasicLand  = viewModel::removeNonBasicLand,
-                    onSetTab              = viewModel::setActiveTab,
-                    onToggleColorFilter   = viewModel::toggleColorFilter,
-                    onSetMaxPriceFilter   = viewModel::setMaxPriceFilter,
-                    onClearFilters        = viewModel::clearFilters,
-                    onGoToReview          = viewModel::goToReview,
-                    getFilteredCards      = { cards -> viewModel.getFilteredCards(cards, preferredCurrency) },
-                    modifier              = Modifier.padding(padding),
-                )
-            }
-            BuilderStep.REVIEW -> ReviewStep(
-                state                    = state,
-                onRemoveFromMainboard    = viewModel::removeFromMainboard,
-                onRemoveFromSideboard    = viewModel::removeFromSideboard,
-                onMoveToSideboard        = viewModel::moveToSideboard,
-                onMoveToMainboard        = viewModel::moveToMainboard,
-                onRemoveNonBasicLand     = viewModel::removeNonBasicLand,
-                onSetGroupBy             = viewModel::setReviewGroupBy,
-                onAcknowledgeOverLimit   = viewModel::acknowledgeOverLimit,
-                onUnacknowledgeOverLimit = viewModel::unacknowledgeOverLimit,
-                onSave                   = { viewModel.saveDeck(onDeckSaved) },
-                modifier                 = Modifier.padding(padding),
-            )
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Step 1 — Setup
-// ═══════════════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun SetupStep(
-    state:                DeckBuilderState,
-    commanderResults:     List<Card>,
-    isSearchingCommander: Boolean,
-    onCommanderSearch:    (String) -> Unit,
-    onCommanderClear:     () -> Unit,
-    onBuild:              (String, DeckFormat, Card?) -> Unit,
-    onImportDeck:         (text: String, deckName: String, format: DeckFormat) -> Unit,
-    isImporting:          Boolean,
-    modifier:             Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    var deckName          by remember { mutableStateOf("") }
-    var selectedFormat    by remember { mutableStateOf(DeckFormat.STANDARD) }
-    var selectedCommander by remember { mutableStateOf<Card?>(null) }
-    var showCommanderSheet by remember { mutableStateOf(false) }
-    var showImportSheet   by remember { mutableStateOf(false) }
-
-    val canBuild = deckName.isNotBlank() &&
-        (!selectedFormat.requiresCommander || selectedCommander != null)
-
-    Column(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            // Deck name
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel(stringResource(R.string.deckbuilder_setup_name_label))
-                OutlinedTextField(
-                    value         = deckName,
-                    onValueChange = { deckName = it },
-                    placeholder   = { Text(stringResource(R.string.deckbuilder_name_hint), color = mc.textDisabled) },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = mc.primaryAccent,
-                        unfocusedBorderColor = mc.surfaceVariant,
-                        focusedTextColor     = mc.textPrimary,
-                        unfocusedTextColor   = mc.textPrimary,
-                        cursorColor          = mc.primaryAccent,
-                    ),
-                    textStyle = MaterialTheme.magicTypography.bodyLarge,
-                )
-            }
-
-            // Format selector
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel(stringResource(R.string.deckbuilder_setup_format_label))
-                FormatGrid(
-                    selected = selectedFormat,
-                    onSelect = { fmt ->
-                        selectedFormat    = fmt
-                        selectedCommander = null
-                        onCommanderClear()
-                    },
-                )
-            }
-
-            // Commander search (only for Commander format)
-            if (selectedFormat.requiresCommander) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel(stringResource(R.string.deckbuilder_setup_commander_label))
-                    if (selectedCommander != null) {
-                        CommanderBanner(
-                            commander = selectedCommander!!,
-                            modifier  = Modifier.clickable { showCommanderSheet = true },
-                        )
-                    } else {
-                        OutlinedButton(
-                            onClick  = { showCommanderSheet = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            border   = androidx.compose.foundation.BorderStroke(
-                                1.dp, mc.primaryAccent.copy(alpha = 0.6f)
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                        ) {
-                            Text(
-                                text  = stringResource(R.string.deckbuilder_search_commander_hint),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                                color = mc.primaryAccent,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Bottom action buttons
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(mc.background)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Button(
-                onClick  = { onBuild(deckName, selectedFormat, selectedCommander) },
-                enabled  = canBuild && !isImporting,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor         = mc.primaryAccent,
-                    disabledContainerColor = mc.surfaceVariant,
-                ),
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text(
-                    text  = stringResource(R.string.deckbuilder_setup_build_button),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = if (canBuild && !isImporting) mc.background else mc.textDisabled,
-                )
-            }
-
-            OutlinedButton(
-                onClick  = { showImportSheet = true },
-                enabled  = !isImporting,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape    = RoundedCornerShape(8.dp),
-                border   = androidx.compose.foundation.BorderStroke(
-                    1.dp, mc.primaryAccent.copy(alpha = 0.5f)
-                ),
-            ) {
-                if (isImporting) {
-                    CircularProgressIndicator(
-                        color    = mc.primaryAccent,
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text  = stringResource(R.string.deck_import_loading),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.primaryAccent,
-                    )
-                } else {
-                    Text(
-                        text  = stringResource(R.string.deck_import_button_setup),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.primaryAccent,
-                    )
-                }
-            }
-        }
-    }
-
-    if (showImportSheet) {
-        DeckImportSheet(
-            isLoading = isImporting,
-            error     = null,
-            onImport  = { text ->
-                onImportDeck(text, deckName, selectedFormat)
-                showImportSheet = false
+        ViewStepContent(
+            uiState = uiState,
+            viewModel = viewModel,
+            onCardClick = { id ->
+                // Cards tapped from the main deck list are never in commander-selection context.
+                isCardDetailInCommanderContext = false
+                selectedCardId = id
             },
-            onDismiss = { showImportSheet = false },
+            onAddBasicLands = { showBasicLandsSheet = true },
+            onChooseCommander = {
+                viewModel.showCollectionCards()
+                showCommanderSearchSheet = true
+            },
+            modifier = Modifier.padding(padding)
         )
     }
 
-    if (showCommanderSheet) {
-        CommanderSearchSheet(
-            results       = commanderResults,
-            isSearching   = isSearchingCommander,
-            onQueryChange = onCommanderSearch,
-            onSelectCard  = { card ->
-                selectedCommander  = card
-                showCommanderSheet = false
-                onCommanderClear()
+    if (uiState.showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDiscardDialog,
+            title = { Text(stringResource(R.string.deckbuilder_discard_dialog_title)) },
+            text = { Text(stringResource(R.string.deckbuilder_discard_dialog_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.discardChanges { onBack() } }) {
+                    Text(stringResource(R.string.deckbuilder_discard_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDiscardDialog) {
+                    Text(stringResource(R.string.deckbuilder_discard_cancel))
+                }
+            },
+            containerColor = mc.backgroundSecondary,
+            titleContentColor = mc.textPrimary,
+            textContentColor = mc.textSecondary,
+        )
+    }
+
+    if (showEditDeckSheet) {
+        EditDeckSheet(
+            deck = uiState.deck,
+            cards = uiState.cards,
+            onSave = { newName, newCoverId ->
+                if (newName != null) viewModel.updateDeckName(newName)
+                if (newCoverId != null) viewModel.setCoverCard(newCoverId)
+                showEditDeckSheet = false
+            },
+            onDismiss = { showEditDeckSheet = false },
+        )
+    }
+
+    if (showBasicLandsSheet) {
+        BasicLandsSheet(
+            uiState = uiState,
+            onAddBasicLand = viewModel::addBasicLandByName,
+            onRemoveBasicLand = viewModel::removeBasicLandByName,
+            viewModel = viewModel,
+            onDismiss = { showBasicLandsSheet = false },
+        )
+    }
+
+    if (showAddCardsSheet) {
+        CardSearchSheet(
+            uiState = uiState,
+            isCommanderMode = false,
+            onQueryChange = viewModel::onAddCardsQueryChange,
+            onScryfallSearch = viewModel::searchScryfallDirect,
+            onAdd = viewModel::addCardToDeck,
+            onRemove = viewModel::removeCardFromDeck,
+            onCardClick = { id ->
+                // Regular add-cards flow: no commander context.
+                isCardDetailInCommanderContext = false
+                selectedCardId = id
             },
             onDismiss = {
-                showCommanderSheet = false
-                onCommanderClear()
+                showAddCardsSheet = false
+                viewModel.clearAddCardsState()
+            },
+        )
+    }
+
+    if (showCommanderSearchSheet) {
+        CardSearchSheet(
+            uiState = uiState,
+            isCommanderMode = true,
+            onQueryChange = viewModel::searchCommander,
+            onScryfallSearch = viewModel::searchCommander,
+            onAdd = { id ->
+                // Direct add from the list row: resolve card and assign as commander.
+                (uiState.addCardsResults + uiState.scryfallResults).find { it.card.scryfallId == id }?.card?.let { card ->
+                    viewModel.setCommander(card)
+                    showCommanderSearchSheet = false
+                }
+            },
+            onRemove = { /* No-op in commander selection mode */ },
+            onCardClick = { id ->
+                // Open detail sheet with the commander-selection context flag active.
+                isCardDetailInCommanderContext = true
+                selectedCardId = id
+            },
+            onDismiss = {
+                showCommanderSearchSheet = false
+                viewModel.clearCommanderSearch()
+            }
+        )
+    }
+
+    if (selectedDeckCard != null) {
+        // Load tags and other details
+        LaunchedEffect(selectedDeckCard.scryfallId) {
+            viewModel.loadCardDetails(selectedDeckCard.scryfallId)
+        }
+
+        val isAlreadyCommander = uiState.commanderCard?.scryfallId == selectedDeckCard.scryfallId
+
+        CardDetailSheet(
+            deckCard = selectedDeckCard,
+            isCommander = isAlreadyCommander,
+            isCommanderSelectionContext = isCardDetailInCommanderContext,
+            tags = uiState.detailTags,
+            onAdd = {
+                // In commander-selection context, "add" means "set as commander", not add to mainboard.
+                if (isCardDetailInCommanderContext) {
+                    selectedDeckCard.card?.let { card -> viewModel.setCommander(card) }
+                    selectedCardId = null
+                    isCardDetailInCommanderContext = false
+                    showCommanderSearchSheet = false
+                } else {
+                    viewModel.addCardToDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard)
+                }
+            },
+            onRemove = { viewModel.removeCardFromDeck(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard) },
+            onDelete = {
+                viewModel.removeCard(selectedDeckCard.scryfallId, selectedDeckCard.isSideboard)
+                selectedCardId = null
+                isCardDetailInCommanderContext = false
+            },
+            onChooseAsCommander = { card ->
+                viewModel.setCommander(card)
+                selectedCardId = null
+                isCardDetailInCommanderContext = false
+                showCommanderSearchSheet = false
+            },
+            onRemoveCommander = {
+                viewModel.removeCommander()
+                selectedCardId = null
+                isCardDetailInCommanderContext = false
+            },
+            onDismiss = {
+                selectedCardId = null
+                isCardDetailInCommanderContext = false
             },
         )
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FormatGrid(
-    selected: DeckFormat,
-    onSelect: (DeckFormat) -> Unit,
-) {
-    val mc   = MaterialTheme.magicColors
-    val rows = DeckFormat.entries.chunked(4)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { fmt ->
-                    val sel = fmt == selected
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier         = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (sel) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface)
-                            .border(
-                                width = if (sel) 1.5.dp else 0.5.dp,
-                                color = if (sel) mc.primaryAccent else mc.surfaceVariant,
-                                shape = RoundedCornerShape(8.dp),
-                            )
-                            .clickable { onSelect(fmt) }
-                            .padding(vertical = 10.dp),
-                    ) {
-                        Text(
-                            text      = stringResource(fmt.displayNameRes),
-                            style     = MaterialTheme.magicTypography.labelMedium,
-                            color     = if (sel) mc.primaryAccent else mc.textSecondary,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                // Pad last row if uneven
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Step 2 — Building
-// ═══════════════════════════════════════════════════════════════════════════════
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun BuildingStep(
-    state:                DeckBuilderState,
-    onAddToMainboard:     (DeckCard) -> Unit,
-    onAddToSideboard:     (DeckCard) -> Unit,
-    onRemoveFromMainboard:(String) -> Unit,
-    onRemoveNonBasicLand: (String) -> Unit,
-    onSetTab:             (BuilderTab) -> Unit,
-    onToggleColorFilter:  (String) -> Unit,
-    onSetMaxPriceFilter:  (Double?) -> Unit,
-    onClearFilters:       () -> Unit,
-    onGoToReview:         () -> Unit,
-    getFilteredCards:     (List<DeckCard>) -> List<DeckCard>,
-    modifier:             Modifier,
+private fun ViewStepContent(
+    uiState: DeckMagicDetailUiState,
+    viewModel: DeckMagicDetailViewModel,
+    onCardClick: (String) -> Unit,
+    onAddBasicLands: () -> Unit,
+    onChooseCommander: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
-    val sourceCards = when (state.activeTab) {
-        BuilderTab.MY_COLLECTION       -> state.collectionCards
-        BuilderTab.SCRYFALL_SUGGESTIONS -> state.suggestions
-    }
-    val visibleCards = remember(sourceCards, state.filterColors, state.filterType, state.filterMaxCmc, state.filterMaxPrice) {
-        getFilteredCards(sourceCards)
-    }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        // Progress bar
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(mc.backgroundSecondary)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    "${state.totalCardCount} / ${state.format.targetDeckSize}",
-                    style = ty.labelLarge,
-                    color = mc.textSecondary,
-                )
-                Text(
-                    "${(state.completionPercent * 100).toInt()}%",
-                    style = ty.labelLarge,
-                    color = mc.primaryAccent,
-                )
+    AnimatedContent(
+        targetState = uiState.isLoading,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+        },
+        label = "LoadingTransition"
+    ) { isLoading ->
+        if (isLoading) {
+            Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = mc.primaryAccent)
             }
-            LinearProgressIndicator(
-                progress   = { state.completionPercent },
-                modifier   = Modifier.fillMaxWidth().height(3.dp)
-                    .clip(RoundedCornerShape(2.dp)),
-                color      = mc.primaryAccent,
-                trackColor = mc.surfaceVariant,
-            )
-        }
-
-        // Main scrollable content
-        LazyColumn(
-            modifier       = Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = 80.dp),
-        ) {
-            // Commander banner
-            state.commander?.let { cmdr ->
-                item {
-                    CommanderBanner(
-                        commander = cmdr,
-                        modifier  = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-            }
-
-            // Mainboard quick-view
-            if (state.mainboard.isNotEmpty()) {
-                item {
-                    SectionLabel(
-                        text     = "${stringResource(R.string.deckbuilder_step_building)} · ${state.nonLandCardCount}",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-                items(state.mainboard, key = { "main_${it.card.scryfallId}" }) { dc ->
-                    DeckCardRow(
-                        deckCard = dc,
-                        onRemove = { onRemoveFromMainboard(dc.card.scryfallId) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                    )
-                }
-            }
-
-            // Lands
-            if (state.nonBasicLands.isNotEmpty() || state.basicLands.total > 0) {
-                item {
-                    LandsSection(
-                        nonBasicLands    = state.nonBasicLands,
-                        basicLands       = state.basicLands,
-                        onRemoveNonBasic = onRemoveNonBasicLand,
-                        modifier         = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-            }
-
-            // Divider & tab row
-            item {
-                Spacer(Modifier.height(8.dp))
-                TabRow(
-                    selectedTabIndex = state.activeTab.ordinal,
-                    containerColor   = mc.backgroundSecondary,
-                    contentColor     = mc.primaryAccent,
-                    modifier         = Modifier.fillMaxWidth(),
+        } else {
+            Box(modifier.fillMaxSize()) {
+                val mainboardCards = uiState.cards.filter { !it.isSideboard }
+                val sideboardCards = uiState.cards.filter { it.isSideboard }.sortedBy { it.card?.name }
+                val isCommanderFormat = viewModel.deckFormat == DeckFormat.COMMANDER
+                
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    BuilderTab.entries.forEach { tab ->
-                        Tab(
-                            selected = state.activeTab == tab,
-                            onClick  = { onSetTab(tab) },
-                            text     = {
+                    item(key = "summary") {
+                        val targetCount = when (viewModel.deckFormat) {
+                            DeckFormat.COMMANDER -> 100
+                            else -> 60
+                        }
+                        val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
+                        val deckCards = (uiState.cards + listOfNotNull(uiState.commanderCard))
+                            .filter { it.card != null && !it.isSideboard && !BasicLandCalculator.isLand(it.card!!) }
+                            .map { DeckCard(it.card!!, it.quantity, it.scryfallId in uiState.collectionIds) }
+                        
+                        DeckSummaryCard(
+                            totalCards = uiState.totalCards,
+                            targetCount = targetCount,
+                            manaCurve = uiState.manaCurve,
+                            maxInCurve = maxInCurve,
+                            deckCards = deckCards,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).animateItem()
+                        )
+                    }
+
+                    item(key = "grouping_selector") {
+                        Column(Modifier.padding(horizontal = 16.dp).animateItem()) {
+                            GroupingFlowSelector(
+                                selected = uiState.groupingMode,
+                                onSelect = viewModel::setGroupingMode
+                            )
+                        }
+                    }
+
+                    // ── Commander Section ─────────────────────────────────────────
+                    if (isCommanderFormat) {
+                        item(key = "commander_section") {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp).animateItem()) {
                                 Text(
-                                    text  = when (tab) {
-                                        BuilderTab.MY_COLLECTION        -> stringResource(R.string.deckbuilder_tab_collection)
-                                        BuilderTab.SCRYFALL_SUGGESTIONS -> stringResource(R.string.deckbuilder_tab_suggestions)
-                                    },
-                                    style = MaterialTheme.magicTypography.labelMedium,
+                                    text = "Commander",
+                                    style = ty.titleMedium,
+                                    color = mc.goldMtg,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 8.dp)
                                 )
-                            },
-                        )
-                    }
-                }
-            }
-
-            // Filters
-            item {
-                BuildingFilters(
-                    selectedColors   = state.filterColors,
-                    maxPrice         = state.filterMaxPrice,
-                    onToggleColor    = onToggleColorFilter,
-                    onMaxPriceChange = onSetMaxPriceFilter,
-                    onClearFilters   = onClearFilters,
-                    modifier         = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-
-            // Card list
-            when {
-                (state.activeTab == BuilderTab.MY_COLLECTION && state.isLoadingCollection) ||
-                (state.activeTab == BuilderTab.SCRYFALL_SUGGESTIONS && state.isLoadingSuggestions) -> {
-                    item {
-                        Box(
-                            modifier         = Modifier.fillMaxWidth().height(120.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(color = mc.primaryAccent)
-                        }
-                    }
-                }
-                visibleCards.isEmpty() -> {
-                    item {
-                        Text(
-                            text     = stringResource(R.string.deckbuilder_no_cards),
-                            style    = MaterialTheme.magicTypography.bodyMedium,
-                            color    = mc.textDisabled,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
-                        )
-                    }
-                }
-                else -> {
-                    items(visibleCards, key = { "${state.activeTab}_${it.card.scryfallId}" }) { dc ->
-                        DeckCardRow(
-                            deckCard = dc,
-                            onAdd    = { onAddToMainboard(dc) },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-            }
-        }
-
-        // Bottom summary bar
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(mc.backgroundSecondary)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        ) {
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column {
-                    Text(
-                        text  = stringResource(
-                            R.string.deckbuilder_format_total_cards,
-                            state.totalCardCount
-                        ),
-                        style = ty.labelLarge,
-                        color = mc.textPrimary,
-                    )
-                    Text(
-                        text  = stringResource(
-                            R.string.deckbuilder_lands,
-                        ) + ": ${state.totalLandCount}",
-                        style = ty.labelSmall,
-                        color = mc.textSecondary,
-                    )
-                }
-                Button(
-                    onClick  = onGoToReview,
-                    colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                    shape    = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(40.dp),
-                ) {
-                    Text(
-                        text  = stringResource(R.string.deckbuilder_step_review),
-                        style = ty.labelLarge,
-                        color = mc.background,
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Step 3 — Review
-// ═══════════════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun ReviewStep(
-    state:                    DeckBuilderState,
-    onRemoveFromMainboard:    (String) -> Unit,
-    onRemoveFromSideboard:    (String) -> Unit,
-    onMoveToSideboard:        (String) -> Unit,
-    onMoveToMainboard:        (String) -> Unit,
-    onRemoveNonBasicLand:     (String) -> Unit,
-    onSetGroupBy:             (ReviewGroupBy) -> Unit,
-    onAcknowledgeOverLimit:   (String) -> Unit,
-    onUnacknowledgeOverLimit: (String) -> Unit,
-    onSave:                   () -> Unit,
-    modifier:                 Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
-    // Group mainboard
-    val grouped = remember(state.mainboard, state.reviewGroupBy) {
-        when (state.reviewGroupBy) {
-            ReviewGroupBy.TYPE   -> state.mainboard.groupBy { cardTypeLabel(it.card.typeLine) }
-            ReviewGroupBy.COLOR  -> state.mainboard.groupBy { mainColorLabel(it.card.colors) }
-            ReviewGroupBy.CMC    -> state.mainboard.groupBy { cmcLabel(it.card.cmc) }
-            ReviewGroupBy.RARITY -> state.mainboard.groupBy { it.card.rarity.replaceFirstChar { c -> c.uppercase() } }
-        }
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier       = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            // Mana curve chart
-            item {
-                ManaCurveChart(
-                    cards    = state.mainboard,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                )
-            }
-
-            // Group-by selector
-            item {
-                Row(
-                    modifier              = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment     = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text  = "Group:",
-                        style = ty.labelSmall,
-                        color = mc.textDisabled,
-                    )
-                    ReviewGroupBy.entries.forEach { g ->
-                        val sel = g == state.reviewGroupBy
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (sel) mc.primaryAccent.copy(0.15f) else mc.surface)
-                                .border(
-                                    width = if (sel) 1.dp else 0.dp,
-                                    color = if (sel) mc.primaryAccent else mc.surface,
-                                    shape = RoundedCornerShape(6.dp),
-                                )
-                                .clickable { onSetGroupBy(g) }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                        ) {
-                            Text(
-                                text  = when (g) {
-                                    ReviewGroupBy.TYPE   -> stringResource(R.string.deckbuilder_group_type)
-                                    ReviewGroupBy.COLOR  -> stringResource(R.string.deckbuilder_group_color)
-                                    ReviewGroupBy.CMC    -> stringResource(R.string.deckbuilder_group_cmc)
-                                    ReviewGroupBy.RARITY -> stringResource(R.string.deckbuilder_group_rarity)
-                                },
-                                style = ty.labelSmall,
-                                color = if (sel) mc.primaryAccent else mc.textSecondary,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Grouped mainboard sections
-            grouped.entries.sortedBy { it.key }.forEach { (groupLabel, cards) ->
-                item(key = "group_$groupLabel") {
-                    SectionLabel(
-                        text     = "$groupLabel (${cards.sumOf { it.quantity }})",
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                    )
-                }
-                items(cards, key = { "main_${it.card.scryfallId}" }) { dc ->
-                    Column {
-                        Row(
-                            modifier              = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment     = Alignment.CenterVertically,
-                        ) {
-                            DeckCardRow(
-                                deckCard = dc,
-                                onRemove = { onRemoveFromMainboard(dc.card.scryfallId) },
-                                modifier = Modifier.weight(1f),
-                            )
-                            // Move to sideboard button
-                            TextButton(
-                                onClick  = { onMoveToSideboard(dc.card.scryfallId) },
-                                modifier = Modifier.width(48.dp),
-                            ) {
-                                Text("SB", style = ty.labelSmall, color = mc.secondaryAccent)
+                                if (uiState.commanderCard != null) {
+                                    uiState.commanderCard.card?.let { card ->
+                                        CommanderBanner(
+                                            commander = card,
+                                            modifier = Modifier.clickable { onCardClick(uiState.commanderCard.scryfallId) }
+                                        )
+                                    }
+                                    WarningOverlay(uiState.commanderCard, uiState, viewModel, isCommander = true)
+                                    TextButton(
+                                        onClick = viewModel::removeCommander,
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("Remove Commander", style = ty.labelSmall, color = mc.lifeNegative)
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = onChooseCommander,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Choose Commander", style = ty.labelLarge)
+                                    }
+                                }
                             }
                         }
-                        // Copy limit warning for standard-like formats
-                        if (dc.card.scryfallId in state.overLimitCards) {
-                            val isAcknowledged = dc.card.scryfallId in state.acknowledgedOverLimitCards
-                            Surface(
-                                shape    = RoundedCornerShape(6.dp),
-                                color    = if (isAcknowledged) mc.surface else mc.lifeNegative.copy(alpha = 0.1f),
-                                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp, bottom = 4.dp),
+                    }
+
+                    // ── Mainboard Section ─────────────────────────────────────────
+                    item(key = "mainboard_header") {
+                        MainSectionHeader(
+                            title = stringResource(R.string.deckdetail_tab_mainboard, mainboardCards.sumOf { it.quantity }),
+                            expanded = uiState.mainboardExpanded,
+                            onToggle = viewModel::toggleMainboard,
+                            modifier = Modifier.padding(horizontal = 0.dp).animateItem()
+                        )
+                    }
+
+                    if (uiState.mainboardExpanded) {
+                        val groupedMain = groupCards(mainboardCards, uiState.groupingMode)
+                        groupedMain.forEach { (groupLabel, cards) ->
+                            val isLandGroup = groupLabel == "Lands" || groupLabel == "Land"
+                            item(key = "main_header_$groupLabel") {
+                                GroupHeader(
+                                    label = groupLabel, 
+                                    count = cards.sumOf { it.quantity },
+                                    showSuggestionToggle = isLandGroup,
+                                    isSuggestionEnabled = uiState.showLandSuggestions,
+                                    onToggleSuggestion = viewModel::toggleLandSuggestions,
+                                    modifier = Modifier.padding(horizontal = 16.dp).animateItem()
+                                )
+                            }
+                            
+                            if (isLandGroup) {
+                                item(key = "main_lands_logic") {
+                                    Column(Modifier.animateItem()) {
+                                        AnimatedVisibility(
+                                            visible = uiState.showLandSuggestions && uiState.landDeltas.isNotEmpty(),
+                                            enter = expandVertically() + fadeIn(),
+                                            exit = shrinkVertically() + fadeOut()
+                                        ) {
+                                            MagicLandSuggestionStatic(
+                                                deltas = uiState.landDeltas,
+                                                onClick = viewModel::applyLandSuggestions,
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                        AddBasicLandsRow(onClick = onAddBasicLands, modifier = Modifier.padding(horizontal = 16.dp))
+                                    }
+                                }
+                            }
+
+                            items(cards, key = { "main_" + it.scryfallId + groupLabel }) { entry ->
+                                Column(Modifier.animateItem()) {
+                                    CardRow(
+                                        entry = entry,
+                                        isInCollection = entry.scryfallId in uiState.collectionIds,
+                                        onClick = { onCardClick(entry.scryfallId) },
+                                        onRemove = { viewModel.removeCard(entry.scryfallId) },
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    
+                                    val qtyInSideboard = uiState.cards.find { it.scryfallId == entry.scryfallId && it.isSideboard }?.quantity ?: 0
+                                    MovementRow(
+                                        labelTo = "1x To Sideboard",
+                                        onMoveTo = { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) },
+                                        labelFrom = if (qtyInSideboard > 0) "1x From Sideboard" else null,
+                                        onMoveFrom = if (qtyInSideboard > 0) {
+                                            { viewModel.moveQuantityToMainboard(entry.scryfallId, 1) }
+                                        } else null,
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    
+                                    WarningOverlay(entry, uiState, viewModel)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Sideboard Section ─────────────────────────────────────────
+                    item(key = "sideboard_header") {
+                        MainSectionHeader(
+                            title = stringResource(R.string.deckdetail_tab_sideboard, sideboardCards.sumOf { it.quantity }),
+                            expanded = uiState.sideboardExpanded,
+                            onToggle = viewModel::toggleSideboard,
+                            modifier = Modifier.padding(horizontal = 0.dp).animateItem()
+                        )
+                    }
+
+                    if (uiState.sideboardExpanded) {
+                        if (sideboardCards.isEmpty()) {
+                            item(key = "sideboard_empty") {
+                                Text(
+                                    text = "No cards in sideboard",
+                                    style = ty.labelSmall,
+                                    color = mc.textDisabled,
+                                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp).animateItem()
+                                )
+                            }
+                        } else {
+                            items(sideboardCards, key = { "side_" + it.scryfallId }) { entry ->
+                                Column(Modifier.animateItem()) {
+                                    CardRow(
+                                        entry = entry,
+                                        isInCollection = entry.scryfallId in uiState.collectionIds,
+                                        onClick = { onCardClick(entry.scryfallId) },
+                                        onRemove = { viewModel.removeCard(entry.scryfallId, true) },
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    val qtyInMainboard = uiState.cards.find { it.scryfallId == entry.scryfallId && !it.isSideboard }?.quantity ?: 0
+                                    MovementRow(
+                                        labelTo = "1x To Mainboard",
+                                        onMoveTo = { viewModel.moveQuantityToMainboard(entry.scryfallId, 1) },
+                                        labelFrom = if (qtyInMainboard > 0) "1x From Sideboard" else null,
+                                        onMoveFrom = if (qtyInMainboard > 0) {
+                                            { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) }
+                                        } else null,
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item(key = "save_section") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .animateItem(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Reactive save button:
+                            // - Dirty state  (hasUnsavedChanges=true):  highlighted with primaryAccent, label "Save changes"
+                            // - Clean state  (hasUnsavedChanges=false): visually neutral, label "Saved", disabled
+                            val hasDirtyChanges = uiState.hasUnsavedChanges
+                            val saveEnabled = uiState.totalCards > 0 && !uiState.isSaving && hasDirtyChanges
+                            Button(
+                                onClick = { viewModel.saveDeck { /* Stay on screen after save */ } },
+                                enabled = saveEnabled,
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = mc.primaryAccent,
+                                    disabledContainerColor = if (hasDirtyChanges) mc.surfaceVariant else mc.surfaceVariant.copy(alpha = 0.5f),
+                                ),
+                                shape = RoundedCornerShape(8.dp),
                             ) {
-                                Row(
-                                    modifier          = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                if (uiState.isSaving) {
+                                    CircularProgressIndicator(color = mc.background, modifier = Modifier.size(24.dp))
+                                } else {
+                                    val saveLabel = when {
+                                        hasDirtyChanges -> stringResource(R.string.deckbuilder_save_changes_button)
+                                        else -> stringResource(R.string.deckbuilder_saved_button)
+                                    }
+                                    Text(
+                                        text = saveLabel,
+                                        style = ty.titleMedium,
+                                        color = if (saveEnabled) mc.background else mc.textDisabled,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WarningOverlay(
+    entry: DeckSlotEntry,
+    uiState: DeckMagicDetailUiState,
+    viewModel: DeckMagicDetailViewModel,
+    isCommander: Boolean = false
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    
+    val isOverLimit = entry.scryfallId in uiState.overLimitCards
+    val isInvalidIdentity = entry.scryfallId in uiState.invalidColorIdentityCards
+    val isNonLegendaryCommander = isCommander && uiState.isCommanderInvalid
+
+    AnimatedVisibility(
+        visible = isOverLimit || isInvalidIdentity || isNonLegendaryCommander,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut()
+    ) {
+        val isAck = entry.scryfallId in uiState.acknowledgedOverLimitCards
+        val limitInt = viewModel.deckFormat?.maxCopies ?: 4
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = if (isAck) mc.surface else mc.lifeNegative.copy(alpha = 0.1f),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+        ) {
+            Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                val warningText = when {
+                    isNonLegendaryCommander -> "Possibly invalid commander: Must be Legendary"
+                    isOverLimit && isInvalidIdentity -> "Exceeds limit ($limitInt) & Invalid color identity"
+                    isOverLimit -> stringResource(R.string.deckbuilder_copy_warning, limitInt)
+                    else -> "Invalid color identity for this commander"
+                }
+                Text(
+                    warningText,
+                    style = ty.labelSmall,
+                    color = if (isAck) mc.textSecondary else mc.lifeNegative,
+                    modifier = Modifier.weight(1f)
+                )
+                Checkbox(
+                    checked = isAck,
+                    onCheckedChange = { if (it) viewModel.acknowledgeOverLimit(entry.scryfallId) else viewModel.unacknowledgeOverLimit(entry.scryfallId) },
+                    colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent, uncheckedColor = mc.lifeNegative)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainSectionHeader(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "HeaderRotation"
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = ty.titleMedium, color = mc.primaryAccent, fontWeight = FontWeight.Bold)
+
+        Spacer(Modifier.weight(1f))
+        Icon(
+            Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = mc.primaryAccent,
+            modifier = Modifier.graphicsLayer { rotationZ = rotation }
+        )
+    }
+}
+
+
+
+@Composable
+private fun MovementRow(
+    labelTo: String,
+    onMoveTo: () -> Unit,
+    labelFrom: String? = null,
+    onMoveFrom: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Left Action: Move To [Other]
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable(onClick = onMoveTo)
+                .padding(vertical = 4.dp, horizontal = 4.dp)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.CompareArrows,
+                null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(labelTo, style = ty.labelSmall, color = mc.primaryAccent)
+        }
+
+        // Right Action: Move From [Other] (if applicable)
+        if (labelFrom != null && onMoveFrom != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(onClick = onMoveFrom)
+                    .padding(vertical = 4.dp, horizontal = 4.dp)
+            ) {
+                Text(labelFrom, style = ty.labelSmall, color = mc.secondaryAccent)
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    Icons.AutoMirrored.Filled.CompareArrows,
+                    null,
+                    tint = mc.secondaryAccent,
+                    modifier = Modifier.size(16.dp).graphicsLayer { rotationY = 180f }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GroupingFlowSelector(
+    selected: GroupingMode,
+    onSelect: (GroupingMode) -> Unit
+) {
+    val mc = MaterialTheme.magicColors
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        GroupingMode.entries.forEach { mode ->
+            val label = when (mode) {
+                GroupingMode.COST -> "Cost"
+                else -> mode.name.lowercase().replaceFirstChar { it.uppercase() }
+            }
+            FilterChip(
+                selected = mode == selected,
+                onClick = { onSelect(mode) },
+                label = { Text(label) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = mc.primaryAccent,
+                    selectedLabelColor = mc.background
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun GroupHeader(
+    label: String, 
+    count: Int,
+    modifier: Modifier = Modifier,
+    showSuggestionToggle: Boolean = false,
+    isSuggestionEnabled: Boolean = true,
+    onToggleSuggestion: () -> Unit = {},
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Row(
+        modifier = modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val colorName = when(label) {
+            "W" -> "White"
+            "U" -> "Blue"
+            "B" -> "Black"
+            "R" -> "Red"
+            "G" -> "Green"
+            else -> label
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (label.length == 1 && label[0] in "WUBRG") {
+                ManaSymbolImage(token = label, size = 20.dp)
+            }
+            Text(colorName, style = ty.titleMedium, color = mc.goldMtg)
+            Text("($count)", style = ty.bodyMedium, color = mc.textSecondary)
+        }
+        
+        if (showSuggestionToggle) {
+            TextButton(
+                onClick = onToggleSuggestion,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                val text = if (isSuggestionEnabled) "Disable suggestions" else "Enable suggestions"
+                Text(text = text, style = ty.labelSmall, color = mc.primaryAccent)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardRow(
+    entry: DeckSlotEntry,
+    isInCollection: Boolean,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = mc.surface,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            AsyncImage(
+                model = entry.card?.imageNormal,
+                contentDescription = null,
+                modifier = Modifier.size(width = 44.dp, height = 60.dp).clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    entry.card?.name ?: "Unknown", 
+                    style = ty.bodyMedium, 
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                entry.card?.typeLine?.let {
+                    Text(it, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                entry.card?.manaCost?.let {
+                    ManaCostImages(manaCost = it, symbolSize = 14.dp)
+                }
+            }
+            if (entry.quantity > 1) {
+                Surface(shape = RoundedCornerShape(4.dp), color = mc.primaryAccent.copy(alpha = 0.2f)) {
+                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                }
+            }
+            if (isInCollection) {
+                Icon(Icons.Default.Star, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(14.dp))
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun CardDetailSheet(
+    deckCard: DeckSlotEntry,
+    /** True when this card IS the current deck commander. */
+    isCommander: Boolean,
+    /**
+     * True when the sheet was opened from the "Choose Commander" search flow.
+     * In this context the +/- counter is hidden and commander-specific action
+     * buttons are shown instead.
+     */
+    isCommanderSelectionContext: Boolean,
+    tags: List<com.mmg.manahub.core.domain.model.CardTag>,
+    onAdd: () -> Unit,
+    onRemove: () -> Unit,
+    onDelete: () -> Unit,
+    /** Called with the resolved Card when the user taps "Choose as commander". */
+    onChooseAsCommander: (com.mmg.manahub.core.domain.model.Card) -> Unit,
+    /** Called when the user taps "Remove commander" inside the commander-selection context. */
+    onRemoveCommander: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val card = deckCard.card
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var showBackFace by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.background,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 32.dp),
+        ) {
+            if (card != null) {
+                val hasBackFace = !card.imageBackNormal.isNullOrBlank()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val rotation by animateFloatAsState(
+                        targetValue = if (showBackFace) -180f else 0f,
+                        animationSpec = tween(durationMillis = 500),
+                        label = "CardFlip"
+                    )
+
+                    Box(
+                        modifier = Modifier.fillMaxWidth(0.75f).aspectRatio(0.716f).graphicsLayer {
+                            rotationY = rotation
+                            cameraDistance = 12f * density
+                        }.clip(RoundedCornerShape(12.dp)).then(
+                            if (hasBackFace) Modifier.clickable { showBackFace = !showBackFace } else Modifier
+                        ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current).data(card.imageNormal ?: card.imageArtCrop).crossfade(true).build(),
+                            contentDescription = card.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (rotation >= -90f) 1f else 0f },
+                        )
+                        if (hasBackFace) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current).data(card.imageBackNormal).crossfade(true).build(),
+                                contentDescription = card.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f; alpha = if (rotation < -90f) 1f else 0f },
+                            )
+                        }
+                    }
+                }
+
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val displayName = card.printedName?.takeIf { it.isNotBlank() } ?: card.name
+                        Text(displayName, style = ty.titleMedium, color = mc.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        card.manaCost?.let { ManaCostImages(manaCost = it, symbolSize = 18.dp) }
+                    }
+                    val typeLine = card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
+                    Text(typeLine, style = ty.labelMedium, color = mc.textSecondary)
+                    HorizontalDivider(color = mc.surfaceVariant)
+
+                    val oracleDisplayText = card.oracleText?.takeIf { it.isNotBlank() } ?: card.printedText ?: ""
+                    OracleText(text = oracleDisplayText, style = MaterialTheme.typography.bodySmall)
+
+                    // Tag section
+                    if (tags.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            tags.forEach { tag ->
+                                Surface(
+                                    color = mc.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(4.dp),
+                                    border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f))
                                 ) {
                                     Text(
-                                        text  = stringResource(R.string.deckbuilder_copy_warning, state.format.maxCopies),
+                                        text = tag.label,
                                         style = ty.labelSmall,
-                                        color = if (isAcknowledged) mc.textDisabled else mc.lifeNegative,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Checkbox(
-                                        checked         = isAcknowledged,
-                                        onCheckedChange = { checked ->
-                                            if (checked) onAcknowledgeOverLimit(dc.card.scryfallId)
-                                            else onUnacknowledgeOverLimit(dc.card.scryfallId)
-                                        },
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor   = mc.primaryAccent,
-                                            uncheckedColor = mc.lifeNegative,
-                                            checkmarkColor = mc.background,
-                                        ),
-                                        modifier = Modifier.size(20.dp),
+                                        color = mc.textSecondary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
                             }
@@ -758,133 +975,510 @@ private fun ReviewStep(
                 }
             }
 
-            // Lands section
-            if (state.nonBasicLands.isNotEmpty() || state.basicLands.total > 0) {
-                item {
-                    LandsSection(
-                        nonBasicLands    = state.nonBasicLands,
-                        basicLands       = state.basicLands,
-                        onRemoveNonBasic = onRemoveNonBasicLand,
-                        modifier         = Modifier.padding(top = 8.dp),
-                    )
+            // ── Action area ───────────────────────────────────────────────────
+            when {
+                // Case 1: This sheet is in the "Choose Commander" search flow.
+                isCommanderSelectionContext -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (isCommander) {
+                            // Card is already the commander — show current status badge.
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = mc.goldMtg.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(Icons.Default.Star, null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.deckbuilder_commander_label).uppercase(),
+                                        style = ty.labelLarge,
+                                        color = mc.goldMtg,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            // Remove commander option below the status badge.
+                            OutlinedButton(
+                                onClick = onRemoveCommander,
+                                modifier = Modifier.fillMaxWidth(),
+                                border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.deckbuilder_remove_commander),
+                                    color = mc.lifeNegative,
+                                    style = ty.labelLarge
+                                )
+                            }
+                        } else {
+                            // Card is not yet the commander — golden "Choose as commander" CTA.
+                            if (card != null) {
+                                Button(
+                                    onClick = { onChooseAsCommander(card) },
+                                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Star, null, tint = mc.background, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.deckbuilder_choose_as_commander),
+                                        style = ty.titleMedium,
+                                        color = mc.background,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Case 2: Card is the current commander, viewed from the normal deck list.
+                isCommander -> {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = mc.goldMtg.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Star, null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.deckbuilder_commander_label).uppercase(),
+                                style = ty.labelLarge,
+                                color = mc.goldMtg,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Case 3: Regular card in the deck — show the +/- quantity counter.
+                else -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.deckdetail_in_deck_label),
+                            style = ty.labelMedium,
+                            color = mc.textSecondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onRemove, enabled = deckCard.quantity > 0) {
+                            Icon(
+                                Icons.Default.Remove,
+                                contentDescription = null,
+                                tint = if (deckCard.quantity > 0) mc.primaryAccent else mc.textDisabled
+                            )
+                        }
+                        Surface(shape = RoundedCornerShape(8.dp), color = mc.primaryAccent.copy(alpha = 0.15f)) {
+                            Text(
+                                text = "${deckCard.quantity}",
+                                style = ty.titleMedium,
+                                color = mc.primaryAccent,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
+                        }
+                        IconButton(onClick = onAdd) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = mc.primaryAccent)
+                        }
+                    }
                 }
             }
 
-            // Sideboard
-            if (state.sideboard.isNotEmpty()) {
-                item {
-                    SectionLabel(
-                        text     = "Sideboard (${state.sideboard.sumOf { it.quantity }})",
-                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+            // Delete / remove-all button — always visible except in pure commander-selection context.
+            if (!isCommanderSelectionContext) {
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.action_remove_all), color = mc.lifeNegative, style = ty.labelLarge)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CardSearchSheet(
+    uiState: DeckMagicDetailUiState,
+    isCommanderMode: Boolean,
+    onQueryChange: (String) -> Unit,
+    onScryfallSearch: (String) -> Unit,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onCardClick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedTab by remember { mutableStateOf(0) }
+    var showAdvancedSearch by remember { mutableStateOf(false) }
+
+    if (showAdvancedSearch) {
+        AdvancedSearchSheet(
+            onDismiss = { showAdvancedSearch = false },
+            onSearch = { _, rawQuery ->
+                showAdvancedSearch = false
+                selectedTab = 1
+                onScryfallSearch(rawQuery)
+            },
+        )
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f).padding(bottom = 16.dp)) {
+            val title = if (isCommanderMode) "Choose Commander" else stringResource(R.string.deckbuilder_add_cards)
+            Text(title, style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(16.dp))
+
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = uiState.addCardsQuery,
+                    onValueChange = { if (selectedTab == 0) onQueryChange(it) else onScryfallSearch(it) },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.deckbuilder_add_cards_search_hint), color = mc.textDisabled) },
+                    leadingIcon = {
+                        val isSearching = if (selectedTab == 0) uiState.isSearchingCards else uiState.isSearchingScryfall
+                        if (isSearching) CircularProgressIndicator(Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
+                        else Icon(Icons.Default.Search, null, tint = mc.textSecondary)
+                    },
+                    trailingIcon = if (uiState.addCardsQuery.isNotEmpty()) {
+                        { IconButton(onClick = { onQueryChange(""); onScryfallSearch("") }) { Icon(Icons.Default.Clear, null, tint = mc.textSecondary) } }
+                    } else null,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = mc.primaryAccent, unfocusedBorderColor = mc.surfaceVariant, cursorColor = mc.primaryAccent)
+                )
+                IconButton(onClick = { showAdvancedSearch = true }, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(mc.surface)) {
+                    Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.advsearch_title), tint = mc.primaryAccent)
+                }
+            }
+
+            TabRow(selectedTabIndex = selectedTab, containerColor = mc.backgroundSecondary, contentColor = mc.primaryAccent) {
+                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.deckbuilder_tab_collection), style = ty.labelLarge) })
+                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.deckdetail_tab_scryfall), style = ty.labelLarge) })
+            }
+
+            val results = if (selectedTab == 0) uiState.addCardsResults else uiState.scryfallResults
+            LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { Spacer(Modifier.height(8.dp)) }
+                
+                items(results, key = { it.card.scryfallId }) { row ->
+                    AddCardSheetRow(
+                        row = row,
+                        isCommanderMode = isCommanderMode,
+                        isCurrentCommander = uiState.commanderCard?.scryfallId == row.card.scryfallId,
+                        onAdd = { onAdd(row.card.scryfallId) },
+                        onRemove = { onRemove(row.card.scryfallId) },
+                        onClick = { onCardClick(row.card.scryfallId) }
                     )
                 }
-                items(state.sideboard, key = { "side_${it.card.scryfallId}" }) { dc ->
-                    Row(
-                        modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment     = Alignment.CenterVertically,
-                    ) {
-                        DeckCardRow(
-                            deckCard = dc,
-                            onRemove = { onRemoveFromSideboard(dc.card.scryfallId) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(
-                            onClick  = { onMoveToMainboard(dc.card.scryfallId) },
-                            modifier = Modifier.width(56.dp),
+
+                // Empty State from DeckDetail
+                if (results.isEmpty()) {
+                    val isSearching = if (selectedTab == 0) uiState.isSearchingCards else uiState.isSearchingScryfall
+                    if (!isSearching) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (selectedTab == 1 && uiState.addCardsQuery.isBlank())
+                                        stringResource(R.string.deckbuilder_add_cards_search_hint)
+                                    else
+                                        stringResource(R.string.deckbuilder_no_cards),
+                                    style = ty.bodyMedium,
+                                    color = mc.textDisabled,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = RoundedCornerShape(8.dp)) {
+                Text(stringResource(R.string.deckbuilder_add_cards_done), style = ty.titleMedium, color = mc.background)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddCardSheetRow(
+    row: AddCardRow,
+    isCommanderMode: Boolean = false,
+    isCurrentCommander: Boolean = false,
+    onAdd: () -> Unit,
+    onRemove: () -> Unit,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val card = row.card
+    // Always allow adding, warning overlay handles limits
+    val addEnabled = true 
+
+    Surface(
+        onClick = onClick, 
+        shape = RoundedCornerShape(8.dp), 
+        color = if (isCurrentCommander) mc.goldMtg.copy(alpha = 0.1f) else mc.surface,
+        border = if (isCurrentCommander) BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)) else null
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AsyncImage(model = card.imageArtCrop, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(RoundedCornerShape(4.dp)))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(card.name, style = ty.bodyMedium, color = if (isCurrentCommander) mc.goldMtg else mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(card.typeLine, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (row.quantityInDeck > 0 && !isCommanderMode) {
+                    IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Remove, null, tint = mc.textSecondary, modifier = Modifier.size(16.dp))
+                    }
+                    Text("${row.quantityInDeck}", style = ty.labelMedium, color = mc.primaryAccent)
+                }
+                
+                val icon = if (isCommanderMode) {
+                    if (isCurrentCommander) Icons.Default.Check else Icons.Default.Add
+                } else Icons.Default.Add
+
+                IconButton(onClick = onAdd, enabled = addEnabled || isCommanderMode, modifier = Modifier.size(32.dp)) {
+                    Icon(icon, null, tint = if (isCurrentCommander) mc.goldMtg else if (addEnabled || isCommanderMode) mc.primaryAccent else mc.textDisabled, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BasicLandsSheet(
+    uiState: DeckMagicDetailUiState,
+    onAddBasicLand: (String) -> Unit,
+    onRemoveBasicLand: (String) -> Unit,
+    viewModel: DeckMagicDetailViewModel,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = mc.backgroundSecondary) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.deckdetail_basic_lands_sheet_title), style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
+            BASIC_LAND_NAMES.forEach { landName ->
+                val quantity = uiState.cards.filter { it.card?.name == landName && !it.isSideboard }.sumOf { it.quantity }
+                BasicLandRow(
+                    name = landName,
+                    quantityInDeck = quantity,
+                    onAdd = { onAddBasicLand(landName) },
+                    onRemove = { onRemoveBasicLand(landName) },
+                    manaCode = { viewModel.getManaCode(landName) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BasicLandRow(name: String, quantityInDeck: Int, onAdd: () -> Unit, onRemove: () -> Unit, manaCode: () -> String?) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            manaCode()?.let { ManaSymbolImage(token = it, size = 24.dp) }
+            Text(name, style = ty.bodyMedium, color = mc.textPrimary, modifier = Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (quantityInDeck > 0) {
+                    IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Remove, null, tint = mc.textSecondary, modifier = Modifier.size(16.dp))
+                    }
+                    Text("$quantityInDeck", style = ty.labelMedium, color = mc.primaryAccent)
+                }
+                IconButton(onClick = onAdd, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Add, null, tint = mc.primaryAccent, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddBasicLandsRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(
+        shape = RoundedCornerShape(8.dp), 
+        color = mc.surface, 
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Default.Park, null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
+            Text(stringResource(R.string.deckdetail_add_basic_lands), style = ty.bodyMedium, color = mc.primaryAccent, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.Add, null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditDeckSheet(
+    deck: Deck?,
+    cards: List<DeckSlotEntry>,
+    onSave: (newName: String?, newCoverId: String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var nameText by remember(deck?.name) { mutableStateOf(deck?.name ?: "") }
+    var selectedCoverId by remember(deck?.coverCardId) { mutableStateOf(deck?.coverCardId) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(bottom = 16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.deck_edit_title), style = ty.titleMedium, color = mc.textPrimary)
+                Button(onClick = { onSave(nameText, selectedCoverId) }, colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = RoundedCornerShape(8.dp)) {
+                    Text(stringResource(R.string.action_save), style = ty.labelLarge, color = mc.background)
+                }
+            }
+            OutlinedTextField(
+                value = nameText,
+                onValueChange = { nameText = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                label = { Text(stringResource(R.string.deckbuilder_setup_name_label)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = mc.primaryAccent, cursorColor = mc.primaryAccent)
+            )
+            
+            val coverCards = remember(cards) {
+                cards.filter { it.card?.imageArtCrop != null }.distinctBy { it.scryfallId }
+            }
+            if (coverCards.isNotEmpty()) {
+                Text(stringResource(R.string.deck_edit_cover_section), style = ty.labelMedium, modifier = Modifier.padding(16.dp))
+                LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(coverCards, key = { "cover_" + it.scryfallId }) { dc ->
+                        val isSelected = dc.scryfallId == selectedCoverId
+                        Box(
+                            modifier = Modifier.aspectRatio(1.37f).clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedCoverId = dc.scryfallId }
+                                .then(if (isSelected) Modifier.border(2.dp, mc.primaryAccent, RoundedCornerShape(8.dp)) else Modifier)
                         ) {
-                            Text("→MB", style = ty.labelSmall, color = mc.primaryAccent)
+                            AsyncImage(
+                                model = dc.card?.imageArtCrop,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
                 }
             }
         }
-
-        // Save button
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(mc.background)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            Button(
-                onClick  = onSave,
-                enabled  = state.totalCardCount > 0,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor         = mc.primaryAccent,
-                    disabledContainerColor = mc.surfaceVariant,
-                ),
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text(
-                    text  = stringResource(R.string.deckbuilder_save_button),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = if (state.totalCardCount > 0) mc.background else mc.textDisabled,
-                )
-            }
-        }
-
-        // Error
-        state.error?.let { msg ->
-            Snackbar(
-                modifier         = Modifier.align(Alignment.BottomCenter).padding(bottom = 72.dp, start = 16.dp, end = 16.dp),
-                containerColor   = mc.lifeNegative.copy(alpha = 0.9f),
-                contentColor     = mc.textPrimary,
-            ) {
-                Text(msg, style = MaterialTheme.magicTypography.bodySmall)
-            }
-        }
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Helpers
-// ═══════════════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text     = text,
-        style    = MaterialTheme.magicTypography.labelLarge,
-        color    = MaterialTheme.magicColors.textSecondary,
-        modifier = modifier,
-    )
-}
-
-private fun cardTypeLabel(typeLine: String): String = when {
-    typeLine.contains("Creature",    ignoreCase = true) -> "Creature"
-    typeLine.contains("Planeswalker",ignoreCase = true) -> "Planeswalker"
-    typeLine.contains("Instant",     ignoreCase = true) -> "Instant"
-    typeLine.contains("Sorcery",     ignoreCase = true) -> "Sorcery"
-    typeLine.contains("Enchantment", ignoreCase = true) -> "Enchantment"
-    typeLine.contains("Artifact",    ignoreCase = true) -> "Artifact"
-    typeLine.contains("Land",        ignoreCase = true) -> "Land"
-    else                                                -> "Other"
-}
-
-private fun mainColorLabel(colors: List<String>): String = when {
-    colors.isEmpty()  -> "Colorless"
-    colors.size > 1   -> "Multicolor"
-    else              -> when (colors.first().uppercase()) {
-        "W" -> "White"
-        "U" -> "Blue"
-        "B" -> "Black"
-        "R" -> "Red"
-        "G" -> "Green"
-        else -> colors.first()
+private fun groupCards(cards: List<DeckSlotEntry>, mode: GroupingMode): List<Pair<String, List<DeckSlotEntry>>> {
+    return when (mode) {
+        GroupingMode.TYPE -> {
+            val order = listOf("Creatures", "Instants", "Sorceries", "Enchantments", "Artifacts", "Planeswalkers", "Lands", "Other")
+            val groups = cards.groupBy { entry ->
+                val type = entry.card?.typeLine ?: ""
+                when {
+                    type.contains("Creature") -> "Creatures"
+                    type.contains("Instant") -> "Instants"
+                    type.contains("Sorcery") -> "Sorceries"
+                    type.contains("Enchantment") -> "Enchantments"
+                    type.contains("Artifact") -> "Artifacts"
+                    type.contains("Planeswalker") -> "Planeswalkers"
+                    type.contains("Land") -> "Lands"
+                    else -> "Other"
+                }
+            }
+            order.mapNotNull { label ->
+                val list = groups[label]?.sortedBy { it.card?.name } ?: emptyList()
+                if (list.isEmpty() && label != "Lands") null
+                else label to list
+            }
+        }
+        GroupingMode.COLOR -> {
+            val order = listOf("W", "U", "B", "R", "G", "Multicolor", "Colorless", "Land")
+            val groups = cards.groupBy { entry ->
+                val card = entry.card ?: return@groupBy "Other"
+                if (card.typeLine.contains("Land")) return@groupBy "Land"
+                when (card.colors.size) {
+                    0 -> "Colorless"
+                    1 -> card.colors.first()
+                    else -> "Multicolor"
+                }
+            }
+            order.mapNotNull { label ->
+                val list = groups[label]?.sortedBy { it.card?.name } ?: emptyList()
+                if (list.isEmpty() && label != "Land") null
+                else label to list
+            }
+        }
+        GroupingMode.COST -> {
+            val nonLands = cards.filter { it.card != null && !BasicLandCalculator.isLand(it.card!!) }
+            val groups = nonLands.groupBy { entry ->
+                val cmc = entry.card?.cmc?.toInt()?.coerceIn(0, 7) ?: 0
+                if (cmc == 7) "7+ Cost" else "$cmc Cost"
+            }
+            groups.entries.filter { it.value.isNotEmpty() }.sortedBy { it.key }.map { it.key to it.value.sortedBy { it.card?.name } }
+        }
+        GroupingMode.TAG -> {
+            val tagMap = mutableMapOf<String, MutableList<DeckSlotEntry>>()
+            cards.forEach { entry ->
+                val tags = (entry.card?.tags ?: emptyList()) + (entry.card?.userTags ?: emptyList())
+                if (tags.isEmpty()) {
+                    tagMap.getOrPut("Untagged") { mutableListOf() }.add(entry)
+                } else {
+                    tags.forEach { tag ->
+                        tagMap.getOrPut(tag.label) { mutableListOf() }.add(entry)
+                    }
+                }
+            }
+            tagMap.entries.filter { it.value.isNotEmpty() }.sortedByDescending { it.value.size }.map { it.key to it.value.sortedBy { it.card?.name } }
+        }
     }
 }
-
-private fun cmcLabel(cmc: Double): String = when (cmc.toInt()) {
-    0, 1 -> "0–1"
-    2    -> "2"
-    3    -> "3"
-    4    -> "4"
-    else -> "5+"
-}
-
-
-
-

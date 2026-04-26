@@ -1,20 +1,50 @@
 package com.mmg.manahub.core.data.remote.decks
 
-import java.time.Instant
-
+/**
+ * Contract for all Supabase operations on the `decks` and `deck_cards` tables.
+ *
+ * Sync is driven by [updatedAt] epoch millis (Last-Write-Wins).
+ * All methods return [Result] so callers can handle failures without try/catch.
+ */
 interface DeckRemoteDataSource {
-    /** Returns the MAX(updated_at) across all non-deleted decks for the current user, or null. */
-    suspend fun getLastModified(): Instant?
 
-    /** Upserts a deck via the `upsert_deck` RPC. Returns the Supabase-assigned UUID. */
-    suspend fun upsertDeck(params: UpsertDeckParams): Result<String>
+    /**
+     * Fetches all deck rows (including soft-deleted) modified after [since].
+     *
+     * Delegates to the `get_deck_changes_since` Supabase RPC.
+     * The RPC uses `auth.uid()` server-side for RLS — no explicit user_id param needed.
+     *
+     * @param since Epoch millis watermark; pass 0L for a full pull.
+     */
+    suspend fun getDeckChangesSince(since: Long): Result<List<DeckSyncDto>>
 
-    /** Soft-deletes a deck by local Room id via the `delete_deck` RPC. */
-    suspend fun deleteDeck(localDeckId: Long): Result<Unit>
+    /**
+     * Upserts a batch of deck rows using the `batch_upsert_decks` RPC.
+     *
+     * Deck metadata only — call [upsertDeckCards] separately for card slots.
+     *
+     * @param rows List of [DeckSyncDto] to upload.
+     */
+    suspend fun batchUpsertDecks(rows: List<DeckSyncDto>): Result<Unit>
 
-    /** Replaces all cards for a deck atomically via the `upsert_deck_cards` RPC. */
-    suspend fun upsertDeckCards(localDeckId: Long, cards: List<DeckCardDto>): Result<Unit>
+    /**
+     * Replaces all card slots for a single deck using the `upsert_deck_cards` RPC.
+     *
+     * The RPC performs a full replacement (DELETE + INSERT) server-side so that
+     * removed cards are cleaned up atomically.
+     *
+     * @param deckId UUID of the deck whose cards are being replaced.
+     * @param cards  New list of card slots for the deck.
+     */
+    suspend fun upsertDeckCards(deckId: String, cards: List<DeckCardSyncDto>): Result<Unit>
 
-    /** Returns all non-deleted decks updated after [since] for the current user. */
-    suspend fun getDecksChangedSince(since: Instant): Result<List<DeckDto>>
+    /**
+     * Fetches all card slots for a single deck from Supabase.
+     *
+     * Delegates to the `get_deck_cards_for_deck` RPC, which enforces RLS via `auth.uid()`.
+     * Used during the sync PULL phase to restore card slots alongside deck metadata.
+     *
+     * @param deckId UUID of the deck whose cards should be fetched.
+     */
+    suspend fun getDeckCardsForDeck(deckId: String): Result<List<DeckCardSyncDto>>
 }

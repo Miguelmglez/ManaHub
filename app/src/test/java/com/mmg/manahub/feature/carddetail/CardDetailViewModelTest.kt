@@ -2,12 +2,13 @@ package com.mmg.manahub.feature.carddetail
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -39,44 +40,40 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class CardDetailViewModelTest {
 
-    // ── Test dispatcher ───────────────────────────────────────────────────────
-
     private val testDispatcher = StandardTestDispatcher()
-
-    // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val savedStateHandle = SavedStateHandle(mapOf("scryfallId" to "id-001"))
     private val cardRepo         = mockk<CardRepository>()
     private val userCardRepo     = mockk<UserCardRepository>(relaxed = true)
     private val deckRepo         = mockk<DeckRepository>()
     private val addToCollection  = mockk<AddCardToCollectionUseCase>()
-    private val userPrefs        = mockk<UserPreferencesDataStore>()
+    private val userPrefs        = mockk<UserPreferencesRepository>()
+    private val helper           = mockk<AnalyticsHelper>(relaxed = true)
 
     private lateinit var viewModel: CardDetailViewModel
 
-    // ── Setup / Teardown ─────────────────────────────────────────────────────
+    private fun buildViewModel() = CardDetailViewModel(
+        savedStateHandle = savedStateHandle,
+        cardRepo         = cardRepo,
+        userCardRepo     = userCardRepo,
+        deckRepo         = deckRepo,
+        addToCollection  = addToCollection,
+        userPrefs        = userPrefs,
+        helper           = helper,
+    )
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
         val card = TestFixtures.buildCard("id-001")
-
-        // Default happy-path stubs
         coEvery { cardRepo.getCardById("id-001") } returns DataResult.Success(card)
         every { cardRepo.observeCard("id-001") } returns flowOf(card)
-        every { userCardRepo.observeByScryfallId("id-001") } returns flowOf(emptyList())
+        every { userCardRepo.observeByScryfallId("id-001", null) } returns flowOf(emptyList())
         every { deckRepo.observeDecksContainingCard("id-001") } returns flowOf(emptyList())
         every { userPrefs.userDefinedTagsFlow } returns flowOf(emptyList())
 
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        viewModel = buildViewModel()
     }
 
     @After
@@ -101,43 +98,24 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given getCardById returns stale success when ViewModel initializes then isStale is true`() = runTest {
-        // Arrange
         val staleCard = TestFixtures.buildCard("id-001", isStale = true)
         coEvery { cardRepo.getCardById("id-001") } returns DataResult.Success(staleCard, isStale = true)
         every { cardRepo.observeCard("id-001") } returns flowOf(staleCard)
 
-        // Re-create ViewModel with updated stubs
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        viewModel = buildViewModel()
         advanceUntilIdle()
 
-        // Assert
         assertTrue(viewModel.uiState.value.isStale)
     }
 
     @Test
     fun `given getCardById returns error when ViewModel initializes then error is set in state`() = runTest {
-        // Arrange
         coEvery { cardRepo.getCardById("id-001") } returns DataResult.Error("HTTP 404")
+        every { cardRepo.observeCard("id-001") } returns kotlinx.coroutines.flow.emptyFlow()
 
-        // Re-create ViewModel
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        viewModel = buildViewModel()
         advanceUntilIdle()
 
-        // Assert
         val state = viewModel.uiState.value
         assertEquals("HTTP 404", state.error)
         assertFalse(state.isLoading)
@@ -146,50 +124,32 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given observeCard emits updated card when observing then state is updated`() = runTest {
-        // Arrange — card observer emits twice
         val initial = TestFixtures.buildCard("id-001", priceUsd = 1.00)
         val updated = TestFixtures.buildCard("id-001", priceUsd = 1.50)
 
         coEvery { cardRepo.getCardById("id-001") } returns DataResult.Success(initial)
         every { cardRepo.observeCard("id-001") } returns flowOf(initial, updated)
 
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        viewModel = buildViewModel()
         advanceUntilIdle()
 
-        // Assert: state reflects the latest emission
         assertEquals(1.50, viewModel.uiState.value.card?.priceUsd)
     }
 
     @Test
     fun `given observeUserCards emits non-wishlist cards then userCards state is populated`() = runTest {
-        // Arrange
-        val collectionEntry = TestFixtures.buildUserCard(id = 10L, scryfallId = "id-001", isInWishlist = false)
-        val wishlistEntry   = TestFixtures.buildUserCard(id = 11L, scryfallId = "id-001", isInWishlist = true)
+        val collectionEntry = TestFixtures.buildUserCard(id = "uc-010", scryfallId = "id-001", isInWishlist = false)
+        val wishlistEntry   = TestFixtures.buildUserCard(id = "uc-011", scryfallId = "id-001", isInWishlist = true)
 
-        every { userCardRepo.observeByScryfallId("id-001") } returns
+        every { userCardRepo.observeByScryfallId("id-001", null) } returns
                 flowOf(listOf(collectionEntry, wishlistEntry))
 
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        viewModel = buildViewModel()
         advanceUntilIdle()
 
-        // Assert: wishlist entry is filtered out from userCards
         val userCards = viewModel.uiState.value.userCards
         assertEquals(1, userCards.size)
-        assertEquals(10L, userCards.first().id)
+        assertEquals("uc-010", userCards.first().id)
         assertFalse(userCards.any { it.isInWishlist })
     }
 
@@ -243,11 +203,9 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given successful add when onAddToCollection then success toast event is emitted`() = runTest {
-        // Arrange
-        coEvery { addToCollection(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { addToCollection(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 DataResult.Success(Unit)
 
-        // Act & Assert
         viewModel.events.test {
             viewModel.onAddToCollection(
                 isFoil           = false,
@@ -270,11 +228,9 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given failed add when onAddToCollection then error toast event is emitted and error state set`() = runTest {
-        // Arrange
-        coEvery { addToCollection(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { addToCollection(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 DataResult.Error("Card not found")
 
-        // Act & Assert
         viewModel.events.test {
             viewModel.onAddToCollection(
                 isFoil           = false,
@@ -298,18 +254,15 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given any result when onAddToCollection then showAddSheet becomes false`() = runTest {
-        // Arrange
-        coEvery { addToCollection(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { addToCollection(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 DataResult.Success(Unit)
 
         viewModel.onShowAddSheet()
         assertTrue(viewModel.uiState.value.showAddSheet)
 
-        // Act
         viewModel.onAddToCollection(false, false, "NM", "en", 1)
         advanceUntilIdle()
 
-        // Assert
         assertFalse(viewModel.uiState.value.showAddSheet)
     }
 
@@ -319,10 +272,8 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given successful wishlist add when onAddToWishlist then success toast is emitted`() = runTest {
-        // Arrange
-        coEvery { userCardRepo.addOrIncrement(any()) } returns Unit
+        coEvery { userCardRepo.addOrIncrement(any(), any(), any(), any(), any(), any(), any(), any()) } returns Unit
 
-        // Act & Assert
         viewModel.events.test {
             viewModel.onAddToWishlist(false, false, "NM", "en", 1)
             advanceUntilIdle()
@@ -335,10 +286,8 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given failed wishlist add when onAddToWishlist then error toast is emitted`() = runTest {
-        // Arrange
-        coEvery { userCardRepo.addOrIncrement(any()) } throws RuntimeException("DB error")
+        coEvery { userCardRepo.addOrIncrement(any(), any(), any(), any(), any(), any(), any(), any()) } throws RuntimeException("DB error")
 
-        // Act & Assert
         viewModel.events.test {
             viewModel.onAddToWishlist(false, false, "NM", "en", 1)
             advanceUntilIdle()
@@ -355,30 +304,24 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given valid card id when onDeleteCard then deleteCard is called and cardToDelete is cleared`() = runTest {
-        // Arrange
-        val userCard = TestFixtures.buildUserCard(id = 5L)
+        val userCard = TestFixtures.buildUserCard(id = "uc-005")
         viewModel.onRequestDelete(userCard)
-        coEvery { userCardRepo.deleteCard(5L) } returns Unit
+        coEvery { userCardRepo.deleteCard("uc-005") } returns Unit
 
-        // Act
-        viewModel.onDeleteCard(5L)
+        viewModel.onDeleteCard("uc-005")
         advanceUntilIdle()
 
-        // Assert
-        coVerify(exactly = 1) { userCardRepo.deleteCard(5L) }
+        coVerify(exactly = 1) { userCardRepo.deleteCard("uc-005") }
         assertNull(viewModel.uiState.value.cardToDelete)
     }
 
     @Test
     fun `given delete fails when onDeleteCard then error is set in state`() = runTest {
-        // Arrange
         coEvery { userCardRepo.deleteCard(any()) } throws RuntimeException("FK constraint")
 
-        // Act
-        viewModel.onDeleteCard(5L)
+        viewModel.onDeleteCard("uc-005")
         advanceUntilIdle()
 
-        // Assert
         assertNotNull(viewModel.uiState.value.error)
     }
 
@@ -387,29 +330,31 @@ class CardDetailViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given valid quantity when onUpdateQuantity then updateQuantity is called on repo`() = runTest {
-        // Arrange
-        coEvery { userCardRepo.updateQuantity(any(), any()) } returns Unit
+    fun `given valid quantity when onUpdateQuantity then updateAttributes is called on repo`() = runTest {
+        val card = TestFixtures.buildUserCard(id = "uc-003", scryfallId = "id-001")
+        every { userCardRepo.observeByScryfallId("id-001", null) } returns flowOf(listOf(card))
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        coEvery { userCardRepo.updateAttributes(any(), any(), any(), any()) } returns Unit
 
-        // Act
-        viewModel.onUpdateQuantity(userCardId = 3L, quantity = 4)
+        viewModel.onUpdateQuantity(userCardId = "uc-003", quantity = 4)
         advanceUntilIdle()
 
-        // Assert
-        coVerify(exactly = 1) { userCardRepo.updateQuantity(3L, 4) }
+        coVerify(exactly = 1) { userCardRepo.updateAttributes("uc-003", any(), any(), 4) }
     }
 
     @Test
     fun `given quantity update fails when onUpdateQuantity then error is set in state`() = runTest {
-        // Arrange
-        coEvery { userCardRepo.updateQuantity(any(), any()) } throws
+        val card = TestFixtures.buildUserCard(id = "uc-003", scryfallId = "id-001")
+        every { userCardRepo.observeByScryfallId("id-001", null) } returns flowOf(listOf(card))
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        coEvery { userCardRepo.updateAttributes(any(), any(), any(), any()) } throws
                 IllegalArgumentException("Quantity cannot be negative")
 
-        // Act
-        viewModel.onUpdateQuantity(userCardId = 3L, quantity = -1)
+        viewModel.onUpdateQuantity(userCardId = "uc-003", quantity = -1)
         advanceUntilIdle()
 
-        // Assert
         assertNotNull(viewModel.uiState.value.error)
     }
 
@@ -419,79 +364,54 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given card in state when onAddTag then tag is added optimistically`() = runTest {
-        // Arrange
         advanceUntilIdle()
         coEvery { cardRepo.updateCardTags(any(), any()) } returns Unit
         val newTag = TestFixtures.TAG_REMOVAL
 
-        // Act
         viewModel.onAddTag(newTag)
         advanceUntilIdle()
 
-        // Assert: optimistic update
         assertTrue(viewModel.uiState.value.card?.tags?.contains(newTag) == true)
     }
 
     @Test
     fun `given card already has tag when onAddTag then duplicate is not added`() = runTest {
-        // Arrange — card already has the REMOVAL tag
-        val tag = TestFixtures.TAG_REMOVAL
+        val tag  = TestFixtures.TAG_REMOVAL
         val card = TestFixtures.buildCard("id-001", tags = listOf(tag))
         coEvery { cardRepo.getCardById("id-001") } returns DataResult.Success(card)
         every { cardRepo.observeCard("id-001") } returns flowOf(card)
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        viewModel = buildViewModel()
         advanceUntilIdle()
         coEvery { cardRepo.updateCardTags(any(), any()) } returns Unit
 
-        // Act — try to add the same tag again
         viewModel.onAddTag(tag)
         advanceUntilIdle()
 
-        // Assert: updateCardTags was NOT called (guard in onAddTag: "if (tag in current) return")
         coVerify(exactly = 0) { cardRepo.updateCardTags(any(), any()) }
     }
 
     @Test
     fun `given card in state when onRemoveTag then tag is removed from state`() = runTest {
-        // Arrange
         val tag  = TestFixtures.TAG_REMOVAL
         val card = TestFixtures.buildCard("id-001", tags = listOf(tag))
         coEvery { cardRepo.getCardById("id-001") } returns DataResult.Success(card)
         every { cardRepo.observeCard("id-001") } returns flowOf(card)
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        viewModel = buildViewModel()
         advanceUntilIdle()
         coEvery { cardRepo.updateCardTags(any(), any()) } returns Unit
 
-        // Act
         viewModel.onRemoveTag(tag)
         advanceUntilIdle()
 
-        // Assert
         assertFalse(viewModel.uiState.value.card?.tags?.contains(tag) == true)
     }
 
     @Test
     fun `given successful user tag add when onAddUserTag then success toast is emitted`() = runTest {
-        // Arrange
         advanceUntilIdle()
         val userTag = TestFixtures.TAG_CUSTOM
         coEvery { cardRepo.updateUserTags(any(), any()) } returns Unit
 
-        // Act & Assert
         viewModel.events.test {
             viewModel.onAddUserTag(userTag)
             advanceUntilIdle()
@@ -504,18 +424,15 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given user tag update fails when onAddUserTag then state is rolled back`() = runTest {
-        // Arrange — card starts with empty userTags
         advanceUntilIdle()
         val userTag = TestFixtures.TAG_CUSTOM
         coEvery { cardRepo.updateUserTags(any(), any()) } throws RuntimeException("DB error")
 
         val stateBefore = viewModel.uiState.value.card?.userTags?.toList() ?: emptyList()
 
-        // Act
         viewModel.onAddUserTag(userTag)
         advanceUntilIdle()
 
-        // Assert: rollback — userTags is restored to pre-optimistic state
         assertEquals(stateBefore, viewModel.uiState.value.card?.userTags)
     }
 
@@ -525,23 +442,14 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given trade selection with one marked card when onConfirmTradeSelection then toast mentions one copy`() = runTest {
-        // Arrange — pre-populate userCards with a non-trade card
-        val userCard = TestFixtures.buildUserCard(id = 1L, isForTrade = false)
-        every { userCardRepo.observeByScryfallId("id-001") } returns flowOf(listOf(userCard))
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        val userCard = TestFixtures.buildUserCard(id = "uc-001", isForTrade = false)
+        every { userCardRepo.observeByScryfallId("id-001", null) } returns flowOf(listOf(userCard))
+        viewModel = buildViewModel()
         advanceUntilIdle()
-        coEvery { userCardRepo.updateCard(any()) } returns Unit
+        coEvery { userCardRepo.updateAttributes(any(), any(), any(), any()) } returns Unit
 
-        // Act & Assert
         viewModel.events.test {
-            viewModel.onConfirmTradeSelection(mapOf(1L to true))
+            viewModel.onConfirmTradeSelection(mapOf("uc-001" to true))
             advanceUntilIdle()
 
             val event = awaitItem() as CardDetailEvent.ShowToast
@@ -553,23 +461,14 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given trade selection with zero marked cards when onConfirmTradeSelection then cleared toast is shown`() = runTest {
-        // Arrange
-        val userCard = TestFixtures.buildUserCard(id = 1L, isForTrade = true)
-        every { userCardRepo.observeByScryfallId("id-001") } returns flowOf(listOf(userCard))
-        viewModel = CardDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            cardRepo         = cardRepo,
-            userCardRepo     = userCardRepo,
-            deckRepo         = deckRepo,
-            addToCollection  = addToCollection,
-            userPrefs        = userPrefs,
-        )
+        val userCard = TestFixtures.buildUserCard(id = "uc-001", isForTrade = true)
+        every { userCardRepo.observeByScryfallId("id-001", null) } returns flowOf(listOf(userCard))
+        viewModel = buildViewModel()
         advanceUntilIdle()
-        coEvery { userCardRepo.updateCard(any()) } returns Unit
+        coEvery { userCardRepo.updateAttributes(any(), any(), any(), any()) } returns Unit
 
-        // Act & Assert
         viewModel.events.test {
-            viewModel.onConfirmTradeSelection(mapOf(1L to false))
+            viewModel.onConfirmTradeSelection(mapOf("uc-001" to false))
             advanceUntilIdle()
 
             val event = awaitItem() as CardDetailEvent.ShowToast
@@ -584,16 +483,13 @@ class CardDetailViewModelTest {
 
     @Test
     fun `given error in state when onErrorDismissed then error is cleared`() = runTest {
-        // Arrange — inject an error
         coEvery { userCardRepo.deleteCard(any()) } throws RuntimeException("error")
-        viewModel.onDeleteCard(1L)
+        viewModel.onDeleteCard("uc-001")
         advanceUntilIdle()
         assertNotNull(viewModel.uiState.value.error)
 
-        // Act
         viewModel.onErrorDismissed()
 
-        // Assert
         assertNull(viewModel.uiState.value.error)
     }
 }

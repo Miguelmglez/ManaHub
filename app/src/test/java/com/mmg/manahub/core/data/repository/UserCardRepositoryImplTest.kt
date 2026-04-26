@@ -1,298 +1,253 @@
 package com.mmg.manahub.core.data.repository
 
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.local.dao.UserCardDao
+import com.mmg.manahub.core.data.local.MtgDatabase
+import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
+import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
+import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
-import com.mmg.manahub.util.TestFixtures
-import io.github.jan.supabase.auth.Auth
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.github.jan.supabase.SupabaseClient
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for [UserCardRepositoryImpl].
+ * Unit tests for [UserCardRepositoryImpl] — complementary edge cases.
  *
- * Focus areas:
- *  - addOrIncrement() decision tree: first insert vs. duplicate key increment
- *  - updateQuantity() guards (negative, zero → delete, positive → update)
- *  - Uniqueness key composition (scryfallId + foil + altArt + condition + language + wishlist)
+ * Core behaviors (addOrIncrement, updateAttributes, deleteCard, getScryfallIds)
+ * are tested in depth in [UserCardRepositoryImplSyncTest].
+ * This class focuses on edge cases around entity construction and attribute handling.
+ *
+ * Covers:
+ *  - addOrIncrement: UUID uniqueness, timestamp fields, per-call isolation
+ *  - updateAttributes: individual attribute changes, updatedAt independence from createdAt
+ *  - deleteCard: soft-delete is idempotent (no crash on repeated call)
  */
 class UserCardRepositoryImplTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val userCardDao      = mockk<UserCardDao>(relaxed = true)
-    private val remoteDataSource = mockk<CollectionRemoteDataSource>(relaxed = true)
-    private val prefsDataStore   = mockk<UserPreferencesDataStore>(relaxed = true)
-    private val supabaseAuth     = mockk<Auth>(relaxed = true)
+    private val userCardCollectionDao      = mockk<UserCardCollectionDao>(relaxed = true)
+    private val collectionRemoteDataSource = mockk<CollectionRemoteDataSource>(relaxed = true)
+    private val remoteKeyDao               = mockk<RemoteKeyDao>(relaxed = true)
+    private val database                   = mockk<MtgDatabase>(relaxed = true)
+    private val supabaseClient             = mockk<SupabaseClient>(relaxed = true)
 
     private lateinit var repository: UserCardRepositoryImpl
+
+    // ── Fixtures ──────────────────────────────────────────────────────────────
+
+    private fun buildEntity(
+        id:               String  = "entity-uuid-001",
+        scryfallId:       String  = "card-001",
+        userId:           String? = "user-uuid-001",
+        quantity:         Int     = 1,
+        isFoil:           Boolean = false,
+        condition:        String  = "NM",
+        language:         String  = "en",
+        isAlternativeArt: Boolean = false,
+        isForTrade:       Boolean = false,
+        isInWishlist:     Boolean = false,
+        isDeleted:        Boolean = false,
+        updatedAt:        Long    = 1_000L,
+        createdAt:        Long    = 1_000L,
+    ) = UserCardCollectionEntity(
+        id               = id,
+        userId           = userId,
+        scryfallId       = scryfallId,
+        quantity         = quantity,
+        isFoil           = isFoil,
+        condition        = condition,
+        language         = language,
+        isAlternativeArt = isAlternativeArt,
+        isForTrade       = isForTrade,
+        isInWishlist     = isInWishlist,
+        isDeleted        = isDeleted,
+        updatedAt        = updatedAt,
+        createdAt        = createdAt,
+    )
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     @Before
     fun setUp() {
         repository = UserCardRepositoryImpl(
-            userCardDao      = userCardDao,
-            remoteDataSource = remoteDataSource,
-            prefsDataStore   = prefsDataStore,
-            supabaseAuth     = supabaseAuth,
-            ioDispatcher     = UnconfinedTestDispatcher(),
+            userCardCollectionDao      = userCardCollectionDao,
+            collectionRemoteDataSource = collectionRemoteDataSource,
+            remoteKeyDao               = remoteKeyDao,
+            database                   = database,
+            supabaseClient             = supabaseClient,
+            ioDispatcher               = UnconfinedTestDispatcher(),
         )
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — addOrIncrement: first-time insert path
+    //  GROUP 1 — addOrIncrement: UUID and timestamp construction
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given card not yet in collection when addOrIncrement then insert is called`() = runTest {
-        // Arrange
-        val userCard = TestFixtures.buildUserCard(scryfallId = "id-001")
-        coEvery { userCardDao.insert(any()) } returns 42L   // new row id
+    fun `given addOrIncrement called twice then two distinct UUIDs are generated`() = runTest {
+        val captured1 = slot<UserCardCollectionEntity>()
+        val captured2 = slot<UserCardCollectionEntity>()
 
-        // Act
-        repository.addOrIncrement(userCard)
+        every { userCardCollectionDao.upsert(capture(captured1)) } returns 1L andThen 1L
 
-        // Assert: insert was attempted
-        coVerify(exactly = 1) { userCardDao.insert(any()) }
-        // incrementQuantityByUniqueKey must NOT be called when insert succeeds
-        coVerify(exactly = 0) { userCardDao.incrementQuantityByUniqueKey(any(), any(), any(), any(), any(), any()) }
+        repository.addOrIncrement("card-a", false, "NM", "en", false, false, false, "user-001")
+
+        every { userCardCollectionDao.upsert(capture(captured2)) } returns 1L
+
+        repository.addOrIncrement("card-b", false, "NM", "en", false, false, false, "user-001")
+
+        assertNotEquals(captured1.captured.id, captured2.captured.id)
     }
 
     @Test
-    fun `given card already in collection with same unique key when addOrIncrement then quantity is incremented`() = runTest {
-        // Arrange — insert returns -1 (conflict on unique key)
-        val userCard = TestFixtures.buildUserCard(scryfallId = "id-001", isFoil = false, condition = "NM", language = "en")
-        coEvery { userCardDao.insert(any()) } returns -1L
+    fun `given addOrIncrement when entity is built then createdAt and updatedAt are both set`() = runTest {
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        // Act
-        repository.addOrIncrement(userCard)
+        val before = System.currentTimeMillis()
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, "user-001")
+        val after = System.currentTimeMillis()
 
-        // Assert: increment path taken — no new row
-        coVerify(exactly = 1) { userCardDao.insert(any()) }
-        coVerify(exactly = 1) {
-            userCardDao.incrementQuantityByUniqueKey(
-                scryfallId       = "id-001",
-                isFoil           = false,
-                isAlternativeArt = false,
-                condition        = "NM",
-                language         = "en",
-                isInWishlist     = false,
-            )
-        }
+        val entity = captured.captured
+        assertTrue("createdAt must be in test window", entity.createdAt in before..after)
+        assertTrue("updatedAt must be in test window", entity.updatedAt in before..after)
     }
 
     @Test
-    fun `given foil copy already in collection when addOrIncrement foil then foil row is incremented`() = runTest {
-        // Arrange
-        val foilCard = TestFixtures.buildUserCard(scryfallId = "id-001", isFoil = true)
-        coEvery { userCardDao.insert(any()) } returns -1L
+    fun `given addOrIncrement with all boolean flags true then entity reflects all flags`() = runTest {
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        // Act
-        repository.addOrIncrement(foilCard)
+        repository.addOrIncrement(
+            scryfallId       = "card-001",
+            isFoil           = true,
+            condition        = "LP",
+            language         = "fr",
+            isAlternativeArt = true,
+            isForTrade       = true,
+            isInWishlist     = true,
+            userId           = "user-001",
+        )
 
-        // Assert: isFoil = true is forwarded to the increment query
-        coVerify(exactly = 1) {
-            userCardDao.incrementQuantityByUniqueKey(
-                scryfallId       = "id-001",
-                isFoil           = true,
-                isAlternativeArt = false,
-                condition        = "NM",
-                language         = "en",
-                isInWishlist     = false,
-            )
-        }
+        val entity = captured.captured
+        assertTrue(entity.isFoil)
+        assertTrue(entity.isAlternativeArt)
+        assertTrue(entity.isForTrade)
+        assertTrue(entity.isInWishlist)
+        assertEquals("LP", entity.condition)
+        assertEquals("fr", entity.language)
     }
 
     @Test
-    fun `given foil and non-foil copies when addOrIncrement non-foil then foil row is NOT incremented`() = runTest {
-        // Arrange — non-foil insert returns -1 (non-foil duplicate exists)
-        val nonFoilCard = TestFixtures.buildUserCard(scryfallId = "id-001", isFoil = false)
-        coEvery { userCardDao.insert(any()) } returns -1L
+    fun `given addOrIncrement with all boolean flags false then entity reflects all flags false`() = runTest {
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        // Act
-        repository.addOrIncrement(nonFoilCard)
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, "user-001")
 
-        // Assert: isFoil = false is forwarded — foil row must not be touched
-        val capturedFoil = slot<Boolean>()
-        coVerify(exactly = 1) {
-            userCardDao.incrementQuantityByUniqueKey(
-                scryfallId       = "id-001",
-                isFoil           = capture(capturedFoil),
-                isAlternativeArt = any(),
-                condition        = any(),
-                language         = any(),
-                isInWishlist     = any(),
-            )
-        }
-        assertEquals(false, capturedFoil.captured)
+        val entity = captured.captured
+        assertFalse(entity.isFoil)
+        assertFalse(entity.isAlternativeArt)
+        assertFalse(entity.isForTrade)
+        assertFalse(entity.isInWishlist)
+        assertFalse(entity.isDeleted)
     }
 
     @Test
-    fun `given wishlist entry already exists when addOrIncrement wishlist then wishlist row is incremented`() = runTest {
-        // Arrange — wishlist card insert conflicts
-        val wishlistCard = TestFixtures.buildUserCard(scryfallId = "id-001", isInWishlist = true)
-        coEvery { userCardDao.insert(any()) } returns -1L
+    fun `given null userId in addOrIncrement then entity userId is null`() = runTest {
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        // Act
-        repository.addOrIncrement(wishlistCard)
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, null)
 
-        // Assert: isInWishlist = true is correctly forwarded
-        coVerify(exactly = 1) {
-            userCardDao.incrementQuantityByUniqueKey(
-                scryfallId       = "id-001",
-                isFoil           = false,
-                isAlternativeArt = false,
-                condition        = "NM",
-                language         = "en",
-                isInWishlist     = true,
-            )
-        }
-    }
-
-    @Test
-    fun `given collection entry and wishlist entry for same card when addOrIncrement then they are treated as separate entries`() = runTest {
-        // This test documents that isInWishlist is part of the unique key.
-        // A collection copy and a wishlist copy are separate rows.
-
-        // Arrange: insert of collection copy succeeds (new row)
-        val collectionCard = TestFixtures.buildUserCard(scryfallId = "id-001", isInWishlist = false)
-        coEvery { userCardDao.insert(any()) } returns 10L
-
-        // Act
-        repository.addOrIncrement(collectionCard)
-
-        // Assert: a fresh insert was created — increment was NOT called
-        coVerify(exactly = 0) { userCardDao.incrementQuantityByUniqueKey(any(), any(), any(), any(), any(), any()) }
-    }
-
-    @Test
-    fun `given different conditions when addOrIncrement then each condition is a separate row`() = runTest {
-        // Arrange — NM insert succeeds (new row, no conflict with existing LP row)
-        val nmCard = TestFixtures.buildUserCard(scryfallId = "id-001", condition = "NM")
-        coEvery { userCardDao.insert(any()) } returns 20L
-
-        // Act
-        repository.addOrIncrement(nmCard)
-
-        // Assert: no increment — different condition = new row
-        coVerify(exactly = 0) { userCardDao.incrementQuantityByUniqueKey(any(), any(), any(), any(), any(), any()) }
+        assertNull(captured.captured.userId)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 2 — updateQuantity guards
+    //  GROUP 2 — updateAttributes: individual field isolation
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given quantity zero when updateQuantity then card is deleted`() = runTest {
-        // Arrange
-        coEvery { userCardDao.deleteById(any()) } returns Unit
+    fun `given only isForTrade changes when updateAttributes then other fields are preserved`() = runTest {
+        val original = buildEntity(
+            id           = "e-001",
+            scryfallId   = "card-001",
+            condition    = "LP",
+            language     = "de",
+            isFoil       = true,
+            isForTrade   = false,
+            isInWishlist = false,
+            quantity     = 3,
+        )
+        every { userCardCollectionDao.getById("e-001") } returns original
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        // Act
-        repository.updateQuantity(id = 1L, quantity = 0)
+        repository.updateAttributes(id = "e-001", isForTrade = true, isInWishlist = false, quantity = 3)
 
-        // Assert
-        coVerify(exactly = 1) { userCardDao.deleteById(1L) }
-        coVerify(exactly = 0) { userCardDao.updateQuantity(any(), any()) }
+        val entity = captured.captured
+        // Changed field:
+        assertTrue(entity.isForTrade)
+        // Unchanged fields:
+        assertEquals("card-001", entity.scryfallId)
+        assertEquals("LP",       entity.condition)
+        assertEquals("de",       entity.language)
+        assertTrue(entity.isFoil)
+        assertEquals(3, entity.quantity)
     }
 
     @Test
-    fun `given positive quantity when updateQuantity then quantity is updated without deleting`() = runTest {
-        // Arrange
-        coEvery { userCardDao.updateQuantity(any(), any()) } returns Unit
+    fun `given updatedAt when updateAttributes then updatedAt is bumped but createdAt is preserved`() = runTest {
+        val original = buildEntity(id = "e-001", createdAt = 500L, updatedAt = 100L)
+        every { userCardCollectionDao.getById("e-001") } returns original
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        // Act
-        repository.updateQuantity(id = 1L, quantity = 5)
+        repository.updateAttributes("e-001", false, false, 1)
 
-        // Assert
-        coVerify(exactly = 1) { userCardDao.updateQuantity(1L, 5) }
-        coVerify(exactly = 0) { userCardDao.deleteById(any()) }
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun `given negative quantity when updateQuantity then IllegalArgumentException is thrown`() = runTest {
-        // Act — must throw before touching the DAO
-        repository.updateQuantity(id = 1L, quantity = -1)
+        val entity = captured.captured
+        assertTrue("updatedAt must be bumped", entity.updatedAt > 100L)
+        assertEquals("createdAt must be preserved", 500L, entity.createdAt)
     }
 
     @Test
-    fun `given quantity one when updateQuantity then single copy remains`() = runTest {
-        // Arrange
-        coEvery { userCardDao.updateQuantity(any(), any()) } returns Unit
+    fun `given quantity reduced when updateAttributes then new quantity is stored`() = runTest {
+        every { userCardCollectionDao.getById("e-001") } returns buildEntity(id = "e-001", quantity = 10)
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        // Act
-        repository.updateQuantity(id = 1L, quantity = 1)
+        repository.updateAttributes("e-001", false, false, 2)
 
-        // Assert: quantity = 1 is a valid update, not a deletion
-        coVerify(exactly = 1) { userCardDao.updateQuantity(1L, 1) }
-        coVerify(exactly = 0) { userCardDao.deleteById(any()) }
+        assertEquals(2, captured.captured.quantity)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — deleteCard delegates correctly
+    //  GROUP 3 — deleteCard: repeated soft-delete is safe
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given valid id when deleteCard then deleteById is called with the correct id`() = runTest {
-        // Arrange
-        coEvery { userCardDao.deleteById(any()) } returns Unit
+    fun `given deleteCard called twice then softDelete is called twice without crash`() = runTest {
+        repository.deleteCard("entity-001")
+        repository.deleteCard("entity-001")
 
-        // Act
-        repository.deleteCard(id = 99L)
-
-        // Assert
-        coVerify(exactly = 1) { userCardDao.deleteById(99L) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — incrementQuantity delegates correctly
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given valid id when incrementQuantity then dao incrementQuantity is called`() = runTest {
-        // Arrange
-        coEvery { userCardDao.incrementQuantity(any()) } returns Unit
-
-        // Act
-        repository.incrementQuantity(id = 7L)
-
-        // Assert
-        coVerify(exactly = 1) { userCardDao.incrementQuantity(7L) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — getScryfallIds delegation
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given collection has entries when getScryfallIds then returns distinct ids`() = runTest {
-        // Arrange
-        val expected = listOf("id-001", "id-002", "id-003")
-        coEvery { userCardDao.getAllScryfallIds() } returns expected
-
-        // Act
-        val result = repository.getScryfallIds()
-
-        // Assert
-        assertEquals(expected, result)
+        verify(exactly = 2) { userCardCollectionDao.softDelete(eq("entity-001"), any()) }
     }
 
     @Test
-    fun `given empty collection when getScryfallIds then returns empty list`() = runTest {
-        // Arrange
-        coEvery { userCardDao.getAllScryfallIds() } returns emptyList()
+    fun `given deleteCard when called then upsert is never invoked`() = runTest {
+        repository.deleteCard("entity-001")
 
-        // Act
-        val result = repository.getScryfallIds()
-
-        // Assert
-        assertEquals(emptyList<String>(), result)
+        verify(exactly = 0) { userCardCollectionDao.upsert(any()) }
     }
 }

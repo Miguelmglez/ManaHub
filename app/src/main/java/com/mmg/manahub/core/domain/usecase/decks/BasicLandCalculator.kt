@@ -20,6 +20,7 @@ object BasicLandCalculator {
         mainboard: List<DeckCard>,
         nonBasicLands: List<DeckCard>,
         format: DeckFormat,
+        commanderIdentity: Set<String>? = null,
     ): BasicLandDistribution {
         val nonBasicCount = nonBasicLands.sumOf { it.quantity }
         val basicSlotsAvailable = (format.targetLandCount - nonBasicCount).coerceAtLeast(0)
@@ -29,6 +30,13 @@ object BasicLandCalculator {
         val colorWeights = mutableMapOf("W" to 0, "U" to 0, "B" to 0, "R" to 0, "G" to 0)
 
         mainboard.forEach { deckCard ->
+            // In Commander, we ignore cards that don't fit the identity for land calculation purposes.
+            // This treats them as user errors.
+            val cardIdentity = deckCard.card.colorIdentity.toSet()
+            if (commanderIdentity != null && !commanderIdentity.containsAll(cardIdentity)) {
+                return@forEach
+            }
+
             val manaCost = deckCard.card.manaCost ?: ""
             val qty = deckCard.quantity
             colorWeights["W"] = colorWeights["W"]!! + manaCost.count { it == 'W' } * qty
@@ -39,9 +47,42 @@ object BasicLandCalculator {
         }
 
         val totalWeight = colorWeights.values.sum()
-        if (totalWeight == 0) return BasicLandDistribution()
+        
+        // If no weights (e.g. all colorless or all cards filtered out), 
+        // we fallback to equal distribution if we have a commander identity, 
+        // or return empty if no weights at all and no identity.
+        if (totalWeight == 0) {
+            return if (commanderIdentity != null && commanderIdentity.isNotEmpty()) {
+                val allowedColors = commanderIdentity.filter { it in LAND_FOR_COLOR.keys }
+                if (allowedColors.isEmpty()) return BasicLandDistribution()
+                
+                val perColor = basicSlotsAvailable / allowedColors.size
+                val remainder = basicSlotsAvailable % allowedColors.size
+                
+                val allocated = mutableMapOf<String, Int>()
+                allowedColors.forEachIndexed { i, color ->
+                    allocated[color] = perColor + (if (i < remainder) 1 else 0)
+                }
+                BasicLandDistribution(
+                    plains    = allocated["W"] ?: 0,
+                    islands   = allocated["U"] ?: 0,
+                    swamps    = allocated["B"] ?: 0,
+                    mountains = allocated["R"] ?: 0,
+                    forests   = allocated["G"] ?: 0,
+                )
+            } else {
+                BasicLandDistribution()
+            }
+        }
 
-        val activeColors = colorWeights.filter { it.value > 0 }
+        // Filter active colors to only those allowed by commander identity if provided
+        val activeColors = colorWeights.filter { entry -> 
+            entry.value > 0 && (commanderIdentity == null || commanderIdentity.contains(entry.key))
+        }
+        
+        if (activeColors.isEmpty()) return BasicLandDistribution()
+
+        val filteredTotalWeight = activeColors.values.sum()
         val allocated = mutableMapOf<String, Int>()
         var totalAllocated = 0
 
@@ -49,7 +90,7 @@ object BasicLandCalculator {
             val share = if (i == activeColors.size - 1) {
                 basicSlotsAvailable - totalAllocated
             } else {
-                (weight.toFloat() / totalWeight * basicSlotsAvailable)
+                (weight.toFloat() / filteredTotalWeight * basicSlotsAvailable)
                     .roundToInt()
                     .coerceAtLeast(1)
             }

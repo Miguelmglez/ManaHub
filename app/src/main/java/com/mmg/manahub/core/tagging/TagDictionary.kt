@@ -49,9 +49,12 @@ object TagDictionary {
     /** Localize a CardTag for the current locale. Returns null if unknown. */
     fun localize(tag: CardTag, lang: String = currentLang()): String? = when (tag.category) {
         TagCategory.TYPE -> {
+            // "basic_land" -> "Basic Land"
+            val words = tag.key.split("_")
+                .joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
+
             // Delegate to the type translator (single source of truth).
-            val word = tag.key.replaceFirstChar { it.uppercase() }
-            CardTypeTranslator.translateWord(word).takeIf { it.isNotBlank() }
+            CardTypeTranslator.translateTypeLine(words, lang).takeIf { it.isNotBlank() }
         }
         else -> entries[tag.key]?.labels?.get(lang)
             ?: entries[tag.key]?.labels?.get("en")
@@ -344,8 +347,9 @@ private val baseEntries: List<TagDictionary.Entry> = listOf(
     plain("enchantress",TagCategory.STRATEGY, "Enchantress","Enchantress",   "Verzauberin"),
     plain("infinite_combo", TagCategory.STRATEGY, "Infinite Combo", "Combo infinito", "Endlos-Combo"),
     plain("stax",      TagCategory.STRATEGY,  "Stax/Prison","Stax/Prisión",  "Stax/Gefängnis"),
-    plain("mana_dork", TagCategory.ROLE,      "Mana Dork",  "Criatura de maná","Mana-Kreatur"),
-    plain("win_con",   TagCategory.ROLE,      "Win Condition","Condición de victoria","Siegbedingung"),
+    plain("mana_dork",    TagCategory.ROLE, "Mana Dork",    "Criatura de maná",     "Mana-Kreatur"),
+    plain("win_con",      TagCategory.ROLE, "Win Condition","Condición de victoria", "Siegbedingung"),
+    plain("game_changer", TagCategory.ROLE, "Game Changer", "Game Changer",          "Game Changer"),
     plain("goblin",    TagCategory.TRIBAL,    "Goblin",     "Trasgo",        "Goblin"),
     plain("elf",       TagCategory.TRIBAL,    "Elf",        "Elfo",          "Elf"),
     plain("dragon",    TagCategory.TRIBAL,    "Dragon",     "Dragón",        "Drache"),

@@ -53,12 +53,6 @@ interface SupabaseUserProfileService {
     @POST("rpc/update_user_avatar")
     suspend fun updateAvatarUrl(@Body body: UpdateAvatarUrlDto): Response<Unit>
 
-    /**
-     * Calls the `delete_current_user` Supabase RPC (SECURITY DEFINER).
-     * Deletes the currently authenticated user from auth.users.
-     */
-    @POST("rpc/delete_current_user")
-    suspend fun deleteCurrentUser(): Response<Unit>
 }
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.usecase.card.SearchCardUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -51,9 +52,10 @@ class ScannerViewModelTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val searchCards     = mockk<SearchCardsUseCase>()
-    private val searchCard      = mockk<SearchCardUseCase>()
-    private val addToCollection = mockk<AddCardToCollectionUseCase>()
+    private val searchCards      = mockk<SearchCardsUseCase>()
+    private val searchCard       = mockk<SearchCardUseCase>()
+    private val addToCollection  = mockk<AddCardToCollectionUseCase>()
+    private val analyticsHelper  = mockk<AnalyticsHelper>(relaxed = true)
 
     private lateinit var viewModel: ScannerViewModel
 
@@ -66,9 +68,10 @@ class ScannerViewModelTest {
 
     private fun buildViewModel(): ScannerViewModel =
         ScannerViewModel(
-            searchCards    = searchCards,
-            searchCard     = searchCard,
+            searchCards     = searchCards,
+            searchCard      = searchCard,
             addToCollection = addToCollection,
+            analyticsHelper = analyticsHelper,
         )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -319,7 +322,7 @@ class ScannerViewModelTest {
     fun `given addToCollection succeeds when onConfirmAdd then state is reset for next scan`() = runTest {
         // Arrange — put ViewModel in confirm-sheet state first
         coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any(), quantity = any()) } returns DataResult.Success(Unit)
+        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any()) } returns DataResult.Success(Unit)
 
         viewModel.onCardNameDetected("Lightning Bolt")
         advanceUntilIdle()
@@ -347,7 +350,7 @@ class ScannerViewModelTest {
     fun `given addToCollection returns error when onConfirmAdd then error message is shown and sheet dismissed`() = runTest {
         // Arrange
         coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any(), quantity = any()) } returns DataResult.Error("Server error")
+        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any()) } returns DataResult.Error("Server error")
 
         viewModel.onCardNameDetected("Lightning Bolt")
         advanceUntilIdle()
@@ -403,7 +406,7 @@ class ScannerViewModelTest {
     fun `given addedSuccessfully is true when onSuccessDismissed then flag is cleared`() = runTest {
         // Arrange
         coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any(), quantity = any()) } returns DataResult.Success(Unit)
+        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any()) } returns DataResult.Success(Unit)
         viewModel.onCardNameDetected("Lightning Bolt")
         advanceUntilIdle()
         viewModel.onConfirmAdd("abc-001", false, "NM", "en", 1)
