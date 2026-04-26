@@ -48,7 +48,10 @@ fun CardDto.toDomain(): Card {
         cachedAt = System.currentTimeMillis(),
         printedName = printedName?:"",
         printedText = printedText?:"",
-        printedTypeLine = printedTypeLine?:""
+        printedTypeLine = printedTypeLine?:"",
+        relatedUris = relatedUris ?: emptyMap(),
+        purchaseUris = purchaseUris ?: emptyMap(),
+        gameChanger = gameChanger ?: false,
     )
 }
 

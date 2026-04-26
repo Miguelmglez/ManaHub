@@ -2,7 +2,7 @@ package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
-import com.mmg.manahub.core.data.local.dao.UserCardDao
+import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.model.DataResult
@@ -35,8 +35,8 @@ class CardRepositoryImplTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val cardDao       = mockk<CardDao>(relaxed = true)
-    private val userCardDao   = mockk<UserCardDao>(relaxed = true)
+    private val cardDao               = mockk<CardDao>(relaxed = true)
+    private val userCardCollectionDao = mockk<UserCardCollectionDao>(relaxed = true)
     private val remote        = mockk<ScryfallRemoteDataSource>()
     private val suggestTags   = mockk<SuggestTagsUseCase>()
     private val userPrefs     = mockk<UserPreferencesDataStore>()
@@ -57,12 +57,12 @@ class CardRepositoryImplTest {
         every { userPrefs.tagSuggestThresholdFlow } returns flowOf(SuggestTagsUseCase.DEFAULT_SUGGEST_THRESHOLD)
 
         repository = CardRepositoryImpl(
-            cardDao        = cardDao,
-            userCardDao    = userCardDao,
-            remote         = remote,
-            suggestTags    = suggestTags,
-            userPrefs      = userPrefs,
-            ioDispatcher   = UnconfinedTestDispatcher(),
+            cardDao               = cardDao,
+            userCardCollectionDao = userCardCollectionDao,
+            remote                = remote,
+            suggestTags           = suggestTags,
+            userPrefs             = userPrefs,
+            ioDispatcher          = UnconfinedTestDispatcher(),
         )
     }
 
@@ -75,7 +75,7 @@ class CardRepositoryImplTest {
     fun `given collection has stale cards when refreshCollectionPrices succeeds then upsert is called not delete`() = runTest {
         // Arrange
         val staleCard = TestFixtures.buildExpiredCard("id-stale-001")
-        coEvery { userCardDao.getAllScryfallIds() } returns listOf("id-stale-001")
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-stale-001")
         coEvery { cardDao.getById("id-stale-001") } returns null   // forces stale path
         coEvery { remote.getCardsBatch(listOf("id-stale-001")) } returns Result.success(listOf(staleCard))
 
@@ -93,7 +93,7 @@ class CardRepositoryImplTest {
         // Arrange
         val card1 = TestFixtures.buildExpiredCard("id-001")
         val card2 = TestFixtures.buildExpiredCard("id-002")
-        coEvery { userCardDao.getAllScryfallIds() } returns listOf("id-001", "id-002")
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001", "id-002")
         coEvery { cardDao.getById("id-001") } returns null
         coEvery { cardDao.getById("id-002") } returns null
         coEvery { remote.getCardsBatch(listOf("id-001", "id-002")) } returns
@@ -112,7 +112,7 @@ class CardRepositoryImplTest {
         // Arrange — simulates multiple collection cards needing a price refresh
         val ids = listOf("id-001", "id-002", "id-003")
         val cards = ids.map { TestFixtures.buildExpiredCard(it) }
-        coEvery { userCardDao.getAllScryfallIds() } returns ids
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns ids
         ids.forEach { coEvery { cardDao.getById(it) } returns null }
         coEvery { remote.getCardsBatch(ids) } returns Result.success(cards)
 
@@ -132,7 +132,7 @@ class CardRepositoryImplTest {
         )
 
         val refreshedCard = TestFixtures.buildCard("id-001")
-        coEvery { userCardDao.getAllScryfallIds() } returns listOf("id-001")
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001")
         coEvery { cardDao.getById("id-001") } returns existingEntity
         coEvery { remote.getCardsBatch(listOf("id-001")) } returns Result.success(listOf(refreshedCard))
 
@@ -153,7 +153,7 @@ class CardRepositoryImplTest {
     @Test
     fun `given empty collection when refreshCollectionPrices then no network call is made`() = runTest {
         // Arrange
-        coEvery { userCardDao.getAllScryfallIds() } returns emptyList()
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns emptyList()
 
         // Act
         repository.refreshCollectionPrices()
@@ -167,7 +167,7 @@ class CardRepositoryImplTest {
         // Arrange — all cards are within the 24-h freshness window
         val freshEntity = TestFixtures.buildFreshCardEntity("id-fresh-001")
 
-        coEvery { userCardDao.getAllScryfallIds() } returns listOf("id-fresh-001")
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-fresh-001")
         coEvery { cardDao.getById("id-fresh-001") } returns freshEntity
 
         // Act
@@ -182,7 +182,7 @@ class CardRepositoryImplTest {
         // Arrange
         val staleEntity = TestFixtures.buildStaleCardEntity("id-001")
 
-        coEvery { userCardDao.getAllScryfallIds() } returns listOf("id-001")
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001")
         coEvery { cardDao.getById("id-001") } returns staleEntity
         coEvery { remote.getCardsBatch(any()) } returns
                 Result.failure(RuntimeException("Network unavailable"))
@@ -201,7 +201,7 @@ class CardRepositoryImplTest {
         val staleEntity1 = TestFixtures.buildStaleCardEntity("id-001")
         val staleEntity2 = TestFixtures.buildStaleCardEntity("id-002")
 
-        coEvery { userCardDao.getAllScryfallIds() } returns listOf("id-001", "id-002")
+        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001", "id-002")
         coEvery { cardDao.getById("id-001") } returns staleEntity1
         coEvery { cardDao.getById("id-002") } returns staleEntity2
         val returnedCard = TestFixtures.buildCard("id-001")

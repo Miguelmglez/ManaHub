@@ -7,19 +7,31 @@ import com.mmg.manahub.core.domain.model.DeckSlot
 import com.mmg.manahub.core.domain.model.DeckWithCards
 
 fun DeckEntity.toDomainDeck(): Deck = Deck(
-    id = id, name = name, description = description,
-    format = format, coverCardId = coverCardId,
-    createdAt = createdAt, updatedAt = updatedAt,
+    id = id,
+    userId = userId,
+    name = name,
+    description = description,
+    format = format,
+    coverCardId = coverCardId,
+    isDeleted = isDeleted,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
 )
 
 fun DeckWithCardsEntity.toDomainDeckWithCards(): DeckWithCards = DeckWithCards(
-    deck      = deck.toDomainDeck(),
+    deck = deck.toDomainDeck(),
     mainboard = cards.filter { !it.isSideboard }.map { DeckSlot(it.scryfallId, it.quantity) },
-    sideboard = cards.filter {  it.isSideboard }.map { DeckSlot(it.scryfallId, it.quantity) },
+    sideboard = cards.filter { it.isSideboard }.map { DeckSlot(it.scryfallId, it.quantity) },
 )
 
 fun Deck.toEntity(): DeckEntity = DeckEntity(
-    id = id, name = name, description = description,
-    format = format, coverCardId = coverCardId,
-    createdAt = createdAt, updatedAt = updatedAt,
+    id = id,
+    userId = userId,
+    name = name,
+    description = description,
+    format = format,
+    coverCardId = coverCardId,
+    isDeleted = isDeleted,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
 )

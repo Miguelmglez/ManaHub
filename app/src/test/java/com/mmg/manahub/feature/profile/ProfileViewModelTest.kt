@@ -163,7 +163,6 @@ class ProfileViewModelTest {
         surveyAnswerDao          = surveyAnswerDao,
         checkAchievementsUseCase = checkAchievementsUseCase,
         userPreferencesDataStore = userPreferencesDataStore,
-        authRepository           = authRepository,
         friendRepository         = friendRepository,
     )
 

@@ -960,3 +960,4 @@ class AuthViewModelTest {
         assertFalse(AuthViewModel.isPasswordStrong("!!!!!!!!!!"))
     }
 }
+

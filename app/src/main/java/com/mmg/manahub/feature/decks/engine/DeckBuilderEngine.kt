@@ -108,11 +108,9 @@ class DeckBuilderEngine @Inject constructor(
             _state.update { it.copy(isSaving = true, error = null) }
             try {
                 val deckId = deckRepo.createDeck(
-                    Deck(
-                        name        = s.deckName,
-                        format      = s.format.name.lowercase(),
-                        description = "${s.seedStrategy?.displayName ?: "Custom"} — built by Æther",
-                    )
+                    name        = s.deckName,
+                    description = "${s.seedStrategy?.displayName ?: "Custom"} — built by Æther",
+                    format      = s.format.name.lowercase(),
                 )
                 s.mainboard.forEach { e ->
                     deckRepo.addCardToDeck(deckId, e.card.scryfallId, e.quantity, false)

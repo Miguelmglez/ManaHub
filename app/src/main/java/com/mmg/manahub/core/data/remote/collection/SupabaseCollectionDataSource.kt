@@ -2,18 +2,24 @@ package com.mmg.manahub.core.data.remote.collection
 
 import com.mmg.manahub.core.di.IoDispatcher
 import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
-import java.time.Instant
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Supabase implementation of [CollectionRemoteDataSource].
+ *
+ * Uses the Supabase SDK v3 RPC API. Key SDK gotchas applied here:
+ * - `rpc("name", buildJsonObject { put("key", value) })` — params must be [kotlinx.serialization.json.JsonObject]
+ * - `rpc().decodeList<T>()` — not `.body`
+ * - All timestamps are Long (epoch millis), not Instant strings.
+ */
 @Singleton
 class SupabaseCollectionDataSource @Inject constructor(
     private val supabaseClient: SupabaseClient,
@@ -22,69 +28,31 @@ class SupabaseCollectionDataSource @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun getLastModified(userId: String): Instant? = withContext(ioDispatcher) {
-        runCatching {
-            // Fetch the single most-recently updated row's timestamp (DESC + limit 1 = MAX).
-            supabaseClient.from(TABLE)
-                .select {
-                    filter { eq("user_id", userId) }
-                    order("updated_at", Order.DESCENDING)
-                    limit(1)
-                }
-                .decodeSingleOrNull<UpdatedAtDto>()
-                ?.updatedAt
-                ?.let { Instant.parse(it) }
-        }.getOrNull()
-    }
-
-    override suspend fun getChangesSince(
-        userId: String,
-        since: Instant,
-    ): Result<List<UserCardCollectionDto>> = withContext(ioDispatcher) {
-        runCatching {
-            // RLS ensures only our own rows; the explicit user_id filter is defence-in-depth.
-            supabaseClient.from(TABLE)
-                .select {
-                    filter {
-                        eq("user_id", userId)
-                        gt("updated_at", since.toString())
-                    }
-                    order("updated_at", Order.ASCENDING)
-                }
-                .decodeList<UserCardCollectionDto>()
-        }
-    }
-
-    override suspend fun upsertCard(params: UpsertUserCardParams): Result<String> =
+    /**
+     * Calls the `get_collection_changes_since` RPC.
+     * The RPC uses `auth.uid()` internally for RLS row filtering.
+     */
+    override suspend fun getChangesSince(since: Long): Result<List<UserCardCollectionDto>> =
         withContext(ioDispatcher) {
             runCatching {
-                // Use the upsert_user_card RPC to atomically insert-or-update on the unique
-                // constraint (user_id, scryfall_id, is_foil, condition, language, ...).
-                val jsonParams = json.encodeToJsonElement(params).jsonObject
-                val remoteId = supabaseClient.postgrest
-                    .rpc("upsert_user_card", jsonParams)
-                    .decodeSingleOrNull<String>()
-                remoteId ?: ""
+                val params = buildJsonObject { put("p_since", since) }
+                supabaseClient.postgrest
+                    .rpc("get_collection_changes_since", params)
+                    .decodeList<UserCardCollectionDto>()
             }
         }
 
-    override suspend fun softDeleteCard(remoteId: String): Result<Unit> =
+    /**
+     * Serializes [rows] to a JSON array and calls `batch_upsert_collection`.
+     * The RPC performs server-side upsert on the `id` primary key.
+     */
+    override suspend fun batchUpsert(rows: List<UserCardCollectionDto>): Result<Unit> =
         withContext(ioDispatcher) {
             runCatching {
-                supabaseClient.from(TABLE)
-                    .update(SoftDeletePayload()) {
-                        filter { eq("id", remoteId) }
-                    }
+                val jsonArray = json.encodeToJsonElement(rows)
+                val params = buildJsonObject { put("p_rows", jsonArray) }
+                supabaseClient.postgrest.rpc("batch_upsert_collection", params)
                 Unit
             }
         }
-
-    private companion object {
-        const val TABLE = "user_card_collection"
-    }
 }
-
-@kotlinx.serialization.Serializable
-private data class UpdatedAtDto(
-    @kotlinx.serialization.SerialName("updated_at") val updatedAt: String?,
-)

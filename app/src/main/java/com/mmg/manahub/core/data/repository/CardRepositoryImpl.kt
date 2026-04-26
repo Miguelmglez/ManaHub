@@ -2,7 +2,7 @@ package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
-import com.mmg.manahub.core.data.local.dao.UserCardDao
+import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.mapper.toSuggestedTagList
 import com.mmg.manahub.core.data.local.mapper.toSuggestedTagsJson
 import com.mmg.manahub.core.data.local.mapper.toTagList
@@ -30,8 +30,8 @@ import javax.inject.Singleton
 
 @Singleton
 class CardRepositoryImpl @Inject constructor(
-    private val cardDao:        CardDao,
-    private val userCardDao:    UserCardDao,
+    private val cardDao:              CardDao,
+    private val userCardCollectionDao: UserCardCollectionDao,
     private val remote:         ScryfallRemoteDataSource,
     private val suggestTags:    SuggestTagsUseCase,
     private val userPrefs:      UserPreferencesDataStore,
@@ -119,7 +119,7 @@ class CardRepositoryImpl @Inject constructor(
         cardDao.observeById(scryfallId).map { it?.toDomain() }
 
     override suspend fun refreshCollectionPrices() = withContext(ioDispatcher) {
-        val allIds = userCardDao.getAllScryfallIds()
+        val allIds = userCardCollectionDao.getAllScryfallIds()
         if (allIds.isEmpty()) return@withContext
 
         // Batch-load all cached entries in a single query instead of N getById() calls.

@@ -31,6 +31,7 @@ import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.StaleWarningBanner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.decks.DeckListScreen
 import java.util.Locale
@@ -43,10 +44,7 @@ private const val TAB_DECKS = 1
 fun CollectionScreen(
     onCardClick:              (scryfallId: String) -> Unit,
     onScannerClick:           () -> Unit,
-    onDeckClick:              (deckId: Long) -> Unit,
-    onCreateDeckClick:        () -> Unit,
-    onSynergyClick:           () -> Unit,
-    onDeckBuilderClick:       () -> Unit,
+    onDeckClick:              (deckId: String) -> Unit,
     viewModel:                CollectionViewModel = hiltViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
@@ -63,10 +61,6 @@ fun CollectionScreen(
             viewModel.onTabSelected(CollectionTab.DECKS)
             onDeckClick(id)
         },
-        onCreateDeckClick     = {
-            viewModel.onTabSelected(CollectionTab.DECKS)
-            onCreateDeckClick()
-        },
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
@@ -78,9 +72,7 @@ fun CollectionScreen(
         onShowAdvancedSearch  = { showAdvancedSearch = true },
         onShowSyncSheet       = { showSyncSheet = true },
         onTabSelected         = viewModel::onTabSelected,
-        onSyncDismissed       = viewModel::onSyncDismissed,
-        onSynergyClick        = onSynergyClick,
-        onDeckBuilderClick    = onDeckBuilderClick,
+        onSyncDismissed       = viewModel::onSyncDismissed
     )
 
     if (showAdvancedSearch) {
@@ -96,11 +88,9 @@ fun CollectionScreen(
 
     if (showSyncSheet) {
         SyncBottomSheet(
-            isSyncing        = uiState.syncState == SyncState.SYNCING,
-            pendingCount     = uiState.pendingUploadCount,
-            onPushCollection = viewModel::onPushCollection,
-            onPullCollection = viewModel::onPullCollection,
-            onDismiss        = { showSyncSheet = false }
+            isSyncing = uiState.syncState == SyncState.SYNCING,
+            onSync    = viewModel::onSync,
+            onDismiss = { showSyncSheet = false }
         )
     }
 }
@@ -110,8 +100,7 @@ private fun CollectionContent(
     uiState:              CollectionUiState,
     onCardClick:          (String) -> Unit,
     onScannerClick:       () -> Unit,
-    onDeckClick:          (Long) -> Unit,
-    onCreateDeckClick:    () -> Unit,
+    onDeckClick:          (String) -> Unit,
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
@@ -121,8 +110,6 @@ private fun CollectionContent(
     onShowSyncSheet:      () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
     onSyncDismissed:      () -> Unit,
-    onSynergyClick:       () -> Unit,
-    onDeckBuilderClick:   () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val snackbarHostState = remember { SnackbarHostState() }
@@ -215,10 +202,7 @@ private fun CollectionContent(
                     onShowSyncSheet       = onShowSyncSheet,
                 )
                 CollectionTab.DECKS -> DeckListScreen(
-                    onDeckClick       = onDeckClick,
-                    onCreateDeckClick = onCreateDeckClick,
-                    onSynergyClick    = onSynergyClick,
-                    onDeckBuilderClick= onDeckBuilderClick,
+                    onDeckClick       = onDeckClick
                 )
             }
         }
@@ -351,7 +335,7 @@ private fun CardsTabContent(
                         Icon(
                             imageVector = Icons.Default.Sync,
                             contentDescription = stringResource(R.string.action_refresh),
-                            tint = if (uiState.pendingUploadCount > 0) mc.primaryAccent else mc.textSecondary,
+                            tint = mc.textSecondary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -570,11 +554,9 @@ private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SyncBottomSheet(
-    isSyncing:        Boolean,
-    pendingCount:     Int,
-    onPushCollection: () -> Unit,
-    onPullCollection: () -> Unit,
-    onDismiss:        () -> Unit,
+    isSyncing: Boolean,
+    onSync:    () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val sheetState = rememberModalBottomSheetState()
@@ -588,18 +570,17 @@ private fun SyncBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+                .padding(bottom = 32.dp, start = 24.dp, end = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 text  = stringResource(R.string.auth_section_title),
                 style = MaterialTheme.magicTypography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Push Option
             Surface(
                 onClick = {
-                    onPushCollection()
+                    onSync()
                     onDismiss()
                 },
                 enabled = !isSyncing,
@@ -609,70 +590,27 @@ private fun SyncBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box {
-                        Icon(
-                            imageVector = Icons.Default.CloudUpload,
-                            contentDescription = null,
-                            tint = if (pendingCount > 0) mc.primaryAccent else mc.textSecondary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text  = stringResource(R.string.collection_sync_push),
-                            style = MaterialTheme.magicTypography.bodyLarge,
-                        )
-                        if (pendingCount > 0) {
-                            Text(
-                                text  = stringResource(R.string.collection_sync_pending, pendingCount),
-                                style = MaterialTheme.magicTypography.bodySmall,
-                                color = mc.primaryAccent,
-                            )
-                        }
-                    }
-                }
-            }
-
-            HorizontalDivider(color = mc.surfaceVariant, thickness = 0.5.dp)
-
-            // Pull Option
-            Surface(
-                onClick = {
-                    onPullCollection()
-                    onDismiss()
-                },
-                enabled = !isSyncing,
-                color   = Color.Transparent,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        imageVector = Icons.Default.CloudDownload,
+                        imageVector = Icons.Default.Sync,
                         contentDescription = null,
-                        tint = mc.textPrimary,
+                        tint = mc.primaryAccent,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(Modifier.width(16.dp))
                     Text(
-                        text  = stringResource(R.string.collection_sync_pull),
+                        text  = stringResource(R.string.action_refresh),
                         style = MaterialTheme.magicTypography.bodyLarge,
                     )
                 }
             }
 
             if (isSyncing) {
-                Spacer(Modifier.height(16.dp))
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color    = mc.primaryAccent,
-                    trackColor = mc.surfaceVariant
+                    modifier   = Modifier.fillMaxWidth(),
+                    color      = mc.primaryAccent,
+                    trackColor = mc.surfaceVariant,
                 )
             }
         }

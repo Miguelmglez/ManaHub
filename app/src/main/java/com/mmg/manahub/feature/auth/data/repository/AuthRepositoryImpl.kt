@@ -15,6 +15,7 @@ import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
@@ -338,15 +339,37 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun deleteAccount(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
-            val response: Response<Unit> = supabaseUserProfileService.deleteCurrentUser()
-            if (!response.isSuccessful) {
-                return@runCatching AuthResult.Error(
-                    AuthError.Unknown("HTTP ${response.code()}")
-                )
+            // Retrieve the current JWT to authenticate the Edge Function call.
+            val accessToken = supabaseAuth.currentSessionOrNull()?.accessToken
+                ?: return@runCatching AuthResult.Error(AuthError.SessionExpired)
+
+            // Call the Edge Function which:
+            //   1. Deletes all app data (user_card_collection, decks, deck_cards,
+            //      game_sessions, tournaments, friendships, user_profiles, etc.)
+            //   2. Calls supabase.auth.admin.deleteUser() to fully remove the Auth record
+            //      so the same email can re-register immediately.
+            // The old `rpc/delete_current_user` only deleted user_profiles and did NOT
+            // remove the Auth user, leaving orphaned data behind.
+            val request = Request.Builder()
+                .url("${BuildConfig.SUPABASE_URL}/functions/v1/delete-current-user")
+                .addHeader("Authorization", "Bearer $accessToken")
+                .post("".toRequestBody(null))
+                .build()
+
+            val httpResponse = supabaseOkHttpClient.newCall(request).execute()
+            httpResponse.use { resp ->
+                if (!resp.isSuccessful) {
+                    val errorBody = resp.body?.string() ?: "HTTP ${resp.code}"
+                    return@runCatching AuthResult.Error(AuthError.Unknown(errorBody))
+                }
             }
-            // signOut may fail if the session is already invalidated server-side after deletion.
-            // The account is gone regardless — always return Success once the RPC call succeeds.
-            runCatching { supabaseAuth.signOut() }
+
+            // Use LOCAL scope: clears the in-memory session without a network call.
+            // A GLOBAL signOut would hit the server with an already-deleted token,
+            // potentially throw before clearing local state, and leave the session
+            // alive — causing the background sync worker to keep hitting Supabase
+            // with an invalid token until the JWT TTL expires.
+            runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
             AuthResult.Success(Unit)
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }

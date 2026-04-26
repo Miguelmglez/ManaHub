@@ -96,23 +96,30 @@ object CardTypeTranslator {
         "Clue"       to mapOf("es" to "Pista",     "de" to "Hinweis")
     )
 
+    // Tipos complejos o combinados
+    private val complexTypes = mapOf(
+        "Basic Land" to mapOf("es" to "Tierra Básica", "de" to "Standardland")
+    )
+
     // Diccionario combinado de todos los tipos
     private val allTypes: Map<String, Map<String, String>> by lazy {
-        supertypes + mainTypes + creatureSubtypes + landSubtypes + artifactSubtypes
+        supertypes + mainTypes + creatureSubtypes + landSubtypes + artifactSubtypes + complexTypes
     }
 
     // Traduce una palabra de la type_line al idioma del dispositivo
     fun translateWord(word: String): String {
+        val sanitized = word.replace('_', ' ')
         val lang = java.util.Locale.getDefault().language.lowercase()
-        if (lang == "en") return word
-        return allTypes[word]?.get(lang) ?: word
+        if (lang == "en") return sanitized
+
+        val capitalized = sanitized.split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        return allTypes[capitalized]?.get(lang) ?: sanitized
     }
 
     // Traduce la type_line completa
     // Input:  "Legendary Creature — Elf Wizard"
     // Output: "Criatura Legendaria — Elfo Mago" (en español)
-    fun translateTypeLine(typeLine: String): String {
-        val lang = java.util.Locale.getDefault().language.lowercase()
+    fun translateTypeLine(typeLine: String, lang: String = currentLang()): String {
         if (lang == "en") return typeLine
 
         val parts = typeLine.split(" — ", " - ")
@@ -129,9 +136,10 @@ object CardTypeTranslator {
     }
 
     // Traduce solo el tipo principal (sin subtipos) para chips y filtros
-    fun translateMainType(type: String): String {
-        val lang = java.util.Locale.getDefault().language.lowercase()
+    fun translateMainType(type: String, lang: String = currentLang()): String {
         if (lang == "en") return type
         return mainTypes[type]?.get(lang) ?: type
     }
+
+    private fun currentLang(): String = java.util.Locale.getDefault().language.lowercase()
 }

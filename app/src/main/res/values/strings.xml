@@ -392,6 +392,43 @@
     <string name="deckbuilder_add_cards_done">Done</string>
     <string name="deckbuilder_deck_empty">This deck is empty</string>
     <string name="deckbuilder_max_copies_reached">Max copies reached</string>
+    <string name="deckbuilder_discard_dialog_title">Unsaved changes</string>
+    <string name="deckbuilder_discard_dialog_message">You have unsaved changes. Discard them and leave?</string>
+    <string name="deckbuilder_discard_confirm">Discard</string>
+    <string name="deckbuilder_discard_cancel">Keep editing</string>
+    <string name="deckbuilder_choose_as_commander">Choose as commander</string>
+    <string name="deckbuilder_remove_commander">Remove commander</string>
+    <string name="deckbuilder_save_changes_button">Save changes</string>
+    <string name="deckbuilder_saved_button">Saved</string>
+
+    <!-- ══════════════════════════════════════════
+         DECK IMPROVEMENT SCREEN
+    ═══════════════════════════════════════════ -->
+    <string name="deck_improve_title">Deck Analysis</string>
+    <string name="deck_improve_button">Improve</string>
+    <string name="deck_improve_strengths">Strengths</string>
+    <string name="deck_improve_weaknesses">Weaknesses</string>
+    <string name="deck_improve_suggestions">Suggestions</string>
+    <string name="deck_improve_empty_analysis">Analyzing your deck…</string>
+    <string name="deck_improve_apply_suggestion">Apply</string>
+    <string name="deck_improve_suggestion_applied">Suggestion applied</string>
+
+    <string name="deck_improve_mana_curve_good">Excellent mana curve. You have a balanced spread of costs.</string>
+    <string name="deck_improve_mana_curve_high">Mana curve is too high. You might struggle in the early game.</string>
+    <string name="deck_improve_mana_curve_low">Mana curve is very low. You might run out of steam in the late game.</string>
+
+    <string name="deck_improve_lands_good">Solid land count for this format.</string>
+    <string name="deck_improve_lands_few">Too few lands. You might get mana screwed often.</string>
+    <string name="deck_improve_lands_many">Too many lands. You might get mana flooded often.</string>
+
+    <string name="deck_improve_interaction_good">Great amount of interaction and removal.</string>
+    <string name="deck_improve_interaction_low">Low on interaction. Consider adding more removal or counterspells.</string>
+
+    <string name="deck_improve_synergy_good">Strong internal synergy detected.</string>
+    <string name="deck_improve_synergy_low">Deck lacks clear synergies. Try focusing on specific tags or strategies.</string>
+
+    <string name="deck_improve_suggestion_add_from_collection">Add %1$s from your collection</string>
+    <string name="deck_improve_suggestion_swap_from_sideboard">Swap %1$s from sideboard for %2$s</string>
 
     <!-- ══════════════════════════════════════════
          GAME SETUP SCREEN

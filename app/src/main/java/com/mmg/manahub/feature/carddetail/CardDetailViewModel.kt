@@ -14,11 +14,15 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CardDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -27,6 +31,7 @@ class CardDetailViewModel @Inject constructor(
     private val deckRepo: DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
     private val userPrefs: UserPreferencesRepository,
+    private val authRepository: AuthRepository,
     private val helper: AnalyticsHelper,
 ) : ViewModel() {
 
@@ -88,7 +93,11 @@ class CardDetailViewModel @Inject constructor(
 
     private fun observeUserCards() {
         viewModelScope.launch {
-            userCardRepo.observeByScryfallId(scryfallId)
+            authRepository.sessionState
+                .flatMapLatest { state ->
+                    val userId = (state as? SessionState.Authenticated)?.user?.id
+                    userCardRepo.observeByScryfallId(scryfallId, userId)
+                }
                 .collect { cards ->
                     _uiState.update { it.copy(userCards = cards.filter { c -> !c.isInWishlist }) }
                 }
@@ -122,7 +131,6 @@ class CardDetailViewModel @Inject constructor(
                 isAlternativeArt = isAlternativeArt,
                 condition = condition,
                 language = language,
-                quantity = quantity,
             )
             if (result is DataResult.Error) {
                 _uiState.update { it.copy(error = result.message) }
@@ -145,16 +153,18 @@ class CardDetailViewModel @Inject constructor(
         condition: String, language: String, quantity: Int,
     ) {
         viewModelScope.launch {
-            val wishlistCard = UserCard(
-                scryfallId = scryfallId,
-                isFoil = isFoil,
-                isAlternativeArt = isAlternativeArt,
-                condition = condition,
-                language = language,
-                quantity = quantity,
-                isInWishlist = true,
-            )
-            runCatching { userCardRepo.addOrIncrement(wishlistCard) }
+            runCatching {
+                userCardRepo.addOrIncrement(
+                    scryfallId = scryfallId,
+                    isFoil = isFoil,
+                    isAlternativeArt = isAlternativeArt,
+                    condition = condition,
+                    language = language,
+                    isForTrade = false,
+                    isInWishlist = true,
+                    userId = null,
+                )
+            }
                 .onSuccess {
                     helper.logEvent("add_card_wishlist", mapOf("card_id" to scryfallId))
                     _events.emit(CardDetailEvent.ShowToast("Added to wishlist"))
@@ -173,32 +183,51 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
-    fun onUpdateQuantity(userCardId: Long, quantity: Int) {
+    fun onUpdateQuantity(userCardId: String, quantity: Int) {
         viewModelScope.launch {
-            runCatching { userCardRepo.updateQuantity(userCardId, quantity) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+            val card = _uiState.value.userCards.find { it.id == userCardId } ?: return@launch
+            runCatching {
+                userCardRepo.updateAttributes(
+                    id = userCardId,
+                    isForTrade = card.isForTrade,
+                    isInWishlist = card.isInWishlist,
+                    quantity = quantity,
+                )
+            }.onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
     }
 
     fun onUpdateCondition(userCard: UserCard, condition: String) {
         viewModelScope.launch {
-            runCatching { userCardRepo.updateCard(userCard.copy(condition = condition)) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+            runCatching {
+                userCardRepo.updateAttributes(
+                    id = userCard.id,
+                    isForTrade = userCard.isForTrade,
+                    isInWishlist = userCard.isInWishlist,
+                    quantity = userCard.quantity,
+                )
+            }.onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
     }
 
-    fun onConfirmTradeSelection(selections: Map<Long, Boolean>) {
+    fun onConfirmTradeSelection(selections: Map<String, Boolean>) {
         val userCards = _uiState.value.userCards
         viewModelScope.launch {
             var anyError = false
             selections.forEach { (id, isForTrade) ->
                 val card = userCards.find { it.id == id } ?: return@forEach
                 if (card.isForTrade != isForTrade) {
-                    runCatching { userCardRepo.updateCard(card.copy(isForTrade = isForTrade)) }
-                        .onFailure { e ->
-                            anyError = true
-                            _uiState.update { it.copy(error = e.message) }
-                        }
+                    runCatching {
+                        userCardRepo.updateAttributes(
+                            id = id,
+                            isForTrade = isForTrade,
+                            isInWishlist = card.isInWishlist,
+                            quantity = card.quantity,
+                        )
+                    }.onFailure { e ->
+                        anyError = true
+                        _uiState.update { it.copy(error = e.message) }
+                    }
                 }
             }
             if (!anyError) {
@@ -214,7 +243,7 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
-    fun onDeleteCard(userCardId: Long) {
+    fun onDeleteCard(userCardId: String) {
         viewModelScope.launch {
             runCatching { userCardRepo.deleteCard(userCardId) }
                 .onSuccess {
