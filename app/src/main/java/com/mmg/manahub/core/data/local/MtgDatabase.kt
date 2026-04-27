@@ -15,6 +15,10 @@ import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
 import com.mmg.manahub.feature.news.data.local.NewsDao
 import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
+import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
+import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
 
 @Database(
     entities = [
@@ -36,8 +40,10 @@ import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
         DraftSetEntity::class,
         FriendEntity::class,
         FriendRequestEntity::class,
+        LocalWishlistEntity::class,
+        LocalOpenForTradeEntity::class,
     ],
-    version = 27,
+    version = 28,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -54,4 +60,6 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun draftSetDao(): DraftSetDao
     abstract fun friendDao(): FriendDao
     abstract fun remoteKeyDao(): RemoteKeyDao
+    abstract fun localWishlistDao(): LocalWishlistDao
+    abstract fun localOpenForTradeDao(): LocalOpenForTradeDao
 }

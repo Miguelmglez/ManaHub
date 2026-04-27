@@ -73,5 +73,17 @@ sealed class Screen(val route: String) {
 
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Puzzle : Screen("puzzle")
+
+    // ── Trades (sub-section of Collection, also handles deep links) ───────────
+    /** Root trades route — rendered as a sub-tab inside CollectionScreen. */
+    object Trades : Screen("trades")
+
+    /**
+     * Deep link target for shared wishlist / open-for-trade lists.
+     * App Link pattern: https://trades.manahub.app/list/{shareId}
+     */
+    object TradesSharedList : Screen("trades/shared/{shareId}") {
+        fun createRoute(shareId: String) = "trades/shared/$shareId"
+    }
 }
 

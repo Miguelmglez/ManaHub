@@ -48,6 +48,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="manahub" android:host="auth" />
             </intent-filter>
+            <!-- App Links — shared trade lists (https://trades.manahub.app/list/{shareId}) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="trades.manahub.app"
+                    android:pathPrefix="/list/" />
+            </intent-filter>
         </activity>
 
     </application>

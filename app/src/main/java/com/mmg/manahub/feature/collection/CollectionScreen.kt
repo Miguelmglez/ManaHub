@@ -34,11 +34,13 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.decks.DeckListScreen
+import com.mmg.manahub.feature.trades.presentation.TradesScreen
 import java.util.Locale
 
 // ── Sub-tab index constants ───────────────────────────────────────────────────
-private const val TAB_CARDS = 0
-private const val TAB_DECKS = 1
+private const val TAB_CARDS  = 0
+private const val TAB_DECKS  = 1
+private const val TAB_TRADES = 2
 
 @Composable
 fun CollectionScreen(
@@ -72,7 +74,8 @@ fun CollectionScreen(
         onShowAdvancedSearch  = { showAdvancedSearch = true },
         onShowSyncSheet       = { showSyncSheet = true },
         onTabSelected         = viewModel::onTabSelected,
-        onSyncDismissed       = viewModel::onSyncDismissed
+        onSyncDismissed       = viewModel::onSyncDismissed,
+        onSnackbarDismissed   = viewModel::onSnackbarDismissed,
     )
 
     if (showAdvancedSearch) {
@@ -110,11 +113,13 @@ private fun CollectionContent(
     onShowSyncSheet:      () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
     onSyncDismissed:      () -> Unit,
+    onSnackbarDismissed:  () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val snackbarHostState = remember { SnackbarHostState() }
-    val syncSuccessMsg = stringResource(R.string.collection_sync_success)
-    val syncErrorMsg   = stringResource(R.string.collection_sync_error)
+    val syncSuccessMsg     = stringResource(R.string.collection_sync_success)
+    val syncErrorMsg       = stringResource(R.string.collection_sync_error)
+    val migrationMsgFmt    = stringResource(R.string.trades_migration_synced_n_cards)
 
     // Auto-dismiss sync success/error via snackbar
     LaunchedEffect(uiState.syncState, uiState.syncError) {
@@ -129,6 +134,14 @@ private fun CollectionContent(
             }
             else -> Unit
         }
+    }
+
+    // Show trade list migration snackbar when count > 0
+    LaunchedEffect(uiState.snackbarMessage) {
+        val countStr = uiState.snackbarMessage ?: return@LaunchedEffect
+        val count = countStr.toIntOrNull() ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message = migrationMsgFmt.format(count))
+        onSnackbarDismissed()
     }
 
     Scaffold(
@@ -162,9 +175,14 @@ private fun CollectionContent(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            // ── Cards / Decks sub-tabs ────────────────────────────────────────
+            // ── Cards / Decks / Trades sub-tabs ──────────────────────────────
+            val selectedTabIndex = when (uiState.selectedTab) {
+                CollectionTab.CARDS  -> TAB_CARDS
+                CollectionTab.DECKS  -> TAB_DECKS
+                CollectionTab.TRADES -> TAB_TRADES
+            }
             TabRow(
-                selectedTabIndex = if (uiState.selectedTab == CollectionTab.CARDS) TAB_CARDS else TAB_DECKS,
+                selectedTabIndex = selectedTabIndex,
                 containerColor   = mc.backgroundSecondary,
                 contentColor     = mc.primaryAccent,
             ) {
@@ -188,6 +206,16 @@ private fun CollectionContent(
                         )
                     },
                 )
+                Tab(
+                    selected = uiState.selectedTab == CollectionTab.TRADES,
+                    onClick  = { onTabSelected(CollectionTab.TRADES) },
+                    text     = {
+                        Text(
+                            text  = stringResource(R.string.collection_tab_trades).uppercase(Locale.getDefault()),
+                            style = MaterialTheme.magicTypography.labelLarge,
+                        )
+                    },
+                )
             }
 
             // ── Tab content ───────────────────────────────────────────────────
@@ -201,9 +229,8 @@ private fun CollectionContent(
                     onShowAdvancedSearch  = onShowAdvancedSearch,
                     onShowSyncSheet       = onShowSyncSheet,
                 )
-                CollectionTab.DECKS -> DeckListScreen(
-                    onDeckClick       = onDeckClick
-                )
+                CollectionTab.DECKS   -> DeckListScreen(onDeckClick = onDeckClick)
+                CollectionTab.TRADES  -> TradesScreen(onCardClick = onCardClick)
             }
         }
 
