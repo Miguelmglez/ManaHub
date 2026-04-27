@@ -26,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.feature.addcard.AddCardScreen
 import com.mmg.manahub.feature.carddetail.CardDetailScreen
@@ -37,6 +38,7 @@ import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.game.GamePlayScreen
+import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
 import com.mmg.manahub.feature.game.GameSetupScreen
 import com.mmg.manahub.feature.game.GameSetupViewModel
 import com.mmg.manahub.feature.game.GameViewModel
@@ -281,6 +283,19 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
 
             composable(Screen.FriendsList.route) {
                 FriendsScreen(onNavigateBack = { navController.popBackStack() })
+            }
+
+            // ── Trades shared list (deep link) ────────────────────────────────
+            composable(
+                route     = Screen.TradesSharedList.route,
+                arguments = listOf(navArgument("shareId") { type = NavType.StringType }),
+                deepLinks = listOf(
+                    navDeepLink {
+                        uriPattern = "https://trades.manahub.app/list/{shareId}"
+                    },
+                ),
+            ) {
+                TradesSharedListScreen(onBack = { navController.popBackStack() })
             }
 
             // ── Tournament flow ────────────────────────────────────────────────

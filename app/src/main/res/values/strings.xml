@@ -1177,4 +1177,37 @@
     <string name="friends_error_generic">Something went wrong. Please try again.</string>
     <string name="friends_error_send">Could not send friend request. Please try again.</string>
 
+    <!-- ══════════════════════════════════════════
+         TRADES FEATURE
+    ═══════════════════════════════════════════ -->
+    <string name="collection_tab_trades">Trades</string>
+    <string name="trades_tab_exploration">Exploration</string>
+    <string name="trades_tab_history">History</string>
+    <string name="trades_toggle_my_lists">My Lists</string>
+    <string name="trades_toggle_friends">Friends</string>
+    <string name="trades_wishlist_section">My Wishlist</string>
+    <string name="trades_offers_section">My Offers</string>
+    <string name="trades_add_to_wishlist">Add to Wishlist</string>
+    <string name="trades_any_variant">Any variant</string>
+    <string name="trades_exact_variant">Exact variant</string>
+    <string name="trades_create_proposal_cta">Create proposal</string>
+    <string name="trades_coming_soon">Coming soon</string>
+    <string name="trades_no_friends_cta">Add friends to see their trade lists</string>
+    <string name="trades_view_full_list">View full list</string>
+    <string name="trades_friend_sheet_wishlist">Wishlist</string>
+    <string name="trades_friend_sheet_offers">Offer for Trade</string>
+    <string name="trades_friend_sheet_collection">Collection</string>
+    <string name="trades_history_coming_soon">Trade history coming soon</string>
+    <string name="trades_sign_in_cta">Sign in to track your trades</string>
+    <string name="trades_create_account">Create account</string>
+    <string name="trades_shared_list_loading">Loading shared list…</string>
+    <string name="trades_shared_list_private">This user no longer shares publicly</string>
+    <string name="trades_shared_list_not_found">Link not found</string>
+    <string name="trades_migration_synced_n_cards">Synced %d cards from this device to your account.</string>
+    <string name="trades_select_card_id_hint">Enter card Scryfall ID</string>
+    <string name="trades_foil">Foil</string>
+    <string name="trades_condition">Condition</string>
+    <string name="trades_language">Language</string>
+    <string name="trades_alt_art">Alternative Art</string>
+
 </resources>

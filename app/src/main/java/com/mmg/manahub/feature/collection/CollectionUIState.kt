@@ -12,18 +12,20 @@ import com.mmg.manahub.feature.auth.domain.model.SessionState
  * sync surface is now a single button that triggers push + pull via [SyncManager].
  */
 data class CollectionUiState(
-    val cards:         List<CollectionCardGroup> = emptyList(),
-    val isLoading:     Boolean                   = false,
-    val error:         String?                   = null,
-    val searchQuery:   String                    = "",
-    val activeQuery:   AdvancedSearchQuery?      = null,
-    val sortOrder:     SortOrder                 = SortOrder.DATE_ADDED,
-    val viewMode:      ViewMode                  = ViewMode.GRID,
-    val hasStaleCards: Boolean                   = false,
-    val selectedTab:   CollectionTab             = CollectionTab.CARDS,
-    val syncState:     SyncState                 = SyncState.IDLE,
-    val syncError:     String?                   = null,
-    val sessionState:  SessionState              = SessionState.Loading,
+    val cards:            List<CollectionCardGroup> = emptyList(),
+    val isLoading:        Boolean                   = false,
+    val error:            String?                   = null,
+    val searchQuery:      String                    = "",
+    val activeQuery:      AdvancedSearchQuery?      = null,
+    val sortOrder:        SortOrder                 = SortOrder.DATE_ADDED,
+    val viewMode:         ViewMode                  = ViewMode.GRID,
+    val hasStaleCards:    Boolean                   = false,
+    val selectedTab:      CollectionTab             = CollectionTab.CARDS,
+    val syncState:        SyncState                 = SyncState.IDLE,
+    val syncError:        String?                   = null,
+    val sessionState:     SessionState              = SessionState.Loading,
+    /** One-shot message surfaced as a Snackbar (e.g. trade list migration result). */
+    val snackbarMessage:  String?                   = null,
 )
 
 val CollectionUiState.activeFilterCount: Int
@@ -31,4 +33,4 @@ val CollectionUiState.activeFilterCount: Int
 
 enum class SortOrder { DATE_ADDED, NAME, PRICE_DESC, PRICE_ASC, RARITY }
 enum class ViewMode  { GRID, LIST }
-enum class CollectionTab { CARDS, DECKS }
+enum class CollectionTab { CARDS, DECKS, TRADES }

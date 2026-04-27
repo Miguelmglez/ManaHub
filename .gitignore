@@ -290,3 +290,4 @@ $RECYCLE.BIN/
 /app/supabase/migrations/20260421_friends.sql
 /.artifacts/
 /.artifacts/
+/app/DEEPLINKS.md
