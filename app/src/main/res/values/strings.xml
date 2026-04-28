@@ -231,6 +231,34 @@
     <string name="scanner_ocr_paused">Paused</string>
     <string name="scanner_permission_denied_settings">Camera permission denied. Open Settings to enable it.</string>
 
+    <!-- Scanner — no-modal UI (bulk scanner) -->
+    <string name="scanner_hash_db_missing">Card database not loaded — scanner identification disabled</string>
+    <string name="scanner_searching">Searching…</string>
+    <string name="scanner_searching_idle">Searching for card…</string>
+    <string name="scanner_toast_added_prefix">Added:</string>
+    <string name="scanner_queue_title">%1$d cards scanned</string>
+    <string name="scanner_queue_search_hint">Filter by name…</string>
+    <string name="scanner_queue_button_desc">Scan queue</string>
+    <string name="scanner_add_all">+ Add to collection</string>
+    <string name="scanner_clear_session">Clear</string>
+    <string name="scanner_quick_mode">Quick Mode</string>
+    <string name="scanner_quick_mode_desc">Auto-add detected cards using current mode settings</string>
+    <string name="scanner_lookup_only">Lookup Only</string>
+    <string name="scanner_lookup_only_desc">Show card info and price without adding to collection</string>
+    <string name="scanner_set_lock">Any set</string>
+    <string name="scanner_foil">Foil</string>
+    <string name="scanner_normal">Normal</string>
+    <string name="scanner_view_detail">View card detail</string>
+    <string name="scanner_sound_effects">Sound effects</string>
+    <string name="scanner_language_mismatch">Language mismatch</string>
+    <string name="scanner_ambiguous_match">Ambiguous match — confirm or skip</string>
+    <string name="scanner_confirm">Confirm</string>
+    <string name="scanner_skip">Skip</string>
+    <string name="scanner_price_detail_normal">Normal</string>
+    <string name="scanner_price_detail_foil">Foil</string>
+    <string name="scanner_price_detail_buy">Buy</string>
+    <string name="scanner_price_na">N/A</string>
+
     <!-- ══════════════════════════════════════════
          SYNERGY SCREEN
     ═══════════════════════════════════════════ -->

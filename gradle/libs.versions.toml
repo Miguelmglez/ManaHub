@@ -1,5 +1,6 @@
 [versions]
 accompanist-permissions = "0.37.3"
+opencv = "4.10.0"
 paging = "3.3.6"
 work = "2.10.1"
 hilt-work = "1.2.0"
@@ -16,7 +17,6 @@ coil                 = "2.7.0"
 navigation           = "2.9.7"
 lifecycle            = "2.10.0"
 coroutines           = "1.10.2"
-mlkit-text-recognition = "16.0.1"
 camerax              = "1.6.0"
 google-services      = "4.4.4"
 mockk                = "1.14.9"
@@ -40,6 +40,7 @@ googleid             = "1.1.1"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
+opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
 paging-runtime   = { group = "androidx.paging", name = "paging-runtime-ktx",  version.ref = "paging" }
 paging-compose   = { group = "androidx.paging", name = "paging-compose",       version.ref = "paging" }
 room-paging      = { group = "androidx.room",   name = "room-paging",          version.ref = "room" }
@@ -73,7 +74,6 @@ coil-svg                = { group = "io.coil-kt", name = "coil-svg",            
 camerax-camera2         = { group = "androidx.camera", name = "camera-camera2",            version.ref = "camerax" }
 camerax-lifecycle       = { group = "androidx.camera", name = "camera-lifecycle",          version.ref = "camerax" }
 camerax-view            = { group = "androidx.camera", name = "camera-view",               version.ref = "camerax" }
-mlkit-text-recognition  = { group = "com.google.mlkit", name = "text-recognition",          version.ref = "mlkit-text-recognition" }
 mockk                   = { group = "io.mockk", name = "mockk",                            version.ref = "mockk" }
 turbine                 = { group = "app.cash.turbine", name = "turbine",                  version.ref = "turbine" }
 coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }

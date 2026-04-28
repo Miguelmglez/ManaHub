@@ -32,6 +32,9 @@ class ManaHubApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Initialize OpenCV native library — must run before any OpenCV call.
+        org.opencv.android.OpenCVLoader.initLocal()
+
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
 
         Coil.setImageLoader(ImageLoader.Builder(this).components { add(SvgDecoder.Factory()) }

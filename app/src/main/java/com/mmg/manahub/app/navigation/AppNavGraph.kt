@@ -163,7 +163,12 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(Screen.CollectionScanner.route) {
-                ScannerScreen(onBack = { navController.popBackStack() })
+                ScannerScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToCardDetail = { scryfallId ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                    },
+                )
             }
 
             composable(
