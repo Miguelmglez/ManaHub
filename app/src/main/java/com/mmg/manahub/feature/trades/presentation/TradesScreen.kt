@@ -92,6 +92,8 @@ import java.util.Locale
 @Composable
 fun TradesScreen(
     onCardClick: (scryfallId: String) -> Unit,
+    onNavigateToProposal: (receiverId: String) -> Unit = {},
+    onNavigateToThread: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel: TradesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -114,16 +116,10 @@ fun TradesScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            // Only show the top-level tab row when there is trade history.
-            // Phase 2: history is empty, so we always render the Exploration pane directly.
-            val hasHistory = false // will become uiState.history.isNotEmpty() in Phase 3
-
-            if (hasHistory) {
-                TradesTabRow(
-                    selectedTab = uiState.selectedTab,
-                    onTabSelected = viewModel::onTabSelected,
-                )
-            }
+            TradesTabRow(
+                selectedTab = uiState.selectedTab,
+                onTabSelected = viewModel::onTabSelected,
+            )
 
             when (uiState.selectedTab) {
                 TradesMainTab.EXPLORATION -> ExplorationContent(
@@ -136,25 +132,27 @@ fun TradesScreen(
                     onAddToWishlist   = viewModel::onAddToWishlist,
                     onRemoveWishlist  = viewModel::onRemoveFromWishlist,
                     onRemoveOffer     = viewModel::onRemoveFromOpenForTrade,
-                    onProposalCta     = { snackbarHostState.let {
-                        // Using LaunchedEffect pattern from the FAB click callback would
-                        // require a coroutine scope; we store it as a snackbar message instead.
-                        viewModel.onSnackbarDismissed() // no-op; reset
-                        viewModel.onClearSelection()
-                    }},
-                    onComingSoon = {
-                        // The ViewModel stores a "coming soon" message to surface via Snackbar
-                        // using the standard LaunchedEffect(uiState.snackbarMessage) mechanism.
-                        // We call a dedicated action so the snackbar text is set.
-                    },
-                    comingSoonMsg = comingSoonMsg,
+                    onProposalCta     = { viewModel.onShowFriendPicker() },
+                    onComingSoon      = {},
+                    comingSoonMsg     = comingSoonMsg,
                     snackbarHostState = snackbarHostState,
                 )
-                TradesMainTab.HISTORY -> HistoryPlaceholder(
-                    isLoggedIn = true, // Phase 3 will wire session state
-                    onComingSoon = { /* no-op — Snackbar shown inline */ },
+                TradesMainTab.HISTORY -> TradesHistoryScreen(
+                    onOpenThread = onNavigateToThread,
                 )
             }
+        }
+
+        if (uiState.showFriendPicker) {
+            FriendPickerDialog(
+                friends   = uiState.friends,
+                onDismiss = viewModel::onDismissFriendPicker,
+                onSelect  = { friend ->
+                    viewModel.onDismissFriendPicker()
+                    viewModel.onClearSelection()
+                    onNavigateToProposal(friend.userId)
+                },
+            )
         }
     }
 }
@@ -318,10 +316,7 @@ private fun ExplorationContent(
                     ExtendedFloatingActionButton(
                         text            = { Text(stringResource(R.string.trades_create_proposal_cta)) },
                         icon            = {},
-                        onClick         = {
-                            // Phase 3: actual proposal creation
-                            // For Phase 2, show a "Coming soon" snackbar
-                        },
+                        onClick         = onProposalCta,
                         containerColor  = mc.primaryAccent,
                         contentColor    = mc.background,
                     )
@@ -806,51 +801,6 @@ private fun FriendTradeBottomSheet(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  History placeholder
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun HistoryPlaceholder(
-    isLoggedIn:  Boolean,
-    onComingSoon: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    Box(
-        modifier        = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (!isLoggedIn) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier            = Modifier.padding(32.dp),
-            ) {
-                Text(
-                    text      = stringResource(R.string.trades_sign_in_cta),
-                    style     = MaterialTheme.magicTypography.bodyMedium,
-                    color     = mc.textSecondary,
-                    textAlign = TextAlign.Center,
-                )
-                Button(
-                    onClick = onComingSoon,
-                    colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                ) {
-                    Text(stringResource(R.string.trades_create_account), color = mc.background)
-                }
-            }
-        } else {
-            Text(
-                text      = stringResource(R.string.trades_history_coming_soon),
-                style     = MaterialTheme.magicTypography.bodyMedium,
-                color     = mc.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.padding(32.dp),
-            )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  Add to Wishlist dialog
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1067,6 +1017,61 @@ private fun AddToWishlistDialog(
                     stringResource(R.string.action_cancel),
                     color = mc.textSecondary,
                 )
+            }
+        },
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Friend picker dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FriendPickerDialog(
+    friends: List<Friend>,
+    onDismiss: () -> Unit,
+    onSelect: (Friend) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = mc.surface,
+        title = {
+            Text(
+                text  = stringResource(R.string.trades_pick_friend_title),
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textPrimary,
+            )
+        },
+        text = {
+            if (friends.isEmpty()) {
+                Text(
+                    text  = stringResource(R.string.trades_no_friends),
+                    style = MaterialTheme.magicTypography.bodyMedium,
+                    color = mc.textSecondary,
+                )
+            } else {
+                LazyColumn {
+                    items(friends, key = { it.id }) { friend ->
+                        TextButton(
+                            onClick  = { onSelect(friend) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text  = "${friend.nickname} #${friend.gameTag}",
+                                style = MaterialTheme.magicTypography.bodyMedium,
+                                color = mc.textPrimary,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = mc.textSecondary)
             }
         },
     )

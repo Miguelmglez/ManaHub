@@ -60,10 +60,12 @@ class TradesSharedListViewModel @Inject constructor(
     val uiState: StateFlow<SharedListUiState> = _uiState.asStateFlow()
 
     init {
-        val shareId: String = checkNotNull(savedStateHandle["shareId"]) {
-            "TradesSharedListViewModel requires a 'shareId' nav argument"
+        val shareId = savedStateHandle.get<String>("shareId")
+        if (shareId.isNullOrBlank()) {
+            _uiState.update { SharedListUiState.NotFound }
+        } else {
+            resolveList(shareId)
         }
-        resolveList(shareId)
     }
 
     private fun resolveList(shareId: String) {

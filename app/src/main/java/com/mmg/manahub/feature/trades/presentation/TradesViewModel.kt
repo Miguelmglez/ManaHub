@@ -60,6 +60,7 @@ data class TradesUiState(
     val selectedOfferIds:   Set<String>                = emptySet(),
     val isMultiSelectMode:  Boolean                    = false,
     val isLoadingSuggestions: Boolean                  = false,
+    val showFriendPicker:   Boolean                    = false,
     val snackbarMessage:    String?                    = null,
 )
 
@@ -243,6 +244,9 @@ class TradesViewModel @Inject constructor(
             )
         }
     }
+
+    fun onShowFriendPicker() = _uiState.update { it.copy(showFriendPicker = true) }
+    fun onDismissFriendPicker() = _uiState.update { it.copy(showFriendPicker = false) }
 
     // ── Refresh ───────────────────────────────────────────────────────────────
 

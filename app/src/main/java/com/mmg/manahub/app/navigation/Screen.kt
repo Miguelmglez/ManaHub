@@ -85,5 +85,21 @@ sealed class Screen(val route: String) {
     object TradesSharedList : Screen("trades/shared/{shareId}") {
         fun createRoute(shareId: String) = "trades/shared/$shareId"
     }
+
+    // ── Trade proposal flow ───────────────────────────────────────────────────
+    object CreateTradeProposal : Screen(
+        "trades/proposal/create/{receiverId}?parentProposalId={parentProposalId}&editingProposalId={editingProposalId}&rootProposalId={rootProposalId}"
+    ) {
+        fun createRoute(receiverId: String) = "trades/proposal/create/$receiverId"
+        fun createCounterRoute(receiverId: String, parentProposalId: String, rootProposalId: String) =
+            "trades/proposal/create/${Uri.encode(receiverId)}?parentProposalId=${Uri.encode(parentProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+        fun createEditRoute(receiverId: String, editingProposalId: String, rootProposalId: String) =
+            "trades/proposal/create/${Uri.encode(receiverId)}?editingProposalId=${Uri.encode(editingProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+    }
+
+    object TradeNegotiationDetail : Screen("trades/proposal/{proposalId}/thread/{rootProposalId}") {
+        fun createRoute(proposalId: String, rootProposalId: String) =
+            "trades/proposal/$proposalId/thread/$rootProposalId"
+    }
 }
 

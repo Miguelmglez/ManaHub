@@ -3,6 +3,8 @@
   "target": {
     "namespace": "android_app",
     "package_name": "com.mmg.manahub",
-    "sha256_cert_fingerprints": ["REPLACE_WITH_SIGNING_CERT_SHA256"]
+    "sha256_cert_fingerprints": [
+      "23:86:91:A6:3D:DD:98:38:25:B1:66:61:75:57:E2:F4:27:24:3E:A1:F8:B4:F6:93:DB:CC:28:86:D8:9D:6D:5D"
+    ]
   }
 }]

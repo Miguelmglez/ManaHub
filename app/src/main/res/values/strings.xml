@@ -1197,6 +1197,8 @@
     <string name="trades_friend_sheet_wishlist">Wishlist</string>
     <string name="trades_friend_sheet_offers">Offer for Trade</string>
     <string name="trades_friend_sheet_collection">Collection</string>
+    <string name="trades_pick_friend_title">Select a friend</string>
+    <string name="trades_no_friends">You have no friends yet. Add friends to start trading.</string>
     <string name="trades_history_coming_soon">Trade history coming soon</string>
     <string name="trades_sign_in_cta">Sign in to track your trades</string>
     <string name="trades_create_account">Create account</string>
@@ -1209,5 +1211,107 @@
     <string name="trades_condition">Condition</string>
     <string name="trades_language">Language</string>
     <string name="trades_alt_art">Alternative Art</string>
+
+    <!-- Phase 3: proposal creation -->
+    <string name="trades_you_give">You give</string>
+    <string name="trades_you_receive">You receive</string>
+    <string name="trades_add_card">Add card</string>
+    <string name="trades_review_collection_chip">Review my collection</string>
+    <string name="trades_review_collection_warning">Proposals with \'Review my collection\' cannot be accepted directly — only declined or countered.</string>
+    <string name="trades_save_draft">Save draft</string>
+    <string name="trades_send_proposal">Send proposal</string>
+    <string name="trades_discard">Discard</string>
+    <string name="trades_quantity">Qty</string>
+
+    <!-- Phase 3: negotiation -->
+    <string name="trades_send">Send</string>
+    <string name="trades_edit">Edit</string>
+    <string name="trades_counter">Counter</string>
+    <string name="trades_accept">Accept</string>
+    <string name="trades_decline">Decline</string>
+    <string name="trades_cancel_proposal">Cancel proposal</string>
+    <string name="trades_revoke">Revoke</string>
+    <string name="trades_mark_completed">Mark as completed</string>
+    <string name="trades_waiting_confirmation">Waiting for the other party to confirm</string>
+    <string name="trades_long_thread_suggestion">This negotiation has gone on for a while. Consider declining to start fresh.</string>
+    <string name="trades_card_locked_title">Cards already committed</string>
+    <string name="trades_card_locked_message">One or more cards are already committed in another accepted trade: %s. Decline this proposal or wait for the other trade to resolve.</string>
+    <string name="trades_inventory_gone_title">Unexpected inventory state</string>
+    <string name="trades_inventory_gone_message">The inventory state has changed unexpectedly. Please contact support.</string>
+    <string name="trades_version_mismatch">Proposal was updated — please review.</string>
+
+    <!-- Phase 3: history -->
+    <string name="trades_history_filter_active">Active</string>
+    <string name="trades_history_filter_completed">Completed</string>
+    <string name="trades_history_filter_declined">Declined / Cancelled</string>
+    <string name="trades_empty_active">No active trades</string>
+    <string name="trades_empty_completed">No completed trades</string>
+    <string name="trades_empty_declined">No declined or cancelled trades</string>
+    <string name="trades_cards_exchange">%1$d cards ↔ %2$d cards</string>
+
+    <!-- Phase 3: status labels -->
+    <string name="trades_status_draft">Draft</string>
+    <string name="trades_status_proposed">Proposed</string>
+    <string name="trades_status_accepted">Accepted</string>
+    <string name="trades_status_completed">Completed</string>
+    <string name="trades_status_declined">Declined</string>
+    <string name="trades_status_cancelled">Cancelled</string>
+    <string name="trades_status_countered">Countered</string>
+    <string name="trades_status_revoked">Revoked</string>
+
+    <!-- Phase 3: suggestions -->
+    <string name="trades_suggestion_propose">Propose</string>
+    <string name="trades_suggested_for_you">Suggested trades for you</string>
+
+    <!-- Phase 3: history screen -->
+    <string name="trades_history_filter_all">All</string>
+    <string name="trades_history_filter_cancelled">Cancelled</string>
+    <string name="trades_history_item_count">items</string>
+    <string name="trades_history_empty">No trade history yet</string>
+    <string name="trades_history_empty_hint">Completed, cancelled, and declined proposals will appear here.</string>
+
+    <!-- Phase 3: status badges (canonical, used in detail screens) -->
+    <string name="trade_status_draft">Draft</string>
+    <string name="trade_status_proposed">Proposed</string>
+    <string name="trade_status_accepted">Accepted</string>
+    <string name="trade_status_completed">Completed</string>
+    <string name="trade_status_declined">Declined</string>
+    <string name="trade_status_cancelled">Cancelled</string>
+    <string name="trade_status_countered">Countered</string>
+    <string name="trade_status_revoked">Revoked</string>
+
+    <!-- Phase 3: proposal editor screen -->
+    <string name="trades_create_proposal_title">New Trade Proposal</string>
+    <string name="trades_counter_proposal_title">Counter Proposal</string>
+    <string name="trades_you_offer_section">You offer</string>
+    <string name="trades_they_offer_section">They offer</string>
+    <string name="trades_review_collection_proposer">Include \'Review my collection\'</string>
+    <string name="trades_review_collection_receiver">Include \'Review their collection\'</string>
+    <string name="trades_add_item">Add item</string>
+
+    <!-- Phase 3: negotiation screen -->
+    <string name="trades_negotiation_title">Trade Negotiation</string>
+    <string name="trades_proposal_version">Proposal v%d</string>
+    <string name="trades_proposer_offers">Proposer offers</string>
+    <string name="trades_receiver_offers">Receiver offers</string>
+    <string name="trades_review_collection_placeholder">Review my collection</string>
+    <string name="trades_no_proposals_yet">No proposals in this thread yet.</string>
+    <string name="trades_action_accept">Accept</string>
+    <string name="trades_action_decline">Decline</string>
+    <string name="trades_action_cancel">Cancel</string>
+    <string name="trades_action_revoke">Revoke</string>
+    <string name="trades_action_counter">Counter offer</string>
+    <string name="trades_action_edit">Edit</string>
+    <string name="trades_action_mark_completed">Mark as Completed</string>
+
+    <!-- Phase 3: negotiation error dialogs -->
+    <string name="trades_error_card_locked_title">Cards already committed</string>
+    <string name="trades_error_card_locked_body">%d card(s) are already locked in another accepted trade. Please wait for that trade to resolve or revoke it.</string>
+    <string name="trades_error_version_mismatch_title">Proposal updated</string>
+    <string name="trades_error_version_mismatch_body">The proposal was modified by the other party. Please refresh and review the latest version.</string>
+    <string name="trades_error_inventory_gone_title">Inventory changed</string>
+    <string name="trades_error_inventory_gone_body">One or more cards could not be moved. The inventory may have changed since the trade was accepted.</string>
+    <string name="trades_error_generic_title">Something went wrong</string>
+    <string name="trades_error_generic_body">An unexpected error occurred. Please try again.</string>
 
 </resources>
