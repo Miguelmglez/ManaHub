@@ -142,7 +142,6 @@ dependencies {
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
-    implementation(libs.mlkit.text.recognition)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
@@ -158,6 +157,7 @@ dependencies {
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)
 
+    implementation(libs.opencv)
     implementation(libs.accompanist.permissions)
     implementation(libs.material.icons.extended)
     implementation(libs.compose.googlefonts)
