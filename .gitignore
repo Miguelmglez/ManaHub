@@ -289,5 +289,5 @@ $RECYCLE.BIN/
 /.claude/worktrees/agent-abd89b3b/
 /app/supabase/migrations/20260421_friends.sql
 /.artifacts/
-/.artifacts/
 /app/DEEPLINKS.md
+/.well-known/

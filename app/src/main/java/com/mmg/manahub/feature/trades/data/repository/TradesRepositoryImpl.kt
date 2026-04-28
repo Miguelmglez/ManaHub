@@ -26,7 +26,8 @@ class TradesRepositoryImpl @Inject constructor(
     override fun observeActiveProposals(): Flow<List<TradeProposal>> =
         cache.map { list -> list.filter { it.status.isActive } }
 
-    override fun observeProposalHistory(): Flow<List<TradeProposal>> = cache
+    override fun observeProposalHistory(): Flow<List<TradeProposal>> =
+        cache.map { list -> list.filter { it.status.isTerminal } }
 
     override fun observeProposalThread(rootProposalId: String): Flow<List<TradeProposal>> =
         cache.map { list -> list.filter { it.rootProposalId == rootProposalId } }

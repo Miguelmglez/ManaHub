@@ -47,6 +47,8 @@ fun CollectionScreen(
     onCardClick:              (scryfallId: String) -> Unit,
     onScannerClick:           () -> Unit,
     onDeckClick:              (deckId: String) -> Unit,
+    onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
+    onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel:                CollectionViewModel = hiltViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
@@ -74,8 +76,10 @@ fun CollectionScreen(
         onShowAdvancedSearch  = { showAdvancedSearch = true },
         onShowSyncSheet       = { showSyncSheet = true },
         onTabSelected         = viewModel::onTabSelected,
-        onSyncDismissed       = viewModel::onSyncDismissed,
-        onSnackbarDismissed   = viewModel::onSnackbarDismissed,
+        onSyncDismissed            = viewModel::onSyncDismissed,
+        onSnackbarDismissed        = viewModel::onSnackbarDismissed,
+        onNavigateToTradeProposal  = onNavigateToTradeProposal,
+        onNavigateToTradeThread    = onNavigateToTradeThread,
     )
 
     if (showAdvancedSearch) {
@@ -114,6 +118,8 @@ private fun CollectionContent(
     onTabSelected:        (CollectionTab) -> Unit,
     onSyncDismissed:      () -> Unit,
     onSnackbarDismissed:  () -> Unit,
+    onNavigateToTradeProposal: (String) -> Unit = {},
+    onNavigateToTradeThread:   (String, String) -> Unit = { _, _ -> },
 ) {
     val mc = MaterialTheme.magicColors
     val snackbarHostState = remember { SnackbarHostState() }
@@ -230,7 +236,11 @@ private fun CollectionContent(
                     onShowSyncSheet       = onShowSyncSheet,
                 )
                 CollectionTab.DECKS   -> DeckListScreen(onDeckClick = onDeckClick)
-                CollectionTab.TRADES  -> TradesScreen(onCardClick = onCardClick)
+                CollectionTab.TRADES  -> TradesScreen(
+                    onCardClick           = onCardClick,
+                    onNavigateToProposal  = onNavigateToTradeProposal,
+                    onNavigateToThread    = onNavigateToTradeThread,
+                )
             }
         }
 
