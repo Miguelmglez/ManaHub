@@ -15,6 +15,7 @@ import com.mmg.manahub.feature.trades.domain.usecase.GetLocalOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetSuggestedTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RemoveFromOpenForTradeUseCase
+import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.RemoveFromWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -105,7 +106,7 @@ class TradesViewModel @Inject constructor(
     private fun observeWishlist() {
         viewModelScope.launch {
             getLocalWishlist()
-                .catch { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .catch { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
                 .collect { entries -> _uiState.update { it.copy(wishlist = entries) } }
         }
     }
@@ -113,7 +114,7 @@ class TradesViewModel @Inject constructor(
     private fun observeOpenForTrade() {
         viewModelScope.launch {
             getLocalOpenForTrade()
-                .catch { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .catch { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
                 .collect { entries -> _uiState.update { it.copy(openForTrade = entries) } }
         }
     }
@@ -171,7 +172,7 @@ class TradesViewModel @Inject constructor(
                 createdAt       = System.currentTimeMillis(),
             )
             addToWishlist(entry)
-                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
         }
     }
 
@@ -179,7 +180,7 @@ class TradesViewModel @Inject constructor(
     fun onRemoveFromWishlist(id: String) {
         viewModelScope.launch(ioDispatcher) {
             removeFromWishlist(id)
-                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
         }
     }
 
@@ -194,7 +195,7 @@ class TradesViewModel @Inject constructor(
     fun onAddToOpenForTrade(scryfallId: String, localCollectionId: String) {
         viewModelScope.launch(ioDispatcher) {
             addToOpenForTrade(scryfallId, localCollectionId)
-                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
         }
     }
 
@@ -202,7 +203,7 @@ class TradesViewModel @Inject constructor(
     fun onRemoveFromOpenForTrade(id: String) {
         viewModelScope.launch(ioDispatcher) {
             removeFromOpenForTrade(id)
-                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
         }
     }
 
@@ -258,10 +259,10 @@ class TradesViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isLoadingSuggestions = true) }
             suggestionsRepository.refreshSuggestions()
-                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
             getSuggestions()
                 .onSuccess { list -> _uiState.update { it.copy(suggestions = list) } }
-                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
             _uiState.update { it.copy(isLoadingSuggestions = false) }
         }
     }

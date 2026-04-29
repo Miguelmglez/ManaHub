@@ -6,6 +6,7 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
+import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.model.TradeStatus
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
@@ -80,7 +81,7 @@ class TradesHistoryViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isRefreshing = true) }
             refreshTrades(_uiState.value.currentUserId)
-                .onFailure { e -> _uiState.update { s -> s.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { s -> s.copy(snackbarMessage = e.toUserFacingMessage()) } }
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

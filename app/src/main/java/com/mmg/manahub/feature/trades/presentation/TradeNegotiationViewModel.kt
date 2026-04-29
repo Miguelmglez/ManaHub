@@ -7,6 +7,7 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.trades.domain.model.TradeError
+import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
@@ -94,7 +95,7 @@ class TradeNegotiationViewModel @Inject constructor(
                 val error = when (e) {
                     is TradeError.CardAlreadyLocked -> NegotiationError.CardAlreadyLocked(e.cardIds)
                     is TradeError.CannotAcceptReviewCollection -> NegotiationError.Generic("CANNOT_ACCEPT_REVIEW_COLLECTION")
-                    else -> NegotiationError.Generic(e.message)
+                    else -> NegotiationError.Generic(e.toUserFacingMessage())
                 }
                 _uiState.update { it.copy(errorDialog = error) }
             }
@@ -107,7 +108,7 @@ class TradeNegotiationViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
             declineProposal(proposalId).onFailure { e ->
-                _uiState.update { it.copy(snackbarMessage = e.message) }
+                _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) }
             }
             _uiState.update { it.copy(isProcessing = false) }
         }
@@ -118,7 +119,7 @@ class TradeNegotiationViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
             cancelProposal(proposalId).onFailure { e ->
-                _uiState.update { it.copy(snackbarMessage = e.message) }
+                _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) }
             }
             _uiState.update { it.copy(isProcessing = false) }
         }
@@ -129,7 +130,7 @@ class TradeNegotiationViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
             revokeAcceptance(proposalId).onFailure { e ->
-                _uiState.update { it.copy(snackbarMessage = e.message) }
+                _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) }
             }
             _uiState.update { it.copy(isProcessing = false) }
         }
@@ -142,7 +143,7 @@ class TradeNegotiationViewModel @Inject constructor(
             markCompleted(proposalId).onFailure { e ->
                 val error = when (e) {
                     is TradeError.InventoryGone -> NegotiationError.InventoryGone
-                    else -> NegotiationError.Generic(e.message)
+                    else -> NegotiationError.Generic(e.toUserFacingMessage())
                 }
                 _uiState.update { it.copy(errorDialog = error) }
             }
@@ -188,7 +189,7 @@ class TradeNegotiationViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isRefreshing = true) }
             refreshTrades(userId)
-                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message) } }
+                .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

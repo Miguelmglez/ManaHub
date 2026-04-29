@@ -168,7 +168,10 @@ private fun SharedListContent(
     val mc = MaterialTheme.magicColors
     Column(modifier = modifier) {
         Text(
-            text     = "Shared list from ${result.userId}",
+            text = if (result.ownerNickname.isNotBlank())
+                stringResource(R.string.trades_shared_list_by, result.ownerNickname)
+            else
+                stringResource(R.string.trades_shared_list_title),
             style    = MaterialTheme.magicTypography.titleMedium,
             color    = mc.textPrimary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

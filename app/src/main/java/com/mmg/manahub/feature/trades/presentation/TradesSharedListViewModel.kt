@@ -61,11 +61,16 @@ class TradesSharedListViewModel @Inject constructor(
 
     init {
         val shareId = savedStateHandle.get<String>("shareId")
-        if (shareId.isNullOrBlank()) {
-            _uiState.update { SharedListUiState.NotFound }
-        } else {
-            resolveList(shareId)
+        when {
+            shareId.isNullOrBlank() -> _uiState.update { SharedListUiState.NotFound }
+            !isValidShareId(shareId) -> _uiState.update { SharedListUiState.NotFound }
+            else -> resolveList(shareId)
         }
+    }
+
+    private fun isValidShareId(shareId: String): Boolean {
+        if (shareId.length > 64) return false
+        return shareId.all { it.isLetterOrDigit() || it == '-' || it == '_' }
     }
 
     private fun resolveList(shareId: String) {
@@ -81,9 +86,7 @@ class TradesSharedListViewModel @Inject constructor(
                         }
                     }
                 }
-                .onFailure { e ->
-                    _uiState.update { SharedListUiState.Error(e.message) }
-                }
+                .onFailure { _uiState.update { SharedListUiState.Error(null) } }
         }
     }
 }
