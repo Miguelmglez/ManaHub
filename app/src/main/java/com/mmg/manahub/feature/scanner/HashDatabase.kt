@@ -99,6 +99,22 @@ class HashDatabase @Inject constructor(
         loadFromBytesInternal(bytes)
     }
 
+    /**
+     * Reloads the hash database from a previously downloaded [file] in [Context.getFilesDir].
+     *
+     * Called by [HashDatabaseUpdateWorker] after a successful Cloudflare R2 download.
+     * Thread-safe: [loadFromBytesInternal] is @Synchronized to avoid a race with an
+     * ongoing [findBestMatch] scan.
+     */
+    fun loadFromFile(file: java.io.File) {
+        try {
+            loadFromBytesInternal(file.readBytes())
+        } catch (e: Exception) {
+            android.util.Log.e("HashDatabase", "Failed to load hash database from file", e)
+        }
+    }
+
+    @Synchronized
     private fun loadFromBytesInternal(bytes: ByteArray) {
         try {
             val buf = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
@@ -117,6 +133,18 @@ class HashDatabase @Inject constructor(
             buf.order(ByteOrder.LITTLE_ENDIAN)
             val count = buf.int
             buf.order(ByteOrder.BIG_ENDIAN)
+
+            // Reject implausible counts before allocating. A card-hash database
+            // with more than 100 000 entries would require >4 MB of heap just for
+            // the LongArray; anything beyond that is almost certainly a corrupt or
+            // malicious file. MTG has ~30 000 unique printings as of 2026.
+            if (count < 0 || count > 100_000) {
+                android.util.Log.e(
+                    "HashDatabase",
+                    "Rejected card_hashes.bin: count=$count is outside safe range [0, 100000]",
+                )
+                return
+            }
 
             val ids = Array(count) { "" }
             val hashFlat = LongArray(count * 4)
@@ -160,14 +188,21 @@ class HashDatabase @Inject constructor(
      */
     suspend fun findBestMatch(queryHash: LongArray, maxDistance: Int = 20): HashMatch? =
         withContext(Dispatchers.Default) {
-            if (cardCount == 0) return@withContext null
+            // Take a consistent snapshot of all three fields under the same lock so
+            // that a concurrent hot-reload (loadFromBytesInternal) cannot leave us
+            // iterating cardCount entries with a mismatched hashes/scryfallIds pair.
+            val (snapCount, snapHashes, snapIds) = synchronized(this@HashDatabase) {
+                Triple(cardCount, hashes, scryfallIds)
+            }
+
+            if (snapCount == 0) return@withContext null
 
             var bestDist = Int.MAX_VALUE
             var bestIdx = -1
             var secondDist = Int.MAX_VALUE
 
-            for (i in 0 until cardCount) {
-                val dist = hammingDistance(queryHash, i)
+            for (i in 0 until snapCount) {
+                val dist = hammingDistanceSnap(queryHash, snapHashes, i)
                 when {
                     dist < bestDist -> {
                         secondDist = bestDist
@@ -181,21 +216,21 @@ class HashDatabase @Inject constructor(
             if (bestIdx == -1 || bestDist > maxDistance) return@withContext null
 
             HashMatch(
-                scryfallId = scryfallIds[bestIdx],
+                scryfallId = snapIds[bestIdx],
                 distance = bestDist,
                 secondBestDistance = secondDist,
             )
         }
 
     /**
-     * Computes the Hamming distance between [query] and the hash at database index [idx].
-     * Each of the 4 longs is XOR-ed and the total bit-count of set bits is returned.
+     * Computes the Hamming distance between [query] and the hash at database index [idx]
+     * using the caller-supplied [hashArray] snapshot, avoiding reads of the mutable [hashes] field.
      */
-    private fun hammingDistance(query: LongArray, idx: Int): Int {
+    private fun hammingDistanceSnap(query: LongArray, hashArray: LongArray, idx: Int): Int {
         val base = idx * 4
-        return java.lang.Long.bitCount(query[0] xor hashes[base + 0]) +
-            java.lang.Long.bitCount(query[1] xor hashes[base + 1]) +
-            java.lang.Long.bitCount(query[2] xor hashes[base + 2]) +
-            java.lang.Long.bitCount(query[3] xor hashes[base + 3])
+        return java.lang.Long.bitCount(query[0] xor hashArray[base + 0]) +
+            java.lang.Long.bitCount(query[1] xor hashArray[base + 1]) +
+            java.lang.Long.bitCount(query[2] xor hashArray[base + 2]) +
+            java.lang.Long.bitCount(query[3] xor hashArray[base + 3])
     }
 }

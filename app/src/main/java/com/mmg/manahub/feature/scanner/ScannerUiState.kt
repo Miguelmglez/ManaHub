@@ -102,4 +102,7 @@ data class ScannerUiState(
     val showAmbiguitySelector: Boolean = false,
     // Price detail sheet (Lookup Only mode)
     val showPriceDetailSheet: Boolean = false,
+    // Hash database update status (sourced from DataStore + WorkManager)
+    val hashDbVersion: Int = 0,
+    val isHashDbUpdating: Boolean = false,
 )

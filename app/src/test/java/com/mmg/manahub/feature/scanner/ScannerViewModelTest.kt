@@ -1,19 +1,22 @@
 package com.mmg.manahub.feature.scanner
 
-import app.cash.turbine.test
+import android.content.Context
+import android.graphics.PointF
+import androidx.lifecycle.MutableLiveData
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.usecase.card.SearchCardUseCase
-import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -28,58 +31,90 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for [ScannerViewModel].
+ * Unit tests for [ScannerViewModel] — pHash-based scanner architecture.
  *
  * Covers:
- * - Duplicate name detection guard (same name → single search)
- * - foundCard guard (name detected while card already found → ignored)
- * - In-progress search cancellation and restart
- * - searchCards returning results → foundCard set, confirm sheet shown
- * - searchCards returning empty list → fallback to searchCard
- * - searchCard returning success → foundCard set, confirm sheet shown
- * - Both searches returning error → error message set, then auto-cleared after 2s
- * - Exception inside coroutine → connection error shown, then auto-cleared
- * - onConfirmAdd success → state fully reset for next scan
- * - onConfirmAdd error → error shown, sheet dismissed
- * - onDismissConfirmSheet → state reset to initial defaults
+ * - Initial default state
+ * - NoCard result: state unchanged
+ * - Stability buffer: requires [STABILITY_FRAMES]=3 consecutive identical matches
+ * - Anti-duplicate guard: same card within 800 ms is blocked
+ * - Set lock filter: mismatched setCode is rejected before stability
+ * - Language mismatch: Quick Mode + language != "en" sets languageMismatch flag
+ * - Lookup Only mode: card shown in bar, never added to session
+ * - Ambiguity selector: ambiguous + normal mode → showAmbiguitySelector=true
+ * - UI toggle actions: flash, queue sheet, sound
+ *
+ * NOTE: [SoundManager] and [AnalyticsHelper] are relaxed mocks — their side-effects
+ * (audio playback, Firebase calls) are suppressed in unit tests.
+ * [AddCardToCollectionUseCase] is a suspend operator fun — stubbed with coEvery.
+ * [HashDatabase] is used as a relaxed mock (the ViewModel exposes it as a val;
+ * the scanner does not invoke it during recognition result processing).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScannerViewModelTest {
 
-    // ── Test dispatcher ───────────────────────────────────────────────────────
+    // ── Dispatcher ─────────────────────────────────────────────────────────────
 
     private val testDispatcher = StandardTestDispatcher()
 
-    // ── Mocks ─────────────────────────────────────────────────────────────────
+    // ── Mocks ──────────────────────────────────────────────────────────────────
 
-    private val searchCards      = mockk<SearchCardsUseCase>()
-    private val searchCard       = mockk<SearchCardUseCase>()
-    private val addToCollection  = mockk<AddCardToCollectionUseCase>()
-    private val analyticsHelper  = mockk<AnalyticsHelper>(relaxed = true)
+    private val addToCollection: AddCardToCollectionUseCase = mockk()
+    private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
+    private val soundManager: SoundManager = mockk(relaxed = true)
+    private val hashDatabase: HashDatabase = HashDatabase(mockk<Context>(relaxed = true))
+    private val userPreferencesDataStore: UserPreferencesDataStore = mockk(relaxed = true) {
+        every { hashDbVersionFlow } returns flowOf(0)
+    }
+    private val workManager: WorkManager = mockk(relaxed = true) {
+        every { getWorkInfosForUniqueWorkLiveData(any()) } returns
+            MutableLiveData(emptyList<WorkInfo>())
+    }
+
+    // ── ViewModel under test ───────────────────────────────────────────────────
 
     private lateinit var viewModel: ScannerViewModel
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Sample data ────────────────────────────────────────────────────────────
 
-    private val sampleCard = TestFixtures.buildCard(
-        scryfallId = "abc-001",
-        name       = "Lightning Bolt",
+    /** Default card — setCode "lea", lang "en". */
+    private val defaultCard = TestFixtures.buildCard(
+        scryfallId = "card-abc-001",
+        name = "Lightning Bolt",
+        setCode = "lea",
     )
 
-    private fun buildViewModel(): ScannerViewModel =
-        ScannerViewModel(
-            searchCards     = searchCards,
-            searchCard      = searchCard,
-            addToCollection = addToCollection,
-            analyticsHelper = analyticsHelper,
-        )
+    /** Fake corner points — content is irrelevant for ViewModel logic. */
+    private val fakeCorners: List<PointF> = listOf(
+        PointF(0f, 0f), PointF(100f, 0f), PointF(100f, 140f), PointF(0f, 140f),
+    )
 
-    // ── Setup / Teardown ─────────────────────────────────────────────────────
+    /**
+     * Builds an [RecognitionResult.Identified] for [defaultCard] with default settings.
+     */
+    private fun identified(
+        ambiguous: Boolean = false,
+        confidence: Float = 0.95f,
+    ) = RecognitionResult.Identified(
+        card = defaultCard,
+        confidence = confidence,
+        ambiguous = ambiguous,
+        corners = fakeCorners,
+    )
+
+    // ── Setup / Teardown ───────────────────────────────────────────────────────
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = buildViewModel()
+        viewModel = ScannerViewModel(
+            addToCollection = addToCollection,
+            analyticsHelper = analyticsHelper,
+            soundManager = soundManager,
+            hashDatabase = hashDatabase,
+            userPreferencesDataStore = userPreferencesDataStore,
+            workManager = workManager,
+        )
     }
 
     @After
@@ -87,351 +122,430 @@ class ScannerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — onCardNameDetected: guards
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── Helper: feed N identical Identified results ────────────────────────────
 
-    @Test
-    fun `given same card name detected twice when onCardNameDetected then searchCards is called only once`() = runTest {
-        // Arrange
-        coEvery { searchCards("Lightning Bolt") } returns DataResult.Success(listOf(sampleCard))
-
-        // Act
-        viewModel.onCardNameDetected("Lightning Bolt")
-        viewModel.onCardNameDetected("Lightning Bolt") // duplicate — should be ignored
-        advanceUntilIdle()
-
-        // Assert: the use case was invoked exactly once despite two detections
-        coVerify(exactly = 1) { searchCards("Lightning Bolt") }
-    }
-
-    @Test
-    fun `given foundCard is already set when onCardNameDetected then search is not triggered`() = runTest {
-        // Arrange — first detection sets foundCard
-        coEvery { searchCards("Lightning Bolt") } returns DataResult.Success(listOf(sampleCard))
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-
-        // Act — second detection with a different name, while foundCard != null
-        viewModel.onCardNameDetected("Counterspell")
-        advanceUntilIdle()
-
-        // Assert: searchCards was called once only for the first detection
-        coVerify(exactly = 1) { searchCards(any()) }
-    }
-
-    @Test
-    fun `given showConfirmSheet is true when onCardNameDetected then search is ignored`() = runTest {
-        // Arrange — put ViewModel into "confirm sheet shown" state
-        coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.showConfirmSheet)
-
-        // Act — new detection while sheet is open
-        viewModel.onCardNameDetected("Fireball")
-        advanceUntilIdle()
-
-        // Assert: searchCards not called for "Fireball"
-        coVerify(exactly = 0) { searchCards("Fireball") }
+    /**
+     * Sends [count] identical [RecognitionResult.Identified] results to the ViewModel.
+     * The stability buffer requires exactly [STABILITY_FRAMES]=3 to confirm a card.
+     */
+    private fun repeatIdentified(count: Int, result: RecognitionResult.Identified = identified()) {
+        repeat(count) { viewModel.onRecognitionResult(result) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 2 — onCardNameDetected: search cancellation / restart
+    //  GROUP 1 — Initial state
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given isSearching when onCardNameDetected with new name then previous job is cancelled and new search starts`() = runTest {
-        // Arrange — first name starts a delayed search (200ms debounce)
-        coEvery { searchCards("Fireball") } returns DataResult.Success(listOf(sampleCard))
-        coEvery { searchCards("Counterspell") } returns DataResult.Success(listOf(
-            TestFixtures.buildCard(scryfallId = "cs-001", name = "Counterspell")
-        ))
-
-        // Act: trigger first search, then immediately trigger a second before debounce expires
-        viewModel.onCardNameDetected("Fireball")
-        advanceTimeBy(50) // less than 200ms debounce
-        viewModel.onCardNameDetected("Counterspell")
-        advanceUntilIdle()
-
-        // Assert: only the second name's search resulted in a foundCard
-        assertEquals("Counterspell", viewModel.uiState.value.foundCard?.name)
-        // "Fireball" search was cancelled before it could complete
-        coVerify(exactly = 0) { searchCards("Fireball") }
-        coVerify(exactly = 1) { searchCards("Counterspell") }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — searchCards returns results
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given searchCards returns non-empty list when onCardNameDetected then foundCard is set and confirmSheet shown`() = runTest {
-        // Arrange
-        coEvery { searchCards("Lightning Bolt") } returns DataResult.Success(listOf(sampleCard))
-
-        // Act
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-
-        // Assert
+    fun initialState_isCorrect() {
         val state = viewModel.uiState.value
-        assertEquals(sampleCard, state.foundCard)
-        assertTrue(state.showConfirmSheet)
+
+        assertNull(state.lastDetectedCard)
+        assertTrue(state.scanSession.cards.isEmpty())
         assertFalse(state.isSearching)
-        assertNull(state.error)
+        assertFalse(state.showAmbiguitySelector)
+        assertFalse(state.languageMismatch)
+        assertNull(state.lockedSetCode)
+        assertTrue(state.isQuickMode)          // Quick Mode ON by default
+        assertFalse(state.isLookupOnly)
+        assertFalse(state.showQueueSheet)
+        assertFalse(state.showSettingsSheet)
+        assertNull(state.toastMessage)
+        assertTrue(state.isSoundEnabled)
+        assertTrue(state.hasFlash)             // defaults to true until hardware confirms
+        assertFalse(state.isFlashOn)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — searchCards empty → fallback to searchCard
+    //  GROUP 2 — RecognitionResult.NoCard
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given searchCards returns empty list when onCardNameDetected then searchCard fallback is invoked`() = runTest {
-        // Arrange
-        coEvery { searchCards("Lightning Bolt") } returns DataResult.Success(emptyList())
-        coEvery { searchCard("Lightning Bolt") } returns DataResult.Success(sampleCard)
+    fun onRecognitionResult_noCard_doesNotChangeState() {
+        // Arrange — default initial state
+        val stateBefore = viewModel.uiState.value
 
         // Act
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
+        viewModel.onRecognitionResult(RecognitionResult.NoCard)
 
-        // Assert: exact-lookup was used after empty fuzzy result
-        coVerify(exactly = 1) { searchCard("Lightning Bolt") }
-        assertEquals(sampleCard, viewModel.uiState.value.foundCard)
-        assertTrue(viewModel.uiState.value.showConfirmSheet)
-    }
-
-    @Test
-    fun `given searchCards returns error when onCardNameDetected then searchCard fallback is invoked`() = runTest {
-        // Arrange
-        coEvery { searchCards("Lightning Bolt") } returns DataResult.Error("Network error")
-        coEvery { searchCard("Lightning Bolt") } returns DataResult.Success(sampleCard)
-
-        // Act
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-
-        // Assert: error from searchCards did not abort — fallback ran
-        coVerify(exactly = 1) { searchCard("Lightning Bolt") }
-        assertEquals(sampleCard, viewModel.uiState.value.foundCard)
+        // Assert — only transient overlay fields cleared; session/modes unchanged
+        val stateAfter = viewModel.uiState.value
+        assertNull(stateAfter.detectedCorners)
+        assertFalse(stateAfter.isSearching)
+        assertFalse(stateAfter.languageMismatch)
+        // Session and mode flags must not change
+        assertEquals(stateBefore.scanSession, stateAfter.scanSession)
+        assertEquals(stateBefore.isQuickMode, stateAfter.isQuickMode)
+        assertEquals(stateBefore.isLookupOnly, stateAfter.isLookupOnly)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — searchCard returns success
+    //  GROUP 3 — Stability buffer (Quick Mode)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given searchCards empty and searchCard success when onCardNameDetected then foundCard and sheet are set`() = runTest {
-        // Arrange
-        coEvery { searchCards(any()) } returns DataResult.Success(emptyList())
-        coEvery { searchCard(any()) } returns DataResult.Success(sampleCard)
+    fun onRecognitionResult_stabilityBuffer_requiresThreeConsecutive() = runTest {
+        // Arrange — Quick Mode ON, addToCollection succeeds
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
 
-        // Act
-        viewModel.onCardNameDetected("Lightning Bolt")
+        // Act — only 2 frames: should NOT confirm
+        repeatIdentified(2)
         advanceUntilIdle()
 
-        // Assert
-        val state = viewModel.uiState.value
-        assertEquals(sampleCard, state.foundCard)
-        assertTrue(state.showConfirmSheet)
-        assertFalse(state.isSearching)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — Both searches return error → error state, then auto-clear
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given both searches return error when onCardNameDetected then error message is shown`() = runTest {
-        // Arrange
-        coEvery { searchCards("Unknown") } returns DataResult.Success(emptyList())
-        coEvery { searchCard("Unknown") } returns DataResult.Error("Not found")
-
-        // Act
-        viewModel.onCardNameDetected("Unknown")
-        advanceUntilIdle()
-
-        // Assert: error is shown immediately after failure
-        val state = viewModel.uiState.value
-        assertNotNull(state.error)
-        assertTrue(state.error!!.contains("Unknown"))
-        assertFalse(state.isSearching)
-    }
-
-    @Test
-    fun `given both searches return error when 2 seconds pass then error and detectedName are cleared`() = runTest {
-        // Arrange
-        coEvery { searchCards("Unknown") } returns DataResult.Success(emptyList())
-        coEvery { searchCard("Unknown") } returns DataResult.Error("Not found")
-
-        // Act
-        viewModel.onCardNameDetected("Unknown")
-        advanceUntilIdle() // run coroutine up to the 2s delay
-
-        // Advance past the 2-second auto-clear delay inside the coroutine
-        advanceTimeBy(2_001)
-        advanceUntilIdle()
-
-        // Assert: error and detectedName are cleared after 2s
-        val state = viewModel.uiState.value
-        assertNull(state.error)
-        assertNull(state.detectedName)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 7 — Exception inside coroutine
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given searchCards throws exception when onCardNameDetected then connection error is shown`() = runTest {
-        // Arrange
-        coEvery { searchCards(any()) } throws RuntimeException("Socket timeout")
-
-        // Act
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-
-        // Assert
-        val state = viewModel.uiState.value
-        assertEquals("Connection error", state.error)
-        assertFalse(state.isSearching)
-    }
-
-    @Test
-    fun `given exception in coroutine when 2 seconds pass then error is auto-cleared`() = runTest {
-        // Arrange
-        coEvery { searchCards(any()) } throws RuntimeException("timeout")
-
-        // Act
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-        advanceTimeBy(2_001)
-        advanceUntilIdle()
-
-        // Assert
-        assertNull(viewModel.uiState.value.error)
-        assertNull(viewModel.uiState.value.detectedName)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 8 — onConfirmAdd
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given addToCollection succeeds when onConfirmAdd then state is reset for next scan`() = runTest {
-        // Arrange — put ViewModel in confirm-sheet state first
-        coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any()) } returns DataResult.Success(Unit)
-
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-
-        // Act
-        viewModel.onConfirmAdd(
-            scryfallId = "abc-001",
-            isFoil     = false,
-            condition  = "NM",
-            language   = "en",
-            quantity   = 1,
+        // Assert — card not yet added after 2 frames
+        assertTrue(
+            "Session should still be empty after only 2 stability frames",
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
         )
+
+        // Act — 3rd frame: should confirm and add
+        viewModel.onRecognitionResult(identified())
         advanceUntilIdle()
 
-        // Assert: state resets to allow next scan
-        val state = viewModel.uiState.value
-        assertNull(state.foundCard)
-        assertFalse(state.showConfirmSheet)
-        assertTrue(state.addedSuccessfully)
-        assertTrue(state.isScanning)
-        assertNull(state.detectedName)
-    }
-
-    @Test
-    fun `given addToCollection returns error when onConfirmAdd then error message is shown and sheet dismissed`() = runTest {
-        // Arrange
-        coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any()) } returns DataResult.Error("Server error")
-
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-
-        // Act
-        viewModel.onConfirmAdd(
-            scryfallId = "abc-001",
-            isFoil     = false,
-            condition  = "NM",
-            language   = "en",
-            quantity   = 1,
+        // Assert — card added after 3rd consecutive frame
+        assertFalse(
+            "Session should contain the card after 3 consecutive frames",
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
         )
-        advanceUntilIdle()
-
-        // Assert
-        val state = viewModel.uiState.value
-        assertEquals("Server error", state.error)
-        assertFalse(state.showConfirmSheet)
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 9 — onDismissConfirmSheet
-    // ══════════════════════════════════════════════════════════════════════════
-
     @Test
-    fun `given confirm sheet is shown when onDismissConfirmSheet then state resets to initial`() = runTest {
-        // Arrange — navigate to confirm-sheet state
-        coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-
-        assertTrue(viewModel.uiState.value.showConfirmSheet)
-
-        // Act
-        viewModel.onDismissConfirmSheet()
-
-        // Assert: full reset to defaults
-        val state = viewModel.uiState.value
-        assertNull(state.foundCard)
-        assertFalse(state.showConfirmSheet)
-        assertFalse(state.isSearching)
-        assertNull(state.detectedName)
-        assertNull(state.error)
-        assertTrue(state.isScanning)
-        assertFalse(state.addedSuccessfully)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 10 — Utility actions
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given addedSuccessfully is true when onSuccessDismissed then flag is cleared`() = runTest {
+    fun onRecognitionResult_identified_quickMode_addsToSession() = runTest {
         // Arrange
-        coEvery { searchCards(any()) } returns DataResult.Success(listOf(sampleCard))
-        coEvery { addToCollection(scryfallId = any(), isFoil = any(), condition = any(), language = any()) } returns DataResult.Success(Unit)
-        viewModel.onCardNameDetected("Lightning Bolt")
-        advanceUntilIdle()
-        viewModel.onConfirmAdd("abc-001", false, "NM", "en", 1)
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.addedSuccessfully)
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
 
-        // Act
-        viewModel.onSuccessDismissed()
+        // Act — 3 consecutive frames to satisfy stability buffer
+        repeatIdentified(3)
+        advanceUntilIdle()
 
-        // Assert
-        assertFalse(viewModel.uiState.value.addedSuccessfully)
+        // Assert — card appears in session
+        val session = viewModel.uiState.value.scanSession
+        assertFalse(session.cards.isEmpty())
+        assertEquals(defaultCard.scryfallId, session.cards.first().card.scryfallId)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 4 — Anti-duplicate guard
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onRecognitionResult_antiDuplicate_blocksWithin800ms() = runTest {
+        // Arrange
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
+
+        // Act — first successful add (3 frames)
+        repeatIdentified(3)
+        advanceUntilIdle()
+
+        val countAfterFirst = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
+
+        // Act — immediately try to add the same card again (within 800 ms window)
+        // The anti-duplicate guard clears recentMatches and returns early.
+        // We need 3 new frames but the guard fires on the first one.
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+
+        val countAfterSecond = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
+
+        // Assert — count unchanged; second scan within 800 ms was blocked
+        assertEquals(
+            "Anti-duplicate guard should block same card within 800 ms",
+            countAfterFirst,
+            countAfterSecond,
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 5 — Set lock filter
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onRecognitionResult_setLock_mismatch_doesNotAdd() = runTest {
+        // Arrange — lock to a different set than the card's setCode ("lea")
+        viewModel.onSetLockSelected("khm")
+
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
+
+        // Act — 3 frames with a card from set "lea" but lock is "khm"
+        repeatIdentified(3)
+        advanceUntilIdle()
+
+        // Assert — card rejected by set lock; session empty
+        assertTrue(
+            "Set lock mismatch: card should not be added",
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
+        )
     }
 
     @Test
-    fun `given error in state when onErrorDismissed then error is null`() = runTest {
-        // Arrange
-        coEvery { searchCards(any()) } throws RuntimeException("boom")
-        viewModel.onCardNameDetected("Any Card")
-        advanceUntilIdle()
-        assertNotNull(viewModel.uiState.value.error)
+    fun onRecognitionResult_setLock_match_addsCard() = runTest {
+        // Arrange — lock matches the card's setCode
+        viewModel.onSetLockSelected("lea")
+
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
 
         // Act
-        viewModel.onErrorDismissed()
+        repeatIdentified(3)
+        advanceUntilIdle()
+
+        // Assert — card passes the lock filter and is added
+        assertFalse(
+            "Set lock match: card should be added",
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6 — Language mismatch (Quick Mode)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onRecognitionResult_languageMismatch_quickMode_setsFlag() = runTest {
+        // Arrange — Quick Mode ON, selectedLanguage = "ja", card.lang = "en"
+        // The language filter only triggers when selectedLanguage != "en"
+        viewModel.onLanguageSelected("ja")
+
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
+
+        // Act — 3 frames to satisfy stability buffer
+        repeatIdentified(3)
+        advanceUntilIdle()
+
+        // Assert — languageMismatch is true; card was NOT auto-added
+        val state = viewModel.uiState.value
+        assertTrue(
+            "Language mismatch flag should be set when card.lang != selectedLanguage in Quick Mode",
+            state.languageMismatch,
+        )
+        // Card is shown in bottom bar (lastDetectedCard set) but session is empty
+        assertNotNull(state.lastDetectedCard)
+        assertTrue(
+            "Session should be empty when language mismatch in Quick Mode",
+            state.scanSession.cards.isEmpty(),
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 7 — Lookup Only mode
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onRecognitionResult_lookupOnly_setsLastDetectedCard() = runTest {
+        // Arrange — enable Lookup Only (disables both Quick Mode auto-add and manual add)
+        viewModel.onToggleLookupOnly()  // isLookupOnly = true
+        // Also turn off Quick Mode to isolate Lookup Only behaviour
+        viewModel.onToggleQuickMode()   // isQuickMode = false
+
+        // Act — 3 frames to confirm card
+        repeatIdentified(3)
+        advanceUntilIdle()
+
+        // Assert — card shown in bottom bar but NOT added to session
+        val state = viewModel.uiState.value
+        assertNotNull(
+            "Lookup Only: lastDetectedCard should be set",
+            state.lastDetectedCard,
+        )
+        assertTrue(
+            "Lookup Only: session must remain empty — card is never added",
+            state.scanSession.cards.isEmpty(),
+        )
+        assertFalse(
+            "Lookup Only: languageMismatch should be cleared in this mode",
+            state.languageMismatch,
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — Ambiguity selector (normal mode)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onRecognitionResult_ambiguous_normalMode_showsSelector() = runTest {
+        // Arrange — disable Quick Mode and Lookup Only to enter normal mode
+        viewModel.onToggleQuickMode()   // isQuickMode = false; isLookupOnly already false
+
+        // Act — 3 frames with ambiguous=true
+        repeatIdentified(3, result = identified(ambiguous = true))
+        advanceUntilIdle()
+
+        // Assert — inline ambiguity selector is triggered
+        assertTrue(
+            "Ambiguous card in normal mode should set showAmbiguitySelector=true",
+            viewModel.uiState.value.showAmbiguitySelector,
+        )
+        // Card is set in bottom bar but session remains empty (user must confirm)
+        assertNotNull(viewModel.uiState.value.lastDetectedCard)
+        assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
+    }
+
+    @Test
+    fun onDismissAmbiguitySelector_clearsSelectorAndCard() = runTest {
+        // Arrange — reach ambiguity state
+        viewModel.onToggleQuickMode()
+        repeatIdentified(3, result = identified(ambiguous = true))
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showAmbiguitySelector)
+
+        // Act
+        viewModel.onDismissAmbiguitySelector()
 
         // Assert
-        assertNull(viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.showAmbiguitySelector)
+        assertNull(viewModel.uiState.value.lastDetectedCard)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 9 — UI toggle actions
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onToggleFlash_updatesState() {
+        // Arrange
+        assertFalse(viewModel.uiState.value.isFlashOn)
+
+        // Act
+        viewModel.onToggleFlash()
+
+        // Assert
+        assertTrue(viewModel.uiState.value.isFlashOn)
+
+        // Act — toggle back
+        viewModel.onToggleFlash()
+        assertFalse(viewModel.uiState.value.isFlashOn)
+    }
+
+    @Test
+    fun onOpenQueue_updatesShowQueueSheet() {
+        // Arrange
+        assertFalse(viewModel.uiState.value.showQueueSheet)
+
+        // Act
+        viewModel.onOpenQueue()
+
+        // Assert
+        assertTrue(viewModel.uiState.value.showQueueSheet)
+    }
+
+    @Test
+    fun onCloseQueue_hidesQueueSheet() {
+        // Arrange
+        viewModel.onOpenQueue()
+        assertTrue(viewModel.uiState.value.showQueueSheet)
+
+        // Act
+        viewModel.onCloseQueue()
+
+        // Assert
+        assertFalse(viewModel.uiState.value.showQueueSheet)
+    }
+
+    @Test
+    fun onToggleSound_updatesState() {
+        // Arrange — sound is enabled by default
+        assertTrue(viewModel.uiState.value.isSoundEnabled)
+
+        // Act
+        viewModel.onToggleSound()
+
+        // Assert
+        assertFalse(viewModel.uiState.value.isSoundEnabled)
+
+        // Act — toggle back
+        viewModel.onToggleSound()
+        assertTrue(viewModel.uiState.value.isSoundEnabled)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 10 — Miscellaneous state transitions
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onToastDismissed_clearsToastMessage() = runTest {
+        // Arrange — trigger a successful add to produce a toast
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
+
+        repeatIdentified(3)
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.toastMessage)
+
+        // Act
+        viewModel.onToastDismissed()
+
+        // Assert
+        assertNull(viewModel.uiState.value.toastMessage)
+    }
+
+    @Test
+    fun onClearSession_emptiesSessionAndResetsGuard() = runTest {
+        // Arrange — add a card first
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
+
+        repeatIdentified(3)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())
+
+        // Act
+        viewModel.onClearSession()
+
+        // Assert
+        assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
+        assertFalse(viewModel.uiState.value.showQueueSheet)
     }
 }

@@ -82,7 +82,12 @@ class OpenCvCardDetector : CardDetector {
     private val hierarchyMat = Mat()
 
     // ── EMA state ───────────────────────────────────────────────────────────
-    /** EMA smoothing factor. Higher = faster tracking, less smoothing. */
+    /**
+     * EMA smoothing factor applied to the *new* observation.
+     * Higher = faster tracking (more weight on the new measurement), less smoothing.
+     * Lower = slower tracking (more inertia), smoother overlay.
+     * Formula: smoothed = emaAlpha * new + (1 - emaAlpha) * previous.
+     */
     private val emaAlpha = 0.65f
     private var smoothedCorners: List<PointF>? = null
 
@@ -270,11 +275,12 @@ class OpenCvCardDetector : CardDetector {
             // First detection or size mismatch — seed with raw corners
             newCorners.also { smoothedCorners = it }
         } else {
+            // EMA: smoothed = emaAlpha * new + (1 - emaAlpha) * previous
             val result = newCorners.mapIndexed { i, new ->
                 val prev = previous[i]
                 PointF(
-                    emaAlpha * prev.x + (1f - emaAlpha) * new.x,
-                    emaAlpha * prev.y + (1f - emaAlpha) * new.y,
+                    emaAlpha * new.x + (1f - emaAlpha) * prev.x,
+                    emaAlpha * new.y + (1f - emaAlpha) * prev.y,
                 )
             }
             smoothedCorners = result
