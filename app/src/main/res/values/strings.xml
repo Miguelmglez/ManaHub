@@ -1236,6 +1236,8 @@
     <string name="trades_shared_list_loading">Loading shared list…</string>
     <string name="trades_shared_list_private">This user no longer shares publicly</string>
     <string name="trades_shared_list_not_found">Link not found</string>
+    <string name="trades_shared_list_title">Shared list</string>
+    <string name="trades_shared_list_by">Shared list from @%s</string>
     <string name="trades_migration_synced_n_cards">Synced %d cards from this device to your account.</string>
     <string name="trades_select_card_id_hint">Enter card Scryfall ID</string>
     <string name="trades_foil">Foil</string>

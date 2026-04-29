@@ -59,9 +59,11 @@ class SharedListsRemoteDataSource @Inject constructor(
                     else -> {
                         val typeStr = obj["list_type"]?.jsonPrimitive?.content ?: "WISHLIST"
                         val ownerId = obj["user_id"]?.jsonPrimitive?.content ?: ""
+                        val ownerNickname = obj["owner_nickname"]?.jsonPrimitive?.content ?: ""
                         SharedListResult.Ok(
                             listType = SharedListType.valueOf(typeStr),
                             userId = ownerId,
+                            ownerNickname = ownerNickname,
                             items = emptyList(),
                         )
                     }

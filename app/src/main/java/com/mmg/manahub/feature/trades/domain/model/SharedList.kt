@@ -13,6 +13,7 @@ sealed class SharedListResult {
     data class Ok(
         val listType: SharedListType,
         val userId: String,
+        val ownerNickname: String = "",
         val items: List<Map<String, String?>>,
     ) : SharedListResult()
     object Private : SharedListResult()

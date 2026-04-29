@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
 import com.mmg.manahub.feature.trades.domain.model.TradeError
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
@@ -56,6 +58,7 @@ data class ProposalEditorUiState(
 @HiltViewModel
 class TradeProposalViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val authRepository: AuthRepository,
     private val createProposal: CreateTradeProposalUseCase,
     private val editProposal: EditProposalUseCase,
     private val sendProposal: SendProposalUseCase,
@@ -67,7 +70,16 @@ class TradeProposalViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ProposalEditorUiState())
     val uiState: StateFlow<ProposalEditorUiState> = _uiState.asStateFlow()
 
+    private var currentUserId: String = ""
+
     init {
+        viewModelScope.launch {
+            authRepository.sessionState.collect { state ->
+                if (state is SessionState.Authenticated) {
+                    currentUserId = state.user.id
+                }
+            }
+        }
         val receiverId = savedStateHandle.get<String>("receiverId") ?: ""
         val parentProposalId = savedStateHandle.get<String>("parentProposalId")
         val editingProposalId = savedStateHandle.get<String>("editingProposalId")
@@ -148,7 +160,7 @@ class TradeProposalViewModel @Inject constructor(
                         s.copy(isSaving = false, navigateToThread = Pair(proposalId, proposalId))
                     },
                     onFailure = { e ->
-                        s.copy(isSaving = false, errorMessage = (e as? TradeError)?.javaClass?.simpleName ?: e.message)
+                        s.copy(isSaving = false, errorMessage = (e as? TradeError)?.javaClass?.simpleName)
                     }
                 )
             }
@@ -214,7 +226,7 @@ class TradeProposalViewModel @Inject constructor(
                         val msg = when (e) {
                             is TradeError.ProposalVersionMismatch -> "PROPOSAL_VERSION_MISMATCH"
                             is TradeError.InitialAsymmetryNotAllowed -> "INITIAL_ASYMMETRY"
-                            else -> (e as? TradeError)?.javaClass?.simpleName ?: e.message
+                            else -> (e as? TradeError)?.javaClass?.simpleName
                         }
                         s.copy(isSaving = false, errorMessage = msg)
                     }
@@ -228,8 +240,9 @@ class TradeProposalViewModel @Inject constructor(
     fun onNavigationConsumed() = _uiState.update { it.copy(navigateToThread = null, navigateBack = false) }
 
     private fun buildItemRequestDtos(state: ProposalEditorUiState): List<TradeItemRequestDto> {
-        val proposerDtos = state.proposerItems.map { it.toRequestDto(fromUserId = "me", toUserId = state.receiverId) }
-        val receiverDtos = state.receiverItems.map { it.toRequestDto(fromUserId = state.receiverId, toUserId = "me") }
+        val myId = currentUserId
+        val proposerDtos = state.proposerItems.map { it.toRequestDto(fromUserId = myId, toUserId = state.receiverId) }
+        val receiverDtos = state.receiverItems.map { it.toRequestDto(fromUserId = state.receiverId, toUserId = myId) }
         return proposerDtos + receiverDtos
     }
 

@@ -14,6 +14,8 @@ sealed class TradeError : Exception() {
     data class Unknown(override val message: String?) : TradeError()
 }
 
+fun Throwable.toUserFacingMessage(): String? = null
+
 /**
  * Parses a raw [PostgrestException] message string into a typed [TradeError].
  * The Supabase state-machine RPCs raise errors in the format "ERROR_CODE: detail".
