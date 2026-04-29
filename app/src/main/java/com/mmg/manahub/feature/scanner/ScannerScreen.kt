@@ -102,6 +102,7 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Root screen — entry point from navigation
@@ -297,6 +298,8 @@ fun ScannerScreen(
             isQuickMode = uiState.isQuickMode,
             isLookupOnly = uiState.isLookupOnly,
             isSoundEnabled = uiState.isSoundEnabled,
+            hashDbVersion = uiState.hashDbVersion,
+            isHashDbUpdating = uiState.isHashDbUpdating,
             onDismiss = viewModel::onCloseSettings,
             onToggleQuickMode = viewModel::onToggleQuickMode,
             onToggleLookupOnly = viewModel::onToggleLookupOnly,
@@ -362,13 +365,27 @@ private fun CameraPreview(
     // CardRecognizer wraps OpenCV detection + pHash lookup
     // rememberUpdatedState is not needed here because onRecognitionResult is
     // a stable ViewModel function reference.
+    val recognizerScope = remember {
+        kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default,
+        )
+    }
     val recognizer = remember {
         CardRecognizer(
             hashDatabase = hashDatabase,
             cardRepository = cardRepository,
-            scope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default),
+            scope = recognizerScope,
             onResult = onRecognitionResult,
         )
+    }
+
+    // Release native OpenCV Mats and cancel in-flight coroutines when the composable
+    // leaves composition (e.g. back navigation, configuration change recomposition).
+    androidx.compose.runtime.DisposableEffect(recognizer) {
+        onDispose {
+            recognizerScope.cancel()
+            recognizer.release()
+        }
     }
 
     // Attach a wrapper analyzer that captures frame metadata and delegates to recognizer
@@ -399,8 +416,8 @@ private fun CameraPreview(
                         it.setSurfaceProvider(pv.surfaceProvider)
                     }
                     val imageAnalysis = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .setTargetResolution(android.util.Size(720, 1280))
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                         .also { analysis ->
                             analysis.setAnalyzer(
@@ -1180,6 +1197,8 @@ private fun ScannerSettingsSheet(
     isQuickMode: Boolean,
     isLookupOnly: Boolean,
     isSoundEnabled: Boolean,
+    hashDbVersion: Int,
+    isHashDbUpdating: Boolean,
     onDismiss: () -> Unit,
     onToggleQuickMode: () -> Unit,
     onToggleLookupOnly: () -> Unit,
@@ -1231,7 +1250,62 @@ private fun ScannerSettingsSheet(
                 onToggle = onToggleSound,
             )
 
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Hash database update status
+            HashDbStatusRow(
+                hashDbVersion = hashDbVersion,
+                isHashDbUpdating = isHashDbUpdating,
+            )
+
             Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/**
+ * Read-only status row that shows whether the hash DB is up-to-date, updating,
+ * or still using the bundled asset (no remote download yet).
+ */
+@Composable
+private fun HashDbStatusRow(
+    hashDbVersion: Int,
+    isHashDbUpdating: Boolean,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        when {
+            isHashDbUpdating -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.scanner_db_status_updating),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            hashDbVersion > 0 -> {
+                Text(
+                    text = stringResource(R.string.scanner_db_status_up_to_date, hashDbVersion),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            else -> {
+                Text(
+                    text = stringResource(R.string.scanner_db_status_bundled),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -21,17 +21,21 @@ import javax.inject.Singleton
 object ScannerModule {
 
     /**
-     * Provides the [HashDatabase] singleton, pre-loaded from `assets/card_hashes.bin`.
+     * Provides the [HashDatabase] singleton.
      *
-     * Loading happens synchronously during Hilt component initialization.
-     * If the asset is missing, [HashDatabase.cardCount] stays 0 and the scanner
-     * degrades gracefully to the [com.mmg.manahub.feature.scanner.RecognitionResult.Detected]
-     * result (shows the overlay but cannot identify the card).
+     * Prefers a previously downloaded file in [Context.getFilesDir] over the bundled asset,
+     * so that OTA hash-DB updates take effect immediately without a new release.
+     * Falls back to the bundled asset when no downloaded file is present.
      */
     @Provides
     @Singleton
-    fun provideHashDatabase(@ApplicationContext context: Context): HashDatabase =
-        HashDatabase(context).also { it.loadFromAssets() }
+    fun provideHashDatabase(@ApplicationContext context: Context): HashDatabase {
+        val db = HashDatabase(context)
+        val downloadedFile = java.io.File(context.filesDir, "card_hashes.bin")
+        if (downloadedFile.exists()) db.loadFromFile(downloadedFile)
+        else db.loadFromAssets()
+        return db
+    }
 
     /**
      * Provides the [SoundManager] singleton.

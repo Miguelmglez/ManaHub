@@ -291,3 +291,4 @@ $RECYCLE.BIN/
 /.artifacts/
 /app/DEEPLINKS.md
 /.well-known/
+.wrangler/

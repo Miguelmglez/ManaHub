@@ -258,6 +258,9 @@
     <string name="scanner_price_detail_foil">Foil</string>
     <string name="scanner_price_detail_buy">Buy</string>
     <string name="scanner_price_na">N/A</string>
+    <string name="scanner_db_status_up_to_date">DB: v%1$d — up to date</string>
+    <string name="scanner_db_status_updating">DB: Updating…</string>
+    <string name="scanner_db_status_bundled">DB: bundled (no update yet)</string>
 
     <!-- ══════════════════════════════════════════
          SYNERGY SCREEN

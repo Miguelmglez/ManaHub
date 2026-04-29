@@ -1,7 +1,11 @@
 package com.mmg.manahub.feature.scanner
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
@@ -44,6 +48,8 @@ class ScannerViewModel @Inject constructor(
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
     val hashDatabase: HashDatabase,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val workManager: WorkManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScannerUiState())
@@ -67,6 +73,26 @@ class ScannerViewModel @Inject constructor(
         private const val DEFAULT_LANGUAGE = "en"
     }
 
+    init {
+        // Reflect the persisted hash-DB version in the UI state.
+        viewModelScope.launch {
+            userPreferencesDataStore.hashDbVersionFlow.collect { version ->
+                _uiState.update { it.copy(hashDbVersion = version) }
+            }
+        }
+
+        // Mirror the WorkManager running state so the settings sheet shows an updating indicator.
+        viewModelScope.launch {
+            workManager
+                .getWorkInfosForUniqueWorkLiveData(HashDatabaseUpdateWorker.WORK_NAME)
+                .asFlow()
+                .collect { infos ->
+                    val isRunning = infos.any { it.state == WorkInfo.State.RUNNING }
+                    _uiState.update { it.copy(isHashDbUpdating = isRunning) }
+                }
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  pHash recognition entry point — called by CardRecognizer
     // ─────────────────────────────────────────────────────────────────────────
@@ -80,6 +106,15 @@ class ScannerViewModel @Inject constructor(
      *   stability + anti-duplicate logic, then routes to the appropriate mode.
      */
     fun onRecognitionResult(result: RecognitionResult) {
+        // onRecognitionResult is called from CardRecognizer's Dispatchers.Default coroutine.
+        // recentMatches, lastAddedId, and lastAddedTime are not thread-safe, so we dispatch
+        // the entire handler onto the main thread where those fields are always accessed.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
+            processRecognitionResult(result)
+        }
+    }
+
+    private fun processRecognitionResult(result: RecognitionResult) {
         when (result) {
             RecognitionResult.NoCard -> {
                 recentMatches.clear()
