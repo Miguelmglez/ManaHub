@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.scanner
 
+// COMMENTED OUT — replaced by ML Kit OCR. See CardRecognizer for the new pipeline.
+/*
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.opencv.core.Mat
@@ -157,3 +159,4 @@ class CardEmbeddingModel @Inject constructor(
         return vector
     }
 }
+*/

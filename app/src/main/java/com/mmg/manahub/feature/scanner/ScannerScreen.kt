@@ -167,39 +167,19 @@ fun ScannerScreen(
         when {
             cameraPermission.status.isGranted -> {
                 when {
-                    !uiState.embeddingDbVersionReady -> {
-                        // DataStore hasn't emitted yet — show dark screen for one frame
-                        Box(
-                            modifier = Modifier.fillMaxSize().background(Color.Black),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(color = MaterialTheme.magicColors.primaryAccent)
-                        }
-                    }
-
-                    uiState.embeddingDbVersion < 1 -> {
-                        // Full DB never downloaded — block camera and show setup UI
-                        EmbeddingDbSetupScreen(
-                            onBack = onBack,
-                            isDownloading = uiState.isEmbeddingDbUpdating,
-                            downloadProgress = uiState.embeddingDbDownloadProgress,
-                        )
-                    }
-
                     else -> {
-                        // Full DB is available — normal camera + recognition flow
+                        // OCR pipeline — no DB download required; camera starts immediately
                         CameraPreview(
                             isFlashOn = uiState.isFlashOn,
                             detectedCorners = uiState.detectedCorners,
-                            embeddingDatabase = viewModel.embeddingDatabase,
                             onRecognitionResult = viewModel::onRecognitionResult,
                             onFlashAvailability = viewModel::onFlashAvailabilityChanged,
                         )
 
-                        // Transient banner while DB is reloading into memory after app restart
-                        if (!uiState.embeddingDbLoaded) {
-                            EmbeddingDbNotLoadedBanner(isUpdating = uiState.isEmbeddingDbUpdating)
-                        }
+                        // COMMENTED OUT — banner only relevant for embedding DB pipeline
+                        // if (!uiState.embeddingDbLoaded) {
+                        //     EmbeddingDbNotLoadedBanner(isUpdating = uiState.isEmbeddingDbUpdating)
+                        // }
 
                         // Top bar with back button and right-side controls
                         TopScannerControls(
@@ -286,9 +266,6 @@ fun ScannerScreen(
             isQuickMode = uiState.isQuickMode,
             isLookupOnly = uiState.isLookupOnly,
             isSoundEnabled = uiState.isSoundEnabled,
-            embeddingDbVersion = uiState.embeddingDbVersion,
-            embeddingDbCardCount = uiState.embeddingDbCardCount,
-            isEmbeddingDbUpdating = uiState.isEmbeddingDbUpdating,
             onDismiss = viewModel::onCloseSettings,
             onToggleQuickMode = viewModel::onToggleQuickMode,
             onToggleLookupOnly = viewModel::onToggleLookupOnly,
@@ -316,7 +293,8 @@ fun ScannerScreen(
 private fun CameraPreview(
     isFlashOn: Boolean,
     detectedCorners: List<PointF>?,
-    embeddingDatabase: EmbeddingDatabase,
+    // COMMENTED OUT — embeddingDatabase no longer needed with ML Kit OCR pipeline
+    // embeddingDatabase: EmbeddingDatabase,
     onRecognitionResult: (RecognitionResult) -> Unit,
     onFlashAvailability: (Boolean) -> Unit,
 ) {
@@ -332,7 +310,9 @@ private fun CameraPreview(
             .fromApplication(context.applicationContext, ScannerEntryPoint::class.java)
     }
     val cardRepository = remember { entryPoint.cardRepository() }
-    val cardEmbeddingModel = remember { entryPoint.cardEmbeddingModel() }
+    val cardOcrAnalyzer = remember { entryPoint.cardOcrAnalyzer() }
+    // COMMENTED OUT — TFLite model no longer used in OCR pipeline
+    // val cardEmbeddingModel = remember { entryPoint.cardEmbeddingModel() }
 
     val lastFrameWidth = remember { AtomicInteger(0) }
     val lastFrameHeight = remember { AtomicInteger(0) }
@@ -346,11 +326,13 @@ private fun CameraPreview(
     }
     val recognizer = remember {
         CardRecognizer(
-            embeddingDatabase = embeddingDatabase,
-            cardEmbeddingModel = cardEmbeddingModel,
             cardRepository = cardRepository,
+            cardOcrAnalyzer = cardOcrAnalyzer,
             scope = recognizerScope,
             onResult = onRecognitionResult,
+            // COMMENTED OUT — embedding params replaced by OCR
+            // embeddingDatabase = embeddingDatabase,
+            // cardEmbeddingModel = cardEmbeddingModel,
         )
     }
 
@@ -483,7 +465,9 @@ private class FrameMetadataAnalyzer(
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
 interface ScannerEntryPoint {
     fun cardRepository(): com.mmg.manahub.core.domain.repository.CardRepository
-    fun cardEmbeddingModel(): CardEmbeddingModel
+    fun cardOcrAnalyzer(): CardOcrAnalyzer
+    // COMMENTED OUT — TFLite embedding model replaced by ML Kit OCR
+    // fun cardEmbeddingModel(): CardEmbeddingModel
 }
 
 private fun mapFrameToCanvas(
@@ -1306,9 +1290,10 @@ private fun ScannerSettingsSheet(
     isQuickMode: Boolean,
     isLookupOnly: Boolean,
     isSoundEnabled: Boolean,
-    embeddingDbVersion: Int,
-    embeddingDbCardCount: Int,
-    isEmbeddingDbUpdating: Boolean,
+    // COMMENTED OUT — embedding DB params replaced by ML Kit OCR (no DB required)
+    // embeddingDbVersion: Int,
+    // embeddingDbCardCount: Int,
+    // isEmbeddingDbUpdating: Boolean,
     onDismiss: () -> Unit,
     onToggleQuickMode: () -> Unit,
     onToggleLookupOnly: () -> Unit,
@@ -1323,46 +1308,9 @@ private fun ScannerSettingsSheet(
             SettingsToggleRow(stringResource(R.string.scanner_lookup_only), stringResource(R.string.scanner_lookup_only_desc), isLookupOnly, { onToggleLookupOnly() })
             SettingsToggleRow(stringResource(R.string.scanner_sound_effects), stringResource(R.string.scanner_sound_effects_desc), isSoundEnabled, { onToggleSound() })
 
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-
-            // Hash DB status row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.scanner_db_label),
-                        style = ty.bodyMedium,
-                        color = Color.White,
-                    )
-                    Text(
-                        text = when {
-                            isEmbeddingDbUpdating -> stringResource(R.string.scanner_db_status_updating)
-                            embeddingDbCardCount > 0 -> stringResource(
-                                R.string.scanner_db_status_loaded,
-                                embeddingDbCardCount,
-                                embeddingDbVersion,
-                            )
-                            else -> stringResource(R.string.scanner_db_not_loaded)
-                        },
-                        style = ty.bodySmall,
-                        color = when {
-                            embeddingDbCardCount > 0 -> Color(0xFF4CAF50)
-                            isEmbeddingDbUpdating -> Color(0xFFFFA000)
-                            else -> Color(0xFFF44336)
-                        },
-                    )
-                }
-                if (isEmbeddingDbUpdating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color(0xFFFFA000),
-                        strokeWidth = 2.dp,
-                    )
-                }
-            }
+            // COMMENTED OUT — embedding DB status row replaced by ML Kit OCR (always ready)
+            // HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            // Row(...) { /* embeddingDbVersion, embeddingDbCardCount, isEmbeddingDbUpdating UI */ }
 
             Spacer(Modifier.height(24.dp))
         }

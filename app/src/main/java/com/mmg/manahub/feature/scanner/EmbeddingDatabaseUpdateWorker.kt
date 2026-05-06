@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.scanner
 
+// COMMENTED OUT — replaced by ML Kit OCR. See CardRecognizer for the new pipeline.
+/*
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
@@ -234,3 +236,4 @@ class EmbeddingDatabaseUpdateWorker @AssistedInject constructor(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }
+*/

@@ -9,7 +9,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.sync.CollectionSyncWorker
-import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater
+// import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
@@ -27,7 +27,7 @@ class ManaHubApp : Application() {
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
     @Inject lateinit var authRepository: AuthRepository
-    @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater
+    // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -52,8 +52,8 @@ class ManaHubApp : Application() {
             runCatching { tagDictionaryRepo.loadAndApply() }
         }
 
-        // Check Cloudflare R2 for a newer embedding database on every app launch.
-        embeddingDatabaseUpdater.scheduleUpdateCheck()
+        // COMMENTED OUT — Cloudflare R2 embedding DB download replaced by ML Kit OCR
+        // embeddingDatabaseUpdater.scheduleUpdateCheck()
 
         // Schedule/cancel the periodic background sync based on auth state.
         // CollectionViewModel also does this for the collection screen, but this

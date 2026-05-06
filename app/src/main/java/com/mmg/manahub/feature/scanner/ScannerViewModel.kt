@@ -1,11 +1,7 @@
 package com.mmg.manahub.feature.scanner
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -19,6 +15,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+// COMMENTED OUT — no longer needed with ML Kit OCR pipeline
+// import androidx.lifecycle.asFlow
+// import androidx.work.WorkInfo
+// import androidx.work.WorkManager
+// import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 
 /**
  * ViewModel for the scanner screen.
@@ -49,9 +51,10 @@ class ScannerViewModel @Inject constructor(
     private val addToCollection: AddCardToCollectionUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
-    val embeddingDatabase: EmbeddingDatabase,
-    private val userPreferencesDataStore: UserPreferencesDataStore,
-    private val workManager: WorkManager,
+    // COMMENTED OUT — embedding DB and WorkManager no longer injected with OCR pipeline
+    // val embeddingDatabase: EmbeddingDatabase,
+    // private val userPreferencesDataStore: UserPreferencesDataStore,
+    // private val workManager: WorkManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScannerUiState())
@@ -69,26 +72,22 @@ class ScannerViewModel @Inject constructor(
 
     companion object {
         /**
-         * Number of consecutive identical matches required before a card is confirmed
-         * when the similarity score is below [HIGH_CONFIDENCE_SIMILARITY].
+         * Number of consecutive identical matches required before a card is confirmed.
+         * With OCR + exact name match the similarity is always 1.0f, so all matches
+         * are treated as high-confidence and use [HIGH_CONFIDENCE_FRAMES] directly.
          */
         private const val STABILITY_FRAMES = 3
 
         /**
-         * Reduced stability requirement when the similarity score exceeds
-         * [HIGH_CONFIDENCE_SIMILARITY].  A single very-strong match (≥ 0.90 cosine
-         * similarity) is enough to confirm the card without waiting for two more frames.
-         * This halves perceived latency for clean, well-lit shots while keeping the
-         * three-frame requirement for borderline matches where false positives are more likely.
+         * Reduced stability requirement for high-confidence matches.
+         * Since OCR + exact-name lookup always returns similarity = 1.0f,
+         * [HIGH_CONFIDENCE_FRAMES] = 1 is always used — a single clean OCR read
+         * is enough to confirm the card.
          */
         private const val HIGH_CONFIDENCE_FRAMES = 1
 
-        /**
-         * Cosine similarity threshold above which [HIGH_CONFIDENCE_FRAMES] is used instead
-         * of [STABILITY_FRAMES].  Value 0.90 is deliberately above the acceptance threshold
-         * of 0.80 set in [EmbeddingDatabase] — it only activates for genuinely strong matches.
-         */
-        private const val HIGH_CONFIDENCE_SIMILARITY = 0.90f
+        // COMMENTED OUT — similarity threshold only meaningful for embedding-based search
+        // private const val HIGH_CONFIDENCE_SIMILARITY = 0.90f
 
         /** Minimum time in ms before the same card can be added again. */
         private const val ANTI_DUPLICATE_MS = 800L
@@ -97,48 +96,42 @@ class ScannerViewModel @Inject constructor(
         private const val DEFAULT_LANGUAGE = "en"
     }
 
-    init {
-        // Check immediately — the DB may already be loaded from a previous download.
-        _uiState.update {
-            it.copy(
-                embeddingDbLoaded = embeddingDatabase.cardCount > 0,
-                embeddingDbCardCount = embeddingDatabase.cardCount,
-            )
-        }
-
-        // Reflect the persisted embedding-DB version in the UI state.
-        // Sets embeddingDbVersionReady=true on first emission so the screen
-        // avoids a flash of the setup UI for users who already have the DB.
-        viewModelScope.launch {
-            userPreferencesDataStore.embeddingDbVersionFlow.collect { version ->
-                _uiState.update { it.copy(
-                    embeddingDbVersionReady = true,
-                    embeddingDbVersion = version,
-                    embeddingDbLoaded = embeddingDatabase.cardCount > 0,
-                    embeddingDbCardCount = embeddingDatabase.cardCount,
-                ) }
-            }
-        }
-
-        // Mirror WorkManager state. Also reads download progress from WorkInfo.progress.
-        viewModelScope.launch {
-            workManager
-                .getWorkInfosForUniqueWorkLiveData(EmbeddingDatabaseUpdateWorker.WORK_NAME)
-                .asFlow()
-                .collect { infos ->
-                    val info = infos.firstOrNull()
-                    val isRunning = info?.state == WorkInfo.State.RUNNING
-                    val progress = info?.progress
-                        ?.getFloat(EmbeddingDatabaseUpdateWorker.KEY_PROGRESS, 0f) ?: 0f
-                    _uiState.update { it.copy(
-                        isEmbeddingDbUpdating = isRunning,
-                        embeddingDbDownloadProgress = if (isRunning) progress else 0f,
-                        embeddingDbLoaded = embeddingDatabase.cardCount > 0,
-                        embeddingDbCardCount = embeddingDatabase.cardCount,
-                    ) }
-                }
-        }
-    }
+    // COMMENTED OUT — embedding DB lifecycle observers no longer needed with OCR
+    // init {
+    //     _uiState.update {
+    //         it.copy(
+    //             embeddingDbLoaded = embeddingDatabase.cardCount > 0,
+    //             embeddingDbCardCount = embeddingDatabase.cardCount,
+    //         )
+    //     }
+    //     viewModelScope.launch {
+    //         userPreferencesDataStore.embeddingDbVersionFlow.collect { version ->
+    //             _uiState.update { it.copy(
+    //                 embeddingDbVersionReady = true,
+    //                 embeddingDbVersion = version,
+    //                 embeddingDbLoaded = embeddingDatabase.cardCount > 0,
+    //                 embeddingDbCardCount = embeddingDatabase.cardCount,
+    //             ) }
+    //         }
+    //     }
+    //     viewModelScope.launch {
+    //         workManager
+    //             .getWorkInfosForUniqueWorkLiveData(EmbeddingDatabaseUpdateWorker.WORK_NAME)
+    //             .asFlow()
+    //             .collect { infos ->
+    //                 val info = infos.firstOrNull()
+    //                 val isRunning = info?.state == WorkInfo.State.RUNNING
+    //                 val progress = info?.progress
+    //                     ?.getFloat(EmbeddingDatabaseUpdateWorker.KEY_PROGRESS, 0f) ?: 0f
+    //                 _uiState.update { it.copy(
+    //                     isEmbeddingDbUpdating = isRunning,
+    //                     embeddingDbDownloadProgress = if (isRunning) progress else 0f,
+    //                     embeddingDbLoaded = embeddingDatabase.cardCount > 0,
+    //                     embeddingDbCardCount = embeddingDatabase.cardCount,
+    //                 ) }
+    //             }
+    //     }
+    // }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  ML recognition entry point — called by CardRecognizer
@@ -218,14 +211,10 @@ class ScannerViewModel @Inject constructor(
                 }
 
                 // ── Adaptive stability buffer ────────────────────────────────
-                // High-confidence matches (similarity ≥ 0.90) are confirmed after a single
-                // consistent frame.  Borderline matches still require STABILITY_FRAMES (3)
-                // consecutive identical detections to guard against false positives.
-                val requiredFrames = if (result.similarity >= HIGH_CONFIDENCE_SIMILARITY) {
-                    HIGH_CONFIDENCE_FRAMES
-                } else {
-                    STABILITY_FRAMES
-                }
+                // OCR + exact-name lookup always yields similarity = 1.0f, so
+                // HIGH_CONFIDENCE_FRAMES (1) is always used — a single clean OCR
+                // read is enough to confirm without waiting for extra frames.
+                val requiredFrames = HIGH_CONFIDENCE_FRAMES
 
                 if (recentMatches.size >= requiredFrames) recentMatches.removeFirst()
                 recentMatches.addLast(id)
@@ -262,6 +251,7 @@ class ScannerViewModel @Inject constructor(
 
                     result.ambiguous -> {
                         // ── Ambiguous match — show inline selector (normal mode) ──
+                        // Note: OCR always returns ambiguous=false, but guard retained for safety.
                         _uiState.update {
                             it.copy(
                                 showAmbiguitySelector = true,

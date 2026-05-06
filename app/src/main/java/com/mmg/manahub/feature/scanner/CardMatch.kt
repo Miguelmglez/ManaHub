@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.scanner
 
+// COMMENTED OUT — replaced by ML Kit OCR. See CardRecognizer for the new pipeline.
+/*
 /**
  * Result of a nearest-neighbour search in [EmbeddingDatabase].
  *
@@ -16,3 +18,4 @@ data class CardMatch(
     val similarity: Float,
     val secondBestSimilarity: Float = 0f,
 )
+*/
