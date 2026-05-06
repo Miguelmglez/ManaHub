@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.collection
 
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
@@ -13,10 +14,12 @@ import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlin.Result
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -46,17 +50,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionViewModelSyncTest {
 
+    @get:Rule
+    val instantTaskExecutorRule = InstantTaskExecutorRule()
+
     private val testDispatcher = StandardTestDispatcher()
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val getCollection      = mockk<GetCollectionUseCase>()
-    private val removeCard         = mockk<RemoveCardUseCase>(relaxed = true)
-    private val cardRepository     = mockk<CardRepository>(relaxed = true)
-    private val userCardRepository = mockk<UserCardRepository>(relaxed = true)
-    private val authRepository     = mockk<AuthRepository>(relaxed = true)
-    private val syncManager        = mockk<SyncManager>(relaxed = true)
-    private val workManager        = mockk<WorkManager>(relaxed = true)
+    private val getCollection          = mockk<GetCollectionUseCase>()
+    private val removeCard             = mockk<RemoveCardUseCase>(relaxed = true)
+    private val cardRepository         = mockk<CardRepository>(relaxed = true)
+    private val userCardRepository     = mockk<UserCardRepository>(relaxed = true)
+    private val authRepository         = mockk<AuthRepository>(relaxed = true)
+    private val syncManager            = mockk<SyncManager>(relaxed = true)
+    private val workManager            = mockk<WorkManager>(relaxed = true)
+    private val migrateLocalTradeLists = mockk<MigrateLocalTradeListsUseCase>(relaxed = true)
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -80,6 +88,7 @@ class CollectionViewModelSyncTest {
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         coEvery { authRepository.getCurrentUser() } returns null
+        coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
     }
 
     @After
@@ -90,13 +99,14 @@ class CollectionViewModelSyncTest {
     // ── Builder ───────────────────────────────────────────────────────────────
 
     private fun buildViewModel(): CollectionViewModel = CollectionViewModel(
-        getCollection      = getCollection,
-        removeCard         = removeCard,
-        cardRepository     = cardRepository,
-        userCardRepository = userCardRepository,
-        authRepository     = authRepository,
-        syncManager        = syncManager,
-        workManager        = workManager,
+        getCollection          = getCollection,
+        removeCard             = removeCard,
+        cardRepository         = cardRepository,
+        userCardRepository     = userCardRepository,
+        authRepository         = authRepository,
+        syncManager            = syncManager,
+        workManager            = workManager,
+        migrateLocalTradeLists = migrateLocalTradeLists,
     )
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -161,7 +171,7 @@ class CollectionViewModelSyncTest {
     }
 
     @Test
-    fun `given logged-in user when onSync called then workManager enqueues fallback work`() = runTest {
+    fun `given logged-in user when onSync called then syncManager sync is invoked`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
         coEvery { syncManager.sync(USER_ID) } returns SyncResult(state = SyncState.SUCCESS)
 
@@ -171,13 +181,7 @@ class CollectionViewModelSyncTest {
         vm.onSync()
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            workManager.enqueueUniqueWork(
-                any<String>(),
-                eq(ExistingWorkPolicy.REPLACE),
-                any<OneTimeWorkRequest>(),
-            )
-        }
+        coVerify(exactly = 1) { syncManager.sync(USER_ID) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

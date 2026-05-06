@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.trades.data.repository
 
+import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistWithCard
 import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.feature.trades.data.remote.WishlistRemoteDataSource
 import com.mmg.manahub.feature.trades.data.remote.dto.WishlistEntryDto
@@ -20,7 +22,7 @@ class WishlistRepositoryImpl @Inject constructor(
 ) : WishlistRepository {
 
     override fun observeLocal(): Flow<List<WishlistEntry>> =
-        dao.observeAll().map { list -> list.map { it.toDomain() } }
+        dao.observeAllWithCard().map { list -> list.map { it.toDomain() } }
 
     override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
 
@@ -62,6 +64,10 @@ class WishlistRepositoryImpl @Inject constructor(
         language = language,
         isAltArt = isAltArt,
         createdAt = createdAt,
+    )
+
+    private fun LocalWishlistWithCard.toDomain() = entity.toDomain().copy(
+        card = card?.toDomain()
     )
 
     private fun WishlistEntry.toEntity() = LocalWishlistEntity(

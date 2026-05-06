@@ -24,7 +24,8 @@ import com.mmg.manahub.core.util.CardConstants
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun AddToCollectionSheet(
+fun AddCardSheet(
+    title: String,
     cardName: String,
     onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
     onDismiss: () -> Unit,
@@ -80,7 +81,7 @@ fun AddToCollectionSheet(
                     }
                 }
                 Text(
-                    text = stringResource(R.string.carddetail_add_copy),
+                    text = title,
                     modifier = Modifier
                         .weight(1f)
                         .offset(x = if (closeButton) (-16).dp else 0.dp),
@@ -92,8 +93,8 @@ fun AddToCollectionSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = cardName,
+                CardName(
+                    name = cardName,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.magicColors.primaryAccent,
@@ -158,21 +159,37 @@ fun AddToCollectionSheet(
                 }
             }
 
-            // Condition chips
-            Text(
-                stringResource(R.string.addcard_confirm_condition),
-                style = MaterialTheme.typography.labelLarge
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Condition dropdown
+            var condExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = condExpanded,
+                onExpandedChange = { condExpanded = it },
             ) {
-                conditions.forEach { (code, resId) ->
-                    FilterChip(
-                        selected = code == condition,
-                        onClick = { condition = code },
-                        label = { Text(stringResource(resId)) },
-                    )
+                OutlinedTextField(
+                    value = stringResource(conditions.find { it.first == condition }?.second ?: R.string.card_condition_nm),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = {
+                        Text(
+                            stringResource(R.string.addcard_confirm_condition),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(condExpanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                )
+                ExposedDropdownMenu(
+                    expanded = condExpanded,
+                    onDismissRequest = { condExpanded = false },
+                ) {
+                    conditions.forEach { (code, resId) ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(resId)) },
+                            onClick = { condition = code; condExpanded = false },
+                        )
+                    }
                 }
             }
 

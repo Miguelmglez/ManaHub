@@ -44,6 +44,7 @@ object DatabaseModule {
                 MIGRATION_25_26,
                 MIGRATION_26_27,
                 MIGRATION_27_28,
+                MIGRATION_28_29,
             )
             .build()
 
@@ -131,6 +132,21 @@ object DatabaseModule {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS idx_local_open_for_trade_scryfall_id ON local_open_for_trade(scryfall_id)"
             )
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v28 → v29
+    // Adds `card_faces` (nullable TEXT) to `cards`.
+    // Stores a JSON array of CardFace objects for double-faced / multi-face cards.
+    // Single-faced cards get NULL, which is the correct default — no data loss.
+    // The guard via columnExists() makes the migration idempotent.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_28_29 = object : Migration(28, 29) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "cards", "card_faces")) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN card_faces TEXT")
+            }
         }
     }
 

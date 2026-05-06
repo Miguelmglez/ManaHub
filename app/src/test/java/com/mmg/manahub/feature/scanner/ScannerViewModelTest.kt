@@ -2,11 +2,13 @@ package com.mmg.manahub.feature.scanner
 
 import android.content.Context
 import android.graphics.PointF
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.MutableLiveData
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.util.TestFixtures
@@ -28,15 +30,19 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 /**
- * Unit tests for [ScannerViewModel] — pHash-based scanner architecture.
+ * Unit tests for [ScannerViewModel] — ML embedding scanner architecture.
  *
  * Covers:
  * - Initial default state
  * - NoCard result: state unchanged
- * - Stability buffer: requires [STABILITY_FRAMES]=3 consecutive identical matches
+ * - Stability buffer — normal path: requires [STABILITY_FRAMES]=3 consecutive identical
+ *   matches when similarity < [HIGH_CONFIDENCE_SIMILARITY] (0.90)
+ * - Stability buffer — high-confidence path: a single frame with similarity ≥ 0.90
+ *   immediately confirms the card ([HIGH_CONFIDENCE_FRAMES]=1)
  * - Anti-duplicate guard: same card within 800 ms is blocked
  * - Set lock filter: mismatched setCode is rejected before stability
  * - Language mismatch: Quick Mode + language != "en" sets languageMismatch flag
@@ -47,11 +53,14 @@ import org.junit.Test
  * NOTE: [SoundManager] and [AnalyticsHelper] are relaxed mocks — their side-effects
  * (audio playback, Firebase calls) are suppressed in unit tests.
  * [AddCardToCollectionUseCase] is a suspend operator fun — stubbed with coEvery.
- * [HashDatabase] is used as a relaxed mock (the ViewModel exposes it as a val;
+ * [EmbeddingDatabase] is used as a relaxed mock (the ViewModel exposes it as a val;
  * the scanner does not invoke it during recognition result processing).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScannerViewModelTest {
+
+    @get:Rule
+    val instantTaskExecutorRule = InstantTaskExecutorRule()
 
     // ── Dispatcher ─────────────────────────────────────────────────────────────
 
@@ -59,12 +68,13 @@ class ScannerViewModelTest {
 
     // ── Mocks ──────────────────────────────────────────────────────────────────
 
+    private val cardRepository: CardRepository = mockk(relaxed = true)
     private val addToCollection: AddCardToCollectionUseCase = mockk()
     private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
     private val soundManager: SoundManager = mockk(relaxed = true)
-    private val hashDatabase: HashDatabase = HashDatabase(mockk<Context>(relaxed = true))
+    private val embeddingDatabase: EmbeddingDatabase = EmbeddingDatabase(mockk<Context>(relaxed = true))
     private val userPreferencesDataStore: UserPreferencesDataStore = mockk(relaxed = true) {
-        every { hashDbVersionFlow } returns flowOf(0)
+        every { embeddingDbVersionFlow } returns flowOf(0)
     }
     private val workManager: WorkManager = mockk(relaxed = true) {
         every { getWorkInfosForUniqueWorkLiveData(any()) } returns
@@ -90,14 +100,18 @@ class ScannerViewModelTest {
     )
 
     /**
-     * Builds an [RecognitionResult.Identified] for [defaultCard] with default settings.
+     * Builds a [RecognitionResult.Identified] for [defaultCard] with default settings.
+     *
+     * Default [similarity] is 0.85f — above the acceptance threshold (0.80) but below the
+     * high-confidence threshold (0.90) — so tests that call this without overriding similarity
+     * exercise the 3-frame stability path.  Pass similarity ≥ 0.90f to test the 1-frame path.
      */
     private fun identified(
         ambiguous: Boolean = false,
-        confidence: Float = 0.95f,
+        similarity: Float = 0.85f,
     ) = RecognitionResult.Identified(
         card = defaultCard,
-        confidence = confidence,
+        similarity = similarity,
         ambiguous = ambiguous,
         corners = fakeCorners,
     )
@@ -108,10 +122,11 @@ class ScannerViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         viewModel = ScannerViewModel(
+            cardRepository = cardRepository,
             addToCollection = addToCollection,
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
-            hashDatabase = hashDatabase,
+            embeddingDatabase = embeddingDatabase,
             userPreferencesDataStore = userPreferencesDataStore,
             workManager = workManager,
         )
@@ -126,7 +141,10 @@ class ScannerViewModelTest {
 
     /**
      * Sends [count] identical [RecognitionResult.Identified] results to the ViewModel.
-     * The stability buffer requires exactly [STABILITY_FRAMES]=3 to confirm a card.
+     *
+     * Defaults to [similarity]=0.85f so that tests exercise the normal stability path
+     * ([STABILITY_FRAMES]=3). Use [similarity]≥0.90f to exercise the high-confidence
+     * path ([HIGH_CONFIDENCE_FRAMES]=1).
      */
     private fun repeatIdentified(count: Int, result: RecognitionResult.Identified = identified()) {
         repeat(count) { viewModel.onRecognitionResult(result) }
@@ -184,8 +202,8 @@ class ScannerViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun onRecognitionResult_stabilityBuffer_requiresThreeConsecutive() = runTest {
-        // Arrange — Quick Mode ON, addToCollection succeeds
+    fun onRecognitionResult_stabilityBuffer_requiresThreeConsecutive_forBorderlineMatch() = runTest {
+        // Arrange — Quick Mode ON, similarity=0.85 (below high-confidence 0.90) → needs 3 frames
         coEvery {
             addToCollection(
                 scryfallId = any(),
@@ -195,25 +213,49 @@ class ScannerViewModelTest {
             )
         } returns DataResult.Success(Unit)
 
-        // Act — only 2 frames: should NOT confirm
-        repeatIdentified(2)
+        // Act — only 2 frames at borderline similarity: should NOT confirm yet
+        repeatIdentified(2, identified(similarity = 0.85f))
         advanceUntilIdle()
 
         // Assert — card not yet added after 2 frames
         assertTrue(
-            "Session should still be empty after only 2 stability frames",
+            "Session should still be empty after only 2 frames at borderline similarity",
             viewModel.uiState.value.scanSession.cards.isEmpty(),
         )
 
         // Act — 3rd frame: should confirm and add
-        viewModel.onRecognitionResult(identified())
+        viewModel.onRecognitionResult(identified(similarity = 0.85f))
         advanceUntilIdle()
 
         // Assert — card added after 3rd consecutive frame
         assertFalse(
-            "Session should contain the card after 3 consecutive frames",
+            "Session should contain the card after 3 consecutive borderline frames",
             viewModel.uiState.value.scanSession.cards.isEmpty(),
         )
+    }
+
+    @Test
+    fun onRecognitionResult_stabilityBuffer_confirmsImmediately_forHighConfidenceMatch() = runTest {
+        // Arrange — Quick Mode ON, similarity=0.95 (above high-confidence 0.90) → needs 1 frame
+        coEvery {
+            addToCollection(
+                scryfallId = any(),
+                isFoil = any(),
+                condition = any(),
+                language = any(),
+            )
+        } returns DataResult.Success(Unit)
+
+        // Act — single frame with high-confidence similarity
+        viewModel.onRecognitionResult(identified(similarity = 0.95f))
+        advanceUntilIdle()
+
+        // Assert — card confirmed and added after just 1 frame
+        assertFalse(
+            "Session should contain the card after a single high-confidence frame",
+            viewModel.uiState.value.scanSession.cards.isEmpty(),
+        )
+        assertEquals(defaultCard.scryfallId, viewModel.uiState.value.scanSession.cards.first().card.scryfallId)
     }
 
     @Test
@@ -228,8 +270,8 @@ class ScannerViewModelTest {
             )
         } returns DataResult.Success(Unit)
 
-        // Act — 3 consecutive frames to satisfy stability buffer
-        repeatIdentified(3)
+        // Act — 3 consecutive borderline frames to satisfy the full stability buffer
+        repeatIdentified(3, identified(similarity = 0.85f))
         advanceUntilIdle()
 
         // Assert — card appears in session

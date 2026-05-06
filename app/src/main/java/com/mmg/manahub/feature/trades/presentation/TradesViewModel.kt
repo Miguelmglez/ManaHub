@@ -17,6 +17,7 @@ import com.mmg.manahub.feature.trades.domain.usecase.GetSuggestedTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RemoveFromOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.RemoveFromWishlistUseCase
+import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,19 +34,9 @@ import javax.inject.Inject
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Two top-level tabs inside the Trades feature.
- *
- * - [EXPLORATION]: browse and manage your wishlist / open-for-trade lists,
- *   and optionally view your friends' lists.
- * - [HISTORY]: past completed trades (Phase 3).
+ * Sub-tabs inside the Trades feature.
  */
-enum class TradesMainTab { EXPLORATION, HISTORY }
-
-/**
- * Toggle inside the Exploration tab to switch between the user's own lists
- * and their friends' trade lists.
- */
-enum class ExplorationToggle { MY_LISTS, FRIENDS }
+enum class TradesMainTab { MY_LIST, FRIENDS, HISTORY }
 
 /**
  * Immutable UI state for [TradesViewModel].
@@ -55,8 +46,7 @@ data class TradesUiState(
     val openForTrade:       List<OpenForTradeEntry>    = emptyList(),
     val suggestions:        List<TradeSuggestion>      = emptyList(),
     val friends:            List<Friend>               = emptyList(),
-    val selectedTab:        TradesMainTab              = TradesMainTab.EXPLORATION,
-    val explorationToggle:  ExplorationToggle          = ExplorationToggle.MY_LISTS,
+    val selectedTab:        TradesMainTab              = TradesMainTab.MY_LIST,
     val selectedWishlistIds: Set<String>               = emptySet(),
     val selectedOfferIds:   Set<String>                = emptySet(),
     val isMultiSelectMode:  Boolean                    = false,
@@ -89,6 +79,7 @@ class TradesViewModel @Inject constructor(
     private val getSuggestions: GetSuggestedTradesUseCase,
     private val suggestionsRepository: TradeSuggestionsRepository,
     private val getFriends: GetFriendsUseCase,
+    val searchCards: SearchCardsUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -129,14 +120,9 @@ class TradesViewModel @Inject constructor(
 
     // ── Tab / toggle selection ────────────────────────────────────────────────
 
-    /** Switches between [TradesMainTab.EXPLORATION] and [TradesMainTab.HISTORY]. */
+    /** Switches between [TradesMainTab] states (MY_LIST, FRIENDS, HISTORY). */
     fun onTabSelected(tab: TradesMainTab) {
         _uiState.update { it.copy(selectedTab = tab) }
-    }
-
-    /** Switches the Exploration tab between "My Lists" and "Friends". */
-    fun onExplorationToggle(toggle: ExplorationToggle) {
-        _uiState.update { it.copy(explorationToggle = toggle) }
     }
 
     // ── Wishlist actions ──────────────────────────────────────────────────────

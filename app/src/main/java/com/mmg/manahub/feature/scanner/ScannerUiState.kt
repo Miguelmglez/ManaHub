@@ -38,7 +38,7 @@ data class ScanSession(
  * Full UI state for the no-modal scanner screen.
  *
  * @property isFlashOn              Whether the camera torch is on.
- * @property isSearching            A pHash lookup is in-flight.
+ * @property isSearching            An embedding lookup is in-flight.
  * @property lastDetectedCard       The most recently confirmed card from Scryfall.
  * @property error                  Transient error message shown in the bottom bar.
  * @property scanSession            Accumulated cards for the current session.
@@ -68,6 +68,15 @@ data class ScanSession(
  * @property hasFlash               True when the current camera hardware has a flash unit.
  *                                  Populated asynchronously after the camera binds; defaults to
  *                                  true so the flash button is visible until confirmed otherwise.
+ * @property embeddingDbVersionReady    True once DataStore has emitted the initial persisted version.
+ *                                      False during the brief startup window before first emission.
+ * @property embeddingDbVersion     Version number of the currently loaded embedding database
+ *                                  (0 = never downloaded from R2; ≥1 = full DB available).
+ * @property isEmbeddingDbUpdating  True while [EmbeddingDatabaseUpdateWorker] is running.
+ * @property embeddingDbDownloadProgress Download progress 0f–1f from [WorkInfo.progress]. 0f when
+ *                                       idle or not downloading.
+ * @property embeddingDbLoaded      True once the in-memory embedding DB has at least one entry.
+ * @property embeddingDbCardCount   Number of card embeddings currently in memory (0 = not loaded).
  */
 data class ScannerUiState(
     val isFlashOn: Boolean = false,
@@ -88,6 +97,12 @@ data class ScannerUiState(
     // Sheet visibility
     val showQueueSheet: Boolean = false,
     val showSettingsSheet: Boolean = false,
+    val showEditSheet: Boolean = false,
+    val showPriceDetailSheet: Boolean = false,
+    // Edit card
+    val editingCard: ScannedCard? = null,
+    val availablePrints: List<Card> = emptyList(),
+    val isLoadingPrints: Boolean = false,
     // Toast
     val toastMessage: String? = null,
     // Queue multi-select
@@ -100,9 +115,15 @@ data class ScannerUiState(
     val languageMismatch: Boolean = false,
     // Ambiguity resolution (normal mode only)
     val showAmbiguitySelector: Boolean = false,
-    // Price detail sheet (Lookup Only mode)
-    val showPriceDetailSheet: Boolean = false,
-    // Hash database update status (sourced from DataStore + WorkManager)
-    val hashDbVersion: Int = 0,
-    val isHashDbUpdating: Boolean = false,
+    // Embedding database update status (sourced from DataStore + WorkManager)
+    val embeddingDbVersionReady: Boolean = false,
+    val embeddingDbVersion: Int = 0,
+    val isEmbeddingDbUpdating: Boolean = false,
+    val embeddingDbDownloadProgress: Float = 0f,
+    // True once the in-memory embedding DB has at least one entry (loaded from file or assets)
+    val embeddingDbLoaded: Boolean = false,
+    // Number of card embeddings currently in memory (0 = DB not loaded yet)
+    val embeddingDbCardCount: Int = 0,
+    // Rolling FPS counter — only populated in DEBUG builds, always 0 in release
+    val fps: Int = 0,
 )

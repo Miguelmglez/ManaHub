@@ -791,4 +791,8 @@
     <!-- Auth field validation -->
     <string name="auth_error_name_too_short">El nombre es demasiado corto</string>
 
+    <!-- TRADES -->
+    <string name="trades_create_proposal_cta">Crear propuesta</string>
+    <string name="trades_new_trade_cta">Nuevo trade</string>
+
 </resources>

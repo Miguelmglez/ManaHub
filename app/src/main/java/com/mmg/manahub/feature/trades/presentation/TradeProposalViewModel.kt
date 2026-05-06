@@ -5,7 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.model.*
+import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
 import com.mmg.manahub.feature.trades.domain.model.TradeError
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
@@ -53,6 +57,14 @@ data class ProposalEditorUiState(
     val snackbarMessage: String? = null,
     val navigateToThread: Pair<String, String>? = null, // (proposalId, rootProposalId)
     val navigateBack: Boolean = false,
+
+    // Search / Add cards state
+    val addCardsQuery: String = "",
+    val addCardsResults: List<AddCardRow> = emptyList(),
+    val isSearchingCards: Boolean = false,
+    val scryfallResults: List<AddCardRow> = emptyList(),
+    val isSearchingScryfall: Boolean = false,
+    val collectionIds: Set<String> = emptySet(),
 )
 
 @HiltViewModel
@@ -64,6 +76,9 @@ class TradeProposalViewModel @Inject constructor(
     private val sendProposal: SendProposalUseCase,
     private val counterProposal: CounterProposalUseCase,
     private val refreshTrades: RefreshTradesUseCase,
+    private val cardRepository: CardRepository,
+    private val userCardRepository: UserCardRepository,
+    val searchCards: SearchCardsUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -71,6 +86,7 @@ class TradeProposalViewModel @Inject constructor(
     val uiState: StateFlow<ProposalEditorUiState> = _uiState.asStateFlow()
 
     private var currentUserId: String = ""
+    private var collectionCards: List<Card> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -80,6 +96,7 @@ class TradeProposalViewModel @Inject constructor(
                 }
             }
         }
+        observeCollection()
         val receiverId = savedStateHandle.get<String>("receiverId") ?: ""
         val parentProposalId = savedStateHandle.get<String>("parentProposalId")
         val editingProposalId = savedStateHandle.get<String>("editingProposalId")
@@ -93,6 +110,91 @@ class TradeProposalViewModel @Inject constructor(
                 isCounterMode = parentProposalId != null,
             )
         }
+    }
+
+    private fun observeCollection() {
+        viewModelScope.launch {
+            userCardRepository.observeCollection().collect { collection ->
+                collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                val ids = collectionCards.map { it.scryfallId }.toSet()
+                _uiState.update { it.copy(collectionIds = ids) }
+            }
+        }
+    }
+
+    fun onAddCardsQueryChange(query: String) {
+        _uiState.update { it.copy(addCardsQuery = query) }
+        if (query.isBlank()) {
+            showCollectionCards()
+            return
+        }
+        val filtered = collectionCards.filter { it.name.contains(query, ignoreCase = true) }
+        _uiState.update { s ->
+            s.copy(
+                addCardsResults = filtered.map { card ->
+                    AddCardRow(
+                        card = card,
+                        quantityInDeck = 0, // Not applicable here
+                        isOwned = true,
+                    )
+                },
+            )
+        }
+    }
+
+    fun showCollectionCards() {
+        _uiState.update { s ->
+            s.copy(
+                addCardsResults = collectionCards.map { card ->
+                    AddCardRow(
+                        card = card,
+                        quantityInDeck = 0,
+                        isOwned = true,
+                    )
+                },
+            )
+        }
+    }
+
+    fun searchScryfallDirect(query: String) {
+        _uiState.update { it.copy(addCardsQuery = query) }
+        if (query.isBlank()) {
+            _uiState.update { it.copy(scryfallResults = emptyList(), isSearchingScryfall = false) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSearchingScryfall = true) }
+            try {
+                val cards = when (val result = cardRepository.searchCards(query)) {
+                    is DataResult.Success -> result.data
+                    is DataResult.Error -> emptyList()
+                }
+                val ownedIds = _uiState.value.collectionIds
+                _uiState.update { s ->
+                    s.copy(
+                        isSearchingScryfall = false,
+                        scryfallResults = cards.map { card ->
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = 0,
+                                isOwned = card.scryfallId in ownedIds,
+                            )
+                        },
+                    )
+                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isSearchingScryfall = false) }
+            }
+        }
+    }
+
+    fun clearAddCardsState() {
+        _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList(), scryfallResults = emptyList()) }
+    }
+
+    fun getCardById(scryfallId: String): Card? {
+        return (uiState.value.addCardsResults + uiState.value.scryfallResults)
+            .find { it.card.scryfallId == scryfallId }?.card
     }
 
     fun addProposerItem(item: TradeItemDraft) {

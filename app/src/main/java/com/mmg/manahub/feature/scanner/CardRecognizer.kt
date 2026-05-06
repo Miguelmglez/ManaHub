@@ -1,16 +1,14 @@
 package com.mmg.manahub.feature.scanner
 
 import android.graphics.PointF
-import androidx.annotation.VisibleForTesting
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.opencv.core.Core
+import kotlinx.coroutines.withContext
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
@@ -20,138 +18,79 @@ import org.opencv.imgproc.Imgproc
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Recognition result sealed interface
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Represents the outcome of a single frame processed by [CardRecognizer].
- */
-sealed interface RecognitionResult {
-    /** No card quadrilateral detected in the frame. */
-    data object NoCard : RecognitionResult
-
-    /**
-     * A card outline was detected but the hash lookup returned no match
-     * (either the database is empty or no card is close enough).
-     *
-     * @property corners Four corner points in frame pixel coordinates.
-     */
-    data class Detected(val corners: List<PointF>) : RecognitionResult
-
-    /**
-     * A card was detected and successfully identified via pHash lookup.
-     *
-     * @property card       Resolved domain [Card] from [CardRepository].
-     * @property confidence Recognition confidence in [0, 1]: `1 - distance / 32`.
-     * @property ambiguous  True when the gap between the best and second-best match is < 5 bits.
-     * @property corners    Four corner points in frame pixel coordinates.
-     */
-    data class Identified(
-        val card: Card,
-        val confidence: Float,
-        val ambiguous: Boolean,
-        val corners: List<PointF>,
-    ) : RecognitionResult
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  CardRecognizer
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * [ImageAnalysis.Analyzer] that combines OpenCV card edge detection with
- * perceptual-hash (pHash) lookup for on-device, network-free card recognition.
+ * [ImageAnalysis.Analyzer] that combines OpenCV card edge detection with a TFLite
+ * MobileNetV3-Small feature extractor and cosine nearest-neighbour search for
+ * on-device, network-free card recognition.
  *
  * Pipeline per frame:
- * 1. [OpenCvCardDetector.detect] — finds the card quadrilateral.
- * 2. Sort corners (TL, TR, BR, BL) for a consistent warp transform.
- * 3. [Imgproc.getPerspectiveTransform] + [Imgproc.warpPerspective] → 488×680 px card image.
- * 4. Crop art zone: rows 8%–53%, cols 7%–93%.
- * 5. Resize to 64×64, convert to float32, apply 2D DCT.
- * 6. Take top-left 16×16 sub-matrix (256 coefficients), compute median, threshold → 256-bit hash.
- *    Bit packing: MSB first, matching Python `int.to_bytes(32, 'big')`.
- * 7. [HashDatabase.findBestMatch] → [HashMatch] or null.
- * 8. If matched: fetch [Card] from [CardRepository] on [Dispatchers.IO].
- * 9. Report [RecognitionResult] via [onResult] callback.
+ * 1. Throttle (150 ms between processed frames) and re-entrance guard.
+ * 2. [OpenCvCardDetector.detect] — synchronous quad detection on the calling thread.
+ * 3. Sort corners (TL, TR, BR, BL) via [sortCorners].
+ * 4. Apply rotation permutation (same logic for rot=90/180/270).
+ * 5. [warpCard] → 224×224 BGR [Mat] (grayscale Y-plane replicated to 3 channels for V1).
+ * 6. [CardEmbeddingModel.extract] → L2-normalised float[576] embedding, or null.
+ * 7. [EmbeddingDatabase.findBestMatch] → [CardMatch] or null.
+ * 8. [CardRepository.getCardById] on [Dispatchers.IO].
+ * 9. Emit [RecognitionResult] via [onResult].
  *
- * Throttling: maximum 10 FPS (100 ms between frames processed).
- * Mat pool: all OpenCV Mats are allocated once and reused. Call [release] when done.
+ * If any step from 5 onwards produces null, [RecognitionResult.Detected] is emitted
+ * so the overlay remains visible while the ML pipeline is warming up.
  *
- * @param hashDatabase   Singleton hash database loaded from assets.
- * @param cardRepository Domain repository used to resolve the matched scryfallId.
- * @param scope          [CoroutineScope] for suspending hash lookup and IO operations.
- * @param onResult       Callback invoked on every frame with the recognition outcome.
+ * Mat pool: [warpedBgrMat] and the warp transform matrices are
+ * allocated once and reused. Call [release] when the recognizer is no longer needed.
+ *
+ * @param embeddingDatabase In-memory embedding DB used for cosine nearest-neighbour lookup.
+ * @param cardEmbeddingModel TFLite inference wrapper that converts a 224×224 BGR Mat to a
+ *                           L2-normalised float[576] embedding.
+ * @param cardRepository     Domain repository used to resolve the matched scryfallId.
+ * @param scope              [CoroutineScope] for suspending operations.
+ * @param onResult           Callback invoked on every frame with the recognition outcome.
  */
 class CardRecognizer(
-    private val hashDatabase: HashDatabase,
+    private val embeddingDatabase: EmbeddingDatabase,
+    private val cardEmbeddingModel: CardEmbeddingModel,
     private val cardRepository: CardRepository,
     private val scope: CoroutineScope,
     private val onResult: (RecognitionResult) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
-    // ── Warp destination size ────────────────────────────────────────────────
-    private val warpWidth = 488.0
-    private val warpHeight = 680.0
-
-    // ── Art crop ratios ──────────────────────────────────────────────────────
-    private val artRowStart = 0.08
-    private val artRowEnd = 0.53
-    private val artColStart = 0.07
-    private val artColEnd = 0.93
-
-    // ── DCT hash parameters ──────────────────────────────────────────────────
-    private val dctSize = 64
-    private val dctSubSize = 16  // top-left sub-matrix for hash
+    // ── Warp destination size for the ML model ───────────────────────────────
+    private val warpSize = 224.0
 
     // ── Mat pool — allocated once, reused every frame ────────────────────────
-    private val warpedMat = Mat()
-    private val grayMat = Mat()
-    private val floatMat = Mat()
-    private val dctMat = Mat()
-    private val croppedMat = Mat()
-    private val resizedMat = Mat()
+    private val warpedBgrMat = Mat()
 
     // ── OpenCV card detector ─────────────────────────────────────────────────
     private val cardDetector = OpenCvCardDetector()
 
-    // ── Warp transform matrices (recreated each frame, small allocation) ─────
+    // ── Warp transform source/destination points ─────────────────────────────
     private val srcPoints = MatOfPoint2f()
     private val dstPoints = MatOfPoint2f()
 
     // ── Throttling ───────────────────────────────────────────────────────────
-    private val minIntervalMs = 100L
+    // 150 ms gives the full pipeline (OpenCV detect + TFLite embed + cosine search)
+    // enough headroom to finish before the next frame arrives.  At 6–7 FPS the UI
+    // overlay remains smooth while the CPU stays below thermal throttle on mid-range devices.
+    private val minIntervalMs = 150L
     @Volatile private var lastProcessedMs = 0L
     private val isProcessing = AtomicBoolean(false)
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  ImageAnalysis.Analyzer entry point
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * Entry point called by [FrameMetadataAnalyzer] for each camera frame.
+     * Entry point called for each camera frame.
      *
-     * Full pipeline:
-     * 1. Throttle: frames arriving faster than [minIntervalMs] are dropped and the
-     *    [ImageProxy] is closed immediately.
-     * 2. Re-entrancy guard: if a previous frame is still being processed the new
-     *    frame is dropped.
-     * 3. [OpenCvCardDetector.detect] — synchronous quad detection on the calling thread.
-     * 4. Corner sort (TL, TR, BR, BL) via [sortCorners].
-     * 5–7. Warp + pHash computation + [HashDatabase.findBestMatch] — launched on
-     *    [Dispatchers.Default] to avoid blocking the camera executor.
-     * 8. [CardRepository.getCardById] — IO-bound, switched to [Dispatchers.IO].
-     * 9. [onResult] is invoked on whichever dispatcher step 5 ran on.
-     *
-     * The [ImageProxy] is closed **exactly once** in every execution path:
-     * - Early exits (throttle, re-entrant, no detection) close it on the calling thread.
-     * - All paths inside the coroutine close it before or after the repository call,
-     *   with the coroutine's top-level `catch` as the final safety net.
-     *
-     * [android.os.Trace] sections instrument the four most expensive sub-steps:
-     * `CardRecognizer.detect`, `CardRecognizer.warpAndHash`,
-     * `CardRecognizer.hammingLookup`, and `CardRecognizer.repoLookup`.
+     * The [ImageProxy] is closed exactly once in every execution path.
+     * Early exits (throttle, re-entrant, no detection) close it synchronously.
+     * The coroutine path closes it after the repository call or in the catch block.
      */
     override fun analyze(imageProxy: ImageProxy) {
         val now = System.currentTimeMillis()
 
-        // Throttle to max 10 FPS
+        // Throttle to max ~6-7 FPS — matches the pipeline budget of 150 ms/frame
         if (now - lastProcessedMs < minIntervalMs) {
             imageProxy.close()
             return
@@ -165,7 +104,7 @@ class CardRecognizer(
 
         lastProcessedMs = now
 
-        // Step 1: Detect card quadrilateral
+        // Step 1: Detect card quadrilateral (synchronous, on calling thread)
         val detected = try {
             android.os.Trace.beginSection("CardRecognizer.detect")
             try {
@@ -173,7 +112,8 @@ class CardRecognizer(
             } finally {
                 android.os.Trace.endSection()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.w("CardRecognizer", "detect() threw an exception", e)
             null
         }
 
@@ -184,50 +124,88 @@ class CardRecognizer(
             return
         }
 
-        val corners = detected.cornersInImage
-
         // Step 2: Sort corners (TL, TR, BR, BL) for consistent warp
-        val sortedCorners = sortCorners(corners)
+        val sortedCorners = sortCorners(detected.cornersInImage)
 
-        // Steps 3–7: warp + hash computation + lookup (all CPU-bound, launched on Default)
+        // Steps 3–8: warp + embedding extraction + lookup (CPU-bound, launched on Default)
         scope.launch(Dispatchers.Default) {
             try {
-                val hash: LongArray?
-                android.os.Trace.beginSection("CardRecognizer.warpAndHash")
+                // Step 3: Apply rotation permutation so the card is upright in the warp
+                val rotation = imageProxy.imageInfo.rotationDegrees
+                val rotatedCorners = when (rotation) {
+                    90  -> listOf(sortedCorners[3], sortedCorners[0], sortedCorners[1], sortedCorners[2])
+                    180 -> listOf(sortedCorners[2], sortedCorners[3], sortedCorners[0], sortedCorners[1])
+                    270 -> listOf(sortedCorners[1], sortedCorners[2], sortedCorners[3], sortedCorners[0])
+                    else -> sortedCorners  // 0°: no correction needed
+                }
+
+                // Clamp corners to the frame boundary so warpPerspective receives valid source points
+                // even when EMA smoothing temporarily pushes a corner slightly outside the image.
+                val fw = imageProxy.width.toFloat()
+                val fh = imageProxy.height.toFloat()
+                val clampedCorners = rotatedCorners.map { pt ->
+                    PointF(pt.x.coerceIn(0f, fw - 1f), pt.y.coerceIn(0f, fh - 1f))
+                }
+
+                // Step 4: Warp to 224×224 BGR (grayscale→3ch for V1)
+                android.os.Trace.beginSection("CardRecognizer.warpCard")
+                val warpedMat: Mat?
                 try {
-                    hash = computeHash(imageProxy, sortedCorners)
+                    warpedMat = warpCard(imageProxy, clampedCorners)
                 } finally {
                     android.os.Trace.endSection()
                 }
 
-                if (hash == null) {
+                if (warpedMat == null) {
                     imageProxy.close()
                     isProcessing.set(false)
                     onResult(RecognitionResult.Detected(sortedCorners))
                     return@launch
                 }
 
-                // Step 7: Hash lookup
-                val match: HashMatch?
-                android.os.Trace.beginSection("CardRecognizer.hammingLookup")
+                // Step 5: Extract embedding
+                android.os.Trace.beginSection("CardRecognizer.embeddingExtract")
+                val embedding: FloatArray?
                 try {
-                    match = hashDatabase.findBestMatch(hash)
+                    embedding = cardEmbeddingModel.extract(warpedMat)
+                } finally {
+                    android.os.Trace.endSection()
+                }
+
+                if (embedding == null) {
+                    android.util.Log.d("CardRecognizer", "embedding extraction returned null")
+                    imageProxy.close()
+                    isProcessing.set(false)
+                    onResult(RecognitionResult.Detected(sortedCorners))
+                    return@launch
+                }
+
+                // Step 6: Cosine nearest-neighbour lookup
+                android.os.Trace.beginSection("CardRecognizer.cosineSearch")
+                val match: CardMatch?
+                try {
+                    match = embeddingDatabase.findBestMatch(embedding)
                 } finally {
                     android.os.Trace.endSection()
                 }
 
                 if (match == null) {
+                    android.util.Log.d("CardRecognizer", "no match above threshold")
                     imageProxy.close()
                     isProcessing.set(false)
                     onResult(RecognitionResult.Detected(sortedCorners))
                     return@launch
                 }
 
-                // Step 8: Resolve card from repository (IO-bound)
-                val cardResult: DataResult<Card>
+                android.util.Log.d(
+                    "CardRecognizer",
+                    "MATCH: id=${match.scryfallId}, sim=%.4f".format(match.similarity),
+                )
+
+                // Step 7: Resolve card from repository (IO-bound)
                 android.os.Trace.beginSection("CardRecognizer.repoLookup")
-                try {
-                    cardResult = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                val cardResult = try {
+                    withContext(Dispatchers.IO) {
                         cardRepository.getCardById(match.scryfallId)
                     }
                 } finally {
@@ -239,23 +217,23 @@ class CardRecognizer(
 
                 when (cardResult) {
                     is DataResult.Success -> {
-                        val confidence = 1f - match.distance / 32f
-                        val ambiguous = (match.secondBestDistance - match.distance) < 5
+                        val ambiguous = (match.similarity - match.secondBestSimilarity) < EmbeddingDatabase.AMBIGUITY_GAP
                         onResult(
                             RecognitionResult.Identified(
                                 card = cardResult.data,
-                                confidence = confidence,
+                                similarity = match.similarity,
                                 ambiguous = ambiguous,
                                 corners = sortedCorners,
                             ),
                         )
                     }
                     is DataResult.Error -> {
-                        // Repository lookup failed — report as detected-only
+                        // Repository lookup failed — keep overlay visible
                         onResult(RecognitionResult.Detected(sortedCorners))
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.w("CardRecognizer", "Pipeline exception in warp/embed/lookup", e)
                 imageProxy.close()
                 isProcessing.set(false)
                 onResult(RecognitionResult.NoCard)
@@ -263,203 +241,151 @@ class CardRecognizer(
         }
     }
 
-    /**
-     * Performs warp perspective and DCT-based perceptual hash computation on [imageProxy].
-     *
-     * Steps:
-     * 1. Warp the card to [warpWidth]×[warpHeight] using [warpCard].
-     * 2. Convert to grayscale (handles 1-, 3-, and 4-channel source Mats).
-     * 3. Crop the art zone: rows [[artRowStart], [artRowEnd]) × cols [[artColStart], [artColEnd]).
-     * 4. Resize to [dctSize]×[dctSize] and convert to float32.
-     * 5. Apply 2D DCT via [Core.dct].
-     * 6. Extract the top-left [dctSubSize]×[dctSubSize] sub-matrix (256 coefficients).
-     * 7. Compute the median of those 256 values.
-     * 8. Threshold each value against the median and pack into a [LongArray] of size 4.
-     *
-     * **Bit-packing convention (MSB first):**
-     * Bit `i` (0-indexed, left-to-right in the 256-element flat array) maps to
-     * `longs[i / 64]` at bit position `(63 - i % 64)`. This matches Python's
-     * `int.from_bytes(hash_bytes, 'big')` convention used when the hash database
-     * was generated, ensuring Hamming distance comparisons against stored hashes
-     * yield correct results.
-     *
-     * This function must **not** close [imageProxy]; that is the caller's responsibility.
-     *
-     * @param imageProxy    Current camera frame. Must remain open for the duration of the call.
-     * @param sortedCorners Four corners of the detected card in TL, TR, BR, BL order.
-     * @return 256-bit hash as a [LongArray] of size 4, or null if any step fails.
-     */
-    private fun computeHash(imageProxy: ImageProxy, sortedCorners: List<PointF>): LongArray? {
-        return try {
-            // Step 3: Warp perspective to 488×680
-            val warpMat = warpCard(imageProxy, sortedCorners) ?: return null
-
-            // Convert warped BGR/Gray to grayscale
-            when (warpMat.channels()) {
-                1 -> warpMat.copyTo(grayMat)
-                3 -> Imgproc.cvtColor(warpMat, grayMat, Imgproc.COLOR_BGR2GRAY)
-                4 -> Imgproc.cvtColor(warpMat, grayMat, Imgproc.COLOR_BGRA2GRAY)
-                else -> return null
-            }
-
-            // Step 4: Crop art zone (rows 8%–53%, cols 7%–93%)
-            val rows = grayMat.rows()
-            val cols = grayMat.cols()
-            val rowStart = (rows * artRowStart).toInt()
-            val rowEnd = (rows * artRowEnd).toInt()
-            val colStart = (cols * artColStart).toInt()
-            val colEnd = (cols * artColEnd).toInt()
-
-            if (rowEnd <= rowStart || colEnd <= colStart) return null
-
-            val artRoi = org.opencv.core.Rect(colStart, rowStart, colEnd - colStart, rowEnd - rowStart)
-            grayMat.submat(artRoi).copyTo(croppedMat)
-
-            // Step 5: Resize to 64×64 and convert to float32
-            Imgproc.resize(croppedMat, resizedMat, Size(dctSize.toDouble(), dctSize.toDouble()))
-            resizedMat.convertTo(floatMat, CvType.CV_32F)
-
-            // Steps 6–8: DCT → sub-matrix → median threshold → bit packing
-            computePHashFromMat(floatMat)
-        } catch (_: Exception) {
-            null
-        }
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Warp — grayscale Y-plane replicated to 3 channels (V1 approach)
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Computes a 256-bit perceptual hash from a grayscale float32 [Mat] at 64×64 px.
+     * Applies perspective warp to the camera frame and produces a 224×224 BGR [Mat].
      *
-     * Steps:
-     * 1. Apply 2D DCT to [grayFloat32Mat].
-     * 2. Extract the top-left 16×16 sub-matrix (256 DCT coefficients).
-     * 3. Compute the median of those 256 values.
-     * 4. Threshold: bit = 1 when coefficient > median, 0 otherwise.
-     * 5. Pack into 4 longs, MSB first — matches Python `int.to_bytes(32, 'big')`.
+     * Converts the full YUV_420_888 frame to BGR (preserving colour) before warping,
+     * so the embedding matches the colour images used to build the database.
      *
-     * Exposed as `internal` so unit tests in the same Gradle module can call it directly
-     * without requiring a real camera frame or warp perspective step.
-     *
-     * @param grayFloat32Mat A 64×64 [CvType.CV_32F] single-channel [Mat].
-     * @return 256-bit hash packed as [LongArray] of size 4, or null on failure.
-     */
-    @VisibleForTesting
-    internal fun computePHashFromMat(grayFloat32Mat: Mat): LongArray? {
-        return try {
-            // Apply 2D DCT
-            Core.dct(grayFloat32Mat, dctMat)
-
-            // Extract top-left 16×16 sub-matrix (256 coefficients)
-            val subRoi = org.opencv.core.Rect(0, 0, dctSubSize, dctSubSize)
-            val subMat = dctMat.submat(subRoi)
-
-            val values = FloatArray(dctSubSize * dctSubSize)
-            subMat.get(0, 0, values)
-            subMat.release()
-
-            // Compute median
-            val sorted = values.clone().also { it.sort() }
-            val median = if (sorted.size % 2 == 0) {
-                (sorted[sorted.size / 2 - 1] + sorted[sorted.size / 2]) / 2f
-            } else {
-                sorted[sorted.size / 2]
-            }
-
-            // Threshold and pack into 4 longs (MSB first — matches Python int.to_bytes(32,'big'))
-            val longs = LongArray(4)
-            for (i in values.indices) {
-                if (values[i] > median) {
-                    // Bit i maps to longs[i/64] bit (63 - i%64) — MSB first
-                    longs[i / 64] = longs[i / 64] or (1L shl (63 - i % 64))
-                }
-            }
-
-            longs
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Applies perspective warp to the camera frame using the detected card corners.
-     *
-     * Source: the 4 sorted corners in frame pixel space (TL, TR, BR, BL).
-     * Destination: canonical rectangle [0,0]–[488,680].
-     *
-     * The Y-plane (grayscale) from YUV_420_888 is used directly to avoid
-     * colour conversion overhead.
-     *
-     * @return Warped [Mat] in 8UC1, or null if the frame planes are unavailable.
+     * @param imageProxy    Current camera frame (must remain open during this call).
+     * @param sortedCorners Four corners in TL, TR, BR, BL order (after rotation correction).
+     * @return A 224×224 CV_8UC3 BGR [Mat], or null on error.
      */
     private fun warpCard(imageProxy: ImageProxy, sortedCorners: List<PointF>): Mat? {
-        val width = imageProxy.width
-        val height = imageProxy.height
+        return try {
+            val width = imageProxy.width
+            val height = imageProxy.height
 
-        // Extract Y-plane as grayscale source
-        val yPlane: ImageProxy.PlaneProxy = imageProxy.planes[0]
-        val yBuffer: ByteBuffer = yPlane.buffer
-        val rowStride = yPlane.rowStride
-        val pixelStride = yPlane.pixelStride
+            // Build a full-colour BGR Mat from YUV_420_888 planes.
+            // Most Android devices use semi-planar UV (pixel stride = 2).
+            val yPlane  = imageProxy.planes[0]
+            val uPlane  = imageProxy.planes[1]
+            val vPlane  = imageProxy.planes[2]
+            val uvPixelStride = uPlane.pixelStride
 
-        val srcMat = Mat(height, width, CvType.CV_8UC1)
-        if (rowStride == width && pixelStride == 1) {
-            val bytes = ByteArray(yBuffer.remaining())
-            yBuffer.get(bytes)
-            srcMat.put(0, 0, bytes)
-        } else {
-            val rowBytes = ByteArray(width)
-            for (row in 0 until height) {
-                val rowStart = row * rowStride
-                for (col in 0 until width) {
-                    rowBytes[col] = yBuffer.get(rowStart + col * pixelStride)
+            val srcBgrMat: Mat
+            if (uvPixelStride == 2) {
+                // Semi-planar (NV12/NV21): build NV21 (YYYY…VUVU…) and let OpenCV convert.
+                val yRowStride = yPlane.rowStride
+                val uvRowStride = uPlane.rowStride
+                val uvHeight = height / 2
+                val uvWidth  = width  / 2
+
+                // duplicate() gives an independent position/limit; clear() opens full capacity range
+                val yBuf = (yPlane.buffer.duplicate() as java.nio.ByteBuffer).also { it.clear() }
+                val vBuf = (vPlane.buffer.duplicate() as java.nio.ByteBuffer).also { it.clear() }
+                val uBuf = (uPlane.buffer.duplicate() as java.nio.ByteBuffer).also { it.clear() }
+
+                val nv21 = ByteArray(width * height + width * uvHeight)
+
+                // Copy Y rows, one bulk read per row to strip stride padding
+                for (row in 0 until height) {
+                    val srcPos = row * yRowStride
+                    if (srcPos + width <= yBuf.limit()) {
+                        yBuf.position(srcPos)
+                        yBuf.get(nv21, row * width, width)
+                    }
                 }
-                srcMat.put(row, 0, rowBytes)
+
+                // Interleave V,U for NV21 using absolute get() to avoid limit issues
+                var uvOffset = width * height
+                val vLimit = vBuf.limit()
+                val uLimit = uBuf.limit()
+                for (row in 0 until uvHeight) {
+                    for (col in 0 until uvWidth) {
+                        val idx = row * uvRowStride + col * uvPixelStride
+                        nv21[uvOffset++] = if (idx < vLimit) vBuf.get(idx) else 0
+                        nv21[uvOffset++] = if (idx < uLimit) uBuf.get(idx) else 0
+                    }
+                }
+
+                val nv21Mat = Mat(height + uvHeight, width, CvType.CV_8UC1)
+                nv21Mat.put(0, 0, nv21)
+                srcBgrMat = Mat()
+                Imgproc.cvtColor(nv21Mat, srcBgrMat, Imgproc.COLOR_YUV2BGR_NV21)
+                nv21Mat.release()
+            } else {
+                // Fully planar I420 (pixel stride = 1): Y + U + V each contiguous.
+                val uvHeight = height / 2
+                val yBytes = ByteArray(width * height)
+                val uBytes = ByteArray(width * uvHeight / 2)
+                val vBytes = ByteArray(width * uvHeight / 2)
+                (yPlane.buffer.duplicate() as java.nio.ByteBuffer).also { it.clear() }.get(yBytes)
+                (uPlane.buffer.duplicate() as java.nio.ByteBuffer).also { it.clear() }.get(uBytes)
+                (vPlane.buffer.duplicate() as java.nio.ByteBuffer).also { it.clear() }.get(vBytes)
+
+                val i420 = yBytes + uBytes + vBytes
+                val i420Mat = Mat(height + uvHeight, width, CvType.CV_8UC1)
+                i420Mat.put(0, 0, i420)
+                srcBgrMat = Mat()
+                Imgproc.cvtColor(i420Mat, srcBgrMat, Imgproc.COLOR_YUV2BGR_I420)
+                i420Mat.release()
             }
+
+            // Source corners: TL, TR, BR, BL
+            srcPoints.fromArray(
+                Point(sortedCorners[0].x.toDouble(), sortedCorners[0].y.toDouble()),
+                Point(sortedCorners[1].x.toDouble(), sortedCorners[1].y.toDouble()),
+                Point(sortedCorners[2].x.toDouble(), sortedCorners[2].y.toDouble()),
+                Point(sortedCorners[3].x.toDouble(), sortedCorners[3].y.toDouble()),
+            )
+
+            // Destination: canonical 224×224 rectangle
+            dstPoints.fromArray(
+                Point(0.0, 0.0),
+                Point(warpSize, 0.0),
+                Point(warpSize, warpSize),
+                Point(0.0, warpSize),
+            )
+
+            val transformMat = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
+            Imgproc.warpPerspective(srcBgrMat, warpedBgrMat, transformMat, Size(warpSize, warpSize))
+            srcBgrMat.release()
+            transformMat.release()
+
+            // Clone so the caller owns an independent Mat; warpedBgrMat stays valid for the next frame.
+            warpedBgrMat.clone()
+        } catch (e: Exception) {
+            android.util.Log.w("CardRecognizer", "warpCard() failed", e)
+            null
         }
-
-        // Source corners: TL, TR, BR, BL
-        srcPoints.fromArray(
-            Point(sortedCorners[0].x.toDouble(), sortedCorners[0].y.toDouble()),
-            Point(sortedCorners[1].x.toDouble(), sortedCorners[1].y.toDouble()),
-            Point(sortedCorners[2].x.toDouble(), sortedCorners[2].y.toDouble()),
-            Point(sortedCorners[3].x.toDouble(), sortedCorners[3].y.toDouble()),
-        )
-
-        // Destination corners: canonical card rectangle
-        dstPoints.fromArray(
-            Point(0.0, 0.0),
-            Point(warpWidth, 0.0),
-            Point(warpWidth, warpHeight),
-            Point(0.0, warpHeight),
-        )
-
-        val transformMat = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
-        Imgproc.warpPerspective(
-            srcMat,
-            warpedMat,
-            transformMat,
-            Size(warpWidth, warpHeight),
-        )
-        srcMat.release()
-        transformMat.release()
-
-        return warpedMat
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Corner sorting
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Sorts the four detected corners into (top-left, top-right, bottom-right, bottom-left) order.
+     * Sorts the four detected corners into (top-left, top-right, bottom-right, bottom-left)
+     * by computing each corner's angle relative to the centroid.
      *
-     * - Top-left:     minimum (x + y)
-     * - Bottom-right: maximum (x + y)
-     * - Top-right:    maximum (x − y)
-     * - Bottom-left:  minimum (x − y)
+     * The x+y / x−y heuristic breaks when two corners share the same diagonal projection
+     * (e.g. a card tilted ~45°). The angular sort is robust for any orientation.
      */
     private fun sortCorners(corners: List<PointF>): List<PointF> {
-        val topLeft = corners.minByOrNull { it.x + it.y }!!
-        val bottomRight = corners.maxByOrNull { it.x + it.y }!!
-        val topRight = corners.maxByOrNull { it.x - it.y }!!
-        val bottomLeft = corners.minByOrNull { it.x - it.y }!!
-        return listOf(topLeft, topRight, bottomRight, bottomLeft)
+        val cx = corners.map { it.x }.average().toFloat()
+        val cy = corners.map { it.y }.average().toFloat()
+        // Sort CCW starting from the corner closest to −135° (top-left quadrant).
+        val byAngle = corners.sortedBy { Math.atan2((it.y - cy).toDouble(), (it.x - cx).toDouble()) }
+        // atan2 order: left(−π), bottom-left(−π/2 .. −π), top-left(−π .. 0), top-right(0 .. π/2), right/bottom-right(π/2 .. π)
+        // We need TL, TR, BR, BL. Find the index of TL = corner with minimum (x+y) among the angularly-sorted list.
+        val tlIdx = byAngle.indices.minByOrNull { byAngle[it].x + byAngle[it].y }!!
+        val n = byAngle.size
+        return listOf(
+            byAngle[tlIdx],
+            byAngle[(tlIdx + 1) % n],
+            byAngle[(tlIdx + 2) % n],
+            byAngle[(tlIdx + 3) % n],
+        )
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Cleanup
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Releases all native OpenCV [Mat] resources.
@@ -467,12 +393,7 @@ class CardRecognizer(
      */
     fun release() {
         cardDetector.release()
-        warpedMat.release()
-        grayMat.release()
-        floatMat.release()
-        dctMat.release()
-        croppedMat.release()
-        resizedMat.release()
+        warpedBgrMat.release()
         srcPoints.release()
         dstPoints.release()
     }

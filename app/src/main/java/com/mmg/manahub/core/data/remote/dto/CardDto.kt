@@ -53,6 +53,9 @@ data class CardFaceDto(
     @SerializedName("oracle_text") val oracleText: String?,
     @SerializedName("power")       val power:      String?,
     @SerializedName("toughness")   val toughness:  String?,
+    @SerializedName("loyalty")     val loyalty:    String? = null,
+    @SerializedName("defense")     val defense:    String? = null,
+    @SerializedName("flavor_text") val flavorText: String? = null,
     @SerializedName("image_uris")  val imageUris:  ImageUrisDto?,
 )
 

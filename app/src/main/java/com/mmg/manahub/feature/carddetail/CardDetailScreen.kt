@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +41,7 @@ import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -50,7 +52,8 @@ import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.StaleBadge
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.ui.components.AddToCollectionSheet
+import com.mmg.manahub.core.ui.components.TradeSelectionSheet
+import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -104,12 +107,11 @@ fun CardDetailScreen(
                                 contentDescription = stringResource(R.string.action_back)
                             )
                         }
-                        Text(
-                            text = uiState.card?.name ?: "",
+                        CardName(
+                            name = uiState.card?.name ?: "",
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp),
+                                .weight(1f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -171,7 +173,8 @@ fun CardDetailScreen(
     // Add to collection sheet
     if (uiState.showAddSheet) {
         uiState.card?.let { card ->
-            AddToCollectionSheet(
+            AddCardSheet(
+                title = stringResource(R.string.carddetail_add_copy),
                 cardName = card.name,
                 cardImage = null,
                 manaCost = card.manaCost,
@@ -186,9 +189,12 @@ fun CardDetailScreen(
     // Add to wishlist sheet
     if (uiState.showWishlistSheet) {
         uiState.card?.let { card ->
-            AddToWishlistSheet(
+            AddCardSheet(
+                title = stringResource(R.string.carddetail_wishlist_sheet_title),
                 cardName = card.name,
-                onConfirm = { isFoil, isAltArt, condition, language, qty ->
+                cardImage = null,
+                manaCost = card.manaCost,
+                onConfirm = { isFoil: Boolean, isAltArt: Boolean, condition: String, language: String, qty: Int ->
                     viewModel.onAddToWishlist(isFoil, isAltArt, condition, language, qty)
                 },
                 onDismiss = viewModel::onDismissWishlistSheet,
@@ -198,7 +204,7 @@ fun CardDetailScreen(
 
     // Mark as tradeable sheet
     if (uiState.showTradeSheet) {
-        MarkAsTradeableSheet(
+        TradeSelectionSheet(
             userCards = uiState.userCards,
             onConfirm = viewModel::onConfirmTradeSelection,
             onDismiss = viewModel::onDismissTradeSheet,
@@ -248,7 +254,6 @@ private fun CardDetailContent(
     onNavigateToDeck: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val uriHandler = LocalUriHandler.current
     var showBackFace by remember { mutableStateOf(false) }
 
     Column(
@@ -331,12 +336,8 @@ private fun CardDetailContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SetSymbol(
-                setCode = card.setCode,
-                rarity = CardRarity.fromString(card.rarity),
-                size = 20.dp,
-            )
-            Text(card.name, style = MaterialTheme.typography.headlineSmall)
+            val displayName = card.name.replace(" // ", "\n")
+            CardName(displayName, style = MaterialTheme.typography.headlineSmall)
             if (isStale) StaleBadge()
         }
 
@@ -345,19 +346,30 @@ private fun CardDetailContent(
             card.manaCost?.let {
                 ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
-            if (card.printedTypeLine.isNullOrEmpty()) {
-                Text(
-                    text = card.typeLine,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(
-                    text = card.printedTypeLine,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            val typeText = (card.printedTypeLine.takeUnless { it.isNullOrEmpty() } ?: card.typeLine)
+                .replace(" // ", "\n")
+            Text(
+                text = typeText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Set Icon + Set Name
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SetSymbol(
+                setCode = card.setCode,
+                rarity = CardRarity.fromString(card.rarity),
+                size = 20.dp,
+            )
+            Text(
+                text = card.setName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         // Oracle / printed text with inline mana symbols
@@ -388,16 +400,26 @@ private fun CardDetailContent(
         }
 
         // Power/Toughness or Loyalty
-        if (card.power != null && card.toughness != null) {
-            Text(
-                text = "${card.power}/${card.toughness}",
-                style = MaterialTheme.typography.titleMedium,
-            )
-        } else card.loyalty?.let {
-            Text(
-                text = stringResource(R.string.carddetail_loyalty_value, it),
-                style = MaterialTheme.typography.titleMedium
-            )
+        val ptOrLoyalty = when {
+            card.power != null && card.toughness != null -> "${card.power}/${card.toughness}"
+            card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty)
+            else -> null
+        }
+
+        if (ptOrLoyalty != null) {
+            val mc = MaterialTheme.magicColors
+            Surface(
+                color = mc.secondaryAccent.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, mc.secondaryAccent),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    text = ptOrLoyalty,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = mc.secondaryAccent,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
         }
 
         HorizontalDivider()
@@ -452,16 +474,10 @@ private fun CardDetailContent(
             )
         }
 
-        // Scryfall link
-        TextButton(onClick = { uriHandler.openUri(card.scryfallUri) }) {
-            Icon(
-                Icons.Default.OpenInBrowser,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.carddetail_view_scryfall))
-        }
+        HorizontalDivider()
+
+        // External links — References, Community, Where to Buy
+        ExternalLinksSection(card = card)
 
         // Extra bottom padding for FAB
         Spacer(Modifier.height(72.dp))
@@ -782,267 +798,6 @@ private fun CopyBadge(label: String) {
     }
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Add to wishlist bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
-@Composable
-private fun AddToWishlistSheet(
-    cardName: String,
-    onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val conditions = CardConstants.conditions
-    val languages = CardConstants.languages
-
-    var isFoil by remember { mutableStateOf(false) }
-    var isAlternativeArt by remember { mutableStateOf(false) }
-    var condition by remember { mutableStateOf("NM") }
-    var language by remember { mutableStateOf("en") }
-    var qty by remember { mutableIntStateOf(1) }
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        contentWindowInsets = { WindowInsets(0) },
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.carddetail_wishlist_sheet_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = cardName,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            // Foil toggle
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.addcard_confirm_foil),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Switch(checked = isFoil, onCheckedChange = { isFoil = it })
-            }
-
-            // Alternative art toggle
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.carddetail_alternative_art),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Switch(checked = isAlternativeArt, onCheckedChange = { isAlternativeArt = it })
-            }
-
-            // Quantity stepper
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.addcard_confirm_quantity),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                IconButton(onClick = { if (qty > 1) qty-- }) {
-                    Icon(
-                        Icons.Default.Remove,
-                        contentDescription = stringResource(R.string.action_remove)
-                    )
-                }
-                Text("$qty", style = MaterialTheme.typography.titleMedium)
-                IconButton(onClick = { qty++ }) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add)
-                    )
-                }
-            }
-
-            // Condition chips
-            Text(
-                stringResource(R.string.addcard_confirm_condition),
-                style = MaterialTheme.typography.labelLarge
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                conditions.forEach { (code, resId) ->
-                    FilterChip(
-                        selected = code == condition,
-                        onClick = { condition = code },
-                        label = { Text(stringResource(resId)) },
-                    )
-                }
-            }
-
-            // Language dropdown
-            var langExpanded by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
-                expanded = langExpanded,
-                onExpandedChange = { langExpanded = it },
-            ) {
-                OutlinedTextField(
-                    value = "${CardConstants.getFlag(language)} ${language.uppercase()}",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = {
-                        Text(
-                            stringResource(R.string.addcard_confirm_language),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth(),
-                )
-                ExposedDropdownMenu(
-                    expanded = langExpanded,
-                    onDismissRequest = { langExpanded = false },
-                ) {
-                    languages.forEach { (lang, flag) ->
-                        DropdownMenuItem(
-                            text = { Text("$flag ${lang.uppercase()}") },
-                            onClick = { language = lang; langExpanded = false },
-                        )
-                    }
-                }
-            }
-
-            // Confirm / Cancel
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                Button(onClick = {
-                    onConfirm(
-                        isFoil,
-                        isAlternativeArt,
-                        condition,
-                        language,
-                        qty
-                    )
-                }) {
-                    Text(stringResource(R.string.action_add))
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Mark as tradeable bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MarkAsTradeableSheet(
-    userCards: List<UserCard>,
-    onConfirm: (Map<String, Boolean>) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val tradeState = remember(userCards) {
-        mutableStateMapOf<String, Boolean>().also { map ->
-            userCards.forEach { map[it.id] = it.isForTrade }
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        contentWindowInsets = { WindowInsets(0) },
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.carddetail_trade_sheet_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.carddetail_trade_sheet_subtitle),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (userCards.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.carddetail_no_copies_for_trade),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                userCards.forEach { uc ->
-                    val checked = tradeState[uc.id] ?: false
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { tradeState[uc.id] = !checked },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Checkbox(
-                            checked = checked,
-                            onCheckedChange = { tradeState[uc.id] = it },
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                CopyBadge(label = uc.language.uppercase())
-                                CopyBadge(label = uc.condition)
-                                if (uc.isFoil) FoilBadge()
-                                if (uc.isAlternativeArt) {
-                                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
-                                }
-                            }
-                            Text(
-                                text = "×${uc.quantity}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Confirm / Cancel
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                Button(
-                    onClick = { onConfirm(tradeState.toMap()) },
-                    enabled = userCards.isNotEmpty(),
-                ) {
-                    Text(stringResource(R.string.action_save))
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-        }
-    }
-}
 
 @Composable
 private fun PriceSection(card: Card) {
@@ -1877,4 +1632,154 @@ private fun NewCategoryDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  External Links section
+// ─────────────────────────────────────────────────────────────────────────────
+
+private data class ExternalLink(val label: String, val url: String)
+
+@Composable
+private fun ExternalLinksSection(card: Card) {
+    val uriHandler = LocalUriHandler.current
+
+    val referenceLinks = buildList {
+        add(ExternalLink(stringResource(R.string.carddetail_links_scryfall), card.scryfallUri))
+        card.relatedUris["gatherer"]?.let {
+            add(ExternalLink(stringResource(R.string.carddetail_links_gatherer), it))
+        }
+        card.relatedUris["edhrec"]?.let {
+            add(ExternalLink(stringResource(R.string.carddetail_links_edhrec), it))
+        }
+    }
+
+    val communityLinks = buildList {
+        card.relatedUris["tcgplayer_infinite_articles"]?.let {
+            add(ExternalLink(stringResource(R.string.carddetail_links_tcgplayer_articles), it))
+        }
+        card.relatedUris["tcgplayer_infinite_decks"]?.let {
+            add(ExternalLink(stringResource(R.string.carddetail_links_tcgplayer_decks), it))
+        }
+    }
+
+    val purchaseLinks = buildList {
+        card.purchaseUris["tcgplayer"]?.let {
+            add(ExternalLink(stringResource(R.string.carddetail_links_tcgplayer), it))
+        }
+        card.purchaseUris["cardmarket"]?.let {
+            add(ExternalLink(stringResource(R.string.carddetail_links_cardmarket), it))
+        }
+        card.purchaseUris["cardhoarder"]?.let {
+            add(ExternalLink(stringResource(R.string.carddetail_links_cardhoarder), it))
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = stringResource(R.string.carddetail_links_title),
+            style = MaterialTheme.typography.titleSmall,
+        )
+
+        if (referenceLinks.isNotEmpty()) {
+            LinkCategory(
+                title = stringResource(R.string.carddetail_links_references),
+                icon = Icons.Default.MenuBook,
+                links = referenceLinks,
+                onOpen = { uriHandler.openUri(it) },
+            )
+        }
+
+        if (communityLinks.isNotEmpty()) {
+            LinkCategory(
+                title = stringResource(R.string.carddetail_links_community),
+                icon = Icons.Default.Group,
+                links = communityLinks,
+                onOpen = { uriHandler.openUri(it) },
+            )
+        }
+
+        if (purchaseLinks.isNotEmpty()) {
+            LinkCategory(
+                title = stringResource(R.string.carddetail_links_purchase),
+                icon = Icons.Default.ShoppingCart,
+                links = purchaseLinks,
+                onOpen = { uriHandler.openUri(it) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LinkCategory(
+    title: String,
+    icon: ImageVector,
+    links: List<ExternalLink>,
+    onOpen: (String) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = title,
+                style = ty.labelLarge,
+                color = mc.textSecondary,
+            )
+        }
+        links.forEach { link ->
+            LinkRow(link = link, onOpen = onOpen)
+        }
+    }
+}
+
+@Composable
+private fun LinkRow(link: ExternalLink, onOpen: (String) -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Surface(
+        onClick = { onOpen(link.url) },
+        color = mc.surface,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(0.5.dp, mc.surfaceVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.OpenInBrowser,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = link.label,
+                style = ty.bodyMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
 }

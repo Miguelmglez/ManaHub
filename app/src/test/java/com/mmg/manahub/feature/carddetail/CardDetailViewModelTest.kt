@@ -9,6 +9,8 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -16,6 +18,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -48,6 +51,7 @@ class CardDetailViewModelTest {
     private val deckRepo         = mockk<DeckRepository>()
     private val addToCollection  = mockk<AddCardToCollectionUseCase>()
     private val userPrefs        = mockk<UserPreferencesRepository>()
+    private val authRepository   = mockk<AuthRepository>(relaxed = true)
     private val helper           = mockk<AnalyticsHelper>(relaxed = true)
 
     private lateinit var viewModel: CardDetailViewModel
@@ -60,11 +64,14 @@ class CardDetailViewModelTest {
         addToCollection  = addToCollection,
         userPrefs        = userPrefs,
         helper           = helper,
+        authRepository   = authRepository,
     )
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+
+        every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
 
         val card = TestFixtures.buildCard("id-001")
         coEvery { cardRepo.getCardById("id-001") } returns DataResult.Success(card)

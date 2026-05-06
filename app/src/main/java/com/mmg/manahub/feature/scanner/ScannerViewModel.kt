@@ -8,6 +8,7 @@ import androidx.work.WorkManager
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -44,10 +45,11 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ScannerViewModel @Inject constructor(
+    private val cardRepository: CardRepository,
     private val addToCollection: AddCardToCollectionUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
-    val hashDatabase: HashDatabase,
+    val embeddingDatabase: EmbeddingDatabase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val workManager: WorkManager,
 ) : ViewModel() {
@@ -58,13 +60,35 @@ class ScannerViewModel @Inject constructor(
     // ── Stability buffer ─────────────────────────────────────────────────────
     private val recentMatches = ArrayDeque<String>(STABILITY_FRAMES)
 
+    // ── Rolling FPS counter (DEBUG only) ─────────────────────────────────────
+    private val frameTimestamps = ArrayDeque<Long>(11)
+
     // ── Anti-duplicate guard ─────────────────────────────────────────────────
     private var lastAddedId: String? = null
     private var lastAddedTime: Long = 0L
 
     companion object {
-        /** Number of consecutive identical matches required before a card is confirmed. */
+        /**
+         * Number of consecutive identical matches required before a card is confirmed
+         * when the similarity score is below [HIGH_CONFIDENCE_SIMILARITY].
+         */
         private const val STABILITY_FRAMES = 3
+
+        /**
+         * Reduced stability requirement when the similarity score exceeds
+         * [HIGH_CONFIDENCE_SIMILARITY].  A single very-strong match (≥ 0.90 cosine
+         * similarity) is enough to confirm the card without waiting for two more frames.
+         * This halves perceived latency for clean, well-lit shots while keeping the
+         * three-frame requirement for borderline matches where false positives are more likely.
+         */
+        private const val HIGH_CONFIDENCE_FRAMES = 1
+
+        /**
+         * Cosine similarity threshold above which [HIGH_CONFIDENCE_FRAMES] is used instead
+         * of [STABILITY_FRAMES].  Value 0.90 is deliberately above the acceptance threshold
+         * of 0.80 set in [EmbeddingDatabase] — it only activates for genuinely strong matches.
+         */
+        private const val HIGH_CONFIDENCE_SIMILARITY = 0.90f
 
         /** Minimum time in ms before the same card can be added again. */
         private const val ANTI_DUPLICATE_MS = 800L
@@ -74,27 +98,50 @@ class ScannerViewModel @Inject constructor(
     }
 
     init {
-        // Reflect the persisted hash-DB version in the UI state.
+        // Check immediately — the DB may already be loaded from a previous download.
+        _uiState.update {
+            it.copy(
+                embeddingDbLoaded = embeddingDatabase.cardCount > 0,
+                embeddingDbCardCount = embeddingDatabase.cardCount,
+            )
+        }
+
+        // Reflect the persisted embedding-DB version in the UI state.
+        // Sets embeddingDbVersionReady=true on first emission so the screen
+        // avoids a flash of the setup UI for users who already have the DB.
         viewModelScope.launch {
-            userPreferencesDataStore.hashDbVersionFlow.collect { version ->
-                _uiState.update { it.copy(hashDbVersion = version) }
+            userPreferencesDataStore.embeddingDbVersionFlow.collect { version ->
+                _uiState.update { it.copy(
+                    embeddingDbVersionReady = true,
+                    embeddingDbVersion = version,
+                    embeddingDbLoaded = embeddingDatabase.cardCount > 0,
+                    embeddingDbCardCount = embeddingDatabase.cardCount,
+                ) }
             }
         }
 
-        // Mirror the WorkManager running state so the settings sheet shows an updating indicator.
+        // Mirror WorkManager state. Also reads download progress from WorkInfo.progress.
         viewModelScope.launch {
             workManager
-                .getWorkInfosForUniqueWorkLiveData(HashDatabaseUpdateWorker.WORK_NAME)
+                .getWorkInfosForUniqueWorkLiveData(EmbeddingDatabaseUpdateWorker.WORK_NAME)
                 .asFlow()
                 .collect { infos ->
-                    val isRunning = infos.any { it.state == WorkInfo.State.RUNNING }
-                    _uiState.update { it.copy(isHashDbUpdating = isRunning) }
+                    val info = infos.firstOrNull()
+                    val isRunning = info?.state == WorkInfo.State.RUNNING
+                    val progress = info?.progress
+                        ?.getFloat(EmbeddingDatabaseUpdateWorker.KEY_PROGRESS, 0f) ?: 0f
+                    _uiState.update { it.copy(
+                        isEmbeddingDbUpdating = isRunning,
+                        embeddingDbDownloadProgress = if (isRunning) progress else 0f,
+                        embeddingDbLoaded = embeddingDatabase.cardCount > 0,
+                        embeddingDbCardCount = embeddingDatabase.cardCount,
+                    ) }
                 }
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  pHash recognition entry point — called by CardRecognizer
+    //  ML recognition entry point — called by CardRecognizer
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -107,9 +154,19 @@ class ScannerViewModel @Inject constructor(
      */
     fun onRecognitionResult(result: RecognitionResult) {
         // onRecognitionResult is called from CardRecognizer's Dispatchers.Default coroutine.
-        // recentMatches, lastAddedId, and lastAddedTime are not thread-safe, so we dispatch
-        // the entire handler onto the main thread where those fields are always accessed.
+        // recentMatches, lastAddedId, lastAddedTime, and frameTimestamps are not thread-safe,
+        // so we dispatch the entire handler onto the main thread.
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
+            if (com.mmg.manahub.BuildConfig.DEBUG) {
+                val now = System.currentTimeMillis()
+                frameTimestamps.addLast(now)
+                if (frameTimestamps.size > 10) frameTimestamps.removeFirst()
+                val fps = if (frameTimestamps.size >= 2) {
+                    val span = frameTimestamps.last() - frameTimestamps.first()
+                    if (span > 0) ((frameTimestamps.size - 1) * 1000L / span).toInt() else 0
+                } else 0
+                _uiState.update { it.copy(fps = fps) }
+            }
             processRecognitionResult(result)
         }
     }
@@ -160,10 +217,24 @@ class ScannerViewModel @Inject constructor(
                     return
                 }
 
-                // ── Stability buffer ─────────────────────────────────────────
-                if (recentMatches.size >= STABILITY_FRAMES) recentMatches.removeFirst()
+                // ── Adaptive stability buffer ────────────────────────────────
+                // High-confidence matches (similarity ≥ 0.90) are confirmed after a single
+                // consistent frame.  Borderline matches still require STABILITY_FRAMES (3)
+                // consecutive identical detections to guard against false positives.
+                val requiredFrames = if (result.similarity >= HIGH_CONFIDENCE_SIMILARITY) {
+                    HIGH_CONFIDENCE_FRAMES
+                } else {
+                    STABILITY_FRAMES
+                }
+
+                if (recentMatches.size >= requiredFrames) recentMatches.removeFirst()
                 recentMatches.addLast(id)
-                if (recentMatches.size < STABILITY_FRAMES || recentMatches.any { it != id }) return
+
+                if (recentMatches.size < requiredFrames || recentMatches.any { it != id }) {
+                    // Update searching state if it was false
+                    _uiState.update { it.copy(isSearching = true) }
+                    return
+                }
 
                 // ── Card confirmed — reset buffer ────────────────────────────
                 recentMatches.clear()
@@ -388,6 +459,71 @@ class ScannerViewModel @Inject constructor(
     /** Sets or clears the locked set filter. */
     fun onSetLockSelected(setCode: String?) {
         _uiState.update { it.copy(lockedSetCode = setCode) }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Queue actions & filtering
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Updates the search query for filtering the scan queue. */
+    fun onQueueSearchQueryChanged(query: String) {
+        // We'll handle filtering in the UI for now as it's a simple list,
+        // but the query is stored here.
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Editing scanned cards
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Opens the edit sheet for a specific scanned card.
+     * Fetches all available prints (sets) for that card to populate the set picker.
+     */
+    fun onEditScannedCard(entry: ScannedCard) {
+        _uiState.update {
+            it.copy(
+                editingCard = entry,
+                showEditSheet = true,
+                availablePrints = emptyList(),
+                isLoadingPrints = true
+            )
+        }
+
+        viewModelScope.launch {
+            val result = cardRepository.getCardPrints(entry.card.name)
+            if (result is DataResult.Success) {
+                _uiState.update {
+                    it.copy(
+                        availablePrints = result.data,
+                        isLoadingPrints = false
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isLoadingPrints = false) }
+            }
+        }
+    }
+
+    /**
+     * Updates an existing entry in the scan session with new attributes.
+     */
+    fun onUpdateScannedCard(updatedEntry: ScannedCard) {
+        val original = _uiState.value.editingCard ?: return
+        _uiState.update { state ->
+            val updatedList = state.scanSession.cards.map {
+                if (it === original) updatedEntry else it
+            }
+            state.copy(
+                scanSession = state.scanSession.copy(cards = updatedList),
+                showEditSheet = false,
+                editingCard = null
+            )
+        }
+    }
+
+    /** Closes the edit sheet without saving. */
+    fun onCloseEditSheet() {
+        _uiState.update { it.copy(showEditSheet = false, editingCard = null) }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

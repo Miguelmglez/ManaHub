@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.trades.data.repository
 
+import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeWithCard
 import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.feature.trades.data.remote.OpenForTradeRemoteDataSource
 import com.mmg.manahub.feature.trades.data.remote.dto.OpenForTradeEntryDto
@@ -20,7 +22,7 @@ class OpenForTradeRepositoryImpl @Inject constructor(
 ) : OpenForTradeRepository {
 
     override fun observeLocal(): Flow<List<OpenForTradeEntry>> =
-        dao.observeAll().map { list -> list.map { it.toDomain() } }
+        dao.observeAllWithCard().map { list -> list.map { it.toDomain() } }
 
     override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
 
@@ -71,6 +73,10 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         language = "en",
         isAltArt = false,
         createdAt = createdAt,
+    )
+
+    private fun LocalOpenForTradeWithCard.toDomain() = entity.toDomain().copy(
+        card = card?.toDomain()
     )
 
     private fun OpenForTradeEntryDto.toDomain() = OpenForTradeEntry(
