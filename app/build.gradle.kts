@@ -168,8 +168,10 @@ dependencies {
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)
 
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    // implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    // implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     implementation(libs.opencv)
     implementation(libs.accompanist.permissions)

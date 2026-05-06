@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.scanner
 
+// COMMENTED OUT — replaced by ML Kit OCR. See CardRecognizer for the new pipeline.
+/*
 import android.content.Context
 import androidx.annotation.VisibleForTesting
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -335,3 +337,4 @@ class EmbeddingDatabase @Inject constructor(
     /** Lightweight tuple to take a consistent 4-field snapshot under a single lock. */
     private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 }
+*/

@@ -1,8 +1,7 @@
 package com.mmg.manahub.feature.scanner.di
 
 import android.content.Context
-import com.mmg.manahub.feature.scanner.CardEmbeddingModel
-import com.mmg.manahub.feature.scanner.EmbeddingDatabase
+import com.mmg.manahub.feature.scanner.CardOcrAnalyzer
 import com.mmg.manahub.feature.scanner.SoundManager
 import dagger.Module
 import dagger.Provides
@@ -14,22 +13,16 @@ import javax.inject.Singleton
 /**
  * Hilt module that provides scanner-related singleton dependencies.
  *
- * Separated from the core DI modules because the embedding database and TFLite model
- * are specific to the scanner feature and carry their own lifecycle
- * (loaded once at startup, potentially hot-reloaded via WorkManager).
+ * The embedding-database and TFLite-model providers are commented out because the
+ * pipeline now uses ML Kit Text Recognition (OCR) instead of cosine nearest-neighbour
+ * search over a downloaded embedding binary.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object ScannerModule {
 
-    /**
-     * Provides the [EmbeddingDatabase] singleton.
-     *
-     * Prefers a previously downloaded file in [Context.getFilesDir] over the bundled asset,
-     * so that OTA embedding-DB updates take effect immediately without a new release.
-     * Falls back to the bundled asset when no downloaded file is present (returns an empty
-     * DB on first launch when the model has never been downloaded).
-     */
+    // COMMENTED OUT — replaced by ML Kit OCR provider below.
+    /*
     @Provides
     @Singleton
     fun provideEmbeddingDatabase(@ApplicationContext context: Context): EmbeddingDatabase {
@@ -40,18 +33,22 @@ object ScannerModule {
         return db
     }
 
-    /**
-     * Provides the [CardEmbeddingModel] singleton.
-     *
-     * The TFLite interpreter is initialised eagerly in the constructor.
-     * If `mobilenet_v3_small.tflite` is absent from assets, the constructor
-     * throws [IllegalStateException] — this is intentional so the failure is
-     * surfaced immediately at startup rather than silently at scan time.
-     */
     @Provides
     @Singleton
     fun provideCardEmbeddingModel(@ApplicationContext context: Context): CardEmbeddingModel =
         CardEmbeddingModel(context)
+    */
+
+    /**
+     * Provides the [CardOcrAnalyzer] singleton.
+     *
+     * Initialises the ML Kit Latin text recognizer client eagerly.
+     * No asset downloads or device-side model caching are required — ML Kit
+     * bundles the base model in the app and updates it transparently via Google Play Services.
+     */
+    @Provides
+    @Singleton
+    fun provideCardOcrAnalyzer(): CardOcrAnalyzer = CardOcrAnalyzer()
 
     /**
      * Provides the [SoundManager] singleton.
