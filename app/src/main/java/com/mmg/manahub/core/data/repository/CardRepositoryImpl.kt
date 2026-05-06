@@ -62,6 +62,20 @@ class CardRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun getCardPrints(name: String): DataResult<List<Card>> =
+        withContext(ioDispatcher) {
+            // Using unique=prints to get all versions of the card
+            val query = "!\"$name\" unique:prints"
+            val result = remote.searchCards(query, 1)
+            if (result.isSuccess) {
+                val cards = result.getOrThrow()
+                // We don't necessarily want to cache all prints in the main DB unless they are picked
+                DataResult.Success(cards)
+            } else {
+                DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+            }
+        }
+
     private suspend fun entityWithComputedTags(card: Card) = run {
         val existing = cardDao.getById(card.scryfallId)
         val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
@@ -80,7 +94,7 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = withContext(ioDispatcher) {
         val cached = cardDao.getById(scryfallId)
-        if (cached != null && CachePolicy.isFresh(cached.cachedAt))
+        if (cached != null && CachePolicy.isFresh(cached.cachedAt) && cached.relatedUris != "{}")
             return@withContext DataResult.Success(cached.toDomain())
 
         val result = remote.getCardById(scryfallId)

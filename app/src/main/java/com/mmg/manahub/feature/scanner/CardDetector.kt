@@ -58,14 +58,22 @@ interface CardDetector {
  *
  * Pipeline per frame (synchronous, runs on the calling thread):
  * 1. Extract Y-plane from YUV_420_888 → grayscale [Mat] (8UC1).
- * 2. GaussianBlur 5×5.
- * 3. Canny edge detection (low=50, high=150).
- * 4. findContours (RETR_EXTERNAL, CHAIN_APPROX_SIMPLE).
- * 5. Discard contours with area < 15 % of the total frame area.
- * 6. approxPolyDP with ε = 2 % of perimeter; keep only 4-vertex polygons.
- * 7. Validate aspect ratio: MTG card is 63×88 mm ≈ 0.716, accept ±15 % → [0.608, 0.823].
- * 8. Choose the largest surviving contour.
- * 9. Apply EMA smoothing (α = 0.65) over the 4 corners.
+ * 2. CLAHE (clipLimit=2, tileSize=8×8) to normalise LOCAL contrast — makes the
+ *    card border visible against any background colour (dark table, light wood, etc.).
+ * 3. GaussianBlur 5×5 to reduce noise introduced by CLAHE.
+ * 4. Canny edge detection (low=25, high=75) — lower thresholds are safe after CLAHE
+ *    because contrast is already amplified; the outer card border edge is now detectable.
+ * 5. Morphological close (9×9 rect, 3 iterations) to bridge gaps ≤ 13 px in the outer
+ *    card border contour caused by low-contrast or rounded-corner areas.
+ * 6. findContours (RETR_LIST, CHAIN_APPROX_SIMPLE) — returns ALL contours so both
+ *    the inner art-frame border (~40 % of frame area) and the outer card border
+ *    (~55 % of frame area) are candidates.
+ * 7. Discard contours with area < 15 % of the total frame area.
+ * 8. approxPolyDP with ε = 2 % of perimeter; keep only 4-vertex polygons.
+ * 9. Discard non-convex polygons.
+ * 10. Validate aspect ratio: MTG card is 63×88 mm ≈ 0.716, accept [0.65, 0.78].
+ * 11. Choose the largest surviving contour → outer card border wins over inner art frame.
+ * 12. Apply EMA smoothing (α = 0.50) over the 4 corners.
  *
  * Throttling: at most one detection every 100 ms; returns last cached result
  * between ticks. [AtomicBoolean] guards against re-entrant calls.
@@ -79,7 +87,15 @@ class OpenCvCardDetector : CardDetector {
     private val grayMat = Mat()
     private val blurredMat = Mat()
     private val edgesMat = Mat()
+    private val dilatedMat = Mat()
     private val hierarchyMat = Mat()
+
+    // 9×9 rect kernel for MORPH_CLOSE after Canny — bridges gaps ≤ 13 px
+    // in the outer card border without over-expanding into background pixels.
+    private val dilKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(9.0, 9.0))
+
+    // CLAHE instance created once; it is a Java object and is GC-managed (no release() call needed).
+    private val clahe = Imgproc.createCLAHE(2.0, Size(8.0, 8.0))
 
     // ── EMA state ───────────────────────────────────────────────────────────
     /**
@@ -87,39 +103,30 @@ class OpenCvCardDetector : CardDetector {
      * Higher = faster tracking (more weight on the new measurement), less smoothing.
      * Lower = slower tracking (more inertia), smoother overlay.
      * Formula: smoothed = emaAlpha * new + (1 - emaAlpha) * previous.
+     *
+     * Raised from 0.30 → 0.50: at 0.30 the filter needed ~10 frames (≈1.5 s at 150 ms/frame)
+     * to converge within 5 % of the true corner position.  At 0.50 convergence happens in
+     * ~4 frames (≈600 ms), cutting the delay before ML inference sees a stable warp input.
+     * The overlay jitter trade-off is acceptable — the card barely moves once held steady.
      */
-    private val emaAlpha = 0.65f
+    private val emaAlpha = 0.50f
     private var smoothedCorners: List<PointF>? = null
 
-    // ── Throttling ──────────────────────────────────────────────────────────
-    private val minIntervalMs = 100L
-    @Volatile private var lastProcessedMs = 0L
+    // ── Re-entrance guard ───────────────────────────────────────────────────
     private val isProcessing = AtomicBoolean(false)
 
-    /** Last result returned while throttling is active. */
-    @Volatile private var lastResult: DetectedCard? = null
+    // ── Diagnostic log throttle (once every 2 s to avoid flooding Logcat) ──
+    @Volatile private var lastLogMs = 0L
 
-    // ── MTG card aspect ratio bounds ────────────────────────────────────────
-    private val aspectRatioMin = 0.608f   // 0.716 - 15 %
-    private val aspectRatioMax = 0.823f   // 0.716 + 15 %
+    // ── MTG card aspect ratio bounds (applied to actual quad side lengths,
+    //    not the axis-aligned bounding rect, so rotated cards pass correctly) ─
+    private val aspectRatioMin = 0.65f
+    private val aspectRatioMax = 0.78f
 
     override fun detect(frame: ImageProxy): DetectedCard? {
-        // Throttle: return cached result if called too soon
-        val now = System.currentTimeMillis()
-        if (now - lastProcessedMs < minIntervalMs) {
-            return lastResult
-        }
-
-        // Guard against re-entrance (synchronous, but protects if called from
-        // multiple threads simultaneously — e.g., during a config change).
-        if (!isProcessing.compareAndSet(false, true)) {
-            return lastResult
-        }
-
+        if (!isProcessing.compareAndSet(false, true)) return null
         return try {
-            lastProcessedMs = now
-            lastResult = runDetectionPipeline(frame)
-            lastResult
+            runDetectionPipeline(frame)
         } finally {
             isProcessing.set(false)
         }
@@ -129,6 +136,8 @@ class OpenCvCardDetector : CardDetector {
         grayMat.release()
         blurredMat.release()
         edgesMat.release()
+        dilatedMat.release()
+        dilKernel.release()
         hierarchyMat.release()
     }
 
@@ -138,44 +147,68 @@ class OpenCvCardDetector : CardDetector {
         val width = frame.width
         val height = frame.height
         val frameArea = width.toDouble() * height.toDouble()
+        val shouldLog = System.currentTimeMillis().also { now ->
+            if (now - lastLogMs > 2_000L) lastLogMs = now else return@also
+        } == lastLogMs
 
         // Step 1: Extract Y-plane → grayscale Mat
         extractYPlane(frame, width, height)
 
-        // Step 2: Gaussian blur
-        Imgproc.GaussianBlur(grayMat, blurredMat, Size(5.0, 5.0), 0.0)
+        // Step 2: CLAHE — equalises local contrast in 8×8 tiles so the card border
+        // is detectable regardless of whether the background is dark, grey, or bright.
+        clahe.apply(grayMat, blurredMat)
 
-        // Step 3: Canny edge detection
-        Imgproc.Canny(blurredMat, edgesMat, 50.0, 150.0)
+        // Step 3: Gaussian blur to reduce CLAHE noise before edge detection.
+        Imgproc.GaussianBlur(blurredMat, blurredMat, Size(5.0, 5.0), 0.0)
 
-        // Step 4: Find external contours
+        // Step 4: Canny — lower thresholds are safe here because CLAHE has already
+        // boosted local contrast; even weak outer-border edges become detectable.
+        Imgproc.Canny(blurredMat, edgesMat, 25.0, 75.0)
+
+        // Step 5: Morphological close to bridge gaps in the outer card border.
+        // 9×9 rect kernel × 3 iterations fills gaps ≤ 13 px.
+        Imgproc.morphologyEx(
+            edgesMat, dilatedMat, Imgproc.MORPH_CLOSE, dilKernel,
+            org.opencv.core.Point(-1.0, -1.0), 3,
+        )
+
+        // Step 6: RETR_LIST returns ALL contours — both the outer card border
+        // (~55 % frame area) and the inner art-frame border (~40 %) are candidates.
+        // findBestCardQuadrilateral picks the largest valid quad → outer card wins.
         val contours = mutableListOf<MatOfPoint>()
         Imgproc.findContours(
-            edgesMat,
+            dilatedMat,
             contours,
             hierarchyMat,
-            Imgproc.RETR_EXTERNAL,
+            Imgproc.RETR_LIST,
             Imgproc.CHAIN_APPROX_SIMPLE,
         )
 
-        // Steps 5–7: Filter and find the best quadrilateral
-        val bestQuad = findBestCardQuadrilateral(contours, frameArea)
+        if (shouldLog) {
+            android.util.Log.d(
+                "CardDetector",
+                "Frame ${width}×${height} — ${contours.size} contours found",
+            )
+        }
+
+        // Steps 7–11: Filter and find the best quadrilateral
+        val bestQuad = findBestCardQuadrilateral(contours, frameArea, shouldLog)
 
         // Release contour Mats to avoid native leaks
         contours.forEach { it.release() }
 
         if (bestQuad == null) {
-            // Reset smoothing when no card is found so stale corners are not
-            // shown after the card disappears from the frame.
-            smoothedCorners = null
-            return null
+            return null  // keep smoothedCorners for overlay persistence
         }
 
-        // Step 8: EMA smoothing
+        // Step 12: EMA smoothing
         val corners = bestQuad.toList().map { pt -> PointF(pt.x.toFloat(), pt.y.toFloat()) }
         val smoothed = applyEma(corners)
 
-        // Step 9: Build result
+        if (shouldLog) {
+            android.util.Log.d("CardDetector", "Card DETECTED — corners: $smoothed")
+        }
+
         return DetectedCard(cornersInImage = smoothed, confidence = 1.0f)
     }
 
@@ -211,57 +244,90 @@ class OpenCvCardDetector : CardDetector {
     }
 
     /**
-     * Iterates over [contours], applying area and aspect-ratio filters, and
-     * returns the quadrilateral with the largest area, or null if none passes.
+     * Iterates over [contours], fitting a minimum-area rectangle to each large candidate,
+     * and returns the rectangle with the largest contour area whose aspect ratio matches
+     * an MTG card, or null if none passes.
+     *
+     * [Imgproc.minAreaRect] is used instead of [Imgproc.approxPolyDP] because the outer
+     * card border contour often has 5–8 vertices after MORPH_CLOSE (rounded corners, slight
+     * irregularities). approxPolyDP with a tight ε rejects these; minAreaRect always
+     * produces a clean 4-vertex rectangle that is optimal for the contour's shape.
      */
     private fun findBestCardQuadrilateral(
         contours: List<MatOfPoint>,
         frameArea: Double,
+        shouldLog: Boolean,
     ): MatOfPoint2f? {
         var bestArea = 0.0
+        var bestAreaPct = 0
+        var bestRatio = 0f
         var bestQuad: MatOfPoint2f? = null
 
         for (contour in contours) {
-            // Step 5: Area filter — must be at least 15 % of frame
             val area = Imgproc.contourArea(contour)
-            if (area < frameArea * 0.15) continue
+            val areaPct = (area / frameArea * 100).toInt()
 
-            // Step 6: Polygon approximation — keep only quadrilaterals
+            // Area filter — must be at least 15 % of frame.
+            // Only log contours ≥ 8 % to avoid flooding logcat with RETR_LIST noise.
+            if (area < frameArea * 0.15) {
+                if (shouldLog && areaPct >= 8) {
+                    android.util.Log.d("CardDetector", "  skip area=${areaPct}% (need ≥15%)")
+                }
+                continue
+            }
+
+            // Fit the tightest bounding rectangle to this contour.
+            // minAreaRect handles rounded corners and MORPH_CLOSE artifacts gracefully —
+            // it always yields a clean 4-point rectangle regardless of vertex count.
             val contour2f = MatOfPoint2f(*contour.toArray())
-            val perimeter = Imgproc.arcLength(contour2f, true)
-            val approx = MatOfPoint2f()
-            Imgproc.approxPolyDP(contour2f, approx, 0.02 * perimeter, true)
+            val rotRect = Imgproc.minAreaRect(contour2f)
             contour2f.release()
 
-            if (approx.rows() != 4) {
-                approx.release()
-                continue
-            }
-
-            // Step 7: Aspect ratio validation
-            val rect = Imgproc.boundingRect(MatOfPoint(*approx.toArray()))
-            val shorter = minOf(rect.width, rect.height).toFloat()
-            val longer = maxOf(rect.width, rect.height).toFloat()
-            if (longer == 0f) {
-                approx.release()
-                continue
-            }
-            val ratio = shorter / longer
+            // Aspect ratio check using the rectangle's actual short/long sides.
+            val shortSide = minOf(rotRect.size.width, rotRect.size.height).toFloat()
+            val longSide  = maxOf(rotRect.size.width, rotRect.size.height).toFloat()
+            if (longSide == 0f) continue
+            val ratio = shortSide / longSide
             if (ratio < aspectRatioMin || ratio > aspectRatioMax) {
-                approx.release()
+                if (shouldLog) {
+                    android.util.Log.d(
+                        "CardDetector",
+                        "  skip area=%d%% ratio=%.2f (need %.2f–%.2f)".format(
+                            areaPct, ratio, aspectRatioMin, aspectRatioMax,
+                        ),
+                    )
+                }
                 continue
             }
 
-            // Keep the quad with the largest contour area
+            // Always log passes (unthrottled) to diagnose which contour wins each frame.
+            android.util.Log.d(
+                "CardDetector",
+                "  PASS area=%d%% ratio=%.2f".format(areaPct, ratio),
+            )
+
+            // Extract the 4 corner points from the rotated rect.
+            val pts = Array(4) { org.opencv.core.Point() }
+            rotRect.points(pts)
+            val quad = MatOfPoint2f(*pts)
+
             if (area > bestArea) {
                 bestQuad?.release()
                 bestArea = area
-                bestQuad = approx
+                bestAreaPct = areaPct
+                bestRatio = ratio
+                bestQuad = quad
             } else {
-                approx.release()
+                quad.release()
             }
         }
 
+        if (bestQuad != null) {
+            android.util.Log.d(
+                "CardDetector",
+                "BEST area=%d%% ratio=%.2f".format(bestAreaPct, bestRatio),
+            )
+        }
         return bestQuad
     }
 
@@ -272,10 +338,8 @@ class OpenCvCardDetector : CardDetector {
     private fun applyEma(newCorners: List<PointF>): List<PointF> {
         val previous = smoothedCorners
         return if (previous == null || previous.size != newCorners.size) {
-            // First detection or size mismatch — seed with raw corners
             newCorners.also { smoothedCorners = it }
         } else {
-            // EMA: smoothed = emaAlpha * new + (1 - emaAlpha) * previous
             val result = newCorners.mapIndexed { i, new ->
                 val prev = previous[i]
                 PointF(

@@ -84,8 +84,8 @@ fun CardGridItem(
             }
             // Card name + price
             Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    text     = card.name,
+                CardName(
+                    name     = card.name,
                     style    = MaterialTheme.magicTypography.labelSmall,
                     color    = mc.textPrimary,
                     maxLines = 1,

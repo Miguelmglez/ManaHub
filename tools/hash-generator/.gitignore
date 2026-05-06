@@ -1,8 +1,0 @@
-image_cache/
-card_hashes.bin
-card_index.json
-version.json
-.wrangler/
-.claude/
-__pycache__/
-*.pyc

@@ -57,6 +57,12 @@ data class Card(
     val purchaseUris: Map<String, String> = emptyMap(),
     /** True when Scryfall marks this card as a "Game Changer" in its format. */
     val gameChanger: Boolean = false,
+    /**
+     * Full per-face data for double-faced cards (DFCs), meld cards, etc.
+     * Null for single-faced cards.  [imageBackNormal] remains as a fast-access
+     * shortcut for the most common DFC use-case (displaying the back image).
+     */
+    val cardFaces: List<CardFace>? = null,
 )
 
 data class UserCard(

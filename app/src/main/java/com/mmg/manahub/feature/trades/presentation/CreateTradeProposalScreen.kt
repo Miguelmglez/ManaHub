@@ -1,18 +1,7 @@
 package com.mmg.manahub.feature.trades.presentation
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -30,16 +18,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,11 +32,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.CardSearchSheet
+import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -66,6 +54,7 @@ fun CreateTradeProposalScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val mc = MaterialTheme.magicColors
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
@@ -97,30 +86,43 @@ fun CreateTradeProposalScreen(
         }
     }
 
-    var showAddItemDialog by remember { mutableStateOf<ItemSide?>(null) }
+    var showAddItemSheet by remember { mutableStateOf<ItemSide?>(null) }
+    var editingItem by remember { mutableStateOf<TradeItemDraft?>(null) }
+    var showEditSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         snackbarHost   = { SnackbarHost(snackbarHostState) },
         containerColor = mc.background,
         topBar = {
-            TopAppBar(
-                title = {
+            Surface(
+                color = mc.backgroundSecondary,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 8.dp)
+                        .heightIn(min = 48.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            tint = mc.textPrimary
+                        )
+                    }
                     Text(
-                        text  = stringResource(
+                        text = stringResource(
                             if (uiState.isCounterMode) R.string.trades_counter_proposal_title
                             else R.string.trades_create_proposal_title
                         ),
-                        style = MaterialTheme.magicTypography.titleMedium,
+                        style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
+                        modifier = Modifier.weight(1f).padding(start = 8.dp)
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textPrimary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
+                }
+            }
         },
         bottomBar = {
             Column(
@@ -177,6 +179,10 @@ fun CreateTradeProposalScreen(
             items(uiState.proposerItems, key = { "pi_${it.id}" }) { item ->
                 TradeItemDraftRow(
                     item     = item,
+                    onClick  = { 
+                        editingItem = item
+                        showEditSheet = true
+                    },
                     onRemove = { viewModel.removeProposerItem(item.id) },
                 )
             }
@@ -190,7 +196,7 @@ fun CreateTradeProposalScreen(
             }
 
             item(key = "you_offer_add") {
-                AddItemButton(onClick = { showAddItemDialog = ItemSide.PROPOSER })
+                AddItemButton(onClick = { showAddItemSheet = ItemSide.PROPOSER })
             }
 
             item(key = "divider") { Spacer(Modifier.height(4.dp)) }
@@ -203,6 +209,10 @@ fun CreateTradeProposalScreen(
             items(uiState.receiverItems, key = { "ri_${it.id}" }) { item ->
                 TradeItemDraftRow(
                     item     = item,
+                    onClick  = {
+                        editingItem = item
+                        showEditSheet = true
+                    },
                     onRemove = { viewModel.removeReceiverItem(item.id) },
                 )
             }
@@ -216,32 +226,83 @@ fun CreateTradeProposalScreen(
             }
 
             item(key = "they_offer_add") {
-                AddItemButton(onClick = { showAddItemDialog = ItemSide.RECEIVER })
+                AddItemButton(onClick = { showAddItemSheet = ItemSide.RECEIVER })
             }
 
             item(key = "bottom_spacer") { Spacer(Modifier.height(16.dp)) }
         }
     }
 
-    showAddItemDialog?.let { side ->
-        AddTradeItemDialog(
-            onConfirm = { cardId, quantity, isFoil, condition, language, isAltArt ->
-                val draft = TradeItemDraft(
-                    cardId    = cardId,
-                    quantity  = quantity,
-                    isFoil    = isFoil,
-                    condition = condition,
-                    language  = language,
-                    isAltArt  = isAltArt,
-                )
-                when (side) {
-                    ItemSide.PROPOSER -> viewModel.addProposerItem(draft)
-                    ItemSide.RECEIVER -> viewModel.addReceiverItem(draft)
+    showAddItemSheet?.let { side ->
+        CardSearchSheet(
+            query = uiState.addCardsQuery,
+            addCardsResults = uiState.addCardsResults,
+            scryfallResults = uiState.scryfallResults,
+            isSearchingCards = uiState.isSearchingCards,
+            isSearchingScryfall = uiState.isSearchingScryfall,
+            onQueryChange = viewModel::onAddCardsQueryChange,
+            onScryfallSearch = viewModel::searchScryfallDirect,
+            onAdd = { id ->
+                focusManager.clearFocus()
+                val card = viewModel.getCardById(id)
+                if (card != null) {
+                    val draft = TradeItemDraft(
+                        cardId = card.scryfallId,
+                        cardName = card.name,
+                        quantity = 1,
+                        condition = "NM",
+                        language = "en"
+                    )
+                    when (side) {
+                        ItemSide.PROPOSER -> viewModel.addProposerItem(draft)
+                        ItemSide.RECEIVER -> viewModel.addReceiverItem(draft)
+                    }
+                    showAddItemSheet = null
+                    viewModel.clearAddCardsState()
                 }
-                showAddItemDialog = null
             },
-            onDismiss = { showAddItemDialog = null },
+            onRemove = { /* No-op here */ },
+            onCardClick = { 
+                focusManager.clearFocus()
+                /* Maybe show detail later */ 
+            },
+            onDismiss = {
+                focusManager.clearFocus()
+                showAddItemSheet = null
+                viewModel.clearAddCardsState()
+            }
         )
+    }
+
+    if (showEditSheet) {
+        editingItem?.let { item ->
+            AddCardSheet(
+                title = stringResource(R.string.trades_edit),
+                cardName = item.cardName,
+                onConfirm = { isFoil, isAltArt, condition, language, qty ->
+                    val updated = item.copy(
+                        quantity = qty,
+                        isFoil = isFoil,
+                        condition = condition,
+                        language = language,
+                        isAltArt = isAltArt
+                    )
+                    if (uiState.proposerItems.any { it.id == item.id }) {
+                        viewModel.updateProposerItem(updated)
+                    } else {
+                        viewModel.updateReceiverItem(updated)
+                    }
+                    showEditSheet = false
+                    editingItem = null
+                },
+                onDismiss = {
+                    showEditSheet = false
+                    editingItem = null
+                },
+                manaCost = null,
+                cardImage = null
+            )
+        }
     }
 }
 
@@ -259,23 +320,29 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun TradeItemDraftRow(
     item:     TradeItemDraft,
+    onClick:  () -> Unit,
     onRemove: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
     Surface(
-        shape    = RoundedCornerShape(10.dp),
+        onClick  = onClick,
+        shape    = RoundedCornerShape(12.dp),
         color    = mc.surface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier          = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier          = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = item.cardId,
-                    style = MaterialTheme.magicTypography.bodyMedium,
-                    color = mc.textPrimary,
+                    text     = item.cardName,
+                    style    = ty.bodyMedium,
+                    color    = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 val badges = buildList {
                     add("x${item.quantity}")
@@ -286,7 +353,7 @@ private fun TradeItemDraftRow(
                 }
                 Text(
                     text  = badges.joinToString(" · "),
-                    style = MaterialTheme.magicTypography.labelSmall,
+                    style = ty.labelSmall,
                     color = mc.textSecondary,
                 )
             }
@@ -348,129 +415,4 @@ private fun AddItemButton(onClick: () -> Unit) {
             color = mc.primaryAccent,
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddTradeItemDialog(
-    onConfirm: (cardId: String, quantity: Int, isFoil: Boolean, condition: String, language: String, isAltArt: Boolean) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    var cardId    by remember { mutableStateOf("") }
-    var quantity  by remember { mutableStateOf("1") }
-    var isFoil    by remember { mutableStateOf(false) }
-    var condition by remember { mutableStateOf("NM") }
-    var language  by remember { mutableStateOf("en") }
-    var isAltArt  by remember { mutableStateOf(false) }
-
-    val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor   = mc.primaryAccent,
-        unfocusedBorderColor = mc.surfaceVariant,
-        focusedTextColor     = mc.textPrimary,
-        unfocusedTextColor   = mc.textPrimary,
-        cursorColor          = mc.primaryAccent,
-        focusedLabelColor    = mc.primaryAccent,
-        unfocusedLabelColor  = mc.textSecondary,
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor   = mc.backgroundSecondary,
-        title = {
-            Text(
-                stringResource(R.string.trades_add_item),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value         = cardId,
-                    onValueChange = { cardId = it },
-                    label         = { Text(stringResource(R.string.trades_select_card_id_hint)) },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = textFieldColors,
-                )
-                OutlinedTextField(
-                    value         = quantity,
-                    onValueChange = { if (it.all(Char::isDigit)) quantity = it },
-                    label         = { Text(stringResource(R.string.trades_quantity)) },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = textFieldColors,
-                )
-                OutlinedTextField(
-                    value         = condition,
-                    onValueChange = { condition = it },
-                    label         = { Text(stringResource(R.string.trades_condition)) },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = textFieldColors,
-                )
-                OutlinedTextField(
-                    value         = language,
-                    onValueChange = { language = it },
-                    label         = { Text(stringResource(R.string.trades_language)) },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = textFieldColors,
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier          = Modifier.clickable { isFoil = !isFoil },
-                ) {
-                    Checkbox(
-                        checked         = isFoil,
-                        onCheckedChange = { isFoil = it },
-                        colors          = CheckboxDefaults.colors(
-                            checkedColor   = mc.primaryAccent,
-                            uncheckedColor = mc.textSecondary,
-                        ),
-                    )
-                    Text(stringResource(R.string.trades_foil), style = MaterialTheme.magicTypography.bodySmall, color = mc.textPrimary)
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier          = Modifier.clickable { isAltArt = !isAltArt },
-                ) {
-                    Checkbox(
-                        checked         = isAltArt,
-                        onCheckedChange = { isAltArt = it },
-                        colors          = CheckboxDefaults.colors(
-                            checkedColor   = mc.primaryAccent,
-                            uncheckedColor = mc.textSecondary,
-                        ),
-                    )
-                    Text(stringResource(R.string.trades_alt_art), style = MaterialTheme.magicTypography.bodySmall, color = mc.textPrimary)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick  = {
-                    if (cardId.isNotBlank()) {
-                        onConfirm(
-                            cardId,
-                            quantity.toIntOrNull()?.coerceAtLeast(1) ?: 1,
-                            isFoil,
-                            condition,
-                            language,
-                            isAltArt,
-                        )
-                    }
-                },
-                enabled = cardId.isNotBlank(),
-            ) {
-                Text(stringResource(R.string.action_confirm), color = mc.primaryAccent)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel), color = mc.textSecondary)
-            }
-        },
-    )
 }

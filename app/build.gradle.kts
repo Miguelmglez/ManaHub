@@ -50,6 +50,12 @@ android {
         )
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -83,6 +89,10 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+    }
+
+    androidResources {
+        noCompress += listOf("tflite", "bin")
     }
 
     ksp {
@@ -147,6 +157,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.arch.core.testing)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
@@ -156,6 +167,9 @@ dependencies {
 
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)
+
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     implementation(libs.opencv)
     implementation(libs.accompanist.permissions)

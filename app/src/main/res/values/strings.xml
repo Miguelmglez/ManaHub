@@ -133,6 +133,20 @@
     <string name="carddetail_price_foil_eur">Foil (EUR)</string>
     <string name="carddetail_price_normal">Normal</string>
     <string name="carddetail_view_scryfall">View on Scryfall</string>
+
+    <!-- Card Detail — External Links section -->
+    <string name="carddetail_links_title">External Links</string>
+    <string name="carddetail_links_references">References</string>
+    <string name="carddetail_links_community">Community</string>
+    <string name="carddetail_links_purchase">Where to Buy</string>
+    <string name="carddetail_links_scryfall">Scryfall</string>
+    <string name="carddetail_links_gatherer">Gatherer</string>
+    <string name="carddetail_links_edhrec">EDHREC</string>
+    <string name="carddetail_links_tcgplayer_articles">TCGPlayer Articles</string>
+    <string name="carddetail_links_tcgplayer_decks">TCGPlayer Decks</string>
+    <string name="carddetail_links_tcgplayer">TCGPlayer</string>
+    <string name="carddetail_links_cardmarket">Cardmarket</string>
+    <string name="carddetail_links_cardhoarder">Cardhoarder</string>
     <string name="carddetail_tags_section">Tags</string>
     <string name="carddetail_edit_title">Edit card</string>
     <string name="carddetail_delete_title">Remove card</string>
@@ -260,7 +274,34 @@
     <string name="scanner_price_na">N/A</string>
     <string name="scanner_db_status_up_to_date">DB: v%1$d — up to date</string>
     <string name="scanner_db_status_updating">DB: Updating…</string>
+    <string name="scanner_db_not_loaded">Downloading card database… identification disabled</string>
+    <string name="scanner_db_setup_title">Setting up card scanner</string>
+    <string name="scanner_db_setup_desc">A one-time download is required to enable card identification.</string>
+    <string name="scanner_db_setup_downloading">Downloading… %1$d%%</string>
+    <string name="scanner_db_setup_waiting">Waiting for network connection…</string>
+    <string name="scanner_db_setup_size_hint">~218 MB · Wi-Fi recommended</string>
+    <string name="scanner_settings_title">Scanner settings</string>
+    <string name="scanner_sound_effects_desc">Play sound when a card is detected</string>
+    <string name="scanner_db_label">Card database</string>
+    <string name="scanner_db_status_loaded">%1$,d cards loaded — v%2$d</string>
     <string name="scanner_db_status_bundled">DB: bundled (no update yet)</string>
+    <string name="scanner_trend_price_prefix">TREND %1$s</string>
+    <string name="scanner_searching_indicator">Searching…</string>
+    <string name="scanner_point_at_card">Focus the card art</string>
+    <string name="scanner_queue_search_placeholder">Filter cards</string>
+    <string name="scanner_queue_clear">Clear</string>
+    <string name="scanner_queue_add_all">Add to</string>
+    <string name="scanner_recently_added">Just now</string>
+    <string name="scanner_edit_quantity">Quantity</string>
+    <string name="scanner_edit_foil_label">Foil</string>
+    <string name="scanner_edit_foil_value">Foil</string>
+    <string name="scanner_edit_normal_value">Normal</string>
+    <string name="scanner_edit_language_label">Language</string>
+    <string name="scanner_edit_condition_label">Condition</string>
+    <string name="scanner_edit_set_label">Set</string>
+    <string name="scanner_edit_save">Save</string>
+    <string name="scanner_permission_camera_required">Camera permission required</string>
+    <string name="scanner_permission_grant">Grant permission</string>
 
     <!-- ══════════════════════════════════════════
          SYNERGY SCREEN
@@ -1222,6 +1263,7 @@
     <string name="trades_any_variant">Any variant</string>
     <string name="trades_exact_variant">Exact variant</string>
     <string name="trades_create_proposal_cta">Create proposal</string>
+    <string name="trades_new_trade_cta">New trade</string>
     <string name="trades_coming_soon">Coming soon</string>
     <string name="trades_no_friends_cta">Add friends to see their trade lists</string>
     <string name="trades_view_full_list">View full list</string>

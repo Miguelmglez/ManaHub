@@ -1,11 +1,25 @@
 package com.mmg.manahub.feature.trades.data.local.dao
 
 import androidx.room.*
+import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
 import kotlinx.coroutines.flow.Flow
 
+data class LocalOpenForTradeWithCard(
+    @Embedded val entity: LocalOpenForTradeEntity,
+    @Relation(
+        parentColumn = "scryfall_id",
+        entityColumn = "scryfall_id"
+    )
+    val card: CardEntity?
+)
+
 @Dao
 interface LocalOpenForTradeDao {
+
+    @Transaction
+    @Query("SELECT * FROM local_open_for_trade ORDER BY created_at DESC")
+    fun observeAllWithCard(): Flow<List<LocalOpenForTradeWithCard>>
 
     @Query("SELECT * FROM local_open_for_trade ORDER BY created_at DESC")
     fun observeAll(): Flow<List<LocalOpenForTradeEntity>>

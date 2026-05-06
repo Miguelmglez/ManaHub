@@ -1,8 +1,10 @@
 package com.mmg.manahub.core.sync
 
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
+import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
+import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
@@ -53,8 +55,10 @@ class SyncManagerTest {
 
     private val collectionDao    = mockk<UserCardCollectionDao>(relaxed = true)
     private val deckDao          = mockk<DeckDao>(relaxed = true)
+    private val cardDao          = mockk<CardDao>(relaxed = true)
     private val collectionRemote = mockk<CollectionRemoteDataSource>(relaxed = true)
     private val deckRemote       = mockk<DeckRemoteDataSource>(relaxed = true)
+    private val scryfallRemote   = mockk<ScryfallRemoteDataSource>(relaxed = true)
     private val syncPrefs        = mockk<SyncPreferencesStore>(relaxed = true)
 
     // ── Constants ─────────────────────────────────────────────────────────────
@@ -171,8 +175,10 @@ class SyncManagerTest {
         syncManager = SyncManager(
             collectionDao    = collectionDao,
             deckDao          = deckDao,
+            cardDao          = cardDao,
             collectionRemote = collectionRemote,
             deckRemote       = deckRemote,
+            scryfallRemote   = scryfallRemote,
             syncPrefs        = syncPrefs,
             ioDispatcher     = testDispatcher,
         )
