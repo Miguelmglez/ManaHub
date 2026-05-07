@@ -9,6 +9,9 @@
         <exclude domain="file" path="datastore/supabase_session.preferences_pb" />
         <!-- Exclude Crashlytics pending crash reports from cloud backup -->
         <exclude domain="file" path=".firebase" />
+        <!-- Exclude downloaded card hash database — large binary, reconstructed on demand -->
+        <exclude domain="file" path="card_hashes.bin" />
+        <exclude domain="file" path="card_hashes.bin.tmp" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/" />
@@ -19,5 +22,8 @@
         <exclude domain="file" path="datastore/supabase_session.preferences_pb" />
         <!-- Exclude Crashlytics pending crash reports from device transfer -->
         <exclude domain="file" path=".firebase" />
+        <!-- Exclude downloaded card hash database — large binary, reconstructed on demand -->
+        <exclude domain="file" path="card_hashes.bin" />
+        <exclude domain="file" path="card_hashes.bin.tmp" />
     </device-transfer>
 </data-extraction-rules>

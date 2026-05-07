@@ -13,7 +13,9 @@ import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import com.mmg.manahub.util.TestFixtures
+import kotlin.Result
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -58,13 +60,14 @@ class CollectionViewModelTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val getCollection     = mockk<GetCollectionUseCase>()
-    private val removeCard        = mockk<RemoveCardUseCase>(relaxed = true)
-    private val cardRepository    = mockk<CardRepository>(relaxed = true)
-    private val userCardRepository = mockk<UserCardRepository>(relaxed = true)
-    private val authRepository    = mockk<AuthRepository>(relaxed = true)
-    private val syncManager       = mockk<SyncManager>(relaxed = true)
-    private val workManager       = mockk<WorkManager>(relaxed = true)
+    private val getCollection          = mockk<GetCollectionUseCase>()
+    private val removeCard             = mockk<RemoveCardUseCase>(relaxed = true)
+    private val cardRepository         = mockk<CardRepository>(relaxed = true)
+    private val userCardRepository     = mockk<UserCardRepository>(relaxed = true)
+    private val authRepository         = mockk<AuthRepository>(relaxed = true)
+    private val syncManager            = mockk<SyncManager>(relaxed = true)
+    private val workManager            = mockk<WorkManager>(relaxed = true)
+    private val migrateLocalTradeLists = mockk<MigrateLocalTradeListsUseCase>(relaxed = true)
 
     private lateinit var viewModel: CollectionViewModel
 
@@ -125,14 +128,16 @@ class CollectionViewModelTest {
         coEvery { authRepository.getCurrentUser() } returns null
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
+        coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
         return CollectionViewModel(
-            getCollection      = getCollection,
-            removeCard         = removeCard,
-            cardRepository     = cardRepository,
-            userCardRepository = userCardRepository,
-            authRepository     = authRepository,
-            syncManager        = syncManager,
-            workManager        = workManager,
+            getCollection          = getCollection,
+            removeCard             = removeCard,
+            cardRepository         = cardRepository,
+            userCardRepository     = userCardRepository,
+            authRepository         = authRepository,
+            syncManager            = syncManager,
+            workManager            = workManager,
+            migrateLocalTradeLists = migrateLocalTradeLists,
         )
     }
 

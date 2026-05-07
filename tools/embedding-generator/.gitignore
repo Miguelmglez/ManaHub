@@ -1,0 +1,8 @@
+image_cache/
+card_embeddings.bin
+card_index.json
+missing_cards.json
+generate_embeddings.log
+__pycache__/
+*.pyc
+.venv/

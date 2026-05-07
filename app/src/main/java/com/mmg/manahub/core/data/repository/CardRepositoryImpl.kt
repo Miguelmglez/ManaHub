@@ -8,8 +8,8 @@ import com.mmg.manahub.core.data.local.mapper.toSuggestedTagsJson
 import com.mmg.manahub.core.data.local.mapper.toTagList
 import com.mmg.manahub.core.data.local.mapper.toTagsJson
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.data.remote.mapper.toDomain
-import com.mmg.manahub.core.data.remote.mapper.toEntity
+import com.mmg.manahub.core.data.local.mapper.toDomainCard
+import com.mmg.manahub.core.data.local.mapper.toEntityCard
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DataResult
@@ -62,10 +62,24 @@ class CardRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun getCardPrints(name: String): DataResult<List<Card>> =
+        withContext(ioDispatcher) {
+            // Using unique=prints to get all versions of the card
+            val query = "!\"$name\" unique:prints"
+            val result = remote.searchCards(query, 1)
+            if (result.isSuccess) {
+                val cards = result.getOrThrow()
+                // We don't necessarily want to cache all prints in the main DB unless they are picked
+                DataResult.Success(cards)
+            } else {
+                DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+            }
+        }
+
     private suspend fun entityWithComputedTags(card: Card) = run {
         val existing = cardDao.getById(card.scryfallId)
         val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
-        card.toEntity().copy(
+        card.toEntityCard().copy(
             tags = tagsJson,
             userTags = existing?.userTags ?: "[]",
             suggestedTags = suggestedJson,
@@ -80,8 +94,8 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = withContext(ioDispatcher) {
         val cached = cardDao.getById(scryfallId)
-        if (cached != null && CachePolicy.isFresh(cached.cachedAt))
-            return@withContext DataResult.Success(cached.toDomain())
+        if (cached != null && CachePolicy.isFresh(cached.cachedAt) && cached.relatedUris != "{}")
+            return@withContext DataResult.Success(cached.toDomainCard())
 
         val result = remote.getCardById(scryfallId)
         return@withContext when {
@@ -92,20 +106,20 @@ class CardRepositoryImpl @Inject constructor(
                 val (tagsJson, suggestedJson) = computeTagsForCache(card, cached?.tags)
 
                 cardDao.upsert(
-                    card.toEntity().copy(
+                    card.toEntityCard().copy(
                         tags = tagsJson,
                         userTags = cached?.userTags ?: "[]",
                         suggestedTags = suggestedJson,
                     )
                 )
                 cardDao.clearStale(scryfallId)
-                DataResult.Success(cardDao.getById(scryfallId)!!.toDomain())
+                DataResult.Success(cardDao.getById(scryfallId)!!.toDomainCard())
             }
             cached != null -> {
                 if (CachePolicy.isStale(cached.cachedAt))
                     cardDao.markStale(scryfallId, buildStaleReason(result.exceptionOrNull()))
                 DataResult.Success(
-                    data    = cached.toDomain(),
+                    data    = cached.toDomainCard(),
                     isStale = CachePolicy.isStale(cached.cachedAt),
                 )
             }
@@ -116,7 +130,7 @@ class CardRepositoryImpl @Inject constructor(
     }
 
     override fun observeCard(scryfallId: String): Flow<Card?> =
-        cardDao.observeById(scryfallId).map { it?.toDomain() }
+        cardDao.observeById(scryfallId).map { it?.toDomainCard() }
 
     override suspend fun refreshCollectionPrices() = withContext(ioDispatcher) {
         val allIds = userCardCollectionDao.getAllScryfallIds()
@@ -139,7 +153,7 @@ class CardRepositoryImpl @Inject constructor(
             val entities = cards.map { card ->
                 val existing = cachedMap[card.scryfallId]
                 val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
-                card.toEntity().copy(
+                card.toEntityCard().copy(
                     tags          = tagsJson,
                     userTags      = existing?.userTags ?: "[]",
                     suggestedTags = suggestedJson,

@@ -83,4 +83,14 @@ data class CardEntity(
     /** True when Scryfall marks this card as a Game Changer in its format. */
     @ColumnInfo(name = "game_changer", defaultValue = "0")
     val gameChanger: Boolean = false,
+
+    /**
+     * JSON array of CardFace objects for double-faced / multi-face cards.
+     * Null for single-faced cards.
+     * Schema: [{"name":"...","manaCost":"...","typeLine":"...","oracleText":"...",
+     *           "power":null,"toughness":null,"loyalty":null,"defense":null,
+     *           "flavorText":null,"imageNormal":"...","imageArtCrop":"..."}]
+     */
+    @ColumnInfo(name = "card_faces")
+    val cardFaces: String? = null,
 )

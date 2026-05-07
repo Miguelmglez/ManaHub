@@ -26,19 +26,27 @@ object CardConstants {
         "pt" to "🇵🇹",
         "ja" to "🇯🇵",
         "ko" to "🇰🇷",
-        "ru" to "🇷🇺"
     )
-    
-    /**
-     * Helper to get the flag for a language code.
-     */
+
+    val languageNames = mapOf(
+        "en" to "English",
+        "es" to "Spanish",
+        "de" to "German",
+        "fr" to "French",
+        "it" to "Italian",
+        "pt" to "Portuguese",
+        "ja" to "Japanese",
+        "ko" to "Korean",
+    )
+
     fun getFlag(langCode: String): String {
         return languages.find { it.first == langCode }?.second ?: ""
     }
 
-    /**
-     * Helper to get the display name resource for a condition code.
-     */
+    fun getLanguageName(langCode: String): String {
+        return languageNames[langCode] ?: langCode.uppercase()
+    }
+
     fun getConditionName(code: String): Int {
         return conditions.find { it.first == code }?.second ?: R.string.card_condition_nm
     }

@@ -26,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.feature.addcard.AddCardScreen
 import com.mmg.manahub.feature.carddetail.CardDetailScreen
@@ -37,6 +38,9 @@ import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.game.GamePlayScreen
+import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
+import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
+import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
 import com.mmg.manahub.feature.game.GameSetupScreen
 import com.mmg.manahub.feature.game.GameSetupViewModel
 import com.mmg.manahub.feature.game.GameViewModel
@@ -132,14 +136,18 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             composable(Screen.Collection.route) {
                 CollectionScreen(
                     onCardClick = { id ->
-                        navController.navigate(
-                            Screen.CollectionCardDetail.createRoute(
-                                id
-                            )
-                        )
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) }
+                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onNavigateToTradeProposal = { receiverId ->
+                        navController.navigate(Screen.CreateTradeProposal.createRoute(receiverId))
+                    },
+                    onNavigateToTradeThread = { proposalId, rootProposalId ->
+                        navController.navigate(
+                            Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
+                        )
+                    },
                 )
             }
 
@@ -155,7 +163,12 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(Screen.CollectionScanner.route) {
-                ScannerScreen(onBack = { navController.popBackStack() })
+                ScannerScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToCardDetail = { scryfallId ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                    },
+                )
             }
 
             composable(
@@ -281,6 +294,76 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
 
             composable(Screen.FriendsList.route) {
                 FriendsScreen(onNavigateBack = { navController.popBackStack() })
+            }
+
+            // ── Trades shared list (deep link) ────────────────────────────────
+            composable(
+                route     = Screen.TradesSharedList.route,
+                arguments = listOf(navArgument("shareId") { type = NavType.StringType }),
+                deepLinks = listOf(
+                    navDeepLink {
+                        uriPattern = "https://trades.manahub.app/list/{shareId}"
+                    },
+                ),
+            ) {
+                TradesSharedListScreen(onBack = { navController.popBackStack() })
+            }
+
+            // ── Trade proposal editor ─────────────────────────────────────────
+            composable(
+                route     = Screen.CreateTradeProposal.route,
+                arguments = listOf(
+                    navArgument("receiverId") { type = NavType.StringType },
+                    navArgument("parentProposalId") {
+                        type = NavType.StringType; nullable = true; defaultValue = null
+                    },
+                    navArgument("editingProposalId") {
+                        type = NavType.StringType; nullable = true; defaultValue = null
+                    },
+                    navArgument("rootProposalId") {
+                        type = NavType.StringType; nullable = true; defaultValue = null
+                    },
+                ),
+            ) {
+                CreateTradeProposalScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToThread = { proposalId, rootProposalId ->
+                        navController.navigate(
+                            Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
+                        ) {
+                            popUpTo(Screen.CreateTradeProposal.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            // ── Trade negotiation thread ──────────────────────────────────────
+            composable(
+                route     = Screen.TradeNegotiationDetail.route,
+                arguments = listOf(
+                    navArgument("proposalId") { type = NavType.StringType },
+                    navArgument("rootProposalId") { type = NavType.StringType },
+                ),
+            ) {
+                TradeNegotiationDetailScreen(
+                    onBack             = { navController.popBackStack() },
+                    onNavigateToEditor = { args ->
+                        val route = if (args.isCounter) {
+                            Screen.CreateTradeProposal.createCounterRoute(
+                                receiverId      = args.receiverId,
+                                parentProposalId = args.proposalId,
+                                rootProposalId  = args.rootProposalId,
+                            )
+                        } else {
+                            Screen.CreateTradeProposal.createEditRoute(
+                                receiverId        = args.receiverId,
+                                editingProposalId = args.proposalId,
+                                rootProposalId    = args.rootProposalId,
+                            )
+                        }
+                        navController.navigate(route)
+                    },
+                )
             }
 
             // ── Tournament flow ────────────────────────────────────────────────

@@ -11,6 +11,9 @@ interface CardRepository {
     suspend fun searchCards(query: String, page: Int = 1): DataResult<List<Card>>
     suspend fun getCardById(scryfallId: String): DataResult<Card>
 
+    /** Fetches all prints (versions) of a card by its exact English name. */
+    suspend fun getCardPrints(name: String): DataResult<List<Card>>
+
     /** Fetches a card by its exact English name (e.g. "Lightning Bolt"). */
     suspend fun getCardByExactName(name: String): Result<Card>
 

@@ -133,6 +133,20 @@
     <string name="carddetail_price_foil_eur">Foil (EUR)</string>
     <string name="carddetail_price_normal">Normal</string>
     <string name="carddetail_view_scryfall">View on Scryfall</string>
+
+    <!-- Card Detail — External Links section -->
+    <string name="carddetail_links_title">External Links</string>
+    <string name="carddetail_links_references">References</string>
+    <string name="carddetail_links_community">Community</string>
+    <string name="carddetail_links_purchase">Where to Buy</string>
+    <string name="carddetail_links_scryfall">Scryfall</string>
+    <string name="carddetail_links_gatherer">Gatherer</string>
+    <string name="carddetail_links_edhrec">EDHREC</string>
+    <string name="carddetail_links_tcgplayer_articles">TCGPlayer Articles</string>
+    <string name="carddetail_links_tcgplayer_decks">TCGPlayer Decks</string>
+    <string name="carddetail_links_tcgplayer">TCGPlayer</string>
+    <string name="carddetail_links_cardmarket">Cardmarket</string>
+    <string name="carddetail_links_cardhoarder">Cardhoarder</string>
     <string name="carddetail_tags_section">Tags</string>
     <string name="carddetail_edit_title">Edit card</string>
     <string name="carddetail_delete_title">Remove card</string>
@@ -230,6 +244,70 @@
     <string name="scanner_ocr_scanning">Scanning</string>
     <string name="scanner_ocr_paused">Paused</string>
     <string name="scanner_permission_denied_settings">Camera permission denied. Open Settings to enable it.</string>
+
+    <!-- Scanner — no-modal UI (bulk scanner) -->
+    <string name="scanner_hash_db_missing">Card database not loaded — scanner identification disabled</string>
+    <string name="scanner_searching">Searching…</string>
+    <string name="scanner_searching_idle">Searching for card…</string>
+    <string name="scanner_toast_added_prefix">Added:</string>
+    <string name="scanner_toast_added_to_collection">%1$s added to Collection</string>
+    <string name="scanner_toast_added_to_wishlist">%1$s added to Wishlist</string>
+    <string name="scanner_toast_added_all_to_wishlist">%1$d items added to Wishlist</string>
+    <string name="scanner_toast_added_all_to_collection">%1$d items added to Collection</string>
+    <string name="scanner_queue_title">%1$d cards scanned</string>
+    <string name="scanner_queue_search_hint">Filter by name…</string>
+    <string name="scanner_queue_button_desc">Scan queue</string>
+    <string name="scanner_add_all">+ Add to collection</string>
+    <string name="scanner_clear_session">Clear</string>
+    <string name="scanner_quick_mode">Quick Mode</string>
+    <string name="scanner_quick_mode_desc">Auto-add detected cards using current mode settings</string>
+    <string name="scanner_lookup_only">Lookup Only</string>
+    <string name="scanner_lookup_only_desc">Show card info and price without adding to collection</string>
+    <string name="scanner_set_lock">Any set</string>
+    <string name="scanner_foil">Foil</string>
+    <string name="scanner_normal">Normal</string>
+    <string name="scanner_view_detail">View card detail</string>
+    <string name="scanner_sound_effects">Sound effects</string>
+    <string name="scanner_language_mismatch">Language mismatch</string>
+    <string name="scanner_ambiguous_match">Ambiguous match — confirm or skip</string>
+    <string name="scanner_confirm">Confirm</string>
+    <string name="scanner_skip">Skip</string>
+    <string name="scanner_price_detail_normal">Normal</string>
+    <string name="scanner_price_detail_foil">Foil</string>
+    <string name="scanner_price_detail_buy">Buy</string>
+    <string name="scanner_price_na">N/A</string>
+    <string name="scanner_db_status_up_to_date">DB: v%1$d — up to date</string>
+    <string name="scanner_db_status_updating">DB: Updating…</string>
+    <string name="scanner_db_not_loaded">Downloading card database… identification disabled</string>
+    <string name="scanner_db_setup_title">Setting up card scanner</string>
+    <string name="scanner_db_setup_desc">A one-time download is required to enable card identification.</string>
+    <string name="scanner_db_setup_downloading">Downloading… %1$d%%</string>
+    <string name="scanner_db_setup_waiting">Waiting for network connection…</string>
+    <string name="scanner_db_setup_size_hint">~218 MB · Wi-Fi recommended</string>
+    <string name="scanner_settings_title">Scanner settings</string>
+    <string name="scanner_sound_effects_desc">Play sound when a card is detected</string>
+    <string name="scanner_db_label">Card database</string>
+    <string name="scanner_db_status_loaded">%1$,d cards loaded — v%2$d</string>
+    <string name="scanner_db_status_bundled">DB: bundled (no update yet)</string>
+    <string name="scanner_trend_price_prefix">TREND %1$s</string>
+    <string name="scanner_searching_indicator">Searching…</string>
+    <string name="scanner_point_at_card">Place card name in the zone</string>
+    <string name="scanner_name_zone_label">CARD NAME</string>
+    <string name="scanner_queue_search_placeholder">Filter cards</string>
+    <string name="scanner_queue_clear">Clear</string>
+    <string name="scanner_queue_add_all">Add to collection</string>
+    <string name="scanner_recently_added">Just now</string>
+    <string name="scanner_edit_quantity">Quantity</string>
+    <string name="scanner_edit_foil_label">Foil</string>
+    <string name="scanner_edit_foil_value">Foil</string>
+    <string name="scanner_edit_normal_value">Normal</string>
+    <string name="scanner_edit_language_label">Language</string>
+    <string name="scanner_edit_condition_label">Condition</string>
+    <string name="scanner_edit_set_label">Set</string>
+    <string name="scanner_edit_save">Save details</string>
+    <string name="scanner_edit_sheet_title">Edit scanned card</string>
+    <string name="scanner_permission_camera_required">Camera permission required</string>
+    <string name="scanner_permission_grant">Grant permission</string>
 
     <!-- ══════════════════════════════════════════
          SYNERGY SCREEN
@@ -1176,5 +1254,158 @@
     <string name="friends_remove_confirm_cancel">Cancel</string>
     <string name="friends_error_generic">Something went wrong. Please try again.</string>
     <string name="friends_error_send">Could not send friend request. Please try again.</string>
+
+    <!-- ══════════════════════════════════════════
+         TRADES FEATURE
+    ═══════════════════════════════════════════ -->
+    <string name="collection_tab_trades">Trades</string>
+    <string name="trades_tab_exploration">Exploration</string>
+    <string name="trades_tab_history">History</string>
+    <string name="trades_toggle_my_lists">My Lists</string>
+    <string name="trades_toggle_friends">Friends</string>
+    <string name="trades_wishlist_section">My Wishlist</string>
+    <string name="trades_offers_section">My Offers</string>
+    <string name="trades_add_to_wishlist">Add to Wishlist</string>
+    <string name="trades_any_variant">Any variant</string>
+    <string name="trades_exact_variant">Exact variant</string>
+    <string name="trades_create_proposal_cta">Create proposal</string>
+    <string name="trades_new_trade_cta">New trade</string>
+    <string name="trades_coming_soon">Coming soon</string>
+    <string name="trades_no_friends_cta">Add friends to see their trade lists</string>
+    <string name="trades_view_full_list">View full list</string>
+    <string name="trades_friend_sheet_wishlist">Wishlist</string>
+    <string name="trades_friend_sheet_offers">Offer for Trade</string>
+    <string name="trades_friend_sheet_collection">Collection</string>
+    <string name="trades_pick_friend_title">Select a friend</string>
+    <string name="trades_no_friends">You have no friends yet. Add friends to start trading.</string>
+    <string name="trades_history_coming_soon">Trade history coming soon</string>
+    <string name="trades_sign_in_cta">Sign in to track your trades</string>
+    <string name="trades_create_account">Create account</string>
+    <string name="trades_shared_list_loading">Loading shared list…</string>
+    <string name="trades_shared_list_private">This user no longer shares publicly</string>
+    <string name="trades_shared_list_not_found">Link not found</string>
+    <string name="trades_shared_list_title">Shared list</string>
+    <string name="trades_shared_list_by">Shared list from @%s</string>
+    <string name="trades_migration_synced_n_cards">Synced %d cards from this device to your account.</string>
+    <string name="trades_select_card_id_hint">Enter card Scryfall ID</string>
+    <string name="trades_foil">Foil</string>
+    <string name="trades_condition">Condition</string>
+    <string name="trades_language">Language</string>
+    <string name="trades_alt_art">Alternative Art</string>
+
+    <!-- Phase 3: proposal creation -->
+    <string name="trades_you_give">You give</string>
+    <string name="trades_you_receive">You receive</string>
+    <string name="trades_add_card">Add card</string>
+    <string name="trades_review_collection_chip">Review my collection</string>
+    <string name="trades_review_collection_warning">Proposals with \'Review my collection\' cannot be accepted directly — only declined or countered.</string>
+    <string name="trades_save_draft">Save draft</string>
+    <string name="trades_send_proposal">Send proposal</string>
+    <string name="trades_discard">Discard</string>
+    <string name="trades_quantity">Qty</string>
+
+    <!-- Phase 3: negotiation -->
+    <string name="trades_send">Send</string>
+    <string name="trades_edit">Edit</string>
+    <string name="trades_counter">Counter</string>
+    <string name="trades_accept">Accept</string>
+    <string name="trades_decline">Decline</string>
+    <string name="trades_cancel_proposal">Cancel proposal</string>
+    <string name="trades_revoke">Revoke</string>
+    <string name="trades_mark_completed">Mark as completed</string>
+    <string name="trades_waiting_confirmation">Waiting for the other party to confirm</string>
+    <string name="trades_long_thread_suggestion">This negotiation has gone on for a while. Consider declining to start fresh.</string>
+    <string name="trades_card_locked_title">Cards already committed</string>
+    <string name="trades_card_locked_message">One or more cards are already committed in another accepted trade: %s. Decline this proposal or wait for the other trade to resolve.</string>
+    <string name="trades_inventory_gone_title">Unexpected inventory state</string>
+    <string name="trades_inventory_gone_message">The inventory state has changed unexpectedly. Please contact support.</string>
+    <string name="trades_version_mismatch">Proposal was updated — please review.</string>
+
+    <!-- Phase 3: history -->
+    <string name="trades_history_filter_active">Active</string>
+    <string name="trades_history_filter_completed">Completed</string>
+    <string name="trades_history_filter_declined">Declined / Cancelled</string>
+    <string name="trades_empty_active">No active trades</string>
+    <string name="trades_empty_completed">No completed trades</string>
+    <string name="trades_empty_declined">No declined or cancelled trades</string>
+    <string name="trades_cards_exchange">%1$d cards ↔ %2$d cards</string>
+
+    <!-- Phase 3: status labels -->
+    <string name="trades_status_draft">Draft</string>
+    <string name="trades_status_proposed">Proposed</string>
+    <string name="trades_status_accepted">Accepted</string>
+    <string name="trades_status_completed">Completed</string>
+    <string name="trades_status_declined">Declined</string>
+    <string name="trades_status_cancelled">Cancelled</string>
+    <string name="trades_status_countered">Countered</string>
+    <string name="trades_status_revoked">Revoked</string>
+
+    <!-- Phase 3: suggestions -->
+    <string name="trades_suggestion_propose">Propose</string>
+    <string name="trades_suggested_for_you">Suggested trades for you</string>
+
+    <!-- Phase 3: history screen -->
+    <string name="trades_history_filter_all">All</string>
+    <string name="trades_history_filter_cancelled">Cancelled</string>
+    <string name="trades_history_item_count">items</string>
+    <string name="trades_history_empty">No trade history yet</string>
+    <string name="trades_history_empty_hint">Completed, cancelled, and declined proposals will appear here.</string>
+
+    <!-- Phase 3: status badges (canonical, used in detail screens) -->
+    <string name="trade_status_draft">Draft</string>
+    <string name="trade_status_proposed">Proposed</string>
+    <string name="trade_status_accepted">Accepted</string>
+    <string name="trade_status_completed">Completed</string>
+    <string name="trade_status_declined">Declined</string>
+    <string name="trade_status_cancelled">Cancelled</string>
+    <string name="trade_status_countered">Countered</string>
+    <string name="trade_status_revoked">Revoked</string>
+
+    <!-- Phase 3: proposal editor screen -->
+    <string name="trades_create_proposal_title">New Trade Proposal</string>
+    <string name="trades_counter_proposal_title">Counter Proposal</string>
+    <string name="trades_you_offer_section">You offer</string>
+    <string name="trades_they_offer_section">They offer</string>
+    <string name="trades_review_collection_proposer">Include \'Review my collection\'</string>
+    <string name="trades_review_collection_receiver">Include \'Review their collection\'</string>
+    <string name="trades_add_item">Add item</string>
+
+    <!-- Phase 3: negotiation screen -->
+    <string name="trades_negotiation_title">Trade Negotiation</string>
+    <string name="trades_proposal_version">Proposal v%d</string>
+    <string name="trades_proposer_offers">Proposer offers</string>
+    <string name="trades_receiver_offers">Receiver offers</string>
+    <string name="trades_review_collection_placeholder">Review my collection</string>
+    <string name="trades_no_proposals_yet">No proposals in this thread yet.</string>
+    <string name="trades_action_accept">Accept</string>
+    <string name="trades_action_decline">Decline</string>
+    <string name="trades_action_cancel">Cancel</string>
+    <string name="trades_action_revoke">Revoke</string>
+    <string name="trades_action_counter">Counter offer</string>
+    <string name="trades_action_edit">Edit</string>
+    <string name="trades_action_mark_completed">Mark as Completed</string>
+
+    <!-- Phase 3: negotiation error dialogs -->
+    <string name="trades_error_card_locked_title">Cards already committed</string>
+    <string name="trades_error_card_locked_body">%d card(s) are already locked in another accepted trade. Please wait for that trade to resolve or revoke it.</string>
+    <string name="trades_error_version_mismatch_title">Proposal updated</string>
+    <string name="trades_error_version_mismatch_body">The proposal was modified by the other party. Please refresh and review the latest version.</string>
+    <string name="trades_error_inventory_gone_title">Inventory changed</string>
+    <string name="trades_error_inventory_gone_body">One or more cards could not be moved. The inventory may have changed since the trade was accepted.</string>
+    <string name="trades_error_generic_title">Something went wrong</string>
+    <string name="trades_error_generic_body">An unexpected error occurred. Please try again.</string>
+
+    <!-- ══════════════════════════════════════════
+         SCANNER — language names + wishlist button
+    ═══════════════════════════════════════════ -->
+    <string name="scanner_queue_add_all_wishlist">Add All to Wishlist</string>
+    <string name="scanner_language_english">English</string>
+    <string name="scanner_language_spanish">Spanish</string>
+    <string name="scanner_language_german">German</string>
+    <string name="scanner_language_french">French</string>
+    <string name="scanner_language_italian">Italian</string>
+    <string name="scanner_language_portuguese">Portuguese</string>
+    <string name="scanner_language_japanese">Japanese</string>
+    <string name="scanner_language_korean">Korean</string>
 
 </resources>

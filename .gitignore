@@ -289,4 +289,14 @@ $RECYCLE.BIN/
 /.claude/worktrees/agent-abd89b3b/
 /app/supabase/migrations/20260421_friends.sql
 /.artifacts/
-/.artifacts/
+/app/DEEPLINKS.md
+/.well-known/
+.wrangler/
+/tools/embedding-generator/generate_embeddings.py
+/app/src/main/assets/mobilenet_v3_small.tflite
+/tools/embedding-generator/README.md
+/tools/embedding-generator/requirements.txt
+/docs/scanner-ml-plan.md
+/.claude/scheduled_tasks.lock
+/tools/embedding-generator/version.json
+/app/src/main/assets/card_embeddings.bin

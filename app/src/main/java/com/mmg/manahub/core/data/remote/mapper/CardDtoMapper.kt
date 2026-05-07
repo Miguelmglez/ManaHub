@@ -3,6 +3,7 @@ package com.mmg.manahub.core.data.remote.mapper
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.remote.dto.CardDto
 import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.domain.model.CardFace
 import com.mmg.manahub.core.data.local.mapper.toEntityCard
 
 fun CardDto.toDomain(): Card {
@@ -52,6 +53,21 @@ fun CardDto.toDomain(): Card {
         relatedUris = relatedUris ?: emptyMap(),
         purchaseUris = purchaseUris ?: emptyMap(),
         gameChanger = gameChanger ?: false,
+        cardFaces = cardFaces?.map { face ->
+            CardFace(
+                name = face.name,
+                manaCost = face.manaCost,
+                typeLine = face.typeLine,
+                oracleText = face.oracleText,
+                power = face.power,
+                toughness = face.toughness,
+                loyalty = face.loyalty,
+                defense = face.defense,
+                flavorText = face.flavorText,
+                imageNormal = face.imageUris?.normal,
+                imageArtCrop = face.imageUris?.artCrop,
+            )
+        },
     )
 }
 

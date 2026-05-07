@@ -8,4 +8,7 @@
     <exclude domain="file" path="datastore/supabase_session.preferences_pb" />
     <!-- Exclude Crashlytics pending crash reports from backup -->
     <exclude domain="file" path=".firebase" />
+    <!-- Exclude downloaded card hash database — large binary, reconstructed on demand -->
+    <exclude domain="file" path="card_hashes.bin" />
+    <exclude domain="file" path="card_hashes.bin.tmp" />
 </full-backup-content>

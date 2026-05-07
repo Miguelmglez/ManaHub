@@ -4,13 +4,15 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.domain.model.CardFace
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.SuggestedTag
 import com.mmg.manahub.core.domain.model.TagCategory
 
 private val gson = Gson()
-private val listType = object : TypeToken<List<String>>() {}.type
-private val mapType  = object : TypeToken<Map<String, String>>() {}.type
+private val listType      = object : TypeToken<List<String>>() {}.type
+private val mapType       = object : TypeToken<Map<String, String>>() {}.type
+private val cardFacesType = object : TypeToken<List<CardFace>>() {}.type
 
 internal fun String.toStringList(): List<String> = gson.fromJson(this, listType) ?: emptyList()
 internal fun List<String>.toJsonString(): String  = gson.toJson(this)
@@ -106,6 +108,10 @@ fun CardEntity.toDomainCard(): Card = Card(
     printedTypeLine = printedTypeLine,
     relatedUris = relatedUris.toStringMap(),
     purchaseUris = purchaseUris.toStringMap(),
+    cardFaces = cardFaces?.let {
+        runCatching { gson.fromJson<List<CardFace>>(it, cardFacesType) }
+            .getOrNull()
+    },
 )
 
 fun Card.toEntityCard(): CardEntity = CardEntity(
@@ -154,7 +160,8 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     printedTypeLine = printedTypeLine,
     relatedUris = relatedUris.toMapJsonString(),
     purchaseUris = purchaseUris.toMapJsonString(),
-    gameChanger = gameChanger
+    gameChanger = gameChanger,
+    cardFaces = cardFaces?.let { gson.toJson(it) },
 )
 
 fun List<CardEntity>.toDomainCardList(): List<Card> = map { it.toDomainCard() }

@@ -293,7 +293,7 @@ private fun PreferencesSection(
                 }
             }
 
-            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))*/
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             // Card Language — single-select dropdown
 
             Text(
@@ -331,7 +331,7 @@ private fun PreferencesSection(
                         )
                     }
                 }
-            }
+            }*/
 /*
             // News Language — multi-select checkboxes
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -9,6 +9,8 @@ import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
 import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
 import com.mmg.manahub.feature.news.data.local.NewsDao
+import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -41,6 +43,8 @@ object DatabaseModule {
             .addMigrations(
                 MIGRATION_25_26,
                 MIGRATION_26_27,
+                MIGRATION_27_28,
+                MIGRATION_28_29,
             )
             .build()
 
@@ -82,6 +86,71 @@ object DatabaseModule {
     }
 
     // -------------------------------------------------------------------------
+    // v27 → v28
+    // Creates two new tables for offline (guest) trade list support:
+    //   - local_wishlists: cards the user wants to acquire via trade
+    //   - local_open_for_trade: cards the user is willing to trade away
+    // Both tables carry a `synced` flag so rows can be migrated to Supabase
+    // when the user logs in for the first time.
+    // Indexes are created explicitly because Room's @Index generates them only
+    // during CREATE TABLE from scratch — this migration must add them manually.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_27_28 = object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS local_wishlists (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    scryfall_id TEXT NOT NULL,
+                    match_any_variant INTEGER NOT NULL DEFAULT 1,
+                    is_foil INTEGER,
+                    condition TEXT,
+                    language TEXT,
+                    is_alt_art INTEGER,
+                    synced INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS local_open_for_trade (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    local_collection_id TEXT NOT NULL,
+                    scryfall_id TEXT NOT NULL,
+                    synced INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS idx_local_wishlists_scryfall_id ON local_wishlists(scryfall_id)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS idx_local_open_for_trade_collection_id ON local_open_for_trade(local_collection_id)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS idx_local_open_for_trade_scryfall_id ON local_open_for_trade(scryfall_id)"
+            )
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v28 → v29
+    // Adds `card_faces` (nullable TEXT) to `cards`.
+    // Stores a JSON array of CardFace objects for double-faced / multi-face cards.
+    // Single-faced cards get NULL, which is the correct default — no data loss.
+    // The guard via columnExists() makes the migration idempotent.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_28_29 = object : Migration(28, 29) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "cards", "card_faces")) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN card_faces TEXT")
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helper: checks whether a column already exists in a table.
     // Used as a guard so migrations are idempotent — safe to run more than once
     // (e.g. if the app crashes mid-migration and Room retries on next launch).
@@ -114,4 +183,6 @@ object DatabaseModule {
     @Provides fun provideDraftSetDao(db: MtgDatabase): DraftSetDao = db.draftSetDao()
     @Provides fun provideFriendDao(db: MtgDatabase): FriendDao = db.friendDao()
     @Provides fun provideRemoteKeyDao(db: MtgDatabase): RemoteKeyDao = db.remoteKeyDao()
+    @Provides fun provideLocalWishlistDao(db: MtgDatabase): LocalWishlistDao = db.localWishlistDao()
+    @Provides fun provideLocalOpenForTradeDao(db: MtgDatabase): LocalOpenForTradeDao = db.localOpenForTradeDao()
 }

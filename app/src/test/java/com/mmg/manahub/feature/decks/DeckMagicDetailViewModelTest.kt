@@ -28,10 +28,12 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.TestScope
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,10 +49,9 @@ import org.junit.Test
  * Focuses on:
  *  - GROUP 1: Draft mutations — confirm changes stay in memory (no Room writes)
  *  - GROUP 2: Commander management in draft
- *  - GROUP 3: saveDeck — diff computation, Room writes, sync trigger
- *  - GROUP 4: discardChanges — state restoration
- *  - GROUP 5: onNavigatingBack — guards against unsaved changes
- *  - GROUP 6: observeDeck — draft is NOT replaced when unsaved changes exist
+ *  - GROUP 3: persistToLocal (previously saveDeck) — Room writes
+ *  - GROUP 4: onNavigatingBack — triggers final save and sync
+ *  - GROUP 5: observeDeck — draft is NOT replaced when unsaved changes exist
  *
  * All I/O dependencies (deckRepository, cardRepository, authRepository,
  * syncManager, workManager) are mocked with MockK.
@@ -62,6 +63,7 @@ class DeckMagicDetailViewModelTest {
     // ── Dispatcher ────────────────────────────────────────────────────────────
 
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val testScope      = TestScope(testDispatcher)
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
@@ -147,6 +149,7 @@ class DeckMagicDetailViewModelTest {
             userPreferencesRepo = userPreferencesRepo,
             syncManager         = syncManager,
             workManager         = workManager,
+            applicationScope    = testScope,
             savedStateHandle    = SavedStateHandle(mapOf("deckId" to DECK_ID)),
         )
     }
@@ -347,325 +350,69 @@ class DeckMagicDetailViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — saveDeck
+    //  GROUP 3 — Auto-save logic
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given only one card changed when saveDeck then only that card is written to Room`() = runTest {
-        // Arrange: deck has A(qty=1) and B(qty=2) persisted
-        val deck      = buildDeck(format = "casual")
-        val mainboard = listOf(
-            DeckSlot(SCRYFALL_ID_A, 1),
-            DeckSlot(SCRYFALL_ID_B, 2),
-        )
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck, mainboard = mainboard)))
-        // Mutate only card B in the draft
-        vm.addCardToDeck(SCRYFALL_ID_B, isSideboard = false)   // B becomes qty=3
-
-        // Act
-        var completed = false
-        vm.saveDeck { completed = true }
-        advanceUntilIdle()
-
-        // Assert: replaceAllCards called once with the full card list (atomic replace, no per-card diffs)
-        coVerify(exactly = 1) { deckRepository.replaceAllCards(eq(DECK_ID), any()) }
-        coVerify(exactly = 0) { deckRepository.addCardToDeck(any(), any(), any(), any()) }
-        assertTrue(completed)
-    }
-
-    @Test
-    fun `given card removed in draft when saveDeck then removeCardFromDeck is called`() = runTest {
-        // Arrange: deck has card A persisted
-        val deck      = buildDeck(format = "casual")
-        val mainboard = listOf(DeckSlot(SCRYFALL_ID_A, 1))
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck, mainboard = mainboard)))
-        // Remove card from draft
-        vm.removeCardFromDeck(SCRYFALL_ID_A, isSideboard = false)
-
-        // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
-
-        // Assert: replaceAllCards called with empty list (card removed from draft)
-        coVerify(exactly = 1) { deckRepository.replaceAllCards(eq(DECK_ID), eq(emptyList())) }
-        coVerify(exactly = 0) { deckRepository.removeCardFromDeck(any(), any(), any()) }
-    }
-
-    @Test
-    fun `given unchanged cards when saveDeck then neither add nor remove is called for unchanged cards`() = runTest {
-        // Arrange: persisted = draft (same qty for A)
-        val deck      = buildDeck(format = "casual")
-        val mainboard = listOf(DeckSlot(SCRYFALL_ID_A, 2))
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck, mainboard = mainboard)))
-        // No mutations
-
-        // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
-
-        // Assert: no write to Room since nothing changed
-        coVerify(exactly = 0) { deckRepository.addCardToDeck(any(), any(), any(), any()) }
-        coVerify(exactly = 0) { deckRepository.removeCardFromDeck(any(), any(), any()) }
-    }
-
-    @Test
-    fun `given deck name changed in draft when saveDeck then updateDeck is called`() = runTest {
-        // Arrange
-        val deck = buildDeck(name = "Original Name")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.updateDeckName("New Name")
-
-        // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 1) { deckRepository.updateDeck(any()) }
-    }
-
-    @Test
-    fun `given logged-in user when saveDeck then syncManager sync is called`() = runTest {
+    fun `given unsaved changes when 2 seconds pass then persistToLocal is called`() = runTest {
         // Arrange
         val deck = buildDeck()
+        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
+
+        // Act
+        vm.addCardToDeck(SCRYFALL_ID_A)
+        assertTrue(vm.uiState.value.hasUnsavedChanges)
+
+        // Advance time to trigger debounce
+        advanceTimeBy(2001)
+        advanceUntilIdle()
+
+        // Assert: replaceAllCards called due to auto-save
+        coVerify(exactly = 1) { deckRepository.replaceAllCards(eq(DECK_ID), any()) }
+        assertFalse(vm.uiState.value.hasUnsavedChanges)
+    }
+
+    @Test
+    fun `given deck name changed in draft when onNavigatingBack then updateDeck and sync are called via applicationScope`() = runTest {
+        // Arrange
+        val deck = buildDeck(name = "Original Name")
         val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
         coEvery { authRepository.getCurrentUser() } returns buildLoggedInUser()
         coEvery { syncManager.sync(USER_ID) } returns SyncResult(state = SyncState.SUCCESS)
 
+        vm.updateDeckName("New Name")
+        assertTrue(vm.uiState.value.hasUnsavedChanges)
+
         // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
+        val canNavigate = vm.onNavigatingBack()
 
         // Assert
-        coVerify(exactly = 1) { syncManager.sync(USER_ID) }
+        assertTrue(canNavigate)
+        coVerify(atLeast = 1) { deckRepository.updateDeck(any()) }
+        coVerify(atLeast = 1) { deckRepository.replaceAllCards(eq(DECK_ID), any()) }
+        coVerify(atLeast = 1) { syncManager.sync(USER_ID) }
+        assertFalse(vm.uiState.value.hasUnsavedChanges)
     }
 
     @Test
-    fun `given guest user (null userId) when saveDeck then syncManager sync is NOT called`() = runTest {
+    fun `given guest user when onNavigatingBack then sync is NOT called`() = runTest {
         // Arrange
         val deck = buildDeck()
         val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
         coEvery { authRepository.getCurrentUser() } returns null
 
+        vm.addCardToDeck(SCRYFALL_ID_A)
+
         // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
+        vm.onNavigatingBack()
 
         // Assert
+        coVerify(atLeast = 1) { deckRepository.replaceAllCards(eq(DECK_ID), any()) }
         coVerify(exactly = 0) { syncManager.sync(any()) }
     }
 
-    @Test
-    fun `given successful save when saveDeck then hasUnsavedChanges is false`() = runTest {
-        // Arrange
-        val deck = buildDeck(format = "casual")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.addCardToDeck(SCRYFALL_ID_A)   // create a draft change
-
-        // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
-
-        // Assert
-        assertFalse(vm.uiState.value.hasUnsavedChanges)
-    }
-
-    @Test
-    fun `given successful save when saveDeck then isSaving is false after completion`() = runTest {
-        // Arrange
-        val deck = buildDeck()
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-
-        // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
-
-        // Assert
-        assertFalse(vm.uiState.value.isSaving)
-    }
-
-    @Test
-    fun `given sync returns error when saveDeck then syncError is set in uiState`() = runTest {
-        // Arrange
-        val deck = buildDeck()
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        coEvery { authRepository.getCurrentUser() } returns buildLoggedInUser()
-        coEvery { syncManager.sync(USER_ID) } returns SyncResult(
-            state = SyncState.ERROR,
-            error = "network timeout",
-        )
-
-        // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
-
-        // Assert
-        assertEquals("network timeout", vm.uiState.value.syncError)
-    }
-
-    @Test
-    fun `given logged-in user when saveDeck then workManager enqueueUniqueWork is called`() = runTest {
-        // Arrange
-        val deck = buildDeck()
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        coEvery { authRepository.getCurrentUser() } returns buildLoggedInUser()
-        coEvery { syncManager.sync(any()) } returns SyncResult(state = SyncState.SUCCESS)
-
-        // Act
-        vm.saveDeck { }
-        advanceUntilIdle()
-
-        // Assert: one-time sync worker enqueued
-        verify(exactly = 1) {
-            workManager.enqueueUniqueWork(
-                any<String>(),
-                eq(ExistingWorkPolicy.REPLACE),
-                any<androidx.work.OneTimeWorkRequest>(),
-            )
-        }
-    }
-
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — discardChanges
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given unsaved changes when discardChanges then draft is restored to persisted state`() = runTest {
-        // Arrange
-        val deck      = buildDeck(format = "casual")
-        val mainboard = listOf(DeckSlot(SCRYFALL_ID_A, 2))
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck, mainboard = mainboard)))
-        // Mutate draft
-        vm.addCardToDeck(SCRYFALL_ID_B)
-        assertTrue(vm.uiState.value.hasUnsavedChanges)
-
-        // Act
-        var navigated = false
-        vm.discardChanges { navigated = true }
-
-        // Assert: draft is back to persisted (B was never persisted → not in draft)
-        val cardB = vm.uiState.value.cards.find { it.scryfallId == SCRYFALL_ID_B }
-        assertNull("Card B should not exist in restored draft", cardB)
-        // But A should still be there
-        val cardA = vm.uiState.value.cards.find { it.scryfallId == SCRYFALL_ID_A && !it.isSideboard }
-        assertNotNull("Card A should still be present after discard", cardA)
-        assertTrue(navigated)
-    }
-
-    @Test
-    fun `given unsaved changes when discardChanges then hasUnsavedChanges is false`() = runTest {
-        // Arrange
-        val deck = buildDeck(format = "casual")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.addCardToDeck(SCRYFALL_ID_A)
-        assertTrue(vm.uiState.value.hasUnsavedChanges)
-
-        // Act
-        vm.discardChanges { }
-
-        // Assert
-        assertFalse(vm.uiState.value.hasUnsavedChanges)
-    }
-
-    @Test
-    fun `given discard dialog shown when discardChanges then showDiscardDialog is false`() = runTest {
-        // Arrange: trigger the dialog first
-        val deck = buildDeck(format = "casual")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.addCardToDeck(SCRYFALL_ID_A)
-        vm.onNavigatingBack()   // sets showDiscardDialog = true
-        assertTrue(vm.uiState.value.showDiscardDialog)
-
-        // Act
-        vm.discardChanges { }
-
-        // Assert
-        assertFalse(vm.uiState.value.showDiscardDialog)
-    }
-
-    @Test
-    fun `given deck name changed in draft when discardChanges then original name is restored`() = runTest {
-        // Arrange
-        val deck = buildDeck(name = "Original Name")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.updateDeckName("Changed Name")
-        assertEquals("Changed Name", vm.uiState.value.deck?.name)
-
-        // Act
-        vm.discardChanges { }
-
-        // Assert
-        assertEquals("Original Name", vm.uiState.value.deck?.name)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — onNavigatingBack
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given unsaved changes when onNavigatingBack then returns false and shows discard dialog`() = runTest {
-        // Arrange
-        val deck = buildDeck(format = "casual")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.addCardToDeck(SCRYFALL_ID_A)
-        assertTrue(vm.uiState.value.hasUnsavedChanges)
-
-        // Act
-        val canNavigate = vm.onNavigatingBack()
-
-        // Assert
-        assertFalse("Should block navigation when unsaved changes exist", canNavigate)
-        assertTrue(vm.uiState.value.showDiscardDialog)
-    }
-
-    @Test
-    fun `given no unsaved changes when onNavigatingBack then returns true`() = runTest {
-        // Arrange: no mutations to draft
-        val deck = buildDeck()
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        assertFalse(vm.uiState.value.hasUnsavedChanges)
-
-        // Act
-        val canNavigate = vm.onNavigatingBack()
-
-        // Assert
-        assertTrue("Should allow navigation when no unsaved changes", canNavigate)
-        assertFalse(vm.uiState.value.showDiscardDialog)
-    }
-
-    @Test
-    fun `given unsaved changes when onNavigatingBack then showDiscardDialog is true`() = runTest {
-        // Arrange
-        val deck = buildDeck(format = "casual")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.addCardToDeck(SCRYFALL_ID_A)
-
-        // Act
-        vm.onNavigatingBack()
-
-        // Assert
-        assertTrue(vm.uiState.value.showDiscardDialog)
-    }
-
-    @Test
-    fun `given discard dialog visible when dismissDiscardDialog then dialog is hidden`() = runTest {
-        // Arrange
-        val deck = buildDeck(format = "casual")
-        val vm = buildViewModel(deckFlow = flowOf(buildDeckWithCards(deck = deck)))
-        vm.addCardToDeck(SCRYFALL_ID_A)
-        vm.onNavigatingBack()
-        assertTrue(vm.uiState.value.showDiscardDialog)
-
-        // Act
-        vm.dismissDiscardDialog()
-
-        // Assert
-        assertFalse(vm.uiState.value.showDiscardDialog)
-        // hasUnsavedChanges unchanged
-        assertTrue(vm.uiState.value.hasUnsavedChanges)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — observeDeck: draft is NOT replaced when unsaved changes exist
+    //  GROUP 4 — observeDeck: draft is NOT replaced when unsaved changes exist
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test

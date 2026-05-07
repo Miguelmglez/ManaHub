@@ -43,8 +43,8 @@ fun CardListItem(
         },
         headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text     = card.name,
+                CardName(
+                    name     = card.name,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color    = mc.textPrimary,

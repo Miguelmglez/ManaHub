@@ -73,5 +73,33 @@ sealed class Screen(val route: String) {
 
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Puzzle : Screen("puzzle")
+
+    // ── Trades (sub-section of Collection, also handles deep links) ───────────
+    /** Root trades route — rendered as a sub-tab inside CollectionScreen. */
+    object Trades : Screen("trades")
+
+    /**
+     * Deep link target for shared wishlist / open-for-trade lists.
+     * App Link pattern: https://trades.manahub.app/list/{shareId}
+     */
+    object TradesSharedList : Screen("trades/shared/{shareId}") {
+        fun createRoute(shareId: String) = "trades/shared/$shareId"
+    }
+
+    // ── Trade proposal flow ───────────────────────────────────────────────────
+    object CreateTradeProposal : Screen(
+        "trades/proposal/create/{receiverId}?parentProposalId={parentProposalId}&editingProposalId={editingProposalId}&rootProposalId={rootProposalId}"
+    ) {
+        fun createRoute(receiverId: String) = "trades/proposal/create/$receiverId"
+        fun createCounterRoute(receiverId: String, parentProposalId: String, rootProposalId: String) =
+            "trades/proposal/create/${Uri.encode(receiverId)}?parentProposalId=${Uri.encode(parentProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+        fun createEditRoute(receiverId: String, editingProposalId: String, rootProposalId: String) =
+            "trades/proposal/create/${Uri.encode(receiverId)}?editingProposalId=${Uri.encode(editingProposalId)}&rootProposalId=${Uri.encode(rootProposalId)}"
+    }
+
+    object TradeNegotiationDetail : Screen("trades/proposal/{proposalId}/thread/{rootProposalId}") {
+        fun createRoute(proposalId: String, rootProposalId: String) =
+            "trades/proposal/$proposalId/thread/$rootProposalId"
+    }
 }
 
