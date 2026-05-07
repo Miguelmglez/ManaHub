@@ -15,32 +15,43 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.util.CardConstants
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddCardSheet(
-    title: String,
     cardName: String,
     onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
     onDismiss: () -> Unit,
     manaCost: String?,
     cardImage: String?,
     closeButton: Boolean = false,
+    initialFoil: Boolean = false,
+    initialCondition: String = "NM",
+    initialLanguage: String = "en",
+    initialQty: Int = 1,
+    initialAlternativeArt: Boolean = false,
+    confirmButtonText: String = stringResource(R.string.scanner_add_to_collection),
+    setCode: String? = null,
+    setName: String? = null,
+    rarity: String? = null,
 ) {
     val conditions = CardConstants.conditions
     val languages = CardConstants.languages
 
-    var isFoil by remember { mutableStateOf(false) }
-    var isAlternativeArt by remember { mutableStateOf(false) }
-    var condition by remember { mutableStateOf("NM") }
-    var language by remember { mutableStateOf("en") }
-    var qty by remember { mutableIntStateOf(1) }
+    var isFoil by remember { mutableStateOf(initialFoil) }
+    var isAlternativeArt by remember { mutableStateOf(initialAlternativeArt) }
+    var condition by remember { mutableStateOf(initialCondition) }
+    var language by remember { mutableStateOf(initialLanguage) }
+    var qty by remember { mutableIntStateOf(initialQty) }
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
@@ -65,6 +76,7 @@ fun AddCardSheet(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
 
+            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -80,43 +92,62 @@ fun AddCardSheet(
                         )
                     }
                 }
-                Text(
-                    text = title,
-                    modifier = Modifier
-                        .weight(1f)
-                        .offset(x = if (closeButton) (-16).dp else 0.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                )
             }
-            Row(
+            
+            // Card Info - Centered
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                val displayName = cardName.substringBefore(" // ")
                 CardName(
-                    name = cardName,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
+                    name = displayName,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.magicColors.primaryAccent,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                
 
-                manaCost?.let {
-                    ManaCostImages(manaCost = it, symbolSize = 16.dp)
+                if (setCode != null && setName != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        SetSymbol(
+                            setCode = setCode,
+                            rarity = CardRarity.fromString(rarity ?: "common"),
+                            size = 14.dp
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = setName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.magicColors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
+
+            // Card Image - Centered and small size
             cardImage?.let {
                 AsyncImage(
                     model = cardImage,
                     contentDescription = cardName,
-                    contentScale = ContentScale.FillWidth,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier
-                        .fillMaxWidth(1f)
+                        .fillMaxWidth(0.45f)
+                        .heightIn(max = 220.dp)
                         .align(Alignment.CenterHorizontally)
                         .clip(MaterialTheme.shapes.medium)
                 )
             }
+
+            Spacer(Modifier.height(4.dp))
             // Foil toggle
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -166,7 +197,7 @@ fun AddCardSheet(
                 onExpandedChange = { condExpanded = it },
             ) {
                 OutlinedTextField(
-                    value = stringResource(conditions.find { it.first == condition }?.second ?: R.string.card_condition_nm),
+                    value = "(${condition}) ${stringResource(conditions.find { it.first == condition }?.second ?: R.string.card_condition_nm)}",
                     onValueChange = {},
                     readOnly = true,
                     label = {
@@ -186,7 +217,7 @@ fun AddCardSheet(
                 ) {
                     conditions.forEach { (code, resId) ->
                         DropdownMenuItem(
-                            text = { Text(stringResource(resId)) },
+                            text = { Text("(${code}) ${stringResource(resId)}") },
                             onClick = { condition = code; condExpanded = false },
                         )
                     }
@@ -200,7 +231,7 @@ fun AddCardSheet(
                 onExpandedChange = { langExpanded = it },
             ) {
                 OutlinedTextField(
-                    value = "${languages.find { it.first == language }?.second ?: ""} ${language.uppercase()}",
+                    value = "(${language.uppercase()}) ${CardConstants.getLanguageName(language)}",
                     onValueChange = {},
                     readOnly = true,
                     label = {
@@ -218,9 +249,9 @@ fun AddCardSheet(
                     expanded = langExpanded,
                     onDismissRequest = { langExpanded = false },
                 ) {
-                    languages.forEach { (lang, flag) ->
+                    languages.forEach { (lang, _) ->
                         DropdownMenuItem(
-                            text = { Text("$flag ${lang.uppercase()}") },
+                            text = { Text("(${lang.uppercase()}) ${CardConstants.getLanguageName(lang)}") },
                             onClick = { language = lang; langExpanded = false },
                         )
                     }
@@ -242,7 +273,7 @@ fun AddCardSheet(
                         qty
                     )
                 }) {
-                    Text(stringResource(R.string.action_add))
+                    Text(confirmButtonText)
                 }
             }
 
@@ -250,3 +281,5 @@ fun AddCardSheet(
         }
     }
 }
+
+

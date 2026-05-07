@@ -1,6 +1,6 @@
 [versions]
 accompanist-permissions = "0.37.3"
-opencv = "4.10.0"
+# opencv = "4.10.0"
 paging = "3.3.6"
 work = "2.10.1"
 hilt-work = "1.2.0"
@@ -41,7 +41,7 @@ googleid             = "1.1.1"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
-opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
+# opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
 paging-runtime   = { group = "androidx.paging", name = "paging-runtime-ktx",  version.ref = "paging" }
 paging-compose   = { group = "androidx.paging", name = "paging-compose",       version.ref = "paging" }
 room-paging      = { group = "androidx.room",   name = "room-paging",          version.ref = "room" }

@@ -57,8 +57,10 @@ import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.PriceFormatter
+import androidx.compose.ui.tooling.preview.Preview
+import com.mmg.manahub.core.domain.model.CardFace
+import com.mmg.manahub.core.ui.theme.MagicTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -174,10 +176,13 @@ fun CardDetailScreen(
     if (uiState.showAddSheet) {
         uiState.card?.let { card ->
             AddCardSheet(
-                title = stringResource(R.string.carddetail_add_copy),
                 cardName = card.name,
-                cardImage = null,
+                cardImage = card.imageNormal,
                 manaCost = card.manaCost,
+                setCode = card.setCode,
+                setName = card.setName,
+                rarity = card.rarity,
+                confirmButtonText = stringResource(R.string.carddetail_add_copy),
                 onConfirm = { isFoil: Boolean, isAltArt: Boolean, condition: String, language: String, qty: Int ->
                     viewModel.onAddToCollection(isFoil, isAltArt, condition, language, qty)
                 },
@@ -190,10 +195,13 @@ fun CardDetailScreen(
     if (uiState.showWishlistSheet) {
         uiState.card?.let { card ->
             AddCardSheet(
-                title = stringResource(R.string.carddetail_wishlist_sheet_title),
                 cardName = card.name,
-                cardImage = null,
+                cardImage = card.imageNormal,
                 manaCost = card.manaCost,
+                setCode = card.setCode,
+                setName = card.setName,
+                rarity = card.rarity,
+                confirmButtonText = stringResource(R.string.carddetail_wishlist_sheet_title),
                 onConfirm = { isFoil: Boolean, isAltArt: Boolean, condition: String, language: String, qty: Int ->
                     viewModel.onAddToWishlist(isFoil, isAltArt, condition, language, qty)
                 },
@@ -235,6 +243,28 @@ fun CardDetailScreen(
 }
 
 @Composable
+private fun FaceFlippable(
+    rotation: Float,
+    modifier: Modifier = Modifier,
+    content: @Composable (isBack: Boolean) -> Unit
+) {
+    Box(
+        modifier = modifier.graphicsLayer {
+            rotationY = rotation
+            cameraDistance = 12f * density
+        }
+    ) {
+        if (rotation >= -90f) {
+            content(false)
+        } else {
+            Box(Modifier.graphicsLayer { rotationY = 180f }) {
+                content(true)
+            }
+        }
+    }
+}
+
+@Composable
 private fun CardDetailContent(
     card: Card,
     userCards: List<UserCard>,
@@ -255,6 +285,11 @@ private fun CardDetailContent(
     modifier: Modifier = Modifier,
 ) {
     var showBackFace by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(
+        targetValue = if (showBackFace) -180f else 0f,
+        animationSpec = tween(durationMillis = 500),
+        label = "CardFlip"
+    )
 
     Column(
         modifier = modifier
@@ -269,12 +304,6 @@ private fun CardDetailContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val rotation by animateFloatAsState(
-                targetValue = if (showBackFace) -180f else 0f,
-                animationSpec = tween(durationMillis = 500),
-                label = "CardFlip"
-            )
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
@@ -331,14 +360,19 @@ private fun CardDetailContent(
             }
         }
 
+        val frontFace = card.cardFaces?.firstOrNull()
+        val backFace = card.cardFaces?.getOrNull(1)
+
         // Name + badges
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val displayName = card.name.replace(" // ", "\n")
-            CardName(displayName, style = MaterialTheme.typography.headlineSmall)
-            if (isStale) StaleBadge()
+        FaceFlippable(rotation = rotation) { isBack ->
+            val name = if (isBack) backFace?.name ?: card.name else frontFace?.name ?: card.name
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CardName(name, style = MaterialTheme.typography.headlineSmall)
+                if (isStale) StaleBadge()
+            }
         }
 
         // Mana cost + type
@@ -346,13 +380,18 @@ private fun CardDetailContent(
             card.manaCost?.let {
                 ManaCostImages(manaCost = it, symbolSize = 20.dp)
             }
-            val typeText = (card.printedTypeLine.takeUnless { it.isNullOrEmpty() } ?: card.typeLine)
-                .replace(" // ", "\n")
-            Text(
-                text = typeText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            FaceFlippable(rotation = rotation) { isBack ->
+                val typeText = if (isBack) {
+                    backFace?.typeLine ?: card.typeLine
+                } else {
+                    frontFace?.typeLine ?: card.printedTypeLine.takeUnless { it.isNullOrEmpty() } ?: card.typeLine
+                }
+                Text(
+                    text = typeText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         // Set Icon + Set Name
@@ -373,52 +412,71 @@ private fun CardDetailContent(
         }
 
         // Oracle / printed text with inline mana symbols
-        val oracleDisplayText = card.printedText.takeUnless { it.isNullOrEmpty() }
-            ?: card.oracleText
-        if (!oracleDisplayText.isNullOrEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-            ) {
-                OracleText(
-                    text = oracleDisplayText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(12.dp),
-                )
+        FaceFlippable(rotation = rotation) { isBack ->
+            val oracleDisplayText = if (isBack) {
+                backFace?.oracleText
+            } else {
+                frontFace?.oracleText ?: card.printedText.takeUnless { it.isNullOrEmpty() } ?: card.oracleText
+            }
+            if (!oracleDisplayText.isNullOrEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OracleText(
+                        text = oracleDisplayText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
             }
         }
 
         // Flavor text
-        card.flavorText?.let {
-            Text(
-                text = "\"$it\"",
-                style = MaterialTheme.typography.bodySmall,
-                fontStyle = FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        FaceFlippable(rotation = rotation) { isBack ->
+            val flavorText = if (isBack) backFace?.flavorText else frontFace?.flavorText ?: card.flavorText
+            flavorText?.let {
+                Text(
+                    text = "\"$it\"",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         // Power/Toughness or Loyalty
-        val ptOrLoyalty = when {
-            card.power != null && card.toughness != null -> "${card.power}/${card.toughness}"
-            card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty)
-            else -> null
-        }
+        FaceFlippable(rotation = rotation) { isBack ->
+            val face = if (isBack) backFace else frontFace
+            val ptOrLoyalty = when {
+                face != null -> {
+                    when {
+                        face.power != null && face.toughness != null -> "${face.power}/${face.toughness}"
+                        face.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, face.loyalty)
+                        else -> null
+                    }
+                }
+                card.power != null && card.toughness != null -> "${card.power}/${card.toughness}"
+                card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty)
+                else -> null
+            }
 
-        if (ptOrLoyalty != null) {
-            val mc = MaterialTheme.magicColors
-            Surface(
-                color = mc.secondaryAccent.copy(alpha = 0.08f),
-                border = BorderStroke(1.dp, mc.secondaryAccent),
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text(
-                    text = ptOrLoyalty,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = mc.secondaryAccent,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
+            if (ptOrLoyalty != null) {
+                val mc = MaterialTheme.magicColors
+                Surface(
+                    color = mc.secondaryAccent.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, mc.secondaryAccent),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        text = ptOrLoyalty,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = mc.secondaryAccent,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
             }
         }
 
@@ -481,6 +539,71 @@ private fun CardDetailContent(
 
         // Extra bottom padding for FAB
         Spacer(Modifier.height(72.dp))
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CardDetailContentDFCPreview() {
+    val card = Card(
+        scryfallId = "1",
+        name = "Delver of Secrets // Insectile Aberration",
+        manaCost = "{U}",
+        cmc = 1.0,
+        colors = listOf("U"),
+        colorIdentity = listOf("U"),
+        typeLine = "Creature — Human Wizard // Creature — Human Insect",
+        oracleText = "At the beginning of your upkeep, look at the top card of your library...",
+        keywords = listOf("Transform"),
+        power = "1",
+        toughness = "1",
+        setCode = "ISD",
+        setName = "Innistrad",
+        collectorNumber = "51",
+        rarity = "uncommon",
+        releasedAt = "2011-09-30",
+        frameEffects = emptyList(),
+        promoTypes = emptyList(),
+        lang = "en",
+        imageNormal = null,
+        imageArtCrop = null,
+        imageBackNormal = "back_url",
+        legalityStandard = "not_legal",
+        legalityPioneer = "legal",
+        legalityModern = "legal",
+        legalityCommander = "legal",
+        scryfallUri = "",
+        printedName = "",
+        printedText = "",
+        printedTypeLine = "",
+        artist = "Nils Hamm",
+        flavorText = null,
+        loyalty = null,
+        priceEur = null,
+        priceEurFoil = null,
+        priceUsd = null,
+        priceUsdFoil = null,
+    )
+
+    MagicTheme {
+        CardDetailContent(
+            card = card,
+            userCards = emptyList(),
+            decksContainingCard = emptyList(),
+            isStale = false,
+            onRemoveAutoTag = {},
+            onAddUserTag = {},
+            onRemoveUserTag = {},
+            onShowTagPicker = {},
+            onConfirmSuggestedTag = {},
+            onDismissSuggestedTag = {},
+            onShowAddSheet = {},
+            onShowWishlistSheet = {},
+            onShowTradeSheet = {},
+            onUpdateQuantity = { _, _ -> },
+            onRequestDelete = {},
+            onNavigateToDeck = {},
+        )
     }
 }
 

@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.trades.data.repository
 
-import com.mmg.manahub.core.data.remote.mapper.toDomain
+import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistWithCard
 import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
@@ -67,7 +67,7 @@ class WishlistRepositoryImpl @Inject constructor(
     )
 
     private fun LocalWishlistWithCard.toDomain() = entity.toDomain().copy(
-        card = card?.toDomain()
+        card = card?.toDomainCard()
     )
 
     private fun WishlistEntry.toEntity() = LocalWishlistEntity(

@@ -250,6 +250,10 @@
     <string name="scanner_searching">Searching…</string>
     <string name="scanner_searching_idle">Searching for card…</string>
     <string name="scanner_toast_added_prefix">Added:</string>
+    <string name="scanner_toast_added_to_collection">%1$s added to Collection</string>
+    <string name="scanner_toast_added_to_wishlist">%1$s added to Wishlist</string>
+    <string name="scanner_toast_added_all_to_wishlist">%1$d items added to Wishlist</string>
+    <string name="scanner_toast_added_all_to_collection">%1$d items added to Collection</string>
     <string name="scanner_queue_title">%1$d cards scanned</string>
     <string name="scanner_queue_search_hint">Filter by name…</string>
     <string name="scanner_queue_button_desc">Scan queue</string>
@@ -287,10 +291,11 @@
     <string name="scanner_db_status_bundled">DB: bundled (no update yet)</string>
     <string name="scanner_trend_price_prefix">TREND %1$s</string>
     <string name="scanner_searching_indicator">Searching…</string>
-    <string name="scanner_point_at_card">Focus the card art</string>
+    <string name="scanner_point_at_card">Place card name in the zone</string>
+    <string name="scanner_name_zone_label">CARD NAME</string>
     <string name="scanner_queue_search_placeholder">Filter cards</string>
     <string name="scanner_queue_clear">Clear</string>
-    <string name="scanner_queue_add_all">Add to</string>
+    <string name="scanner_queue_add_all">Add to collection</string>
     <string name="scanner_recently_added">Just now</string>
     <string name="scanner_edit_quantity">Quantity</string>
     <string name="scanner_edit_foil_label">Foil</string>
@@ -299,7 +304,8 @@
     <string name="scanner_edit_language_label">Language</string>
     <string name="scanner_edit_condition_label">Condition</string>
     <string name="scanner_edit_set_label">Set</string>
-    <string name="scanner_edit_save">Save</string>
+    <string name="scanner_edit_save">Save details</string>
+    <string name="scanner_edit_sheet_title">Edit scanned card</string>
     <string name="scanner_permission_camera_required">Camera permission required</string>
     <string name="scanner_permission_grant">Grant permission</string>
 
@@ -1388,5 +1394,18 @@
     <string name="trades_error_inventory_gone_body">One or more cards could not be moved. The inventory may have changed since the trade was accepted.</string>
     <string name="trades_error_generic_title">Something went wrong</string>
     <string name="trades_error_generic_body">An unexpected error occurred. Please try again.</string>
+
+    <!-- ══════════════════════════════════════════
+         SCANNER — language names + wishlist button
+    ═══════════════════════════════════════════ -->
+    <string name="scanner_queue_add_all_wishlist">Add All to Wishlist</string>
+    <string name="scanner_language_english">English</string>
+    <string name="scanner_language_spanish">Spanish</string>
+    <string name="scanner_language_german">German</string>
+    <string name="scanner_language_french">French</string>
+    <string name="scanner_language_italian">Italian</string>
+    <string name="scanner_language_portuguese">Portuguese</string>
+    <string name="scanner_language_japanese">Japanese</string>
+    <string name="scanner_language_korean">Korean</string>
 
 </resources>

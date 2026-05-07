@@ -277,7 +277,6 @@ fun CreateTradeProposalScreen(
     if (showEditSheet) {
         editingItem?.let { item ->
             AddCardSheet(
-                title = stringResource(R.string.trades_edit),
                 cardName = item.cardName,
                 onConfirm = { isFoil, isAltArt, condition, language, qty ->
                     val updated = item.copy(
@@ -300,7 +299,8 @@ fun CreateTradeProposalScreen(
                     editingItem = null
                 },
                 manaCost = null,
-                cardImage = null
+                cardImage = null,
+                confirmButtonText = stringResource(R.string.scanner_edit_save)
             )
         }
     }

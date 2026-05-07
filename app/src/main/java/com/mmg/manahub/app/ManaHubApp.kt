@@ -34,14 +34,6 @@ class ManaHubApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize OpenCV native library — must run before any OpenCV call.
-        val opencvOk = org.opencv.android.OpenCVLoader.initLocal()
-        if (opencvOk) {
-            android.util.Log.i("ManaHub", "OpenCV ${org.opencv.core.Core.VERSION} initialized successfully")
-        } else {
-            android.util.Log.e("ManaHub", "OpenCV initialization FAILED — card scanner will not work")
-        }
-
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
 
         Coil.setImageLoader(ImageLoader.Builder(this).components { add(SvgDecoder.Factory()) }

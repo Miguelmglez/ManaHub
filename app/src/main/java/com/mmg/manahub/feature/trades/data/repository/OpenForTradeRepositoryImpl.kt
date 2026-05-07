@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.trades.data.repository
 
-import com.mmg.manahub.core.data.remote.mapper.toDomain
+import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeWithCard
 import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
@@ -76,7 +76,7 @@ class OpenForTradeRepositoryImpl @Inject constructor(
     )
 
     private fun LocalOpenForTradeWithCard.toDomain() = entity.toDomain().copy(
-        card = card?.toDomain()
+        card = card?.toDomainCard()
     )
 
     private fun OpenForTradeEntryDto.toDomain() = OpenForTradeEntry(
