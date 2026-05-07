@@ -169,14 +169,16 @@ fun CardName(
     overflow: TextOverflow = TextOverflow.Clip,
     color: Color = Color.Unspecified,
     fontWeight: androidx.compose.ui.text.font.FontWeight? = null,
+    showFrontOnly: Boolean = false,
 ) {
+    val displayName = if (showFrontOnly) name.split(" // ").first() else name
     val mergedStyle = if (fontWeight != null) style.copy(fontWeight = fontWeight) else style
 
     // Find all occurrences of "A-" at the start, after " // ", or after a newline
     // Regex matches "A-" at the beginning of string OR following " // " OR following a newline
     val alchemyRegex = Regex("(^| // |\\n)A-")
 
-    if (name.contains(alchemyRegex)) {
+    if (displayName.contains(alchemyRegex)) {
         val inlineContentId = "alchemy_icon"
         val inlineContent = mapOf(
             inlineContentId to androidx.compose.foundation.text.InlineTextContent(
@@ -199,9 +201,9 @@ fun CardName(
 
         val annotatedString = buildAnnotatedString {
             var lastIndex = 0
-            alchemyRegex.findAll(name).forEach { match ->
+            alchemyRegex.findAll(displayName).forEach { match ->
                 // Append text before the match
-                append(name.substring(lastIndex, match.range.first))
+                append(displayName.substring(lastIndex, match.range.first))
                 
                 // If it matches a separator, we need to keep that part
                 val matchValue = match.value
@@ -216,8 +218,8 @@ fun CardName(
                 lastIndex = match.range.last + 1
             }
             // Append remaining text
-            if (lastIndex < name.length) {
-                append(name.substring(lastIndex))
+            if (lastIndex < displayName.length) {
+                append(displayName.substring(lastIndex))
             }
         }
 
@@ -232,7 +234,7 @@ fun CardName(
         )
     } else {
         Text(
-            text = name,
+            text = displayName,
             modifier = modifier,
             style = style,
             maxLines = maxLines,
@@ -247,11 +249,14 @@ fun CardName(
 fun CardNamePreview() {
     MaterialTheme {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            CardName(name = "A-Dorothea, Vengeful Victim\nA-Dorothea's Retribution", style = MaterialTheme.typography.headlineSmall)
+            Text("Full Names:", style = MaterialTheme.typography.labelSmall)
             CardName(name = "A-Dorothea, Vengeful Victim // A-Dorothea's Retribution", style = MaterialTheme.typography.headlineSmall)
-            CardName(name = "A-Tidal Wave", style = MaterialTheme.typography.headlineSmall)
-            CardName(name = "Black Lotus", style = MaterialTheme.typography.headlineSmall)
-            CardName(name = "A-Llanowar Elves", style = MaterialTheme.typography.bodyLarge, color = Color.Green)
+            CardName(name = "Fire // Ice", style = MaterialTheme.typography.headlineSmall)
+            
+            Spacer(Modifier.height(8.dp))
+            Text("Front Only:", style = MaterialTheme.typography.labelSmall)
+            CardName(name = "A-Dorothea, Vengeful Victim // A-Dorothea's Retribution", showFrontOnly = true, style = MaterialTheme.typography.headlineSmall)
+            CardName(name = "Fire // Ice", showFrontOnly = true, style = MaterialTheme.typography.headlineSmall)
         }
     }
 }

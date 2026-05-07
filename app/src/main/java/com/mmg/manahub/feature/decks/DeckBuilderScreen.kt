@@ -846,11 +846,12 @@ private fun CardRow(
             )
             Column(Modifier.weight(1f)) {
                 CardName(
-                    name = entry.card?.name ?: "Unknown", 
-                    style = ty.bodyMedium, 
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    name          = entry.card?.name ?: "Unknown",
+                    showFrontOnly = true,
+                    style         = ty.bodyMedium,
+                    color         = mc.textPrimary,
+                    maxLines      = 1,
+                    overflow      = TextOverflow.Ellipsis
                 )
                 entry.card?.typeLine?.let {
                     Text(it, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -954,7 +955,14 @@ private fun CardDetailSheet(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val displayName = card.printedName?.takeIf { it.isNotBlank() } ?: card.name
-                        CardName(displayName, style = ty.titleMedium, color = mc.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        CardName(
+                            name          = displayName,
+                            showFrontOnly = true,
+                            style         = ty.titleMedium,
+                            color         = mc.textPrimary,
+                            fontWeight    = FontWeight.Bold,
+                            modifier      = Modifier.weight(1f)
+                        )
                         card.manaCost?.let { ManaCostImages(manaCost = it, symbolSize = 18.dp) }
                     }
                     val typeLine = card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
