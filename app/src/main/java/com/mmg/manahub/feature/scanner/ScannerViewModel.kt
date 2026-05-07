@@ -1,19 +1,26 @@
 package com.mmg.manahub.feature.scanner
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
 import javax.inject.Inject
 
 // COMMENTED OUT — no longer needed with ML Kit OCR pipeline
@@ -37,11 +44,14 @@ import javax.inject.Inject
  *   scanned card's [Card.lang] differs, the card is displayed but not auto-added in
  *   Quick Mode, and a [ScannerUiState.languageMismatch] indicator is shown.
  * - **Ambiguity selector**: when the recognition result is ambiguous and the scanner is
- *   in normal mode (not Quick, not Lookup Only), a [DropdownMenu] is shown to let the
- *   user confirm or skip without interrupting the camera.
+ *   in normal mode (not Quick, not Lookup Only), a dialog is shown to let the user confirm.
+ *
+ * **Queue persistence**: the [ScanSession] is serialized to [SharedPreferences] on every
+ * mutation, using [PREF_KEY_QUEUE] inside the [PREF_FILE] preferences file.
+ * On ViewModel init, any persisted queue is restored automatically.
  *
  * Modes (controlled by the settings sheet):
- * - **Quick Mode ON**:  auto-adds the confirmed card to the session and collection.
+ * - **Quick Mode ON**:  auto-adds the confirmed card to the session.
  * - **Lookup Only ON**: only shows the card in the bottom bar, never adds it.
  * - **Neither**:        shows the card in the bottom bar; user taps "+" to add.
  */
@@ -49,8 +59,10 @@ import javax.inject.Inject
 class ScannerViewModel @Inject constructor(
     private val cardRepository: CardRepository,
     private val addToCollection: AddCardToCollectionUseCase,
+    private val addToWishlist: AddToWishlistUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
+    @ApplicationContext private val context: Context,
     // COMMENTED OUT — embedding DB and WorkManager no longer injected with OCR pipeline
     // val embeddingDatabase: EmbeddingDatabase,
     // private val userPreferencesDataStore: UserPreferencesDataStore,
@@ -70,68 +82,144 @@ class ScannerViewModel @Inject constructor(
     private var lastAddedId: String? = null
     private var lastAddedTime: Long = 0L
 
+    // ── SharedPreferences for queue persistence ───────────────────────────────
+    private val prefs by lazy {
+        context.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE)
+    }
+
     companion object {
         /**
          * Number of consecutive identical matches required before a card is confirmed.
-         * With OCR + exact name match the similarity is always 1.0f, so all matches
-         * are treated as high-confidence and use [HIGH_CONFIDENCE_FRAMES] directly.
          */
         private const val STABILITY_FRAMES = 3
 
         /**
          * Reduced stability requirement for high-confidence matches.
          * Since OCR + exact-name lookup always returns similarity = 1.0f,
-         * [HIGH_CONFIDENCE_FRAMES] = 1 is always used — a single clean OCR read
-         * is enough to confirm the card.
+         * [HIGH_CONFIDENCE_FRAMES] = 1 is always used.
          */
         private const val HIGH_CONFIDENCE_FRAMES = 1
-
-        // COMMENTED OUT — similarity threshold only meaningful for embedding-based search
-        // private const val HIGH_CONFIDENCE_SIMILARITY = 0.90f
 
         /** Minimum time in ms before the same card can be added again. */
         private const val ANTI_DUPLICATE_MS = 800L
 
         /** Default language code — used to determine when the language filter is active. */
         private const val DEFAULT_LANGUAGE = "en"
+
+        /** SharedPreferences file name for scanner settings. */
+        private const val PREF_FILE = "scanner_prefs"
+
+        /** Key storing the serialized scan queue JSON. */
+        private const val PREF_KEY_QUEUE = "scanner_queue_v1"
     }
 
-    // COMMENTED OUT — embedding DB lifecycle observers no longer needed with OCR
-    // init {
-    //     _uiState.update {
-    //         it.copy(
-    //             embeddingDbLoaded = embeddingDatabase.cardCount > 0,
-    //             embeddingDbCardCount = embeddingDatabase.cardCount,
-    //         )
-    //     }
-    //     viewModelScope.launch {
-    //         userPreferencesDataStore.embeddingDbVersionFlow.collect { version ->
-    //             _uiState.update { it.copy(
-    //                 embeddingDbVersionReady = true,
-    //                 embeddingDbVersion = version,
-    //                 embeddingDbLoaded = embeddingDatabase.cardCount > 0,
-    //                 embeddingDbCardCount = embeddingDatabase.cardCount,
-    //             ) }
-    //         }
-    //     }
-    //     viewModelScope.launch {
-    //         workManager
-    //             .getWorkInfosForUniqueWorkLiveData(EmbeddingDatabaseUpdateWorker.WORK_NAME)
-    //             .asFlow()
-    //             .collect { infos ->
-    //                 val info = infos.firstOrNull()
-    //                 val isRunning = info?.state == WorkInfo.State.RUNNING
-    //                 val progress = info?.progress
-    //                     ?.getFloat(EmbeddingDatabaseUpdateWorker.KEY_PROGRESS, 0f) ?: 0f
-    //                 _uiState.update { it.copy(
-    //                     isEmbeddingDbUpdating = isRunning,
-    //                     embeddingDbDownloadProgress = if (isRunning) progress else 0f,
-    //                     embeddingDbLoaded = embeddingDatabase.cardCount > 0,
-    //                     embeddingDbCardCount = embeddingDatabase.cardCount,
-    //                 ) }
-    //             }
-    //     }
-    // }
+    init {
+        loadPersistedQueue()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Queue persistence — SharedPreferences + org.json
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Serializes the current [ScanSession] to JSON and saves it to [SharedPreferences].
+     * Must be called after any mutation that modifies [ScannerUiState.scanSession].
+     */
+    private fun persistQueue() {
+        val cards = _uiState.value.scanSession.cards
+        val array = JSONArray()
+        for (entry in cards) {
+            val obj = JSONObject().apply {
+                put("scryfallId",       entry.card.scryfallId)
+                put("name",             entry.card.name)
+                put("setCode",          entry.card.setCode)
+                put("setName",          entry.card.setName)
+                put("lang",             entry.card.lang)
+                put("priceUsd",         entry.card.priceUsd ?: JSONObject.NULL)
+                put("priceEur",         entry.card.priceEur ?: JSONObject.NULL)
+                put("imageNormal",      entry.card.imageNormal ?: JSONObject.NULL)
+                put("imageArtCrop",     entry.card.imageArtCrop ?: JSONObject.NULL)
+                put("collectorNumber",  entry.card.collectorNumber)
+                put("quantity",         entry.quantity)
+                put("isFoil",           entry.isFoil)
+                put("language",         entry.language)
+                put("condition",        entry.condition)
+                put("timestamp",        entry.timestamp)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString(PREF_KEY_QUEUE, array.toString()).apply()
+    }
+
+    /**
+     * Loads any previously persisted [ScanSession] from [SharedPreferences] and
+     * updates [uiState] with the restored cards. Called once in [init].
+     */
+    private fun loadPersistedQueue() {
+        val json = prefs.getString(PREF_KEY_QUEUE, null) ?: return
+        try {
+            val array = JSONArray(json)
+            val cards = mutableListOf<ScannedCard>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val card = Card(
+                    scryfallId       = obj.getString("scryfallId"),
+                    name             = obj.getString("name"),
+                    printedName      = null,
+                    manaCost         = null,
+                    cmc              = 0.0,
+                    colors           = emptyList(),
+                    colorIdentity    = emptyList(),
+                    typeLine         = "",
+                    printedTypeLine  = null,
+                    oracleText       = null,
+                    printedText      = null,
+                    keywords         = emptyList(),
+                    power            = null,
+                    toughness        = null,
+                    loyalty          = null,
+                    setCode          = obj.getString("setCode"),
+                    setName          = obj.getString("setName"),
+                    collectorNumber  = obj.getString("collectorNumber"),
+                    rarity           = "",
+                    releasedAt       = "",
+                    frameEffects     = emptyList(),
+                    promoTypes       = emptyList(),
+                    lang             = obj.getString("lang"),
+                    imageNormal      = obj.optString("imageNormal").takeIf { it.isNotEmpty() },
+                    imageArtCrop     = obj.optString("imageArtCrop").takeIf { it.isNotEmpty() },
+                    imageBackNormal  = null,
+                    priceUsd         = if (obj.isNull("priceUsd")) null else obj.getDouble("priceUsd"),
+                    priceUsdFoil     = null,
+                    priceEur         = if (obj.isNull("priceEur")) null else obj.getDouble("priceEur"),
+                    priceEurFoil     = null,
+                    legalityStandard  = "",
+                    legalityPioneer   = "",
+                    legalityModern    = "",
+                    legalityCommander = "",
+                    flavorText        = null,
+                    artist            = null,
+                    scryfallUri       = "",
+                )
+                cards.add(
+                    ScannedCard(
+                        card      = card,
+                        quantity  = obj.getInt("quantity"),
+                        isFoil    = obj.getBoolean("isFoil"),
+                        language  = obj.getString("language"),
+                        condition = obj.getString("condition"),
+                        setCode   = obj.getString("setCode"),
+                        timestamp = obj.getLong("timestamp"),
+                    )
+                )
+            }
+            if (cards.isNotEmpty()) {
+                _uiState.update { it.copy(scanSession = ScanSession(cards)) }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ScannerViewModel", "Failed to restore persisted queue", e)
+        }
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  ML recognition entry point — called by CardRecognizer
@@ -141,14 +229,11 @@ class ScannerViewModel @Inject constructor(
      * Processes a [RecognitionResult] from [CardRecognizer].
      *
      * - [RecognitionResult.NoCard]     → clears the overlay and search indicator.
-     * - [RecognitionResult.Detected]   → shows the outline but keeps searching.
+     * - [RecognitionResult.Detected]   → shows searching indicator but keeps going.
      * - [RecognitionResult.Identified] → applies set lock, language mismatch,
      *   stability + anti-duplicate logic, then routes to the appropriate mode.
      */
     fun onRecognitionResult(result: RecognitionResult) {
-        // onRecognitionResult is called from CardRecognizer's Dispatchers.Default coroutine.
-        // recentMatches, lastAddedId, lastAddedTime, and frameTimestamps are not thread-safe,
-        // so we dispatch the entire handler onto the main thread.
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
             if (com.mmg.manahub.BuildConfig.DEBUG) {
                 val now = System.currentTimeMillis()
@@ -158,7 +243,7 @@ class ScannerViewModel @Inject constructor(
                     val span = frameTimestamps.last() - frameTimestamps.first()
                     if (span > 0) ((frameTimestamps.size - 1) * 1000L / span).toInt() else 0
                 } else 0
-                _uiState.update { it.copy(fps = fps) }
+                android.util.Log.d("ScannerFPS", "fps=$fps")
             }
             processRecognitionResult(result)
         }
@@ -181,7 +266,7 @@ class ScannerViewModel @Inject constructor(
                 recentMatches.clear()
                 _uiState.update {
                     it.copy(
-                        detectedCorners = result.corners,
+                        detectedCorners = result.corners.ifEmpty { null },
                         isSearching = true,
                         languageMismatch = false,
                     )
@@ -189,7 +274,9 @@ class ScannerViewModel @Inject constructor(
             }
 
             is RecognitionResult.Identified -> {
-                _uiState.update { it.copy(detectedCorners = result.corners) }
+                _uiState.update {
+                    it.copy(detectedCorners = result.corners.ifEmpty { null })
+                }
 
                 val state = _uiState.value
 
@@ -211,16 +298,12 @@ class ScannerViewModel @Inject constructor(
                 }
 
                 // ── Adaptive stability buffer ────────────────────────────────
-                // OCR + exact-name lookup always yields similarity = 1.0f, so
-                // HIGH_CONFIDENCE_FRAMES (1) is always used — a single clean OCR
-                // read is enough to confirm without waiting for extra frames.
                 val requiredFrames = HIGH_CONFIDENCE_FRAMES
 
                 if (recentMatches.size >= requiredFrames) recentMatches.removeFirst()
                 recentMatches.addLast(id)
 
                 if (recentMatches.size < requiredFrames || recentMatches.any { it != id }) {
-                    // Update searching state if it was false
                     _uiState.update { it.copy(isSearching = true) }
                     return
                 }
@@ -231,14 +314,25 @@ class ScannerViewModel @Inject constructor(
 
                 val confirmedState = _uiState.value
 
+                // Skip adding if already in session with same attributes
+                val isInSession = confirmedState.scanSession.cards.any { entry ->
+                    entry.card.scryfallId == result.card.scryfallId &&
+                            entry.isFoil == confirmedState.selectedIsFoil &&
+                            entry.language == confirmedState.selectedLanguage &&
+                            entry.condition == confirmedState.selectedCondition
+                }
+
+                if (isInSession) {
+                    _uiState.update { it.copy(languageMismatch = false) }
+                    return
+                }
+
                 when {
                     confirmedState.isLookupOnly -> {
-                        // Show card in the bottom bar; language mismatch is irrelevant in this mode
                         _uiState.update { it.copy(languageMismatch = false) }
                     }
 
                     confirmedState.isQuickMode -> {
-                        // ── Language mismatch check (Quick Mode) ─────────────
                         if (confirmedState.selectedLanguage != DEFAULT_LANGUAGE &&
                             result.card.lang != confirmedState.selectedLanguage
                         ) {
@@ -250,8 +344,6 @@ class ScannerViewModel @Inject constructor(
                     }
 
                     result.ambiguous -> {
-                        // ── Ambiguous match — show inline selector (normal mode) ──
-                        // Note: OCR always returns ambiguous=false, but guard retained for safety.
                         _uiState.update {
                             it.copy(
                                 showAmbiguitySelector = true,
@@ -261,7 +353,6 @@ class ScannerViewModel @Inject constructor(
                     }
 
                     else -> {
-                        // Normal mode, unambiguous: card shown in bar for manual confirmation
                         _uiState.update { it.copy(languageMismatch = false) }
                     }
                 }
@@ -274,62 +365,27 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Adds [card] to the scan session and persists it to the collection.
-     * Updates [lastAddedId] and [lastAddedTime] on success to activate the anti-duplicate guard.
+     * Adds [card] to the scan session (queue only — no automatic collection write).
+     * Updates [lastAddedId] and [lastAddedTime] to activate the anti-duplicate guard.
      * Used both by Quick Mode (automatic) and [onManualAddCurrentCard] (manual confirmation).
      */
     private fun quickAddCard(card: Card) {
-        val state = _uiState.value
-        viewModelScope.launch {
-            // Optimistic update: add to session immediately
-            addToSession(card)
+        addToSession(card)
+        lastAddedId = card.scryfallId
+        lastAddedTime = System.currentTimeMillis()
 
-            val result = addToCollection(
-                scryfallId = card.scryfallId,
-                isFoil = state.selectedIsFoil,
-                condition = state.selectedCondition,
-                language = state.selectedLanguage,
+        _uiState.update { it.copy(toastMessage = card.name) }
+
+        if (_uiState.value.isSoundEnabled) {
+            soundManager.playForPrice(
+                priceEur = card.priceEur,
+                priceUsdFallback = card.priceUsd,
             )
-
-            when (result) {
-                is DataResult.Success -> {
-                    analyticsHelper.logEvent(
-                        "scanner_quick_add",
-                        mapOf("card_id" to card.scryfallId, "mode" to "quick"),
-                    )
-                    // Activate anti-duplicate guard
-                    lastAddedId = card.scryfallId
-                    lastAddedTime = System.currentTimeMillis()
-
-                    _uiState.update { it.copy(toastMessage = card.name) }
-
-                    // Play price-based sound if enabled
-                    if (_uiState.value.isSoundEnabled) {
-                        soundManager.playForPrice(
-                            priceEur = card.priceEur,
-                            priceUsdFallback = card.priceUsd,
-                        )
-                    }
-
-                    // Brief pause to prevent immediate re-scan of the same card
-                    delay(1_500)
-                }
-
-                is DataResult.Error -> {
-                    analyticsHelper.logEvent(
-                        "scanner_quick_add_error",
-                        mapOf("card_id" to card.scryfallId),
-                    )
-                    _uiState.update { it.copy(error = result.message) }
-                    delay(2_000)
-                    _uiState.update { it.copy(error = null) }
-                }
-            }
         }
     }
 
     /**
-     * Merges [card] into the current [ScanSession].
+     * Merges [card] into the current [ScanSession] and persists the updated queue.
      * Increments quantity if an entry with the same key (scryfallId + isFoil + language + condition)
      * already exists; otherwise appends a new [ScannedCard].
      */
@@ -360,6 +416,7 @@ class ScannerViewModel @Inject constructor(
             }
             state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
         }
+        persistQueue()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -367,8 +424,8 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Called when the user explicitly confirms adding the currently displayed card
-     * from the bottom bar (non-quick mode). Reuses [quickAddCard] logic.
+     * Called when the user explicitly confirms adding the currently displayed card.
+     * Reuses [quickAddCard] logic.
      */
     fun onManualAddCurrentCard() {
         val card = _uiState.value.lastDetectedCard ?: return
@@ -376,13 +433,102 @@ class ScannerViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Ambiguity selector
+    //  Individual Actions (Collection & Wishlist)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Adds a single queue entry to the user's collection. */
+    fun onAddEntryToCollection(entry: ScannedCard) {
+        viewModelScope.launch {
+            repeat(entry.quantity) {
+                addToCollection(
+                    scryfallId = entry.card.scryfallId,
+                    isFoil = entry.isFoil,
+                    condition = entry.condition,
+                    language = entry.language,
+                )
+            }
+            analyticsHelper.logEvent(
+                "scanner_entry_to_collection",
+                mapOf("card_id" to entry.card.scryfallId)
+            )
+            _uiState.update {
+                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name))
+            }
+        }
+    }
+
+    /**
+     * Adds a single queue entry to the user's local wishlist.
+     * No authentication required — wishlist entries are stored locally via Room.
+     */
+    fun onAddEntryToWishlist(entry: ScannedCard) {
+        viewModelScope.launch {
+            val wishlistEntry = WishlistEntry(
+                id             = UUID.randomUUID().toString(),
+                userId         = "",  // local-only; no auth required
+                cardId         = entry.card.scryfallId,
+                matchAnyVariant = false,
+                isFoil         = entry.isFoil,
+                condition      = entry.condition,
+                language       = entry.language,
+                isAltArt       = false,
+                createdAt      = System.currentTimeMillis(),
+                card           = entry.card,
+            )
+            addToWishlist(wishlistEntry)
+            analyticsHelper.logEvent(
+                "scanner_entry_to_wishlist",
+                mapOf("card_id" to entry.card.scryfallId)
+            )
+            _uiState.update {
+                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name))
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Bulk Actions
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Dismisses the inline ambiguity [DropdownMenu] without adding the card.
-     * Clears [ScannerUiState.showAmbiguitySelector] and [ScannerUiState.lastDetectedCard].
+     * Adds all queue entries to the user's local wishlist.
+     * No authentication required — entries are stored locally via Room.
      */
+    fun onAddAllToWishlist() {
+        val cards = _uiState.value.scanSession.cards
+        if (cards.isEmpty()) return
+
+        viewModelScope.launch {
+            cards.forEach { entry ->
+                val wishlistEntry = WishlistEntry(
+                    id             = UUID.randomUUID().toString(),
+                    userId         = "",  // local-only; no auth required
+                    cardId         = entry.card.scryfallId,
+                    matchAnyVariant = false,
+                    isFoil         = entry.isFoil,
+                    condition      = entry.condition,
+                    language       = entry.language,
+                    isAltArt       = false,
+                    createdAt      = System.currentTimeMillis(),
+                    card           = entry.card,
+                )
+                addToWishlist(wishlistEntry)
+            }
+            analyticsHelper.logEvent(
+                "scanner_add_all_wishlist",
+                mapOf("count" to cards.size.toString()),
+            )
+            _uiState.update {
+                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_all_to_wishlist, cards.size))
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Common ViewModel Actions
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Dismisses the ambiguity resolution dialog without adding the card. */
     fun onDismissAmbiguitySelector() {
         _uiState.update {
             it.copy(
@@ -396,17 +542,12 @@ class ScannerViewModel @Inject constructor(
     //  Price detail sheet (Lookup Only mode)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Opens the price detail [ModalBottomSheet] for the currently detected card.
-     * Only meaningful when [ScannerUiState.isLookupOnly] is true.
-     */
+    /** Opens the price detail [ModalBottomSheet] for the currently detected card. */
     fun onOpenPriceDetail() {
         _uiState.update { it.copy(showPriceDetailSheet = true) }
     }
 
-    /**
-     * Closes the price detail [ModalBottomSheet].
-     */
+    /** Closes the price detail [ModalBottomSheet]. */
     fun onClosePriceDetail() {
         _uiState.update { it.copy(showPriceDetailSheet = false) }
     }
@@ -415,9 +556,7 @@ class ScannerViewModel @Inject constructor(
     //  Sound toggle
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Toggles sound effects on or off.
-     */
+    /** Toggles sound effects on or off. */
     fun onToggleSound() {
         _uiState.update { it.copy(isSoundEnabled = !it.isSoundEnabled) }
     }
@@ -457,8 +596,8 @@ class ScannerViewModel @Inject constructor(
 
     /** Updates the search query for filtering the scan queue. */
     fun onQueueSearchQueryChanged(query: String) {
-        // We'll handle filtering in the UI for now as it's a simple list,
-        // but the query is stored here.
+        // Filtering is handled in the UI layer (ScanQueueSheet) for performance;
+        // the query is stored here for future ViewModel-side filtering if needed.
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -475,7 +614,7 @@ class ScannerViewModel @Inject constructor(
                 editingCard = entry,
                 showEditSheet = true,
                 availablePrints = emptyList(),
-                isLoadingPrints = true
+                isLoadingPrints = true,
             )
         }
 
@@ -485,7 +624,7 @@ class ScannerViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         availablePrints = result.data,
-                        isLoadingPrints = false
+                        isLoadingPrints = false,
                     )
                 }
             } else {
@@ -495,7 +634,8 @@ class ScannerViewModel @Inject constructor(
     }
 
     /**
-     * Updates an existing entry in the scan session with new attributes.
+     * Updates an existing entry in the scan session with new attributes,
+     * then persists the updated queue to SharedPreferences.
      */
     fun onUpdateScannedCard(updatedEntry: ScannedCard) {
         val original = _uiState.value.editingCard ?: return
@@ -506,9 +646,10 @@ class ScannerViewModel @Inject constructor(
             state.copy(
                 scanSession = state.scanSession.copy(cards = updatedList),
                 showEditSheet = false,
-                editingCard = null
+                editingCard = null,
             )
         }
+        persistQueue()
     }
 
     /** Closes the edit sheet without saving. */
@@ -528,8 +669,6 @@ class ScannerViewModel @Inject constructor(
     /**
      * Updates [ScannerUiState.hasFlash] after the camera binds and hardware availability
      * is confirmed via [androidx.camera.core.CameraInfo.hasFlashUnit].
-     *
-     * @param available True if the bound camera has a flash unit, false otherwise.
      */
     fun onFlashAvailabilityChanged(available: Boolean) {
         _uiState.update { it.copy(hasFlash = available) }
@@ -573,7 +712,7 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(showQueueSheet = false, multiSelectedIds = emptySet()) }
     }
 
-    /** Removes a single [ScannedCard] from the session. */
+    /** Removes a single [ScannedCard] from the session and persists the change. */
     fun onRemoveSessionCard(entry: ScannedCard) {
         _uiState.update { state ->
             state.copy(
@@ -583,9 +722,10 @@ class ScannerViewModel @Inject constructor(
                 multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
             )
         }
+        persistQueue()
     }
 
-    /** Clears the entire scan session and resets the anti-duplicate guard. */
+    /** Clears the entire scan session, resets the anti-duplicate guard, and persists. */
     fun onClearSession() {
         _uiState.update {
             it.copy(
@@ -596,6 +736,7 @@ class ScannerViewModel @Inject constructor(
         }
         lastAddedId = null
         lastAddedTime = 0L
+        persistQueue()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -615,7 +756,7 @@ class ScannerViewModel @Inject constructor(
         }
     }
 
-    /** Deletes all currently selected entries from the session. */
+    /** Deletes all currently selected entries from the session and persists the change. */
     fun onDeleteSelected() {
         _uiState.update { state ->
             state.copy(
@@ -627,6 +768,7 @@ class ScannerViewModel @Inject constructor(
                 multiSelectedIds = emptySet(),
             )
         }
+        persistQueue()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -635,7 +777,7 @@ class ScannerViewModel @Inject constructor(
 
     /**
      * Persists every [ScannedCard] in the session to the collection,
-     * then closes the queue sheet.
+     * then clears the queue and closes the sheet.
      */
     fun onAddAllToCollection() {
         val cards = _uiState.value.scanSession.cards
@@ -656,6 +798,9 @@ class ScannerViewModel @Inject constructor(
                 "scanner_add_all",
                 mapOf("count" to cards.size.toString()),
             )
+            _uiState.update {
+                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size))
+            }
             onClearSession()
         }
     }

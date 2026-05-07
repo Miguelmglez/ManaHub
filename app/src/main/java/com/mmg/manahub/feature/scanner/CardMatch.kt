@@ -1,7 +1,5 @@
 package com.mmg.manahub.feature.scanner
 
-// COMMENTED OUT — replaced by ML Kit OCR. See CardRecognizer for the new pipeline.
-/*
 /**
  * Result of a nearest-neighbour search in [EmbeddingDatabase].
  *
@@ -10,7 +8,7 @@ package com.mmg.manahub.feature.scanner
  *                               in [0, 1]. Both vectors are L2-normalised, so this equals the
  *                               dot product.
  * @property secondBestSimilarity Cosine similarity of the second-best candidate; used to detect
- *                               ambiguous matches (gap < [EmbeddingDatabase.AMBIGUITY_GAP]).
+ *                               ambiguous matches.
  *                               Defaults to 0 when there is only one candidate in the DB.
  */
 data class CardMatch(
@@ -18,4 +16,3 @@ data class CardMatch(
     val similarity: Float,
     val secondBestSimilarity: Float = 0f,
 )
-*/

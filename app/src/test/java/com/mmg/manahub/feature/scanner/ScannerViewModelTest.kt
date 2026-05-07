@@ -3,21 +3,17 @@ package com.mmg.manahub.feature.scanner
 import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -70,16 +66,10 @@ class ScannerViewModelTest {
 
     private val cardRepository: CardRepository = mockk(relaxed = true)
     private val addToCollection: AddCardToCollectionUseCase = mockk()
+    private val addToWishlist: AddToWishlistUseCase = mockk()
     private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
     private val soundManager: SoundManager = mockk(relaxed = true)
-    private val embeddingDatabase: EmbeddingDatabase = EmbeddingDatabase(mockk<Context>(relaxed = true))
-    private val userPreferencesDataStore: UserPreferencesDataStore = mockk(relaxed = true) {
-        every { embeddingDbVersionFlow } returns flowOf(0)
-    }
-    private val workManager: WorkManager = mockk(relaxed = true) {
-        every { getWorkInfosForUniqueWorkLiveData(any()) } returns
-            MutableLiveData(emptyList<WorkInfo>())
-    }
+    private val context: Context = mockk(relaxed = true)
 
     // ── ViewModel under test ───────────────────────────────────────────────────
 
@@ -124,11 +114,10 @@ class ScannerViewModelTest {
         viewModel = ScannerViewModel(
             cardRepository = cardRepository,
             addToCollection = addToCollection,
+            addToWishlist = addToWishlist,
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
-            embeddingDatabase = embeddingDatabase,
-            userPreferencesDataStore = userPreferencesDataStore,
-            workManager = workManager,
+            context = context,
         )
     }
 

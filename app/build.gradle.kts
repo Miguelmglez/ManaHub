@@ -92,7 +92,7 @@ android {
     }
 
     androidResources {
-        noCompress += listOf("tflite", "bin")
+        noCompress += listOf("tflite")
     }
 
     ksp {
@@ -172,8 +172,9 @@ dependencies {
     // implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
 
-    implementation(libs.opencv)
     implementation(libs.accompanist.permissions)
     implementation(libs.material.icons.extended)
     implementation(libs.compose.googlefonts)

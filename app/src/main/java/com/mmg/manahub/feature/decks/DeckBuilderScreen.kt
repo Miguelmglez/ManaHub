@@ -2,14 +2,34 @@ package com.mmg.manahub.feature.decks
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -22,9 +42,45 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,30 +94,26 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mmg.manahub.feature.decks.components.DeckSummaryCard
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.AddCardRow
-import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
-import com.mmg.manahub.core.ui.components.*
+import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardSearchSheet
-import com.mmg.manahub.core.ui.components.AddCardSheet
-import com.mmg.manahub.core.ui.components.TradeSelectionSheet
-import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
+import com.mmg.manahub.core.ui.components.ManaCostImages
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.components.OracleText
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
-import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.components.CommanderBanner
+import com.mmg.manahub.feature.decks.components.DeckSummaryCard
 import com.mmg.manahub.feature.decks.components.MagicLandSuggestionStatic
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -179,27 +231,6 @@ fun DeckMagicDetailScreen(
                 showCommanderSearchSheet = true
             },
             modifier = Modifier.padding(padding)
-        )
-    }
-
-    if (uiState.showDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissDiscardDialog,
-            title = { Text(stringResource(R.string.deckbuilder_discard_dialog_title)) },
-            text = { Text(stringResource(R.string.deckbuilder_discard_dialog_message)) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.discardChanges { onBack() } }) {
-                    Text(stringResource(R.string.deckbuilder_discard_confirm), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissDiscardDialog) {
-                    Text(stringResource(R.string.deckbuilder_discard_cancel))
-                }
-            },
-            containerColor = mc.backgroundSecondary,
-            titleContentColor = mc.textPrimary,
-            textContentColor = mc.textSecondary,
         )
     }
 
@@ -556,46 +587,6 @@ private fun ViewStepContent(
                                             { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) }
                                         } else null,
                                         modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    item(key = "save_section") {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                .animateItem(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Reactive save button:
-                            // - Dirty state  (hasUnsavedChanges=true):  highlighted with primaryAccent, label "Save changes"
-                            // - Clean state  (hasUnsavedChanges=false): visually neutral, label "Saved", disabled
-                            val hasDirtyChanges = uiState.hasUnsavedChanges
-                            val saveEnabled = uiState.totalCards > 0 && !uiState.isSaving && hasDirtyChanges
-                            Button(
-                                onClick = { viewModel.saveDeck { /* Stay on screen after save */ } },
-                                enabled = saveEnabled,
-                                modifier = Modifier.fillMaxWidth().height(52.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = mc.primaryAccent,
-                                    disabledContainerColor = if (hasDirtyChanges) mc.surfaceVariant else mc.surfaceVariant.copy(alpha = 0.5f),
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                            ) {
-                                if (uiState.isSaving) {
-                                    CircularProgressIndicator(color = mc.background, modifier = Modifier.size(24.dp))
-                                } else {
-                                    val saveLabel = when {
-                                        hasDirtyChanges -> stringResource(R.string.deckbuilder_save_changes_button)
-                                        else -> stringResource(R.string.deckbuilder_saved_button)
-                                    }
-                                    Text(
-                                        text = saveLabel,
-                                        style = ty.titleMedium,
-                                        color = if (saveEnabled) mc.background else mc.textDisabled,
                                     )
                                 }
                             }
