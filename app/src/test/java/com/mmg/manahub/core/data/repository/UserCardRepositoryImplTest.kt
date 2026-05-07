@@ -5,6 +5,7 @@ import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import io.github.jan.supabase.SupabaseClient
 import io.mockk.every
 import io.mockk.mockk
@@ -41,6 +42,7 @@ class UserCardRepositoryImplTest {
     private val remoteKeyDao               = mockk<RemoteKeyDao>(relaxed = true)
     private val database                   = mockk<MtgDatabase>(relaxed = true)
     private val supabaseClient             = mockk<SupabaseClient>(relaxed = true)
+    private val authRepository             = mockk<AuthRepository>(relaxed = true)
 
     private lateinit var repository: UserCardRepositoryImpl
 
@@ -86,6 +88,7 @@ class UserCardRepositoryImplTest {
             remoteKeyDao               = remoteKeyDao,
             database                   = database,
             supabaseClient             = supabaseClient,
+            authRepository             = authRepository,
             ioDispatcher               = UnconfinedTestDispatcher(),
         )
     }

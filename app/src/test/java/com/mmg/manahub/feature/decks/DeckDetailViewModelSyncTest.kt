@@ -17,8 +17,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -27,17 +29,20 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
  * Unit tests for [DeckMagicDetailViewModel] sync / navigation behaviour.
  *
- * Sync is now handled by [SyncManager] via WorkManager — the ViewModel must
- * not trigger any deck mutation (updateDeck, addCardToDeck…) on navigation back.
+ * Changes are now auto-saved.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeckDetailViewModelSyncTest {
+
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private val testScope      = CoroutineScope(testDispatcher + SupervisorJob())
 
     private val deckRepository       = mockk<DeckRepository>(relaxed = true)
     private val cardRepository       = mockk<CardRepository>(relaxed = true)
@@ -69,6 +74,7 @@ class DeckDetailViewModelSyncTest {
             userPreferencesRepo = userPreferencesRepo,
             syncManager         = syncManager,
             workManager         = workManager,
+            applicationScope    = testScope,
             savedStateHandle    = SavedStateHandle(mapOf("deckId" to DECK_ID)),
         )
     }
@@ -103,7 +109,7 @@ class DeckDetailViewModelSyncTest {
     }
 
     @Test
-    fun `onNavigatingBack returns false and shows discard dialog when there are unsaved changes`() = runTest {
+    fun `onNavigatingBack returns true and triggers save when there are unsaved changes`() = runTest {
         // updateDeckName requires a loaded deck (draftDeck != null), so create a ViewModel with one.
         val deck = Deck(
             id = DECK_ID, userId = "user", name = "Test Deck", description = "",
@@ -123,12 +129,14 @@ class DeckDetailViewModelSyncTest {
             userPreferencesRepo = userPreferencesRepo,
             syncManager         = syncManager,
             workManager         = workManager,
+            applicationScope    = testScope,
             savedStateHandle    = SavedStateHandle(mapOf("deckId" to DECK_ID)),
         )
 
         localVm.updateDeckName("Modified Name")
         val canNavigate = localVm.onNavigatingBack()
 
-        assertFalse("Expected canNavigate=false when unsaved changes exist", canNavigate)
+        assertTrue("Expected canNavigate=true as changes are auto-saved", canNavigate)
+        coVerify(atLeast = 1) { deckRepository.updateDeck(any()) }
     }
 }

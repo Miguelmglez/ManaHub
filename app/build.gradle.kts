@@ -50,6 +50,12 @@ android {
         )
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -83,6 +89,10 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+    }
+
+    androidResources {
+        noCompress += listOf("tflite")
     }
 
     ksp {
@@ -142,12 +152,12 @@ dependencies {
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
-    implementation(libs.mlkit.text.recognition)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.arch.core.testing)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
@@ -157,6 +167,13 @@ dependencies {
 
     // Gson — needed directly by RoomConverters and CardEntityMapper
     implementation(libs.gson)
+
+    // implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    // implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
 
     implementation(libs.accompanist.permissions)
     implementation(libs.material.icons.extended)

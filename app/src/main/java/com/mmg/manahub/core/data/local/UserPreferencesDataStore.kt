@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -43,6 +44,8 @@ private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold"
 private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
+
+private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
 
 // ── Per-user sync keys (keyed by userId to handle multi-account scenarios) ───
 private fun syncTimestampKey(userId: String) = stringPreferencesKey("sync_ts_$userId")
@@ -288,6 +291,22 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun clearPendingDeleteRemoteIds(userId: String) {
         context.userPrefsDataStore.edit { it.remove(pendingDeletesKey(userId)) }
+    }
+
+    // ── Embedding database version ────────────────────────────────────────────
+
+    /** Emits the locally stored version of the downloaded embedding DB (0 = bundled asset only). */
+    val embeddingDbVersionFlow: Flow<Int> = context.userPrefsDataStore.data
+        .map { it[KEY_EMBEDDING_DB_VERSION] ?: 0 }
+        .catch { emit(0) }
+
+    /** Returns the current embedding DB version synchronously (for use in Workers). */
+    suspend fun getEmbeddingDbVersion(): Int =
+        context.userPrefsDataStore.data.map { it[KEY_EMBEDDING_DB_VERSION] ?: 0 }.first()
+
+    /** Persists the version number after a successful R2 download. */
+    suspend fun saveEmbeddingDbVersion(version: Int) {
+        context.userPrefsDataStore.edit { it[KEY_EMBEDDING_DB_VERSION] = version }
     }
 
     suspend fun saveTheme(theme: AppTheme) {

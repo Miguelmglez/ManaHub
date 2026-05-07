@@ -791,4 +791,14 @@
     <!-- Auth field validation -->
     <string name="auth_error_name_too_short">El nombre es demasiado corto</string>
 
+    <!-- TRADES -->
+    <string name="trades_create_proposal_cta">Crear propuesta</string>
+    <string name="trades_new_trade_cta">Nuevo trade</string>
+
+    <string name="scanner_toast_added_to_collection">%1$s añadida a la Colección</string>
+    <string name="scanner_toast_added_to_wishlist">%1$s añadida a la Lista de deseos</string>
+    <string name="scanner_toast_added_all_to_wishlist">%1$d objetos añadidos a la lista de deseos</string>
+    <string name="scanner_toast_added_all_to_collection">%1$d objetos añadidos a la colección</string>
+    <string name="scanner_edit_sheet_title">Editar carta escaneada</string>
+
 </resources>

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
+import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.domain.model.*
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -19,6 +20,8 @@ import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.decks.engine.DeckImportExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -66,7 +69,6 @@ data class DeckMagicDetailUiState(
 
     val detailTags: List<CardTag> = emptyList(),
 
-    val isSaving: Boolean = false,
     val isImporting: Boolean = false,
     val importError: String? = null,
     val syncState: SyncState = SyncState.IDLE,
@@ -74,9 +76,9 @@ data class DeckMagicDetailUiState(
 
     // Draft / unsaved-changes state
     val hasUnsavedChanges: Boolean = false,
-    val showDiscardDialog: Boolean = false,
 )
 
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class DeckMagicDetailViewModel @Inject constructor(
     private val deckRepository: DeckRepository,
@@ -87,6 +89,7 @@ class DeckMagicDetailViewModel @Inject constructor(
     private val userPreferencesRepo: UserPreferencesRepository,
     private val syncManager: SyncManager,
     private val workManager: WorkManager,
+    @ApplicationScope private val applicationScope: CoroutineScope,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -117,6 +120,17 @@ class DeckMagicDetailViewModel @Inject constructor(
         observeDeck()
         observeCollection()
         observeSyncState()
+        observeDraftChanges()
+    }
+
+    private fun observeDraftChanges() {
+        uiState
+            .map { it.hasUnsavedChanges }
+            .distinctUntilChanged()
+            .filter { it }
+            .debounce(2000)
+            .onEach { persistToLocal() }
+            .launchIn(viewModelScope)
     }
 
     private fun observeSyncState() {
@@ -652,66 +666,47 @@ class DeckMagicDetailViewModel @Inject constructor(
 
     /**
      * Called when the user taps the system back button or the back arrow.
-     * Returns true if navigation should proceed, false if the discard dialog was shown.
+     * Always returns true as changes are auto-saved.
      */
     fun onNavigatingBack(): Boolean {
-        return if (_uiState.value.hasUnsavedChanges) {
-            _uiState.update { it.copy(showDiscardDialog = true) }
-            false
-        } else {
-            true
+        if (_uiState.value.hasUnsavedChanges) {
+            applicationScope.launch {
+                persistToLocal()
+                triggerSync()
+            }
         }
+        return true
     }
 
-    fun dismissDiscardDialog() {
-        _uiState.update { it.copy(showDiscardDialog = false) }
+    private suspend fun persistToLocal() {
+        // 1. Persist deck metadata if changed
+        val currentDeck = draftDeck
+        if (currentDeck != null && currentDeck != persistedDeck) {
+            runCatching {
+                deckRepository.updateDeck(currentDeck.copy(updatedAt = System.currentTimeMillis()))
+            }
+        }
+
+        // 2. Atomically replace all card slots
+        val slots = draftCardsMap.map { (key, qty) ->
+            Triple(key.first, qty, key.second)
+        }
+        runCatching { deckRepository.replaceAllCards(deckId, slots) }
+
+        // Mark as saved only after Room confirms
+        _uiState.update { it.copy(hasUnsavedChanges = false) }
     }
 
-    fun discardChanges(onNavigate: () -> Unit) {
-        draftCardsMap = persistedCardsMap.toMap()
-        draftDeck = persistedDeck
-        _uiState.update { it.copy(hasUnsavedChanges = false, showDiscardDialog = false) }
-        rebuildUiState()
-        onNavigate()
-    }
-
-    fun saveDeck(onComplete: () -> Unit) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, syncError = null) }
-
-            // 1. Persist deck metadata if changed
-            val currentDeck = draftDeck
-            if (currentDeck != null && currentDeck != persistedDeck) {
-                runCatching {
-                    deckRepository.updateDeck(currentDeck.copy(updatedAt = System.currentTimeMillis()))
-                }
-            }
-
-            // 2. Atomically replace all card slots in a single Room transaction.
-            // Using replaceAllCards (clearDeckCards + upsertDeckCards inside @Transaction)
-            // instead of per-card diffs prevents partial writes if the process is killed mid-save.
-            val slots = draftCardsMap.map { (key, qty) ->
-                Triple(key.first, qty, key.second)
-            }
-            runCatching { deckRepository.replaceAllCards(deckId, slots) }
-
-            // Mark as saved only after Room confirms — NOT before.
-            _uiState.update { it.copy(hasUnsavedChanges = false) }
-
-            // 3. Sync to Supabase
-            val userId = authRepository.getCurrentUser()?.id
-            if (userId != null) {
-                workManager.enqueueUniqueWork(
-                    CollectionSyncWorker.WORK_NAME_ONE_TIME,
-                    ExistingWorkPolicy.REPLACE,
-                    CollectionSyncWorker.oneTimeWorkRequest()
-                )
-                val result = syncManager.sync(userId)
-                _uiState.update { it.copy(syncError = result.error) }
-            }
-
-            _uiState.update { it.copy(isSaving = false) }
-            onComplete()
+    private suspend fun triggerSync() {
+        val userId = authRepository.getCurrentUser()?.id
+        if (userId != null) {
+            workManager.enqueueUniqueWork(
+                CollectionSyncWorker.WORK_NAME_ONE_TIME,
+                ExistingWorkPolicy.REPLACE,
+                CollectionSyncWorker.oneTimeWorkRequest()
+            )
+            val result = syncManager.sync(userId)
+            _uiState.update { it.copy(syncError = result.error) }
         }
     }
 

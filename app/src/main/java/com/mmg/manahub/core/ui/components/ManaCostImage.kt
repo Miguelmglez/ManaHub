@@ -1,23 +1,27 @@
 package com.mmg.manahub.core.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.mmg.manahub.R
 
 // ── Scryfall SVG base URL ─────────────────────────────────────────────────────
 private const val SVG_BASE = "https://svgs.scryfall.io/card-symbols/"
@@ -150,4 +154,104 @@ fun OracleText(
         modifier      = modifier,
         style         = style,
     )
+}
+
+/**
+ * Renders a card name, substituting the "A-" prefix (and any occurrences after " // ")
+ * with the Alchemy icon.
+ */
+@Composable
+fun CardName(
+    name: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    color: Color = Color.Unspecified,
+    fontWeight: androidx.compose.ui.text.font.FontWeight? = null,
+) {
+    val mergedStyle = if (fontWeight != null) style.copy(fontWeight = fontWeight) else style
+
+    // Find all occurrences of "A-" at the start, after " // ", or after a newline
+    // Regex matches "A-" at the beginning of string OR following " // " OR following a newline
+    val alchemyRegex = Regex("(^| // |\\n)A-")
+
+    if (name.contains(alchemyRegex)) {
+        val inlineContentId = "alchemy_icon"
+        val inlineContent = mapOf(
+            inlineContentId to androidx.compose.foundation.text.InlineTextContent(
+                placeholder = Placeholder(
+                    width = mergedStyle.fontSize.takeIf { it != TextStyle.Default.fontSize }?.let { it * 1.3f } ?: 18.sp,
+                    height = mergedStyle.fontSize.takeIf { it != TextStyle.Default.fontSize }?.let { it * 1.1f } ?: 15.sp,
+                    placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+                )
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_alchemy),
+                        contentDescription = "Alchemy",
+                        modifier = Modifier.fillMaxHeight().aspectRatio(1f)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
+            }
+        )
+
+        val annotatedString = buildAnnotatedString {
+            var lastIndex = 0
+            alchemyRegex.findAll(name).forEach { match ->
+                // Append text before the match
+                append(name.substring(lastIndex, match.range.first))
+                
+                // If it matches a separator, we need to keep that part
+                val matchValue = match.value
+                when {
+                    matchValue.startsWith(" // ") -> append(" // ")
+                    matchValue.startsWith("\n") -> append("\n")
+                }
+                
+                // Append the inline icon
+                appendInlineContent(inlineContentId, "[A-]")
+                
+                lastIndex = match.range.last + 1
+            }
+            // Append remaining text
+            if (lastIndex < name.length) {
+                append(name.substring(lastIndex))
+            }
+        }
+
+        Text(
+            text = annotatedString,
+            inlineContent = inlineContent,
+            modifier = modifier,
+            style = mergedStyle,
+            maxLines = maxLines,
+            overflow = overflow,
+            color = color
+        )
+    } else {
+        Text(
+            text = name,
+            modifier = modifier,
+            style = style,
+            maxLines = maxLines,
+            overflow = overflow,
+            color = color
+        )
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun CardNamePreview() {
+    MaterialTheme {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            CardName(name = "A-Dorothea, Vengeful Victim\nA-Dorothea's Retribution", style = MaterialTheme.typography.headlineSmall)
+            CardName(name = "A-Dorothea, Vengeful Victim // A-Dorothea's Retribution", style = MaterialTheme.typography.headlineSmall)
+            CardName(name = "A-Tidal Wave", style = MaterialTheme.typography.headlineSmall)
+            CardName(name = "Black Lotus", style = MaterialTheme.typography.headlineSmall)
+            CardName(name = "A-Llanowar Elves", style = MaterialTheme.typography.bodyLarge, color = Color.Green)
+        }
+    }
 }

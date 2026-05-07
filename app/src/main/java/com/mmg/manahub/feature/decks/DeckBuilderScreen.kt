@@ -2,14 +2,34 @@ package com.mmg.manahub.feature.decks
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -22,43 +42,78 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mmg.manahub.feature.decks.components.DeckSummaryCard
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.OracleText
-import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
-import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.components.CommanderBanner
+import com.mmg.manahub.feature.decks.components.DeckSummaryCard
 import com.mmg.manahub.feature.decks.components.MagicLandSuggestionStatic
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,6 +127,7 @@ fun DeckMagicDetailScreen(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
 
     var showAddCardsSheet by remember { mutableStateOf(false) }
     var showBasicLandsSheet by remember { mutableStateOf(false) }
@@ -83,6 +139,7 @@ fun DeckMagicDetailScreen(
     var isCardDetailInCommanderContext by remember { mutableStateOf(false) }
 
     val handleBack: () -> Unit = {
+        focusManager.clearFocus()
         if (viewModel.onNavigatingBack()) onBack()
     }
     BackHandler(onBack = handleBack)
@@ -177,37 +234,20 @@ fun DeckMagicDetailScreen(
         )
     }
 
-    if (uiState.showDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissDiscardDialog,
-            title = { Text(stringResource(R.string.deckbuilder_discard_dialog_title)) },
-            text = { Text(stringResource(R.string.deckbuilder_discard_dialog_message)) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.discardChanges { onBack() } }) {
-                    Text(stringResource(R.string.deckbuilder_discard_confirm), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissDiscardDialog) {
-                    Text(stringResource(R.string.deckbuilder_discard_cancel))
-                }
-            },
-            containerColor = mc.backgroundSecondary,
-            titleContentColor = mc.textPrimary,
-            textContentColor = mc.textSecondary,
-        )
-    }
-
     if (showEditDeckSheet) {
         EditDeckSheet(
             deck = uiState.deck,
             cards = uiState.cards,
             onSave = { newName, newCoverId ->
+                focusManager.clearFocus()
                 if (newName != null) viewModel.updateDeckName(newName)
                 if (newCoverId != null) viewModel.setCoverCard(newCoverId)
                 showEditDeckSheet = false
             },
-            onDismiss = { showEditDeckSheet = false },
+            onDismiss = { 
+                focusManager.clearFocus()
+                showEditDeckSheet = false 
+            },
         )
     }
 
@@ -223,18 +263,24 @@ fun DeckMagicDetailScreen(
 
     if (showAddCardsSheet) {
         CardSearchSheet(
-            uiState = uiState,
+            query = uiState.addCardsQuery,
+            addCardsResults = uiState.addCardsResults,
+            scryfallResults = uiState.scryfallResults,
+            isSearchingCards = uiState.isSearchingCards,
+            isSearchingScryfall = uiState.isSearchingScryfall,
             isCommanderMode = false,
             onQueryChange = viewModel::onAddCardsQueryChange,
             onScryfallSearch = viewModel::searchScryfallDirect,
             onAdd = viewModel::addCardToDeck,
             onRemove = viewModel::removeCardFromDeck,
             onCardClick = { id ->
+                focusManager.clearFocus()
                 // Regular add-cards flow: no commander context.
                 isCardDetailInCommanderContext = false
                 selectedCardId = id
             },
             onDismiss = {
+                focusManager.clearFocus()
                 showAddCardsSheet = false
                 viewModel.clearAddCardsState()
             },
@@ -243,11 +289,17 @@ fun DeckMagicDetailScreen(
 
     if (showCommanderSearchSheet) {
         CardSearchSheet(
-            uiState = uiState,
+            query = uiState.addCardsQuery,
+            addCardsResults = uiState.addCardsResults,
+            scryfallResults = uiState.scryfallResults,
+            isSearchingCards = uiState.isSearchingCards,
+            isSearchingScryfall = uiState.isSearchingScryfall,
             isCommanderMode = true,
+            isCurrentCommander = { it == uiState.commanderCard?.scryfallId },
             onQueryChange = viewModel::searchCommander,
             onScryfallSearch = viewModel::searchCommander,
             onAdd = { id ->
+                focusManager.clearFocus()
                 // Direct add from the list row: resolve card and assign as commander.
                 (uiState.addCardsResults + uiState.scryfallResults).find { it.card.scryfallId == id }?.card?.let { card ->
                     viewModel.setCommander(card)
@@ -256,11 +308,13 @@ fun DeckMagicDetailScreen(
             },
             onRemove = { /* No-op in commander selection mode */ },
             onCardClick = { id ->
+                focusManager.clearFocus()
                 // Open detail sheet with the commander-selection context flag active.
                 isCardDetailInCommanderContext = true
                 selectedCardId = id
             },
             onDismiss = {
+                focusManager.clearFocus()
                 showCommanderSearchSheet = false
                 viewModel.clearCommanderSearch()
             }
@@ -270,6 +324,7 @@ fun DeckMagicDetailScreen(
     if (selectedDeckCard != null) {
         // Load tags and other details
         LaunchedEffect(selectedDeckCard.scryfallId) {
+            focusManager.clearFocus()
             viewModel.loadCardDetails(selectedDeckCard.scryfallId)
         }
 
@@ -309,6 +364,7 @@ fun DeckMagicDetailScreen(
                 isCardDetailInCommanderContext = false
             },
             onDismiss = {
+                focusManager.clearFocus()
                 selectedCardId = null
                 isCardDetailInCommanderContext = false
             },
@@ -531,46 +587,6 @@ private fun ViewStepContent(
                                             { viewModel.moveQuantityToSideboard(entry.scryfallId, 1) }
                                         } else null,
                                         modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    item(key = "save_section") {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                .animateItem(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Reactive save button:
-                            // - Dirty state  (hasUnsavedChanges=true):  highlighted with primaryAccent, label "Save changes"
-                            // - Clean state  (hasUnsavedChanges=false): visually neutral, label "Saved", disabled
-                            val hasDirtyChanges = uiState.hasUnsavedChanges
-                            val saveEnabled = uiState.totalCards > 0 && !uiState.isSaving && hasDirtyChanges
-                            Button(
-                                onClick = { viewModel.saveDeck { /* Stay on screen after save */ } },
-                                enabled = saveEnabled,
-                                modifier = Modifier.fillMaxWidth().height(52.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = mc.primaryAccent,
-                                    disabledContainerColor = if (hasDirtyChanges) mc.surfaceVariant else mc.surfaceVariant.copy(alpha = 0.5f),
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                            ) {
-                                if (uiState.isSaving) {
-                                    CircularProgressIndicator(color = mc.background, modifier = Modifier.size(24.dp))
-                                } else {
-                                    val saveLabel = when {
-                                        hasDirtyChanges -> stringResource(R.string.deckbuilder_save_changes_button)
-                                        else -> stringResource(R.string.deckbuilder_saved_button)
-                                    }
-                                    Text(
-                                        text = saveLabel,
-                                        style = ty.titleMedium,
-                                        color = if (saveEnabled) mc.background else mc.textDisabled,
                                     )
                                 }
                             }
@@ -829,8 +845,8 @@ private fun CardRow(
                 contentScale = ContentScale.Crop
             )
             Column(Modifier.weight(1f)) {
-                Text(
-                    entry.card?.name ?: "Unknown", 
+                CardName(
+                    name = entry.card?.name ?: "Unknown", 
                     style = ty.bodyMedium, 
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -938,7 +954,7 @@ private fun CardDetailSheet(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val displayName = card.printedName?.takeIf { it.isNotBlank() } ?: card.name
-                        Text(displayName, style = ty.titleMedium, color = mc.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        CardName(displayName, style = ty.titleMedium, color = mc.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         card.manaCost?.let { ManaCostImages(manaCost = it, symbolSize = 18.dp) }
                     }
                     val typeLine = card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
@@ -1118,165 +1134,6 @@ private fun CardDetailSheet(
                     Icon(Icons.Default.Delete, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.action_remove_all), color = mc.lifeNegative, style = ty.labelLarge)
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CardSearchSheet(
-    uiState: DeckMagicDetailUiState,
-    isCommanderMode: Boolean,
-    onQueryChange: (String) -> Unit,
-    onScryfallSearch: (String) -> Unit,
-    onAdd: (String) -> Unit,
-    onRemove: (String) -> Unit,
-    onCardClick: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedTab by remember { mutableStateOf(0) }
-    var showAdvancedSearch by remember { mutableStateOf(false) }
-
-    if (showAdvancedSearch) {
-        AdvancedSearchSheet(
-            onDismiss = { showAdvancedSearch = false },
-            onSearch = { _, rawQuery ->
-                showAdvancedSearch = false
-                selectedTab = 1
-                onScryfallSearch(rawQuery)
-            },
-        )
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = mc.backgroundSecondary,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f).padding(bottom = 16.dp)) {
-            val title = if (isCommanderMode) "Choose Commander" else stringResource(R.string.deckbuilder_add_cards)
-            Text(title, style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(16.dp))
-
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = uiState.addCardsQuery,
-                    onValueChange = { if (selectedTab == 0) onQueryChange(it) else onScryfallSearch(it) },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(R.string.deckbuilder_add_cards_search_hint), color = mc.textDisabled) },
-                    leadingIcon = {
-                        val isSearching = if (selectedTab == 0) uiState.isSearchingCards else uiState.isSearchingScryfall
-                        if (isSearching) CircularProgressIndicator(Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Search, null, tint = mc.textSecondary)
-                    },
-                    trailingIcon = if (uiState.addCardsQuery.isNotEmpty()) {
-                        { IconButton(onClick = { onQueryChange(""); onScryfallSearch("") }) { Icon(Icons.Default.Clear, null, tint = mc.textSecondary) } }
-                    } else null,
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.medium,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = mc.primaryAccent, unfocusedBorderColor = mc.surfaceVariant, cursorColor = mc.primaryAccent)
-                )
-                IconButton(onClick = { showAdvancedSearch = true }, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(mc.surface)) {
-                    Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.advsearch_title), tint = mc.primaryAccent)
-                }
-            }
-
-            TabRow(selectedTabIndex = selectedTab, containerColor = mc.backgroundSecondary, contentColor = mc.primaryAccent) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.deckbuilder_tab_collection), style = ty.labelLarge) })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.deckdetail_tab_scryfall), style = ty.labelLarge) })
-            }
-
-            val results = if (selectedTab == 0) uiState.addCardsResults else uiState.scryfallResults
-            LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { Spacer(Modifier.height(8.dp)) }
-                
-                items(results, key = { it.card.scryfallId }) { row ->
-                    AddCardSheetRow(
-                        row = row,
-                        isCommanderMode = isCommanderMode,
-                        isCurrentCommander = uiState.commanderCard?.scryfallId == row.card.scryfallId,
-                        onAdd = { onAdd(row.card.scryfallId) },
-                        onRemove = { onRemove(row.card.scryfallId) },
-                        onClick = { onCardClick(row.card.scryfallId) }
-                    )
-                }
-
-                // Empty State from DeckDetail
-                if (results.isEmpty()) {
-                    val isSearching = if (selectedTab == 0) uiState.isSearchingCards else uiState.isSearchingScryfall
-                    if (!isSearching) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (selectedTab == 1 && uiState.addCardsQuery.isBlank())
-                                        stringResource(R.string.deckbuilder_add_cards_search_hint)
-                                    else
-                                        stringResource(R.string.deckbuilder_no_cards),
-                                    style = ty.bodyMedium,
-                                    color = mc.textDisabled,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = RoundedCornerShape(8.dp)) {
-                Text(stringResource(R.string.deckbuilder_add_cards_done), style = ty.titleMedium, color = mc.background)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddCardSheetRow(
-    row: AddCardRow,
-    isCommanderMode: Boolean = false,
-    isCurrentCommander: Boolean = false,
-    onAdd: () -> Unit,
-    onRemove: () -> Unit,
-    onClick: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val card = row.card
-    // Always allow adding, warning overlay handles limits
-    val addEnabled = true 
-
-    Surface(
-        onClick = onClick, 
-        shape = RoundedCornerShape(8.dp), 
-        color = if (isCurrentCommander) mc.goldMtg.copy(alpha = 0.1f) else mc.surface,
-        border = if (isCurrentCommander) BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)) else null
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            AsyncImage(model = card.imageArtCrop, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(RoundedCornerShape(4.dp)))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(card.name, style = ty.bodyMedium, color = if (isCurrentCommander) mc.goldMtg else mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(card.typeLine, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (row.quantityInDeck > 0 && !isCommanderMode) {
-                    IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Remove, null, tint = mc.textSecondary, modifier = Modifier.size(16.dp))
-                    }
-                    Text("${row.quantityInDeck}", style = ty.labelMedium, color = mc.primaryAccent)
-                }
-                
-                val icon = if (isCommanderMode) {
-                    if (isCurrentCommander) Icons.Default.Check else Icons.Default.Add
-                } else Icons.Default.Add
-
-                IconButton(onClick = onAdd, enabled = addEnabled || isCommanderMode, modifier = Modifier.size(32.dp)) {
-                    Icon(icon, null, tint = if (isCurrentCommander) mc.goldMtg else if (addEnabled || isCommanderMode) mc.primaryAccent else mc.textDisabled, modifier = Modifier.size(16.dp))
                 }
             }
         }

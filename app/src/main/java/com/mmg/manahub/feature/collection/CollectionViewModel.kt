@@ -16,6 +16,7 @@ import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -40,6 +41,7 @@ class CollectionViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val syncManager: SyncManager,
     private val workManager: WorkManager,
+    private val migrateLocalTradeLists: MigrateLocalTradeListsUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CollectionUiState())
@@ -110,6 +112,7 @@ class CollectionViewModel @Inject constructor(
                             viewModelScope.launch {
                                 syncManager.assignUserIdAndSync(state.user.id)
                             }
+                            triggerTradeListMigration(state.user.id)
                         }
                     }
                     is SessionState.Unauthenticated -> {
@@ -175,6 +178,26 @@ class CollectionViewModel @Inject constructor(
     }
 
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
+
+    fun onSnackbarDismissed() = _uiState.update { it.copy(snackbarMessage = null) }
+
+    /**
+     * Migrates locally stored trade lists (wishlist + open-for-trade) to the
+     * authenticated user's remote account. Shows a Snackbar if cards were migrated.
+     *
+     * The migration string format is handled by the caller (CollectionScreen) using
+     * the count stored in [CollectionUiState.snackbarMessage].
+     */
+    private fun triggerTradeListMigration(userId: String) {
+        viewModelScope.launch {
+            migrateLocalTradeLists(userId)
+                .onSuccess { count ->
+                    if (count > 0) {
+                        _uiState.update { it.copy(snackbarMessage = count.toString()) }
+                    }
+                }
+        }
+    }
 
     fun applyAdvancedFilters(query: AdvancedSearchQuery) {
         _uiState.update { it.copy(activeQuery = if (query.isEmpty()) null else query) }
