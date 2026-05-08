@@ -13,6 +13,8 @@ data class CardDetailUiState(
     val isLoading:        Boolean        = true,
     val error:            String?        = null,
     val isStale:          Boolean        = false,
+    // Trade quantities: userCardId → number of copies currently offered for trade
+    val tradeQuantities:  Map<String, Int> = emptyMap(),
     // Dialog / sheet state
     val showAddSheet:      Boolean        = false,
     val showWishlistSheet: Boolean        = false,

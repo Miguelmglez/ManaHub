@@ -133,6 +133,7 @@ fun CardDetailScreen(
                 uiState.card != null -> CardDetailContent(
                     card = uiState.card!!,
                     userCards = uiState.userCards,
+                    tradeQuantities = uiState.tradeQuantities,
                     decksContainingCard = uiState.decksContainingCard,
                     isStale = uiState.isStale,
                     onRemoveAutoTag = viewModel::onRemoveTag,
@@ -214,6 +215,7 @@ fun CardDetailScreen(
     if (uiState.showTradeSheet) {
         TradeSelectionSheet(
             userCards = uiState.userCards,
+            currentTradeQty = uiState.tradeQuantities,
             onConfirm = viewModel::onConfirmTradeSelection,
             onDismiss = viewModel::onDismissTradeSheet,
         )
@@ -268,6 +270,7 @@ private fun FaceFlippable(
 private fun CardDetailContent(
     card: Card,
     userCards: List<UserCard>,
+    tradeQuantities: Map<String, Int>,
     decksContainingCard: List<Deck>,
     isStale: Boolean,
     onRemoveAutoTag: (CardTag) -> Unit,
@@ -490,6 +493,7 @@ private fun CardDetailContent(
         // Collection section: copies list + add / wishlist / trade buttons
         CollectionSection(
             userCards = userCards,
+            tradeQuantities = tradeQuantities,
             onShowAddSheet = onShowAddSheet,
             onShowWishlistSheet = onShowWishlistSheet,
             onShowTradeSheet = onShowTradeSheet,
@@ -589,6 +593,7 @@ private fun CardDetailContentDFCPreview() {
         CardDetailContent(
             card = card,
             userCards = emptyList(),
+            tradeQuantities = emptyMap(),
             decksContainingCard = emptyList(),
             isStale = false,
             onRemoveAutoTag = {},
@@ -713,6 +718,7 @@ private fun DeckChip(deck: Deck, onClick: () -> Unit) {
 @Composable
 private fun CollectionSection(
     userCards: List<UserCard>,
+    tradeQuantities: Map<String, Int>,
     onShowAddSheet: () -> Unit,
     onShowWishlistSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
@@ -783,6 +789,7 @@ private fun CollectionSection(
         userCards.forEach { uc ->
             CollectionCopyRow(
                 userCard = uc,
+                tradeQuantity = tradeQuantities[uc.id] ?: 0,
                 onUpdateQuantity = onUpdateQuantity,
                 onRequestDelete = onRequestDelete,
             )
@@ -814,6 +821,7 @@ private fun CollectionSection(
 @Composable
 private fun CollectionCopyRow(
     userCard: UserCard,
+    tradeQuantity: Int,
     onUpdateQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
 ) {
@@ -838,7 +846,7 @@ private fun CollectionCopyRow(
                 if (userCard.isAlternativeArt) {
                     CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
                 }
-                if (userCard.isForTrade) {
+                if (tradeQuantity > 0) {
                     Surface(
                         color = MaterialTheme.colorScheme.tertiaryContainer,
                         shape = MaterialTheme.shapes.extraSmall,

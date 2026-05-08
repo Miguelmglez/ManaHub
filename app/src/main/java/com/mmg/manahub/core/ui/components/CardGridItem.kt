@@ -85,11 +85,12 @@ fun CardGridItem(
             // Card name + price
             Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 CardName(
-                    name     = card.name,
-                    style    = MaterialTheme.magicTypography.labelSmall,
-                    color    = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    name          = card.name,
+                    showFrontOnly = true,
+                    style         = MaterialTheme.magicTypography.labelSmall,
+                    color         = mc.textPrimary,
+                    maxLines      = 1,
+                    overflow      = TextOverflow.Ellipsis,
                 )
                 val preferredCurrency = LocalPreferredCurrency.current
                 val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, item.hasFoil, preferredCurrency) {

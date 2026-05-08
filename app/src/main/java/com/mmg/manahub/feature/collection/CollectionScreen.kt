@@ -155,10 +155,6 @@ private fun CollectionContent(
         topBar = {
             CollectionTopBar(
                 selectedTab       = uiState.selectedTab,
-                viewMode          = uiState.viewMode,
-                onViewModeToggle  = onViewModeToggle,
-                onSortChange      = onSortChange,
-                currentSort       = uiState.sortOrder,
             )
         },
         floatingActionButton = {
@@ -234,6 +230,8 @@ private fun CollectionContent(
                     onClearFilters        = onClearFilters,
                     onShowAdvancedSearch  = onShowAdvancedSearch,
                     onShowSyncSheet       = onShowSyncSheet,
+                    onViewModeToggle      = onViewModeToggle,
+                    onSortChange          = onSortChange,
                 )
                 CollectionTab.DECKS   -> DeckListScreen(onDeckClick = onDeckClick)
                 CollectionTab.TRADES  -> TradesScreen(
@@ -264,9 +262,13 @@ private fun CardsTabContent(
     onClearFilters:       () -> Unit,
     onShowAdvancedSearch: () -> Unit,
     onShowSyncSheet:      () -> Unit,
+    onViewModeToggle:     () -> Unit,
+    onSortChange:         (SortOrder) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val filterCount = uiState.activeFilterCount
+    var showSortMenu by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Stale data warning
         AnimatedVisibility(visible = uiState.hasStaleCards) {
@@ -342,7 +344,7 @@ private fun CardsTabContent(
             }
         }
 
-        // Card count
+        // Card count + Sort/View controls
         val totalCopies = uiState.cards.sumOf { it.totalQuantity }
         Row(
             modifier = Modifier
@@ -355,26 +357,69 @@ private fun CardsTabContent(
                 text     = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
                 style    = MaterialTheme.magicTypography.labelLarge,
                 color    = mc.textSecondary,
+                modifier = Modifier.weight(1f)
             )
 
-            if (uiState.sessionState is SessionState.Authenticated) {
-                IconButton(
-                    onClick  = onShowSyncSheet,
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    if (uiState.syncState == SyncState.SYNCING) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = mc.primaryAccent
-                        )
-                    } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (uiState.sessionState is SessionState.Authenticated) {
+                    IconButton(
+                        onClick  = onShowSyncSheet,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        if (uiState.syncState == SyncState.SYNCING) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = mc.primaryAccent
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = stringResource(R.string.action_refresh),
+                                tint = mc.textSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+
+                IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        imageVector = if (uiState.viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
+                        contentDescription = stringResource(R.string.collection_view_grid),
+                        tint = mc.textSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                Box {
+                    IconButton(onClick = { showSortMenu = true }, modifier = Modifier.size(24.dp)) {
                         Icon(
-                            imageVector = Icons.Default.Sync,
+                            imageVector        = Icons.Default.Sort,
                             contentDescription = stringResource(R.string.action_refresh),
-                            tint = mc.textSecondary,
-                            modifier = Modifier.size(18.dp)
+                            tint               = mc.textSecondary,
+                            modifier           = Modifier.size(18.dp)
                         )
+                    }
+                    DropdownMenu(
+                        expanded         = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                    ) {
+                        SortOrder.entries.forEach { sort ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(sort.displayResId)) },
+                                onClick = {
+                                    onSortChange(sort)
+                                    showSortMenu = false
+                                },
+                                leadingIcon = if (sort == uiState.sortOrder) {
+                                    { Icon(Icons.Default.Check, contentDescription = null) }
+                                } else null,
+                            )
+                        }
                     }
                 }
             }
@@ -411,12 +456,7 @@ private fun CardsTabContent(
 @Composable
 private fun CollectionTopBar(
     selectedTab:      CollectionTab,
-    viewMode:         ViewMode,
-    onViewModeToggle: () -> Unit,
-    onSortChange:     (SortOrder) -> Unit,
-    currentSort:      SortOrder,
 ) {
-    var showSortMenu by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors
 
     Surface(
@@ -436,42 +476,6 @@ private fun CollectionTopBar(
                 color    = mc.textPrimary,
                 modifier = Modifier.weight(1f)
             )
-
-            if (selectedTab == CollectionTab.CARDS) {
-                IconButton(onClick = onViewModeToggle) {
-                    Icon(
-                        imageVector = if (viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
-                        contentDescription = stringResource(R.string.collection_view_grid),
-                        tint = mc.textSecondary
-                    )
-                }
-                Box {
-                    IconButton(onClick = { showSortMenu = true }) {
-                        Icon(
-                            imageVector        = Icons.Default.Sort,
-                            contentDescription = stringResource(R.string.action_refresh),
-                            tint               = mc.textSecondary
-                        )
-                    }
-                    DropdownMenu(
-                        expanded         = showSortMenu,
-                        onDismissRequest = { showSortMenu = false },
-                    ) {
-                        SortOrder.entries.forEach { sort ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(sort.displayResId)) },
-                                onClick = {
-                                    onSortChange(sort)
-                                    showSortMenu = false
-                                },
-                                leadingIcon = if (sort == currentSort) {
-                                    { Icon(Icons.Default.Check, contentDescription = null) }
-                                } else null,
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

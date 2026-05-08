@@ -46,6 +46,10 @@ interface UserCardCollectionDao {
     @Query("SELECT * FROM user_card_collection WHERE user_id = :userId AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language AND is_alternative_art = :isAlternativeArt LIMIT 1")
     fun getByCompositeKey(userId: String, scryfallId: String, isFoil: Boolean, condition: String, language: String, isAlternativeArt: Boolean): UserCardCollectionEntity?
 
+    // Guest-session variant: matches rows where user_id is NULL or empty.
+    @Query("SELECT * FROM user_card_collection WHERE (user_id IS NULL OR user_id = '') AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language AND is_alternative_art = :isAlternativeArt LIMIT 1")
+    fun getByCompositeKeyGuest(scryfallId: String, isFoil: Boolean, condition: String, language: String, isAlternativeArt: Boolean): UserCardCollectionEntity?
+
     // Hard-delete used only for UUID reconciliation: removes the stale guest-UUID row so
     // the Supabase-canonical UUID row can be inserted without a composite UNIQUE conflict.
     @Query("DELETE FROM user_card_collection WHERE id = :id")

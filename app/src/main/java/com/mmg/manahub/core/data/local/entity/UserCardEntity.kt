@@ -34,11 +34,10 @@ data class UserCardCollectionEntity(
     @ColumnInfo(name = "scryfall_id") val scryfallId: String,
     @ColumnInfo(name = "quantity") val quantity: Int = 1,
     @ColumnInfo(name = "is_foil") val isFoil: Boolean = false,
-    @ColumnInfo(name = "condition") val condition: String = "NM",          // NM | LP | MP | HP | DMG
+    @ColumnInfo(name = "condition") val condition: String = "NM",          // M | NM | EX | GD | LP | PL | PO
     @ColumnInfo(name = "language") val language: String = "en",            // ISO: en | ja | de | …
     @ColumnInfo(name = "is_alternative_art") val isAlternativeArt: Boolean = false,
     @ColumnInfo(name = "is_for_trade") val isForTrade: Boolean = false,
-    @ColumnInfo(name = "is_in_wishlist") val isInWishlist: Boolean = false,
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,       // soft-delete flag
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
