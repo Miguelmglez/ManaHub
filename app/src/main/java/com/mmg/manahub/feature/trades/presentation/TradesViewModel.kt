@@ -177,10 +177,23 @@ class TradesViewModel @Inject constructor(
      *
      * @param scryfallId        Scryfall card ID.
      * @param localCollectionId The user_cards row ID to link this offer to.
+     * @param quantity          Number of copies to offer.
+     * @param isFoil            Whether the copy is foil.
+     * @param condition         Card condition (e.g. "NM").
+     * @param language          Card language (e.g. "en").
+     * @param isAltArt          Whether the copy is alternative art.
      */
-    fun onAddToOpenForTrade(scryfallId: String, localCollectionId: String) {
+    fun onAddToOpenForTrade(
+        scryfallId: String,
+        localCollectionId: String,
+        quantity: Int = 1,
+        isFoil: Boolean = false,
+        condition: String = "NM",
+        language: String = "en",
+        isAltArt: Boolean = false,
+    ) {
         viewModelScope.launch(ioDispatcher) {
-            addToOpenForTrade(scryfallId, localCollectionId)
+            addToOpenForTrade(scryfallId, localCollectionId, quantity, isFoil, condition, language, isAltArt)
                 .onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
         }
     }

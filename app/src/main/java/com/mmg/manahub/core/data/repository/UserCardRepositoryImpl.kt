@@ -124,7 +124,6 @@ class UserCardRepositoryImpl @Inject constructor(
                 language = entity.language,
                 isAlternativeArt = entity.isAlternativeArt,
                 isForTrade = entity.isForTrade,
-                isInWishlist = entity.isInWishlist,
                 updatedAt = entity.updatedAt,
                 createdAt = entity.createdAt,
             )
@@ -156,54 +155,67 @@ class UserCardRepositoryImpl @Inject constructor(
         language: String,
         isAlternativeArt: Boolean,
         isForTrade: Boolean,
-        isInWishlist: Boolean,
         userId: String?,
+        quantity: Int,
     ) = withContext(ioDispatcher) {
         val now = System.currentTimeMillis()
+        val resolvedUserId = userId ?: authRepository.getCurrentUser()?.id
+        val normalizedCondition = condition.uppercase().trim()
+        val normalizedLanguage = language.lowercase().trim()
 
-        // Try to find an existing row matching the unique physical variant.
-        val existing = userCardCollectionDao.observeByScryfall(scryfallId, userId)
-            // This is a Flow — we read once using a suspend-compatible approach.
-            // Use getById after finding the match from a snapshot.
-            .let { flow ->
-                // Read current list synchronously from the DAO (non-Flow query).
-                null // will resolve via upsert logic below
-            }
+        // Look up existing row by composite unique key (synchronous query, not Flow).
+        val existing = if (!resolvedUserId.isNullOrBlank()) {
+            userCardCollectionDao.getByCompositeKey(
+                resolvedUserId, scryfallId, isFoil,
+                normalizedCondition, normalizedLanguage, isAlternativeArt,
+            )
+        } else {
+            userCardCollectionDao.getByCompositeKeyGuest(
+                scryfallId, isFoil, normalizedCondition,
+                normalizedLanguage, isAlternativeArt,
+            )
+        }
 
-        // The DAO's upsert handles the insert-or-increment logic:
-        // If a row with the same (userId, scryfallId, isFoil, condition, language,
-        // isAlternativeArt) already exists, it increments the quantity and updates
-        // updatedAt. Otherwise, it inserts a new row with a fresh UUID.
-        val entity = UserCardCollectionEntity(
-            id = UUID.randomUUID().toString(),
-            userId = userId,
-            scryfallId = scryfallId,
-            quantity = 1,
-            isFoil = isFoil,
-            condition = condition,
-            language = language,
-            isAlternativeArt = isAlternativeArt,
-            isForTrade = isForTrade,
-            isInWishlist = isInWishlist,
-            isDeleted = false,
-            updatedAt = now,
-            createdAt = now,
-        )
-        userCardCollectionDao.upsert(entity)
+        if (existing != null && !existing.isDeleted) {
+            // INCREMENT existing row's quantity
+            userCardCollectionDao.upsert(
+                existing.copy(
+                    quantity  = existing.quantity + quantity,
+                    isForTrade = isForTrade || existing.isForTrade,
+                    updatedAt = now,
+                )
+            )
+        } else {
+            // INSERT new row
+            userCardCollectionDao.upsert(
+                UserCardCollectionEntity(
+                    id               = UUID.randomUUID().toString(),
+                    userId           = resolvedUserId,
+                    scryfallId       = scryfallId,
+                    quantity         = quantity,
+                    isFoil           = isFoil,
+                    condition        = normalizedCondition,
+                    language         = normalizedLanguage,
+                    isAlternativeArt = isAlternativeArt,
+                    isForTrade       = isForTrade,
+                    isDeleted        = false,
+                    updatedAt        = now,
+                    createdAt        = now,
+                )
+            )
+        }
         Unit
     }
 
     override suspend fun updateAttributes(
         id: String,
         isForTrade: Boolean,
-        isInWishlist: Boolean,
         quantity: Int,
     ) = withContext(ioDispatcher) {
         val existing = userCardCollectionDao.getById(id) ?: return@withContext
         userCardCollectionDao.upsert(
             existing.copy(
                 isForTrade = isForTrade,
-                isInWishlist = isInWishlist,
                 quantity = quantity,
                 updatedAt = System.currentTimeMillis(),
             )
@@ -237,7 +249,6 @@ class UserCardRepositoryImpl @Inject constructor(
             language = userCard.language,
             isAlternativeArt = userCard.isAlternativeArt,
             isForTrade = userCard.isForTrade,
-            isInWishlist = userCard.isInWishlist,
             updatedAt = userCard.updatedAt,
             createdAt = userCard.createdAt,
         )

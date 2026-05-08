@@ -60,18 +60,17 @@ interface UserCardRepository {
         language: String,
         isAlternativeArt: Boolean,
         isForTrade: Boolean,
-        isInWishlist: Boolean,
         userId: String?,
+        quantity: Int = 1,
     )
 
     /**
-     * Updates the trade/wishlist flags and quantity for an existing row.
+     * Updates the trade flag and quantity for an existing row.
      * Also bumps [updatedAt] so the sync engine picks up the change.
      */
     suspend fun updateAttributes(
         id: String,
         isForTrade: Boolean,
-        isInWishlist: Boolean,
         quantity: Int,
     )
 

@@ -16,6 +16,7 @@ import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -42,6 +43,7 @@ class CollectionViewModel @Inject constructor(
     private val syncManager: SyncManager,
     private val workManager: WorkManager,
     private val migrateLocalTradeLists: MigrateLocalTradeListsUseCase,
+    private val getLocalWishlist: GetLocalWishlistUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CollectionUiState())
@@ -49,6 +51,10 @@ class CollectionViewModel @Inject constructor(
 
     // Raw unfiltered collection from Room (non-deleted entries)
     private val _allCards = MutableStateFlow<List<UserCardWithCard>>(emptyList())
+
+    // Live set of scryfall IDs present in the local wishlist table.
+    // Used by the "In Wishlist" advanced-search filter.
+    private val _wishlistCardIds = MutableStateFlow<Set<String>>(emptySet())
 
     // ViewModel-scoped field (not a local var) so it survives config changes.
     // Reset only on genuine Unauthenticated transitions, never on Loading, so
@@ -58,9 +64,20 @@ class CollectionViewModel @Inject constructor(
 
     init {
         observeCollection()
+        observeWishlistIds()
         refreshPrices()
         observeSyncState()
         observeSessionChanges()
+    }
+
+    private fun observeWishlistIds() {
+        viewModelScope.launch {
+            getLocalWishlist().collect { entries ->
+                _wishlistCardIds.value = entries.map { it.cardId }.toSet()
+                // Re-apply filters so active "In Wishlist" criterion picks up changes.
+                applyFilters()
+            }
+        }
     }
 
     // ── Collection observation ────────────────────────────────────────────────
@@ -300,7 +317,7 @@ class CollectionViewModel @Inject constructor(
                     card.card.oracleText?.contains(criterion.value, ignoreCase = true) == true
             // ── Collection-local ──────────────────────────────────────────────
             is SearchCriterion.IsInWishlist ->
-                card.userCard.isInWishlist == criterion.value
+                (_wishlistCardIds.value.contains(card.userCard.scryfallId)) == criterion.value
             is SearchCriterion.IsForTrade ->
                 card.userCard.isForTrade == criterion.value
             is SearchCriterion.HasTag ->

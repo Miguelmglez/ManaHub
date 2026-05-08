@@ -16,10 +16,14 @@ import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -30,6 +34,8 @@ class CardDetailViewModel @Inject constructor(
     private val userCardRepo: UserCardRepository,
     private val deckRepo: DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
+    private val addToWishlistUseCase: AddToWishlistUseCase,
+    private val openForTradeRepo: OpenForTradeRepository,
     private val userPrefs: UserPreferencesRepository,
     private val authRepository: AuthRepository,
     private val helper: AnalyticsHelper,
@@ -47,6 +53,7 @@ class CardDetailViewModel @Inject constructor(
     init {
         loadCard()
         observeUserCards()
+        observeTradeEntries()
         observeDecks()
         viewModelScope.launch {
             userPrefs.userDefinedTagsFlow.collect { tags ->
@@ -99,7 +106,17 @@ class CardDetailViewModel @Inject constructor(
                     userCardRepo.observeByScryfallId(scryfallId, userId)
                 }
                 .collect { cards ->
-                    _uiState.update { it.copy(userCards = cards.filter { c -> !c.isInWishlist }) }
+                    _uiState.update { it.copy(userCards = cards) }
+                }
+        }
+    }
+
+    private fun observeTradeEntries() {
+        viewModelScope.launch {
+            openForTradeRepo.observeByScryfallId(scryfallId)
+                .collect { entries ->
+                    val qtyMap = entries.associate { it.userCardId to it.quantity }
+                    _uiState.update { it.copy(tradeQuantities = qtyMap) }
                 }
         }
     }
@@ -131,6 +148,7 @@ class CardDetailViewModel @Inject constructor(
                 isAlternativeArt = isAlternativeArt,
                 condition = condition,
                 language = language,
+                quantity = quantity,
             )
             if (result is DataResult.Error) {
                 _uiState.update { it.copy(error = result.message) }
@@ -153,18 +171,18 @@ class CardDetailViewModel @Inject constructor(
         condition: String, language: String, quantity: Int,
     ) {
         viewModelScope.launch {
-            runCatching {
-                userCardRepo.addOrIncrement(
-                    scryfallId = scryfallId,
-                    isFoil = isFoil,
-                    isAlternativeArt = isAlternativeArt,
-                    condition = condition,
-                    language = language,
-                    isForTrade = false,
-                    isInWishlist = true,
-                    userId = null,
-                )
-            }
+            val entry = WishlistEntry(
+                id              = UUID.randomUUID().toString(),
+                userId          = "",
+                cardId          = scryfallId,
+                matchAnyVariant = false,
+                isFoil          = isFoil,
+                condition       = condition.uppercase().trim(),
+                language        = language.lowercase().trim(),
+                isAltArt        = isAlternativeArt,
+                createdAt       = System.currentTimeMillis(),
+            )
+            addToWishlistUseCase(entry)
                 .onSuccess {
                     helper.logEvent("add_card_wishlist", mapOf("card_id" to scryfallId))
                     _events.emit(CardDetailEvent.ShowToast("Added to wishlist"))
@@ -190,7 +208,6 @@ class CardDetailViewModel @Inject constructor(
                 userCardRepo.updateAttributes(
                     id = userCardId,
                     isForTrade = card.isForTrade,
-                    isInWishlist = card.isInWishlist,
                     quantity = quantity,
                 )
             }.onFailure { e -> _uiState.update { it.copy(error = e.message) } }
@@ -203,38 +220,53 @@ class CardDetailViewModel @Inject constructor(
                 userCardRepo.updateAttributes(
                     id = userCard.id,
                     isForTrade = userCard.isForTrade,
-                    isInWishlist = userCard.isInWishlist,
                     quantity = userCard.quantity,
                 )
             }.onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
     }
 
-    fun onConfirmTradeSelection(selections: Map<String, Boolean>) {
+    fun onConfirmTradeSelection(selections: Map<String, Int>) {
         val userCards = _uiState.value.userCards
+        val currentQty = _uiState.value.tradeQuantities
         viewModelScope.launch {
             var anyError = false
-            selections.forEach { (id, isForTrade) ->
-                val card = userCards.find { it.id == id } ?: return@forEach
-                if (card.isForTrade != isForTrade) {
-                    runCatching {
-                        userCardRepo.updateAttributes(
-                            id = id,
-                            isForTrade = isForTrade,
-                            isInWishlist = card.isInWishlist,
-                            quantity = card.quantity,
-                        )
-                    }.onFailure { e ->
+            var totalOffered = 0
+            selections.forEach { (id, desiredQty) ->
+                val uc = userCards.find { it.id == id } ?: return@forEach
+                val prevQty = currentQty[id] ?: 0
+                if (desiredQty == prevQty) {
+                    totalOffered += desiredQty
+                    return@forEach
+                }
+                if (desiredQty > 0) {
+                    // Add or update the trade entry
+                    openForTradeRepo.addLocal(
+                        scryfallId = uc.scryfallId,
+                        localCollectionId = uc.id,
+                        quantity = desiredQty,
+                        isFoil = uc.isFoil,
+                        condition = uc.condition,
+                        language = uc.language,
+                        isAltArt = uc.isAlternativeArt,
+                    ).onFailure { e ->
                         anyError = true
                         _uiState.update { it.copy(error = e.message) }
                     }
+                    totalOffered += desiredQty
+                } else {
+                    // Remove the trade entry
+                    openForTradeRepo.removeByCollectionId(uc.id)
+                        .onFailure { e ->
+                            anyError = true
+                            _uiState.update { it.copy(error = e.message) }
+                        }
                 }
             }
             if (!anyError) {
-                val tradeCount = selections.values.count { it }
                 _events.emit(
                     CardDetailEvent.ShowToast(
-                        if (tradeCount > 0) "$tradeCount ${if (tradeCount == 1) "copy" else "copies"} offered for trade"
+                        if (totalOffered > 0) "$totalOffered ${if (totalOffered == 1) "copy" else "copies"} offered for trade"
                         else "Trade offers cleared"
                     )
                 )

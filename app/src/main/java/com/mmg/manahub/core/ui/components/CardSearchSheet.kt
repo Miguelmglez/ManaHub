@@ -268,7 +268,14 @@ private fun AddCardSheetRow(
         Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AsyncImage(model = card.imageArtCrop, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(RoundedCornerShape(4.dp)))
             Column(modifier = Modifier.weight(1f)) {
-                CardName(name = card.name, style = ty.bodyMedium, color = if (isCurrentCommander) mc.goldMtg else mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                CardName(
+                    name          = card.name,
+                    showFrontOnly = true,
+                    style         = ty.bodyMedium,
+                    color         = if (isCurrentCommander) mc.goldMtg else mc.textPrimary,
+                    maxLines      = 1,
+                    overflow      = TextOverflow.Ellipsis
+                )
                 Text(card.typeLine, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

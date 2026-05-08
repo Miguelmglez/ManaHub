@@ -20,17 +20,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +36,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,19 +45,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
@@ -100,8 +95,6 @@ fun TradesScreen(
                         onCardClick = onCardClick,
                         onWishlistSelect = viewModel::onToggleWishlistSelect,
                         onOfferSelect = viewModel::onToggleOfferSelect,
-                        onRemoveWishlist = viewModel::onRemoveFromWishlist,
-                        onRemoveOffer = viewModel::onRemoveFromOpenForTrade,
                     )
 
                     TradesMainTab.FRIENDS -> FriendsContent(
@@ -157,7 +150,7 @@ private fun TradesSubNavigation(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp), // Reduced vertical padding
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         TradesMainTab.entries.forEach { tab ->
@@ -205,16 +198,14 @@ private fun MyListContent(
     onCardClick: (String) -> Unit,
     onWishlistSelect: (String) -> Unit,
     onOfferSelect: (String) -> Unit,
-    onRemoveWishlist: (String) -> Unit,
-    onRemoveOffer: (String) -> Unit,
 ) {
     var wishlistExpanded by remember { mutableStateOf(true) }
     var offersExpanded by remember { mutableStateOf(true) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 88.dp), // FAB clearance
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(bottom = 88.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         // ── My Wishlist section ───────────────────────────────────────────────
         item(key = "wishlist_header") {
@@ -238,15 +229,13 @@ private fun MyListContent(
                 }
             } else {
                 items(uiState.wishlist, key = { "w_${it.id}" }) { entry ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        WishlistEntryRow(
-                            entry = entry,
-                            isSelected = entry.id in uiState.selectedWishlistIds,
-                            onCardClick = onCardClick,
-                            onSelect = { onWishlistSelect(entry.id) },
-                            onRemove = { onRemoveWishlist(entry.id) },
-                        )
-                    }
+                    WishlistEntryRow(
+                        entry = entry,
+                        isSelected = entry.id in uiState.selectedWishlistIds,
+                        onCardClick = onCardClick,
+                        onSelect = { onWishlistSelect(entry.id) },
+                    )
+                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
                 }
             }
         }
@@ -275,15 +264,13 @@ private fun MyListContent(
                 }
             } else {
                 items(uiState.openForTrade, key = { "o_${it.id}" }) { entry ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        OfferEntryRow(
-                            entry = entry,
-                            isSelected = entry.id in uiState.selectedOfferIds,
-                            onCardClick = onCardClick,
-                            onSelect = { onOfferSelect(entry.id) },
-                            onRemove = { onRemoveOffer(entry.id) },
-                        )
-                    }
+                    OfferEntryRow(
+                        entry = entry,
+                        isSelected = entry.id in uiState.selectedOfferIds,
+                        onCardClick = onCardClick,
+                        onSelect = { onOfferSelect(entry.id) },
+                    )
+                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
                 }
             }
         }
@@ -439,92 +426,36 @@ private fun WishlistEntryRow(
     isSelected: Boolean,
     onCardClick: (String) -> Unit,
     onSelect:   () -> Unit,
-    onRemove:   () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val preferredCurrency = LocalPreferredCurrency.current
+    val card = entry.card
 
-    Surface(
-        shape    = RoundedCornerShape(12.dp),
-        color    = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCardClick(entry.cardId) },
-    ) {
-        Row(
-            modifier          = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Multi-select checkbox
-            IconButton(onClick = onSelect, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector        = if (isSelected) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                    contentDescription = null,
-                    tint               = if (isSelected) mc.primaryAccent else mc.textDisabled,
-                    modifier           = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-
-            // Card Image
-            AsyncImage(
-                model              = entry.card?.imageArtCrop,
-                contentDescription = entry.card?.name,
-                contentScale       = ContentScale.Crop,
-                modifier           = Modifier
-                    .size(width = 44.dp, height = 60.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(mc.surfaceVariant),
-            )
-            Spacer(Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
+    CardListItem(
+        name = card?.name ?: entry.cardId,
+        imageUrl = card?.imageArtCrop,
+        priceUsd = if (entry.isFoil == true) card?.priceUsdFoil else card?.priceUsd,
+        priceEur = if (entry.isFoil == true) card?.priceEurFoil else card?.priceEur,
+        onClick = { onCardClick(entry.cardId) },
+        showCheckbox = true,
+        isChecked = isSelected,
+        onCheckedChange = { onSelect() },
+        containerColor = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else Color.Transparent,
+        hasFoil = entry.isFoil == true,
+        isStale = card?.isStale ?: false,
+        setCode = card?.setCode,
+        setName = card?.setName,
+        rarity = card?.rarity,
+        extraSupportingContent = {
+            val badges = buildVariantBadges(entry)
+            if (badges.isNotEmpty()) {
                 Text(
-                    text     = entry.card?.name ?: entry.cardId,
-                    style    = ty.bodyMedium,
-                    color    = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text  = badges.joinToString(" · "),
+                    style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
+                    color = mc.textSecondary,
                 )
-                // Variant badges
-                val badges = buildVariantBadges(entry)
-                if (badges.isNotEmpty()) {
-                    Text(
-                        text  = badges.joinToString(" · "),
-                        style = ty.labelSmall,
-                        color = mc.textSecondary,
-                    )
-                }
-            }
-
-            // Price column
-            Column(horizontalAlignment = Alignment.End) {
-                entry.card?.let { card ->
-                    val priceText = PriceFormatter.formatFromScryfall(
-                        priceUsd = if (entry.isFoil == true) card.priceUsdFoil else card.priceUsd,
-                        priceEur = if (entry.isFoil == true) card.priceEurFoil else card.priceEur,
-                        preferredCurrency = preferredCurrency,
-                    )
-                    if (priceText != "—") {
-                        Text(
-                            text  = priceText,
-                            style = ty.bodyMedium,
-                            color = mc.goldMtg,
-                        )
-                    }
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector        = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_remove),
-                        tint               = mc.textDisabled,
-                        modifier           = Modifier.size(16.dp),
-                    )
-                }
             }
         }
-    }
+    )
 }
 
 private fun buildVariantBadges(entry: WishlistEntry): List<String> {
@@ -547,90 +478,36 @@ private fun OfferEntryRow(
     isSelected: Boolean,
     onCardClick: (String) -> Unit,
     onSelect:   () -> Unit,
-    onRemove:   () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val preferredCurrency = LocalPreferredCurrency.current
+    val card = entry.card
 
-    Surface(
-        shape    = RoundedCornerShape(12.dp),
-        color    = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCardClick(entry.scryfallId) },
-    ) {
-        Row(
-            modifier          = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onSelect, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector        = if (isSelected) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                    contentDescription = null,
-                    tint               = if (isSelected) mc.primaryAccent else mc.textDisabled,
-                    modifier           = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-
-            // Card Image
-            AsyncImage(
-                model              = entry.card?.imageArtCrop,
-                contentDescription = entry.card?.name,
-                contentScale       = ContentScale.Crop,
-                modifier           = Modifier
-                    .size(width = 44.dp, height = 60.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(mc.surfaceVariant),
-            )
-            Spacer(Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
+    CardListItem(
+        name = card?.name ?: entry.scryfallId,
+        imageUrl = card?.imageArtCrop,
+        priceUsd = if (entry.isFoil) card?.priceUsdFoil else card?.priceUsd,
+        priceEur = if (entry.isFoil) card?.priceEurFoil else card?.priceEur,
+        onClick = { onCardClick(entry.scryfallId) },
+        showCheckbox = true,
+        isChecked = isSelected,
+        onCheckedChange = { onSelect() },
+        containerColor = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else Color.Transparent,
+        hasFoil = entry.isFoil,
+        isStale = card?.isStale ?: false,
+        setCode = card?.setCode,
+        setName = card?.setName,
+        rarity = card?.rarity,
+        extraSupportingContent = {
+            val badges = buildOfferBadges(entry)
+            if (badges.isNotEmpty()) {
                 Text(
-                    text     = entry.card?.name ?: entry.scryfallId,
-                    style    = ty.bodyMedium,
-                    color    = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text  = badges.joinToString(" · "),
+                    style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
+                    color = mc.textSecondary,
                 )
-                val badges = buildOfferBadges(entry)
-                if (badges.isNotEmpty()) {
-                    Text(
-                        text  = badges.joinToString(" · "),
-                        style = ty.labelSmall,
-                        color = mc.textSecondary,
-                    )
-                }
-            }
-
-            // Price column
-            Column(horizontalAlignment = Alignment.End) {
-                entry.card?.let { card ->
-                    val priceText = PriceFormatter.formatFromScryfall(
-                        priceUsd = if (entry.isFoil) card.priceUsdFoil else card.priceUsd,
-                        priceEur = if (entry.isFoil) card.priceEurFoil else card.priceEur,
-                        preferredCurrency = preferredCurrency,
-                    )
-                    if (priceText != "—") {
-                        Text(
-                            text  = priceText,
-                            style = ty.bodyMedium,
-                            color = mc.goldMtg,
-                        )
-                    }
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector        = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_remove),
-                        tint               = mc.textDisabled,
-                        modifier           = Modifier.size(16.dp),
-                    )
-                }
             }
         }
-    }
+    )
 }
 
 private fun buildOfferBadges(entry: OpenForTradeEntry): List<String> = buildList {
@@ -639,4 +516,3 @@ private fun buildOfferBadges(entry: OpenForTradeEntry): List<String> = buildList
     if (entry.language.isNotBlank())  add(entry.language)
     if (entry.isAltArt)   add("Alt art")
 }
-

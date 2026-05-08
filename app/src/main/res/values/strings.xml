@@ -107,13 +107,13 @@
 
     <string name="addcard_added_success">%1$s added to collection</string>
 
-    <string name="card_condition_m">Mint (M)</string>
-    <string name="card_condition_nm">Near Mint (NM)</string>
-    <string name="card_condition_ex">Excellent (EX)</string>
-    <string name="card_condition_gd">Good (GD)</string>
-    <string name="card_condition_lp">Light Played (LP)</string>
-    <string name="card_condition_pl">Played (PL)</string>
-    <string name="card_condition_p">Poor (PO)</string>
+    <string name="card_condition_m">Mint</string>
+    <string name="card_condition_nm">Near Mint</string>
+    <string name="card_condition_ex">Excellent</string>
+    <string name="card_condition_gd">Good</string>
+    <string name="card_condition_lp">Light Played</string>
+    <string name="card_condition_pl">Played</string>
+    <string name="card_condition_p">Poor</string>
 
     <!-- ══════════════════════════════════════════
          CARD DETAIL SCREEN
@@ -176,6 +176,8 @@
     <string name="carddetail_trade_sheet_subtitle">Choose which copies you want to mark for trade. They will remain in your collection.</string>
     <string name="carddetail_for_trade_badge">For trade</string>
     <string name="carddetail_no_copies_for_trade">You have no collection copies to mark for trade.</string>
+    <string name="carddetail_trade_offered_header">Offered for Trade</string>
+    <string name="carddetail_trade_available_header">Available in Collection</string>
     <string name="carddetail_rename_tag">Rename tag</string>
     <string name="carddetail_new_name_hint">New name…</string>
     <string name="carddetail_new_custom_tag">New custom tag</string>
