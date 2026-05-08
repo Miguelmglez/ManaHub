@@ -14,7 +14,6 @@ fun UserCardCollectionEntity.toDomain(): UserCard = UserCard(
     condition = condition,
     language = language,
     isForTrade = isForTrade,
-    isInWishlist = isInWishlist,
     updatedAt = updatedAt,
     createdAt = createdAt,
 )
@@ -36,7 +35,6 @@ fun UserCard.toEntity(userId: String?): UserCardCollectionEntity = UserCardColle
     condition = condition,
     language = language,
     isForTrade = isForTrade,
-    isInWishlist = isInWishlist,
     isDeleted = false,
     updatedAt = updatedAt,
     createdAt = createdAt,
