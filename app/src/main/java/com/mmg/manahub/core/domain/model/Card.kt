@@ -74,7 +74,6 @@ data class UserCard(
     val condition:        String  = "NM",
     val language:         String  = "en",
     val isForTrade:       Boolean = false,
-    val isInWishlist:     Boolean = false,
     val updatedAt:        Long    = System.currentTimeMillis(),
     val createdAt:        Long    = System.currentTimeMillis(),
 )

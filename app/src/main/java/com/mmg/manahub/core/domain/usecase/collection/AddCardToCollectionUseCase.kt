@@ -21,8 +21,8 @@ class AddCardToCollectionUseCase @Inject constructor(
         condition:        String  = "NM",
         language:         String  = "en",
         isForTrade:       Boolean = false,
-        isInWishlist:     Boolean = false,
         userId:           String? = null,
+        quantity:         Int     = 1,
     ): DataResult<Unit> {
         val cardResult = cardRepository.getCardById(scryfallId)
         if (cardResult is DataResult.Error) return DataResult.Error(cardResult.message)
@@ -33,8 +33,8 @@ class AddCardToCollectionUseCase @Inject constructor(
             condition        = condition,
             language         = language,
             isForTrade       = isForTrade,
-            isInWishlist     = isInWishlist,
             userId           = userId,
+            quantity         = quantity,
         )
         return DataResult.Success(Unit)
     }

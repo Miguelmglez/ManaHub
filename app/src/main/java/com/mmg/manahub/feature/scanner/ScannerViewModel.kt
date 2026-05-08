@@ -439,14 +439,14 @@ class ScannerViewModel @Inject constructor(
     /** Adds a single queue entry to the user's collection. */
     fun onAddEntryToCollection(entry: ScannedCard) {
         viewModelScope.launch {
-            repeat(entry.quantity) {
-                addToCollection(
-                    scryfallId = entry.card.scryfallId,
-                    isFoil = entry.isFoil,
-                    condition = entry.condition,
-                    language = entry.language,
-                )
-            }
+            addToCollection(
+                scryfallId = entry.card.scryfallId,
+                isFoil = entry.isFoil,
+                isAlternativeArt = false, // Scanner doesn't track alt art
+                condition = entry.condition,
+                language = entry.language,
+                quantity = entry.quantity,
+            )
             analyticsHelper.logEvent(
                 "scanner_entry_to_collection",
                 mapOf("card_id" to entry.card.scryfallId)
@@ -469,8 +469,8 @@ class ScannerViewModel @Inject constructor(
                 cardId         = entry.card.scryfallId,
                 matchAnyVariant = false,
                 isFoil         = entry.isFoil,
-                condition      = entry.condition,
-                language       = entry.language,
+                condition      = entry.condition.uppercase().trim(),
+                language       = entry.language.lowercase().trim(),
                 isAltArt       = false,
                 createdAt      = System.currentTimeMillis(),
                 card           = entry.card,
@@ -506,8 +506,8 @@ class ScannerViewModel @Inject constructor(
                     cardId         = entry.card.scryfallId,
                     matchAnyVariant = false,
                     isFoil         = entry.isFoil,
-                    condition      = entry.condition,
-                    language       = entry.language,
+                    condition      = entry.condition.uppercase().trim(),
+                    language       = entry.language.lowercase().trim(),
                     isAltArt       = false,
                     createdAt      = System.currentTimeMillis(),
                     card           = entry.card,
