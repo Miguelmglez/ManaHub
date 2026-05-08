@@ -43,7 +43,7 @@ import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
         LocalWishlistEntity::class,
         LocalOpenForTradeEntity::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

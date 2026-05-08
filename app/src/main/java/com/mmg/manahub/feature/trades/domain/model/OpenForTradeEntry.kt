@@ -7,6 +7,7 @@ data class OpenForTradeEntry(
     val userId: String,
     val userCardId: String,
     val scryfallId: String,
+    val quantity: Int,
     val isFoil: Boolean,
     val condition: String,
     val language: String,

@@ -24,20 +24,53 @@ class OpenForTradeRepositoryImpl @Inject constructor(
     override fun observeLocal(): Flow<List<OpenForTradeEntry>> =
         dao.observeAllWithCard().map { list -> list.map { it.toDomain() } }
 
+    override fun observeByScryfallId(scryfallId: String): Flow<List<OpenForTradeEntry>> =
+        dao.observeByScryfallId(scryfallId).map { list -> list.map { it.toDomain() } }
+
     override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
 
-    override suspend fun addLocal(scryfallId: String, localCollectionId: String): Result<Unit> =
-        runCatching {
-            dao.insert(
+    override suspend fun addLocal(
+        scryfallId: String,
+        localCollectionId: String,
+        quantity: Int,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isAltArt: Boolean,
+    ): Result<Unit> = runCatching {
+        val existing = dao.getByCollectionId(localCollectionId)
+        if (existing != null) {
+            // Update existing entry with new quantity and attributes
+            dao.upsert(
+                existing.copy(
+                    quantity = quantity,
+                    isFoil = isFoil,
+                    condition = condition,
+                    language = language,
+                    isAltArt = isAltArt,
+                    synced = false,
+                )
+            )
+        } else {
+            dao.upsert(
                 LocalOpenForTradeEntity(
                     id = UUID.randomUUID().toString(),
                     localCollectionId = localCollectionId,
                     scryfallId = scryfallId,
+                    quantity = quantity,
+                    isFoil = isFoil,
+                    condition = condition,
+                    language = language,
+                    isAltArt = isAltArt,
                     synced = false,
                     createdAt = System.currentTimeMillis(),
                 )
             )
         }
+    }
+
+    override suspend fun removeByCollectionId(localCollectionId: String): Result<Unit> =
+        runCatching { dao.deleteByCollectionId(localCollectionId) }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
         dao.deleteById(id)
@@ -68,10 +101,11 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         userId = "",
         userCardId = localCollectionId,
         scryfallId = scryfallId,
-        isFoil = false,
-        condition = "NM",
-        language = "en",
-        isAltArt = false,
+        quantity = quantity,
+        isFoil = isFoil,
+        condition = condition,
+        language = language,
+        isAltArt = isAltArt,
         createdAt = createdAt,
     )
 
@@ -84,6 +118,7 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         userId = userId,
         userCardId = userCardId,
         scryfallId = scryfallId ?: "",
+        quantity = 1, // Remote entries are always 1:1
         isFoil = isFoil ?: false,
         condition = condition ?: "NM",
         language = language ?: "en",

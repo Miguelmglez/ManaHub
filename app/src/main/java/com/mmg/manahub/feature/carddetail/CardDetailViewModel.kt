@@ -17,6 +17,7 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,6 +35,7 @@ class CardDetailViewModel @Inject constructor(
     private val deckRepo: DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
     private val addToWishlistUseCase: AddToWishlistUseCase,
+    private val openForTradeRepo: OpenForTradeRepository,
     private val userPrefs: UserPreferencesRepository,
     private val authRepository: AuthRepository,
     private val helper: AnalyticsHelper,
@@ -51,6 +53,7 @@ class CardDetailViewModel @Inject constructor(
     init {
         loadCard()
         observeUserCards()
+        observeTradeEntries()
         observeDecks()
         viewModelScope.launch {
             userPrefs.userDefinedTagsFlow.collect { tags ->
@@ -104,6 +107,16 @@ class CardDetailViewModel @Inject constructor(
                 }
                 .collect { cards ->
                     _uiState.update { it.copy(userCards = cards) }
+                }
+        }
+    }
+
+    private fun observeTradeEntries() {
+        viewModelScope.launch {
+            openForTradeRepo.observeByScryfallId(scryfallId)
+                .collect { entries ->
+                    val qtyMap = entries.associate { it.userCardId to it.quantity }
+                    _uiState.update { it.copy(tradeQuantities = qtyMap) }
                 }
         }
     }
@@ -213,30 +226,47 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
-    fun onConfirmTradeSelection(selections: Map<String, Boolean>) {
+    fun onConfirmTradeSelection(selections: Map<String, Int>) {
         val userCards = _uiState.value.userCards
+        val currentQty = _uiState.value.tradeQuantities
         viewModelScope.launch {
             var anyError = false
-            selections.forEach { (id, isForTrade) ->
-                val card = userCards.find { it.id == id } ?: return@forEach
-                if (card.isForTrade != isForTrade) {
-                    runCatching {
-                        userCardRepo.updateAttributes(
-                            id = id,
-                            isForTrade = isForTrade,
-                            quantity = card.quantity,
-                        )
-                    }.onFailure { e ->
+            var totalOffered = 0
+            selections.forEach { (id, desiredQty) ->
+                val uc = userCards.find { it.id == id } ?: return@forEach
+                val prevQty = currentQty[id] ?: 0
+                if (desiredQty == prevQty) {
+                    totalOffered += desiredQty
+                    return@forEach
+                }
+                if (desiredQty > 0) {
+                    // Add or update the trade entry
+                    openForTradeRepo.addLocal(
+                        scryfallId = uc.scryfallId,
+                        localCollectionId = uc.id,
+                        quantity = desiredQty,
+                        isFoil = uc.isFoil,
+                        condition = uc.condition,
+                        language = uc.language,
+                        isAltArt = uc.isAlternativeArt,
+                    ).onFailure { e ->
                         anyError = true
                         _uiState.update { it.copy(error = e.message) }
                     }
+                    totalOffered += desiredQty
+                } else {
+                    // Remove the trade entry
+                    openForTradeRepo.removeByCollectionId(uc.id)
+                        .onFailure { e ->
+                            anyError = true
+                            _uiState.update { it.copy(error = e.message) }
+                        }
                 }
             }
             if (!anyError) {
-                val tradeCount = selections.values.count { it }
                 _events.emit(
                     CardDetailEvent.ShowToast(
-                        if (tradeCount > 0) "$tradeCount ${if (tradeCount == 1) "copy" else "copies"} offered for trade"
+                        if (totalOffered > 0) "$totalOffered ${if (totalOffered == 1) "copy" else "copies"} offered for trade"
                         else "Trade offers cleared"
                     )
                 )
