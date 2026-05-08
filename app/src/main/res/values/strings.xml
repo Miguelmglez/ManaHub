@@ -107,13 +107,13 @@
 
     <string name="addcard_added_success">%1$s added to collection</string>
 
-    <string name="card_condition_m">Mint (M)</string>
-    <string name="card_condition_nm">Near Mint (NM)</string>
-    <string name="card_condition_ex">Excellent (EX)</string>
-    <string name="card_condition_gd">Good (GD)</string>
-    <string name="card_condition_lp">Light Played (LP)</string>
-    <string name="card_condition_pl">Played (PL)</string>
-    <string name="card_condition_p">Poor (PO)</string>
+    <string name="card_condition_m">Mint</string>
+    <string name="card_condition_nm">Near Mint</string>
+    <string name="card_condition_ex">Excellent</string>
+    <string name="card_condition_gd">Good</string>
+    <string name="card_condition_lp">Light Played</string>
+    <string name="card_condition_pl">Played</string>
+    <string name="card_condition_p">Poor</string>
 
     <!-- ══════════════════════════════════════════
          CARD DETAIL SCREEN

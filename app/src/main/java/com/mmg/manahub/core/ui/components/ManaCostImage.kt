@@ -244,19 +244,3 @@ fun CardName(
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
-@Composable
-fun CardNamePreview() {
-    MaterialTheme {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Full Names:", style = MaterialTheme.typography.labelSmall)
-            CardName(name = "A-Dorothea, Vengeful Victim // A-Dorothea's Retribution", style = MaterialTheme.typography.headlineSmall)
-            CardName(name = "Fire // Ice", style = MaterialTheme.typography.headlineSmall)
-            
-            Spacer(Modifier.height(8.dp))
-            Text("Front Only:", style = MaterialTheme.typography.labelSmall)
-            CardName(name = "A-Dorothea, Vengeful Victim // A-Dorothea's Retribution", showFrontOnly = true, style = MaterialTheme.typography.headlineSmall)
-            CardName(name = "Fire // Ice", showFrontOnly = true, style = MaterialTheme.typography.headlineSmall)
-        }
-    }
-}

@@ -115,54 +115,58 @@ fun TradeSelectionSheet(
                     contentPadding = PaddingValues(bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
-                    // ── Section 1: Offered for Trade ────────────────────────
+                    // ── Section 1: Available in Collection ──────────────────
+                    val availableCards = userCards.filter { (editQty[it.id] ?: 0) < it.quantity }
+
+                    item(key = "available_header") {
+                        val availableCount =
+                            availableCards.sumOf { it.quantity - (editQty[it.id] ?: 0) }
+                        SectionHeader(
+                            title = stringResource(R.string.carddetail_trade_available_header),
+                            count = availableCount,
+                        )
+                    }
+                    items(availableCards, key = { "available_${it.id}" }) { uc ->
+                        val tradeQty = editQty[uc.id] ?: 0
+                        val availableQty = uc.quantity - tradeQty
+                        CopyRow(
+                            userCard = uc,
+                            displayQty = availableQty,
+                            offeredQty = tradeQty,
+                            actionIcon = Icons.Default.Add,
+                            actionColor = mc.primaryAccent,
+                            onAction = { editQty[uc.id] = (tradeQty + 1).coerceAtMost(uc.quantity) }
+                        )
+                    }
+                    
+
+                    // ── Section 2: Offered for Trade ────────────────────────
                     val offeredCards = userCards.filter { (editQty[it.id] ?: 0) > 0 }
-                    if (offeredCards.isNotEmpty()) {
-                        item(key = "offered_header") {
-                            SectionHeader(
-                                title = stringResource(R.string.carddetail_trade_offered_header),
-                                count = offeredCards.sumOf { editQty[it.id] ?: 0 },
-                            )
-                        }
-                        items(offeredCards, key = { "offered_${it.id}" }) { uc ->
-                            val tradeQty = editQty[uc.id] ?: 0
-                            CopyRow(
-                                userCard = uc,
-                                tradeQty = tradeQty,
-                                maxQty = uc.quantity,
-                                onIncrease = { editQty[uc.id] = (tradeQty + 1).coerceAtMost(uc.quantity) },
-                                onDecrease = { editQty[uc.id] = (tradeQty - 1).coerceAtLeast(0) },
-                            )
-                        }
-                        item(key = "divider") {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                color = mc.textDisabled.copy(alpha = 0.2f),
-                            )
-                        }
+
+                    item(key = "offered_header") {
+                        SectionHeader(
+                            title = stringResource(R.string.carddetail_trade_offered_header),
+                            count = offeredCards.sumOf { editQty[it.id] ?: 0 },
+                        )
+                    }
+                    items(offeredCards, key = { "offered_${it.id}" }) { uc ->
+                        val tradeQty = editQty[uc.id] ?: 0
+                        CopyRow(
+                            userCard = uc,
+                            displayQty = tradeQty,
+                            offeredQty = tradeQty,
+                            actionIcon = Icons.Default.Remove,
+                            actionColor = mc.lifeNegative,
+                            onAction = { editQty[uc.id] = (tradeQty - 1).coerceAtLeast(0) }
+                        )
+                    }
+                    item(key = "divider") {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = mc.textDisabled.copy(alpha = 0.2f),
+                        )
                     }
 
-                    // ── Section 2: Available in Collection ──────────────────
-                    val availableCards = userCards.filter { (editQty[it.id] ?: 0) < it.quantity }
-                    if (availableCards.isNotEmpty()) {
-                        item(key = "available_header") {
-                            val availableCount = availableCards.sumOf { it.quantity - (editQty[it.id] ?: 0) }
-                            SectionHeader(
-                                title = stringResource(R.string.carddetail_trade_available_header),
-                                count = availableCount,
-                            )
-                        }
-                        items(availableCards, key = { "available_${it.id}" }) { uc ->
-                            val tradeQty = editQty[uc.id] ?: 0
-                            CopyRow(
-                                userCard = uc,
-                                tradeQty = tradeQty,
-                                maxQty = uc.quantity,
-                                onIncrease = { editQty[uc.id] = (tradeQty + 1).coerceAtMost(uc.quantity) },
-                                onDecrease = { editQty[uc.id] = (tradeQty - 1).coerceAtLeast(0) },
-                            )
-                        }
-                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -222,10 +226,11 @@ private fun SectionHeader(title: String, count: Int) {
 @Composable
 private fun CopyRow(
     userCard: UserCard,
-    tradeQty: Int,
-    maxQty: Int,
-    onIncrease: () -> Unit,
-    onDecrease: () -> Unit,
+    displayQty: Int,
+    offeredQty: Int,
+    actionIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    actionColor: androidx.compose.ui.graphics.Color,
+    onAction: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -250,7 +255,11 @@ private fun CopyRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Quantity badge
-                    AttributeBadge("×${userCard.quantity}", mc.textPrimary, mc.textPrimary.copy(alpha = 0.1f))
+                    AttributeBadge(
+                        "×$displayQty",
+                        mc.textPrimary,
+                        mc.textPrimary.copy(alpha = 0.1f)
+                    )
 
                     // Language
                     AttributeBadge(
@@ -286,53 +295,30 @@ private fun CopyRow(
                 }
 
                 // Trade status line
-                if (tradeQty > 0) {
+                if (offeredQty > 0) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "$tradeQty of ${userCard.quantity} offered",
+                        text = "$offeredQty of ${userCard.quantity} offered",
                         style = ty.labelSmall,
-                        color = mc.primaryAccent,
+                        color = mc.goldMtg,
                     )
                 }
             }
 
-            // Quantity stepper
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            // Action button
+            IconButton(
+                onClick = onAction,
+                modifier = Modifier.size(36.dp),
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = actionColor.copy(alpha = 0.12f),
+                    contentColor = actionColor,
+                ),
             ) {
-                IconButton(
-                    onClick = onDecrease,
-                    enabled = tradeQty > 0,
-                    modifier = Modifier.size(32.dp),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = mc.lifeNegative,
-                        disabledContentColor = mc.textDisabled,
-                    ),
-                ) {
-                    Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-
-                Text(
-                    text = tradeQty.toString(),
-                    style = ty.labelMedium,
-                    color = mc.textPrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(24.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                Icon(
+                    imageVector = actionIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
                 )
-
-                IconButton(
-                    onClick = onIncrease,
-                    enabled = tradeQty < maxQty,
-                    modifier = Modifier.size(32.dp),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = mc.primaryAccent,
-                        disabledContentColor = mc.textDisabled,
-                    ),
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
             }
         }
     }
