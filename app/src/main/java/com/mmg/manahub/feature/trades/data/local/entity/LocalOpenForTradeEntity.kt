@@ -26,6 +26,24 @@ data class LocalOpenForTradeEntity(
     @ColumnInfo(name = "scryfall_id")
     val scryfallId: String,
 
+    // How many copies of this collection group are offered for trade.
+    @ColumnInfo(name = "quantity")
+    val quantity: Int = 1,
+
+    // Denormalized card attributes for display on TradesScreen without a JOIN
+    // to user_card_collection.
+    @ColumnInfo(name = "is_foil")
+    val isFoil: Boolean = false,
+
+    @ColumnInfo(name = "condition")
+    val condition: String = "NM",
+
+    @ColumnInfo(name = "language")
+    val language: String = "en",
+
+    @ColumnInfo(name = "is_alt_art")
+    val isAltArt: Boolean = false,
+
     // 0 = pending cloud migration; 1 = migrated to Supabase after user logs in
     @ColumnInfo(name = "synced")
     val synced: Boolean = false,

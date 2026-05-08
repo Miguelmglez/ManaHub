@@ -176,6 +176,8 @@
     <string name="carddetail_trade_sheet_subtitle">Choose which copies you want to mark for trade. They will remain in your collection.</string>
     <string name="carddetail_for_trade_badge">For trade</string>
     <string name="carddetail_no_copies_for_trade">You have no collection copies to mark for trade.</string>
+    <string name="carddetail_trade_offered_header">Offered for Trade</string>
+    <string name="carddetail_trade_available_header">Available in Collection</string>
     <string name="carddetail_rename_tag">Rename tag</string>
     <string name="carddetail_new_name_hint">New name…</string>
     <string name="carddetail_new_custom_tag">New custom tag</string>

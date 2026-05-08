@@ -45,6 +45,7 @@ object DatabaseModule {
                 MIGRATION_26_27,
                 MIGRATION_27_28,
                 MIGRATION_28_29,
+                MIGRATION_29_30,
             )
             .build()
 
@@ -146,6 +147,34 @@ object DatabaseModule {
         override fun migrate(db: SupportSQLiteDatabase) {
             if (!columnExists(db, "cards", "card_faces")) {
                 db.execSQL("ALTER TABLE cards ADD COLUMN card_faces TEXT")
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v29 → v30
+    // Adds denormalized columns to `local_open_for_trade` so that TradesScreen
+    // can display card variant details (foil, condition, language, alt art)
+    // without a JOIN to user_card_collection.  Also adds `quantity` to support
+    // partial trade offers (e.g. offering 1 of 3 identical copies).
+    // All columns use NOT NULL with a DEFAULT so existing rows are safe.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_29_30 = object : Migration(29, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "local_open_for_trade", "quantity")) {
+                db.execSQL("ALTER TABLE local_open_for_trade ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
+            }
+            if (!columnExists(db, "local_open_for_trade", "is_foil")) {
+                db.execSQL("ALTER TABLE local_open_for_trade ADD COLUMN is_foil INTEGER NOT NULL DEFAULT 0")
+            }
+            if (!columnExists(db, "local_open_for_trade", "condition")) {
+                db.execSQL("ALTER TABLE local_open_for_trade ADD COLUMN condition TEXT NOT NULL DEFAULT 'NM'")
+            }
+            if (!columnExists(db, "local_open_for_trade", "language")) {
+                db.execSQL("ALTER TABLE local_open_for_trade ADD COLUMN language TEXT NOT NULL DEFAULT 'en'")
+            }
+            if (!columnExists(db, "local_open_for_trade", "is_alt_art")) {
+                db.execSQL("ALTER TABLE local_open_for_trade ADD COLUMN is_alt_art INTEGER NOT NULL DEFAULT 0")
             }
         }
     }
