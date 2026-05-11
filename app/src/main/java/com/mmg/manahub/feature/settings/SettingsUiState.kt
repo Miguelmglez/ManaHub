@@ -9,7 +9,6 @@ import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.ui.theme.AppTheme
 
 data class SettingsUiState(
-    val autoRefreshPrices: Boolean = false,
     val currentTheme: AppTheme = AppTheme.NeonVoid,
 )
 

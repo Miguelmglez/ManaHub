@@ -9,6 +9,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.sync.CollectionSyncWorker
+import com.mmg.manahub.core.sync.PriceRefreshWorker
 // import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -43,6 +44,8 @@ class ManaHubApp : Application() {
             runCatching { syncManaSymbols() }
             runCatching { tagDictionaryRepo.loadAndApply() }
         }
+
+        PriceRefreshWorker.scheduleDailyRefresh(workManager)
 
         // COMMENTED OUT — Cloudflare R2 embedding DB download replaced by ML Kit OCR
         // embeddingDatabaseUpdater.scheduleUpdateCheck()

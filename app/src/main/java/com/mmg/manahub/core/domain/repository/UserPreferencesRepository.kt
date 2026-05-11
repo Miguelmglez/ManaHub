@@ -19,7 +19,6 @@ interface UserPreferencesRepository {
     val preferencesFlow: Flow<UserPreferences>
     val preferredCurrencyFlow: Flow<PreferredCurrency>
     val lastPriceRefreshFlow: Flow<Long?>
-    val autoRefreshPricesFlow: Flow<Boolean>
     val userDefinedTagsFlow: Flow<List<UserDefinedTag>>
     val collectionViewModeFlow: Flow<CollectionViewMode>
 
@@ -28,7 +27,6 @@ interface UserPreferencesRepository {
     suspend fun setNewsLanguages(languages: Set<NewsLanguage>)
     suspend fun setPreferredCurrency(currency: PreferredCurrency)
     suspend fun saveLastPriceRefresh(timestamp: Long)
-    suspend fun saveAutoRefreshPrices(enabled: Boolean)
     suspend fun saveUserDefinedTag(tag: UserDefinedTag)
     suspend fun deleteUserDefinedTag(key: String)
     suspend fun saveCollectionViewMode(mode: CollectionViewMode)

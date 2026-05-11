@@ -7,7 +7,13 @@ import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUse
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -33,30 +39,9 @@ class StatsViewModel @Inject constructor(
                 .collect { stats -> _uiState.update { it.copy(stats = stats, isLoading = false) } }
         }
 
-        // Load persisted preferences into state
         viewModelScope.launch {
-            combine(
-                userPreferencesDataStore.lastPriceRefreshFlow,
-                userPreferencesDataStore.autoRefreshPricesFlow,
-            ) { lastRefresh, autoRefresh -> lastRefresh to autoRefresh }
-                .collect { (lastRefresh, autoRefresh) ->
-                    _uiState.update { it.copy(
-                        lastRefreshedAt   = lastRefresh,
-                        autoRefreshPrices = autoRefresh,
-                    )}
-                }
-        }
-
-        // Auto-refresh if enabled and last refresh was > 24 h ago
-        viewModelScope.launch {
-            val (autoRefresh, lastRefresh) = combine(
-                userPreferencesDataStore.autoRefreshPricesFlow,
-                userPreferencesDataStore.lastPriceRefreshFlow,
-            ) { a, b -> a to b }.first()
-
-            if (autoRefresh) {
-                val elapsed = System.currentTimeMillis() - (lastRefresh ?: 0L)
-                if (elapsed > 24 * 60 * 60 * 1000L) refreshPrices()
+            userPreferencesDataStore.lastPriceRefreshFlow.collect { lastRefresh ->
+                _uiState.update { it.copy(lastRefreshedAt = lastRefresh) }
             }
         }
     }
@@ -115,10 +100,4 @@ class StatsViewModel @Inject constructor(
         _uiState.update { it.copy(refreshResult = null, refreshError = null) }
     }
 
-    fun onAutoRefreshChanged(enabled: Boolean) {
-        viewModelScope.launch {
-            userPreferencesDataStore.saveAutoRefreshPrices(enabled)
-            _uiState.update { it.copy(autoRefreshPrices = enabled) }
-        }
-    }
 }

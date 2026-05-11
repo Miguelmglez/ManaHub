@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,12 +43,6 @@ class SettingsViewModel @Inject constructor(
     val prefsState: StateFlow<PreferencesState> = _prefsState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            userPrefsDataStore.autoRefreshPricesFlow.collect { enabled ->
-                _uiState.update { it.copy(autoRefreshPrices = enabled) }
-            }
-        }
-
         userPrefsDataStore.themeFlow
             .onEach { theme -> _uiState.update { it.copy(currentTheme = theme) } }
             .catch { /* ignore */ }
@@ -60,12 +55,6 @@ class SettingsViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    fun onAutoRefreshChanged(enabled: Boolean) {
-        viewModelScope.launch {
-            userPrefsDataStore.saveAutoRefreshPrices(enabled)
-            _uiState.update { it.copy(autoRefreshPrices = enabled) }
-        }
-    }
     fun selectTheme(theme: AppTheme) {
         viewModelScope.launch {
             analyticsHelper.logEvent("theme_selected", mapOf("theme" to theme))
