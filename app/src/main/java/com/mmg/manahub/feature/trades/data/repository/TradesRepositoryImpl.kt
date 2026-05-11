@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.trades.data.repository
 
+import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.feature.trades.data.remote.TradesRemoteDataSource
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemDto
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
@@ -19,6 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class TradesRepositoryImpl @Inject constructor(
     private val remote: TradesRemoteDataSource,
+    private val cardDao: CardDao,
 ) : TradesRepository {
 
     private val cache = MutableStateFlow<List<TradeProposal>>(emptyList())
@@ -39,8 +41,13 @@ class TradesRepositoryImpl @Inject constructor(
         val proposals = proposalsResult.getOrThrow()
         val withItems = proposals.map { proposal ->
             val itemsResult = remote.fetchProposalItems(proposal.id)
-            val items = if (itemsResult.isSuccess) itemsResult.getOrThrow() else emptyList()
-            proposal.toDomain(items)
+            val itemDtos = if (itemsResult.isSuccess) itemsResult.getOrThrow() else emptyList()
+            // Batch-resolve card names from local Room cache to avoid showing raw UUIDs in the UI.
+            val cardIds = itemDtos.map { it.cardId }.distinct()
+            val nameMap = if (cardIds.isNotEmpty()) {
+                cardDao.getByIds(cardIds).associate { it.scryfallId to it.name }
+            } else emptyMap()
+            proposal.toDomain(itemDtos, nameMap)
         }
         cache.value = withItems
         return Result.success(Unit)
@@ -84,7 +91,7 @@ class TradesRepositoryImpl @Inject constructor(
     override suspend fun markCompleted(proposalId: String): Result<Unit> =
         remote.markCompleted(proposalId)
 
-    private fun TradeProposalDto.toDomain(items: List<TradeItemDto>) = TradeProposal(
+    private fun TradeProposalDto.toDomain(items: List<TradeItemDto>, nameMap: Map<String, String> = emptyMap()) = TradeProposal(
         id = id,
         status = runCatching { TradeStatus.valueOf(status) }.getOrDefault(TradeStatus.DRAFT),
         proposerId = proposerId,
@@ -97,12 +104,12 @@ class TradesRepositoryImpl @Inject constructor(
         proposerMarkedCompletedAt = proposerMarkedCompletedAt?.parseIso(),
         receiverMarkedCompletedAt = receiverMarkedCompletedAt?.parseIso(),
         cancellationReason = cancellationReason,
-        items = items.map { it.toDomain() },
+        items = items.map { it.toDomain(nameMap) },
         createdAt = createdAt.parseIso() ?: 0L,
         updatedAt = updatedAt.parseIso() ?: 0L,
     )
 
-    private fun TradeItemDto.toDomain() = TradeItem(
+    private fun TradeItemDto.toDomain(nameMap: Map<String, String> = emptyMap()) = TradeItem(
         id = id,
         tradeProposalId = tradeProposalId,
         fromUserId = fromUserId,
@@ -114,6 +121,7 @@ class TradesRepositoryImpl @Inject constructor(
         language = language,
         isAltArt = isAltArt,
         cardId = cardId,
+        cardName = nameMap[cardId] ?: "",
         isReviewCollectionPlaceholder = isReviewCollectionPlaceholder,
     )
 

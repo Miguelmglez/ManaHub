@@ -8,12 +8,34 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LibraryBooks
-import androidx.compose.material3.*
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,49 +70,52 @@ fun DeckListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            uiState.isLoading -> CircularProgressIndicator(
-                color    = mc.primaryAccent,
-                modifier = Modifier.align(Alignment.Center),
-            )
-
-            uiState.decks.isEmpty() -> EmptyDecksState(
-                onCreateClick = viewModel::onShowCreateDialog,
-                modifier      = Modifier.align(Alignment.Center),
-            )
-
-            else -> LazyColumn(
-                contentPadding      = PaddingValues(top = 8.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
-            ) {
-                items(uiState.decks, key = { it.id }) { deck ->
-                    DeckItem(
-                        deck     = deck,
-                        onClick  = { onDeckClick(deck.id) },
-                        onDelete = { viewModel.deleteDeck(deck.id) },
-                    )
+    Scaffold(
+        containerColor = Color.Transparent,
+        floatingActionButton = {
+            if (uiState.decks.isNotEmpty()) {
+                FloatingActionButton(
+                    onClick = viewModel::onShowCreateDialog,
+                    containerColor = mc.primaryAccent,
+                    contentColor = mc.background,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
                 }
             }
         }
-
-        // Create deck FAB pinned at bottom
-        Button(
-            onClick  = viewModel::onShowCreateDialog,
+    ) { padding ->
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            shape  = RoundedCornerShape(12.dp),
+                .fillMaxSize()
+                .padding(padding)
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = mc.background)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stringResource(R.string.decklist_create_button),
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = mc.background,
-            )
+            when {
+                uiState.isLoading -> CircularProgressIndicator(
+                    color    = mc.primaryAccent,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+
+                uiState.decks.isEmpty() -> EmptyDecksState(
+                    onCreateClick = viewModel::onShowCreateDialog,
+                    modifier      = Modifier.align(Alignment.Center),
+                )
+
+                else -> {
+                    LazyColumn(
+                        modifier            = Modifier.fillMaxSize(),
+                        contentPadding      = PaddingValues(top = 8.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+                        items(uiState.decks, key = { it.id }) { deck ->
+                            DeckItem(
+                                deck     = deck,
+                                onClick  = { onDeckClick(deck.id) },
+                                onDelete = { viewModel.deleteDeck(deck.id) },
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -202,7 +227,7 @@ private fun DeckItem(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector        = Icons.Default.LibraryBooks,
+                                imageVector        = Icons.AutoMirrored.Filled.LibraryBooks,
                                 contentDescription = null,
                                 tint               = mc.primaryAccent.copy(alpha = 0.4f),
                                 modifier           = Modifier.size(48.dp),
@@ -289,18 +314,39 @@ private fun DeckItem(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title   = { Text(stringResource(R.string.decklist_delete_title)) },
-            text    = { Text(stringResource(R.string.decklist_delete_message, deck.name)) },
+            title   = {
+                Text(
+                    text  = stringResource(R.string.decklist_delete_title),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+            },
+            text    = {
+                Text(
+                    text  = stringResource(R.string.decklist_delete_message, deck.name),
+                    style = ty.bodyMedium,
+                    color = mc.textSecondary,
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_delete), color = mc.lifeNegative)
+                    Text(
+                        text  = stringResource(R.string.action_delete),
+                        style = ty.labelLarge,
+                        color = mc.lifeNegative,
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(
+                        text  = stringResource(R.string.action_cancel),
+                        style = ty.labelLarge,
+                        color = mc.primaryAccent,
+                    )
                 }
             },
+            containerColor = mc.backgroundSecondary,
         )
     }
 }
@@ -373,7 +419,7 @@ private fun EmptyDecksState(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector        = Icons.Default.LibraryBooks,
+                imageVector        = Icons.AutoMirrored.Filled.LibraryBooks,
                 contentDescription = null,
                 tint               = mc.textDisabled,
                 modifier           = Modifier.size(64.dp),
@@ -445,7 +491,12 @@ private fun CreateDeckBottomSheet(
             OutlinedTextField(
                 value         = name,
                 onValueChange = { name = it },
-                label         = { Text(stringResource(R.string.deckbuilder_name_hint)) },
+                label         = {
+                    Text(
+                        text  = stringResource(R.string.deckbuilder_name_hint),
+                        style = ty.bodySmall,
+                    )
+                },
                 singleLine    = true,
                 modifier      = Modifier.fillMaxWidth(),
                 colors        = OutlinedTextFieldDefaults.colors(
@@ -505,10 +556,11 @@ private fun CreateDeckBottomSheet(
 private fun FormatSelector(selected: String, onSelect: (String) -> Unit) {
     val formats = listOf("standard", "commander", "draft")
     val mc      = MaterialTheme.magicColors
+    val ty      = MaterialTheme.magicTypography
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text  = stringResource(R.string.deckbuilder_format_label),
-            style = MaterialTheme.magicTypography.labelSmall,
+            style = ty.labelSmall,
             color = mc.textSecondary,
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -519,7 +571,7 @@ private fun FormatSelector(selected: String, onSelect: (String) -> Unit) {
                     label    = {
                         Text(
                             fmt.replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.magicTypography.labelSmall,
+                            style = ty.labelSmall,
                         )
                     },
                     colors   = FilterChipDefaults.filterChipColors(

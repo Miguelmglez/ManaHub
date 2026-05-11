@@ -271,9 +271,17 @@ class GameViewModel @Inject constructor(
     fun checkPendingDefeat() {
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
-                if (p.defeated || p.pendingDefeat || p.isSurviving) p
-                else if (shouldEliminate(p, s.mode)) p.copy(pendingDefeat = true)
-                else p
+                val meetsCondition = shouldEliminate(p, s.mode)
+                when {
+                    p.defeated -> p
+                    // If already pending, clear it if they are no longer meeting the condition (e.g. gained life)
+                    p.pendingDefeat -> if (!meetsCondition) p.copy(pendingDefeat = false) else p
+                    // If surviving, clear the flag if they are healthy again
+                    p.isSurviving -> if (!meetsCondition) p.copy(isSurviving = false) else p
+                    // If healthy, mark as pending if they hit a defeat condition
+                    meetsCondition -> p.copy(pendingDefeat = true)
+                    else -> p
+                }
             })
         }
         // NO automatic winner — only confirmDefeat can trigger that

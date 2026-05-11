@@ -1262,8 +1262,8 @@
     ═══════════════════════════════════════════ -->
     <string name="collection_tab_trades">Trades</string>
     <string name="trades_tab_exploration">Exploration</string>
-    <string name="trades_tab_history">History</string>
-    <string name="trades_toggle_my_lists">My Lists</string>
+    <string name="trades_tab_history">Trades</string>
+    <string name="trades_toggle_my_lists">My Folder</string>
     <string name="trades_toggle_friends">Friends</string>
     <string name="trades_wishlist_section">My Wishlist</string>
     <string name="trades_offers_section">My Offers</string>

@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.model.TradeStatus
 import java.text.SimpleDateFormat
@@ -96,6 +97,7 @@ fun TradesHistoryScreen(
                     else -> HistoryList(
                         proposals     = uiState.filtered,
                         currentUserId = uiState.currentUserId,
+                        friends       = uiState.friends,
                         onItemClick   = viewModel::onProposalClick,
                     )
                 }
@@ -144,8 +146,8 @@ private fun FilterRow(
 @Composable
 private fun HistoryFilter.label(): String = when (this) {
     HistoryFilter.ALL       -> stringResource(R.string.trades_history_filter_all)
+    HistoryFilter.ACTIVE    -> stringResource(R.string.trades_history_filter_active)
     HistoryFilter.COMPLETED -> stringResource(R.string.trades_history_filter_completed)
-    HistoryFilter.CANCELLED -> stringResource(R.string.trades_history_filter_cancelled)
     HistoryFilter.DECLINED  -> stringResource(R.string.trades_history_filter_declined)
 }
 
@@ -153,6 +155,7 @@ private fun HistoryFilter.label(): String = when (this) {
 private fun HistoryList(
     proposals: List<TradeProposal>,
     currentUserId: String,
+    friends: List<Friend>,
     onItemClick: (TradeProposal) -> Unit,
 ) {
     LazyColumn(
@@ -163,6 +166,7 @@ private fun HistoryList(
             HistoryProposalRow(
                 proposal      = proposal,
                 currentUserId = currentUserId,
+                friends       = friends,
                 onClick       = { onItemClick(proposal) },
             )
         }
@@ -173,11 +177,13 @@ private fun HistoryList(
 private fun HistoryProposalRow(
     proposal: TradeProposal,
     currentUserId: String,
+    friends: List<Friend>,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val isProposer = proposal.proposerId == currentUserId
     val otherPartyId = if (isProposer) proposal.receiverId else proposal.proposerId
+    val otherPartyLabel = friends.find { it.userId == otherPartyId }?.nickname ?: otherPartyId
     val dateLabel = remember(proposal.updatedAt) {
         SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(proposal.updatedAt))
     }
@@ -202,7 +208,7 @@ private fun HistoryProposalRow(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = otherPartyId,
+                    text  = otherPartyLabel,
                     style = MaterialTheme.magicTypography.bodyMedium,
                     color = mc.textPrimary,
                 )

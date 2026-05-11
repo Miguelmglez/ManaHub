@@ -1,10 +1,13 @@
 package com.mmg.manahub.core.domain.model
 
+import com.mmg.manahub.core.domain.model.CollectionViewMode
+
 data class UserPreferences(
     val appLanguage: AppLanguage,
     val cardLanguage: CardLanguage,
     val newsLanguages: Set<NewsLanguage>,
     val preferredCurrency: PreferredCurrency,
+    val collectionViewMode: CollectionViewMode,
 )
 
 enum class AppLanguage(val code: String, val displayName: String) {
