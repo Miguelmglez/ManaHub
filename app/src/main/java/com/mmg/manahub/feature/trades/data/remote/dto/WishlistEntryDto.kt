@@ -8,6 +8,7 @@ data class WishlistEntryDto(
     val id: String,
     @SerialName("user_id") val userId: String,
     @SerialName("card_id") val cardId: String,
+    val quantity: Int = 1,
     @SerialName("match_any_variant") val matchAnyVariant: Boolean,
     @SerialName("is_foil") val isFoil: Boolean? = null,
     val condition: String? = null,

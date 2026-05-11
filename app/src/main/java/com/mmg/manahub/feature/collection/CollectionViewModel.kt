@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchCriterion
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.sync.CollectionSyncWorker
@@ -44,6 +46,7 @@ class CollectionViewModel @Inject constructor(
     private val workManager: WorkManager,
     private val migrateLocalTradeLists: MigrateLocalTradeListsUseCase,
     private val getLocalWishlist: GetLocalWishlistUseCase,
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CollectionUiState())
@@ -68,6 +71,15 @@ class CollectionViewModel @Inject constructor(
         refreshPrices()
         observeSyncState()
         observeSessionChanges()
+        observeUserPreferences()
+    }
+
+    private fun observeUserPreferences() {
+        viewModelScope.launch {
+            userPreferencesRepository.collectionViewModeFlow.collect { mode ->
+                _uiState.update { it.copy(viewMode = mode) }
+            }
+        }
     }
 
     private fun observeWishlistIds() {
@@ -178,8 +190,13 @@ class CollectionViewModel @Inject constructor(
     }
 
     fun onViewModeToggle() {
-        _uiState.update {
-            it.copy(viewMode = if (it.viewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID)
+        viewModelScope.launch {
+            val newMode = if (_uiState.value.viewMode == CollectionViewMode.GRID) {
+                CollectionViewMode.LIST
+            } else {
+                CollectionViewMode.GRID
+            }
+            userPreferencesRepository.saveCollectionViewMode(newMode)
         }
     }
 

@@ -300,3 +300,5 @@ $RECYCLE.BIN/
 /.claude/scheduled_tasks.lock
 /tools/embedding-generator/version.json
 /app/src/main/assets/card_embeddings.bin
+/app/supabase/migrations/20260511_add_quantity_to_wishlists.sql
+/app/supabase/migrations/20260511_wishlists_foil_notnull.sql

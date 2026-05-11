@@ -43,6 +43,7 @@ import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -546,71 +547,6 @@ private fun CardDetailContent(
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun CardDetailContentDFCPreview() {
-    val card = Card(
-        scryfallId = "1",
-        name = "Delver of Secrets // Insectile Aberration",
-        manaCost = "{U}",
-        cmc = 1.0,
-        colors = listOf("U"),
-        colorIdentity = listOf("U"),
-        typeLine = "Creature — Human Wizard // Creature — Human Insect",
-        oracleText = "At the beginning of your upkeep, look at the top card of your library...",
-        keywords = listOf("Transform"),
-        power = "1",
-        toughness = "1",
-        setCode = "ISD",
-        setName = "Innistrad",
-        collectorNumber = "51",
-        rarity = "uncommon",
-        releasedAt = "2011-09-30",
-        frameEffects = emptyList(),
-        promoTypes = emptyList(),
-        lang = "en",
-        imageNormal = null,
-        imageArtCrop = null,
-        imageBackNormal = "back_url",
-        legalityStandard = "not_legal",
-        legalityPioneer = "legal",
-        legalityModern = "legal",
-        legalityCommander = "legal",
-        scryfallUri = "",
-        printedName = "",
-        printedText = "",
-        printedTypeLine = "",
-        artist = "Nils Hamm",
-        flavorText = null,
-        loyalty = null,
-        priceEur = null,
-        priceEurFoil = null,
-        priceUsd = null,
-        priceUsdFoil = null,
-    )
-
-    MagicTheme {
-        CardDetailContent(
-            card = card,
-            userCards = emptyList(),
-            tradeQuantities = emptyMap(),
-            decksContainingCard = emptyList(),
-            isStale = false,
-            onRemoveAutoTag = {},
-            onAddUserTag = {},
-            onRemoveUserTag = {},
-            onShowTagPicker = {},
-            onConfirmSuggestedTag = {},
-            onDismissSuggestedTag = {},
-            onShowAddSheet = {},
-            onShowWishlistSheet = {},
-            onShowTradeSheet = {},
-            onUpdateQuantity = { _, _ -> },
-            onRequestDelete = {},
-            onNavigateToDeck = {},
-        )
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Found in Decks section
@@ -911,21 +847,6 @@ private fun CollectionCopyRow(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CopyBadge(label: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.extraSmall,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
     }
 }
 

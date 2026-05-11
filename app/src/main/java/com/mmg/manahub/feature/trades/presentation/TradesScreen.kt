@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -56,6 +56,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
@@ -113,21 +114,16 @@ fun TradesScreen(
 
         // ── FAB ───────────────────────────────────────────────────────────────
         val mc = MaterialTheme.magicColors
-        ExtendedFloatingActionButton(
-            text = {
-                Text(
-                    stringResource(R.string.trades_new_trade_cta),
-                    style = MaterialTheme.magicTypography.labelLarge
-                )
-            },
-            icon = { Icon(Icons.Default.Add, contentDescription = null) },
+        FloatingActionButton(
             onClick = { onNavigateToProposal("") },
             containerColor = mc.primaryAccent,
             contentColor = mc.background,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
-        )
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+        }
 
         SnackbarHost(
             hostState = snackbarHostState,
@@ -435,10 +431,8 @@ private fun WishlistEntryRow(
         imageUrl = card?.imageArtCrop,
         priceUsd = if (entry.isFoil == true) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil == true) card?.priceEurFoil else card?.priceEur,
+        quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
         onClick = { onCardClick(entry.cardId) },
-        showCheckbox = true,
-        isChecked = isSelected,
-        onCheckedChange = { onSelect() },
         containerColor = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else Color.Transparent,
         hasFoil = entry.isFoil == true,
         isStale = card?.isStale ?: false,
@@ -448,11 +442,14 @@ private fun WishlistEntryRow(
         extraSupportingContent = {
             val badges = buildVariantBadges(entry)
             if (badges.isNotEmpty()) {
-                Text(
-                    text  = badges.joinToString(" · "),
-                    style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
-                    color = mc.textSecondary,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    badges.forEach { label ->
+                        CopyBadge(label = label)
+                    }
+                }
             }
         }
     )
@@ -487,10 +484,8 @@ private fun OfferEntryRow(
         imageUrl = card?.imageArtCrop,
         priceUsd = if (entry.isFoil) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil) card?.priceEurFoil else card?.priceEur,
+        quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
         onClick = { onCardClick(entry.scryfallId) },
-        showCheckbox = true,
-        isChecked = isSelected,
-        onCheckedChange = { onSelect() },
         containerColor = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else Color.Transparent,
         hasFoil = entry.isFoil,
         isStale = card?.isStale ?: false,
@@ -500,11 +495,14 @@ private fun OfferEntryRow(
         extraSupportingContent = {
             val badges = buildOfferBadges(entry)
             if (badges.isNotEmpty()) {
-                Text(
-                    text  = badges.joinToString(" · "),
-                    style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
-                    color = mc.textSecondary,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    badges.forEach { label ->
+                        CopyBadge(label = label)
+                    }
+                }
             }
         }
     )

@@ -315,7 +315,7 @@ private fun TradeItemRow(item: TradeItem) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text  = item.cardId,
+            text  = item.cardName.ifBlank { item.cardId },
             style = MaterialTheme.magicTypography.bodySmall,
             color = mc.textPrimary,
             modifier = Modifier.weight(1f),

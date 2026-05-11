@@ -14,7 +14,24 @@ sealed class TradeError : Exception() {
     data class Unknown(override val message: String?) : TradeError()
 }
 
-fun Throwable.toUserFacingMessage(): String? = null
+/**
+ * Returns a user-readable message for a [Throwable].
+ * Typed [TradeError] subclasses return a descriptive string; all other exceptions
+ * fall back to the raw message (which may be null for truly unknown failures).
+ */
+fun Throwable.toUserFacingMessage(): String? = when (this) {
+    is TradeError.CardAlreadyLocked          -> "Some cards are already locked in another trade"
+    is TradeError.ProposalVersionMismatch    -> "The proposal was modified by the other party. Please refresh."
+    is TradeError.NotFriends                 -> "You must be friends with this user to trade"
+    is TradeError.InvalidStateTransition     -> "This action is no longer valid for the current trade state"
+    is TradeError.InventoryGone              -> "One or more cards in this trade are no longer available"
+    is TradeError.CannotAcceptReviewCollection -> "You cannot accept a proposal that only includes a collection review"
+    is TradeError.InitialAsymmetryNotAllowed -> "Both sides of the trade must include at least one item or a collection review"
+    is TradeError.ReviewCollectionSameDirection -> "Collection review must go in opposite directions"
+    is TradeError.Unauthorized               -> "You are not authorized to perform this action"
+    is TradeError.Unknown                    -> message
+    else                                     -> message
+}
 
 /**
  * Parses a raw [PostgrestException] message string into a typed [TradeError].
