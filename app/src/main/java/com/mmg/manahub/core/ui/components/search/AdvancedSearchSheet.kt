@@ -1,11 +1,9 @@
-package com.mmg.manahub.feature.addcard
+package com.mmg.manahub.core.ui.components.search
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -13,24 +11,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,6 +37,7 @@ import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchDirection
 import com.mmg.manahub.core.domain.model.SearchOrder
+import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.manaColorFor
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -79,20 +73,6 @@ fun AdvancedSearchSheet(
         }
     }
 
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset = if (source == NestedScrollSource.UserInput) available else Offset.Zero
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                return available
-            }
-        }
-    }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
@@ -104,18 +84,12 @@ fun AdvancedSearchSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.92f)
-                .nestedScroll(nestedScrollConnection)
                 .navigationBarsPadding(),
         ) {
             // ── Header ──────────────────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { change, _ ->
-                            change.consume()
-                        }
-                    }
                     .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -140,45 +114,21 @@ fun AdvancedSearchSheet(
                 }
             }
 
-            // ── Real-time query preview (Scryfall mode only) ───────────────────
-            AnimatedVisibility(visible = !isCollectionMode && uiState.builtQuery.isNotBlank()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    color = mc.surface,
-                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f)),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("⚙", fontSize = 14.sp, color = mc.primaryAccent)
-                        Text(
-                            text = uiState.builtQuery,
-                            style = ty.bodySmall,
-                            color = mc.primaryAccent,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-            }
-
             // ── Scrollable form ─────────────────────────────────────────────────
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
 
                 // ── Name ──
                 item {
-                    SearchSection(title = stringResource(R.string.advsearch_section_name)) {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_name),
+                        icon = Icons.Default.Search
+                    ) {
                         OutlinedTextField(
                             value = uiState.nameValue,
                             onValueChange = viewModel::setName,
@@ -189,7 +139,7 @@ fun AdvancedSearchSheet(
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = magicOutlinedTextFieldColors(mc),
                             singleLine = true,
                         )
@@ -213,7 +163,10 @@ fun AdvancedSearchSheet(
 
                 // ── Oracle text ──
                 item {
-                    SearchSection(title = stringResource(R.string.advsearch_section_oracle)) {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_oracle),
+                        icon = Icons.Default.Description
+                    ) {
                         OutlinedTextField(
                             value = uiState.oracleText,
                             onValueChange = viewModel::setOracleText,
@@ -224,7 +177,7 @@ fun AdvancedSearchSheet(
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = magicOutlinedTextFieldColors(mc),
                             maxLines = 2,
                         )
@@ -233,7 +186,10 @@ fun AdvancedSearchSheet(
 
                 // ── Card type ──
                 item {
-                    SearchSection(title = stringResource(R.string.advsearch_section_type)) {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_type),
+                        icon = Icons.Default.Style
+                    ) {
                         data class TypeOption(val scryfallValue: String, val labelRes: Int)
                         val typeOptions = listOf(
                             TypeOption("Creature",     R.string.cardtype_creature),
@@ -274,7 +230,7 @@ fun AdvancedSearchSheet(
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = magicOutlinedTextFieldColors(mc),
                             singleLine = true,
                         )
@@ -283,7 +239,10 @@ fun AdvancedSearchSheet(
 
                 // ── Colors ──
                 item {
-                    SearchSection(title = stringResource(R.string.advsearch_section_colors)) {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_colors),
+                        icon = Icons.Default.Palette
+                    ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(
                                 false to stringResource(R.string.advsearch_color_mode_color),
@@ -296,32 +255,11 @@ fun AdvancedSearchSheet(
                                 )
                             }
                         }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ManaColorPicker(
+                            selectedColors = uiState.selectedColors,
+                            onToggleColor = viewModel::toggleColor,
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-
-                            listOf("W", "U", "B", "R", "G", "C").forEach { color ->
-                                val isSelected = uiState.selectedColors.contains(color)
-                                val manaColor = manaColorFor(color, MaterialTheme.magicColors)
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .then(
-                                            if (isSelected) {
-                                                Modifier
-                                                    .background(manaColor.copy(alpha = 0.2f))
-                                                    .border(2.dp, manaColor, CircleShape)
-                                            } else Modifier
-                                        )
-                                        .clickable { viewModel.toggleColor(color) },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    ManaSymbolImage(token = color, size = 32.dp)
-                                }
-                            }
-                        }
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -342,7 +280,10 @@ fun AdvancedSearchSheet(
 
                 // ── Mana value (CMC) ──
                 item {
-                    SearchSection(title = stringResource(R.string.advsearch_section_mana)) {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_mana),
+                        icon = Icons.Default.FlashOn
+                    ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -355,16 +296,11 @@ fun AdvancedSearchSheet(
                                 value = uiState.manaCostValue,
                                 onValueChange = { v -> viewModel.setManaCost(v, uiState.manaCostOp) },
                                 placeholder = { Text(stringResource(R.string.advsearch_mana_hint), color = mc.textDisabled) },
-                                modifier = Modifier.width(80.dp),
-                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.width(100.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                            )
-                            Text(
-                                stringResource(R.string.advsearch_sort_cmc),
-                                style = ty.bodySmall,
-                                color = mc.textDisabled
                             )
                         }
                     }
@@ -372,7 +308,10 @@ fun AdvancedSearchSheet(
 
                 // ── Rarity ──
                 item {
-                    SearchSection(title = stringResource(R.string.advsearch_section_rarity)) {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_rarity),
+                        icon = Icons.Default.Diamond
+                    ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -439,7 +378,10 @@ fun AdvancedSearchSheet(
 
                 // ── Set / Collection ──
                 item {
-                    SearchSection(title = stringResource(R.string.advsearch_section_set)) {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_set),
+                        icon = Icons.Default.Layers
+                    ) {
                         var showSetPicker by remember { mutableStateOf(false) }
                         val selectedSets = uiState.selectedSets
 
@@ -559,6 +501,7 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_stats),
+                        icon = Icons.Default.BarChart,
                         collapsedByDefault = true,
                     ) {
                         Row(
@@ -579,8 +522,8 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.powerValue,
                                 onValueChange = { v -> viewModel.setPower(v, uiState.powerOp) },
-                                modifier = Modifier.width(70.dp),
-                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.width(80.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
@@ -605,8 +548,8 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.toughnessValue,
                                 onValueChange = { v -> viewModel.setToughness(v, uiState.toughnessOp) },
-                                modifier = Modifier.width(70.dp),
-                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.width(80.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
@@ -620,6 +563,7 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_price),
+                        icon = Icons.Default.MonetizationOn,
                         collapsedByDefault = true,
                     ) {
                         Row(
@@ -632,7 +576,7 @@ fun AdvancedSearchSheet(
                                 onValueChange = { v -> viewModel.setPrice(v, uiState.priceCurrency) },
                                 placeholder = { Text(stringResource(R.string.advsearch_price_hint), color = mc.textDisabled) },
                                 modifier = Modifier.width(100.dp),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
@@ -657,6 +601,7 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_format),
+                        icon = Icons.Default.Gavel,
                         collapsedByDefault = true,
                     ) {
                         Row(
@@ -728,6 +673,7 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_keyword),
+                        icon = Icons.Default.VpnKey,
                         collapsedByDefault = true,
                     ) {
                         data class KeywordOption(val scryfallValue: String, val labelRes: Int)
@@ -766,7 +712,7 @@ fun AdvancedSearchSheet(
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = magicOutlinedTextFieldColors(mc),
                             singleLine = true,
                         )
@@ -776,7 +722,10 @@ fun AdvancedSearchSheet(
                 // ── Collection status (collection mode only) ──
                 if (isCollectionMode) {
                     item {
-                        SearchSection(title = stringResource(R.string.advsearch_section_collection_status)) {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_collection_status),
+                            icon = Icons.Default.CollectionsBookmark
+                        ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -804,7 +753,10 @@ fun AdvancedSearchSheet(
                 // ── Tags (collection mode only) ──
                 if (isCollectionMode) {
                     item {
-                        SearchSection(title = stringResource(R.string.advsearch_section_tags)) {
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_tags),
+                            icon = Icons.Default.LocalOffer
+                        ) {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -826,6 +778,7 @@ fun AdvancedSearchSheet(
                 if (!isCollectionMode) item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_sort),
+                        icon = Icons.Default.Sort,
                         collapsedByDefault = true,
                     ) {
                         FlowRow(
@@ -877,21 +830,24 @@ fun AdvancedSearchSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .height(52.dp),
+                    .height(56.dp),
                 enabled = if (isCollectionMode) true
                           else uiState.builtQuery.isNotBlank(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = mc.primaryAccent,
                     disabledContainerColor = mc.surfaceVariant,
                 ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
+                Icon(Icons.Default.Search, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(
                         if (isCollectionMode) R.string.advsearch_apply_button
                         else R.string.advsearch_search_button
                     ),
-                    style = ty.titleLarge,
+                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
                 )
             }
         }
@@ -901,8 +857,9 @@ fun AdvancedSearchSheet(
 // ── Collapsible section ──────────────────────────────────────────────────────
 
 @Composable
-private fun SearchSection(
+fun SearchSection(
     title: String,
+    icon: ImageVector? = null,
     collapsedByDefault: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -910,31 +867,52 @@ private fun SearchSection(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
-                .padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(title, style = ty.labelMedium, color = mc.textSecondary)
-            Text(
-                if (expanded) "▲" else "▼",
-                fontSize = 10.sp,
-                color = mc.textDisabled,
-            )
-        }
-        HorizontalDivider(color = mc.surfaceVariant, thickness = 0.5.dp)
-        AnimatedVisibility(visible = expanded) {
-            Column(
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = mc.surface,
+        border = BorderStroke(0.5.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+        shadowElevation = if (expanded) 1.dp else 0.dp
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                content = content,
-            )
+                    .clickable { expanded = !expanded }
+                    .padding(vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (icon != null) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = if (expanded) mc.primaryAccent else mc.textSecondary
+                    )
+                }
+                Text(
+                    title,
+                    style = ty.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (expanded) mc.textPrimary else mc.textSecondary,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = mc.textDisabled,
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    content = content,
+                )
+            }
         }
     }
 }
@@ -952,25 +930,28 @@ private fun OperatorSelector(
     val ty = MaterialTheme.magicTypography
 
     Box {
-        OutlinedButton(
+        Surface(
             onClick = { expanded = true },
             shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.width(64.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp),
+            color = mc.surfaceVariant.copy(alpha = 0.3f),
+            modifier = Modifier.width(64.dp).height(44.dp),
         ) {
-            Text(selected.symbol, style = ty.bodyMedium, color = mc.textPrimary)
+            Box(contentAlignment = Alignment.Center) {
+                Text(selected.symbol, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.primaryAccent)
+            }
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             containerColor = mc.surface,
+            shape = RoundedCornerShape(12.dp)
         ) {
             options.forEach { op ->
                 DropdownMenuItem(
                     text = {
                         Text(
                             "${op.symbol}  (${op.name.lowercase().replace('_', ' ')})",
-                            style = ty.bodySmall,
+                            style = ty.bodyMedium,
                             color = mc.textPrimary,
                         )
                     },
@@ -987,10 +968,10 @@ private fun OperatorSelector(
 private fun magicOutlinedTextFieldColors(mc: com.mmg.manahub.core.ui.theme.MagicColors) =
     OutlinedTextFieldDefaults.colors(
         focusedBorderColor = mc.primaryAccent,
-        unfocusedBorderColor = mc.primaryAccent.copy(alpha = 0.25f),
+        unfocusedBorderColor = mc.surfaceVariant,
         cursorColor = mc.primaryAccent,
         focusedTextColor = mc.textPrimary,
         unfocusedTextColor = mc.textPrimary,
-        focusedContainerColor = mc.surface,
-        unfocusedContainerColor = mc.surface,
+        focusedContainerColor = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent,
     )

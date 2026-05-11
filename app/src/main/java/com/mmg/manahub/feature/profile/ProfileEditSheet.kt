@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.manaColorFor
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -209,26 +210,13 @@ fun ProfileEditSheet(
                             )
                         },
                     )
-                    listOf("W", "U", "B", "R", "G", "C").forEach { color ->
-                        val isSelected = uiState.selectedColors.contains(color)
-                        val manaColor = manaColorFor(color, mc)
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .then(
-                                    if (isSelected) {
-                                        Modifier
-                                            .background(manaColor.copy(alpha = 0.2f))
-                                            .border(2.dp, manaColor, CircleShape)
-                                    } else Modifier
-                                )
-                                .clickable { viewModel.toggleColorFilter(color) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ManaSymbolImage(token = color, size = 28.dp)
-                        }
-                    }
+                    ManaColorPicker(
+                        selectedColors = uiState.selectedColors,
+                        onToggleColor = viewModel::toggleColorFilter,
+                        itemSize = 40.dp,
+                        symbolSize = 28.dp,
+                        spacing = 8.dp
+                    )
                 }
             }
 
