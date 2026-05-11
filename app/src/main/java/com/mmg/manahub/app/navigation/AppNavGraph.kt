@@ -1,13 +1,13 @@
 package com.mmg.manahub.app.navigation
 
 import androidx.activity.ComponentActivity
-import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -53,7 +53,6 @@ import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.profile.ProfileScreen
 import com.mmg.manahub.feature.scanner.ScannerScreen
-import com.mmg.manahub.feature.splash.SplashScreen
 import com.mmg.manahub.feature.settings.SettingsScreen
 import com.mmg.manahub.feature.stats.StatsScreen
 import com.mmg.manahub.feature.survey.SurveyScreen
@@ -98,6 +97,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
     val hasActiveGame = gameUiState.isGameRunning
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         bottomBar = {
             Column {
                 if (currentRoute in bottomBarRoutes) {
@@ -126,32 +126,13 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Collection.route, // Changed from Screen.Splash.route
+            startDestination = Screen.Collection.route,
             modifier = modifier.padding(padding),
             enterTransition = { fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 } },
             exitTransition = { fadeOut(tween(200)) },
             popEnterTransition = { fadeIn(tween(300)) },
             popExitTransition = { fadeOut(tween(200)) + slideOutHorizontally(tween(300)) { it / 5 } },
         ) {
-
-            // ── Splash ────────────────────────────────────────────────────────
-            /* 
-            composable(
-                route = Screen.Splash.route,
-                enterTransition = { EnterTransition.None },
-                exitTransition = { fadeOut(tween(400)) },
-            ) {
-                SplashScreen(
-                    onSessionResolved = { isAuthenticated ->
-                        // Always navigate to Collection — the app supports unauthenticated use.
-                        // Login is progressive (offered via sheets inside the app).
-                        navController.navigate(Screen.Collection.route) {
-                            popUpTo(Screen.Splash.route) { inclusive = true }
-                        }
-                    },
-                )
-            }
-            */
 
             // ── Collection ────────────────────────────────────────────────────
             composable(Screen.Collection.route) {

@@ -116,13 +116,18 @@ fun FriendsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = mc.background,
+            contentWindowInsets = WindowInsets(0),
             topBar = {
                 Surface(
                     color = mc.backgroundSecondary,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onNavigateBack) {

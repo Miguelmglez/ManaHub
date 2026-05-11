@@ -112,7 +112,7 @@ fun SetDraftDetailScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Top bar
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
