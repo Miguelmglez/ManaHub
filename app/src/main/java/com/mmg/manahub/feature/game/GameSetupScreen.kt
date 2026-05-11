@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -67,7 +68,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.HexGridBackground
-import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -115,13 +115,12 @@ private fun GameSetupScreenContent(
     val mc = MaterialTheme.magicColors
     val hasActiveGame = gameUiState.players.isNotEmpty() && gameUiState.winner == null
 
-    ImmersiveSystemBars()
-
     Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
         Scaffold(
             containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0),
             topBar = {
                 Surface(
                     color = mc.backgroundSecondary.copy(alpha = 0.9f),
@@ -131,6 +130,7 @@ private fun GameSetupScreenContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .statusBarsPadding()
                             .padding(horizontal = 4.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -157,6 +157,7 @@ private fun GameSetupScreenContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
+                        .navigationBarsPadding()
                         .padding(horizontal = 24.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,

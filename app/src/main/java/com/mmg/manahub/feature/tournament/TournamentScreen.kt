@@ -44,6 +44,7 @@ fun TournamentScreen(
     var recordResultForMatch by remember { mutableStateOf<TournamentMatchEntity?>(null) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.statusBars,
         topBar = {
             TopAppBar(
                 title = {

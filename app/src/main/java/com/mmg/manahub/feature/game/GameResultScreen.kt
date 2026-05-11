@@ -15,7 +15,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.game.model.*
@@ -30,8 +29,6 @@ fun GameResultScreen(
     val mc          = MaterialTheme.magicColors
     val winnerTheme = gameResult.winner.theme
 
-    ImmersiveSystemBars()
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -44,9 +41,16 @@ fun GameResultScreen(
                 )
             )
     ) {
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         LazyColumn(
             modifier            = Modifier.fillMaxSize(),
-            contentPadding      = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
+            contentPadding      = PaddingValues(
+                start  = 20.dp,
+                end    = 20.dp,
+                top    = 24.dp + statusBarTop,
+                bottom = 24.dp + navBarBottom,
+            ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { VictoryHeader(gameResult = gameResult, winnerColor = winnerTheme.accent) }

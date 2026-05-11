@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -109,7 +110,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
@@ -221,8 +221,6 @@ private fun GamePlayContent(
     var managePlayersInitialTab by remember { mutableIntStateOf(0) }
     var confirmDefeatPlayerId by remember { mutableStateOf<Int?>(null) }
 
-    ImmersiveSystemBars()
-
     BackHandler(enabled = uiState.winner == null) {
         showExitDialog = true
     }
@@ -232,7 +230,7 @@ private fun GamePlayContent(
             .fillMaxSize()
             .background(mc.background),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Box(modifier = Modifier.weight(1f)) {
                 GamePlayerGrid(
                     players = uiState.players,

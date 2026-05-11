@@ -48,7 +48,7 @@ fun DraftScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Toolbar
             Text(
                 text = stringResource(R.string.draft_title),
@@ -137,10 +137,11 @@ fun DraftScreen(
                     }
                 }
                 else -> {
+                    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(12.dp),
+                        contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + navBarBottom),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {

@@ -158,6 +158,7 @@ private fun CollectionContent(
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0),
             topBar = {
                 CollectionTopBar(
                     selectedTab       = uiState.selectedTab,
@@ -475,6 +476,7 @@ private fun CollectionTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
                 .heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically

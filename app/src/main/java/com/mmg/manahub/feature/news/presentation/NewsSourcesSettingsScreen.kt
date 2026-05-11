@@ -37,14 +37,15 @@ fun NewsSourcesSettingsScreen(
     val videoSources = sources.filter { it.type == SourceType.VIDEO }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             Surface(
                 color = mc.backgroundSecondary,
-                modifier = Modifier.statusBarsPadding()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

@@ -42,7 +42,8 @@ fun DeckImprovementScreen(
     val ty = MaterialTheme.magicTypography
 
     Scaffold(
-        containerColor = mc.background,
+        containerColor      = mc.background,
+        contentWindowInsets = WindowInsets.statusBars,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.deck_improve_title), style = ty.titleLarge) },

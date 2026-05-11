@@ -34,11 +34,13 @@ fun TagDictionaryScreen(
     val mc = MaterialTheme.magicColors
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             Surface(color = mc.backgroundSecondary) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -96,9 +98,10 @@ fun TagDictionaryScreen(
                 }
             }
 
+            val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             LazyColumn(
-                contentPadding      = PaddingValues(bottom = 32.dp),
-                modifier            = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 32.dp + navBarBottom),
+                modifier       = Modifier.fillMaxSize(),
             ) {
                 items(filtered, key = { it.key }) { row ->
                     DictionaryRow(

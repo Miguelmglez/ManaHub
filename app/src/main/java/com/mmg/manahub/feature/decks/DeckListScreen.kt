@@ -72,6 +72,7 @@ fun DeckListScreen(
 
     Scaffold(
         containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
             if (uiState.decks.isNotEmpty()) {
                 FloatingActionButton(
