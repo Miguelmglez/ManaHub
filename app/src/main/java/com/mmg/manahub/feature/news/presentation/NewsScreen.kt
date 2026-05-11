@@ -49,7 +49,8 @@ fun NewsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(mc.background),
+            .background(mc.background)
+            .statusBarsPadding(),
     ) {
         // ── Title ────────────────────────────────────────────────────────────
         Text(
@@ -190,8 +191,9 @@ fun NewsScreen(
                     }
                 }
                 else -> {
+                    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(

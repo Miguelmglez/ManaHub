@@ -68,6 +68,7 @@ fun AddCardScreen(
     val ty = MaterialTheme.magicTypography
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             Surface(
                 color = mc.backgroundSecondary,
@@ -75,6 +76,7 @@ fun AddCardScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -344,10 +346,11 @@ private fun SearchTab(
             }
 
             else -> {
+                val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 LazyColumn(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp + navBarBottom),
                 ) {
                     items(uiState.results, key = { it.scryfallId }) { card ->
                         SearchResultItem(
