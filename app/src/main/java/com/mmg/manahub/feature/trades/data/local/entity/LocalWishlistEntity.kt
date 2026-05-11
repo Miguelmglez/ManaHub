@@ -17,6 +17,9 @@ data class LocalWishlistEntity(
     @ColumnInfo(name = "scryfall_id")
     val scryfallId: String,
 
+    @ColumnInfo(name = "quantity")
+    val quantity: Int = 1,
+
     // When true the trade matches any printing/condition/language variant of the card.
     // When false the narrowing fields below are consulted.
     @ColumnInfo(name = "match_any_variant")

@@ -10,6 +10,8 @@ import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -21,13 +23,34 @@ class WishlistRepositoryImpl @Inject constructor(
     private val remote: WishlistRemoteDataSource,
 ) : WishlistRepository {
 
+    // Serialises concurrent addLocal calls to prevent the TOCTOU race on the
+    // read-modify-write quantity increment. Without this, two rapid "Add to
+    // wishlist" taps for the same card attributes both see null from
+    // getByAttributes() and both insert — producing duplicate rows instead of
+    // a single row with quantity = 2.
+    private val addMutex = Mutex()
+
     override fun observeLocal(): Flow<List<WishlistEntry>> =
         dao.observeAllWithCard().map { list -> list.map { it.toDomain() } }
 
     override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
 
-    override suspend fun addLocal(entry: WishlistEntry): Result<Unit> = runCatching {
-        dao.insert(entry.toEntity())
+    override suspend fun addLocal(entry: WishlistEntry): Result<Unit> = addMutex.withLock {
+        runCatching {
+            val existing = dao.getByAttributes(
+                scryfallId = entry.cardId,
+                matchAnyVariant = entry.matchAnyVariant,
+                isFoil = entry.isFoil,
+                condition = entry.condition,
+                language = entry.language,
+                isAltArt = entry.isAltArt
+            )
+            if (existing != null) {
+                dao.update(existing.copy(quantity = existing.quantity + entry.quantity))
+            } else {
+                dao.insert(entry.toEntity())
+            }
+        }
     }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
@@ -48,6 +71,12 @@ class WishlistRepositoryImpl @Inject constructor(
         if (unsynced.isEmpty()) return@runCatching 0
 
         val dtos = unsynced.map { it.toDto(userId) }
+        // getOrThrow() propagates the remote failure before any local state is
+        // modified, keeping the two stores consistent. If the batch insert
+        // succeeds but markSynced/clearSynced crash (extremely unlikely), the
+        // next migration run will attempt to re-insert already-existing rows.
+        // The Supabase wishlists table should have an ON CONFLICT DO NOTHING
+        // (or UPSERT) policy to make that safe.
         remote.batchAddWishlistEntries(dtos).getOrThrow()
         dao.markSynced(unsynced.map { it.id })
         dao.clearSynced()
@@ -58,11 +87,12 @@ class WishlistRepositoryImpl @Inject constructor(
         id = id,
         userId = "",
         cardId = scryfallId,
+        quantity = quantity,
         matchAnyVariant = matchAnyVariant,
-        isFoil = isFoil,
+        isFoil = isFoil ?: false,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
+        isAltArt = isAltArt ?: false,
         createdAt = createdAt,
     )
 
@@ -73,6 +103,7 @@ class WishlistRepositoryImpl @Inject constructor(
     private fun WishlistEntry.toEntity() = LocalWishlistEntity(
         id = id.ifBlank { UUID.randomUUID().toString() },
         scryfallId = cardId,
+        quantity = quantity,
         matchAnyVariant = matchAnyVariant,
         isFoil = isFoil,
         condition = condition,
@@ -86,6 +117,7 @@ class WishlistRepositoryImpl @Inject constructor(
         id = id,
         userId = userId,
         cardId = scryfallId,
+        quantity = quantity,
         matchAnyVariant = matchAnyVariant,
         isFoil = isFoil,
         condition = condition,
@@ -98,11 +130,12 @@ class WishlistRepositoryImpl @Inject constructor(
         id = id,
         userId = userId,
         cardId = cardId,
+        quantity = quantity,
         matchAnyVariant = matchAnyVariant,
-        isFoil = isFoil,
+        isFoil = isFoil ?: false,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
+        isAltArt = isAltArt ?: false,
         createdAt = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrDefault(0L),
     )
 
@@ -110,6 +143,7 @@ class WishlistRepositoryImpl @Inject constructor(
         id = id,
         userId = userId,
         cardId = cardId,
+        quantity = quantity,
         matchAnyVariant = matchAnyVariant,
         isFoil = isFoil,
         condition = condition,

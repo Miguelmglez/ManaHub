@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.collection
 
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 
@@ -18,7 +19,7 @@ data class CollectionUiState(
     val searchQuery:      String                    = "",
     val activeQuery:      AdvancedSearchQuery?      = null,
     val sortOrder:        SortOrder                 = SortOrder.DATE_ADDED,
-    val viewMode:         ViewMode                  = ViewMode.GRID,
+    val viewMode:         CollectionViewMode        = CollectionViewMode.GRID,
     val hasStaleCards:    Boolean                   = false,
     val selectedTab:      CollectionTab             = CollectionTab.CARDS,
     val syncState:        SyncState                 = SyncState.IDLE,
@@ -32,5 +33,4 @@ val CollectionUiState.activeFilterCount: Int
     get() = activeQuery?.criteria?.size ?: 0
 
 enum class SortOrder { DATE_ADDED, NAME, PRICE_DESC, PRICE_ASC, RARITY }
-enum class ViewMode  { GRID, LIST }
 enum class CollectionTab { CARDS, DECKS, TRADES }

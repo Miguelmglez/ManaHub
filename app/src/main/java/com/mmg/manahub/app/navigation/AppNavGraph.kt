@@ -334,6 +334,12 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                             popUpTo(Screen.CreateTradeProposal.route) { inclusive = true }
                         }
                     },
+                    onNavigateToLogin = {
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onNavigateToAddFriends = {
+                        navController.navigate(Screen.FriendsList.route)
+                    }
                 )
             }
 

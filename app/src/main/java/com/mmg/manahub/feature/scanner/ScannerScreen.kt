@@ -1045,7 +1045,7 @@ private fun ScanQueueSheet(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    placeholder = { Text(stringResource(R.string.scanner_queue_search_placeholder), color = mc.textDisabled) },
+                    placeholder = { Text(stringResource(R.string.scanner_queue_search_placeholder), style = ty.bodyMedium, color = mc.textDisabled) },
                     leadingIcon = { Icon(Icons.Default.Search, null, tint = mc.textDisabled) },
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -1091,7 +1091,7 @@ private fun ScanQueueSheet(
                     ) {
                         Icon(Icons.Default.PlaylistAdd, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.scanner_queue_add_all))
+                        Text(stringResource(R.string.scanner_queue_add_all), style = ty.bodyLarge)
                     }
 
                     OutlinedButton(
@@ -1103,7 +1103,7 @@ private fun ScanQueueSheet(
                     ) {
                         Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.scanner_queue_add_all_wishlist))
+                        Text(stringResource(R.string.scanner_queue_add_all_wishlist), style = ty.bodyLarge)
                     }
                 }
             }
@@ -1173,8 +1173,8 @@ private fun QueueCardItem(
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = "${entry.card.setName} #${entry.card.collectorNumber}",
-                        style = ty.bodyMedium,
-                        color = mc.textSecondary,
+                        style = ty.labelMedium,
+                        color = mc.secondaryAccent,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1198,7 +1198,7 @@ private fun QueueCardItem(
 
                 Text(
                     text = PriceFormatter.formatFromScryfall(entry.card.priceUsd, entry.card.priceEur, preferredCurrency),
-                    style = ty.bodyLarge.copy(fontWeight = FontWeight.Bold, color = mc.primaryAccent),
+                    style = ty.labelLarge.copy(fontWeight = FontWeight.Bold, color = mc.goldMtg),
                 )
             }
         }
@@ -1363,14 +1363,15 @@ private fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean,
 @Composable
 private fun CameraPermissionRequest(isPermanentlyDenied: Boolean, onRequest: () -> Unit) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Box(modifier = Modifier.fillMaxSize().background(mc.background), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(stringResource(R.string.scanner_permission_camera_required), color = mc.textPrimary)
+            Text(stringResource(R.string.scanner_permission_camera_required), style = ty.bodyMedium, color = mc.textPrimary)
             Button(
                 onClick = onRequest,
                 colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent, contentColor = mc.background)
             ) {
-                Text(stringResource(R.string.scanner_permission_grant))
+                Text(stringResource(R.string.scanner_permission_grant), style = ty.labelLarge)
             }
         }
     }
@@ -1404,12 +1405,12 @@ private fun AmbiguityDropdown(cardName: String, onConfirm: () -> Unit, onSkip: (
                     contentColor = mc.background,
                 ),
             ) {
-                Text(stringResource(R.string.scanner_confirm))
+                Text(stringResource(R.string.scanner_confirm), style = ty.labelLarge)
             }
         },
         dismissButton = {
             TextButton(onClick = onSkip) {
-                Text(stringResource(R.string.scanner_skip), color = mc.textDisabled)
+                Text(stringResource(R.string.scanner_skip), style = ty.labelLarge, color = mc.textDisabled)
             }
         },
         containerColor = mc.backgroundSecondary,

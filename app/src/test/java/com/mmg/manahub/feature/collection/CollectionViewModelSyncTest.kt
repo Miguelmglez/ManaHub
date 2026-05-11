@@ -4,8 +4,10 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.sync.SyncManager
@@ -14,6 +16,7 @@ import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -65,6 +68,8 @@ class CollectionViewModelSyncTest {
     private val syncManager            = mockk<SyncManager>(relaxed = true)
     private val workManager            = mockk<WorkManager>(relaxed = true)
     private val migrateLocalTradeLists = mockk<MigrateLocalTradeListsUseCase>(relaxed = true)
+    private val getLocalWishlist       = mockk<GetLocalWishlistUseCase>(relaxed = true)
+    private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -87,6 +92,8 @@ class CollectionViewModelSyncTest {
         every { getCollection() } returns flowOf(emptyList())
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
+        every { getLocalWishlist() } returns flowOf(emptyList())
+        every { userPreferencesRepository.collectionViewModeFlow } returns flowOf(CollectionViewMode.GRID)
         coEvery { authRepository.getCurrentUser() } returns null
         coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
     }
@@ -107,6 +114,8 @@ class CollectionViewModelSyncTest {
         syncManager            = syncManager,
         workManager            = workManager,
         migrateLocalTradeLists = migrateLocalTradeLists,
+        getLocalWishlist       = getLocalWishlist,
+        userPreferencesRepository = userPreferencesRepository,
     )
 
     // ══════════════════════════════════════════════════════════════════════════

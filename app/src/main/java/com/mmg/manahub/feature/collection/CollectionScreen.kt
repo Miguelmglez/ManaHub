@@ -24,10 +24,12 @@ import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
 import com.mmg.manahub.feature.addcard.AdvancedSearchViewModel
 import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.StaleWarningBanner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -150,101 +152,107 @@ private fun CollectionContent(
         onSnackbarDismissed()
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            CollectionTopBar(
-                selectedTab       = uiState.selectedTab,
-            )
-        },
-        floatingActionButton = {
-            if (uiState.selectedTab == CollectionTab.CARDS) {
-                FloatingActionButton(
-                    onClick        = onScannerClick,
-                    containerColor = mc.primaryAccent,
-                    contentColor   = mc.background
+    Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
+        HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
+
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = Color.Transparent,
+            topBar = {
+                CollectionTopBar(
+                    selectedTab       = uiState.selectedTab,
+                )
+            },
+            floatingActionButton = {
+                if (uiState.selectedTab == CollectionTab.CARDS) {
+                    FloatingActionButton(
+                        onClick        = onScannerClick,
+                        containerColor = mc.primaryAccent,
+                        contentColor   = mc.background
+                    ) {
+                        Icon(
+                            imageVector        = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.addcard_title)
+                        )
+                    }
+                }
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                // ── Cards / Decks / Trades sub-tabs ──────────────────────────────
+                val selectedTabIndex = when (uiState.selectedTab) {
+                    CollectionTab.CARDS  -> TAB_CARDS
+                    CollectionTab.DECKS  -> TAB_DECKS
+                    CollectionTab.TRADES -> TAB_TRADES
+                }
+                TabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    containerColor   = mc.backgroundSecondary.copy(alpha = 0.9f),
+                    contentColor     = mc.primaryAccent,
+                    divider = {}
                 ) {
-                    Icon(
-                        imageVector        = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.addcard_title)
+                    Tab(
+                        selected = uiState.selectedTab == CollectionTab.CARDS,
+                        onClick  = { onTabSelected(CollectionTab.CARDS) },
+                        text     = {
+                            Text(
+                                text  = stringResource(R.string.collection_tab_cards).uppercase(Locale.getDefault()),
+                                style = MaterialTheme.magicTypography.labelLarge,
+                            )
+                        },
+                    )
+                    Tab(
+                        selected = uiState.selectedTab == CollectionTab.DECKS,
+                        onClick  = { onTabSelected(CollectionTab.DECKS) },
+                        text     = {
+                            Text(
+                                text  = stringResource(R.string.collection_tab_decks).uppercase(Locale.getDefault()),
+                                style = MaterialTheme.magicTypography.labelLarge,
+                            )
+                        },
+                    )
+                    Tab(
+                        selected = uiState.selectedTab == CollectionTab.TRADES,
+                        onClick  = { onTabSelected(CollectionTab.TRADES) },
+                        text     = {
+                            Text(
+                                text  = stringResource(R.string.collection_tab_trades).uppercase(Locale.getDefault()),
+                                style = MaterialTheme.magicTypography.labelLarge,
+                            )
+                        },
+                    )
+                }
+
+                // ── Tab content ───────────────────────────────────────────────────
+                when (uiState.selectedTab) {
+                    CollectionTab.CARDS -> CardsTabContent(
+                        uiState               = uiState,
+                        onCardClick           = onCardClick,
+                        onScannerClick        = onScannerClick,
+                        onSearchQueryChange   = onSearchQueryChange,
+                        onClearFilters        = onClearFilters,
+                        onShowAdvancedSearch  = onShowAdvancedSearch,
+                        onShowSyncSheet       = onShowSyncSheet,
+                        onViewModeToggle      = onViewModeToggle,
+                        onSortChange          = onSortChange,
+                    )
+                    CollectionTab.DECKS   -> DeckListScreen(onDeckClick = onDeckClick)
+                    CollectionTab.TRADES  -> TradesScreen(
+                        onCardClick           = onCardClick,
+                        onNavigateToProposal  = onNavigateToTradeProposal,
+                        onNavigateToThread    = onNavigateToTradeThread,
                     )
                 }
             }
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            // ── Cards / Decks / Trades sub-tabs ──────────────────────────────
-            val selectedTabIndex = when (uiState.selectedTab) {
-                CollectionTab.CARDS  -> TAB_CARDS
-                CollectionTab.DECKS  -> TAB_DECKS
-                CollectionTab.TRADES -> TAB_TRADES
-            }
-            TabRow(
-                selectedTabIndex = selectedTabIndex,
-                containerColor   = mc.backgroundSecondary,
-                contentColor     = mc.primaryAccent,
-            ) {
-                Tab(
-                    selected = uiState.selectedTab == CollectionTab.CARDS,
-                    onClick  = { onTabSelected(CollectionTab.CARDS) },
-                    text     = {
-                        Text(
-                            text  = stringResource(R.string.collection_tab_cards).uppercase(Locale.getDefault()),
-                            style = MaterialTheme.magicTypography.labelLarge,
-                        )
-                    },
-                )
-                Tab(
-                    selected = uiState.selectedTab == CollectionTab.DECKS,
-                    onClick  = { onTabSelected(CollectionTab.DECKS) },
-                    text     = {
-                        Text(
-                            text  = stringResource(R.string.collection_tab_decks).uppercase(Locale.getDefault()),
-                            style = MaterialTheme.magicTypography.labelLarge,
-                        )
-                    },
-                )
-                Tab(
-                    selected = uiState.selectedTab == CollectionTab.TRADES,
-                    onClick  = { onTabSelected(CollectionTab.TRADES) },
-                    text     = {
-                        Text(
-                            text  = stringResource(R.string.collection_tab_trades).uppercase(Locale.getDefault()),
-                            style = MaterialTheme.magicTypography.labelLarge,
-                        )
-                    },
-                )
-            }
 
-            // ── Tab content ───────────────────────────────────────────────────
-            when (uiState.selectedTab) {
-                CollectionTab.CARDS -> CardsTabContent(
-                    uiState               = uiState,
-                    onCardClick           = onCardClick,
-                    onScannerClick        = onScannerClick,
-                    onSearchQueryChange   = onSearchQueryChange,
-                    onClearFilters        = onClearFilters,
-                    onShowAdvancedSearch  = onShowAdvancedSearch,
-                    onShowSyncSheet       = onShowSyncSheet,
-                    onViewModeToggle      = onViewModeToggle,
-                    onSortChange          = onSortChange,
-                )
-                CollectionTab.DECKS   -> DeckListScreen(onDeckClick = onDeckClick)
-                CollectionTab.TRADES  -> TradesScreen(
-                    onCardClick           = onCardClick,
-                    onNavigateToProposal  = onNavigateToTradeProposal,
-                    onNavigateToThread    = onNavigateToTradeThread,
-                )
+            // Error dismissal
+            uiState.error?.let {
+                LaunchedEffect(it) { onErrorDismissed() }
             }
-        }
-
-        // Error dismissal
-        uiState.error?.let {
-            LaunchedEffect(it) { onErrorDismissed() }
         }
     }
 }
@@ -386,10 +394,10 @@ private fun CardsTabContent(
 
                 IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
                     Icon(
-                        imageVector = if (uiState.viewMode == ViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
+                        imageVector = if (uiState.viewMode == CollectionViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
                         contentDescription = stringResource(R.string.collection_view_grid),
                         tint = mc.textSecondary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -441,11 +449,11 @@ private fun CardsTabContent(
 
         // Grid or list
         when (uiState.viewMode) {
-            ViewMode.GRID -> CardGrid(
+            CollectionViewMode.GRID -> CardGrid(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
             )
-            ViewMode.LIST -> CardList(
+            CollectionViewMode.LIST -> CardList(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
             )
@@ -460,8 +468,9 @@ private fun CollectionTopBar(
     val mc = MaterialTheme.magicColors
 
     Surface(
-        color    = mc.backgroundSecondary,
-        modifier = Modifier.fillMaxWidth()
+        color    = mc.backgroundSecondary.copy(alpha = 0.9f),
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier

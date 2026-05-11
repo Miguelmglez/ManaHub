@@ -49,6 +49,8 @@ fun CardSearchSheet(
     scryfallResults: List<AddCardRow>,
     isSearchingCards: Boolean,
     isSearchingScryfall: Boolean,
+    wishlistResults: List<AddCardRow> = emptyList(),
+    isSearchingWishlist: Boolean = false,
     isCommanderMode: Boolean = false,
     isCurrentCommander: (String) -> Boolean = { false },
     onQueryChange: (String) -> Unit,
@@ -57,7 +59,8 @@ fun CardSearchSheet(
     onRemove: (String) -> Unit,
     onCardClick: (String) -> Unit,
     onDismiss: () -> Unit,
-    title: String = if (isCommanderMode) "Choose Commander" else stringResource(R.string.deckbuilder_add_cards)
+    title: String = if (isCommanderMode) "Choose Commander" else stringResource(R.string.deckbuilder_add_cards),
+    friendName: String? = null
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -72,6 +75,12 @@ fun CardSearchSheet(
     
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAdvancedSearch by remember { mutableStateOf(false) }
+
+    val displayTitle = if (friendName != null) {
+        "Search cards from $friendName"
+    } else {
+        title
+    }
 
     val forceHideKeyboard = {
         // 1. Move focus to the sheet container (stealing it from TextField)
@@ -122,7 +131,7 @@ fun CardSearchSheet(
                 .focusRequester(sheetFocusRequester)
                 .focusable()
         ) {
-            Text(title, style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(16.dp))
+            Text(displayTitle, style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(16.dp))
 
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -133,7 +142,11 @@ fun CardSearchSheet(
                         .focusRequester(textFieldFocusRequester),
                     placeholder = { Text(stringResource(R.string.deckbuilder_add_cards_search_hint), color = mc.textDisabled) },
                     leadingIcon = {
-                        val isSearching = if (selectedTab == 0) isSearchingCards else isSearchingScryfall
+                        val isSearching = when (selectedTab) {
+                            0 -> isSearchingWishlist
+                            1 -> isSearchingCards
+                            else -> isSearchingScryfall
+                        }
                         if (isSearching) CircularProgressIndicator(Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
                         else Icon(Icons.Default.Search, null, tint = mc.textSecondary)
                     },
@@ -165,7 +178,7 @@ fun CardSearchSheet(
                         selectedTab = 0
                         forceHideKeyboard()
                     },
-                    text = { Text(stringResource(R.string.deckbuilder_tab_collection), style = ty.labelLarge) }
+                    text = { Text("Wishlist", style = ty.labelLarge) }
                 )
                 Tab(
                     selected = selectedTab == 1,
@@ -173,11 +186,23 @@ fun CardSearchSheet(
                         selectedTab = 1
                         forceHideKeyboard()
                     },
-                    text = { Text(stringResource(R.string.deckdetail_tab_scryfall), style = ty.labelLarge) }
+                    text = { Text("Offer", style = ty.labelLarge) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { 
+                        selectedTab = 2
+                        forceHideKeyboard()
+                    },
+                    text = { Text("All Cards", style = ty.labelLarge) }
                 )
             }
 
-            val results = if (selectedTab == 0) addCardsResults else scryfallResults
+            val results = when (selectedTab) {
+                0 -> wishlistResults
+                1 -> addCardsResults
+                else -> scryfallResults
+            }
             LazyColumn(
                 state = lazyListState,
                 modifier = Modifier
@@ -210,7 +235,11 @@ fun CardSearchSheet(
                 }
 
                 if (results.isEmpty()) {
-                    val isSearching = if (selectedTab == 0) isSearchingCards else isSearchingScryfall
+                    val isSearching = when (selectedTab) {
+                        0 -> isSearchingWishlist
+                        1 -> isSearchingCards
+                        else -> isSearchingScryfall
+                    }
                     if (!isSearching) {
                         item {
                             Box(
@@ -218,7 +247,7 @@ fun CardSearchSheet(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (selectedTab == 1 && query.isBlank())
+                                    text = if (selectedTab == 2 && query.isBlank())
                                         stringResource(R.string.deckbuilder_add_cards_search_hint)
                                     else
                                         stringResource(R.string.deckbuilder_no_cards),

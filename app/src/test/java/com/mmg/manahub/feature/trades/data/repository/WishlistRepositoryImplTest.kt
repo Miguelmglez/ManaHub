@@ -50,6 +50,7 @@ class WishlistRepositoryImplTest {
     private fun buildEntity(
         id: String = "local-id-001",
         scryfallId: String = "scryfall-card-001",
+        quantity: Int = 1,
         matchAnyVariant: Boolean = true,
         isFoil: Boolean? = null,
         condition: String? = null,
@@ -60,6 +61,7 @@ class WishlistRepositoryImplTest {
     ) = LocalWishlistEntity(
         id = id,
         scryfallId = scryfallId,
+        quantity = quantity,
         matchAnyVariant = matchAnyVariant,
         isFoil = isFoil,
         condition = condition,
@@ -72,6 +74,7 @@ class WishlistRepositoryImplTest {
     private fun buildEntry(
         id: String = "entry-id-001",
         cardId: String = "scryfall-card-001",
+        quantity: Int = 1,
         matchAnyVariant: Boolean = true,
         isFoil: Boolean? = null,
         condition: String? = null,
@@ -82,6 +85,7 @@ class WishlistRepositoryImplTest {
         id = id,
         userId = USER_ID,
         cardId = cardId,
+        quantity = quantity,
         matchAnyVariant = matchAnyVariant,
         isFoil = isFoil,
         condition = condition,
@@ -222,6 +226,40 @@ class WishlistRepositoryImplTest {
         repository.addLocal(entry)
 
         assertEquals("target-card-scryfall-001", capturedEntity.captured.scryfallId)
+    }
+
+    @Test
+    fun `given existing entry with same attributes when addLocal then increment quantity and call update`() = runTest {
+        // Arrange
+        val existing = buildEntity(id = "existing-id", quantity = 1)
+        val entry = buildEntry(cardId = existing.scryfallId)
+        
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns existing
+        val capturedEntity = slot<LocalWishlistEntity>()
+        coEvery { dao.update(capture(capturedEntity)) } returns Unit
+
+        // Act
+        repository.addLocal(entry)
+
+        // Assert
+        coVerify(exactly = 1) { dao.update(any()) }
+        coVerify(exactly = 0) { dao.insert(any()) }
+        assertEquals(2, capturedEntity.captured.quantity)
+    }
+
+    @Test
+    fun `given no existing entry with same attributes when addLocal then call insert`() = runTest {
+        // Arrange
+        val entry = buildEntry()
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.insert(any()) } returns Unit
+
+        // Act
+        repository.addLocal(entry)
+
+        // Assert
+        coVerify(exactly = 1) { dao.insert(any()) }
+        coVerify(exactly = 0) { dao.update(any()) }
     }
 
     @Test

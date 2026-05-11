@@ -2,13 +2,16 @@
 
 import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchCriterion
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -68,6 +71,8 @@ class CollectionViewModelTest {
     private val syncManager            = mockk<SyncManager>(relaxed = true)
     private val workManager            = mockk<WorkManager>(relaxed = true)
     private val migrateLocalTradeLists = mockk<MigrateLocalTradeListsUseCase>(relaxed = true)
+    private val getLocalWishlist       = mockk<GetLocalWishlistUseCase>(relaxed = true)
+    private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
 
     private lateinit var viewModel: CollectionViewModel
 
@@ -128,7 +133,10 @@ class CollectionViewModelTest {
         coEvery { authRepository.getCurrentUser() } returns null
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
+        every { getLocalWishlist() } returns flowOf(emptyList())
+        every { userPreferencesRepository.collectionViewModeFlow } returns flowOf(CollectionViewMode.GRID)
         coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
+
         return CollectionViewModel(
             getCollection          = getCollection,
             removeCard             = removeCard,
@@ -138,6 +146,8 @@ class CollectionViewModelTest {
             syncManager            = syncManager,
             workManager            = workManager,
             migrateLocalTradeLists = migrateLocalTradeLists,
+            getLocalWishlist       = getLocalWishlist,
+            userPreferencesRepository = userPreferencesRepository,
         )
     }
 
@@ -386,21 +396,32 @@ class CollectionViewModelTest {
     fun `given GRID mode when onViewModeToggle then mode switches to LIST`() = runTest {
         viewModel = buildViewModel()
         advanceUntilIdle()
-        assertEquals(ViewMode.GRID, viewModel.uiState.value.viewMode)
+        assertEquals(CollectionViewMode.GRID, viewModel.uiState.value.viewMode)
 
         viewModel.onViewModeToggle()
+        advanceUntilIdle()
 
-        assertEquals(ViewMode.LIST, viewModel.uiState.value.viewMode)
+        coVerify { userPreferencesRepository.saveCollectionViewMode(CollectionViewMode.LIST) }
     }
 
     @Test
     fun `given LIST mode when onViewModeToggle then mode switches back to GRID`() = runTest {
+        val modeFlow = MutableStateFlow(CollectionViewMode.GRID)
+        every { userPreferencesRepository.collectionViewModeFlow } returns modeFlow
+        coEvery { userPreferencesRepository.saveCollectionViewMode(any()) } answers {
+            modeFlow.value = firstArg()
+        }
+
         viewModel = buildViewModel()
         advanceUntilIdle()
-        viewModel.onViewModeToggle()   // GRID → LIST
-        viewModel.onViewModeToggle()   // LIST → GRID
 
-        assertEquals(ViewMode.GRID, viewModel.uiState.value.viewMode)
+        viewModel.onViewModeToggle()   // GRID → LIST
+        advanceUntilIdle()
+        assertEquals(CollectionViewMode.LIST, viewModel.uiState.value.viewMode)
+
+        viewModel.onViewModeToggle()   // LIST → GRID
+        advanceUntilIdle()
+        assertEquals(CollectionViewMode.GRID, viewModel.uiState.value.viewMode)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

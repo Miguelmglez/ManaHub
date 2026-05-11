@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.settings
 
 import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserPreferences
@@ -18,5 +19,6 @@ data class PreferencesState(
         cardLanguage = CardLanguage.ENGLISH,
         newsLanguages = setOf(NewsLanguage.ENGLISH),
         preferredCurrency = PreferredCurrency.USD,
+        collectionViewMode = CollectionViewMode.GRID,
     )
 )

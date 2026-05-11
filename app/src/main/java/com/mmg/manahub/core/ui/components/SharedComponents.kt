@@ -28,6 +28,22 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
 @Composable
+fun CopyBadge(label: String, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.extraSmall,
+        modifier = modifier
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
+@Composable
 fun MagicSegmentedControl(
     options: List<String>,
     selectedIndex: Int,

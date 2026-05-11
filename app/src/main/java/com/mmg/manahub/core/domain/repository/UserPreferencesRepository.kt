@@ -6,6 +6,7 @@ import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.model.UserPreferences
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -20,6 +21,7 @@ interface UserPreferencesRepository {
     val lastPriceRefreshFlow: Flow<Long?>
     val autoRefreshPricesFlow: Flow<Boolean>
     val userDefinedTagsFlow: Flow<List<UserDefinedTag>>
+    val collectionViewModeFlow: Flow<CollectionViewMode>
 
     suspend fun setAppLanguage(language: AppLanguage)
     suspend fun setCardLanguage(language: CardLanguage)
@@ -29,4 +31,5 @@ interface UserPreferencesRepository {
     suspend fun saveAutoRefreshPrices(enabled: Boolean)
     suspend fun saveUserDefinedTag(tag: UserDefinedTag)
     suspend fun deleteUserDefinedTag(key: String)
+    suspend fun saveCollectionViewMode(mode: CollectionViewMode)
 }

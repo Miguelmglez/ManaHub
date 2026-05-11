@@ -15,5 +15,7 @@ data class TradeItem(
     val isAltArt: Boolean?,
     /** Scryfall card id. */
     val cardId: String,
+    /** Display name resolved from local Room DB; empty string if card not in local cache. */
+    val cardName: String = "",
     val isReviewCollectionPlaceholder: Boolean,
 )
