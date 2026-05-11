@@ -70,6 +70,7 @@ fun TournamentSetupScreen(
             modifier            = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
             contentPadding      = PaddingValues(vertical = 16.dp),

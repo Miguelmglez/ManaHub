@@ -151,10 +151,10 @@ class TradesViewModel @Inject constructor(
                 userId          = "",          // local entry; userId assigned on cloud migration
                 cardId          = cardId,
                 matchAnyVariant = matchAnyVariant,
-                isFoil          = isFoil,
+                isFoil          = isFoil ?: false,
                 condition       = condition,
                 language        = language,
-                isAltArt        = isAltArt,
+                isAltArt        = isAltArt ?: false,
                 createdAt       = System.currentTimeMillis(),
             )
             addToWishlist(entry)

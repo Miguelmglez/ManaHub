@@ -13,6 +13,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserDefinedTag
@@ -44,6 +45,7 @@ private val KEY_TAG_AUTO_THRESHOLD    = floatPreferencesKey("tag_auto_threshold"
 private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_threshold")
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
+private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
 
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
 
@@ -87,6 +89,9 @@ class UserPreferencesDataStore @Inject constructor(
                 preferredCurrency = PreferredCurrency.fromCode(
                     prefs[KEY_PREFERRED_CURRENCY] ?: defaultCurrency
                 ),
+                collectionViewMode = CollectionViewMode.fromName(
+                    prefs[KEY_COLLECTION_VIEW_MODE]
+                )
             )
         }
         .catch { emit(defaultPreferences()) }
@@ -126,6 +131,7 @@ class UserPreferencesDataStore @Inject constructor(
         cardLanguage = CardLanguage.ENGLISH,
         newsLanguages = setOf(NewsLanguage.ENGLISH),
         preferredCurrency = if (isEuropeanLocale()) PreferredCurrency.EUR else PreferredCurrency.USD,
+        collectionViewMode = CollectionViewMode.GRID,
     )
 
 
@@ -222,6 +228,10 @@ class UserPreferencesDataStore @Inject constructor(
         }
         .catch { emit(emptyList()) }
 
+    override val collectionViewModeFlow: Flow<CollectionViewMode> = context.userPrefsDataStore.data
+        .map { prefs -> CollectionViewMode.fromName(prefs[KEY_COLLECTION_VIEW_MODE]) }
+        .catch { emit(CollectionViewMode.GRID) }
+
     override suspend fun saveUserDefinedTag(tag: UserDefinedTag) {
         context.userPrefsDataStore.edit { prefs ->
             val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
@@ -243,6 +253,10 @@ class UserPreferencesDataStore @Inject constructor(
             records.removeAll { it.k == key }
             prefs[KEY_USER_DEFINED_TAGS] = gson.toJson(records)
         }
+    }
+
+    override suspend fun saveCollectionViewMode(mode: CollectionViewMode) {
+        context.userPrefsDataStore.edit { it[KEY_COLLECTION_VIEW_MODE] = mode.name }
     }
 
     // ── Sync metadata ─────────────────────────────────────────────────────────

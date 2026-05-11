@@ -3,6 +3,8 @@ package com.mmg.manahub.core.ui.components
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
@@ -12,6 +14,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mmg.manahub.feature.collection.CollectionCardGroup
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -64,23 +67,6 @@ fun CardGridItem(
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                     )
                 }
-                // Multi-copy indicator
-                if (item.distinctCopies > 1) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(4.dp),
-                        color    = mc.primaryAccent.copy(alpha = 0.85f),
-                        shape    = MaterialTheme.shapes.extraSmall,
-                    ) {
-                        Text(
-                            text     = "${item.distinctCopies}t",
-                            style    = MaterialTheme.magicTypography.labelSmall,
-                            color    = mc.background,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                        )
-                    }
-                }
             }
             // Card name + price
             Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -112,6 +98,26 @@ fun CardGridItem(
                         )
                     }
                     Spacer(modifier = Modifier.weight(1f))
+                    // Variants indicator
+                    if (item.distinctCopies > 1) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier          = Modifier.padding(end = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Style,
+                                contentDescription = null,
+                                modifier           = Modifier.size(12.dp),
+                                tint               = mc.primaryAccent
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text  = item.distinctCopies.toString(),
+                                style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
+                                color = mc.primaryAccent,
+                            )
+                        }
+                    }
                     SetSymbol(
                         setCode = card.setCode,
                         rarity  = CardRarity.fromString(card.rarity),

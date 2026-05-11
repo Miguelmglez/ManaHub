@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,9 +25,13 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -44,10 +49,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +66,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
@@ -65,6 +74,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.game.model.GameMode
 import com.mmg.manahub.feature.game.model.LayoutTemplate
+import kotlinx.coroutines.launch
 
 @Composable
 fun GameSetupScreen(
@@ -107,118 +117,114 @@ private fun GameSetupScreenContent(
 
     ImmersiveSystemBars()
 
-    Scaffold(
-        containerColor = mc.background,
-        topBar = {
-            Surface(
-                color = mc.backgroundSecondary,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+    Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
+        HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
+
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                Surface(
+                    color = mc.backgroundSecondary.copy(alpha = 0.9f),
+                    modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 4.dp
                 ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                            tint = mc.textSecondary
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
+                                tint = mc.textSecondary
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.gamesetup_title),
+                            style = MaterialTheme.magicTypography.titleLarge,
+                            color = mc.textPrimary,
+                            modifier = Modifier.weight(1f)
                         )
-                    }
-                    Text(
-                        text = stringResource(R.string.gamesetup_title),
-                        style = MaterialTheme.magicTypography.titleLarge,
-                        color = mc.textPrimary,
-                        modifier = Modifier.weight(1f)
-                    )
 
-                }
-            }
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // ── Mode selector ─────────────────────────────────────────────────
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    stringResource(R.string.gamesetup_mode_label),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.textSecondary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    GameMode.entries.forEach { mode ->
-                        ModeTile(
-                            mode = mode,
-                            selected = mode == uiState.selectedMode,
-                            onClick = { onModeChange(mode) },
-                            modifier = Modifier.weight(1f),
-                        )
                     }
                 }
-            }
+            },
+        ) { padding ->
+            Box(modifier = Modifier.padding(padding).imePadding()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    // ── Mode selector ─────────────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            stringResource(R.string.gamesetup_mode_label),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textSecondary,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            GameMode.entries.forEach { mode ->
+                                ModeTile(
+                                    mode = mode,
+                                    selected = mode == uiState.selectedMode,
+                                    onClick = { onModeChange(mode) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
 
-            // ── Player count stepper ──────────────────────────────────────────
-            PlayerCountStepper(
-                playerCount = uiState.playerCount,
-                onPlayerCountChange = onPlayerCountChange,
-            )
-
-            // ── Player config list ────────────────────────────────────────────
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                itemsIndexed(uiState.playerConfigs) { index, config ->
-                    PlayerConfigRow(
-                        config = config,
-                        usedThemes = uiState.playerConfigs
-                            .filter { it.id != config.id }
-                            .map { it.theme },
-                        onNameChange = { name -> onUpdatePlayerName(index, name) },
-                        onThemeChange = { theme -> onUpdatePlayerTheme(index, theme) },
+                    // ── Player count stepper ──────────────────────────────────────────
+                    PlayerCountStepper(
+                        playerCount = uiState.playerCount,
+                        onPlayerCountChange = onPlayerCountChange,
                     )
+
+                    // ── Player config list ────────────────────────────────────────────
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        uiState.playerConfigs.forEachIndexed { index, config ->
+                            PlayerConfigRow(
+                                config = config,
+                                usedThemes = uiState.playerConfigs
+                                    .filter { it.id != config.id }
+                                    .map { it.theme },
+                                onNameChange = { name -> onUpdatePlayerName(index, name) },
+                                onThemeChange = { theme -> onUpdatePlayerTheme(index, theme) },
+                            )
+                        }
+                    }
+
+                    // ── Begin button ──────────────────────────────────────────────────
+                    Button(
+                        onClick = {
+                            onStartGame(
+                                uiState.selectedMode,
+                                uiState.playerConfigs,
+                                uiState.selectedLayout
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.gamesetup_begin_button),
+                            style = MaterialTheme.magicTypography.bodyLarge,
+                            color = mc.background,
+                        )
+                    }
                 }
             }
-
-            // ── Begin button ──────────────────────────────────────────────────
-            Button(
-                onClick = {
-                    onStartGame(
-                        uiState.selectedMode,
-                        uiState.playerConfigs,
-                        uiState.selectedLayout
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text(
-                    stringResource(R.string.gamesetup_begin_button),
-                    style = MaterialTheme.magicTypography.titleLarge,
-                    color = mc.background,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            /*TextButton(onClick = onNavigateToTournament) {
-                Text(
-                    stringResource(R.string.gamesetup_tournament_link),
-                    color = mc.goldMtg,
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }*/
         }
     }
 }
@@ -302,10 +308,13 @@ private fun PlayerConfigRow(
 ) {
     var showColorPicker by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
             .clip(RoundedCornerShape(12.dp))
             .background(mc.surface)
             .padding(12.dp),
@@ -358,7 +367,15 @@ private fun PlayerConfigRow(
             BasicTextField(
                 value = config.name,
                 onValueChange = onNameChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            scope.launch {
+                                bringIntoViewRequester.bringIntoView()
+                            }
+                        }
+                    },
                 textStyle = MaterialTheme.magicTypography.bodyLarge.copy(color = mc.textPrimary),
                 singleLine = true,
                 decorationBox = { inner ->

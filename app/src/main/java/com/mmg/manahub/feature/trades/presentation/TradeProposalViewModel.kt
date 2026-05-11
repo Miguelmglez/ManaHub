@@ -11,8 +11,12 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
+import com.mmg.manahub.feature.friends.domain.model.Friend
+import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.trades.domain.model.TradeError
+import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
@@ -32,6 +36,11 @@ data class TradeItemDraft(
     val id: String = UUID.randomUUID().toString(),
     val cardId: String,
     val cardName: String = "",
+    val imageUrl: String? = null,
+    val priceUsd: Double? = null,
+    val priceUsdFoil: Double? = null,
+    val priceEur: Double? = null,
+    val priceEurFoil: Double? = null,
     val quantity: Int = 1,
     val isFoil: Boolean = false,
     val condition: String = "NM",
@@ -60,12 +69,35 @@ data class ProposalEditorUiState(
 
     // Search / Add cards state
     val addCardsQuery: String = "",
-    val addCardsResults: List<AddCardRow> = emptyList(),
+    val addCardsResults: List<AddCardRow> = emptyList(), // This is Collection/Offer
+    val wishlistResults: List<AddCardRow> = emptyList(),
     val isSearchingCards: Boolean = false,
+    val isSearchingWishlist: Boolean = false,
     val scryfallResults: List<AddCardRow> = emptyList(),
     val isSearchingScryfall: Boolean = false,
     val collectionIds: Set<String> = emptySet(),
-)
+
+    val friends: List<Friend> = emptyList(),
+    val selectedFriend: Friend? = null,
+    val sessionState: SessionState = SessionState.Loading,
+) {
+    val totalProposerValueUsd: Double get() = proposerItems.sumOf { 
+        val price = if (it.isFoil) (it.priceUsdFoil ?: it.priceUsd ?: 0.0) else (it.priceUsd ?: 0.0)
+        price * it.quantity 
+    }
+    val totalReceiverValueUsd: Double get() = receiverItems.sumOf { 
+        val price = if (it.isFoil) (it.priceUsdFoil ?: it.priceUsd ?: 0.0) else (it.priceUsd ?: 0.0)
+        price * it.quantity 
+    }
+    val totalProposerValueEur: Double get() = proposerItems.sumOf { 
+        val price = if (it.isFoil) (it.priceEurFoil ?: it.priceEur ?: 0.0) else (it.priceEur ?: 0.0)
+        price * it.quantity 
+    }
+    val totalReceiverValueEur: Double get() = receiverItems.sumOf { 
+        val price = if (it.isFoil) (it.priceEurFoil ?: it.priceEur ?: 0.0) else (it.priceEur ?: 0.0)
+        price * it.quantity 
+    }
+}
 
 @HiltViewModel
 class TradeProposalViewModel @Inject constructor(
@@ -78,6 +110,8 @@ class TradeProposalViewModel @Inject constructor(
     private val refreshTrades: RefreshTradesUseCase,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
+    private val wishlistRepository: WishlistRepository,
+    private val friendRepository: FriendRepository,
     val searchCards: SearchCardsUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -87,6 +121,10 @@ class TradeProposalViewModel @Inject constructor(
 
     private var currentUserId: String = ""
     private var collectionCards: List<Card> = emptyList()
+    private var wishlistCards: List<Card> = emptyList()
+    
+    private var friendCollectionCards: List<Card> = emptyList()
+    private var friendWishlistCards: List<Card> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -94,9 +132,12 @@ class TradeProposalViewModel @Inject constructor(
                 if (state is SessionState.Authenticated) {
                     currentUserId = state.user.id
                 }
+                _uiState.update { it.copy(sessionState = state) }
             }
         }
         observeCollection()
+        observeWishlist()
+        observeFriends()
         val receiverId = savedStateHandle.get<String>("receiverId") ?: ""
         val parentProposalId = savedStateHandle.get<String>("parentProposalId")
         val editingProposalId = savedStateHandle.get<String>("editingProposalId")
@@ -118,42 +159,109 @@ class TradeProposalViewModel @Inject constructor(
                 collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
                 val ids = collectionCards.map { it.scryfallId }.toSet()
                 _uiState.update { it.copy(collectionIds = ids) }
+                updateSearchLists(_uiState.value.addCardsQuery)
             }
+        }
+    }
+
+    private fun observeWishlist() {
+        viewModelScope.launch {
+            wishlistRepository.observeLocal().collect { wishlist ->
+                wishlistCards = wishlist.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                updateSearchLists(_uiState.value.addCardsQuery)
+            }
+        }
+    }
+
+    private fun observeFriends() {
+        viewModelScope.launch {
+            friendRepository.observeFriends().collect { friends ->
+                _uiState.update { it.copy(friends = friends) }
+                // Auto-select receiver if they are a friend
+                val receiverId = _uiState.value.receiverId
+                val receiverFriend = friends.find { it.userId == receiverId }
+                if (receiverFriend != null && _uiState.value.selectedFriend == null) {
+                    onFriendSelected(receiverFriend)
+                }
+            }
+        }
+    }
+
+    fun onFriendSelected(friend: Friend?) {
+        _uiState.update { it.copy(selectedFriend = friend) }
+        if (friend != null) {
+            fetchFriendData(friend.userId)
+        } else {
+            friendCollectionCards = emptyList()
+            friendWishlistCards = emptyList()
+            updateSearchLists(_uiState.value.addCardsQuery)
+        }
+    }
+
+    /**
+     * Fetches the selected friend's remote wishlist so it can be shown in the
+     * receiver-side card picker. The friend's collection is not yet accessible
+     * via a dedicated remote endpoint; that list stays empty until a
+     * "get_friend_collection" RPC is added to Supabase.
+     */
+    private fun fetchFriendData(userId: String) {
+        viewModelScope.launch(ioDispatcher) {
+            wishlistRepository.getRemote(userId)
+                .onSuccess { entries ->
+                    friendWishlistCards = entries.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                    // Friend collection cards require a dedicated remote endpoint; left empty for now.
+                    friendCollectionCards = emptyList()
+                    updateSearchLists(_uiState.value.addCardsQuery)
+                }
+                .onFailure {
+                    // Non-fatal: the picker still works without the friend's wishlist.
+                    friendWishlistCards = emptyList()
+                    friendCollectionCards = emptyList()
+                    updateSearchLists(_uiState.value.addCardsQuery)
+                }
         }
     }
 
     fun onAddCardsQueryChange(query: String) {
         _uiState.update { it.copy(addCardsQuery = query) }
-        if (query.isBlank()) {
-            showCollectionCards()
-            return
+        updateSearchLists(query)
+    }
+
+    private fun updateSearchLists(query: String) {
+        val state = _uiState.value
+        val isFriendSelected = state.selectedFriend != null
+
+        val collectionSource = if (isFriendSelected) friendCollectionCards else collectionCards
+        val wishlistSource = if (isFriendSelected) friendWishlistCards else wishlistCards
+
+        val filteredCollection = if (query.isBlank()) {
+            collectionSource
+        } else {
+            collectionSource.filter { it.name.contains(query, ignoreCase = true) }
         }
-        val filtered = collectionCards.filter { it.name.contains(query, ignoreCase = true) }
+
+        val filteredWishlist = if (query.isBlank()) {
+            wishlistSource
+        } else {
+            wishlistSource.filter { it.name.contains(query, ignoreCase = true) }
+        }
+
+        val ownedIds = state.collectionIds
+
         _uiState.update { s ->
             s.copy(
-                addCardsResults = filtered.map { card ->
-                    AddCardRow(
-                        card = card,
-                        quantityInDeck = 0, // Not applicable here
-                        isOwned = true,
-                    )
+                addCardsResults = filteredCollection.map { card ->
+                    AddCardRow(card = card, quantityInDeck = 0, isOwned = card.scryfallId in ownedIds)
                 },
+                wishlistResults = filteredWishlist.map { card ->
+                    AddCardRow(card = card, quantityInDeck = 0, isOwned = card.scryfallId in ownedIds)
+                }
             )
         }
     }
 
     fun showCollectionCards() {
-        _uiState.update { s ->
-            s.copy(
-                addCardsResults = collectionCards.map { card ->
-                    AddCardRow(
-                        card = card,
-                        quantityInDeck = 0,
-                        isOwned = true,
-                    )
-                },
-            )
-        }
+        updateSearchLists("")
     }
 
     fun searchScryfallDirect(query: String) {
@@ -193,7 +301,7 @@ class TradeProposalViewModel @Inject constructor(
     }
 
     fun getCardById(scryfallId: String): Card? {
-        return (uiState.value.addCardsResults + uiState.value.scryfallResults)
+        return (uiState.value.addCardsResults + uiState.value.scryfallResults + uiState.value.wishlistResults)
             .find { it.card.scryfallId == scryfallId }?.card
     }
 
@@ -243,6 +351,12 @@ class TradeProposalViewModel @Inject constructor(
 
     fun onSaveDraft() {
         val state = _uiState.value
+        // A missing receiver ID would send an empty string to the RPC, which
+        // either fails with a cryptic server error or creates a malformed proposal.
+        if (!state.isCounterMode && state.receiverId.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
+            return
+        }
         if (!validateInitialProposal()) {
             _uiState.update { it.copy(errorMessage = "INITIAL_ASYMMETRY") }
             return
@@ -262,7 +376,7 @@ class TradeProposalViewModel @Inject constructor(
                         s.copy(isSaving = false, navigateToThread = Pair(proposalId, proposalId))
                     },
                     onFailure = { e ->
-                        s.copy(isSaving = false, errorMessage = (e as? TradeError)?.javaClass?.simpleName)
+                        s.copy(isSaving = false, errorMessage = e.toUserFacingMessage() ?: e.message)
                     }
                 )
             }
@@ -271,6 +385,12 @@ class TradeProposalViewModel @Inject constructor(
 
     fun onSendProposal() {
         val state = _uiState.value
+        // Guard: a new proposal (not a counter-offer, not an edit) requires a
+        // receiver. Without this, an empty-string receiverId reaches the RPC.
+        if (!state.isCounterMode && state.editingProposalId == null && state.receiverId.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
+            return
+        }
         if (!validateInitialProposal()) {
             _uiState.update { it.copy(errorMessage = "INITIAL_ASYMMETRY") }
             return
@@ -281,57 +401,64 @@ class TradeProposalViewModel @Inject constructor(
             val editingId = state.editingProposalId
             val parentId = state.parentProposalId
 
-            val result = when {
+            // Each branch is handled separately so every Result stays properly typed
+            // and no unchecked casts or vacuous .map { it } calls are needed.
+            val handleError: (Throwable) -> Unit = { e ->
+                val msg = when (e) {
+                    is TradeError.ProposalVersionMismatch    -> "PROPOSAL_VERSION_MISMATCH"
+                    is TradeError.InitialAsymmetryNotAllowed -> "INITIAL_ASYMMETRY"
+                    else                                     -> e.toUserFacingMessage() ?: e.message ?: "Unknown error"
+                }
+                _uiState.update { it.copy(isSaving = false, errorMessage = msg) }
+            }
+
+            when {
                 editingId != null -> editProposal(
                     proposalId = editingId,
                     expectedVersion = state.currentVersion,
                     newItems = buildItemRequestDtos(state),
-                    newReviewFlags = ReviewFlags(state.includesReviewFromProposer, state.includesReviewFromReceiver),
+                    newReviewFlags = ReviewFlags(
+                        state.includesReviewFromProposer,
+                        state.includesReviewFromReceiver,
+                    ),
+                ).fold(
+                    onSuccess = { _uiState.update { it.copy(isSaving = false, navigateBack = true) } },
+                    onFailure = handleError,
                 )
+
                 parentId != null -> counterProposal(
                     parentProposalId = parentId,
                     items = buildItemRequestDtos(state),
-                ).map { it }
+                ).fold(
+                    onSuccess = { newId ->
+                        _uiState.update { s ->
+                            s.copy(
+                                isSaving = false,
+                                navigateToThread = if (newId.isNotBlank()) Pair(newId, s.rootProposalId) else null,
+                                navigateBack = newId.isBlank(),
+                            )
+                        }
+                    },
+                    onFailure = handleError,
+                )
+
                 else -> createProposal(
                     receiverId = state.receiverId,
                     items = buildItemRequestDtos(state),
                     includesReviewFromProposer = state.includesReviewFromProposer,
                     includesReviewFromReceiver = state.includesReviewFromReceiver,
                     autoSend = true,
-                )
-            }
-
-            _uiState.update { s ->
-                result.fold(
-                    onSuccess = { id ->
-                        when {
-                            editingId != null -> s.copy(isSaving = false, navigateBack = true)
-                            parentId != null -> {
-                                val newId = id as? String ?: ""
-                                s.copy(
-                                    isSaving = false,
-                                    navigateToThread = if (newId.isNotBlank()) Pair(newId, s.rootProposalId) else null,
-                                    navigateBack = newId.isBlank(),
-                                )
-                            }
-                            else -> {
-                                val newId = id as? String ?: ""
-                                s.copy(
-                                    isSaving = false,
-                                    navigateToThread = if (newId.isNotBlank()) Pair(newId, newId) else null,
-                                    navigateBack = newId.isBlank(),
-                                )
-                            }
+                ).fold(
+                    onSuccess = { newId ->
+                        _uiState.update { s ->
+                            s.copy(
+                                isSaving = false,
+                                navigateToThread = if (newId.isNotBlank()) Pair(newId, newId) else null,
+                                navigateBack = newId.isBlank(),
+                            )
                         }
                     },
-                    onFailure = { e ->
-                        val msg = when (e) {
-                            is TradeError.ProposalVersionMismatch -> "PROPOSAL_VERSION_MISMATCH"
-                            is TradeError.InitialAsymmetryNotAllowed -> "INITIAL_ASYMMETRY"
-                            else -> (e as? TradeError)?.javaClass?.simpleName
-                        }
-                        s.copy(isSaving = false, errorMessage = msg)
-                    }
+                    onFailure = handleError,
                 )
             }
         }

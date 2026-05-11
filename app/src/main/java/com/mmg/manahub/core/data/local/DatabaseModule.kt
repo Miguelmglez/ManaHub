@@ -46,6 +46,7 @@ object DatabaseModule {
                 MIGRATION_27_28,
                 MIGRATION_28_29,
                 MIGRATION_29_30,
+                MIGRATION_30_31,
             )
             .build()
 
@@ -175,6 +176,19 @@ object DatabaseModule {
             }
             if (!columnExists(db, "local_open_for_trade", "is_alt_art")) {
                 db.execSQL("ALTER TABLE local_open_for_trade ADD COLUMN is_alt_art INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v30 → v31
+    // Adds `quantity` to `local_wishlists` to support grouping entries with
+    // identical attributes.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_30_31 = object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "local_wishlists", "quantity")) {
+                db.execSQL("ALTER TABLE local_wishlists ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
             }
         }
     }

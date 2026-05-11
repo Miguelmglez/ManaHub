@@ -24,6 +24,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -49,16 +51,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Landscape
-import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -68,7 +71,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -82,20 +84,23 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,8 +111,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.ImmersiveSystemBars
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.theme.magicColors
-import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
@@ -123,6 +126,7 @@ import com.mmg.manahub.feature.game.model.LayoutTemplates
 import com.mmg.manahub.feature.game.model.Player
 import com.mmg.manahub.feature.game.model.ScreenedGridSlotPosition
 import com.mmg.manahub.feature.game.model.toDefaultDegrees
+import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Entry point (matches nav graph signature)
@@ -698,6 +702,8 @@ private fun PlayerCard(
             CardTier.LARGE -> 6.dp; CardTier.SMALL -> 4.dp; CardTier.TINY -> 2.dp
         }
 
+        var dragAccumulator by remember { mutableFloatStateOf(0f) }
+
         PlayerCardSurface(
             isActive = isActive,
             theme = theme,
@@ -793,7 +799,7 @@ private fun PlayerCard(
                                     label = "landAlpha",
                                 )
                                 Icon(
-                                    imageVector = Icons.Default.Park,
+                                    painter = painterResource(R.drawable.ic_land),
                                     contentDescription = stringResource(R.string.game_counters_button),
                                     tint = theme.accent.copy(alpha = alpha),
                                     modifier = Modifier
@@ -807,66 +813,79 @@ private fun PlayerCard(
                             }
                         }
 
-                        AnimatedContent(
-                            targetState = player.life,
-                            transitionSpec = {
-                                if (targetState > initialState) {
-                                    (slideInVertically { height -> -height } + fadeIn()) togetherWith
-                                            (slideOutVertically { height -> height } + fadeOut())
-                                } else {
-                                    (slideInVertically { height -> height } + fadeIn()) togetherWith
-                                            (slideOutVertically { height -> -height } + fadeOut())
-                                }.using(
-                                    SizeTransform(clip = false)
-                                )
-                            },
-                            label = "lifeAnimation"
-                        ) { targetLife ->
-                            Text(
-                                text = targetLife.toString(),
-                                style = (if (tier == CardTier.LARGE)
-                                    MaterialTheme.magicTypography.lifeNumber
-                                else
-                                    MaterialTheme.magicTypography.lifeNumberMd).copy(
-                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                    lineHeightStyle = LineHeightStyle(
-                                        alignment = LineHeightStyle.Alignment.Center,
-                                        trim = LineHeightStyle.Trim.None
+                        Box(
+                            modifier = Modifier
+                                .pointerInput(Unit) {
+                                    detectVerticalDragGestures(
+                                        onVerticalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragAccumulator += dragAmount
+                                            // 80dp threshold for one life point (less sensitive)
+                                            val threshold = 80f
+                                            if (dragAccumulator > threshold) {
+                                                onLife(-1)
+                                                dragAccumulator = 0f
+                                            } else if (dragAccumulator < -threshold) {
+                                                onLife(1)
+                                                dragAccumulator = 0f
+                                            }
+                                        },
+                                        onDragEnd = { dragAccumulator = 0f },
+                                        onDragCancel = { dragAccumulator = 0f }
                                     )
-                                ),
-                                color = lifeColor,
-                                maxLines = 1,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .padding(horizontal = 24.dp) // Gap between text and icons
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                    ) { onLife(-1) },
-                            )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AnimatedContent(
+                                targetState = player.life,
+                                transitionSpec = {
+                                    if (targetState > initialState) {
+                                        (slideInVertically { height -> -height } + fadeIn()) togetherWith
+                                                (slideOutVertically { height -> height } + fadeOut())
+                                    } else {
+                                        (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                                (slideOutVertically { height -> -height } + fadeOut())
+                                    }.using(
+                                        SizeTransform(clip = false)
+                                    )
+                                },
+                                label = "lifeAnimation"
+                            ) { targetLife ->
+                                Text(
+                                    text = targetLife.toString(),
+                                    style = (if (tier == CardTier.LARGE)
+                                        MaterialTheme.magicTypography.lifeNumber
+                                    else
+                                        MaterialTheme.magicTypography.lifeNumberMd).copy(
+                                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                        lineHeightStyle = LineHeightStyle(
+                                            alignment = LineHeightStyle.Alignment.Center,
+                                            trim = LineHeightStyle.Trim.None
+                                        )
+                                    ),
+                                    color = lifeColor,
+                                    maxLines = 1,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier
+                                        .padding(horizontal = 24.dp) // Gap between text and icons
+                                )
+                            }
                         }
 
-                        // Right container: occupies 1/2 of remaining space, icon aligned to start (near text)
+                        // Right container: occupies 1/2 of remaining space
                         Box(
                             modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.CenterStart
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_heart),
-                                contentDescription = stringResource(R.string.game_life_icon_desc),
-                                tint = theme.accent,
-                                modifier = Modifier
-                                    .size(iconSize)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                    ) { onLife(1) },
-                            )
+                            // Heart icon removed as life is now handled by scroll gesture
                         }
                     }
 
-                    // ── Confirm Defeat Button: Only if isSurviving ──────────────────
-                    if (player.isSurviving) {
+                    // ── Confirm Defeat Button: Only if isSurviving and meeting defeat condition ────
+                    val meetsDefeat = player.life <= 0 || player.poison >= 10 ||
+                            (gameMode == GameMode.COMMANDER && player.commanderDamage.values.any { it >= 21 })
+
+                    if (player.isSurviving && meetsDefeat) {
                         OutlinedButton(
                             onClick  = onConfirmDefeat,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -1091,7 +1110,7 @@ private fun EndTurnButton(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(if (tier == CardTier.SMALL) 22.dp else 18.dp)
+                .size(16.dp)
                 .clip(RoundedCornerShape(5.dp))
                 .background(theme.accent.copy(alpha = 0.15f))
                 .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
@@ -1371,7 +1390,7 @@ private fun CmdDamagePanel(
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -1396,16 +1415,19 @@ private fun CountersPanel(
     val theme = player.theme
     var newCounterName by remember { mutableStateOf("") }
     var selectedIconKey by remember { mutableStateOf(CounterIconKey.DEFAULT) }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
-        contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
             modifier = Modifier
                 .padding(16.dp)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -1485,6 +1507,7 @@ private fun CountersPanel(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
             ) {
                 OutlinedTextField(
                     value = newCounterName,
@@ -1502,7 +1525,15 @@ private fun CountersPanel(
                         focusedTextColor = mc.textPrimary,
                         unfocusedTextColor = mc.textPrimary,
                     ),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged {
+                            if (it.isFocused) {
+                                scope.launch {
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        },
                 )
                 IconButton(
                     onClick = {
@@ -1558,7 +1589,7 @@ private fun CountersPanel(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -1748,12 +1779,12 @@ private fun ManagePlayersSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
-        contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(bottom = 16.dp),
         ) {
             TabRow(
@@ -1833,7 +1864,8 @@ private fun LayoutTab(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
@@ -1895,7 +1927,8 @@ private fun PlayersTab(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // ── Positions section ─────────────────────────────────────────────────
@@ -2010,13 +2043,18 @@ private fun PlayerPropertyRow(
 ) {
     val mc = MaterialTheme.magicColors
     var nameText by remember(player.id) { mutableStateOf(player.name) }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // Name row
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .bringIntoViewRequester(bringIntoViewRequester),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -2060,7 +2098,15 @@ private fun PlayerPropertyRow(
                     focusedTextColor = mc.textPrimary,
                     unfocusedTextColor = mc.textPrimary,
                 ),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            scope.launch {
+                                bringIntoViewRequester.bringIntoView()
+                            }
+                        }
+                    },
             )
         }
         // Color swatches
@@ -2102,7 +2148,8 @@ private fun TurnOrderTab(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
