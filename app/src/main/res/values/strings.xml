@@ -5,6 +5,7 @@
     ═══════════════════════════════════════════ -->
     <string name="app_name">ManaHub</string>
     <string name="app_tagline">Your Magic companion</string>
+    <string name="splash_tagline">Your Magic Companion</string>
 
     <!-- Acciones comunes -->
     <string name="action_save">Save</string>

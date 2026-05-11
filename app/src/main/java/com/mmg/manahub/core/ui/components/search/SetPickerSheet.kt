@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.addcard
+package com.mmg.manahub.core.ui.components.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
