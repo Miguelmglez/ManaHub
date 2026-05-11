@@ -148,16 +148,17 @@ fun ProfileScreen(
 
     Scaffold(
         containerColor = mc.background,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             Surface(
                 color = mc.backgroundSecondary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp) // Forzamos 56dp para igualar a Settings (48dp del icono + 8dp de padding)
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
+                        .height(56.dp)
                         .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -191,11 +192,12 @@ fun ProfileScreen(
             }
         },
     ) { padding ->
+        val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(bottom = 32.dp),
+            contentPadding = PaddingValues(bottom = 32.dp + navBarBottom),
         ) {
 
             // ── Hero ──────────────────────────────────────────────────────────

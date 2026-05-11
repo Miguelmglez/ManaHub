@@ -35,6 +35,7 @@ fun DeckMagicScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
+        contentWindowInsets = WindowInsets.statusBars,
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(

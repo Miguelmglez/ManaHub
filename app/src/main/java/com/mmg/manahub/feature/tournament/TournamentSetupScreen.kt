@@ -43,6 +43,7 @@ fun TournamentSetupScreen(
     val mc      = MaterialTheme.magicColors
 
     Scaffold(
+        contentWindowInsets = WindowInsets.statusBars,
         topBar = {
             TopAppBar(
                 title = {

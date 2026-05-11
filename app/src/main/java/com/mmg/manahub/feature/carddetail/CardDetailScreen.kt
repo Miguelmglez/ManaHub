@@ -93,6 +93,7 @@ fun CardDetailScreen(
     Box(modifier = Modifier.fillMaxSize()) {
 
         Scaffold(
+            contentWindowInsets = WindowInsets(0),
             topBar = {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
@@ -101,6 +102,7 @@ fun CardDetailScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .statusBarsPadding()
                             .padding(horizontal = 4.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

@@ -104,8 +104,9 @@ fun CreateTradeProposalScreen(
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
         Scaffold(
-            snackbarHost   = { SnackbarHost(snackbarHostState) },
-            containerColor = Color.Transparent,
+            snackbarHost        = { SnackbarHost(snackbarHostState) },
+            containerColor      = Color.Transparent,
+            contentWindowInsets = WindowInsets(0),
             topBar = {
                 Surface(
                     color = mc.backgroundSecondary.copy(alpha = 0.9f),
@@ -116,6 +117,7 @@ fun CreateTradeProposalScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .statusBarsPadding()
                                 .padding(horizontal = 4.dp, vertical = 4.dp)
                                 .heightIn(min = 56.dp),
                             verticalAlignment = Alignment.CenterVertically

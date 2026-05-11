@@ -52,6 +52,7 @@ fun StatsScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.statusBars,
         topBar = {
             TopAppBar(
                 title = {
@@ -109,7 +110,8 @@ private fun StatsContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(16.dp)
+            .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         SummarySection(

@@ -53,6 +53,7 @@ fun TournamentListScreen(
     val mc           = MaterialTheme.magicColors
 
     Scaffold(
+        contentWindowInsets = WindowInsets.statusBars,
         topBar = {
             TopAppBar(
                 title = {
@@ -89,9 +90,10 @@ fun TournamentListScreen(
                 }
             }
         } else {
+            val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             LazyColumn(
-                modifier       = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
+                modifier            = Modifier.fillMaxSize().padding(padding),
+                contentPadding      = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(tournaments) { tournament ->
