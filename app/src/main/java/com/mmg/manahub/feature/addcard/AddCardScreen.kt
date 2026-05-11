@@ -38,6 +38,8 @@ import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
+import androidx.compose.animation.AnimatedVisibility
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  AddCardScreen — tabbed entry point for adding cards to the collection.
@@ -135,6 +137,7 @@ fun AddCardScreen(
                 0 -> SearchTab(
                     uiState = uiState,
                     onQueryChange = viewModel::onQueryChange,
+                    onClearFilters = viewModel::onClearFilters,
                     onCardSelected = { card -> onNavigateToCardDetail(card.scryfallId) },
                     onAdvancedSearch = { showAdvancedSearch = true },
                 )
@@ -145,8 +148,8 @@ fun AddCardScreen(
             if (showAdvancedSearch) {
                 AdvancedSearchSheet(
                     onDismiss = { showAdvancedSearch = false },
-                    onSearch = { _, rawQuery ->
-                        viewModel.onAdvancedQuerySearch(rawQuery)
+                    onSearch = { query, rawQuery ->
+                        viewModel.onAdvancedQuerySearch(query, rawQuery)
                         showAdvancedSearch = false
                     },
                 )
@@ -164,6 +167,7 @@ fun AddCardScreen(
 private fun SearchTab(
     uiState: AddCardUiState,
     onQueryChange: (String) -> Unit,
+    onClearFilters: () -> Unit,
     onCardSelected: (Card) -> Unit,
     onAdvancedSearch: () -> Unit,
 ) {
@@ -232,22 +236,60 @@ private fun SearchTab(
                 ),
                 shape = RoundedCornerShape(12.dp),
             )
-            IconButton(
-                onClick = {
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                    onAdvancedSearch()
-                },
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(mc.primaryAccent.copy(alpha = 0.1f)),
+            BadgedBox(
+                badge = {
+                    if (uiState.activeFilterCount > 0) {
+                        Badge(
+                            containerColor = mc.primaryAccent,
+                            contentColor = mc.background,
+                        ) { Text("${uiState.activeFilterCount}") }
+                    }
+                }
             ) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = stringResource(R.string.advsearch_button),
-                    tint = mc.primaryAccent,
+                IconButton(
+                    onClick = {
+                        focusManager.clearFocus(force = true)
+                        keyboardController?.hide()
+                        onAdvancedSearch()
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = stringResource(R.string.advsearch_button),
+                        tint = mc.primaryAccent,
+                    )
+                }
+            }
+        }
+
+        // ── Active filters indicator ─────────────────────────────────────────
+        AnimatedVisibility(visible = uiState.activeFilterCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.collection_active_filters, uiState.activeFilterCount),
+                    style = ty.bodySmall,
+                    color = mc.primaryAccent,
                 )
+                TextButton(
+                    onClick = onClearFilters,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.collection_clear_filters),
+                        style = ty.labelSmall,
+                        color = mc.lifeNegative,
+                    )
+                }
             }
         }
 
@@ -365,15 +407,17 @@ private fun SearchResultItem(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                val frontFace = card.cardFaces?.firstOrNull()
                 CardName(
-                    name = if (card.printedName.isNullOrEmpty()) card.name else card.printedName,
+                    name = frontFace?.name ?: if (card.printedName.isNullOrEmpty()) card.name else card.printedName,
+                    showFrontOnly = true,
                     style = ty.bodyMedium,
                     color = mc.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = if (card.printedTypeLine.isNullOrEmpty()) card.typeLine else card.printedTypeLine,
+                    text = frontFace?.typeLine ?: if (card.printedTypeLine.isNullOrEmpty()) card.typeLine else card.printedTypeLine,
                     style = ty.bodySmall,
                     color = mc.textSecondary,
                     maxLines = 1,
