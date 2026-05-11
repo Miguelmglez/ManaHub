@@ -13,6 +13,5 @@ data class StatsUiState(
     val refreshProgress:     Pair<Int, Int>?  = null,  // current / total chunks
     val lastRefreshedAt:     Long?            = null,
     val refreshError:        String?          = null,
-    val refreshResult:       String?          = null,  // success message
-    val autoRefreshPrices:   Boolean          = false,
+    val refreshResult:       String?          = null,
 )

@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.data.local
 
 import android.content.Context
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -37,7 +36,6 @@ private val KEY_CARD_LANGUAGE     = stringPreferencesKey("card_language")
 private val KEY_NEWS_LANGUAGES    = stringSetPreferencesKey("news_languages")
 private val KEY_PREFERRED_CURRENCY = stringPreferencesKey("preferred_currency")
 private val LAST_PRICE_REFRESH_KEY = longPreferencesKey("last_price_refresh")
-private val AUTO_REFRESH_KEY       = booleanPreferencesKey("auto_refresh_prices")
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
 private val KEY_PLAYER_NAME = stringPreferencesKey("player_name")
 private val KEY_APP_THEME   = stringPreferencesKey("app_theme")
@@ -138,15 +136,8 @@ class UserPreferencesDataStore @Inject constructor(
     override val lastPriceRefreshFlow: Flow<Long?> = context.userPrefsDataStore.data
         .map { it[LAST_PRICE_REFRESH_KEY] }
 
-    override val autoRefreshPricesFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { it[AUTO_REFRESH_KEY] ?: false }
-
     override suspend fun saveLastPriceRefresh(timestamp: Long) {
         context.userPrefsDataStore.edit { it[LAST_PRICE_REFRESH_KEY] = timestamp }
-    }
-
-    override suspend fun saveAutoRefreshPrices(enabled: Boolean) {
-        context.userPrefsDataStore.edit { it[AUTO_REFRESH_KEY] = enabled }
     }
 
     // ── Avatar URL ────────────────────────────────────────────────────────────
