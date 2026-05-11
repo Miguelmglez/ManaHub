@@ -25,8 +25,8 @@ import com.mmg.manahub.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.core.domain.model.CollectionViewMode
-import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
-import com.mmg.manahub.feature.addcard.AdvancedSearchViewModel
+import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
+import com.mmg.manahub.core.ui.components.search.AdvancedSearchViewModel
 import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.HexGridBackground

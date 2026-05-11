@@ -39,7 +39,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.addcard.AdvancedSearchSheet
+import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
