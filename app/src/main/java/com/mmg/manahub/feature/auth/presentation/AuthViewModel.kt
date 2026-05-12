@@ -171,7 +171,12 @@ class AuthViewModel @Inject constructor(
                     val idToken = googleIdTokenCredential.idToken
                     _uiState.value = when (val r = signInWithGoogleUseCase(idToken, rawNonce)) {
                         is AuthResult.Success -> AuthUiState.Success
-                        is AuthResult.Error -> AuthUiState.Error(r.error.toUiMessage())
+                        is AuthResult.Error -> when (val err = r.error) {
+                            // Special case: OAuth succeeded but no ManaHub profile exists.
+                            // Signal the UI to switch to the Create Account tab and pre-fill the email.
+                            is AuthError.NoProfileFound -> AuthUiState.GoogleSignInNoProfile(err.email)
+                            else -> AuthUiState.Error(err.toUiMessage())
+                        }
                     }
                 } else {
                     _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_credential_unsupported))
@@ -322,6 +327,10 @@ class AuthViewModel @Inject constructor(
         is AuthError.EmailConfirmationRequired -> appContext.getString(R.string.auth_email_confirmation_sent)
         is AuthError.NicknameInappropriate -> appContext.getString(R.string.auth_error_nickname_inappropriate)
         is AuthError.NicknameTooLong -> appContext.getString(R.string.auth_error_nickname_too_long)
+        is AuthError.GoogleEmailConflict -> appContext.getString(R.string.auth_error_google_email_conflict)
+        // NoProfileFound is handled as GoogleSignInNoProfile state — this fallback
+        // covers any unexpected path where it reaches toUiMessage directly.
+        is AuthError.NoProfileFound -> appContext.getString(R.string.auth_error_no_profile_found)
         // Never expose raw server error messages to the user — they may leak internal
         // stack traces, table names, or constraint names from Supabase/Postgres.
         is AuthError.Unknown -> appContext.getString(R.string.auth_error_unknown)

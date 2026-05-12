@@ -155,8 +155,8 @@ class UserPreferencesDataStore @Inject constructor(
         }
     }
     val playerNameFlow: Flow<String> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Player 1" }
-        .catch { emit("Player 1") }
+        .map { prefs -> prefs[KEY_PLAYER_NAME] ?: "Wizard" }
+        .catch { emit("Wizard") }
 
     val themeFlow: Flow<AppTheme> = context.userPrefsDataStore.data
         .map { prefs ->

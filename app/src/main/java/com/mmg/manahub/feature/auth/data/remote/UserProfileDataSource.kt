@@ -9,8 +9,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Legacy DTO kept for backward compatibility with any callers that still reference
- * [UserProfileDto] by name. New code should prefer [UserProfileRetrofitDto].
+ * DTO for Supabase SDK (kotlinx-serialization) calls against `user_profiles`.
+ *
+ * [profileCompleted] mirrors the `profile_completed` column that is set to FALSE by the
+ * [handle_new_user] trigger on row creation and to TRUE only after the user explicitly
+ * finishes the sign-up flow via the [complete_user_profile] RPC.
  *
  * The [gameTag] column is auto-generated server-side and must never be sent by the client.
  */
@@ -21,6 +24,7 @@ data class UserProfileDto(
     @SerialName("game_tag") val gameTag: String?,
     @SerialName("avatar_url") val avatarUrl: String?,
     @SerialName("provider") val provider: String?,
+    @SerialName("profile_completed") val profileCompleted: Boolean = false,
 )
 
 /**
@@ -55,6 +59,63 @@ class UserProfileDataSource(
             }
             null
         }
+    }
+
+    /**
+     * Calls the `get_profile_by_user_id` RPC to fetch the profile for [userId].
+     *
+     * Unlike [fetchUserProfile] (which queries the table directly), this RPC is necessary
+     * to correctly read `profile_completed` for Google OAuth users: the [handle_new_user]
+     * trigger always inserts a row immediately, so a table query would never return null,
+     * but the row would have `profile_completed = FALSE` until the user finishes sign-up.
+     *
+     * Returns null on any network/parse failure (non-fatal).
+     */
+    suspend fun getProfileByUserId(userId: String): UserProfileDto? = withContext(ioDispatcher) {
+        try {
+            service.getProfileByUserId(GetProfileByUserIdDto(pUserId = userId))
+                ?.toUserProfileDto()
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "getProfileByUserId failed for user $userId", e)
+            } else {
+                Log.w(TAG, "getProfileByUserId failed: ${e.javaClass.simpleName}")
+            }
+            null
+        }
+    }
+
+    /**
+     * Calls the `complete_user_profile` RPC to atomically set [user]'s nickname
+     * and mark `profile_completed = TRUE` in Supabase.
+     *
+     * This must be used instead of [upsertUserProfile] during the Google sign-up flow
+     * to ensure `profile_completed` is correctly set to TRUE in a single server-side operation.
+     *
+     * Returns an updated [AuthUser] with [AuthUser.profileCompleted] = true and the
+     * server-generated [AuthUser.gameTag] populated, or the original [user] unchanged
+     * if the RPC fails (non-fatal, caller decides how to handle).
+     *
+     * @throws Exception when the RPC returns a non-2xx response (e.g. 400 for inappropriate nickname).
+     *   The exception is NOT swallowed here — callers must handle it.
+     */
+    suspend fun completeUserProfile(user: AuthUser): AuthUser = withContext(ioDispatcher) {
+        val trimmedNickname = requireNotNull(user.nickname?.trim()) {
+            "completeUserProfile called with a null or blank nickname for user ${user.id}"
+        }
+        check(trimmedNickname.isNotBlank()) {
+            "completeUserProfile called with a blank nickname for user ${user.id}"
+        }
+
+        val profileDto = service.completeUserProfile(
+            CompleteUserProfileDto(pNickname = trimmedNickname)
+        )
+        user.copy(
+            nickname = profileDto.nickname ?: trimmedNickname,
+            gameTag = profileDto.gameTag ?: user.gameTag,
+            avatarUrl = profileDto.avatarUrl ?: user.avatarUrl,
+            profileCompleted = profileDto.profileCompleted,
+        )
     }
 
     /**
@@ -105,6 +166,7 @@ class UserProfileDataSource(
         gameTag = gameTag,
         avatarUrl = avatarUrl,
         provider = provider,
+        profileCompleted = profileCompleted,
     )
 
     private companion object {
