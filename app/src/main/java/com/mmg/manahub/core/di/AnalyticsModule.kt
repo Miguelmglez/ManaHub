@@ -1,8 +1,8 @@
 package com.mmg.manahub.core.di
 
 import android.content.Context
-import com.mmg.manahub.BuildConfig
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.mmg.manahub.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

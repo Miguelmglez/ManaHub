@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.synergy
 
-import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.model.MtgColor
+import com.mmg.manahub.core.domain.model.UserCardWithCard
 
 data class SynergyUiState(
     val isLoading:         Boolean                  = true,

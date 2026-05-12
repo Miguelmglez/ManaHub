@@ -1,7 +1,11 @@
 package com.mmg.manahub.feature.news.data
 
 import android.util.Log
-import com.mmg.manahub.feature.news.data.local.*
+import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
+import com.mmg.manahub.feature.news.data.local.DefaultSources
+import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
+import com.mmg.manahub.feature.news.data.local.NewsDao
+import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
 import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService

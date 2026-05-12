@@ -1,6 +1,8 @@
 package com.mmg.manahub.core.data.local.paging
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 
 @Dao
 interface RemoteKeyDao {

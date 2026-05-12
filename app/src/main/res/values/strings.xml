@@ -56,8 +56,6 @@
     <string name="collection_search_hint">Search in collection…</string>
     <string name="collection_tab_cards">Cards</string>
     <string name="collection_tab_decks">Decks</string>
-    <string name="collection_sync_push">Upload to cloud</string>
-    <string name="collection_sync_pull">Download from cloud</string>
     <string name="collection_sync_success">Collection synced</string>
     <string name="collection_sync_error">Sync failed</string>
     <string name="collection_sync_pending">You have %1$d pending changes</string>
@@ -654,7 +652,7 @@
     <string name="profile_edit_avatar_filter_label">Filter planeswalkers by color</string>
     <string name="profile_edit_avatar_remove">Remove photo</string>
 
-    <string name="profile_edit_confirm">Save Changes</string>
+    <string name="profile_edit_confirm">Save</string>
 
     <!-- Game setup -->
     <string name="game_setup_player_name_label">Player Name</string>
@@ -809,7 +807,7 @@
     <string name="profile_developed_by">Developed with ❤️ for the MTG community</string>
     <string name="profile_progress">Progress</string>
     <string name="profile_achievement_ok">OK</string>
-    <string name="profile_version">ManaHub v%1$s</string>
+    <string name="profile_version">ManaHub v%1$s - %2$s</string>
 
     <!-- Play styles -->
     <string name="playstyle_aggro">Aggro</string>

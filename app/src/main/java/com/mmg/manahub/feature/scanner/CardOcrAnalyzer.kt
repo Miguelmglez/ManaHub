@@ -6,6 +6,8 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.mmg.manahub.feature.scanner.CardOcrAnalyzer.Companion.NAME_ZONE_BOTTOM_FRACTION
+import com.mmg.manahub.feature.scanner.CardOcrAnalyzer.Companion.NAME_ZONE_TOP_FRACTION
 import kotlinx.coroutines.tasks.await
 
 /**

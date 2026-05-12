@@ -5,10 +5,10 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UpdateAvatarUrlDto
 import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
-import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
@@ -22,6 +22,7 @@ import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.exceptions.RestException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,7 +37,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive

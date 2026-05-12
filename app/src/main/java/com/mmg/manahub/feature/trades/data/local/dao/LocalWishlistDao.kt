@@ -1,6 +1,14 @@
 package com.mmg.manahub.feature.trades.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Embedded
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Relation
+import androidx.room.Transaction
+import androidx.room.Update
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
 import kotlinx.coroutines.flow.Flow

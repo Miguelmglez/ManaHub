@@ -9,12 +9,11 @@ import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.dao.UserCardWithCard
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.local.paging.CollectionRemoteMediator
+import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
@@ -27,6 +26,7 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
 
 /**
  * Local-first implementation of [UserCardRepository].

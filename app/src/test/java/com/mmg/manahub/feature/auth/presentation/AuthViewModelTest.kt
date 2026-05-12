@@ -1,8 +1,6 @@
 package com.mmg.manahub.feature.auth.presentation
 
 import android.content.Context
-import android.util.Patterns
-import java.util.regex.Pattern
 import app.cash.turbine.test
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
@@ -21,10 +19,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
-import io.mockk.Runs
-import io.mockk.just
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

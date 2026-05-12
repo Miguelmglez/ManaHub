@@ -2,8 +2,19 @@ package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
-import com.mmg.manahub.core.data.local.entity.projection.*
-import com.mmg.manahub.core.domain.model.*
+import com.mmg.manahub.core.data.local.entity.projection.CardValueProjection
+import com.mmg.manahub.core.data.local.entity.projection.CmcCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.ColorCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.RarityCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.SetCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.TotalsProjection
+import com.mmg.manahub.core.data.local.entity.projection.TypeCountProjection
+import com.mmg.manahub.core.domain.model.CardType
+import com.mmg.manahub.core.domain.model.CardValue
+import com.mmg.manahub.core.domain.model.CollectionStats
+import com.mmg.manahub.core.domain.model.MtgColor
+import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.model.Rarity
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine

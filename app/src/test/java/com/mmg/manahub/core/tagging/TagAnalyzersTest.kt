@@ -1,8 +1,6 @@
 package com.mmg.manahub.core.tagging
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.TagCategory
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -9,6 +9,11 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.scanner.ScannerViewModel.Companion.ANTI_DUPLICATE_MS
+import com.mmg.manahub.feature.scanner.ScannerViewModel.Companion.HIGH_CONFIDENCE_FRAMES
+import com.mmg.manahub.feature.scanner.ScannerViewModel.Companion.PREF_FILE
+import com.mmg.manahub.feature.scanner.ScannerViewModel.Companion.PREF_KEY_QUEUE
+import com.mmg.manahub.feature.scanner.ScannerViewModel.Companion.STABILITY_FRAMES
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel

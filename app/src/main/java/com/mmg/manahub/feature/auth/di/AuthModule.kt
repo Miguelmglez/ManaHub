@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.auth.di
 
 import com.google.gson.GsonBuilder
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
