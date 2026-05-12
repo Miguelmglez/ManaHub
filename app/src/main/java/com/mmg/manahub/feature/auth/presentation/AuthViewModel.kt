@@ -24,6 +24,7 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -43,6 +44,7 @@ class AuthViewModel @Inject constructor(
     private val signUpWithEmailUseCase: SignUpWithEmailUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
     private val signUpWithGoogleUseCase: SignUpWithGoogleUseCase,
+    private val linkGoogleIdentityUseCase: LinkGoogleIdentityUseCase,
     private val signOutUseCase: SignOutUseCase,
     private val getSessionState: GetSessionStateUseCase,
     private val resetPasswordUseCase: ResetPasswordUseCase,
@@ -175,6 +177,14 @@ class AuthViewModel @Inject constructor(
                             // Special case: OAuth succeeded but no ManaHub profile exists.
                             // Signal the UI to switch to the Create Account tab and pre-fill the email.
                             is AuthError.NoProfileFound -> AuthUiState.GoogleSignInNoProfile(err.email)
+                            // Email conflict: the Google email already exists as an email/password
+                            // account. Store the pending token data so the user can link accounts
+                            // by entering their password — no need to re-launch the Google picker.
+                            is AuthError.GoogleEmailConflict -> AuthUiState.GoogleEmailConflictLinking(
+                                email = err.email,
+                                pendingIdToken = err.pendingIdToken,
+                                pendingNonce = err.pendingNonce,
+                            )
                             else -> AuthUiState.Error(err.toUiMessage())
                         }
                     }
@@ -256,6 +266,36 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
+     * Links the pending Google identity to the user's existing email/password account.
+     *
+     * Reads the stored [pendingIdToken] and [pendingNonce] from the current
+     * [AuthUiState.GoogleEmailConflictLinking] state (set when the original Google Sign-In
+     * returned a 422 conflict). The user-entered [password] is used to verify ownership
+     * of the account before the link is performed.
+     *
+     * On success the state transitions to [AuthUiState.Success] and the UI dismisses
+     * the linking dialog and navigates to HomeScreen.
+     *
+     * @param password The password the user entered in the account-linking dialog.
+     */
+    fun linkGoogleIdentity(password: String) {
+        val linkingState = uiState.value as? AuthUiState.GoogleEmailConflictLinking ?: return
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = linkGoogleIdentityUseCase(
+                email = linkingState.email,
+                password = password,
+                pendingIdToken = linkingState.pendingIdToken,
+                pendingNonce = linkingState.pendingNonce,
+            )) {
+                is AuthResult.Success -> AuthUiState.Success
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
      * Sends a password-reset link to [email].
      * Transitions to [AuthUiState.ResetSent] on success or [AuthUiState.Error] on failure.
      */
@@ -327,6 +367,8 @@ class AuthViewModel @Inject constructor(
         is AuthError.EmailConfirmationRequired -> appContext.getString(R.string.auth_email_confirmation_sent)
         is AuthError.NicknameInappropriate -> appContext.getString(R.string.auth_error_nickname_inappropriate)
         is AuthError.NicknameTooLong -> appContext.getString(R.string.auth_error_nickname_too_long)
+        // GoogleEmailConflict normally transitions to GoogleEmailConflictLinking state and never
+        // reaches toUiMessage. This fallback covers any unexpected path that bypasses that handling.
         is AuthError.GoogleEmailConflict -> appContext.getString(R.string.auth_error_google_email_conflict)
         // NoProfileFound is handled as GoogleSignInNoProfile state — this fallback
         // covers any unexpected path where it reaches toUiMessage directly.

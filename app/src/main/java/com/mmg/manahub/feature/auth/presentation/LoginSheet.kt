@@ -127,11 +127,12 @@ fun LoginSheet(
                 authViewModel.signUpWithEmail(email, password, nickname, avatarUrl)
             },
             onGoogleSignIn = { context -> authViewModel.signInWithGoogle(context) },
-            onGoogleSignUp = { context, nick, avatarUrl -> 
-                authViewModel.signUpWithGoogle(context, nick, avatarUrl) 
+            onGoogleSignUp = { context, nick, avatarUrl ->
+                authViewModel.signUpWithGoogle(context, nick, avatarUrl)
             },
             onResetPassword = { email -> authViewModel.resetPassword(email) },
             onResetUiState = { authViewModel.resetUiState() },
+            onLinkGoogleIdentity = { password -> authViewModel.linkGoogleIdentity(password) },
         )
     }
 }
@@ -151,6 +152,7 @@ private fun LoginSheetContent(
     onGoogleSignUp: (android.content.Context, String, String?) -> Unit,
     onResetPassword: (String) -> Unit,
     onResetUiState: () -> Unit,
+    onLinkGoogleIdentity: (password: String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -540,6 +542,15 @@ private fun LoginSheetContent(
             },
         )
     }
+
+    // ── Google account linking dialog ──────────────────────────────────────────
+    if (uiState is AuthUiState.GoogleEmailConflictLinking) {
+        LinkGoogleIdentityDialog(
+            email = uiState.email,
+            onLink = { password -> onLinkGoogleIdentity(password) },
+            onDismiss = { onResetUiState() },
+        )
+    }
 }
 
 // ── Email confirmation screen ──────────────────────────────────────────────────
@@ -691,6 +702,105 @@ private fun RequirementRow(label: String, met: Boolean, ty: com.mmg.manahub.core
             style = ty.labelSmall,
         )
     }
+}
+
+/**
+ * Dialog shown when a Google Sign-In attempt collides with an existing email/password account.
+ *
+ * Presents the conflicting [email] for context, collects the user's ManaHub password,
+ * and calls [onLink] to trigger the account-linking flow. Calls [onDismiss] when the
+ * user taps Cancel or to reset the UI state after the dialog is dismissed.
+ */
+@Composable
+private fun LinkGoogleIdentityDialog(
+    email: String,
+    onLink: (password: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = mc.surface,
+        titleContentColor = mc.textPrimary,
+        textContentColor = mc.textSecondary,
+        title = {
+            Text(
+                text = stringResource(R.string.auth_link_google_title),
+                style = ty.titleLarge,
+                color = mc.textPrimary,
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.auth_link_google_message, email),
+                    color = mc.textSecondary,
+                    style = ty.bodyMedium,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text(stringResource(R.string.auth_link_google_password_hint)) },
+                    singleLine = true,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None
+                    else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Visibility
+                                else Icons.Default.VisibilityOff,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                tint = mc.textSecondary,
+                            )
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = mc.primaryAccent,
+                        unfocusedBorderColor = mc.textSecondary.copy(alpha = 0.4f),
+                        focusedLabelColor = mc.primaryAccent,
+                        unfocusedLabelColor = mc.textSecondary,
+                        cursorColor = mc.primaryAccent,
+                        focusedTextColor = mc.textPrimary,
+                        unfocusedTextColor = mc.textPrimary,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onLink(password) },
+                enabled = password.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = mc.primaryAccent,
+                    contentColor = mc.background,
+                    disabledContainerColor = mc.primaryAccent.copy(alpha = 0.4f),
+                    disabledContentColor = mc.background.copy(alpha = 0.6f),
+                ),
+            ) {
+                Text(
+                    text = stringResource(R.string.auth_link_google_btn),
+                    style = ty.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = stringResource(R.string.action_cancel),
+                    color = mc.textSecondary,
+                    style = ty.labelMedium,
+                )
+            }
+        },
+    )
 }
 
 /**
