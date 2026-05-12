@@ -5,40 +5,32 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
-import okhttp3.Call
-import okhttp3.OkHttpClient
-import okhttp3.Response as OkHttpResponse
-import okhttp3.ResponseBody.Companion.toResponseBody as okHttpToResponseBody
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import io.github.jan.supabase.auth.Auth
-import io.github.jan.supabase.auth.status.SessionStatus
-import io.github.jan.supabase.auth.providers.AuthProvider
 import io.github.jan.supabase.auth.providers.builtin.Email
-import io.github.jan.supabase.auth.providers.builtin.IDToken
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.exceptions.RestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.verify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.spyk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
+import okhttp3.Call
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -46,6 +38,8 @@ import org.junit.Before
 import org.junit.Test
 import retrofit2.Response
 import java.io.IOException
+import okhttp3.Response as OkHttpResponse
+import okhttp3.ResponseBody.Companion.toResponseBody as okHttpToResponseBody
 
 /**
  * Unit tests for [AuthRepositoryImpl].

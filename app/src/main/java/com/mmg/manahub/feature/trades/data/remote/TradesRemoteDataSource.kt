@@ -7,8 +7,8 @@ import com.mmg.manahub.feature.trades.data.remote.dto.TradeProposalDto
 import com.mmg.manahub.feature.trades.domain.model.parseTradeError
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
 import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.exceptions.RestException
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json

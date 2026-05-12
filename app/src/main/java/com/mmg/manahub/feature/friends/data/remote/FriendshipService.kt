@@ -2,7 +2,13 @@ package com.mmg.manahub.feature.friends.data.remote
 
 import com.google.gson.annotations.SerializedName
 import retrofit2.Response
-import retrofit2.http.*
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.PATCH
+import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface FriendshipService {
 

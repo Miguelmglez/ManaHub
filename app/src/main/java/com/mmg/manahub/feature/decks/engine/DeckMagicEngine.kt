@@ -1,11 +1,10 @@
 package com.mmg.manahub.feature.decks.engine
 
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
-
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import kotlinx.coroutines.Dispatchers

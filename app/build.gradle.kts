@@ -25,8 +25,8 @@ android {
         applicationId = "com.mmg.manahub"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 6
+        versionName = "0.4"
 
         buildConfigField(
             "String",
@@ -66,6 +66,19 @@ android {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
+
+    signingConfigs {
+        create("release") {
+            val keystorePath = localProperties.getProperty("KEY_STORE_PATH", "")
+            if (keystorePath.isNotEmpty()) {
+                storeFile = file(keystorePath)
+            }
+            storePassword = localProperties.getProperty("KEY_STORE_PASSWORD", "")
+            keyAlias = localProperties.getProperty("KEY_ALIAS", "")
+            keyPassword = localProperties.getProperty("KEY_PASSWORD", "")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -74,6 +87,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false

@@ -1,16 +1,16 @@
 package com.mmg.manahub.util
 
 import com.mmg.manahub.core.data.local.entity.CardEntity
+import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.domain.model.CardLanguage
 import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.model.UserPreferences
-import com.mmg.manahub.core.domain.model.AppLanguage
-import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.NewsLanguage
 
 /**
  * Central place for test data builders.

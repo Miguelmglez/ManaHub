@@ -1,7 +1,7 @@
 package com.mmg.manahub.core.domain.usecase.collection
 
-import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 

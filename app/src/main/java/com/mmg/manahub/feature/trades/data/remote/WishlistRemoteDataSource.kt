@@ -4,7 +4,6 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.trades.data.remote.dto.WishlistEntryDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.exceptions.RestException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject

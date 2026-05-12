@@ -1,6 +1,9 @@
 package com.mmg.manahub.core.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity

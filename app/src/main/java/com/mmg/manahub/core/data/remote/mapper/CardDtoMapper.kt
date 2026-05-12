@@ -1,10 +1,10 @@
 package com.mmg.manahub.core.data.remote.mapper
 
 import com.mmg.manahub.core.data.local.entity.CardEntity
+import com.mmg.manahub.core.data.local.mapper.toEntityCard
 import com.mmg.manahub.core.data.remote.dto.CardDto
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardFace
-import com.mmg.manahub.core.data.local.mapper.toEntityCard
 
 fun CardDto.toDomain(): Card {
     val front = cardFaces?.firstOrNull()

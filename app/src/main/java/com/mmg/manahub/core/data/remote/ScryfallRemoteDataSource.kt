@@ -1,6 +1,9 @@
 package com.mmg.manahub.core.data.remote
 
-import com.mmg.manahub.core.data.remote.dto.*
+import com.mmg.manahub.core.data.remote.dto.CardCollectionRequestDto
+import com.mmg.manahub.core.data.remote.dto.CardCollectionResponseDto
+import com.mmg.manahub.core.data.remote.dto.CardDto
+import com.mmg.manahub.core.data.remote.dto.CardIdentifierDto
 import com.mmg.manahub.core.data.remote.dto.SearchResultDto
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.domain.model.Card

@@ -3,8 +3,8 @@ package com.mmg.manahub.core.domain.repository
 import androidx.paging.PagingData
 import com.mmg.manahub.core.data.local.dao.UserCardWithCard
 import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
 import kotlinx.coroutines.flow.Flow
+import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
 
 /**
  * Contract for all collection (user card) persistence operations.

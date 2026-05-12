@@ -3,11 +3,13 @@ package com.mmg.manahub.feature.trades.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
 import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
 import com.mmg.manahub.feature.trades.domain.model.TradeSuggestion
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.repository.TradeSuggestionsRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
@@ -15,9 +17,7 @@ import com.mmg.manahub.feature.trades.domain.usecase.GetLocalOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetSuggestedTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RemoveFromOpenForTradeUseCase
-import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.RemoveFromWishlistUseCase
-import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow

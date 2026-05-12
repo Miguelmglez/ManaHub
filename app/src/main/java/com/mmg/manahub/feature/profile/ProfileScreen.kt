@@ -3,16 +3,10 @@ package com.mmg.manahub.feature.profile
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
@@ -20,21 +14,17 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import com.mmg.manahub.feature.auth.domain.model.SessionState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,8 +43,9 @@ import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.MarcellusFontFamily
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
-import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.presentation.AccountSection
 import com.mmg.manahub.feature.auth.presentation.AuthUiState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
@@ -1081,14 +1072,14 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
     val version = remember { com.mmg.manahub.BuildConfig.VERSION_NAME }
-
+    val versionType = remember { com.mmg.manahub.BuildConfig.BUILD_TYPE }
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = stringResource(R.string.profile_version, version),
+            text = stringResource(R.string.profile_version, version, versionType),
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.textDisabled
         )

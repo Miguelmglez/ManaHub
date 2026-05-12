@@ -1,6 +1,8 @@
 package com.mmg.manahub.core.data.local.entity
 
-import androidx.room.*
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
 @Entity(tableName = "cards")
 data class CardEntity(
