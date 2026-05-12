@@ -250,8 +250,8 @@ class TournamentViewModelTest {
         // Act
         val (_, configs) = vm.buildPlayerConfigsForMatch(100L)
 
-        // Assert: fallback to "Player 1"
-        assertEquals("Player 1", configs[0].name)
+        // Assert: fallback to "Wizard 1"
+        assertEquals("Wizard 1", configs[0].name)
     }
 
     @Test

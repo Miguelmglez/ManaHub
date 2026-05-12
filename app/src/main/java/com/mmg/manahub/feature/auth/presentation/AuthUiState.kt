@@ -12,5 +12,11 @@ sealed class AuthUiState {
     data object AccountDeleted : AuthUiState()
     /** Emitted after [AuthViewModel.updateNickname] completes successfully. */
     data object NicknameUpdated : AuthUiState()
+    /**
+     * Emitted when a Google Sign-In attempt succeeds at the OAuth level but no ManaHub
+     * profile exists for this Google account. The UI should switch to the Create Account
+     * tab and optionally pre-fill the [googleEmail] field.
+     */
+    data class GoogleSignInNoProfile(val googleEmail: String?) : AuthUiState()
     data class Error(val message: String) : AuthUiState()
 }
