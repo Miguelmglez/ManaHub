@@ -1,14 +1,13 @@
 package com.mmg.manahub.feature.friends.presentation
 
 import app.cash.turbine.test
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import io.mockk.coEvery

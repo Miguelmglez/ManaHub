@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.decks.engine
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel

@@ -1,8 +1,6 @@
 package com.mmg.manahub.feature.collection
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -22,7 +20,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import kotlin.Result
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

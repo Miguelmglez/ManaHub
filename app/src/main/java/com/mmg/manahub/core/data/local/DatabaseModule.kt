@@ -4,7 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.mmg.manahub.core.data.local.dao.*
+import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.data.local.dao.DeckDao
+import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
+import com.mmg.manahub.core.data.local.dao.StatsDao
+import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.dao.TournamentDao
+import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
 import com.mmg.manahub.feature.friends.data.local.dao.FriendDao

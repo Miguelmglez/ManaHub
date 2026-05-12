@@ -39,9 +39,6 @@ import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.game.GamePlayScreen
-import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
-import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
-import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
 import com.mmg.manahub.feature.game.GameSetupScreen
 import com.mmg.manahub.feature.game.GameSetupViewModel
 import com.mmg.manahub.feature.game.GameViewModel
@@ -61,6 +58,9 @@ import com.mmg.manahub.feature.tournament.TournamentListScreen
 import com.mmg.manahub.feature.tournament.TournamentScreen
 import com.mmg.manahub.feature.tournament.TournamentSetupScreen
 import com.mmg.manahub.feature.tournament.TournamentViewModel
+import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
+import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
+import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Bottom-bar visibility rules
