@@ -221,7 +221,7 @@ fun ProfileScreen(
                     mostValuableColor = uiState.mostValuableColor,
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
-                    //.clickable { onStatsClick() },
+                        .clickable { onStatsClick() },
                 )
             }
             /*
@@ -358,10 +358,10 @@ private fun ProfileHeroSection(
                 ThemeBackground(modifier = Modifier.fillMaxSize())
                 Text(
                     text = name.take(1).uppercase().ifEmpty { "✦" },
-                    fontFamily = MarcellusFontFamily,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 72.sp,
-                    color = mc.primaryAccent.copy(alpha = 0.3f),
+                    style = MaterialTheme.magicTypography.lifeNumberMd.copy(
+                        fontSize = 72.sp,
+                        color = mc.primaryAccent.copy(alpha = 0.3f)
+                    ),
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -395,12 +395,9 @@ private fun ProfileHeroSection(
         ) {
             Text(
                 text = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) },
-                style = TextStyle(
-                    fontFamily = MarcellusFontFamily,
-                    fontWeight = FontWeight.Bold,
+                style = MaterialTheme.magicTypography.titleLarge.copy(
                     fontSize = 26.sp,
-                    color = Color.White,
-                    letterSpacing = 1.sp,
+                    color = Color.White
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -420,9 +417,7 @@ private fun ProfileHeroSection(
                     Text(
                         text = gameTag,
                         color = mc.primaryAccent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = MarcellusFontFamily,
+                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
                     )
                 }
             }
@@ -771,8 +766,10 @@ private fun AchievementBadge(
         ) {
             Text(
                 text = achievement.emoji,
-                fontSize = 22.sp,
-                color = if (achievement.isUnlocked) Color.Unspecified else mc.textDisabled,
+                style = MaterialTheme.magicTypography.bodyLarge.copy(
+                    fontSize = 22.sp,
+                    color = if (achievement.isUnlocked) Color.Unspecified else mc.textDisabled
+                ),
             )
             Text(
                 text = achievement.title,
@@ -803,7 +800,11 @@ private fun AchievementProgressRow(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(achievement.emoji, fontSize = 20.sp, modifier = Modifier.padding(end = 12.dp))
+            Text(
+                achievement.emoji,
+                style = MaterialTheme.magicTypography.bodyLarge.copy(fontSize = 20.sp),
+                modifier = Modifier.padding(end = 12.dp)
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -857,7 +858,10 @@ private fun AchievementDetailDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(achievement.emoji, fontSize = 28.sp)
+                Text(
+                    achievement.emoji,
+                    style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 28.sp)
+                )
                 Text(
                     achievement.title,
                     style = MaterialTheme.magicTypography.titleMedium,

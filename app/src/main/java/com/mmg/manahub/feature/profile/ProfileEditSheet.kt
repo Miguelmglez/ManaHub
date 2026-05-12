@@ -264,6 +264,7 @@ fun ProfileEditSheet(
                         Text(
                             stringResource(R.string.error_scryfall),
                             color = mc.textSecondary,
+                            style = MaterialTheme.magicTypography.bodyMedium,
                         )
                     }
                 }
@@ -330,6 +331,7 @@ fun ProfileEditSheet(
                         Text(
                             stringResource(R.string.action_cancel),
                             color = mc.textSecondary,
+                            style = MaterialTheme.magicTypography.bodyMedium,
                         )
                     }
                     Button(
@@ -344,7 +346,10 @@ fun ProfileEditSheet(
                             containerColor = mc.primaryAccent,
                         ),
                     ) {
-                        Text(stringResource(R.string.profile_edit_confirm))
+                        Text(
+                            stringResource(R.string.profile_edit_confirm),
+                            style = MaterialTheme.magicTypography.bodyMedium,
+                        )
                     }
                 }
             }

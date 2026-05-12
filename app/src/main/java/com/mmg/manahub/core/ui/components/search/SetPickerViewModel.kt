@@ -20,6 +20,7 @@ class SetPickerViewModel @Inject constructor(
 
     data class UiState(
         val allSets: List<MagicSet> = emptyList(),
+        val restrictedSets: List<MagicSet>? = null,
         val filteredSets: List<MagicSet> = emptyList(),
         val searchQuery: String = "",
         val selectedTypes: Set<SetType> = emptySet(),
@@ -30,7 +31,12 @@ class SetPickerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    init { loadSets() }
+    fun init(initialRestrictedSets: List<MagicSet>?) {
+        if (_uiState.value.allSets.isNotEmpty() || _uiState.value.restrictedSets != null) return
+        
+        _uiState.update { it.copy(restrictedSets = initialRestrictedSets) }
+        loadSets()
+    }
 
     private fun loadSets() {
         viewModelScope.launch {
@@ -39,9 +45,9 @@ class SetPickerViewModel @Inject constructor(
                 val sets = scryfallDataSource.getAllSets()
                 _uiState.update { it.copy(
                     allSets = sets,
-                    filteredSets = sets,
                     isLoading = false,
                 )}
+                applyFilters()
             } catch (e: Exception) {
                 _uiState.update { it.copy(
                     isLoading = false,
@@ -53,6 +59,11 @@ class SetPickerViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+        applyFilters()
+    }
+
+    fun setRestrictedSets(sets: List<MagicSet>?) {
+        _uiState.update { it.copy(restrictedSets = sets) }
         applyFilters()
     }
 
@@ -73,7 +84,12 @@ class SetPickerViewModel @Inject constructor(
 
     private fun applyFilters() {
         val s = _uiState.value
-        val filtered = s.allSets.filter { set ->
+        
+        // If we have restricted sets, we ONLY show those (even if they are empty)
+        // If restrictedSets is null, we use allSets from Scryfall
+        val sourceSets = s.restrictedSets ?: s.allSets
+
+        val filtered = sourceSets.filter { set ->
             val matchesQuery = s.searchQuery.isBlank() ||
                 set.name.contains(s.searchQuery, ignoreCase = true) ||
                 set.code.contains(s.searchQuery, ignoreCase = true)

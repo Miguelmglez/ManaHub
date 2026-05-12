@@ -201,6 +201,7 @@ dependencies {
     ksp(libs.hilt.work.compiler)
     implementation(libs.browser)
     implementation(libs.guava)
+    implementation(libs.security.crypto)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
 

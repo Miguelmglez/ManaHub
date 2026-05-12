@@ -117,6 +117,7 @@ class ProfileViewModel @Inject constructor(
             .distinctUntilChanged()
             .flatMapLatest { currency ->
                 statsRepo.observeCollectionStats(currency)
+                    .catch { _uiState.update { it.copy(isLoading = false) } }
             }
             .onEach { stats ->
                 _uiState.update {
@@ -128,7 +129,6 @@ class ProfileViewModel @Inject constructor(
                     )
                 }
             }
-            .catch { _uiState.update { it.copy(isLoading = false) } }
             .launchIn(viewModelScope)
 
         // ── Game stats ────────────────────────────────────────────────────────

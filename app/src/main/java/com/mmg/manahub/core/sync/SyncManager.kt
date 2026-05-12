@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.mapper.toEntityCard
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
+import com.mmg.manahub.core.data.remote.collection.UserCardCollectionDto
 import com.mmg.manahub.core.data.remote.collection.toDto
 import com.mmg.manahub.core.data.remote.collection.toEntity
 import com.mmg.manahub.core.data.remote.decks.DeckCardSyncDto
@@ -75,6 +76,15 @@ class SyncManager @Inject constructor(
 
     /** Observable sync state for UI consumption. */
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
+
+    /**
+     * Resets the sync state to [SyncState.IDLE]. Call this on logout so that a stale
+     * ERROR state from a previous background sync is not shown as fresh on the next
+     * app open or login.
+     */
+    fun resetSyncState() {
+        _syncState.value = SyncState.IDLE
+    }
 
     /**
      * Runs a full push-then-pull sync cycle for [userId].
@@ -148,26 +158,7 @@ class SyncManager @Inject constructor(
                 var collectionPulled = 0
                 for (dto in remoteCollection) {
                     if (dto.scryfallId !in cachedIds) continue
-                    val byId = collectionDao.getByIdIncludingDeleted(dto.id)
-                    val local = if (byId != null) {
-                        byId
-                    } else {
-                        // UUID mismatch: the same card variant may exist locally under a
-                        // different (guest-generated) UUID. Find it by composite key and
-                        // hard-delete it so we can insert with Supabase's canonical UUID.
-                        val byComposite = collectionDao.getByCompositeKey(
-                            dto.userId, dto.scryfallId, dto.isFoil,
-                            dto.condition, dto.language, dto.isAlternativeArt,
-                        )
-                        if (byComposite != null) {
-                            if (dto.updatedAt <= byComposite.updatedAt) continue
-                            collectionDao.deleteById(byComposite.id)
-                        }
-                        byComposite
-                    }
-                    if (local != null && dto.updatedAt <= local.updatedAt) continue
-                    collectionDao.upsert(dto.toEntity())
-                    collectionPulled++
+                    pullCollectionRow(dto) { collectionPulled++ }
                 }
 
                 // ── PULL: decks ──────────────────────────────────────────────────
@@ -245,13 +236,36 @@ class SyncManager @Inject constructor(
         syncMutex.withLock {
             val now = System.currentTimeMillis()
 
+            // Resolve any offline↔account duplicates BEFORE calling assignUserId so that
+            // updating user_id on guest rows cannot violate the composite UNIQUE constraint.
+            mergeGuestRowsIntoUser(newUserId)
+
             val collectionMigrated = collectionDao.assignUserId(newUserId, now)
             val decksMigrated = deckDao.assignDeckUserId(newUserId, now)
 
-            // Only clear the watermark when there were orphaned rows to migrate.
-            // Avoids forcing an unnecessary full re-upload on every app startup for
-            // users who are already authenticated.
-            if (collectionMigrated > 0 || decksMigrated > 0) {
+            // Count rows that now belong to this user AFTER the migration above.
+            val localCollectionCount = collectionDao.getCountForUser(newUserId)
+            val localDeckCount = deckDao.getDeckCountForUser(newUserId)
+
+            // Clear the watermark in two scenarios:
+            //
+            // 1. Guest rows were migrated (collectionMigrated > 0 || decksMigrated > 0):
+            //    The watermark must be reset so the PUSH phase re-uploads the migrated rows
+            //    and the PULL phase fetches the full account history.
+            //
+            // 2. Room has no data for this user even though no rows were migrated
+            //    (localCollectionCount == 0 && localDeckCount == 0):
+            //    This indicates Room was wiped (destructive migration, user cleared app data,
+            //    or fresh install on a device where DataStore survived). The DataStore watermark
+            //    may still hold a stale timestamp from a previous installation, causing
+            //    getChangesSince() to return 0 rows because all Supabase data pre-dates the
+            //    watermark. Clearing it forces a full pull and restores the user's data.
+            //
+            //    Note: if the user genuinely has an empty collection (0 local + 0 remote),
+            //    clearing the watermark is harmless — the PULL will simply return 0 rows.
+            if (collectionMigrated > 0 || decksMigrated > 0 ||
+                (localCollectionCount == 0 && localDeckCount == 0)
+            ) {
                 syncPrefs.clearLastSyncMillis(newUserId)
             }
 
@@ -300,23 +314,7 @@ class SyncManager @Inject constructor(
                 var collectionPulled = 0
                 for (dto in remoteCollection) {
                     if (dto.scryfallId !in cachedIds) continue
-                    val byId = collectionDao.getByIdIncludingDeleted(dto.id)
-                    val local = if (byId != null) {
-                        byId
-                    } else {
-                        val byComposite = collectionDao.getByCompositeKey(
-                            dto.userId, dto.scryfallId, dto.isFoil,
-                            dto.condition, dto.language, dto.isAlternativeArt,
-                        )
-                        if (byComposite != null) {
-                            if (dto.updatedAt <= byComposite.updatedAt) continue
-                            collectionDao.deleteById(byComposite.id)
-                        }
-                        byComposite
-                    }
-                    if (local != null && dto.updatedAt <= local.updatedAt) continue
-                    collectionDao.upsert(dto.toEntity())
-                    collectionPulled++
+                    pullCollectionRow(dto) { collectionPulled++ }
                 }
 
                 // ── PULL: decks ──────────────────────────────────────────────────
@@ -368,6 +366,104 @@ class SyncManager @Inject constructor(
     }
 
     /**
+     * Resolves UNIQUE-constraint conflicts between offline (null-userId) rows and the
+     * user's existing rows BEFORE [assignUserId] is called.
+     *
+     * When the same card was added both offline and in a previous logged-in session,
+     * calling `assignUserId(X)` would try to UPDATE the null-userId row to userId X,
+     * but a row with userId X and the same composite key already exists — this violates
+     * the UNIQUE constraint and crashes outside the runCatching safety net.
+     *
+     * Resolution per-conflict (LWW):
+     * - If the offline row is NEWER: copy its quantity and updatedAt into the user row
+     *   (the offline addition took precedence — e.g. user added more copies while logged out).
+     * - If the user row is NEWER or equal: keep the user row unchanged.
+     * - In both cases the null-userId row is hard-deleted to eliminate the duplicate.
+     *
+     * Non-conflicting null-userId rows are left intact for [assignUserId] to migrate.
+     */
+    private fun mergeGuestRowsIntoUser(userId: String) {
+        val guestRows = collectionDao.getAllGuestRows()
+        for (guestRow in guestRows) {
+            val userRow = collectionDao.getByCompositeKey(
+                userId, guestRow.scryfallId, guestRow.isFoil,
+                guestRow.condition, guestRow.language, guestRow.isAlternativeArt,
+            )
+            if (userRow != null) {
+                if (guestRow.updatedAt > userRow.updatedAt) {
+                    collectionDao.upsert(
+                        userRow.copy(
+                            quantity = guestRow.quantity,
+                            isForTrade = guestRow.isForTrade || userRow.isForTrade,
+                            updatedAt = guestRow.updatedAt,
+                        )
+                    )
+                }
+                collectionDao.deleteById(guestRow.id)
+            }
+        }
+    }
+
+    /**
+     * Applies Last-Write-Wins (LWW) logic for a single remote collection [dto] and
+     * upserts it into Room if it wins.
+     *
+     * Resolution order:
+     * 1. Look up the row by its Supabase UUID (exact match, includes tombstones).
+     * 2. If not found, look up by composite key — the same card variant may exist locally
+     *    under a different (guest-generated) UUID. When found:
+     *    a. If the remote row loses the LWW comparison, skip entirely.
+     *    b. Otherwise, hard-delete the stale local row so the Supabase-canonical UUID
+     *       can be inserted without violating the composite UNIQUE constraint.
+     * 3. Skip if the local row is strictly newer (LWW).
+     * 4. Upsert the remote row and invoke [onInserted].
+     *
+     * Note: the `local` variable after a UUID-mismatch resolution intentionally points
+     * to the entity that was just hard-deleted. At that point [dto].updatedAt is always
+     * strictly greater than [local].updatedAt (guaranteed by the check in step 2a), so
+     * step 3 never incorrectly skips the upsert.
+     */
+    private fun pullCollectionRow(
+        dto: UserCardCollectionDto,
+        onInserted: () -> Unit,
+    ) {
+        val byId = collectionDao.getByIdIncludingDeleted(dto.id)
+        // When non-null, this is the stale guest-UUID row that must be removed atomically
+        // with the canonical-UUID upsert (see reconcileAndUpsert below).
+        var staleId: String? = null
+
+        val local = if (byId != null) {
+            byId
+        } else {
+            // UUID mismatch: the same card variant may exist locally under a
+            // different (guest-generated) UUID. Find it by composite key.
+            val byComposite = collectionDao.getByCompositeKey(
+                dto.userId, dto.scryfallId, dto.isFoil,
+                dto.condition, dto.language, dto.isAlternativeArt,
+            )
+            if (byComposite != null) {
+                // LWW: if the local row is strictly newer, skip this remote row entirely.
+                if (dto.updatedAt <= byComposite.updatedAt) return
+                // Remote row wins — mark the stale row for atomic deletion.
+                staleId = byComposite.id
+            }
+            byComposite
+        }
+        // LWW: skip if local row is strictly newer. When local came from the UUID-mismatch
+        // branch, dto.updatedAt > local.updatedAt is always true here (ensured above).
+        if (local != null && dto.updatedAt <= local.updatedAt) return
+
+        // Use the atomic reconcileAndUpsert when a stale-UUID row must be replaced so a
+        // process-kill between the delete and the insert never orphans the collection entry.
+        if (staleId != null) {
+            collectionDao.reconcileAndUpsert(staleId, dto.toEntity())
+        } else {
+            collectionDao.upsert(dto.toEntity())
+        }
+        onInserted()
+    }
+
+    /**
      * Ensures all [scryfallIds] are present in Room's [CardEntity] table.
      *
      * This is required before upserting [UserCardCollectionEntity] rows because the
@@ -384,7 +480,14 @@ class SyncManager @Inject constructor(
      * Returns the set of [scryfallIds] that are now present in Room (either
      * pre-existing or successfully fetched). IDs that couldn't be fetched (Scryfall
      * 404 or network error for a chunk) are excluded — their collection entries will
-     * be silently skipped and retried on the next sync.
+     * be skipped this cycle and retried on the next sync.
+     *
+     * DATA SAFETY: skipping a collection entry when its card cannot be fetched from
+     * Scryfall does NOT cause data loss. The row still exists in Supabase and will be
+     * pulled again on the next sync cycle (the watermark is only advanced after a
+     * fully successful sync). If Scryfall returns 404 for a card indefinitely, the
+     * user's ownership record remains safe in Supabase — only the local display is
+     * affected until the card becomes available again in the Scryfall catalog.
      */
     private suspend fun ensureCardsExist(scryfallIds: List<String>): Set<String> {
         if (scryfallIds.isEmpty()) return emptySet()
