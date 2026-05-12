@@ -214,7 +214,11 @@ private fun AddCustomSourceSection(
             value = state.name,
             onValueChange = onNameChanged,
             placeholder = {
-                Text(stringResource(R.string.news_sources_name_hint), color = mc.textDisabled)
+                Text(
+                    stringResource(R.string.news_sources_name_hint),
+                    color = mc.textDisabled,
+                    style = mt.bodyMedium
+                )
             },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
@@ -232,7 +236,11 @@ private fun AddCustomSourceSection(
             value = state.feedUrl,
             onValueChange = onFeedUrlChanged,
             placeholder = {
-                Text(stringResource(R.string.news_sources_url_hint), color = mc.textDisabled)
+                Text(
+                    stringResource(R.string.news_sources_url_hint),
+                    color = mc.textDisabled,
+                    style = mt.bodyMedium
+                )
             },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(

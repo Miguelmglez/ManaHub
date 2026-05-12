@@ -30,17 +30,18 @@ fun ManaColorPicker(
     itemSize: Dp = 44.dp,
     symbolSize: Dp = 32.dp,
     spacing: Dp = 8.dp,
-    colors: List<String> = listOf("W", "U", "B", "R", "G", "C")
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(spacing),
+    colors: List<String> = listOf("All", "W", "U", "B", "R", "G", "C")
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(spacing),
+        horizontalArrangement = horizontalArrangement,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         colors.forEach { color ->
             ManaColorItem(
                 color = color,
-                isSelected = selectedColors.contains(color),
+                isSelected = if (color == "All") selectedColors.isEmpty() else selectedColors.contains(color),
                 onClick = { onToggleColor(color) },
                 itemSize = itemSize,
                 symbolSize = symbolSize,
@@ -61,7 +62,8 @@ fun ManaColorItem(
     itemSize: Dp = 44.dp,
     symbolSize: Dp = 32.dp,
 ) {
-    val manaColor = manaColorFor(color, MaterialTheme.magicColors)
+    val mc = MaterialTheme.magicColors
+    val manaColor = if (color == "All") mc.goldMtg else manaColorFor(color, mc)
     
     // For Black ("B"), use a light gray selection color to improve visibility on dark backgrounds
     val selectionColor = if (color == "B") Color.LightGray else manaColor
@@ -81,6 +83,15 @@ fun ManaColorItem(
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        ManaSymbolImage(token = color, size = symbolSize)
+        if (color == "All") {
+            androidx.compose.material3.Icon(
+                painter = androidx.compose.ui.res.painterResource(id = com.mmg.manahub.R.drawable.ic_counter),
+                contentDescription = "All",
+                modifier = Modifier.size(symbolSize),
+                tint = mc.goldMtg
+            )
+        } else {
+            ManaSymbolImage(token = color, size = symbolSize)
+        }
     }
 }

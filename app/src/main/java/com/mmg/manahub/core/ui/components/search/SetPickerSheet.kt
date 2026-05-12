@@ -68,11 +68,23 @@ fun SetPickerSheet(
     selectedSetCodes: Set<String>,
     onToggleSet: (MagicSet) -> Unit,
     onDismiss: () -> Unit,
-    viewModel: SetPickerViewModel = hiltViewModel(),
+    availableSets: List<MagicSet>? = null,
 ) {
+    // Force a new ViewModel whenever availableSets changes to ensure clean initialization
+    val viewModel: SetPickerViewModel = hiltViewModel(key = availableSets?.hashCode()?.toString())
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+
+    androidx.compose.runtime.LaunchedEffect(availableSets) {
+        viewModel.init(availableSets)
+        viewModel.setRestrictedSets(availableSets)
+    }
+
+    // We only show the sheet content if we are NOT in the "restricted but not yet loaded" state.
+    // However, the ViewModel's init starts loadSets() immediately. 
+    // To be safe, if availableSets is provided (not null), we should wait for restrictedSets to be set.
+    val isWaitingForRestrictions = availableSets != null && uiState.restrictedSets == null
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -189,7 +201,7 @@ fun SetPickerSheet(
 
             // ── Content ──
             when {
-                uiState.isLoading -> {
+                isWaitingForRestrictions || uiState.isLoading -> {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = mc.primaryAccent)
                     }

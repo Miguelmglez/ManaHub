@@ -133,6 +133,13 @@ interface DeckDao {
 
     @Query("SELECT MAX(updated_at) FROM decks")
     fun getMaxUpdatedAt(): Long?
+
+    // Returns the number of non-deleted decks owned by [userId].
+    // Used by SyncManager.assignUserIdAndSync to detect a wiped Room DB (count == 0
+    // after assignDeckUserId ran but no guest rows were migrated), which means the DataStore
+    // watermark must be cleared to force a full pull from Supabase.
+    @Query("SELECT COUNT(*) FROM decks WHERE user_id = :userId AND is_deleted = 0")
+    fun getDeckCountForUser(userId: String): Int
 }
 
 data class DeckWithCards(

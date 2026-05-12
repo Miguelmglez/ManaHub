@@ -1,9 +1,12 @@
 package com.mmg.manahub.core.di
 
+import android.content.Context
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.auth.EncryptedSessionManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
@@ -20,22 +23,22 @@ object SupabaseModule {
 
     @Provides
     @Singleton
-    fun provideSupabaseClient(): SupabaseClient = createSupabaseClient(
-        supabaseUrl = BuildConfig.SUPABASE_URL,
-        supabaseKey = BuildConfig.SUPABASE_ANON_KEY
-    ) {
-        install(Auth) {
-            // El SDK persiste la sesión en DataStore de forma nativa en Android
-            // Token refresh automático viene habilitado por defecto
-            alwaysAutoRefresh = true
-            autoLoadFromStorage = true
-            scheme = "manahub"
-            host = "auth"
+    fun provideSupabaseClient(@ApplicationContext context: Context): SupabaseClient =
+        createSupabaseClient(
+            supabaseUrl = BuildConfig.SUPABASE_URL,
+            supabaseKey = BuildConfig.SUPABASE_ANON_KEY
+        ) {
+            install(Auth) {
+                alwaysAutoRefresh = true
+                autoLoadFromStorage = true
+                scheme = "manahub"
+                host = "auth"
+                sessionManager = EncryptedSessionManager(context)
+            }
+            install(Postgrest)
+            install(Realtime)
+            httpEngine = Android.create()
         }
-        install(Postgrest)
-        install(Realtime)
-        httpEngine = Android.create()
-    }
 
     @Provides
     @Singleton

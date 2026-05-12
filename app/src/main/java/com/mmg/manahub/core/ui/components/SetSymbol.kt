@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.mmg.manahub.R
 
 enum class CardRarity(val tint: Color) {
     COMMON(Color(0xFFC0C0C0)),
@@ -51,6 +52,8 @@ fun SetSymbol(
         model = ImageRequest.Builder(LocalContext.current)
             .data(url)
             .crossfade(true)
+            .error(R.drawable.ic_counter)
+            .fallback(R.drawable.ic_counter)
             .build(),
         contentDescription = "$setCode ${rarity.name}",
         colorFilter        = ColorFilter.tint(rarity.tint),

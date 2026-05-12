@@ -1,5 +1,10 @@
 package com.mmg.manahub.feature.auth.presentation
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -55,7 +60,7 @@ import com.mmg.manahub.feature.auth.domain.model.SessionState
 /**
  * Profile-screen section that renders different content based on [sessionState]:
  *
- * - [SessionState.Loading]         → renders nothing (avoids flicker)
+ * - [SessionState.Loading]         → shimmer skeleton card while the session is being restored
  * - [SessionState.Unauthenticated] → feature-promotion card with login / sign-up CTAs
  * - [SessionState.Authenticated]   → compact user identity card with sign-out and delete-account options
  */
@@ -72,7 +77,7 @@ fun AccountSection(
     avatarUrl: String? = null,
 ) {
     when (sessionState) {
-        SessionState.Loading -> Unit // Render nothing while session is resolving
+        SessionState.Loading -> AccountSectionSkeleton(modifier = modifier)
 
         SessionState.Unauthenticated -> {
             UnauthenticatedCard(
@@ -91,6 +96,117 @@ fun AccountSection(
                 displayName = playerName,
                 displayAvatarUrl = avatarUrl,
             )
+        }
+    }
+}
+
+// ── Loading skeleton ───────────────────────────────────────────────────────────
+
+/**
+ * Shimmer skeleton that mirrors the visual footprint of [AuthenticatedCard].
+ * Displayed while [SessionState.Loading] is active (~1-2 seconds on app start).
+ *
+ * Animation: infinite alpha oscillation between 0.04f and 0.14f applied over
+ * [MaterialTheme.magicColors.primaryAccent] so the placeholder tiles respect the
+ * active theme without relying on any external shimmer library.
+ */
+@Composable
+private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+
+    // Infinite alpha oscillation: 0.04 → 0.14 → 0.04
+    val infiniteTransition = rememberInfiniteTransition(label = "skeleton_shimmer")
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.04f,
+        targetValue = 0.14f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "shimmer_alpha",
+    )
+
+    val shimmerColor = mc.primaryAccent.copy(alpha = shimmerAlpha)
+    val shimmerBase = mc.primaryAccent.copy(alpha = 0.08f)
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = mc.primaryAccent.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        color = mc.surface,
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        ) {
+            // ── Identity Row ───────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Avatar circle placeholder
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(shimmerColor),
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Text line placeholders
+                Column(modifier = Modifier.weight(1f)) {
+                    // Name line
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.55f)
+                            .height(14.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(shimmerColor),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Email / subtitle line
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.75f)
+                            .height(11.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(shimmerBase),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Button Row placeholder ─────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Primary button placeholder (weight(1f) mirrors Sign Out button)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(shimmerColor),
+                )
+                // Secondary button placeholder (fixed width mirrors Delete Account)
+                Box(
+                    modifier = Modifier
+                        .width(96.dp)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(shimmerBase),
+                )
+            }
         }
     }
 }
