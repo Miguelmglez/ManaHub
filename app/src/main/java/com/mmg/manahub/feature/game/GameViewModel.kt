@@ -565,7 +565,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
-                name      = cfg.name.ifEmpty { "Player ${i + 1}" },
+                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = cfg.theme,
                 isAppUser = cfg.isAppUser,
@@ -626,7 +626,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, config ->
             Player(
                 id        = i,
-                name      = config.name.ifEmpty { "Player ${i + 1}" },
+                name      = config.name.ifEmpty { "Wizard ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = config.theme,
                 isAppUser = config.isAppUser,
@@ -649,7 +649,7 @@ class GameViewModel @Inject constructor(
             val players = (0 until clampedCount).map { i ->
                 Player(
                     id        = i,
-                    name      = "Player ${i + 1}",
+                    name      = "Wizard ${i + 1}",
                     life      = mode.startingLife,
                     theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
                     isAppUser = i == 0,

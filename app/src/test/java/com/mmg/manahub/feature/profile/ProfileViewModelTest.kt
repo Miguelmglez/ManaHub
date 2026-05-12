@@ -74,7 +74,7 @@ class ProfileViewModelTest {
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
 
     // Mutable state flows used to drive ViewModel state changes in tests
-    private val playerNameFlow    = MutableStateFlow("Player 1")
+    private val playerNameFlow    = MutableStateFlow("Wizard")
     private val avatarUrlFlow     = MutableStateFlow<String?>(null)
     private val preferencesFlow   = MutableStateFlow(TestFixtures.buildPreferences())
     private val sessionStateFlow  = MutableStateFlow<SessionState>(SessionState.Unauthenticated)

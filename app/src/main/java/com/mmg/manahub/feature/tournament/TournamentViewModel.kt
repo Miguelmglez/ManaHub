@@ -98,7 +98,7 @@ class TournamentViewModel @Inject constructor(
             val player = state.players.find { it.id == playerId }
             PlayerConfig(
                 id        = index,
-                name      = player?.playerName ?: "Player ${index + 1}",
+                name      = player?.playerName ?: "Wizard ${index + 1}",
                 theme     = PlayerTheme.ALL[(player?.seed ?: index) % PlayerTheme.ALL.size],
                 isAppUser = index == 0,
             )

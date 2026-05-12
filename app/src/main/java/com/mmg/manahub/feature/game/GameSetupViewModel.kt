@@ -21,7 +21,7 @@ import javax.inject.Inject
 //  Data model
 // ─────────────────────────────────────────────────────────────────────────────
 
-private val DEFAULT_NAMES = setOf("Player 1", "Jugador 1", "Spieler 1")
+private val DEFAULT_NAMES = setOf("Wizard", "Player 1", "Jugador 1", "Spieler 1")
 
 data class PlayerConfig(
     val id:           Int,

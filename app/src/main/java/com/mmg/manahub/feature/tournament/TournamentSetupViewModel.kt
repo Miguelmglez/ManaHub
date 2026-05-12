@@ -91,7 +91,7 @@ class TournamentSetupViewModel @Inject constructor(
         _uiState.update { it.copy(isCreating = true) }
         val state   = _uiState.value
         val players = state.players.map { config ->
-            val pName = config.name.ifEmpty { "Player ${config.id + 1}" }
+            val pName = config.name.ifEmpty { "Wizard ${config.id + 1}" }
             val hex   = "#${config.theme.accent.toArgb().and(0xFFFFFF).toString(16).padStart(6, '0')}"
             pName to hex
         }
