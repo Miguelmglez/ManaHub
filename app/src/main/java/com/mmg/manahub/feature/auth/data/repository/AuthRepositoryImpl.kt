@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -90,8 +89,15 @@ class AuthRepositoryImpl @Inject constructor(
                 flowOf(state)
             } else {
                 flow {
-                    // Fast emit: available immediately from in-memory session metadata.
-                    emit(state)
+                    // Fast emit: only emit immediately when the nickname is already known from
+                    // in-memory session metadata (i.e. email/password users whose nickname is
+                    // embedded in the token). For Google users the in-memory metadata may reflect
+                    // stale or provider-supplied values — skip the fast emit and wait for the
+                    // server-side profile fetch so the UI never flashes a wrong nickname.
+                    val isGoogleUser = state.user.provider == "google"
+                    if (!isGoogleUser && state.user.nickname != null) {
+                        emit(state)
+                    }
                     // Enriched emit: fetch server-side profile (nickname, gameTag, avatarUrl).
                     try {
                         val profile = userProfileDataSource.fetchUserProfile(state.user.id)
@@ -100,6 +106,7 @@ class AuthRepositoryImpl @Inject constructor(
                                 nickname = profile.nickname ?: state.user.nickname,
                                 gameTag = profile.gameTag ?: state.user.gameTag,
                                 avatarUrl = profile.avatarUrl,
+                                profileCompleted = profile.profileCompleted,
                             )
                             syncToDataStore(enrichedUser)
                             emit(SessionState.Authenticated(enrichedUser))
@@ -112,6 +119,11 @@ class AuthRepositoryImpl @Inject constructor(
                         }
                     } catch (_: Exception) {
                         // Non-fatal: session is valid even if profile enrichment fails.
+                        // For Google users we suppressed the fast emit, so we must still
+                        // deliver a state so the UI does not hang on Loading forever.
+                        if (isGoogleUser) {
+                            emit(state)
+                        }
                     }
                 }
             }
@@ -147,6 +159,14 @@ class AuthRepositoryImpl @Inject constructor(
         nickname: String,
         avatarUrl: String?,
     ): AuthResult<AuthUser> = withContext(ioDispatcher) {
+        // Defensive guard: the ViewModel validates the nickname before calling this, but
+        // we enforce it here as well to ensure no code path creates a profile with a null
+        // nickname. A blank nickname at this layer is always a caller contract violation.
+        val trimmedNickname = nickname.trim()
+        if (trimmedNickname.isBlank()) {
+            return@withContext AuthResult.Error(AuthError.InvalidCredentials)
+        }
+
         runCatching {
             supabaseAuth.signUpWith(Email) {
                 this.email = email
@@ -154,7 +174,7 @@ class AuthRepositoryImpl @Inject constructor(
                 // The handle_new_user trigger reads raw_user_meta_data->>'nickname' and
                 // inserts it into user_profiles automatically — no extra RPC needed.
                 this.data = buildJsonObject {
-                    put("nickname", nickname)
+                    put("nickname", trimmedNickname)
                     if (avatarUrl != null) put("avatar_url", avatarUrl)
                 }
             }
@@ -163,7 +183,7 @@ class AuthRepositoryImpl @Inject constructor(
                 ?: return@runCatching AuthResult.Error(AuthError.EmailConfirmationRequired)
 
             val user = mapUserInfoToAuthUser(userInfo).copy(
-                nickname = nickname.ifBlank { null },
+                nickname = trimmedNickname,
                 avatarUrl = avatarUrl ?: mapUserInfoToAuthUser(userInfo).avatarUrl,
             )
 
@@ -180,52 +200,57 @@ class AuthRepositoryImpl @Inject constructor(
         rawNonce: String
     ): AuthResult<AuthUser> = withContext(ioDispatcher) {
         runCatching {
-            val localNickname = userPreferencesDataStore.playerNameFlow.first()
-            val localAvatar = userPreferencesDataStore.avatarUrlFlow.first()
-
+            // Sign-in with Google: do NOT pass any local data in the metadata block.
+            // Injecting the local DataStore nickname (e.g. the default "Wizard") would
+            // overwrite the server-side profile nickname for returning users, and would
+            // corrupt the metadata for new users who have not yet typed a nickname.
             supabaseAuth.signInWith(IDToken) {
                 this.idToken = idToken
                 provider = Google
                 nonce = rawNonce
-                // Pass local profile metadata so handle_new_user trigger can pick it up
-                // if this is a first-time Google sign-in.
-                this.data = buildJsonObject {
-                    if (localNickname.isNotBlank()) put("nickname", localNickname)
-                    if (localAvatar != null) put("avatar_url", localAvatar)
-                }
             }
             val userInfo = supabaseAuth.currentUserOrNull()
                 ?: return@runCatching AuthResult.Error(AuthError.SessionExpired)
 
-            val existingProfile = userProfileDataSource.fetchUserProfile(userInfo.id)
+            // Use the get_profile_by_user_id RPC instead of a direct table query.
+            // The handle_new_user trigger always creates a user_profiles row for every
+            // new auth.users entry (including Google OAuth), so `existingProfile == null`
+            // can NEVER be true here. The correct gate is profile_completed:
+            //   - FALSE → user is new, has not chosen a nickname yet → redirect to sign-up
+            //   - TRUE  → returning user, proceed to HomeScreen
+            val profile = userProfileDataSource.getProfileByUserId(userInfo.id)
 
-            val finalUser = if (existingProfile == null) {
-                // New Google user (but via Sign In): metadata push above handled the trigger,
-                // but we also upsert here to be 100% sure we get a game_tag back.
-                val localNickname = userPreferencesDataStore.playerNameFlow.first()
-                val localAvatar = userPreferencesDataStore.avatarUrlFlow.first()
-
-                val newUser = mapUserInfoToAuthUser(userInfo).copy(
-                    nickname = localNickname.takeIf { it.isNotBlank() },
-                    avatarUrl = localAvatar
-                )
-                val profileUser = userProfileDataSource.upsertUserProfile(newUser)
-                callSetGoogleAccountPasswordEdgeFunction()
-                profileUser
-            } else {
-                // Returning Google user: use the profile data already on the server.
-                mapUserInfoToAuthUser(userInfo).copy(
-                    nickname = existingProfile.nickname ?: mapUserInfoToAuthUser(userInfo).nickname,
-                    gameTag = existingProfile.gameTag,
-                    avatarUrl = existingProfile.avatarUrl,
+            if (profile == null || !profile.profileCompleted) {
+                // Profile row was created by the trigger but the user has not yet completed
+                // the sign-up flow (nickname not chosen). Sign out locally and signal the UI
+                // to switch to the Create Account tab so the user can pick a nickname.
+                //
+                // LOCAL scope avoids a network call with a short-lived token. The auth.users
+                // row is harmless until profile_completed = true (RLS policies block access).
+                runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                return@runCatching AuthResult.Error(
+                    AuthError.NoProfileFound(email = userInfo.email)
                 )
             }
+
+            // Returning Google user with a completed profile: use the server data.
+            // Guarantee a non-null nickname: fall back to the email prefix as a last resort
+            // (profile_completed = true guarantees nickname is set, this is just a safety net).
+            val serverNickname = profile.nickname
+                ?: userInfo.email?.substringBefore('@')
+
+            val finalUser = mapUserInfoToAuthUser(userInfo).copy(
+                nickname = serverNickname,
+                gameTag = profile.gameTag,
+                avatarUrl = profile.avatarUrl,
+                profileCompleted = profile.profileCompleted,
+            )
 
             syncToDataStore(finalUser)
             profileRefreshSignal.tryEmit(Unit)
 
             AuthResult.Success(finalUser)
-        }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }.getOrElse { e -> AuthResult.Error(e.toAuthError(isGoogleSignIn = true)) }
     }
 
     override suspend fun signUpWithGoogle(
@@ -234,31 +259,42 @@ class AuthRepositoryImpl @Inject constructor(
         nickname: String,
         avatarUrl: String?
     ): AuthResult<AuthUser> = withContext(ioDispatcher) {
+        // Defensive guard: the ViewModel validates the nickname before calling this, but
+        // we enforce it here as well to ensure no code path creates a profile with a null
+        // nickname. A blank nickname at this layer is always a caller contract violation.
+        val trimmedNickname = nickname.trim()
+        if (trimmedNickname.isBlank()) {
+            return@withContext AuthResult.Error(AuthError.InvalidCredentials)
+        }
+
         runCatching {
             supabaseAuth.signInWith(IDToken) {
                 this.idToken = idToken
                 provider = Google
                 nonce = rawNonce
-                // Pass nickname in metadata so the handle_new_user trigger can pick it up
-                // for new accounts.
-                this.data = buildJsonObject {
-                    put("nickname", nickname)
-                    if (avatarUrl != null) put("avatar_url", avatarUrl)
-                }
+                // Do NOT inject nickname via metadata here. The handle_new_user trigger
+                // creates the profile row with profile_completed = FALSE regardless.
+                // The nickname is set atomically by complete_user_profile RPC below.
             }
             val userInfo = supabaseAuth.currentUserOrNull()
                 ?: return@runCatching AuthResult.Error(AuthError.SessionExpired)
 
-            // For sign-up, we ALWAYS upsert the profile to ensure the provided
-            // nickname and avatarUrl are used, even if the account already existed.
-            val user = mapUserInfoToAuthUser(userInfo).copy(
-                nickname = nickname.ifBlank { null },
+            // Build a base AuthUser from the Supabase auth info and inject the
+            // user-chosen nickname so completeUserProfile can pass it to the RPC.
+            val baseUser = mapUserInfoToAuthUser(userInfo).copy(
+                nickname = trimmedNickname,
                 avatarUrl = avatarUrl,
             )
-            val profileUser = userProfileDataSource.upsertUserProfile(user)
-            
-            // If it was truly new, this will set the password. If not, it might
-            // be redundant but harmless depending on the Edge Function logic.
+
+            // Call the complete_user_profile RPC which atomically:
+            //   1. Sets the nickname on the user_profiles row.
+            //   2. Marks profile_completed = TRUE.
+            // This replaces the old upsertUserProfile call which could not set
+            // profile_completed and would bypass the onboarding gate.
+            val profileUser = userProfileDataSource.completeUserProfile(baseUser)
+
+            // Fire-and-forget Edge Function to assign a random password, enabling
+            // email/password sign-in as a fallback and triggering the welcome email.
             callSetGoogleAccountPasswordEdgeFunction()
 
             syncToDataStore(profileUser)
@@ -505,13 +541,25 @@ class AuthRepositoryImpl @Inject constructor(
             gameTag = metadata?.get("game_tag")?.jsonPrimitive?.contentOrNull,
             avatarUrl = filteredAvatarUrl,
             provider = provider,
+            // profileCompleted is intentionally left as the default (false) here.
+            // It is only set to true after enrichment from the user_profiles row via
+            // the get_profile_by_user_id RPC or the complete_user_profile RPC.
+            profileCompleted = false,
         )
     }
 
-    private fun Throwable.toAuthError(): AuthError = when (this) {
+    /**
+     * Maps a [Throwable] thrown by the Supabase SDK or Retrofit to a domain [AuthError].
+     *
+     * @param isGoogleSignIn When true, a 422 from Supabase is interpreted as
+     *   [AuthError.GoogleEmailConflict] (the email already exists under a different
+     *   provider) rather than the generic [AuthError.EmailAlreadyInUse] that applies
+     *   during email/password sign-up.
+     */
+    private fun Throwable.toAuthError(isGoogleSignIn: Boolean = false): AuthError = when (this) {
         is RestException -> when (statusCode) {
             400 -> AuthError.InvalidCredentials
-            422 -> AuthError.EmailAlreadyInUse
+            422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
             else -> AuthError.Unknown(message)
@@ -519,7 +567,7 @@ class AuthRepositoryImpl @Inject constructor(
 
         is retrofit2.HttpException -> when (code()) {
             400 -> AuthError.InvalidCredentials
-            422 -> AuthError.EmailAlreadyInUse
+            422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
             else -> AuthError.Unknown(message())

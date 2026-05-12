@@ -90,7 +90,7 @@ class SurveyViewModelTest {
         playerResults    = playerResults,
         appUserWon       = true,
         appUserFinalLife = 20,
-        appUserName      = "Player 1",
+        appUserName      = "Wizard",
     )
 
     /**

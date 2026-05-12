@@ -166,6 +166,17 @@ private fun LoginSheetContent(
     var showResetDialog by remember { mutableStateOf(false) }
     val passwordStrength = remember(password) { PasswordStrength.from(password) }
 
+    // When Google Sign-In finds no ManaHub profile, switch to the Create Account tab
+    // and pre-fill the Google email so the user does not have to type it again.
+    LaunchedEffect(uiState) {
+        if (uiState is AuthUiState.GoogleSignInNoProfile) {
+            selectedTab = 1
+            uiState.googleEmail?.let { googleEmail ->
+                if (googleEmail.isNotBlank()) email = googleEmail
+            }
+        }
+    }
+
     // Show email confirmation screen when Supabase requires email verification
     if (uiState is AuthUiState.EmailConfirmationSent) {
         EmailConfirmationContent(
@@ -190,7 +201,14 @@ private fun LoginSheetContent(
     }
 
     val isLoading = uiState is AuthUiState.Loading
-    val errorMessage = (uiState as? AuthUiState.Error)?.message
+    // Show the standard error message, or the "no profile" banner when Google Sign-In
+    // completes without a ManaHub account (shown on tab 1 after the auto-switch).
+    val errorMessage: String? = when (uiState) {
+        is AuthUiState.Error -> uiState.message
+        is AuthUiState.GoogleSignInNoProfile ->
+            stringResource(R.string.auth_error_no_profile_found)
+        else -> null
+    }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = mc.primaryAccent,

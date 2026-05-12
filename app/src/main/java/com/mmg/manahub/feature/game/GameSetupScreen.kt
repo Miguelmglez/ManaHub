@@ -328,7 +328,7 @@ private fun PlayerConfigRow(
                 .clickable { showColorPicker = true },
         )
 
-        // Name field — read-only for the app user (Player 1)
+        // Name field — read-only for the app user (shows their saved profile name)
         if (config.isAppUser) {
             Row(
                 modifier = Modifier.weight(1f),

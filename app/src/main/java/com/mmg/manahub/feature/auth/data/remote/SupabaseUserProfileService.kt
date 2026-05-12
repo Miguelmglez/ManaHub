@@ -26,7 +26,7 @@ interface SupabaseUserProfileService {
     @GET("user_profiles")
     suspend fun fetchProfile(
         @Query("id") idFilter: String,
-        @Query("select") select: String = "id,nickname,game_tag,avatar_url,provider",
+        @Query("select") select: String = "id,nickname,game_tag,avatar_url,provider,profile_completed",
     ): List<UserProfileRetrofitDto>
 
     /**
@@ -53,14 +53,44 @@ interface SupabaseUserProfileService {
     @POST("rpc/update_user_avatar")
     suspend fun updateAvatarUrl(@Body body: UpdateAvatarUrlDto): Response<Unit>
 
+    /**
+     * Calls the `get_profile_by_user_id` Supabase RPC.
+     * Returns the full [UserProfileRetrofitDto] row for the given user, including [profileCompleted].
+     *
+     * Returns null (via [decodeSingleOrNull] semantics) when no row is found.
+     * This is the preferred way to check whether a Google OAuth user has already completed
+     * the sign-up flow, since the [handle_new_user] trigger always creates a row — meaning
+     * a direct table query can never return null for a newly authenticated user.
+     */
+    @POST("rpc/get_profile_by_user_id")
+    suspend fun getProfileByUserId(
+        @Body body: GetProfileByUserIdDto,
+    ): UserProfileRetrofitDto?
+
+    /**
+     * Calls the `complete_user_profile` Supabase RPC.
+     * Atomically sets the user's [nickname] and marks `profile_completed = TRUE`.
+     * Must be called after Google OAuth completes during the sign-up flow.
+     *
+     * Returns the updated [UserProfileRetrofitDto] row (with [profileCompleted] = true).
+     * Throws [retrofit2.HttpException] on failure (e.g. 400 for inappropriate nickname).
+     */
+    @POST("rpc/complete_user_profile")
+    suspend fun completeUserProfile(
+        @Body body: CompleteUserProfileDto,
+    ): UserProfileRetrofitDto
+
 }
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
 /**
- * DTO returned by [SupabaseUserProfileService.fetchProfile].
- * Uses Gson [SerializedName] since the Supabase Kotlin SDK serialization is no longer used
- * for PostgREST calls.
+ * DTO returned by [SupabaseUserProfileService.fetchProfile],
+ * [SupabaseUserProfileService.getProfileByUserId], and
+ * [SupabaseUserProfileService.completeUserProfile].
+ *
+ * [profileCompleted] mirrors the `profile_completed` column: FALSE while the user
+ * has not yet finished the sign-up flow (nickname not chosen), TRUE afterwards.
  */
 data class UserProfileRetrofitDto(
     @SerializedName("id") val id: String,
@@ -68,6 +98,7 @@ data class UserProfileRetrofitDto(
     @SerializedName("game_tag") val gameTag: String?,
     @SerializedName("avatar_url") val avatarUrl: String?,
     @SerializedName("provider") val provider: String?,
+    @SerializedName("profile_completed") val profileCompleted: Boolean = false,
 )
 
 /**
@@ -97,4 +128,21 @@ data class UpdateNicknameDto(
  */
 data class UpdateAvatarUrlDto(
     @SerializedName("new_avatar_url") val newAvatarUrl: String?,
+)
+
+/**
+ * DTO for the `get_profile_by_user_id` RPC body.
+ * [pUserId] must be a valid UUID matching an existing auth.users row.
+ */
+data class GetProfileByUserIdDto(
+    @SerializedName("p_user_id") val pUserId: String,
+)
+
+/**
+ * DTO for the `complete_user_profile` RPC body.
+ * [pNickname] is the nickname chosen by the user during the sign-up flow.
+ * The RPC atomically sets the nickname and marks profile_completed = TRUE.
+ */
+data class CompleteUserProfileDto(
+    @SerializedName("p_nickname") val pNickname: String,
 )
