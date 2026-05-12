@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.local
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -52,6 +53,22 @@ class SyncPreferencesStore @Inject constructor(
     suspend fun clearLastSyncMillis(userId: String) {
         context.userPrefsDataStore.edit { prefs ->
             prefs.remove(milliKey(userId))
+        }
+    }
+
+    /**
+     * Clears ALL sync watermarks across every user ID. Called by the Room
+     * [onDestructiveMigration] callback when Room wipes the database so that the
+     * DataStore watermark (which survives Room wipes) cannot cause a stale-watermark
+     * pull (where getChangesSince returns 0 rows because all Supabase data pre-dates
+     * the watermark from the previous install).
+     */
+    suspend fun clearAllWatermarks() {
+        context.userPrefsDataStore.edit { prefs ->
+            val keysToRemove = prefs.asMap().keys
+                .filter { it.name.startsWith("sync_millis_") }
+            @Suppress("UNCHECKED_CAST")
+            keysToRemove.forEach { prefs.remove(it as Preferences.Key<Any>) }
         }
     }
 

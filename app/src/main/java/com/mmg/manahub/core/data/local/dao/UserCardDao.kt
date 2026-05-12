@@ -60,16 +60,36 @@ interface UserCardCollectionDao {
     @Query("DELETE FROM user_card_collection WHERE id = :id")
     fun deleteById(id: String)
 
+    // Atomic UUID reconciliation: deletes the stale local row and inserts the
+    // Supabase-canonical row in a single transaction so a process-kill between the
+    // two operations can never leave the collection in a partially-updated state.
+    @Transaction
+    fun reconcileAndUpsert(deleteId: String, entity: UserCardCollectionEntity) {
+        deleteById(deleteId)
+        upsert(entity)
+    }
+
     // Returns all rows modified after :since — includes is_deleted = 1 rows so tombstones
     // are also pushed during incremental sync.
     @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND updated_at > :since")
     fun getAllSince(userId: String, since: Long): List<UserCardCollectionEntity>
+
+    // Returns all rows without a userId (guest/offline rows). Used by SyncManager to
+    // resolve UNIQUE-constraint conflicts before calling assignUserId on login.
+    @Query("SELECT * FROM user_card_collection WHERE user_id IS NULL OR user_id = ''")
+    fun getAllGuestRows(): List<UserCardCollectionEntity>
 
     // Reactive stream of all non-deleted entries for this user (or guest rows).
     // @Transaction prevents inconsistent reads across the two Room-internal queries for @Relation.
     @Transaction
     @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY created_at DESC")
     fun observeAll(userId: String?): Flow<List<UserCardWithCard>>
+
+    // Reactive stream of ALL non-deleted entries regardless of userId.
+    // Used when the user is logged out so that locally-stored cards remain visible.
+    @Transaction
+    @Query("SELECT * FROM user_card_collection WHERE is_deleted = 0 ORDER BY created_at DESC")
+    fun observeAllLocal(): Flow<List<UserCardWithCard>>
 
     // Reactive stream for all variants of a single scryfall card.
     @Query("SELECT * FROM user_card_collection WHERE scryfall_id = :scryfallId AND (user_id = :userId OR user_id IS NULL) AND is_deleted = 0")
@@ -81,6 +101,13 @@ interface UserCardCollectionDao {
 
     @Query("SELECT DISTINCT scryfall_id FROM user_card_collection WHERE is_deleted = 0")
     fun getAllScryfallIds(): List<String>
+
+    // Returns the number of non-deleted collection rows owned by [userId].
+    // Used by SyncManager.assignUserIdAndSync to detect a wiped Room DB (count == 0
+    // after assignUserId ran but no guest rows were migrated), which means the DataStore
+    // watermark must be cleared to force a full pull from Supabase.
+    @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId AND is_deleted = 0")
+    fun getCountForUser(userId: String): Int
 
     // ── Paging 3 support ──────────────────────────────────────────────────────
 

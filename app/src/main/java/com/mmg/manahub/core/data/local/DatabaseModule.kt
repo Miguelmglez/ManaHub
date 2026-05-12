@@ -2,8 +2,10 @@ package com.mmg.manahub.core.data.local
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.runBlocking
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
@@ -30,7 +32,10 @@ import javax.inject.Singleton
 object DatabaseModule {
 
     @Provides @Singleton
-    fun provideMtgDatabase(@ApplicationContext context: Context): MtgDatabase =
+    fun provideMtgDatabase(
+        @ApplicationContext context: Context,
+        syncPrefs: SyncPreferencesStore,
+    ): MtgDatabase =
         Room.databaseBuilder(context, MtgDatabase::class.java, "mtg_collection.db")
             // Versions 1–24 are dev/beta only. The 24→25 migration is destructive for
             // `decks` and `user_cards` by design (PK type changed from INTEGER to TEXT UUID).
@@ -43,6 +48,16 @@ object DatabaseModule {
                 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                 21, 22, 23, 24
             )
+            // When Room wipes the database via destructive migration, DataStore survives
+            // the wipe and retains the old sync watermark. A stale watermark causes
+            // getChangesSince() to return 0 rows (all Supabase data pre-dates it),
+            // leaving the user's cloud collection invisible until the watermark is reset.
+            // Clearing all watermarks here ensures the next sync performs a full pull.
+            .addCallback(object : RoomDatabase.Callback() {
+                override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                    runBlocking { syncPrefs.clearAllWatermarks() }
+                }
+            })
             // All migrations from v25 onward are explicit and data-safe.
             // fallbackToDestructiveMigration() is NOT called — any missing migration
             // will throw an IllegalStateException at startup rather than silently

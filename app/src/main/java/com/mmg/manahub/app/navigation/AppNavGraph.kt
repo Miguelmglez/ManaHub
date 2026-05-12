@@ -230,6 +230,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                             )
                         )
                     },
+                    onBackClick = navController::popBackStack,
                 )
             }
 

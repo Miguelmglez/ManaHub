@@ -12,6 +12,21 @@ data class CollectionStats(
     val byType:            Map<CardType, Int>,
     val cmcDistribution:   Map<Int, Int>,
     val bySet:             Map<String, Int>,
+    // Innovative Stats
+    val totalFoil:         Int     = 0,
+    val totalFullArt:      Int     = 0,
+    val topArtist:         String? = null,
+    val topArtistCount:    Int     = 0,
+    val avgManaValue:      Double  = 0.0,
+    val avgPower:          Double? = null,
+    val avgToughness:      Double? = null,
+    val oldestCard:        CardValue? = null,
+    val newestCard:        CardValue? = null,
+    // Set Stats
+    val topSetByCount:     Pair<String, Int>?    = null,
+    val topSetByValue:     Pair<String, Double>? = null,
+    // AutoTags Stats
+    val autoTagDistribution: Map<String, Int> = emptyMap(),
 )
 
 data class CardValue(
@@ -22,6 +37,9 @@ data class CardValue(
     val isFoil:        Boolean,
     val imageArtCrop:  String?,
     val colorIdentity: String = "",
+    val setCode:       String = "",
+    val setName:       String = "",
+    val rarity:        String = "",
 )
 
 enum class MtgColor { W, U, B, R, G, COLORLESS }

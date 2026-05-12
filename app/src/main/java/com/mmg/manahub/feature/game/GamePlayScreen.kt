@@ -821,10 +821,10 @@ private fun PlayerCard(
                                             // 80dp threshold for one life point (less sensitive)
                                             val threshold = 80f
                                             if (dragAccumulator > threshold) {
-                                                onLife(-1)
+                                                onLife(1)
                                                 dragAccumulator = 0f
                                             } else if (dragAccumulator < -threshold) {
-                                                onLife(1)
+                                                onLife(-1)
                                                 dragAccumulator = 0f
                                             }
                                         },
