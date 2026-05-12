@@ -61,9 +61,14 @@ class UserCardRepositoryImpl @Inject constructor(
     @Suppress("OPT_IN_USAGE")
     override fun observeCollection(): Flow<List<DomainUserCardWithCard>> =
         currentUserIdFlow.flatMapLatest { userId ->
-            userCardCollectionDao.observeAll(userId).map { list ->
-                list.filter { !it.userCard.isDeleted }.mapNotNull { it.toDomain() }
-            }
+            // When logged out (userId == null) show ALL local non-deleted cards so the
+            // collection stays visible after logout instead of going blank. Logged-in
+            // cards have a real userId and would be invisible to observeAll(null).
+            val source = if (userId != null)
+                userCardCollectionDao.observeAll(userId)
+            else
+                userCardCollectionDao.observeAllLocal()
+            source.map { list -> list.filter { !it.userCard.isDeleted }.mapNotNull { it.toDomain() } }
         }
 
     @Suppress("OPT_IN_USAGE")

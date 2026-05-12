@@ -154,6 +154,10 @@ class CollectionViewModel @Inject constructor(
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
                         previouslyAuthenticated = false
+                        // Clear any sync error so a stale ERROR from a previous background
+                        // sync is not shown as fresh on the next app open or login.
+                        syncManager.resetSyncState()
+                        _uiState.update { it.copy(syncState = SyncState.IDLE, syncError = null) }
                     }
                     is SessionState.Loading -> { /* no-op — wait for final state */ }
                 }

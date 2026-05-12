@@ -269,9 +269,8 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                 ) {
                     Text(
                         text = stringResource(R.string.feedback_title),
-                        style = ty.titleLarge,
+                        style = ty.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = mc.textPrimary,
-                        fontWeight = FontWeight.SemiBold,
                     )
                     IconButton(onClick = { dismiss() }) {
                         Icon(
@@ -307,7 +306,7 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                             {
                                 Text(
                                     text = stringResource(R.string.feedback_empty_error),
-                                    color = MaterialTheme.colorScheme.error,
+                                    color = mc.lifeNegative,
                                     style = ty.labelSmall,
                                 )
                             }
@@ -441,9 +440,10 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.feedback_send),
-                            style = ty.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
+                            style = ty.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp
+                            ),
                         )
                     }
                 }

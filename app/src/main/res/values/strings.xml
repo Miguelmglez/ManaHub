@@ -352,6 +352,59 @@
     <string name="stats_rarity_rare">Rare</string>
     <string name="stats_rarity_mythic">Mythic</string>
 
+    <!-- Stats Screen - New Sections & Labels -->
+    <string name="stats_section_inventory_value">Inventory &amp; Value</string>
+    <string name="stats_section_combat_mechanics">Combat &amp; Mechanics</string>
+    <string name="stats_section_aesthetics_art">Aesthetics &amp; Art</string>
+    <string name="stats_section_distributions">Distributions</string>
+    <string name="stats_section_hall_of_fame">Hall of Fame</string>
+    <string name="stats_label_avg_mana_value">Avg Mana Value</string>
+    <string name="stats_label_avg_power">Avg Power</string>
+    <string name="stats_label_avg_toughness">Avg Toughness</string>
+    <string name="stats_label_foil_cards">Foil Cards</string>
+    <string name="stats_label_full_art_cards">Full Art Cards</string>
+    <string name="stats_label_top_artist">Top Artist</string>
+    <string name="stats_label_oldest_card">Oldest Card</string>
+    <string name="stats_label_newest_card">Newest Card</string>
+    <string name="stats_label_est_value">Est. Value</string>
+    <string name="stats_label_most_owned_set">Most Owned Set</string>
+    <string name="stats_label_most_valuable_set">Most Valuable Set</string>
+    <string name="stats_dist_color">Distribution by Color</string>
+    <string name="stats_dist_type">Distribution by Type</string>
+    <string name="stats_dist_rarity">Distribution by Rarity</string>
+    <string name="stats_dist_strategy">Strategy Distribution</string>
+    <string name="stats_artist_cards_count">%1$d cards</string>
+    <string name="stats_tab_collection">Collection</string>
+    <string name="stats_tab_games">Games</string>
+    <string name="stats_tab_trades">Trades</string>
+    <string name="stats_label_total_cards">Total cards</string>
+    <string name="stats_label_mana_value">Mana Value</string>
+    <string name="stats_label_unique_cards">Unique cards</string>
+    <string name="stats_label_est_value_short">Est. Value</string>
+    <string name="stats_games_overview">Games Overview</string>
+    <string name="stats_trades_overview">Trades Overview</string>
+    <string name="stats_no_game_data">No game data yet.</string>
+    <string name="stats_no_trade_data">No trade data yet.</string>
+    <string name="stats_total_games">Total Games</string>
+    <string name="stats_win_rate">Win Rate</string>
+    <string name="stats_favorite_mode">Favorite Mode</string>
+    <string name="stats_most_played_deck">Most Played Deck</string>
+    <string name="stats_performance_charts_coming">Performance charts coming soon</string>
+    <string name="stats_for_trade">For Trade</string>
+    <string name="stats_wishlist">Wishlist</string>
+    <string name="stats_total_trade_value">Total Trade Value</string>
+    <string name="stats_trade_history_coming">Trade history coming soon</string>
+    <string name="stats_color_white">White</string>
+    <string name="stats_color_blue">Blue</string>
+    <string name="stats_color_black">Black</string>
+    <string name="stats_color_red">Red</string>
+    <string name="stats_color_green">Green</string>
+    <string name="stats_color_colorless">Colorless</string>
+    <string name="stats_color_unknown">Unknown</string>
+    <string name="stats_not_available">N/A</string>
+    <string name="stats_label_total">total</string>
+    <string name="stats_label_more">+ %1$d more</string>
+
     <!-- ══════════════════════════════════════════
          DECK LIST SCREEN
     ═══════════════════════════════════════════ -->
@@ -1013,9 +1066,9 @@
          ADVANCED SEARCH — SET PICKER
     ═══════════════════════════════════════════ -->
     <string name="advsearch_section_set">Set / Collection</string>
-    <string name="advsearch_set_hint">Search by set name or code…</string>
+    <string name="advsearch_set_hint">Search by set name</string>
     <string name="advsearch_set_picker_title">Choose a Set</string>
-    <string name="advsearch_set_search_hint">Set name or code (e.g. MOM, EOE…)</string>
+    <string name="advsearch_set_search_hint">Set name</string>
     <string name="advsearch_set_clear">Clear set</string>
     <string name="advsearch_set_no_results">No sets found</string>
     <string name="advsearch_set_count">%1$d sets</string>
@@ -1194,6 +1247,7 @@
     <string name="auth_delete_account_confirm_body">Are you sure? This action cannot be undone. All your synced data will be permanently deleted.</string>
     <string name="auth_delete_account_confirm_btn">Delete Account</string>
     <string name="auth_email_confirmation_sent">Check your inbox to confirm your email!</string>
+    <string name="auth_section_loading_description">Loading account information</string>
 
     <!-- Auth error messages (used by AuthViewModel.toUiMessage) -->
     <string name="auth_error_invalid_credentials">Incorrect email or password</string>
