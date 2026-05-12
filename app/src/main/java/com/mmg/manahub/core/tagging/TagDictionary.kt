@@ -2,6 +2,7 @@ package com.mmg.manahub.core.tagging
 
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.tagging.TagDictionary.applyOverrides
 import com.mmg.manahub.core.util.CardTypeTranslator
 import java.util.Locale
 

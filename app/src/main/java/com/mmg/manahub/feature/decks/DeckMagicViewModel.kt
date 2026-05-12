@@ -5,13 +5,17 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.decks.engine.DeckMagicEngine
+import com.mmg.manahub.feature.decks.engine.GameFormat
 import com.mmg.manahub.feature.decks.engine.MagicCard
 import com.mmg.manahub.feature.decks.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.engine.MagicSuggestion
-import com.mmg.manahub.feature.decks.engine.GameFormat
 import com.mmg.manahub.feature.decks.engine.ManaColor
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 

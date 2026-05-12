@@ -1,13 +1,13 @@
 package com.mmg.manahub.core.network
 
 import android.content.Context
+import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import com.mmg.manahub.BuildConfig
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor

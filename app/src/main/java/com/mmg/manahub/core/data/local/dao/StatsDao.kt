@@ -1,8 +1,15 @@
 package com.mmg.manahub.core.data.local.dao
 
 
-import androidx.room.*
-import com.mmg.manahub.core.data.local.entity.projection.*
+import androidx.room.Dao
+import androidx.room.Query
+import com.mmg.manahub.core.data.local.entity.projection.CardValueProjection
+import com.mmg.manahub.core.data.local.entity.projection.CmcCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.ColorCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.RarityCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.SetCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.TotalsProjection
+import com.mmg.manahub.core.data.local.entity.projection.TypeCountProjection
 import kotlinx.coroutines.flow.Flow
 
 @Dao

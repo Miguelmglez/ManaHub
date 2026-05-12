@@ -7,8 +7,8 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.trades.domain.model.TradeError
-import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
+import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.DeclineProposalUseCase

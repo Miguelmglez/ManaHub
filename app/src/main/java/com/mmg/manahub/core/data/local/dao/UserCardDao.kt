@@ -1,7 +1,12 @@
 package com.mmg.manahub.core.data.local.dao
 
 import androidx.paging.PagingSource
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Embedded
+import androidx.room.Query
+import androidx.room.Relation
+import androidx.room.Transaction
+import androidx.room.Upsert
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import kotlinx.coroutines.flow.Flow

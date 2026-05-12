@@ -10,7 +10,6 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

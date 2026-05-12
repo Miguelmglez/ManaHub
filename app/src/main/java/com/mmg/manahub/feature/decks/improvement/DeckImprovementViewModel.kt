@@ -1,23 +1,22 @@
 package com.mmg.manahub.feature.decks.improvement
 
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
-
-
-
-
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.decks.engine.DeckMagicEngine
 import com.mmg.manahub.feature.decks.engine.ImprovementSuggestion
 import com.mmg.manahub.feature.decks.engine.SuggestionActionType
-
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 

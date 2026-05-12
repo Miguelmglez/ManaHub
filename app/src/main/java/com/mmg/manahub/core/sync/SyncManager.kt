@@ -2,8 +2,8 @@ package com.mmg.manahub.core.sync
 
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.CardDao
-import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
+import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.mapper.toEntityCard
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource

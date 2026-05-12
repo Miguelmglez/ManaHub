@@ -1,7 +1,6 @@
 package com.mmg.manahub.feature.auth.presentation
 
 import android.content.Context
-import android.util.Patterns
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -12,8 +11,8 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
-import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -30,16 +29,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.regex.Pattern
 import javax.inject.Inject
-import java.security.MessageDigest
-import java.util.UUID
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(

@@ -1,10 +1,10 @@
 package com.mmg.manahub.core.data.local.mapper
 
 import com.mmg.manahub.core.data.local.entity.DeckEntity
-import com.mmg.manahub.core.data.local.dao.DeckWithCards as DeckWithCardsEntity
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckSlot
 import com.mmg.manahub.core.domain.model.DeckWithCards
+import com.mmg.manahub.core.data.local.dao.DeckWithCards as DeckWithCardsEntity
 
 fun DeckEntity.toDomainDeck(): Deck = Deck(
     id = id,
