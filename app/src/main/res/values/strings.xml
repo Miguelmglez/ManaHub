@@ -1206,8 +1206,13 @@
     <string name="auth_error_credential_unsupported">Credential type not supported</string>
     <string name="auth_error_google_cancelled">Google Sign-In cancelled</string>
     <string name="auth_error_google_failed">Error signing in with Google</string>
-    <!-- Shown when a Google Sign-In email already exists as an email/password account -->
+    <!-- Shown when a Google Sign-In email already exists as an email/password account (fallback only; normally the linking dialog is shown instead) -->
     <string name="auth_error_google_email_conflict">This email is already registered with a password. Sign in with email and password instead.</string>
+    <!-- Google account linking dialog -->
+    <string name="auth_link_google_title">Link Google to your account</string>
+    <string name="auth_link_google_message">Your Google account (%1$s) matches an existing ManaHub account. Enter your password to enable Google Sign-In for this account.</string>
+    <string name="auth_link_google_password_hint">Your ManaHub password</string>
+    <string name="auth_link_google_btn">Link Account</string>
     <!-- Shown when a Google Sign-In succeeds but no ManaHub account exists yet -->
     <string name="auth_error_no_profile_found">No account found for this Google account. Please create an account first.</string>
 
