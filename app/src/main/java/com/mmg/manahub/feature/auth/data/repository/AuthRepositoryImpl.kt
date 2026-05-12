@@ -250,7 +250,65 @@ class AuthRepositoryImpl @Inject constructor(
             profileRefreshSignal.tryEmit(Unit)
 
             AuthResult.Success(finalUser)
-        }.getOrElse { e -> AuthResult.Error(e.toAuthError(isGoogleSignIn = true)) }
+        }.getOrElse { e ->
+            // On 422, extract the email from the Google ID token JWT so the UI can display
+            // it in the linking dialog without asking the user to type it again.
+            val authError = e.toAuthError(isGoogleSignIn = true)
+            if (authError is AuthError.GoogleEmailConflict) {
+                // Build the full GoogleEmailConflict with the pending token data.
+                val email = extractEmailFromIdToken(idToken) ?: ""
+                AuthResult.Error(AuthError.GoogleEmailConflict(email, idToken, rawNonce))
+            } else {
+                AuthResult.Error(authError)
+            }
+        }
+    }
+
+    override suspend fun linkGoogleIdentity(
+        email: String,
+        password: String,
+        pendingIdToken: String,
+        pendingNonce: String,
+    ): AuthResult<AuthUser> = withContext(ioDispatcher) {
+        runCatching {
+            // Step 1: Authenticate with email/password to obtain a valid session.
+            // This verifies the user owns the account before granting identity linking.
+            supabaseAuth.signInWith(Email) {
+                this.email = email
+                this.password = password
+            }
+
+            // Step 2: With an active session whose email matches the Google ID token,
+            // GoTrue links the Google identity to the existing user instead of creating
+            // a new account. From this point forward, both email/password and Google
+            // Sign-In will work for this account.
+            supabaseAuth.signInWith(IDToken) {
+                this.idToken = pendingIdToken
+                provider = Google
+                nonce = pendingNonce
+            }
+
+            val userInfo = supabaseAuth.currentUserOrNull()
+                ?: return@runCatching AuthResult.Error(AuthError.SessionExpired)
+
+            val profile = runCatching {
+                userProfileDataSource.getProfileByUserId(userInfo.id)
+            }.getOrNull()
+
+            val serverNickname = profile?.nickname ?: userInfo.email?.substringBefore('@')
+
+            val finalUser = mapUserInfoToAuthUser(userInfo).copy(
+                nickname = serverNickname,
+                gameTag = profile?.gameTag,
+                avatarUrl = profile?.avatarUrl,
+                profileCompleted = profile?.profileCompleted ?: false,
+            )
+
+            syncToDataStore(finalUser)
+            profileRefreshSignal.tryEmit(Unit)
+
+            AuthResult.Success(finalUser)
+        }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
 
     override suspend fun signUpWithGoogle(
@@ -549,17 +607,38 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     /**
+     * Decodes the JWT payload of a Google ID token and extracts the `email` claim.
+     *
+     * The ID token is a standard JWT with three dot-separated Base64URL-encoded parts.
+     * The middle part (index 1) is the JSON payload. No signature verification is needed
+     * here because the email is only used for display purposes — GoTrue validates the
+     * token on the server when we submit it for linking.
+     *
+     * @return The email string from the JWT claims, or null if decoding fails for any reason.
+     */
+    private fun extractEmailFromIdToken(idToken: String): String? = try {
+        val payload = idToken.split(".").getOrNull(1) ?: return null
+        val decoded = String(android.util.Base64.decode(payload, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING))
+        org.json.JSONObject(decoded).optString("email").takeIf { it.isNotBlank() }
+    } catch (e: Exception) {
+        if (BuildConfig.DEBUG) Log.w(TAG, "Failed to extract email from ID token", e)
+        null
+    }
+
+    /**
      * Maps a [Throwable] thrown by the Supabase SDK or Retrofit to a domain [AuthError].
      *
-     * @param isGoogleSignIn When true, a 422 from Supabase is interpreted as
-     *   [AuthError.GoogleEmailConflict] (the email already exists under a different
-     *   provider) rather than the generic [AuthError.EmailAlreadyInUse] that applies
-     *   during email/password sign-up.
+     * @param isGoogleSignIn When true, a 422 from Supabase is interpreted as a placeholder
+     *   [AuthError.GoogleEmailConflict] (the email already exists under a different provider)
+     *   rather than the generic [AuthError.EmailAlreadyInUse] that applies during email/password
+     *   sign-up. The caller in [signInWithGoogle] enriches this with the actual token data.
      */
     private fun Throwable.toAuthError(isGoogleSignIn: Boolean = false): AuthError = when (this) {
         is RestException -> when (statusCode) {
             400 -> AuthError.InvalidCredentials
-            422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict else AuthError.EmailAlreadyInUse
+            // A placeholder GoogleEmailConflict is returned when isGoogleSignIn=true.
+            // The actual email, pendingIdToken and pendingNonce are injected by the caller.
+            422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
             else -> AuthError.Unknown(message)
@@ -567,7 +646,7 @@ class AuthRepositoryImpl @Inject constructor(
 
         is retrofit2.HttpException -> when (code()) {
             400 -> AuthError.InvalidCredentials
-            422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict else AuthError.EmailAlreadyInUse
+            422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
             else -> AuthError.Unknown(message())

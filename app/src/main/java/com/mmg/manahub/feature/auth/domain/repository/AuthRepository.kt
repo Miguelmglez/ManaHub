@@ -68,6 +68,30 @@ interface AuthRepository {
     suspend fun updateNickname(nickname: String): AuthResult<AuthUser>
 
     /**
+     * Links a Google identity to an existing email/password account.
+     *
+     * Steps:
+     * 1. Authenticates with email/password to obtain a valid session.
+     * 2. Calls `signInWith(IDToken)` with the pending Google token. Because the session is
+     *    active and the email matches, GoTrue links the Google identity to the existing user
+     *    instead of creating a new account.
+     *
+     * @param email          The email address of the existing account.
+     * @param password       The password entered by the user to confirm their identity.
+     * @param pendingIdToken The Google ID token obtained during the original Google Sign-In attempt.
+     * @param pendingNonce   The raw (unhashed) nonce from the original Google Sign-In request.
+     *
+     * @return [AuthResult.Success] on successful linking, or an [AuthResult.Error] carrying
+     *   [AuthError.InvalidCredentials] if the password is wrong.
+     */
+    suspend fun linkGoogleIdentity(
+        email: String,
+        password: String,
+        pendingIdToken: String,
+        pendingNonce: String,
+    ): AuthResult<AuthUser>
+
+    /**
      * Updates the authenticated user's avatar URL in Supabase via the `update_user_avatar` RPC.
      * Pass null to remove the avatar.
      */

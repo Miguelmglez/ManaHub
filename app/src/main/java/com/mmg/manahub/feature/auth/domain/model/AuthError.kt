@@ -14,10 +14,21 @@ sealed class AuthError {
     data object NicknameTooLong : AuthError()
     /**
      * Returned when a Google Sign-In attempt is made with an email that already exists
-     * as an email/password account. The user must sign in with email/password instead.
-     * Supabase returns HTTP 422 with code "email_exists" in this scenario.
+     * as an email/password account.
+     *
+     * The pending Google credentials are stored here so the user can enter their password
+     * to link the Google identity to the existing account without re-launching the Google
+     * account picker.
+     *
+     * @param email       The email extracted from the Google ID token JWT payload.
+     * @param pendingIdToken The Google ID token that triggered the 422 response.
+     * @param pendingNonce   The raw (unhashed) nonce used for the original Google Sign-In request.
      */
-    data object GoogleEmailConflict : AuthError()
+    data class GoogleEmailConflict(
+        val email: String,
+        val pendingIdToken: String,
+        val pendingNonce: String,
+    ) : AuthError()
     /**
      * Returned when a Google Sign-In succeeds at the OAuth level but no ManaHub profile
      * exists for this Google account. The user must create an account first.
