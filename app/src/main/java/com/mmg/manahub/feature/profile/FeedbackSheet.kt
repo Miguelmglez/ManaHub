@@ -265,20 +265,23 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                         .fillMaxWidth()
                         .padding(top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        text = stringResource(R.string.feedback_title),
-                        style = ty.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = mc.textPrimary,
-                    )
-                    IconButton(onClick = { dismiss() }) {
+                    IconButton(
+                        onClick = { dismiss() },
+                        modifier = Modifier.offset(x = (-12).dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = stringResource(R.string.feedback_cancel),
                             tint = mc.textSecondary,
                         )
                     }
+                    Text(
+                        text = stringResource(R.string.feedback_title),
+                        style = ty.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = mc.textPrimary,
+                        modifier = Modifier.offset(x = (-8).dp)
+                    )
                 }
 
                 // ── Text field ────────────────────────────────────────────────

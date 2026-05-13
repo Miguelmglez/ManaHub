@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Style
@@ -72,10 +73,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -109,6 +115,16 @@ fun AdvancedSearchSheet(
     val ty = MaterialTheme.magicTypography
     val scope = rememberCoroutineScope()
     var canDismiss by remember { mutableStateOf(false) }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset = available
+        }
+    }
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
@@ -171,7 +187,8 @@ fun AdvancedSearchSheet(
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp)
+                    .nestedScroll(nestedScrollConnection),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
@@ -312,6 +329,7 @@ fun AdvancedSearchSheet(
                             selectedColors = uiState.selectedColors,
                             onToggleColor = viewModel::toggleColor,
                             modifier = Modifier.fillMaxWidth(),
+                            colors = listOf("W", "U", "B", "R", "G", "C")
                         )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -558,56 +576,78 @@ fun AdvancedSearchSheet(
                         collapsedByDefault = true,
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                stringResource(R.string.advsearch_power),
-                                style = ty.bodySmall,
-                                color = mc.textSecondary,
-                                modifier = Modifier.width(60.dp),
-                            )
-                            OperatorSelector(
-                                selected = uiState.powerOp,
-                                onSelect = { op -> viewModel.setPower(uiState.powerValue, op) },
-                            )
-                            OutlinedTextField(
-                                value = uiState.powerValue,
-                                onValueChange = { v -> viewModel.setPower(v, uiState.powerOp) },
-                                modifier = Modifier.width(80.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = magicOutlinedTextFieldColors(mc),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true,
-                                placeholder = { Text(stringResource(R.string.advsearch_power_hint), color = mc.textDisabled) },
-                            )
-                        }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(
-                                stringResource(R.string.advsearch_toughness),
-                                style = ty.bodySmall,
-                                color = mc.textSecondary,
-                                modifier = Modifier.width(60.dp),
-                            )
-                            OperatorSelector(
-                                selected = uiState.toughnessOp,
-                                onSelect = { op -> viewModel.setToughness(uiState.toughnessValue, op) },
-                            )
-                            OutlinedTextField(
-                                value = uiState.toughnessValue,
-                                onValueChange = { v -> viewModel.setToughness(v, uiState.toughnessOp) },
-                                modifier = Modifier.width(80.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = magicOutlinedTextFieldColors(mc),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true,
-                                placeholder = { Text(stringResource(R.string.advsearch_toughness_hint), color = mc.textDisabled) },
-                            )
+                            // Power
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_battle),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = mc.textSecondary
+                                )
+                                OperatorSelector(
+                                    selected = uiState.powerOp,
+                                    onSelect = { op -> viewModel.setPower(uiState.powerValue, op) },
+                                )
+                                OutlinedTextField(
+                                    value = uiState.powerValue,
+                                    onValueChange = { v -> viewModel.setPower(v, uiState.powerOp) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = magicOutlinedTextFieldColors(mc),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    placeholder = {
+                                        Text(
+                                            stringResource(R.string.advsearch_power_hint),
+                                            color = mc.textDisabled,
+                                            fontSize = 12.sp,
+                                            maxLines = 1
+                                        )
+                                    },
+                                )
+                            }
+                            // Toughness
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Shield,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = mc.textSecondary
+                                )
+                                OperatorSelector(
+                                    selected = uiState.toughnessOp,
+                                    onSelect = { op -> viewModel.setToughness(uiState.toughnessValue, op) },
+                                )
+                                OutlinedTextField(
+                                    value = uiState.toughnessValue,
+                                    onValueChange = { v -> viewModel.setToughness(v, uiState.toughnessOp) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = magicOutlinedTextFieldColors(mc),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    placeholder = {
+                                        Text(
+                                            stringResource(R.string.advsearch_toughness_hint),
+                                            color = mc.textDisabled,
+                                            fontSize = 12.sp,
+                                            maxLines = 1
+                                        )
+                                    },
+                                )
+                            }
                         }
                     }
                 }

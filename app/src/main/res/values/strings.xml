@@ -860,7 +860,7 @@
     <string name="profile_developed_by">Developed with ❤️ for the MTG community</string>
     <string name="profile_progress">Progress</string>
     <string name="profile_achievement_ok">OK</string>
-    <string name="profile_version">ManaHub v%1$s - %2$s</string>
+    <string name="profile_version">ManaHub v%1$s - %2$s (%3$d)</string>
 
     <!-- Play styles -->
     <string name="playstyle_aggro">Aggro</string>

@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1076,14 +1077,15 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 private fun AppInfoFooter(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
     val version = remember { com.mmg.manahub.BuildConfig.VERSION_NAME }
-    val versionType = remember { com.mmg.manahub.BuildConfig.BUILD_TYPE }
+    val versionType = remember { com.mmg.manahub.BuildConfig.BUILD_TYPE.capitalize() }
+    val build = remember { com.mmg.manahub.BuildConfig.VERSION_CODE }
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = stringResource(R.string.profile_version, version, versionType),
+            text = stringResource(R.string.profile_version, version, versionType,build),
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.textDisabled
         )
