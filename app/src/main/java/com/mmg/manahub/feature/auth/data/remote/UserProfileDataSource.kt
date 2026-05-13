@@ -47,6 +47,10 @@ class UserProfileDataSource(
      * locally available data.
      */
     suspend fun fetchUserProfile(userId: String): UserProfileDto? = withContext(ioDispatcher) {
+        if (!isValidUuid(userId)) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "fetchUserProfile: invalid UUID '${userId.take(8)}'")
+            return@withContext null
+        }
         try {
             service.fetchProfile("eq.$userId")
                 .firstOrNull()
@@ -72,6 +76,10 @@ class UserProfileDataSource(
      * Returns null on any network/parse failure (non-fatal).
      */
     suspend fun getProfileByUserId(userId: String): UserProfileDto? = withContext(ioDispatcher) {
+        if (!isValidUuid(userId)) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "getProfileByUserId: invalid UUID '${userId.take(8)}'")
+            return@withContext null
+        }
         try {
             service.getProfileByUserId(GetProfileByUserIdDto(pUserId = userId))
                 ?.toUserProfileDto()
@@ -126,6 +134,10 @@ class UserProfileDataSource(
      * original [user] unchanged if the operation fails (non-fatal).
      */
     suspend fun upsertUserProfile(user: AuthUser): AuthUser = withContext(ioDispatcher) {
+        if (!isValidUuid(user.id)) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "upsertUserProfile: invalid UUID '${user.id.take(8)}'")
+            return@withContext user
+        }
         try {
             service.upsertProfile(
                 profile = UpsertUserProfileDto(
@@ -171,5 +183,11 @@ class UserProfileDataSource(
 
     private companion object {
         private const val TAG = "UserProfileDataSource"
+        private val UUID_REGEX = Regex(
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            RegexOption.IGNORE_CASE,
+        )
     }
+
+    private fun isValidUuid(id: String) = UUID_REGEX.matches(id)
 }

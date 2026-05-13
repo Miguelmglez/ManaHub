@@ -182,9 +182,10 @@ class AuthRepositoryImpl @Inject constructor(
             val userInfo = supabaseAuth.currentUserOrNull()
                 ?: return@runCatching AuthResult.Error(AuthError.EmailConfirmationRequired)
 
-            val user = mapUserInfoToAuthUser(userInfo).copy(
+            val baseUser = mapUserInfoToAuthUser(userInfo)
+            val user = baseUser.copy(
                 nickname = trimmedNickname,
-                avatarUrl = avatarUrl ?: mapUserInfoToAuthUser(userInfo).avatarUrl,
+                avatarUrl = avatarUrl ?: baseUser.avatarUrl,
             )
 
             val profileUser = userProfileDataSource.upsertUserProfile(user)
@@ -453,8 +454,11 @@ class AuthRepositoryImpl @Inject constructor(
             val httpResponse = supabaseOkHttpClient.newCall(request).execute()
             httpResponse.use { resp ->
                 if (!resp.isSuccessful) {
-                    val errorBody = resp.body?.string() ?: "HTTP ${resp.code}"
-                    return@runCatching AuthResult.Error(AuthError.Unknown(errorBody))
+                    if (BuildConfig.DEBUG) {
+                        val errorBody = resp.body?.string() ?: ""
+                        Log.w(TAG, "delete-current-user failed HTTP ${resp.code}: $errorBody")
+                    }
+                    return@runCatching AuthResult.Error(AuthError.Unknown("HTTP ${resp.code}"))
                 }
             }
 

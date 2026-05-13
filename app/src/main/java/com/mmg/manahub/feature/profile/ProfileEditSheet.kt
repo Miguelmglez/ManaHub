@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -24,23 +25,29 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +65,7 @@ import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,12 +76,25 @@ fun ProfileEditSheet(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
+
+    fun dismiss() {
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { /* blocked — use explicit controls only */ },
         containerColor = mc.backgroundSecondary,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        contentWindowInsets = { WindowInsets(0) }
+        sheetState = sheetState,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
@@ -85,24 +106,32 @@ fun ProfileEditSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    IconButton(onClick = ::dismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_cancel),
+                            tint = mc.textSecondary,
+                        )
+                    }
                     Text(
                         stringResource(R.string.profile_edit_title),
                         style = MaterialTheme.magicTypography.titleMedium,
                         color = mc.textPrimary,
+                        modifier = Modifier.offset(x = (-4).dp)
                     )
                     
                     // Game Tag Badge
                     uiState.gameTag?.let { tag ->
                         Box(
                             modifier = Modifier
+                                .padding(start = 8.dp)
                                 .background(
                                     color = mc.primaryAccent.copy(alpha = 0.15f),
                                     shape = RoundedCornerShape(6.dp),
@@ -194,22 +223,13 @@ fun ProfileEditSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FilterChip(
-                        selected = uiState.selectedColors.isEmpty(),
-                        onClick = viewModel::clearColorFilters,
-                        label = {
-                            Text(
-                                stringResource(R.string.collection_filter_all),
-                                style = MaterialTheme.magicTypography.labelSmall,
-                            )
-                        },
-                    )
                     ManaColorPicker(
                         selectedColors = uiState.selectedColors,
                         onToggleColor = viewModel::toggleColorFilter,
                         itemSize = 40.dp,
                         symbolSize = 28.dp,
-                        spacing = 8.dp
+                        spacing = 8.dp,
+                        colors = listOf("W", "U", "B", "R", "G", "C")
                     )
                 }
             }
