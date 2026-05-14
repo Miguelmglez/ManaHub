@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.scanner.di
 
 import android.content.Context
-import com.mmg.manahub.feature.scanner.CardOcrAnalyzer
-import com.mmg.manahub.feature.scanner.SoundManager
+import com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer
+import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
