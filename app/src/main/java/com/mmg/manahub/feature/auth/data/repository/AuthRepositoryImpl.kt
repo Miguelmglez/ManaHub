@@ -234,14 +234,8 @@ class AuthRepositoryImpl @Inject constructor(
                 )
             }
 
-            // Returning Google user with a completed profile: use the server data.
-            // Guarantee a non-null nickname: fall back to the email prefix as a last resort
-            // (profile_completed = true guarantees nickname is set, this is just a safety net).
-            val serverNickname = profile.nickname
-                ?: userInfo.email?.substringBefore('@')
-
             val finalUser = mapUserInfoToAuthUser(userInfo).copy(
-                nickname = serverNickname,
+                nickname = profile.nickname,
                 gameTag = profile.gameTag,
                 avatarUrl = profile.avatarUrl,
                 profileCompleted = profile.profileCompleted,
@@ -296,10 +290,8 @@ class AuthRepositoryImpl @Inject constructor(
                 userProfileDataSource.getProfileByUserId(userInfo.id)
             }.getOrNull()
 
-            val serverNickname = profile?.nickname ?: userInfo.email?.substringBefore('@')
-
             val finalUser = mapUserInfoToAuthUser(userInfo).copy(
-                nickname = serverNickname,
+                nickname = profile?.nickname,
                 gameTag = profile?.gameTag,
                 avatarUrl = profile?.avatarUrl,
                 profileCompleted = profile?.profileCompleted ?: false,
