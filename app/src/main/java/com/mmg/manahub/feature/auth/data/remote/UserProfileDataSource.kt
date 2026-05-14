@@ -82,6 +82,7 @@ class UserProfileDataSource(
         }
         try {
             service.getProfileByUserId(GetProfileByUserIdDto(pUserId = userId))
+                .firstOrNull()
                 ?.toUserProfileDto()
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) {
@@ -117,12 +118,14 @@ class UserProfileDataSource(
 
         val profileDto = service.completeUserProfile(
             CompleteUserProfileDto(pNickname = trimmedNickname)
-        )
+        ).firstOrNull()
         user.copy(
-            nickname = profileDto.nickname ?: trimmedNickname,
-            gameTag = profileDto.gameTag ?: user.gameTag,
-            avatarUrl = profileDto.avatarUrl ?: user.avatarUrl,
-            profileCompleted = profileDto.profileCompleted,
+            nickname = profileDto?.nickname ?: trimmedNickname,
+            gameTag = profileDto?.gameTag ?: user.gameTag,
+            avatarUrl = profileDto?.avatarUrl ?: user.avatarUrl,
+            // The RPC succeeded (no exception), so profile_completed is TRUE even if the
+            // array is unexpectedly empty. Prefer the server value when available.
+            profileCompleted = profileDto?.profileCompleted ?: true,
         )
     }
 

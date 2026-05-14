@@ -9,7 +9,7 @@ import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
-import com.mmg.manahub.feature.game.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.GameResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
