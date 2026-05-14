@@ -4,7 +4,7 @@ import com.mmg.manahub.core.data.local.dao.DeckStatsRow
 import com.mmg.manahub.core.data.local.dao.EliminationCount
 import com.mmg.manahub.core.data.local.dao.ModeCount
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
-import com.mmg.manahub.feature.game.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.GameResult
 import kotlinx.coroutines.flow.Flow
 
 interface GameSessionRepository {

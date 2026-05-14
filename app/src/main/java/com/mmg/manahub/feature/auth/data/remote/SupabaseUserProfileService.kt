@@ -57,7 +57,8 @@ interface SupabaseUserProfileService {
      * Calls the `get_profile_by_user_id` Supabase RPC.
      * Returns the full [UserProfileRetrofitDto] row for the given user, including [profileCompleted].
      *
-     * Returns null (via [decodeSingleOrNull] semantics) when no row is found.
+     * PostgREST always wraps RPC results in a JSON array, even for single rows, so the return
+     * type is List. Callers should use [List.firstOrNull] to get the single expected element.
      * This is the preferred way to check whether a Google OAuth user has already completed
      * the sign-up flow, since the [handle_new_user] trigger always creates a row — meaning
      * a direct table query can never return null for a newly authenticated user.
@@ -65,20 +66,21 @@ interface SupabaseUserProfileService {
     @POST("rpc/get_profile_by_user_id")
     suspend fun getProfileByUserId(
         @Body body: GetProfileByUserIdDto,
-    ): UserProfileRetrofitDto?
+    ): List<UserProfileRetrofitDto>
 
     /**
      * Calls the `complete_user_profile` Supabase RPC.
      * Atomically sets the user's [nickname] and marks `profile_completed = TRUE`.
      * Must be called after Google OAuth completes during the sign-up flow.
      *
-     * Returns the updated [UserProfileRetrofitDto] row (with [profileCompleted] = true).
+     * PostgREST always wraps RPC results in a JSON array, even for single rows, so the return
+     * type is List. Callers should use [List.firstOrNull] to get the single expected element.
      * Throws [retrofit2.HttpException] on failure (e.g. 400 for inappropriate nickname).
      */
     @POST("rpc/complete_user_profile")
     suspend fun completeUserProfile(
         @Body body: CompleteUserProfileDto,
-    ): UserProfileRetrofitDto
+    ): List<UserProfileRetrofitDto>
 
 }
 
