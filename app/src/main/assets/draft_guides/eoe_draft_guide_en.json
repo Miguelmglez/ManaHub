@@ -133,7 +133,7 @@
               "G",
               "U"
             ],
-            "type_line": "Creature — Human Artificer",
+            "type_line": "Creature — Insect Artificer",
             "image_uris": {
               "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7edcef2c-029c-46bd-bfeb-ff56a57dd63a.jpg",
               "normal": "https://cards.scryfall.io/normal/front/7/d/7edcef2c-029c-46bd-bfeb-ff56a57dd63a.jpg"
@@ -150,7 +150,7 @@
               "G",
               "U"
             ],
-            "type_line": "Creature — Insect",
+            "type_line": "Creature — Insect Druid",
             "image_uris": {
               "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/40f0ecf7-f49e-46ff-aa5b-9ff5361b72c5.jpg",
               "normal": "https://cards.scryfall.io/normal/front/4/f/40f0ecf7-f49e-46ff-aa5b-9ff5361b72c5.jpg"
@@ -241,35 +241,33 @@
           },
           {
             "name": "All-Fates Scroll",
-            "id": "a4b5c6d7-e8f9-4a0b-2637-485960718293",
+            "id": "3a5ed010-cb17-45df-b169-ebc807dae534",
             "scryfall_uri": "https://scryfall.com/card/eoe/155/all-fates-scroll",
-            "colors": [
-              "G"
-            ],
+            "colors": [],
             "type_line": "Artifact",
             "image_uris": {
-              "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/a4b5c6d7-e8f9-4a0b-2637-485960718293.jpg",
-              "normal": "https://cards.scryfall.io/normal/front/a/b/a4b5c6d7-e8f9-4a0b-2637-485960718293.jpg"
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a5ed010-cb17-45df-b169-ebc807dae534.jpg",
+              "normal": "https://cards.scryfall.io/normal/front/3/a/3a5ed010-cb17-45df-b169-ebc807dae534.jpg"
             },
             "set": "eoe",
             "set_name": "Edge of Eternities",
-            "rarity": "uncommon"
+            "rarity": "uncommon",
+            "color": "C"
           },
           {
             "name": "Survey Mechan",
-            "id": "f3a4b5c6-d7e8-4f9a-1526-374859607182",
-            "scryfall_uri": "https://scryfall.com/card/eoe/184/survey-mechan",
-            "colors": [
-              "G"
-            ],
+            "id": "9b4278ea-6cd8-45ad-b024-daf3dedd29e0",
+            "scryfall_uri": "https://scryfall.com/card/eoe/245/survey-mechan",
+            "colors": [],
             "type_line": "Artifact Creature — Robot",
             "image_uris": {
-              "art_crop": "https://cards.scryfall.io/art_crop/front/f/a/f3a4b5c6-d7e8-4f9a-1526-374859607182.jpg",
-              "normal": "https://cards.scryfall.io/normal/front/f/a/f3a4b5c6-d7e8-4f9a-1526-374859607182.jpg"
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9b4278ea-6cd8-45ad-b024-daf3dedd29e0.jpg",
+              "normal": "https://cards.scryfall.io/normal/front/9/b/9b4278ea-6cd8-45ad-b024-daf3dedd29e0.jpg"
             },
             "set": "eoe",
             "set_name": "Edge of Eternities",
-            "rarity": "common"
+            "rarity": "common",
+            "color": "C"
           }
         ]
       }
@@ -835,13 +833,13 @@
           },
           {
             "name": "Tezzeret, Cruel Captain",
-            "id": "e4e53c7a-b291-4f8c-9002-d7c1e3f5a809",
+            "id": "02e8e540-8aa3-4e6a-9a11-c3949cab5f0f",
             "scryfall_uri": "https://scryfall.com/card/eoe/2/tezzeret-cruel-captain",
             "colors": [],
             "type_line": "Legendary Planeswalker — Tezzeret",
             "image_uris": {
-              "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/e4e53c7a-b291-4f8c-9002-d7c1e3f5a809.jpg",
-              "normal": "https://cards.scryfall.io/normal/front/e/e/e4e53c7a-b291-4f8c-9002-d7c1e3f5a809.jpg"
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02e8e540-8aa3-4e6a-9a11-c3949cab5f0f.jpg",
+              "normal": "https://cards.scryfall.io/normal/front/0/2/02e8e540-8aa3-4e6a-9a11-c3949cab5f0f.jpg"
             },
             "set": "eoe",
             "set_name": "Edge of Eternities",

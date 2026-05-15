@@ -90,13 +90,13 @@
           "pick_order_rank": 4,
           "tier_rating": "S",
           "note": "Premium planeswalker for UB artifacts. Generates value immediately.",
-          "id": "e4e53c7a-b291-4f8c-9002-d7c1e3f5a809",
+          "id": "02e8e540-8aa3-4e6a-9a11-c3949cab5f0f",
           "scryfall_uri": "https://scryfall.com/card/eoe/2/tezzeret-cruel-captain",
           "colors": [],
           "type_line": "Legendary Planeswalker — Tezzeret",
           "image_uris": {
-            "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/e4e53c7a-b291-4f8c-9002-d7c1e3f5a809.jpg",
-            "normal": "https://cards.scryfall.io/normal/front/e/e/e4e53c7a-b291-4f8c-9002-d7c1e3f5a809.jpg"
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02e8e540-8aa3-4e6a-9a11-c3949cab5f0f.jpg",
+            "normal": "https://cards.scryfall.io/normal/front/0/2/02e8e540-8aa3-4e6a-9a11-c3949cab5f0f.jpg"
           },
           "set": "eoe",
           "set_name": "Edge of Eternities"
@@ -114,7 +114,7 @@
             "G",
             "U"
           ],
-          "type_line": "Creature — Human Artificer",
+          "type_line": "Creature — Insect Artificer",
           "image_uris": {
             "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7edcef2c-029c-46bd-bfeb-ff56a57dd63a.jpg",
             "normal": "https://cards.scryfall.io/normal/front/7/d/7edcef2c-029c-46bd-bfeb-ff56a57dd63a.jpg"
@@ -124,40 +124,40 @@
         },
         {
           "name": "Weftwalking",
-          "color": "W",
+          "color": "U",
           "rarity": "Rare",
           "pick_order_rank": 6,
           "tier_rating": "S",
           "note": "Powerful wheel-style effect with high upside in the right deck.",
-          "id": "d6e7f8a9-b0c1-4d23-8e45-9f0a1b2c3d4e",
+          "id": "39d48ddd-4529-4284-9da3-5272ad362b9b",
           "scryfall_uri": "https://scryfall.com/card/eoe/86/weftwalking",
           "colors": [
             "U"
           ],
           "type_line": "Enchantment",
           "image_uris": {
-            "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/d6e7f8a9-b0c1-4d23-8e45-9f0a1b2c3d4e.jpg",
-            "normal": "https://cards.scryfall.io/normal/front/d/e/d6e7f8a9-b0c1-4d23-8e45-9f0a1b2c3d4e.jpg"
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/9/39d48ddd-4529-4284-9da3-5272ad362b9b.jpg",
+            "normal": "https://cards.scryfall.io/normal/front/3/9/39d48ddd-4529-4284-9da3-5272ad362b9b.jpg"
           },
           "set": "eoe",
           "set_name": "Edge of Eternities"
         },
         {
           "name": "Alpharael, Stonechosen",
-          "color": "W",
+          "color": "B",
           "rarity": "Rare",
           "pick_order_rank": 7,
           "tier_rating": "S",
           "note": "Must-answer threat with huge impact.",
-          "id": "b7d3c2f1-8a47-4e59-9623-1d5e7f8a3c95",
+          "id": "33063d26-37f7-4e35-8da2-5770dfabdc41",
           "scryfall_uri": "https://scryfall.com/card/eoe/87/alpharael-stonechosen",
           "colors": [
             "B"
           ],
           "type_line": "Legendary Creature — Human Cleric",
           "image_uris": {
-            "art_crop": "https://cards.scryfall.io/art_crop/front/b/d/b7d3c2f1-8a47-4e59-9623-1d5e7f8a3c95.jpg",
-            "normal": "https://cards.scryfall.io/normal/front/b/d/b7d3c2f1-8a47-4e59-9623-1d5e7f8a3c95.jpg"
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/3/33063d26-37f7-4e35-8da2-5770dfabdc41.jpg",
+            "normal": "https://cards.scryfall.io/normal/front/3/3/33063d26-37f7-4e35-8da2-5770dfabdc41.jpg"
           },
           "set": "eoe",
           "set_name": "Edge of Eternities"
@@ -169,35 +169,33 @@
           "pick_order_rank": 8,
           "tier_rating": "S",
           "note": "Game-ending ramp payoff.",
-          "id": "f5d4c3b2-a192-4e87-8f01-6b7c8d9e0a12",
+          "id": "2934c9c8-d23a-462b-83d5-94e88c8663ac",
           "scryfall_uri": "https://scryfall.com/card/eoe/182/famished-worldsire",
           "colors": [
             "G"
           ],
           "type_line": "Creature — Leviathan",
           "image_uris": {
-            "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/f5d4c3b2-a192-4e87-8f01-6b7c8d9e0a12.jpg",
-            "normal": "https://cards.scryfall.io/normal/front/f/d/f5d4c3b2-a192-4e87-8f01-6b7c8d9e0a12.jpg"
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/2934c9c8-d23a-462b-83d5-94e88c8663ac.jpg",
+            "normal": "https://cards.scryfall.io/normal/front/2/9/2934c9c8-d23a-462b-83d5-94e88c8663ac.jpg"
           },
           "set": "eoe",
           "set_name": "Edge of Eternities"
         },
         {
           "name": "Dawnsire, Sunstar Dreadnought",
-          "color": "W",
+          "color": "C",
           "rarity": "Rare",
           "pick_order_rank": 9,
           "tier_rating": "S",
           "note": "Powerful spacecraft/creature hybrid.",
-          "id": "e0f1a2b3-c4d5-4e6f-8293-041526374859",
+          "id": "6133355c-3dcf-466a-b771-fe6c44d4fa4d",
           "scryfall_uri": "https://scryfall.com/card/eoe/9/dawnsire-sunstar-dreadnought",
-          "colors": [
-            "W"
-          ],
+          "colors": [],
           "type_line": "Legendary Artifact — Spacecraft",
           "image_uris": {
-            "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/e0f1a2b3-c4d5-4e6f-8293-041526374859.jpg",
-            "normal": "https://cards.scryfall.io/normal/front/e/f/e0f1a2b3-c4d5-4e6f-8293-041526374859.jpg"
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/6133355c-3dcf-466a-b771-fe6c44d4fa4d.jpg",
+            "normal": "https://cards.scryfall.io/normal/front/6/1/6133355c-3dcf-466a-b771-fe6c44d4fa4d.jpg"
           },
           "set": "eoe",
           "set_name": "Edge of Eternities"
@@ -215,7 +213,7 @@
             "G",
             "U"
           ],
-          "type_line": "Creature — Insect",
+          "type_line": "Creature — Insect Druid",
           "image_uris": {
             "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/40f0ecf7-f49e-46ff-aa5b-9ff5361b72c5.jpg",
             "normal": "https://cards.scryfall.io/normal/front/4/f/40f0ecf7-f49e-46ff-aa5b-9ff5361b72c5.jpg"
@@ -1974,40 +1972,36 @@
         },
         {
           "name": "Survey Mechan",
-          "color": "G",
+          "color": "C",
           "rarity": "Common",
           "pick_order_rank": 98,
           "tier_rating": "C",
           "note": "Different lands synergy piece for multi-color GU builds.",
-          "id": "f3a4b5c6-d7e8-4f9a-1526-374859607182",
+          "id": "9b4278ea-6cd8-45ad-b024-daf3dedd29e0",
           "scryfall_uri": "https://scryfall.com/card/eoe/184/survey-mechan",
-          "colors": [
-            "G"
-          ],
+          "colors": [],
           "type_line": "Artifact Creature — Robot",
           "image_uris": {
-            "art_crop": "https://cards.scryfall.io/art_crop/front/f/a/f3a4b5c6-d7e8-4f9a-1526-374859607182.jpg",
-            "normal": "https://cards.scryfall.io/normal/front/f/a/f3a4b5c6-d7e8-4f9a-1526-374859607182.jpg"
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9b4278ea-6cd8-45ad-b024-daf3dedd29e0.jpg",
+            "normal": "https://cards.scryfall.io/normal/front/9/b/9b4278ea-6cd8-45ad-b024-daf3dedd29e0.jpg"
           },
           "set": "eoe",
           "set_name": "Edge of Eternities"
         },
         {
           "name": "All-Fates Scroll",
-          "color": "G",
+          "color": "C",
           "rarity": "Uncommon",
           "pick_order_rank": 99,
           "tier_rating": "C",
           "note": "Encourages multi-color splashing in GU.",
-          "id": "a4b5c6d7-e8f9-4a0b-2637-485960718293",
+          "id": "3a5ed010-cb17-45df-b169-ebc807dae534",
           "scryfall_uri": "https://scryfall.com/card/eoe/155/all-fates-scroll",
-          "colors": [
-            "G"
-          ],
+          "colors": [],
           "type_line": "Artifact",
           "image_uris": {
-            "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/a4b5c6d7-e8f9-4a0b-2637-485960718293.jpg",
-            "normal": "https://cards.scryfall.io/normal/front/a/b/a4b5c6d7-e8f9-4a0b-2637-485960718293.jpg"
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a5ed010-cb17-45df-b169-ebc807dae534.jpg",
+            "normal": "https://cards.scryfall.io/normal/front/3/a/3a5ed010-cb17-45df-b169-ebc807dae534.jpg"
           },
           "set": "eoe",
           "set_name": "Edge of Eternities"
