@@ -1526,5 +1526,9 @@
     <string name="scanner_language_portuguese">Portuguese</string>
     <string name="scanner_language_japanese">Japanese</string>
     <string name="scanner_language_korean">Korean</string>
+    <string name="scanner_select_variant">Variants</string>
+    <string name="scanner_variant_selector_title">Select variant</string>
+    <string name="scanner_variant_no_results">No variants found</string>
+    <string name="scanner_add_another_copy">Add another copy with different options</string>
 
 </resources>

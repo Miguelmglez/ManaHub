@@ -14,6 +14,9 @@ interface CardRepository {
     /** Fetches all prints (versions) of a card by its exact English name. */
     suspend fun getCardPrints(name: String): DataResult<List<Card>>
 
+    /** Fetches all unique art variants of a card by its exact English name. */
+    suspend fun getCardArtVariants(name: String): DataResult<List<Card>>
+
     /** Fetches a card by its exact English name (e.g. "Lightning Bolt"). */
     suspend fun getCardByExactName(name: String): Result<Card>
 

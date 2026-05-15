@@ -233,21 +233,13 @@ object DatabaseModule {
     private val MIGRATION_31_32 = object : Migration(31, 32) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS outgoing_friend_requests (
-                    id          TEXT NOT NULL PRIMARY KEY,
-                    to_user_id  TEXT NOT NULL,
-                    to_nickname TEXT NOT NULL,
-                    to_game_tag TEXT NOT NULL,
-                    to_avatar_url TEXT,
-                    created_at  INTEGER NOT NULL,
-                    cached_at   INTEGER NOT NULL
-                )
-                """.trimIndent()
+                "CREATE TABLE IF NOT EXISTS `outgoing_friend_requests` (`id` TEXT NOT NULL, `to_user_id` TEXT NOT NULL, `to_nickname` TEXT NOT NULL, `to_game_tag` TEXT NOT NULL, `to_avatar_url` TEXT, `created_at` INTEGER NOT NULL, `cached_at` INTEGER NOT NULL, PRIMARY KEY(`id`))"
             )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS idx_outgoing_requests_to_user_id ON outgoing_friend_requests(to_user_id)"
-            )
+            // OutgoingFriendRequestEntity has no @Index declaration, so Room 2.8 expects
+            // indices = emptySet() and fails if any index exists. An earlier version of this
+            // migration accidentally created this index; drop it so devices that already ran
+            // that version also pass schema validation on the next startup.
+            db.execSQL("DROP INDEX IF EXISTS `idx_outgoing_requests_to_user_id`")
         }
     }
 

@@ -87,12 +87,16 @@ class CardRecognizer(
                 isProcessing.set(false)
 
                 if (cardName == null) {
-                    android.util.Log.d("CardRecognizer", "OCR: nothing in name zone")
+                    if (com.mmg.manahub.BuildConfig.DEBUG) {
+                        android.util.Log.d("CardRecognizer", "OCR: nothing in name zone")
+                    }
                     onResult(RecognitionResult.NoCard)
                     return@launch
                 }
 
-                android.util.Log.d("CardRecognizer", "OCR [$selectedLanguage]: '$cardName'")
+                if (com.mmg.manahub.BuildConfig.DEBUG) {
+                    android.util.Log.d("CardRecognizer", "OCR [$selectedLanguage]: '$cardName'")
+                }
 
                 val now2 = System.currentTimeMillis()
                 val card = if (cardName.equals(lastOcrName, ignoreCase = true) &&
@@ -122,7 +126,11 @@ class CardRecognizer(
                     )
                 )
             } catch (e: Exception) {
-                android.util.Log.w("CardRecognizer", "Pipeline exception", e)
+                if (com.mmg.manahub.BuildConfig.DEBUG) {
+                    android.util.Log.w("CardRecognizer", "Pipeline exception", e)
+                } else {
+                    android.util.Log.w("CardRecognizer", "Pipeline exception: ${e.javaClass.simpleName}")
+                }
                 imageProxy.close()
                 isProcessing.set(false)
                 onResult(RecognitionResult.NoCard)
@@ -150,7 +158,9 @@ class CardRecognizer(
         return when (fuzzyResult) {
             is DataResult.Success -> fuzzyResult.data
             is DataResult.Error   -> {
-                android.util.Log.d("CardRecognizer", "Scryfall lookup failed for '$cardName'")
+                if (com.mmg.manahub.BuildConfig.DEBUG) {
+                    android.util.Log.d("CardRecognizer", "Scryfall lookup failed for '$cardName'")
+                }
                 null
             }
         }
