@@ -50,15 +50,32 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="manahub" android:host="auth" />
             </intent-filter>
-            <!-- App Links — shared trade lists (https://trades.manahub.app/list/{shareId}) -->
+            <!-- App Links — shared trade lists (https://miguelmglez.github.io/list/{shareId}) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="trades.manahub.app"
+                    android:host="miguelmglez.github.io"
                     android:pathPrefix="/list/" />
+            </intent-filter>
+            <!-- App Links — friend invite (https://miguelmglez.github.io/invite/{code}) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="miguelmglez.github.io"
+                    android:pathPrefix="/invite/" />
+            </intent-filter>
+            <!-- Custom scheme fallback — friend invite (manahub://invite/{code}) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="manahub" android:host="invite" />
             </intent-filter>
         </activity>
 

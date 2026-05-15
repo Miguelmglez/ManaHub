@@ -14,7 +14,10 @@ import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
 import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import com.mmg.manahub.feature.settings.presentation.PreferencesState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +54,8 @@ class ProfileViewModel @Inject constructor(
     private val checkAchievementsUseCase: CheckAchievementsUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val friendRepository: FriendRepository,
+    private val shareInviteUseCase: ShareInviteUseCase,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     data class UiState(
@@ -86,6 +91,8 @@ class ProfileViewModel @Inject constructor(
         // Friends
         val friendCount: Int = 0,
         val pendingFriendCount: Int = 0,
+        /** Shareable invite URL for the current user, or null if not yet loaded or not authenticated. */
+        val shareUrl: String? = null,
     ) {
         val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
     }
@@ -234,6 +241,21 @@ class ProfileViewModel @Inject constructor(
 
         friendRepository.observePendingCount()
             .onEach { count -> _uiState.update { it.copy(pendingFriendCount = count) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        // ── Invite share URL ──────────────────────────────────────────────────
+        // Load the share URL whenever the session becomes authenticated.
+        authRepository.sessionState
+            .onEach { session ->
+                if (session is SessionState.Authenticated) {
+                    shareInviteUseCase(session.user.id).onSuccess { url ->
+                        _uiState.update { it.copy(shareUrl = url) }
+                    }
+                } else {
+                    _uiState.update { it.copy(shareUrl = null) }
+                }
+            }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 

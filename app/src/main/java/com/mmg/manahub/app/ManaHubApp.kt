@@ -8,6 +8,7 @@ import coil.decode.SvgDecoder
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
+import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
 // import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
@@ -46,6 +47,7 @@ class ManaHubApp : Application() {
         }
 
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
+        CollectionStatsSyncWorker.scheduleDailySync(workManager)
 
         // COMMENTED OUT — Cloudflare R2 embedding DB download replaced by ML Kit OCR
         // embeddingDatabaseUpdater.scheduleUpdateCheck()

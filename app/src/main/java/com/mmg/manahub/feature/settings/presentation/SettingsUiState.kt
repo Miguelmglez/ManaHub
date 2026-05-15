@@ -10,6 +10,19 @@ import com.mmg.manahub.core.ui.theme.AppTheme
 
 data class SettingsUiState(
     val currentTheme: AppTheme = AppTheme.NeonVoid,
+    // ── Privacy toggles ───────────────────────────────────────────────────────
+    /** Mirrors the `collection_public` column in `user_profiles`. Default: false (private). */
+    val collectionPublic: Boolean = false,
+    /** Mirrors the `wishlist_public` column in `user_profiles`. Default: true (public). */
+    val wishlistPublic: Boolean = true,
+    /** Mirrors the `trade_list_public` column in `user_profiles`. Default: true (public). */
+    val tradeListPublic: Boolean = true,
+    /** True while a PATCH request is in-flight to Supabase. */
+    val isUpdatingPrivacy: Boolean = false,
+    /** Non-null while a privacy-update toast should be shown; cleared by [SettingsViewModel.clearPrivacyToast]. */
+    val privacyToastMessage: String? = null,
+    /** True when [privacyToastMessage] represents an error; false for a success message. */
+    val privacyToastIsError: Boolean = false,
 )
 
 data class PreferencesState(

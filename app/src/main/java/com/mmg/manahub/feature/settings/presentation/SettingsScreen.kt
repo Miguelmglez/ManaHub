@@ -57,6 +57,9 @@ import com.mmg.manahub.core.domain.model.CardLanguage
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserPreferences
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -74,10 +77,22 @@ fun SettingsScreen(
     val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
     val activity = LocalContext.current as? Activity
+    val privacyToastState = rememberMagicToastState()
+    val privacyErrorMsg = stringResource(R.string.settings_privacy_error)
 
     LaunchedEffect(Unit) {
         viewModel.appLanguageChanged.collect { activity?.recreate() }
     }
+
+    LaunchedEffect(uiState.privacyToastMessage) {
+        val msg = uiState.privacyToastMessage ?: return@LaunchedEffect
+        privacyToastState.show(
+            msg,
+            if (uiState.privacyToastIsError) MagicToastType.ERROR else MagicToastType.SUCCESS,
+        )
+        viewModel.clearPrivacyToast()
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -105,6 +120,7 @@ fun SettingsScreen(
             }
         },
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -203,11 +219,26 @@ fun SettingsScreen(
             }
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            PrivacySection(
+                collectionPublic = uiState.collectionPublic,
+                wishlistPublic = uiState.wishlistPublic,
+                tradeListPublic = uiState.tradeListPublic,
+                onCollectionPublicChange = { viewModel.setCollectionPublic(it, privacyErrorMsg) },
+                onWishlistPublicChange = { viewModel.setWishlistPublic(it, privacyErrorMsg) },
+                onTradeListPublicChange = { viewModel.setTradeListPublic(it, privacyErrorMsg) },
+            )
+
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             ThemeSelectorSection(
                 currentTheme = uiState.currentTheme,
                 onThemeSelected = viewModel::selectTheme,
             )
         }
+        MagicToastHost(
+            state = privacyToastState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+        } // Box
     }
 }
 
@@ -242,6 +273,53 @@ private fun SettingsToggleItem(
                 checkedTrackColor = mc.primaryAccent,
                 checkedIconColor = mc.primaryAccent,
             ),
+        )
+    }
+}
+
+// ── Privacy section ───────────────────────────────────────────────────────────
+
+/**
+ * Displays three privacy toggle rows: collection, wishlist, and trade list visibility.
+ * Each toggle is stateless — it receives the current value and delegates changes upward.
+ */
+@Composable
+private fun PrivacySection(
+    collectionPublic: Boolean,
+    wishlistPublic: Boolean,
+    tradeListPublic: Boolean,
+    onCollectionPublicChange: (Boolean) -> Unit,
+    onWishlistPublicChange: (Boolean) -> Unit,
+    onTradeListPublicChange: (Boolean) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_section_privacy),
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
+        Spacer(Modifier.height(4.dp))
+        SettingsToggleItem(
+            title = stringResource(R.string.settings_privacy_collection),
+            subtitle = stringResource(R.string.settings_privacy_collection_subtitle),
+            checked = collectionPublic,
+            onCheckedChange = onCollectionPublicChange,
+        )
+        SettingsToggleItem(
+            title = stringResource(R.string.settings_privacy_wishlist),
+            subtitle = stringResource(R.string.settings_privacy_wishlist_subtitle),
+            checked = wishlistPublic,
+            onCheckedChange = onWishlistPublicChange,
+        )
+        SettingsToggleItem(
+            title = stringResource(R.string.settings_privacy_trade_list),
+            subtitle = stringResource(R.string.settings_privacy_trade_list_subtitle),
+            checked = tradeListPublic,
+            onCheckedChange = onTradeListPublicChange,
         )
     }
 }
