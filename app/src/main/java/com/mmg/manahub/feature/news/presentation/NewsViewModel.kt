@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.news.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.feature.news.domain.model.ContentSource
 import com.mmg.manahub.feature.news.domain.model.ContentType
@@ -26,7 +27,7 @@ class NewsViewModel @Inject constructor(
     getNewsFeed: GetNewsFeedUseCase,
     private val refreshNewsFeed: RefreshNewsFeedUseCase,
     manageSources: ManageSourcesUseCase,
-    userPreferences: UserPreferencesRepository,
+    private val userPreferences: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -47,13 +48,13 @@ class NewsViewModel @Inject constructor(
         _selectedSourceId,
         combine(_isRefreshing, _error) { r, e -> r to e },
         combine(manageSources.observeSources(), userPreferences.preferencesFlow) { srcs, prefs ->
-            val activeLanguages = prefs.newsLanguages.map { it.code }.toSet()
+            val activeLanguageCodes = prefs.newsLanguages.map { it.code }.toSet()
             val languageMap = srcs.associate { it.id to it.language }
             val enabledIds = srcs
-                .filter { it.isEnabled && it.language in activeLanguages }
+                .filter { it.isEnabled && it.language in activeLanguageCodes }
                 .map { it.id }
                 .toSet()
-            Triple(activeLanguages, languageMap, enabledIds)
+            Triple(prefs.newsLanguages, languageMap, enabledIds)
         },
     ) { args ->
         @Suppress("UNCHECKED_CAST")
@@ -62,7 +63,7 @@ class NewsViewModel @Inject constructor(
         val type = args[2] as ContentType
         val sourceId = args[3] as String?
         val (refreshing, error) = args[4] as Pair<Boolean, String?>
-        val (activeLanguages, languageMap, enabledSourceIds) = args[5] as Triple<Set<String>, Map<String, String>, Set<String>>
+        val (activeLangs, languageMap, enabledSourceIds) = args[5] as Triple<Set<NewsLanguage>, Map<String, String>, Set<String>>
 
         val items = allItems
             .filter { item -> item.sourceId in enabledSourceIds }
@@ -90,7 +91,8 @@ class NewsViewModel @Inject constructor(
             selectedSourceId = sourceId,
             error            = error,
             sourceLanguageMap    = languageMap,
-            showLanguageBadge    = activeLanguages.size > 1,
+            activeLanguages      = activeLangs,
+            showLanguageBadge    = activeLangs.size > 1,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NewsUiState())
 
@@ -111,6 +113,22 @@ class NewsViewModel @Inject constructor(
     fun onSearchQueryChanged(query: String) { _searchQuery.value = query }
     fun onContentTypeChanged(type: ContentType) { _contentType.value = type }
     fun onSourceFilterChanged(sourceId: String?) { _selectedSourceId.value = sourceId }
+    
+    fun onLanguageToggled(language: NewsLanguage) {
+        viewModelScope.launch {
+            val current = uiState.value.activeLanguages
+            val updated = if (language in current) {
+                if (current.size > 1) current - language else current
+            } else {
+                current + language
+            }
+            if (updated != current) {
+                userPreferences.setNewsLanguages(updated)
+                refresh()
+            }
+        }
+    }
+
     fun onErrorDismissed() { _error.value = null }
 }
 
@@ -123,5 +141,6 @@ data class NewsUiState(
     val selectedSourceId: String? = null,
     val error: String? = null,
     val sourceLanguageMap: Map<String, String> = emptyMap(),
+    val activeLanguages: Set<NewsLanguage> = setOf(NewsLanguage.ENGLISH),
     val showLanguageBadge: Boolean = false,
 )

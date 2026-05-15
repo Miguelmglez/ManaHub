@@ -1,7 +1,10 @@
 package com.mmg.manahub.feature.news.presentation.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,9 +19,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,13 +43,24 @@ fun ArticleCard(
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.98f else 1f, label = "Scale")
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(12.dp))
             .background(mc.surface)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
             .padding(12.dp),
     ) {
         if (article.imageUrl != null) {
@@ -52,7 +69,7 @@ fun ArticleCard(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(88.dp)
+                    .size(96.dp)
                     .clip(RoundedCornerShape(8.dp)),
             )
             Spacer(Modifier.width(12.dp))
@@ -75,7 +92,7 @@ fun ArticleCard(
                     LanguageBadge(languageBadge)
                 }
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 text = "${article.sourceName}  ·  ${TimeAgoFormatter.format(article.publishedAt)}",
                 style = mt.labelSmall,
@@ -83,7 +100,7 @@ fun ArticleCard(
                 maxLines = 1,
             )
             if (article.description.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     text = article.description,
                     style = mt.bodySmall,

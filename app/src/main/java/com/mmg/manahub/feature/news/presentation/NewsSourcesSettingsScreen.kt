@@ -1,6 +1,13 @@
 package com.mmg.manahub.feature.news.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -69,6 +77,7 @@ fun NewsSourcesSettingsScreen(
         topBar = {
             Surface(
                 color = mc.backgroundSecondary,
+                shadowElevation = 4.dp
             ) {
                 Row(
                     modifier = Modifier
@@ -99,7 +108,7 @@ fun NewsSourcesSettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
         ) {
             // ── Article Sources ──────────────────────────────────────────
@@ -108,6 +117,7 @@ fun NewsSourcesSettingsScreen(
                     text = stringResource(R.string.news_sources_section_articles),
                     style = mt.titleMedium,
                     color = mc.primaryAccent,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
             items(articleSources, key = { it.id }) { source ->
@@ -115,6 +125,7 @@ fun NewsSourcesSettingsScreen(
                     source = source,
                     onToggle = { viewModel.toggleSource(source.id, it) },
                     onDelete = { viewModel.deleteSource(source.id) },
+                    modifier = Modifier.animateItem()
                 )
             }
 
@@ -125,6 +136,7 @@ fun NewsSourcesSettingsScreen(
                     text = stringResource(R.string.news_sources_section_videos),
                     style = mt.titleMedium,
                     color = mc.primaryAccent,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
             items(videoSources, key = { it.id }) { source ->
@@ -132,6 +144,7 @@ fun NewsSourcesSettingsScreen(
                     source = source,
                     onToggle = { viewModel.toggleSource(source.id, it) },
                     onDelete = { viewModel.deleteSource(source.id) },
+                    modifier = Modifier.animateItem()
                 )
             }
 
@@ -142,6 +155,7 @@ fun NewsSourcesSettingsScreen(
                     text = stringResource(R.string.news_sources_add_title),
                     style = mt.titleMedium,
                     color = mc.primaryAccent,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
             item {
@@ -162,19 +176,28 @@ private fun SourceItem(
     source: ContentSource,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .background(mc.surface, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(mc.surface)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(source.name, style = mt.bodyLarge, color = mc.textPrimary)
+            if (source.language.isNotEmpty()) {
+                Text(
+                    text = source.language.uppercase(),
+                    style = mt.labelSmall,
+                    color = mc.textDisabled
+                )
+            }
         }
         
         Switch(
@@ -187,7 +210,10 @@ private fun SourceItem(
             ),
         )
         if (!source.isDefault) {
-            IconButton(onClick = onDelete) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = stringResource(R.string.action_delete),
@@ -209,7 +235,14 @@ private fun AddCustomSourceSection(
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(mc.surface)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         OutlinedTextField(
             value = state.name,
             onValueChange = onNameChanged,
@@ -256,15 +289,22 @@ private fun AddCustomSourceSection(
 
         // Type radio
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SourceType.entries.forEach { type ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onTypeChanged(type) }
+                ) {
                     RadioButton(
                         selected = state.type == type,
-                        onClick = { onTypeChanged(type) },
-                        colors = RadioButtonDefaults.colors(selectedColor = mc.primaryAccent),
+                        onClick = null, // Handled by row clickable
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = mc.primaryAccent,
+                            unselectedColor = mc.textDisabled
+                        ),
                     )
                     Text(
                         text = when (type) {
@@ -272,25 +312,34 @@ private fun AddCustomSourceSection(
                             SourceType.VIDEO   -> stringResource(R.string.news_filter_videos)
                         },
                         style = mt.bodyMedium,
-                        color = mc.textPrimary,
+                        color = if (state.type == type) mc.textPrimary else mc.textSecondary,
+                        modifier = Modifier.padding(start = 4.dp)
                     )
                 }
             }
         }
 
         // Error message
-        if (state.error != null) {
+        AnimatedVisibility(
+            visible = state.error != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
             Text(
-                text = state.error,
+                text = state.error ?: "",
                 style = mt.bodySmall,
                 color = mc.lifeNegative,
             )
         }
 
         // Preview count
-        if (state.previewCount != null) {
+        AnimatedVisibility(
+            visible = state.previewCount != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
             Text(
-                text = stringResource(R.string.news_sources_found_items, state.previewCount),
+                text = stringResource(R.string.news_sources_found_items, state.previewCount ?: 0),
                 style = mt.bodySmall,
                 color = mc.lifePositive,
             )
@@ -299,7 +348,10 @@ private fun AddCustomSourceSection(
         Button(
             onClick = onValidateAndAdd,
             enabled = state.name.isNotBlank() && state.feedUrl.isNotBlank() && !state.isValidating,
-            colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = mc.primaryAccent,
+                disabledContainerColor = mc.primaryAccent.copy(alpha = 0.3f)
+            ),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -314,6 +366,7 @@ private fun AddCustomSourceSection(
             Text(
                 text = stringResource(R.string.news_sources_validate_add),
                 style = mt.labelLarge,
+                color = if (state.isValidating) mc.textPrimary else Color.Black
             )
         }
     }
