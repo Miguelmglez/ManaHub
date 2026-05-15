@@ -32,6 +32,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -63,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -80,8 +83,10 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.draft.domain.model.ArchetypeGuide
+import com.mmg.manahub.feature.draft.domain.model.ArchetypeKeyCard
 import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.MechanicGuide
+import com.mmg.manahub.feature.draft.domain.model.TierCard
 import com.mmg.manahub.feature.draft.presentation.viewmodel.CardSortOption
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailViewModel
@@ -104,11 +109,25 @@ private fun colorToManaToken(code: String): String? = when (code.uppercase()) {
     else -> null
 }
 
+/**
+ * Extracts individual color letters from a combined color string or mana symbol string.
+ * Handles both "BR" format and "{B}{R}" mana symbol format.
+ */
+private fun extractColorLetters(colorsStr: String): List<String> {
+    // Handle mana symbol format like "{G}{U}"
+    return if (colorsStr.contains("{")) {
+        Regex("\\{([WUBRGC])\\}").findAll(colorsStr).map { it.groupValues[1] }.toList()
+    } else {
+        // Handle plain concatenated format like "BR"
+        colorsStr.filter { it in "WUBRG C" && it != ' ' }.map { it.toString() }
+    }
+}
+
 private val RARITY_ITEMS = listOf(
-    Triple("common",   "C", Color(0xFF888888)),
+    Triple("common", "C", Color(0xFF888888)),
     Triple("uncommon", "U", Color(0xFFB0C4DE)),
-    Triple("rare",     "R", Color(0xFFC9A84C)),
-    Triple("mythic",   "M", Color(0xFFE8A030)),
+    Triple("rare", "R", Color(0xFFC9A84C)),
+    Triple("mythic", "M", Color(0xFFE8A030)),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,7 +143,7 @@ fun SetDraftDetailScreen(
 
     // Art-crop URL map built from eagerly-loaded set cards (CDN URLs, no per-card API calls).
     // Split / DFC card names like "Fire // Ice" are also indexed under their first part ("Fire")
-    // so guide/tier-list JSON entries that use the short name still resolve correctly.
+    // so any card name lookups still resolve correctly.
     val artCropByName = remember(state.cards) {
         val map = mutableMapOf<String, String>()
         state.cards.forEach { card ->
@@ -170,7 +189,7 @@ fun SetDraftDetailScreen(
                 }
             }
 
-            // Main tabs (2 tabs, fixed TabRow with correct indicator offset)
+            // Main tabs
             TabRow(
                 selectedTabIndex = state.selectedTab,
                 containerColor = Color.Transparent,
@@ -197,8 +216,8 @@ fun SetDraftDetailScreen(
             }
 
             when (state.selectedTab) {
-                0 -> GuideTab(state, artCropByName, state.setIconUri, viewModel::loadCardDetail)
-                1 -> CardsTab(state, artCropByName, state.setIconUri, viewModel)
+                0 -> GuideTab(state, state.setIconUri, viewModel::loadCardDetail)
+                1 -> CardsTab(state, state.setIconUri, viewModel)
             }
         }
 
@@ -222,7 +241,6 @@ fun SetDraftDetailScreen(
 @Composable
 private fun GuideTab(
     state: SetDraftDetailUiState,
-    artCropByName: Map<String, String>,
     setIconUri: String,
     onCardClick: (String) -> Unit,
 ) {
@@ -240,11 +258,84 @@ private fun GuideTab(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Overview: summary + color ranking + gameplay notes
                 item {
                     ExpandableSection(stringResource(R.string.draft_guide_overview), defaultExpanded = true) {
-                        Text(guide.overview, style = typography.bodyMedium, color = colors.textPrimary)
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (guide.summary.isNotBlank()) {
+                                Text(guide.summary, style = typography.bodyMedium, color = colors.textPrimary)
+                            }
+                            if (guide.colorRanking.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    stringResource(R.string.draft_color_ranking_label),
+                                    style = typography.labelSmall,
+                                    color = colors.textDisabled,
+                                )
+                                guide.colorRanking.forEachIndexed { index, colorEntry ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // Rank number badge
+                                        Box(
+                                            modifier = Modifier
+                                                .size(22.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(colors.primaryAccent.copy(alpha = 0.15f)),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                "${index + 1}",
+                                                style = typography.labelSmall,
+                                                color = colors.primaryAccent,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        // Extract mana token from "{G} Green" format
+                                        val token = Regex("\\{([WUBRGC])\\}").find(colorEntry)?.groupValues?.getOrNull(1)
+                                        token?.let { ManaSymbolImage(token = it, size = 16.dp); Spacer(Modifier.width(4.dp)) }
+                                        Text(
+                                            colorEntry.replace(Regex("\\{[^}]+\\}\\s*"), "").trim(),
+                                            style = typography.bodySmall,
+                                            color = colors.textPrimary,
+                                        )
+                                    }
+                                    // Color note for this color
+                                    val note = guide.colorNotes[colorEntry]
+                                    if (!note.isNullOrBlank()) {
+                                        Text(
+                                            note,
+                                            style = typography.labelSmall,
+                                            color = colors.textSecondary,
+                                            modifier = Modifier.padding(start = 30.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            if (guide.keyGameplayNotes.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    stringResource(R.string.draft_key_notes_label),
+                                    style = typography.labelSmall,
+                                    color = colors.textDisabled,
+                                )
+                                guide.keyGameplayNotes.forEach { note ->
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        Icon(
+                                            Icons.Default.Lightbulb,
+                                            contentDescription = null,
+                                            tint = colors.goldMtg,
+                                            modifier = Modifier.size(14.dp).padding(top = 2.dp),
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(note, style = typography.bodySmall, color = colors.textPrimary)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+
+                // Mechanics
                 if (guide.mechanics.isNotEmpty()) {
                     item {
                         ExpandableSection(stringResource(R.string.draft_guide_mechanics)) {
@@ -254,57 +345,21 @@ private fun GuideTab(
                         }
                     }
                 }
+
+                // Archetypes — grouped by tier string
                 if (guide.archetypes.isNotEmpty()) {
                     item {
                         ExpandableSection(stringResource(R.string.draft_guide_archetypes)) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 guide.archetypes.forEach { arch ->
-                                    ArchetypeCard(arch, artCropByName, setIconUri, onCardClick)
+                                    ArchetypeCard(arch, setIconUri, onCardClick)
                                 }
                             }
                         }
                     }
                 }
-                if (guide.topCommons.isNotEmpty()) {
-                    item {
-                        ExpandableSection(stringResource(R.string.draft_guide_top_commons)) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                guide.topCommons.forEach { (color, cardNames) ->
-                                    cardNames.forEach { name ->
-                                        UnifiedCardItem(name = name, artCropUrl = artCropByName[name], setIconUri = setIconUri, color = color, onClick = { onCardClick(name) })
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (guide.topUncommons.isNotEmpty()) {
-                    item {
-                        ExpandableSection(stringResource(R.string.draft_guide_top_uncommons)) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                guide.topUncommons.forEach { (color, cardNames) ->
-                                    cardNames.forEach { name ->
-                                        UnifiedCardItem(name = name, artCropUrl = artCropByName[name], setIconUri = setIconUri, color = color, onClick = { onCardClick(name) })
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (guide.generalTips.isNotEmpty()) {
-                    item {
-                        ExpandableSection(stringResource(R.string.draft_guide_tips)) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                guide.generalTips.forEachIndexed { i, tip ->
-                                    Row {
-                                        Text("${i + 1}. ", style = typography.bodyMedium, color = colors.primaryAccent, fontWeight = FontWeight.Bold)
-                                        Text(tip, style = typography.bodyMedium, color = colors.textPrimary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+
+                // Videos
                 if (state.videos.isNotEmpty()) {
                     item {
                         ExpandableSection(stringResource(R.string.draft_guide_videos), defaultExpanded = true) {
@@ -332,16 +387,52 @@ private fun MechanicCard(mechanic: MechanicGuide) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
     Surface(shape = RoundedCornerShape(8.dp), color = colors.surface) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(mechanic.name, style = typography.labelLarge, color = colors.primaryAccent, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text(mechanic.description, style = typography.bodySmall, color = colors.textPrimary)
-            if (mechanic.draftTip.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+
+            if (mechanic.summary.isNotBlank()) {
+                Text(mechanic.summary, style = typography.bodySmall, color = colors.textPrimary)
+            }
+
+            if (mechanic.performance.isNotBlank()) {
                 Row(verticalAlignment = Alignment.Top) {
-                    Icon(Icons.Default.Lightbulb, null, tint = colors.goldMtg, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Lightbulb, null, tint = colors.goldMtg, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(mechanic.draftTip, style = typography.bodySmall, color = colors.goldMtg)
+                    Text(mechanic.performance, style = typography.bodySmall, color = colors.goldMtg)
+                }
+            }
+
+            val examples = mechanic.keyExamples
+            if (examples != null) {
+                if (examples.overperformers.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.TrendingUp, null, tint = Color(0xFF81C784), modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Column {
+                            Text(
+                                stringResource(R.string.draft_mechanic_overperformers),
+                                style = typography.labelSmall,
+                                color = Color(0xFF81C784),
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(examples.overperformers.joinToString(", "), style = typography.labelSmall, color = colors.textSecondary)
+                        }
+                    }
+                }
+                if (examples.underperformers.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.TrendingDown, null, tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Column {
+                            Text(
+                                stringResource(R.string.draft_mechanic_underperformers),
+                                style = typography.labelSmall,
+                                color = Color(0xFFE57373),
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(examples.underperformers.joinToString(", "), style = typography.labelSmall, color = colors.textSecondary)
+                        }
+                    }
                 }
             }
         }
@@ -351,40 +442,72 @@ private fun MechanicCard(mechanic: MechanicGuide) {
 @Composable
 private fun ArchetypeCard(
     archetype: ArchetypeGuide,
-    artCropByName: Map<String, String>,
     setIconUri: String,
     onCardClick: (String) -> Unit,
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
-    val tierColor = TIER_COLORS[archetype.tier] ?: colors.textSecondary
+    val tierColor = TIER_COLORS[archetype.tier.take(1)] ?: colors.textSecondary
+
     Surface(shape = RoundedCornerShape(8.dp), color = colors.surface) {
         Column(modifier = Modifier.padding(12.dp)) {
+            // Header row: mana symbols + name + tier badge
             Row(verticalAlignment = Alignment.CenterVertically) {
-                archetype.colors.forEach { char ->
-                    colorToManaToken(char.toString())?.let { token ->
+                extractColorLetters(archetype.colors).forEach { letter ->
+                    colorToManaToken(letter)?.let { token ->
                         ManaSymbolImage(token = token, size = 20.dp)
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(2.dp))
                     }
                 }
-                Spacer(Modifier.width(4.dp))
-                Text(archetype.name, style = typography.labelLarge, color = colors.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    archetype.name,
+                    style = typography.labelLarge,
+                    color = colors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
                 Box(
-                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(tierColor.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(tierColor.copy(alpha = 0.2f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
                 ) {
-                    Text(archetype.tier, style = typography.labelMedium, color = tierColor, fontWeight = FontWeight.Bold)
+                    Text(
+                        archetype.tier.substringBefore(" ").substringBefore("—").trim(),
+                        style = typography.labelSmall,
+                        color = tierColor,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Text(archetype.description, style = typography.bodySmall, color = colors.textSecondary)
-            val keyCards = archetype.keyCommons + archetype.keyUncommons
-            if (keyCards.isNotEmpty()) {
+
+            if (archetype.difficulty.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    stringResource(R.string.draft_archetype_difficulty, archetype.difficulty),
+                    style = typography.labelSmall,
+                    color = colors.textDisabled,
+                )
+            }
+
+            if (archetype.strategy.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(archetype.strategy, style = typography.bodySmall, color = colors.textSecondary)
+            }
+
+            // Key cards as an art-crop grid
+            if (archetype.keyCards.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.draft_key_cards_label), style = typography.labelSmall, color = colors.textDisabled)
+                Text(
+                    stringResource(R.string.draft_key_cards_label),
+                    style = typography.labelSmall,
+                    color = colors.textDisabled,
+                )
                 Spacer(Modifier.height(4.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    keyCards.forEach { name ->
-                        UnifiedCardItem(name = name, artCropUrl = artCropByName[name], setIconUri = setIconUri, onClick = { onCardClick(name) })
+                    archetype.keyCards.forEach { card ->
+                        ArchetypeKeyCardItem(card, setIconUri, onClick = { onCardClick(card.name) })
                     }
                 }
             }
@@ -392,27 +515,16 @@ private fun ArchetypeCard(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Unified card item  (Guide + Tier List) — art crop from pre-loaded CDN URLs
-// ═══════════════════════════════════════════════════════════════════════════════
-
 @Composable
-private fun UnifiedCardItem(
-    name: String,
-    artCropUrl: String?,      // CDN art-crop URL from loaded cards; null → placeholder shown
-    setIconUri: String,       // Set icon SVG URI – shown as fallback when URL is missing or 404s
-    color: String? = null,
-    rarity: String? = null,
-    reason: String? = null,
-    tierBadge: String? = null,
+private fun ArchetypeKeyCardItem(
+    card: ArchetypeKeyCard,
+    setIconUri: String,
     onClick: () -> Unit,
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
-
-    // Track whether the card image failed to load (404 / network error)
-    var imageError by remember(artCropUrl) { mutableStateOf(false) }
-    val showArtCrop = !artCropUrl.isNullOrBlank() && !imageError
+    var imageError by remember(card.artCropUri) { mutableStateOf(false) }
+    val showArtCrop = card.artCropUri.isNotBlank() && !imageError
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -420,21 +532,19 @@ private fun UnifiedCardItem(
         modifier = Modifier.clickable(onClick = onClick),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            // Art-crop thumbnail
             Box(
                 modifier = Modifier.width(80.dp).height(58.dp).clip(RoundedCornerShape(4.dp)).background(colors.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
                 if (showArtCrop) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(artCropUrl).crossfade(true).build(),
-                        contentDescription = name,
+                        model = ImageRequest.Builder(LocalContext.current).data(card.artCropUri).crossfade(true).build(),
+                        contentDescription = card.name,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                         onError = { imageError = true },
                     )
                 } else {
-                    // Fallback: set icon tinted as a watermark
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(setIconUri)
@@ -448,25 +558,25 @@ private fun UnifiedCardItem(
             }
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    color?.let { colorToManaToken(it) }?.let { token ->
-                        ManaSymbolImage(token = token, size = 14.dp)
-                    }
-                    Text(name, style = typography.bodyMedium, color = colors.textPrimary, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    if (tierBadge != null) {
-                        val tierColor = TIER_COLORS[tierBadge] ?: colors.textSecondary
-                        Box(
-                            modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(tierColor.copy(alpha = 0.2f)).padding(horizontal = 6.dp, vertical = 2.dp),
-                        ) {
-                            Text(tierBadge, style = typography.labelSmall, color = tierColor, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    card.colors.forEach { colorLetter ->
+                        colorToManaToken(colorLetter)?.let { token ->
+                            ManaSymbolImage(token = token, size = 14.dp)
                         }
                     }
+                    Text(
+                        card.name,
+                        style = typography.bodyMedium,
+                        color = colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-                if (rarity != null) {
-                    Text(rarity.replaceFirstChar { it.uppercase() }, style = typography.labelSmall, color = colors.textDisabled)
-                }
-                if (!reason.isNullOrBlank()) {
-                    Text(reason, style = typography.labelSmall, color = colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(card.rarity.replaceFirstChar { it.uppercase() }, style = typography.labelSmall, color = colors.textDisabled)
+                if (card.typeLine.isNotBlank()) {
+                    Text(card.typeLine, style = typography.labelSmall, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -474,34 +584,35 @@ private fun UnifiedCardItem(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Tab 1: Cards  — segmented toggle between All Cards and Tier List
+//  Tab 1: Cards — segmented toggle between All Cards and Tier List
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CardsTab(
     state: SetDraftDetailUiState,
-    artCropByName: Map<String, String>,
     setIconUri: String,
     viewModel: SetDraftDetailViewModel,
 ) {
-    val colors = MaterialTheme.magicColors
-
     Column(modifier = Modifier.fillMaxSize()) {
-        // Modern segmented control for sub-tabs
         MagicSegmentedControl(
             options = listOf(
                 stringResource(R.string.draft_cards_all),
-                stringResource(R.string.draft_tab_tier_list)
+                stringResource(R.string.draft_tab_tier_list),
             ),
             selectedIndex = state.selectedCardsSubTab,
             onOptionSelected = { viewModel.onCardsSubTabSelected(it) },
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
         when (state.selectedCardsSubTab) {
             0 -> AllCardsSubTab(state, viewModel)
-            1 -> TierListSubTab(state = state, artCropByName = artCropByName, setIconUri = setIconUri, onToggleColor = viewModel::toggleTierListColorFilter, onCardClick = viewModel::loadCardDetail)
+            1 -> TierListSubTab(
+                state = state,
+                setIconUri = setIconUri,
+                onToggleColor = viewModel::toggleTierListColorFilter,
+                onCardClick = viewModel::loadCardDetail,
+            )
         }
     }
 }
@@ -527,8 +638,8 @@ private fun AllCardsSubTab(
             filtered = filtered.filter { it.rarity in state.cardRarityFilter }
         }
         when (state.cardSortBy) {
-            CardSortOption.PRICE  -> filtered.sortedByDescending { it.priceUsd ?: 0.0 }
-            CardSortOption.NAME   -> filtered.sortedBy { it.name }
+            CardSortOption.PRICE -> filtered.sortedByDescending { it.priceUsd ?: 0.0 }
+            CardSortOption.NAME -> filtered.sortedBy { it.name }
             CardSortOption.RARITY -> {
                 val order = mapOf("mythic" to 0, "rare" to 1, "uncommon" to 2, "common" to 3)
                 filtered.sortedBy { order[it.rarity] ?: 4 }
@@ -537,7 +648,6 @@ private fun AllCardsSubTab(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Filter toggle bar
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -549,7 +659,6 @@ private fun AllCardsSubTab(
             }
         }
 
-        // Compact filter panel inside a Surface card
         if (showFilters) {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -557,29 +666,26 @@ private fun AllCardsSubTab(
                 color = mc.surface,
             ) {
                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Color
                     Text(stringResource(R.string.draft_filter_by_color), style = typography.labelSmall, color = mc.textSecondary)
                     ManaColorFilterRow(state.cardColorFilter, viewModel::toggleCardColorFilter, mc)
-                    // Rarity
                     Text(stringResource(R.string.draft_filter_by_rarity), style = typography.labelSmall, color = mc.textSecondary)
                     RarityFilterRow(state.cardRarityFilter, viewModel::toggleCardRarityFilter, mc)
-                    // Sort
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(stringResource(R.string.draft_sort_by_label), style = typography.labelSmall, color = mc.textSecondary)
                         CardSortOption.entries.forEach { option ->
                             val label = when (option) {
-                                CardSortOption.PRICE  -> stringResource(R.string.draft_sort_price)
-                                CardSortOption.NAME   -> stringResource(R.string.draft_sort_name)
+                                CardSortOption.PRICE -> stringResource(R.string.draft_sort_price)
+                                CardSortOption.NAME -> stringResource(R.string.draft_sort_name)
                                 CardSortOption.RARITY -> stringResource(R.string.draft_filter_by_rarity)
                             }
                             FilterChip(
                                 selected = state.cardSortBy == option,
-                                onClick  = { viewModel.setCardSortBy(option) },
-                                label    = { Text(label, style = typography.labelSmall) },
-                                colors   = FilterChipDefaults.filterChipColors(
+                                onClick = { viewModel.setCardSortBy(option) },
+                                label = { Text(label, style = typography.labelSmall) },
+                                colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                                    selectedLabelColor     = mc.primaryAccent,
-                                    containerColor         = mc.surface,
+                                    selectedLabelColor = mc.primaryAccent,
+                                    containerColor = mc.surface,
                                 ),
                             )
                         }
@@ -601,11 +707,9 @@ private fun AllCardsSubTab(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    // Click opens bottom sheet instead of navigating
                     items(filteredAndSorted, key = { it.scryfallId }) { card ->
                         DraftCardItem(card, onClick = { viewModel.showCardDetail(card) })
                     }
-                    // Loading indicator at the bottom while more pages are being fetched
                     if (state.isCardsLoading && state.cards.isNotEmpty()) {
                         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                             Box(
@@ -631,10 +735,10 @@ private fun DraftCardItem(card: Card, onClick: () -> Unit) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
     val rarityBorderColor = when (card.rarity) {
-        "mythic"   -> Color(0xFFE8A030)
-        "rare"     -> Color(0xFFC9A84C)
+        "mythic" -> Color(0xFFE8A030)
+        "rare" -> Color(0xFFC9A84C)
         "uncommon" -> Color(0xFFB0C4DE)
-        else       -> colors.surfaceVariant
+        else -> colors.surfaceVariant
     }
     Surface(shape = RoundedCornerShape(6.dp), color = colors.surface, modifier = Modifier.clickable(onClick = onClick)) {
         Column {
@@ -653,10 +757,13 @@ private fun DraftCardItem(card: Card, onClick: () -> Unit) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Tier List sub-tab — uses direct image URLs from the JSON (no artCropByName needed)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 @Composable
 private fun TierListSubTab(
     state: SetDraftDetailUiState,
-    artCropByName: Map<String, String>,
     setIconUri: String,
     onToggleColor: (String) -> Unit,
     onCardClick: (String) -> Unit,
@@ -673,25 +780,29 @@ private fun TierListSubTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    Text(stringResource(R.string.draft_tier_updated, state.tierList.lastUpdated), style = typography.labelSmall, color = colors.textDisabled)
+                    Text(
+                        stringResource(R.string.draft_tier_updated, state.tierList.lastUpdated),
+                        style = typography.labelSmall,
+                        color = colors.textDisabled,
+                    )
                 }
                 item {
                     ManaColorFilterRow(state.tierListColorFilter, onToggleColor, colors)
                 }
                 state.tierList.tiers.forEach { tier ->
-                    val filteredCards = if (state.tierListColorFilter.isEmpty()) tier.cards
-                    else tier.cards.filter { it.color in state.tierListColorFilter }
+                    val filteredCards = if (state.tierListColorFilter.isEmpty()) {
+                        tier.cards
+                    } else {
+                        tier.cards.filter { card ->
+                            card.colors.any { it in state.tierListColorFilter }
+                        }
+                    }
                     if (filteredCards.isNotEmpty()) {
                         item { TierBanner(tier.tier, tier.label, tier.description) }
                         items(filteredCards) { card ->
-                            UnifiedCardItem(
-                                name = card.name,
-                                artCropUrl = artCropByName[card.name],
+                            TierListCardItem(
+                                card = card,
                                 setIconUri = setIconUri,
-                                color = card.color,
-                                rarity = card.rarity,
-                                reason = card.reason,
-                                tierBadge = tier.tier,
                                 onClick = { onCardClick(card.name) },
                             )
                         }
@@ -700,6 +811,102 @@ private fun TierListSubTab(
             }
         }
         else -> PlaceholderMessage(stringResource(R.string.draft_tier_list_not_available))
+    }
+}
+
+/**
+ * Tier list card item that uses the direct art crop URL embedded in the [TierCard] domain model.
+ * No dependency on the eagerly-loaded cards list — images are served from the Cloudflare JSON.
+ */
+@Composable
+private fun TierListCardItem(
+    card: TierCard,
+    setIconUri: String,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+    val tierColor = TIER_COLORS[card.tierRating] ?: colors.textSecondary
+    var imageError by remember(card.artCropUri) { mutableStateOf(false) }
+    val showArtCrop = card.artCropUri.isNotBlank() && !imageError
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = colors.surface,
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Art crop thumbnail with direct URL from JSON
+            Box(
+                modifier = Modifier.width(80.dp).height(58.dp).clip(RoundedCornerShape(4.dp)).background(colors.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (showArtCrop) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(card.artCropUri).crossfade(true).build(),
+                        contentDescription = card.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        onError = { imageError = true },
+                    )
+                } else {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(setIconUri)
+                            .decoderFactory(SvgDecoder.Factory())
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        colorFilter = ColorFilter.tint(colors.textDisabled.copy(alpha = 0.5f)),
+                    )
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    card.colors.forEach { colorLetter ->
+                        colorToManaToken(colorLetter)?.let { token ->
+                            ManaSymbolImage(token = token, size = 14.dp)
+                        }
+                    }
+                    Text(
+                        card.name,
+                        style = typography.bodyMedium,
+                        color = colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Tier badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(tierColor.copy(alpha = 0.2f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(card.tierRating, style = typography.labelSmall, color = tierColor, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text(card.rarity.replaceFirstChar { it.uppercase() }, style = typography.labelSmall, color = colors.textDisabled)
+                if (card.note.isNotBlank()) {
+                    Text(
+                        card.note,
+                        style = typography.labelSmall,
+                        color = colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (card.pickOrderRank > 0) {
+                    Text(
+                        stringResource(R.string.draft_pick_order_rank, card.pickOrderRank),
+                        style = typography.labelSmall,
+                        color = colors.textDisabled,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -713,7 +920,9 @@ private fun TierBanner(tier: String, label: String, description: String) {
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(label, style = typography.labelLarge, color = tierColor, fontWeight = FontWeight.Bold)
-                if (description.isNotBlank()) Text(description, style = typography.labelSmall, color = tierColor.copy(alpha = 0.7f))
+                if (description.isNotBlank()) {
+                    Text(description, style = typography.labelSmall, color = tierColor.copy(alpha = 0.7f))
+                }
             }
         }
     }
@@ -735,7 +944,6 @@ private fun CardDetailBottomSheet(card: Card?, isLoading: Boolean) {
             }
             card != null -> {
                 Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    // Front face – full card image
                     val frontImageUrl = card.imageNormal ?: card.imageArtCrop
                     if (!frontImageUrl.isNullOrBlank()) {
                         AsyncImage(
@@ -746,7 +954,6 @@ private fun CardDetailBottomSheet(card: Card?, isLoading: Boolean) {
                             contentScale = ContentScale.Fit,
                         )
                     }
-                    // Back face for DFCs
                     if (!card.imageBackNormal.isNullOrBlank()) {
                         Spacer(Modifier.height(8.dp))
                         AsyncImage(
@@ -758,7 +965,6 @@ private fun CardDetailBottomSheet(card: Card?, isLoading: Boolean) {
                     }
 
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // Name + mana cost
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             val displayName = card.printedName?.takeIf { it.isNotBlank() } ?: card.name
                             Text(displayName, style = typography.titleMedium, color = colors.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -859,8 +1065,7 @@ private fun ExpandableSection(title: String, defaultExpanded: Boolean = false, c
 }
 
 /**
- * Mana color filter row – matches CollectionScreen style.
- * Each color is a square [FilterChip] containing the Scryfall SVG symbol.
+ * Mana color filter row — each color is a square [FilterChip] containing the Scryfall SVG symbol.
  */
 @Composable
 private fun ManaColorFilterRow(selected: Set<String>, onToggle: (String) -> Unit, mc: MagicColors) {
@@ -870,22 +1075,22 @@ private fun ManaColorFilterRow(selected: Set<String>, onToggle: (String) -> Unit
             val isSelected = token in selected
             FilterChip(
                 selected = isSelected,
-                onClick  = { onToggle(token) },
-                label    = { ManaSymbolImage(token = token, size = 24.dp) },
+                onClick = { onToggle(token) },
+                label = { ManaSymbolImage(token = token, size = 24.dp) },
                 modifier = Modifier.size(40.dp),
-                colors   = FilterChipDefaults.filterChipColors(
+                colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = mc.primaryAccent.copy(alpha = 0.20f),
-                    containerColor         = mc.surface,
-                    selectedLabelColor     = mc.primaryAccent,
-                    labelColor             = mc.textSecondary,
+                    containerColor = mc.surface,
+                    selectedLabelColor = mc.primaryAccent,
+                    labelColor = mc.textSecondary,
                 ),
                 border = FilterChipDefaults.filterChipBorder(
-                    enabled             = true,
-                    selected            = isSelected,
+                    enabled = true,
+                    selected = isSelected,
                     selectedBorderColor = mc.primaryAccent.copy(alpha = 0.60f),
                     selectedBorderWidth = 2.dp,
-                    borderColor         = mc.surfaceVariant,
-                    borderWidth         = 0.5.dp,
+                    borderColor = mc.surfaceVariant,
+                    borderWidth = 0.5.dp,
                 ),
             )
         }
@@ -893,8 +1098,7 @@ private fun ManaColorFilterRow(selected: Set<String>, onToggle: (String) -> Unit
 }
 
 /**
- * Rarity filter: compact chips with 1-letter abbreviations + rarity accent color.
- * C = Common, U = Uncommon, R = Rare, M = Mythic
+ * Rarity filter chips with 1-letter abbreviations + rarity accent color.
  */
 @Composable
 private fun RarityFilterRow(selected: Set<String>, onToggle: (String) -> Unit, mc: MagicColors) {
@@ -903,21 +1107,21 @@ private fun RarityFilterRow(selected: Set<String>, onToggle: (String) -> Unit, m
             val isSelected = rarity in selected
             FilterChip(
                 selected = isSelected,
-                onClick  = { onToggle(rarity) },
-                label    = { Text(label, style = MaterialTheme.magicTypography.labelMedium, fontWeight = FontWeight.Bold) },
-                colors   = FilterChipDefaults.filterChipColors(
+                onClick = { onToggle(rarity) },
+                label = { Text(label, style = MaterialTheme.magicTypography.labelMedium, fontWeight = FontWeight.Bold) },
+                colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = rarityColor.copy(alpha = 0.20f),
-                    selectedLabelColor     = rarityColor,
-                    containerColor         = mc.surface,
-                    labelColor             = mc.textSecondary,
+                    selectedLabelColor = rarityColor,
+                    containerColor = mc.surface,
+                    labelColor = mc.textSecondary,
                 ),
                 border = FilterChipDefaults.filterChipBorder(
-                    enabled             = true,
-                    selected            = isSelected,
+                    enabled = true,
+                    selected = isSelected,
                     selectedBorderColor = rarityColor.copy(alpha = 0.60f),
                     selectedBorderWidth = 2.dp,
-                    borderColor         = mc.surfaceVariant,
-                    borderWidth         = 0.5.dp,
+                    borderColor = mc.surfaceVariant,
+                    borderWidth = 0.5.dp,
                 ),
             )
         }
@@ -934,7 +1138,12 @@ private fun LoadingIndicator() {
 @Composable
 private fun PlaceholderMessage(message: String) {
     Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(message, style = MaterialTheme.magicTypography.bodyMedium, color = MaterialTheme.magicColors.textSecondary)
+        Text(
+            message,
+            style = MaterialTheme.magicTypography.bodyMedium,
+            color = MaterialTheme.magicColors.textSecondary,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
