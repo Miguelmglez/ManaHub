@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.local
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -46,6 +47,11 @@ private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags"
 private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
 
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
+
+// ── Privacy settings — persisted locally so SettingsScreen renders without a network call ──
+private val KEY_COLLECTION_PUBLIC  = booleanPreferencesKey("collection_public")
+private val KEY_WISHLIST_PUBLIC    = booleanPreferencesKey("wishlist_public")
+private val KEY_TRADE_LIST_PUBLIC  = booleanPreferencesKey("trade_list_public")
 
 // ── Per-user sync keys (keyed by userId to handle multi-account scenarios) ───
 private fun syncTimestampKey(userId: String) = stringPreferencesKey("sync_ts_$userId")
@@ -312,6 +318,50 @@ class UserPreferencesDataStore @Inject constructor(
     /** Persists the version number after a successful R2 download. */
     suspend fun saveEmbeddingDbVersion(version: Int) {
         context.userPrefsDataStore.edit { it[KEY_EMBEDDING_DB_VERSION] = version }
+    }
+
+    // ── Privacy settings ──────────────────────────────────────────────────────
+    //
+    // These three flags mirror the user's own `user_profiles` visibility settings
+    // stored in Supabase. They are cached here so SettingsScreen can render the
+    // current state immediately without a network call. The repository is
+    // responsible for keeping them in sync after a successful Supabase read/write.
+    //
+    // Defaults: collection private (false), wishlist and trade list public (true).
+    // These match the Supabase column defaults in the `user_profiles` table.
+
+    val collectionPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_COLLECTION_PUBLIC] ?: false }
+        .catch { emit(false) }
+
+    val wishlistPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_WISHLIST_PUBLIC] ?: true }
+        .catch { emit(true) }
+
+    val tradeListPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_TRADE_LIST_PUBLIC] ?: true }
+        .catch { emit(true) }
+
+    suspend fun saveCollectionPublic(value: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_COLLECTION_PUBLIC] = value }
+    }
+
+    suspend fun saveWishlistPublic(value: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_WISHLIST_PUBLIC] = value }
+    }
+
+    suspend fun saveTradeListPublic(value: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_TRADE_LIST_PUBLIC] = value }
+    }
+
+    // ── Stats sync watermark ──────────────────────────────────────────────────
+    // Used by CollectionStatsSyncWorker to avoid re-uploading stats more than once per 23h.
+
+    suspend fun getLastStatsSyncMillis(userId: String): Long =
+        context.userPrefsDataStore.data.map { it[longPreferencesKey("stats_sync_ms_$userId")] ?: 0L }.first()
+
+    suspend fun saveLastStatsSyncMillis(userId: String, millis: Long) {
+        context.userPrefsDataStore.edit { it[longPreferencesKey("stats_sync_ms_$userId")] = millis }
     }
 
     suspend fun saveTheme(theme: AppTheme) {

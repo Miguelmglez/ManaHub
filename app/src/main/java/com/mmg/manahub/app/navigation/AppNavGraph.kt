@@ -6,8 +6,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -16,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -29,6 +33,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.mmg.manahub.core.ui.components.MagicBottomBar
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
@@ -38,6 +45,9 @@ import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementScr
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.manahub.feature.friends.presentation.FriendsScreen
+import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailScreen
+import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherScreen
+import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
 import com.mmg.manahub.feature.game.presentation.GamePlayScreen
 import com.mmg.manahub.feature.game.presentation.GameSetupScreen
 import com.mmg.manahub.feature.game.presentation.GameSetupViewModel
@@ -77,11 +87,49 @@ private val bottomBarRoutes = setOf(
 @Composable
 fun AppNavGraph(modifier: Modifier = Modifier) {
     val activity = LocalContext.current as ComponentActivity
+    val context = LocalContext.current
+
     // Activity-scoped so game state persists across all navigation
     val gameVm: GameViewModel = hiltViewModel(activity)
     val gameUiState by gameVm.uiState.collectAsStateWithLifecycle()
 
+    // Activity-scoped so it survives navigation and can process pending invite codes after login
+    val inviteVm: InviteDispatcherViewModel = hiltViewModel(activity)
+
     val navController = rememberNavController()
+
+    // Toast for invite results — shown at the global level so it is visible regardless of
+    // which screen the user ends up on after the InviteDispatcherScreen navigates away.
+    val inviteToastState = rememberMagicToastState()
+
+    LaunchedEffect(Unit) {
+        inviteVm.events.collect { event ->
+            when (event) {
+                is InviteDispatcherViewModel.UiEvent.InviteAccepted -> {
+                    val msg = if (event.inviterNickname != null) {
+                        context.getString(com.mmg.manahub.R.string.friends_invite_success, event.inviterNickname)
+                    } else {
+                        context.getString(com.mmg.manahub.R.string.friends_invite_success_generic)
+                    }
+                    inviteToastState.show(msg, MagicToastType.SUCCESS)
+                }
+                is InviteDispatcherViewModel.UiEvent.InviteError -> {
+                    val msg = when {
+                        event.isSelfInvite -> context.getString(com.mmg.manahub.R.string.friends_invite_self)
+                        event.isInvalidCode -> context.getString(com.mmg.manahub.R.string.friends_invite_invalid)
+                        else -> context.getString(com.mmg.manahub.R.string.friends_invite_error)
+                    }
+                    inviteToastState.show(msg, MagicToastType.ERROR)
+                }
+                InviteDispatcherViewModel.UiEvent.NavigateAway -> {
+                    // Navigate to Profile, removing the invite screen from the back stack.
+                    navController.navigate(Screen.Profile.route) {
+                        popUpTo(Screen.FriendsInvite.route) { inclusive = true }
+                    }
+                }
+            }
+        }
+    }
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
 
@@ -124,10 +172,11 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
         },
     ) { padding ->
+        Box(modifier = modifier.padding(padding).fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = Screen.Collection.route,
-            modifier = modifier.padding(padding),
+            modifier = Modifier,
             enterTransition = { fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 } },
             exitTransition = { fadeOut(tween(200)) },
             popEnterTransition = { fadeIn(tween(300)) },
@@ -296,7 +345,42 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
             }
 
             composable(Screen.FriendsList.route) {
-                FriendsScreen(onNavigateBack = { navController.popBackStack() })
+                FriendsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToFriendDetail = { userId ->
+                        navController.navigate(Screen.FriendDetail.createRoute(userId))
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.FriendDetail.route,
+                arguments = listOf(navArgument("userId") { type = NavType.StringType }),
+            ) {
+                FriendDetailScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
+
+            // ── Friend invite deep link ────────────────────────────────────────
+            composable(
+                route = Screen.FriendsInvite.route,
+                arguments = listOf(navArgument("code") { type = NavType.StringType }),
+                deepLinks = listOf(
+                    navDeepLink { uriPattern = "https://miguelmglez.github.io/invite/{code}" },
+                    navDeepLink { uriPattern = "manahub://invite/{code}" },
+                ),
+            ) { backStack ->
+                val code = backStack.arguments?.getString("code") ?: ""
+                InviteDispatcherScreen(
+                    code = code,
+                    onNavigateAway = {
+                        navController.navigate(Screen.Profile.route) {
+                            popUpTo(Screen.FriendsInvite.route) { inclusive = true }
+                        }
+                    },
+                    inviteVm = inviteVm,
+                )
             }
 
             // ── Trades shared list (deep link) ────────────────────────────────
@@ -305,7 +389,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 arguments = listOf(navArgument("shareId") { type = NavType.StringType }),
                 deepLinks = listOf(
                     navDeepLink {
-                        uriPattern = "https://trades.manahub.app/list/{shareId}"
+                        uriPattern = "https://miguelmglez.github.io/list/{shareId}"
                     },
                 ),
             ) {
@@ -552,6 +636,15 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
                 }
             }
         }
+        // Global toast for invite results — overlays all screens without interfering with
+        // per-screen toast hosts (they all co-exist independently).
+        MagicToastHost(
+            state = inviteToastState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
+        )
+        } // end Box
     }
 }
 

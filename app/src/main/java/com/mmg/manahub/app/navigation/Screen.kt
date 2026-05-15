@@ -39,6 +39,19 @@ sealed class Screen(val route: String) {
     object Profile : Screen("profile")
     object FriendsList : Screen("profile/friends")
 
+    /**
+     * Phantom screen that processes an incoming friend invite link.
+     * Deep link patterns: `https://manahub.app/invite/{code}` and `manahub://invite/{code}`.
+     */
+    object FriendsInvite : Screen("friends/invite/{code}") {
+        fun createRoute(code: String) = "friends/invite/$code"
+    }
+
+    /** Full-screen detail view for a specific friend, identified by their auth UUID. */
+    object FriendDetail : Screen("friends/detail/{userId}") {
+        fun createRoute(userId: String) = "friends/detail/$userId"
+    }
+
     // ── Game flow (central FAB) ───────────────────────────────────────────────
     object GameSetup  : Screen("game/setup")
     object GamePlay   : Screen("game/play/{mode}/{playerCount}") {
@@ -80,7 +93,7 @@ sealed class Screen(val route: String) {
 
     /**
      * Deep link target for shared wishlist / open-for-trade lists.
-     * App Link pattern: https://trades.manahub.app/list/{shareId}
+     * App Link pattern: https://miguelmglez.github.io/list/{shareId}
      */
     object TradesSharedList : Screen("trades/shared/{shareId}") {
         fun createRoute(shareId: String) = "trades/shared/$shareId"

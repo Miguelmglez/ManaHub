@@ -124,6 +124,7 @@ fun ProfileScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 playerName = uiState.playerName,
                 avatarUrl = uiState.avatarUrl,
+                shareUrl = uiState.shareUrl,
             )
             Spacer(modifier = Modifier.navigationBarsPadding())
         }

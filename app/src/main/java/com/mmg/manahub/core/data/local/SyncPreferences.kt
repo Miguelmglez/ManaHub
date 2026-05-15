@@ -73,4 +73,40 @@ class SyncPreferencesStore @Inject constructor(
     }
 
     private fun milliKey(userId: String) = longPreferencesKey("sync_millis_$userId")
+
+    // ── Collection-stats sync gating ─────────────────────────────────────────
+
+    /**
+     * Returns the epoch-millis timestamp of the last successful stats sync for
+     * [userId]. Returns 0L if stats have never been synced, which causes the
+     * [CollectionStatsSyncWorker] to treat it as expired and trigger a full push.
+     */
+    suspend fun getLastStatsSyncMillis(userId: String): Long =
+        context.userPrefsDataStore.data
+            .map { prefs -> prefs[statsMilliKey(userId)] ?: 0L }
+            .first()
+
+    /**
+     * Records [millis] as the last successful stats sync watermark for [userId].
+     * Called by [CollectionStatsSyncWorker] after the `upsert_collection_stats`
+     * RPC completes without error.
+     */
+    suspend fun saveLastStatsSyncMillis(userId: String, millis: Long) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[statsMilliKey(userId)] = millis
+        }
+    }
+
+    /**
+     * Clears the stats sync watermark for [userId], forcing a full push on the
+     * next worker run. Called when the user signs out or when the database is
+     * wiped via destructive migration.
+     */
+    suspend fun clearLastStatsSyncMillis(userId: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(statsMilliKey(userId))
+        }
+    }
+
+    private fun statsMilliKey(userId: String) = longPreferencesKey("stats_sync_ms_$userId")
 }
