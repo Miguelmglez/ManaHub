@@ -71,6 +71,7 @@ fun AddCardSheet(
     setCode: String? = null,
     setName: String? = null,
     rarity: String? = null,
+    extraContent: (@Composable () -> Unit)? = null,
 ) {
     val conditions = CardConstants.conditions
     val languages = CardConstants.languages
@@ -285,6 +286,8 @@ fun AddCardSheet(
                     }
                 }
             }
+
+            extraContent?.invoke()
 
             // Confirm / Cancel
             Row(

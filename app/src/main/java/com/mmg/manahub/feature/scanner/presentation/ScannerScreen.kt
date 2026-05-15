@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,9 +33,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.AddToPhotos
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -44,6 +48,7 @@ import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,6 +63,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -83,6 +89,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -141,7 +149,8 @@ fun ScannerScreen(
                         // OCR pipeline — no DB download required; camera starts immediately
                         CameraPreview(
                             isFlashOn = uiState.isFlashOn,
-                            isPaused = uiState.showQueueSheet || uiState.showSettingsSheet || uiState.showEditSheet,
+                            isPaused = uiState.showQueueSheet || uiState.showSettingsSheet || uiState.showEditSheet
+                                || uiState.showVariantSelector || uiState.expandedVariantImageUrl != null,
                             selectedLanguage = uiState.selectedLanguage,
                             onRecognitionResult = viewModel::onRecognitionResult,
                             onFlashAvailability = viewModel::onFlashAvailabilityChanged,
@@ -176,6 +185,7 @@ fun ScannerScreen(
                                 isQuickMode = uiState.isQuickMode,
                                 isLookupOnly = uiState.isLookupOnly,
                                 languageMismatch = uiState.languageMismatch,
+                                isFoil = uiState.selectedIsFoil,
                                 preferredCurrency = preferredCurrency,
                                 onManualAdd = viewModel::onManualAddCurrentCard,
                                 onOpenPriceDetail = viewModel::onOpenPriceDetail,
@@ -233,6 +243,7 @@ fun ScannerScreen(
             onAddEntryToCollection = viewModel::onAddEntryToCollection,
             onAddEntryToWishlist = viewModel::onAddEntryToWishlist,
             onNavigateToCardDetail = onNavigateToCardDetail,
+            onSelectVariant = viewModel::onOpenVariantSelector,
         )
     }
 
@@ -251,12 +262,34 @@ fun ScannerScreen(
 
     // Edit sheet
     if (uiState.showEditSheet && uiState.editingCard != null) {
+        val editingCard = uiState.editingCard!!
         EditScannedCardSheet(
-            scannedCard = uiState.editingCard!!,
+            scannedCard = editingCard,
             availablePrints = uiState.availablePrints,
             isLoadingPrints = uiState.isLoadingPrints,
             onDismiss = viewModel::onCloseEditSheet,
             onConfirm = viewModel::onUpdateScannedCard,
+            onAddAnotherCopy = { viewModel.onAddDuplicateScannedCard(editingCard) },
+        )
+    }
+
+    // Variant selector sheet
+    if (uiState.showVariantSelector && uiState.variantSelectorEntry != null) {
+        VariantSelectorSheet(
+            entry = uiState.variantSelectorEntry!!,
+            variants = uiState.cardVariants,
+            isLoading = uiState.isLoadingVariants,
+            onDismiss = viewModel::onCloseVariantSelector,
+            onSelectVariant = viewModel::onSelectVariant,
+            onExpandImage = viewModel::onExpandVariantImage,
+        )
+    }
+
+    // Full-screen image viewer
+    if (uiState.expandedVariantImageUrl != null) {
+        FullScreenImageViewer(
+            imageUrl = uiState.expandedVariantImageUrl!!,
+            onDismiss = viewModel::onCloseExpandedImage,
         )
     }
 }
@@ -486,10 +519,16 @@ private class FrameMetadataAnalyzer(
             return
         }
         try {
-            android.util.Log.d("ScannerScreen", "FrameMetadataAnalyzer.analyze: frame=${imageProxy.width}x${imageProxy.height}")
+            if (com.mmg.manahub.BuildConfig.DEBUG) {
+                android.util.Log.d("ScannerScreen", "FrameMetadataAnalyzer.analyze: frame=${imageProxy.width}x${imageProxy.height}")
+            }
             delegate.analyze(imageProxy)
         } catch (e: Exception) {
-            android.util.Log.e("ScannerScreen", "FrameMetadataAnalyzer failed", e)
+            if (com.mmg.manahub.BuildConfig.DEBUG) {
+                android.util.Log.e("ScannerScreen", "FrameMetadataAnalyzer failed", e)
+            } else {
+                android.util.Log.e("ScannerScreen", "FrameMetadataAnalyzer failed: ${e.javaClass.simpleName}")
+            }
             imageProxy.close()
         }
     }
@@ -818,6 +857,7 @@ private fun DetectedCardOverlay(
     isQuickMode: Boolean,
     isLookupOnly: Boolean,
     languageMismatch: Boolean,
+    isFoil: Boolean,
     preferredCurrency: PreferredCurrency,
     onManualAdd: () -> Unit,
     onOpenPriceDetail: () -> Unit,
@@ -881,7 +921,11 @@ private fun DetectedCardOverlay(
                                 )
                             }
                             Text(
-                                text = PriceFormatter.formatFromScryfall(card.priceUsd, card.priceEur, preferredCurrency),
+                                text = PriceFormatter.formatFromScryfall(
+                                    if (isFoil) card.priceUsdFoil else card.priceUsd,
+                                    if (isFoil) card.priceEurFoil else card.priceEur,
+                                    preferredCurrency,
+                                ),
                                 style = ty.labelSmall.copy(letterSpacing = 0.sp),
                                 color = mc.primaryAccent
                             )
@@ -969,6 +1013,7 @@ private fun ScanQueueSheet(
     onAddEntryToCollection: (ScannedCard) -> Unit,
     onAddEntryToWishlist: (ScannedCard) -> Unit,
     onNavigateToCardDetail: (scryfallId: String) -> Unit,
+    onSelectVariant: (ScannedCard) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -1047,6 +1092,7 @@ private fun ScanQueueSheet(
                             onAddToCollection = { onAddEntryToCollection(entry) },
                             onAddToWishlist = { onAddEntryToWishlist(entry) },
                             onClick = { onNavigateToCardDetail(entry.card.scryfallId) },
+                            onSelectVariant = { onSelectVariant(entry) },
                         )
                     }
                 }
@@ -1104,6 +1150,7 @@ private fun QueueCardItem(
     onAddToCollection: () -> Unit,
     onAddToWishlist: () -> Unit,
     onClick: () -> Unit,
+    onSelectVariant: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -1173,7 +1220,11 @@ private fun QueueCardItem(
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    text = PriceFormatter.formatFromScryfall(entry.card.priceUsd, entry.card.priceEur, preferredCurrency),
+                    text = PriceFormatter.formatFromScryfall(
+                        if (entry.isFoil) entry.card.priceUsdFoil else entry.card.priceUsd,
+                        if (entry.isFoil) entry.card.priceEurFoil else entry.card.priceEur,
+                        preferredCurrency,
+                    ),
                     style = ty.labelLarge.copy(fontWeight = FontWeight.Bold, color = mc.goldMtg),
                 )
             }
@@ -1217,6 +1268,15 @@ private fun QueueCardItem(
                 }
             }
             IconButton(
+                onClick = onSelectVariant,
+                modifier = Modifier.weight(1f)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Collections, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
+                    Text(stringResource(R.string.scanner_select_variant), style = ty.labelSmall, color = mc.textSecondary)
+                }
+            }
+            IconButton(
                 onClick = onDelete,
                 modifier = Modifier.weight(1f)
             ) {
@@ -1226,7 +1286,7 @@ private fun QueueCardItem(
                 }
             }
         }
-        
+
         HorizontalDivider(
             modifier = Modifier.padding(top = 8.dp),
             color = mc.textPrimary.copy(alpha = 0.05f)
@@ -1262,7 +1322,10 @@ private fun EditScannedCardSheet(
     isLoadingPrints: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (ScannedCard) -> Unit,
+    onAddAnotherCopy: () -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     AddCardSheet(
         cardName = scannedCard.card.name,
         onConfirm = { foil: Boolean, _: Boolean, cond: String, lang: String, q: Int ->
@@ -1283,10 +1346,232 @@ private fun EditScannedCardSheet(
         confirmButtonText = stringResource(R.string.scanner_edit_save),
         setCode = scannedCard.card.setCode,
         setName = scannedCard.card.setName,
-        rarity = scannedCard.card.rarity
+        rarity = scannedCard.card.rarity,
+        extraContent = {
+            OutlinedButton(
+                onClick = onAddAnotherCopy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.AddCircleOutline, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.scanner_add_another_copy), style = ty.bodyMedium)
+            }
+        },
     )
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Variant Selector Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VariantSelectorSheet(
+    entry: ScannedCard,
+    variants: List<Card>,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onSelectVariant: (Card) -> Unit,
+    onExpandImage: (String) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue -> if (newValue == SheetValue.Hidden) !isLoading else true },
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.background,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textPrimary.copy(0.3f)) },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.scanner_variant_selector_title),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close), tint = mc.textPrimary)
+                }
+            }
+
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = mc.primaryAccent)
+                    }
+                }
+                variants.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.scanner_variant_no_results),
+                            style = ty.bodyMedium,
+                            color = mc.textSecondary,
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                        items(variants, key = { it.scryfallId }) { variant ->
+                            VariantCardItem(
+                                card = variant,
+                                isFoil = entry.isFoil,
+                                onSelectVariant = { onSelectVariant(variant) },
+                                onExpandImage = {
+                                    val url = variant.imageNormal ?: variant.imageArtCrop
+                                    if (!url.isNullOrBlank()) onExpandImage(url)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VariantCardItem(
+    card: Card,
+    isFoil: Boolean,
+    onSelectVariant: () -> Unit,
+    onExpandImage: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val preferredCurrency = LocalPreferredCurrency.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelectVariant() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Box {
+                AsyncImage(
+                    model = card.imageNormal ?: card.imageArtCrop,
+                    contentDescription = card.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .width(80.dp)
+                        .height(112.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onExpandImage() },
+                )
+                Icon(
+                    imageVector = Icons.Default.ZoomIn,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .align(Alignment.BottomEnd)
+                        .padding(2.dp),
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = card.name,
+                    style = ty.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SetSymbol(
+                        setCode = card.setCode,
+                        rarity = CardRarity.fromString(card.rarity),
+                        size = 14.dp,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "${card.setName} #${card.collectorNumber}",
+                        style = ty.labelSmall,
+                        color = mc.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (card.rarity.isNotBlank()) AttrTag(card.rarity.replaceFirstChar { it.uppercaseChar() })
+                Text(
+                    text = PriceFormatter.formatFromScryfall(
+                        if (isFoil) card.priceUsdFoil else card.priceUsd,
+                        if (isFoil) card.priceEurFoil else card.priceEur,
+                        preferredCurrency,
+                    ),
+                    style = ty.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = mc.goldMtg,
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = mc.textPrimary.copy(alpha = 0.05f))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Full-screen image viewer
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FullScreenImageViewer(
+    imageUrl: String,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 48.dp, end = 16.dp)
+                    .size(40.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+            ) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close), tint = Color.White)
+            }
+        }
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Price detail / Settings / Permission — reused or simplified

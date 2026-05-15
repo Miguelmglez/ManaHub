@@ -88,7 +88,11 @@ class CardOcrAnalyzer {
             val result = getRecognizer(language).process(image).await()
             extractFromResult(result)
         } catch (e: Exception) {
-            android.util.Log.w("CardOcrAnalyzer", "OCR failed", e)
+            if (com.mmg.manahub.BuildConfig.DEBUG) {
+                android.util.Log.w("CardOcrAnalyzer", "OCR failed", e)
+            } else {
+                android.util.Log.w("CardOcrAnalyzer", "OCR failed: ${e.javaClass.simpleName}")
+            }
             null
         }
     }

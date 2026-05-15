@@ -88,6 +88,9 @@ class ScannerViewModel @Inject constructor(
     private var lastAddedId: String? = null
     private var lastAddedTime: Long = 0L
 
+    // ── Variant load job — cancelled if the user closes the sheet before load completes ──
+    private var variantLoadJob: kotlinx.coroutines.Job? = null
+
     // ── SharedPreferences for queue persistence ───────────────────────────────
     private val prefs by lazy {
         context.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE)
@@ -142,7 +145,9 @@ class ScannerViewModel @Inject constructor(
                 put("setName",          entry.card.setName)
                 put("lang",             entry.card.lang)
                 put("priceUsd",         entry.card.priceUsd ?: JSONObject.NULL)
+                put("priceUsdFoil",     entry.card.priceUsdFoil ?: JSONObject.NULL)
                 put("priceEur",         entry.card.priceEur ?: JSONObject.NULL)
+                put("priceEurFoil",     entry.card.priceEurFoil ?: JSONObject.NULL)
                 put("imageNormal",      entry.card.imageNormal ?: JSONObject.NULL)
                 put("imageArtCrop",     entry.card.imageArtCrop ?: JSONObject.NULL)
                 put("collectorNumber",  entry.card.collectorNumber)
@@ -196,9 +201,9 @@ class ScannerViewModel @Inject constructor(
                     imageArtCrop     = obj.optString("imageArtCrop").takeIf { it.isNotEmpty() },
                     imageBackNormal  = null,
                     priceUsd         = if (obj.isNull("priceUsd")) null else obj.getDouble("priceUsd"),
-                    priceUsdFoil     = null,
+                    priceUsdFoil     = if (obj.isNull("priceUsdFoil")) null else obj.optDouble("priceUsdFoil").takeIf { !it.isNaN() },
                     priceEur         = if (obj.isNull("priceEur")) null else obj.getDouble("priceEur"),
-                    priceEurFoil     = null,
+                    priceEurFoil     = if (obj.isNull("priceEurFoil")) null else obj.optDouble("priceEurFoil").takeIf { !it.isNaN() },
                     legalityStandard  = "",
                     legalityPioneer   = "",
                     legalityModern    = "",
@@ -223,7 +228,11 @@ class ScannerViewModel @Inject constructor(
                 _uiState.update { it.copy(scanSession = ScanSession(cards)) }
             }
         } catch (e: Exception) {
-            android.util.Log.w("ScannerViewModel", "Failed to restore persisted queue", e)
+            if (com.mmg.manahub.BuildConfig.DEBUG) {
+                android.util.Log.w("ScannerViewModel", "Failed to restore persisted queue", e)
+            } else {
+                android.util.Log.w("ScannerViewModel", "Failed to restore persisted queue: ${e.javaClass.simpleName}")
+            }
         }
     }
 
@@ -647,7 +656,7 @@ class ScannerViewModel @Inject constructor(
         val original = _uiState.value.editingCard ?: return
         _uiState.update { state ->
             val updatedList = state.scanSession.cards.map {
-                if (it === original) updatedEntry else it
+                if (it.timestamp == original.timestamp) updatedEntry else it
             }
             state.copy(
                 scanSession = state.scanSession.copy(cards = updatedList),
@@ -723,7 +732,7 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 scanSession = state.scanSession.copy(
-                    cards = state.scanSession.cards.filter { it !== entry },
+                    cards = state.scanSession.cards.filter { it.timestamp != entry.timestamp },
                 ),
                 multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
             )
@@ -818,6 +827,86 @@ class ScannerViewModel @Inject constructor(
     /** Clears the one-shot toast message after it has been displayed. */
     fun onToastDismissed() {
         _uiState.update { it.copy(toastMessage = null) }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Variant selector
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fun onOpenVariantSelector(entry: ScannedCard) {
+        variantLoadJob?.cancel()
+        _uiState.update {
+            it.copy(
+                showVariantSelector = true,
+                variantSelectorEntry = entry,
+                cardVariants = emptyList(),
+                isLoadingVariants = true,
+            )
+        }
+        variantLoadJob = viewModelScope.launch {
+            val result = cardRepository.getCardArtVariants(entry.card.name)
+            _uiState.update { state ->
+                if (!state.showVariantSelector) return@update state
+                if (result is DataResult.Success)
+                    state.copy(cardVariants = result.data, isLoadingVariants = false)
+                else
+                    state.copy(isLoadingVariants = false)
+            }
+        }
+    }
+
+    fun onCloseVariantSelector() {
+        variantLoadJob?.cancel()
+        _uiState.update {
+            it.copy(
+                showVariantSelector = false,
+                variantSelectorEntry = null,
+                isLoadingVariants = false,
+                cardVariants = emptyList(),
+            )
+        }
+    }
+
+    fun onSelectVariant(variant: Card) {
+        val original = _uiState.value.variantSelectorEntry ?: return
+        _uiState.update { state ->
+            val updatedCards = state.scanSession.cards.map {
+                if (it.timestamp == original.timestamp) it.copy(card = variant, setCode = variant.setCode) else it
+            }
+            state.copy(
+                scanSession = state.scanSession.copy(cards = updatedCards),
+                showVariantSelector = false,
+                variantSelectorEntry = null,
+            )
+        }
+        persistQueue()
+    }
+
+    fun onExpandVariantImage(imageUrl: String) {
+        if (imageUrl.isBlank()) return
+        _uiState.update { it.copy(expandedVariantImageUrl = imageUrl) }
+    }
+
+    fun onCloseExpandedImage() {
+        _uiState.update { it.copy(expandedVariantImageUrl = null) }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Duplicate scanned card
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fun onAddDuplicateScannedCard(original: ScannedCard) {
+        val duplicate = original.copy(timestamp = System.currentTimeMillis())
+        _uiState.update { state ->
+            state.copy(
+                scanSession = state.scanSession.copy(
+                    cards = state.scanSession.cards + duplicate,
+                ),
+                showEditSheet = false,
+                editingCard = null,
+            )
+        }
+        persistQueue()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
