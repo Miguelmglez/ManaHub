@@ -69,6 +69,7 @@ object DatabaseModule {
                 MIGRATION_28_29,
                 MIGRATION_29_30,
                 MIGRATION_30_31,
+                MIGRATION_31_32,
             )
             .build()
 
@@ -212,6 +213,41 @@ object DatabaseModule {
             if (!columnExists(db, "local_wishlists", "quantity")) {
                 db.execSQL("ALTER TABLE local_wishlists ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v31 → v32
+    // Creates the `outgoing_friend_requests` table to cache friend requests sent
+    // by the current user that are still PENDING (friendships where user_id_1 = me
+    // AND status = 'PENDING' on Supabase).
+    //
+    // Kept as a separate table from `friend_requests` (incoming) because the column
+    // semantics differ: outgoing uses `to_*` columns, incoming uses `from_*`. A
+    // single table with an `is_outgoing` flag would require nullable columns and a
+    // filter predicate on every reactive query — a clean split is cheaper and clearer.
+    //
+    // Index on `to_user_id`: lets the repository quickly check whether a specific
+    // user already has a pending request from us (prevents duplicate send attempts).
+    // -------------------------------------------------------------------------
+    private val MIGRATION_31_32 = object : Migration(31, 32) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS outgoing_friend_requests (
+                    id          TEXT NOT NULL PRIMARY KEY,
+                    to_user_id  TEXT NOT NULL,
+                    to_nickname TEXT NOT NULL,
+                    to_game_tag TEXT NOT NULL,
+                    to_avatar_url TEXT,
+                    created_at  INTEGER NOT NULL,
+                    cached_at   INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS idx_outgoing_requests_to_user_id ON outgoing_friend_requests(to_user_id)"
+            )
         }
     }
 

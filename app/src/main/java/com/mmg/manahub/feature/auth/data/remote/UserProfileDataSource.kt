@@ -173,6 +173,51 @@ class UserProfileDataSource(
         }
     }
 
+    /**
+     * Updates one or more privacy visibility flags on the current user's `user_profiles` row.
+     *
+     * Only the fields provided as non-null are included in the PATCH body. Because Gson
+     * serializes nulls on the shared Supabase Retrofit instance, callers should pass a value
+     * for exactly one field per call to avoid accidentally nullifying the others.
+     *
+     * Returns [Result.success] on HTTP 2xx, [Result.failure] otherwise.
+     *
+     * @param userId UUID of the authenticated user (used as the PostgREST row filter).
+     * @param collectionPublic New value for `collection_public`, or null to leave unchanged.
+     * @param wishlistPublic New value for `wishlist_public`, or null to leave unchanged.
+     * @param tradeListPublic New value for `trade_list_public`, or null to leave unchanged.
+     */
+    suspend fun updatePrivacySettings(
+        userId: String,
+        collectionPublic: Boolean? = null,
+        wishlistPublic: Boolean? = null,
+        tradeListPublic: Boolean? = null,
+    ): Result<Unit> = withContext(ioDispatcher) {
+        runCatching {
+            // Build a sparse map so that only the fields that actually changed are sent.
+            // This prevents Gson's serializeNulls from writing null into NOT NULL columns.
+            val body = buildMap<String, Any> {
+                if (collectionPublic != null) put("collection_public", collectionPublic)
+                if (wishlistPublic != null) put("wishlist_public", wishlistPublic)
+                if (tradeListPublic != null) put("trade_list_public", tradeListPublic)
+            }
+            check(body.isNotEmpty()) { "updatePrivacySettings called with all-null arguments" }
+            val response = service.updatePrivacySettings(
+                idFilter = "eq.$userId",
+                body = body,
+            )
+            if (!response.isSuccessful) {
+                error("HTTP ${response.code()} updating privacy settings for user $userId")
+            }
+        }.onFailure { e ->
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "updatePrivacySettings failed for user $userId", e)
+            } else {
+                Log.w(TAG, "updatePrivacySettings failed: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private fun UserProfileRetrofitDto.toUserProfileDto() = UserProfileDto(

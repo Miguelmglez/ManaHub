@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You've been invited to ManaHub</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0D0D1A;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0D0D1A;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#3D1B6E 0%,#1A1A4E 100%);border-radius:12px 12px 0 0;padding:36px 40px;text-align:center;">
+              <p style="margin:0 0 8px 0;font-size:28px;font-weight:700;color:#D4A017;letter-spacing:2px;">⚔ MANAHUB</p>
+              <p style="margin:0;font-size:13px;color:#A090C0;letter-spacing:1px;text-transform:uppercase;">Magic: The Gathering Companion</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#1A1A2E;padding:40px;">
+              <p style="margin:0 0 20px 0;font-size:22px;font-weight:600;color:#E8E8F0;">A friend invited you!</p>
+              <p style="margin:0 0 16px 0;font-size:15px;color:#A0A0B8;line-height:1.6;">
+                Someone from your playgroup has invited you to join ManaHub — the companion app for Magic: The Gathering players.
+              </p>
+              <p style="margin:0 0 32px 0;font-size:15px;color:#A0A0B8;line-height:1.6;">
+                Accept the invitation to connect with friends, share your collection, discover trade opportunities, and track your stats.
+              </p>
+
+              <!-- CTA Button -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block;background:linear-gradient(135deg,#7B2D8B,#4A90D9);color:#FFFFFF;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:8px;letter-spacing:0.5px;">
+                      Accept Invitation
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:32px 0 0 0;font-size:13px;color:#6060A0;line-height:1.6;">
+                If you weren't expecting this invitation, you can safely ignore this email.
+              </p>
+              <p style="margin:12px 0 0 0;font-size:12px;color:#504870;word-break:break-all;">
+                Or copy this link: <a href="{{ .ConfirmationURL }}" style="color:#7B6BBD;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#13132A;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#404060;">
+                © 2026 ManaHub · Magic: The Gathering is © Wizards of the Coast
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

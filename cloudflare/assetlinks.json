@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.mmg.manahub",
+      "sha256_cert_fingerprints": [
+        "4D:E4:7E:9A:48:6A:BA:EC:3A:79:97:9A:A9:22:79:77:53:99:4B:71:D3:2D:BF:1A:88:2F:C2:59:FF:75:EE:BF"
+      ]
+    }
+  }
+]

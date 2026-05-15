@@ -936,6 +936,16 @@
     <string name="settings_tag_dictionary_subtitle">Edit translations, detection patterns and auto-tagger thresholds.</string>
     <string name="settings_open_scryfall">Open Scryfall website</string>
 
+    <!-- Privacy settings -->
+    <string name="settings_section_privacy">Privacy</string>
+    <string name="settings_privacy_collection">Public collection</string>
+    <string name="settings_privacy_collection_subtitle">Let friends see your card collection</string>
+    <string name="settings_privacy_wishlist">Public wishlist</string>
+    <string name="settings_privacy_wishlist_subtitle">Let friends see your wishlist</string>
+    <string name="settings_privacy_trade_list">Public trade list</string>
+    <string name="settings_privacy_trade_list_subtitle">Let friends see your trade offers</string>
+    <string name="settings_privacy_error">Could not update privacy settings. Please try again.</string>
+
     <!-- ══════════════════════════════════════════
          THEMES
     ═══════════════════════════════════════════ -->
@@ -1305,7 +1315,7 @@
     <string name="friends_login_required">You need to be logged in to manage your friends.</string>
     <string name="friends_section_pending">Pending Requests (%d)</string>
     <string name="friends_section_search">Search Player</string>
-    <string name="friends_search_placeholder">Exact game tag (e.g. #A3KX9Z)</string>
+    <string name="friends_search_placeholder">Game tag (e.g. A3KX9Z)</string>
     <string name="friends_search_btn_hint">Search</string>
     <string name="friends_no_result">No player found with that game tag.</string>
     <string name="friends_send_invitation">Send Invitation</string>
@@ -1313,11 +1323,56 @@
     <string name="friends_empty">No friends yet. Search by game tag to add someone!</string>
     <string name="friends_remove_friend">Remove Friend</string>
     <string name="friends_remove_confirm_title">Remove Friend</string>
-    <string name="friends_remove_confirm_body">Are you sure you want to remove %s from your friends?</string>
     <string name="friends_remove_confirm_ok">Remove</string>
     <string name="friends_remove_confirm_cancel">Cancel</string>
     <string name="friends_error_generic">Something went wrong. Please try again.</string>
     <string name="friends_error_send">Could not send friend request. Please try again.</string>
+    <string name="friends_section_outgoing">Pending Invitations (%d)</string>
+    <string name="friends_outgoing_cancel_hint">Cancel invitation</string>
+    <string name="friends_invitation_sent">Invitation sent</string>
+    <string name="friends_invitation_accepted">You are now friends!</string>
+    <string name="friends_invitation_declined">Invitation declined</string>
+    <string name="friends_invitation_cancelled">Invitation cancelled</string>
+    <string name="friends_error_cancel_outgoing">Could not cancel invitation. Please try again.</string>
+    <string name="friends_search_placeholder_no_hash">Game tag (e.g. A3KX9Z)</string>
+    <!-- Invite link sharing -->
+    <string name="friends_share_my_link">Share my link</string>
+    <string name="friends_share_chooser_title">Share your ManaHub invite</string>
+    <string name="friends_invite_self">That\'s your own invite link</string>
+    <string name="friends_invite_invalid">Invitation is no longer valid</string>
+    <string name="friends_invite_success">Now you are friends with %1$s</string>
+    <string name="friends_invite_success_generic">New friendship accepted!</string>
+    <string name="friends_invite_error">Could not accept the invitation</string>
+    <!-- Friend detail screen -->
+    <string name="friend_detail_tab_folder">Folder</string>
+    <string name="friend_detail_tab_stats">Stats</string>
+    <string name="friend_detail_tab_history">History</string>
+    <string name="friend_folder_tab_all">All</string>
+    <string name="friend_folder_tab_wishlist">Wishlist</string>
+    <string name="friend_folder_tab_trade">Offer for trade</string>
+    <string name="friend_folder_search_hint">Search cards by name</string>
+    <string name="friend_folder_empty_collection">%1$s\'s collection is empty or not public</string>
+    <string name="friend_folder_empty_wishlist">%1$s\'s wishlist is empty or not public</string>
+    <string name="friend_folder_empty_trade">%1$s\'s trade list is empty or not public</string>
+    <string name="friend_folder_error">Could not load cards. Check your connection.</string>
+    <string name="friend_history_tab_trades">Trades</string>
+    <string name="friend_history_tab_games">Games</string>
+    <string name="friend_history_trades_empty">No trades yet with %1$s</string>
+    <string name="friend_history_games_coming_soon">Coming soon — multiplayer games will be tracked when online sessions launch.</string>
+    <string name="friend_history_trade_row_cards_offered_received">%1$d cards offered / %2$d cards received</string>
+    <string name="friend_history_trade_row_updated">Updated %1$s</string>
+    <string name="friend_stats_error">Could not load stats. Tap to retry.</string>
+    <string name="friend_stats_no_data">%1$s hasn\'t shared their stats yet.</string>
+    <string name="friend_stats_total_cards">Total cards</string>
+    <string name="friend_stats_unique_cards">Unique cards</string>
+    <string name="friend_stats_value_eur">Value (EUR)</string>
+    <string name="friend_stats_value_usd">Value (USD)</string>
+    <string name="friend_stats_favourite_color">Favourite color</string>
+    <string name="friend_stats_most_valuable_color">Most valuable color</string>
+    <string name="friends_detail_remove_confirm_title">Remove Friend</string>
+    <string name="friends_detail_remove_confirm_body">Are you sure you want to remove %1$s from your friends?</string>
+    <string name="friends_detail_remove_confirm_ok">Remove</string>
+    <string name="friends_detail_remove_error">Could not remove friend. Please try again.</string>
 
     <!-- ══════════════════════════════════════════
          TRADES FEATURE

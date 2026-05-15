@@ -5,6 +5,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -82,6 +83,24 @@ interface SupabaseUserProfileService {
         @Body body: CompleteUserProfileDto,
     ): List<UserProfileRetrofitDto>
 
+    /**
+     * Updates privacy visibility flags on the user's `user_profiles` row.
+     *
+     * Accepts a [Map] body so that only the fields that actually need to change are included
+     * in the JSON payload. This avoids accidental nullification of other NOT NULL columns
+     * when the shared Retrofit instance is configured with [com.google.gson.GsonBuilder.serializeNulls].
+     *
+     * Expected keys: `"collection_public"`, `"wishlist_public"`, `"trade_list_public"` (any subset).
+     * Uses PostgREST row-filter via [idFilter] (format: "eq.{userId}").
+     * Returns HTTP 204 No Content on success (Prefer: return=minimal).
+     */
+    @PATCH("user_profiles")
+    suspend fun updatePrivacySettings(
+        @Query("id") idFilter: String,
+        @Header("Prefer") prefer: String = "return=minimal",
+        @Body body: Map<String, @JvmSuppressWildcards Any>,
+    ): Response<Unit>
+
 }
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
@@ -148,3 +167,4 @@ data class GetProfileByUserIdDto(
 data class CompleteUserProfileDto(
     @SerializedName("p_nickname") val pNickname: String,
 )
+

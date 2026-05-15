@@ -35,6 +35,17 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var supabaseClient: SupabaseClient
 
+    /**
+     * Guards against a malicious app injecting a forged manahub://auth intent.
+     * MainActivity is exported=true (required for LAUNCHER), so any installed app
+     * can send it an intent. Only pass auth intents to the Supabase SDK.
+     */
+    private fun isSupabaseAuthDeepLink(intent: Intent): Boolean {
+        if (intent.action != Intent.ACTION_VIEW) return false
+        val uri = intent.data ?: return false
+        return uri.scheme == "manahub" && uri.host == "auth"
+    }
+
     override fun attachBaseContext(newBase: Context) {
         val langCode = newBase
             .getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
@@ -53,8 +64,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Handle Supabase deep link when app is already running (email verification callback)
-        supabaseClient.handleDeeplinks(intent)
+        if (isSupabaseAuthDeepLink(intent)) {
+            supabaseClient.handleDeeplinks(intent)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,8 +76,9 @@ class MainActivity : ComponentActivity() {
         splashScreen.setKeepOnScreenCondition { false }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Handle Supabase deep link when app is launched cold from email verification
-        supabaseClient.handleDeeplinks(intent)
+        if (isSupabaseAuthDeepLink(intent)) {
+            supabaseClient.handleDeeplinks(intent)
+        }
         setContent {
             val theme by userPreferencesDataStore.themeFlow
                 .collectAsStateWithLifecycle(initialValue = AppTheme.NeonVoid)
