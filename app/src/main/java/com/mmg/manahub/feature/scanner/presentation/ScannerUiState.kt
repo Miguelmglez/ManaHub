@@ -109,6 +109,14 @@ data class ScannerUiState(
     // Rolling FPS counter — only populated in DEBUG builds, always 0 in release
     val fps: Int = 0,
 
+    // Variant selector sheet
+    val showVariantSelector: Boolean = false,
+    val variantSelectorEntry: ScannedCard? = null,
+    val cardVariants: List<Card> = emptyList(),
+    val isLoadingVariants: Boolean = false,
+    // Full-screen image viewer
+    val expandedVariantImageUrl: String? = null,
+
     // COMMENTED OUT — embedding DB fields no longer needed with ML Kit OCR pipeline
     // val embeddingDbVersionReady: Boolean = false,
     // val embeddingDbVersion: Int = 0,
