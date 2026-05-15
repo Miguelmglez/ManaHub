@@ -204,5 +204,6 @@ dependencies {
     implementation(libs.security.crypto)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+    implementation(libs.youtube.player)
 
 }

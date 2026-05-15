@@ -4,6 +4,13 @@ import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,11 +26,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,12 +42,15 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -53,16 +67,19 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.app.MainActivity
+import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.news.domain.model.ContentSource
 import com.mmg.manahub.feature.news.domain.model.ContentType
 import com.mmg.manahub.feature.news.domain.model.NewsItem
 import com.mmg.manahub.feature.news.presentation.components.ArticleCard
+import com.mmg.manahub.feature.news.presentation.components.NewsVideoPlayer
 import com.mmg.manahub.feature.news.presentation.components.ShimmerNewsItem
 import com.mmg.manahub.feature.news.presentation.components.VideoCard
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun NewsScreen(
     viewModel: NewsViewModel = hiltViewModel(),
@@ -72,6 +89,26 @@ fun NewsScreen(
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
     val context = LocalContext.current
+    val mainActivity = context as? MainActivity
+
+    var playingVideoId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(playingVideoId) {
+        mainActivity?.setPlayerActive(playingVideoId != null)
+    }
+
+    // Hide main UI if in PiP
+    val isInPiP = mainActivity?.isInPiP == true
+
+    if (isInPiP && playingVideoId != null) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            NewsVideoPlayer(
+                videoId = playingVideoId!!,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -79,13 +116,44 @@ fun NewsScreen(
             .background(mc.background)
             .statusBarsPadding(),
     ) {
-        // ── Title ────────────────────────────────────────────────────────────
-        Text(
-            text = stringResource(R.string.news_title),
-            style = mt.titleLarge,
-            color = mc.textPrimary,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
-        )
+        // ── Title & Language Selector ───────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = stringResource(R.string.news_title),
+                style = mt.titleLarge,
+                color = mc.textPrimary,
+            )
+            
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NewsLanguage.entries.forEach { lang ->
+                    val selected = lang in uiState.activeLanguages
+                    Surface(
+                        onClick = { viewModel.onLanguageToggled(lang) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selected) mc.primaryAccent.copy(alpha = 0.2f) else mc.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (selected) mc.primaryAccent else mc.surfaceVariant
+                        ),
+                        modifier = Modifier.size(width = 44.dp, height = 32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = lang.code.split("-").first().uppercase(),
+                                style = mt.labelMedium,
+                                color = if (selected) mc.primaryAccent else mc.textSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // ── Search bar ───────────────────────────────────────────────────────
         OutlinedTextField(
@@ -163,7 +231,7 @@ fun NewsScreen(
         Spacer(Modifier.height(8.dp))
 
         // ── Error inline ─────────────────────────────────────────────────────
-        if (uiState.error != null) {
+        AnimatedVisibility(visible = uiState.error != null) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -195,61 +263,100 @@ fun NewsScreen(
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize(),
         ) {
-            when {
-                uiState.isLoading -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(5) { ShimmerNewsItem() }
+            AnimatedContent(
+                targetState = uiState.isLoading to uiState.items.isEmpty(),
+                transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+                label = "NewsContent"
+            ) { (isLoading, isEmpty) ->
+                when {
+                    isLoading -> {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(5) { ShimmerNewsItem() }
+                        }
                     }
-                }
-                uiState.items.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.news_empty),
-                            style = mt.bodyLarge,
-                            color = mc.textDisabled,
-                            textAlign = TextAlign.Center,
-                        )
+                    isEmpty -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.news_empty),
+                                style = mt.bodyLarge,
+                                color = mc.textDisabled,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
-                }
-                else -> {
-                    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                    LazyColumn(
-                        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(
-                            items = uiState.items,
-                            key = { it.id },
-                        ) { item ->
-                            val badge = if (uiState.showLanguageBadge)
-                                uiState.sourceLanguageMap[item.sourceId]
-                            else null
-                            when (item) {
-                                is NewsItem.Article -> ArticleCard(
-                                    article = item,
-                                    languageBadge = badge,
-                                    onClick = {
-                                        openArticle(context, item.url, mc.primaryAccent.toArgb())
-                                    },
-                                )
-                                is NewsItem.Video -> VideoCard(
-                                    video = item,
-                                    languageBadge = badge,
-                                    onClick = {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.url))
-                                        context.startActivity(intent)
-                                    },
-                                )
+                    else -> {
+                        val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        LazyColumn(
+                            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(
+                                items = uiState.items,
+                                key = { it.id },
+                            ) { item ->
+                                val badge = if (uiState.showLanguageBadge)
+                                    uiState.sourceLanguageMap[item.sourceId]
+                                else null
+                                when (item) {
+                                    is NewsItem.Article -> ArticleCard(
+                                        article = item,
+                                        languageBadge = badge,
+                                        onClick = {
+                                            openArticle(context, item.url, mc.primaryAccent.toArgb())
+                                        },
+                                        modifier = Modifier.animateItem()
+                                    )
+                                    is NewsItem.Video -> VideoCard(
+                                        video = item,
+                                        languageBadge = badge,
+                                        onClick = {
+                                            playingVideoId = item.videoId
+                                        },
+                                        modifier = Modifier.animateItem()
+                                    )
+                                }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Overlay Video Player
+    AnimatedVisibility(
+        visible = playingVideoId != null && !isInPiP,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.95f))
+                .clickable { /* prevent click through */ }
+        ) {
+            NewsVideoPlayer(
+                videoId = playingVideoId!!,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+            )
+            
+            IconButton(
+                onClick = { playingVideoId = null },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
             }
         }
     }

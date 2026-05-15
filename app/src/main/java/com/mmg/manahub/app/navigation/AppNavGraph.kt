@@ -85,7 +85,10 @@ private val bottomBarRoutes = setOf(
 )
 
 @Composable
-fun AppNavGraph(modifier: Modifier = Modifier) {
+fun AppNavGraph(
+    modifier: Modifier = Modifier,
+    isInPiP: Boolean = false,
+) {
     val activity = LocalContext.current as ComponentActivity
     val context = LocalContext.current
 
@@ -148,7 +151,7 @@ fun AppNavGraph(modifier: Modifier = Modifier) {
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
             Column {
-                if (currentRoute in bottomBarRoutes) {
+                if (currentRoute in bottomBarRoutes && !isInPiP) {
                     MagicBottomBar(
                         currentRoute = currentRoute,
                         onCollectionClick = { navController.navigateTab(Screen.Collection.route) },

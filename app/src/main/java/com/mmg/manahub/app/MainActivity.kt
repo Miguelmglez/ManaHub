@@ -23,8 +23,41 @@ import io.github.jan.supabase.auth.handleDeeplinks
 import java.util.Locale
 import javax.inject.Inject
 
+import android.app.PictureInPictureParams
+import android.util.Rational
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    var videoPlayerActive by mutableStateOf(false)
+        private set
+
+    var isInPiP by mutableStateOf(false)
+        private set
+
+    fun setPlayerActive(active: Boolean) {
+        videoPlayerActive = active
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (videoPlayerActive) {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .build()
+            enterPictureInPictureMode(params)
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPiP = isInPictureInPictureMode
+    }
 
     @Inject
     lateinit var userPreferencesDataStore: UserPreferencesDataStore
@@ -90,7 +123,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalPreferredCurrency provides (userPrefs?.preferredCurrency ?: com.mmg.manahub.core.domain.model.PreferredCurrency.USD),
                 ) {
-                    AppNavGraph()
+                    AppNavGraph(isInPiP = isInPiP)
                 }
             }
         }
