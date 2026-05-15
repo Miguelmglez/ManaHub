@@ -64,16 +64,21 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> =
         withContext(ioDispatcher) {
-            // Using unique=prints to get all versions of the card
-            val query = "!\"$name\" unique:prints"
+            val safeName = name.replace("\"", "").replace("\\", "").trim()
+            val query = "!\"$safeName\" unique:prints"
             val result = remote.searchCards(query, 1)
             if (result.isSuccess) {
-                val cards = result.getOrThrow()
-                // We don't necessarily want to cache all prints in the main DB unless they are picked
-                DataResult.Success(cards)
+                DataResult.Success(result.getOrThrow())
             } else {
                 DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
             }
+        }
+
+    override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> =
+        withContext(ioDispatcher) {
+            val result = remote.getCardArtVariants(name)
+            if (result.isSuccess) DataResult.Success(result.getOrThrow())
+            else DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
         }
 
     private suspend fun entityWithComputedTags(card: Card) = run {

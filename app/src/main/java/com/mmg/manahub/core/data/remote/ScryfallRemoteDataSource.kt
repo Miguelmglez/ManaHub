@@ -104,6 +104,15 @@ class ScryfallRemoteDataSource @Inject constructor(
         )
     }
 
+    suspend fun getCardArtVariants(name: String): Result<List<Card>> =
+        safeCall {
+            val safeName = name.replace("\"", "").replace("\\", "").trim()
+            if (safeName.isBlank()) return@safeCall emptyList()
+            requestQueue.execute {
+                api.searchCards(query = "!\"$safeName\"", unique = "art", order = "released")
+            }.data.toDomain()
+        }
+
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
         withContext(Dispatchers.IO) { runCatching { block() } }
 }

@@ -13,7 +13,7 @@ sealed class Screen(val route: String) {
     object CollectionAddCard  : Screen("collection/add")
     object CollectionScanner  : Screen("collection/scanner")
     object CollectionCardDetail : Screen("collection/detail/{scryfallId}") {
-        fun createRoute(scryfallId: String) = "collection/detail/$scryfallId"
+        fun createRoute(scryfallId: String) = "collection/detail/${Uri.encode(scryfallId)}"
     }
 
     // ── Decks (sub-section of Collection) ────────────────────────────────────
