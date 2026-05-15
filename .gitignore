@@ -305,3 +305,6 @@ $RECYCLE.BIN/
 /cloudflare/wrangler.toml
 /docs/plans/friends-improvements.md
 /cloudflare/
+
+# GitHub Pages site (separate git repo, not part of the app)
+/github-pages/
