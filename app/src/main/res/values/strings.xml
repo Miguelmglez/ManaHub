@@ -1201,6 +1201,12 @@
     <string name="draft_cards_all">All Cards</string>
     <string name="draft_guide_videos">Videos</string>
     <string name="draft_card_artist">Artist: %1$s</string>
+    <string name="draft_color_ranking_label">Color Ranking:</string>
+    <string name="draft_key_notes_label">Key Notes:</string>
+    <string name="draft_mechanic_overperformers">Overperformers</string>
+    <string name="draft_mechanic_underperformers">Underperformers</string>
+    <string name="draft_archetype_difficulty">Difficulty: %1$s</string>
+    <string name="draft_pick_order_rank">Pick #%1$d</string>
 
     <!-- Deck import / export -->
     <string name="deck_import_title">Import Deck</string>

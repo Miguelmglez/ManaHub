@@ -70,6 +70,7 @@ object DatabaseModule {
                 MIGRATION_29_30,
                 MIGRATION_30_31,
                 MIGRATION_31_32,
+                MIGRATION_32_33,
             )
             .build()
 
@@ -240,6 +241,59 @@ object DatabaseModule {
             // migration accidentally created this index; drop it so devices that already ran
             // that version also pass schema validation on the next startup.
             db.execSQL("DROP INDEX IF EXISTS `idx_outgoing_requests_to_user_id`")
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v32 → v33
+    // Recreates the `draft_sets` table to match the new Cloudflare-based schema.
+    //
+    // Columns removed: setType, cardCount, scryfallUri (not present in the new
+    //   Cloudflare sets-index.json source).
+    // Columns added: guideVersion TEXT NOT NULL DEFAULT '', tierListVersion TEXT NOT NULL DEFAULT ''
+    //   (used for client-side cache invalidation per set).
+    //
+    // SQLite does not support DROP COLUMN, so we use the recommended 12-step table
+    // recreation pattern:
+    //   1. Create a new table with the target schema.
+    //   2. Copy compatible columns from the old table.
+    //   3. Drop the old table.
+    //   4. Rename the new table.
+    //
+    // draft_sets has no referencing foreign keys, so no cascade or constraint
+    // changes are needed. The table is a pure cache — data loss is acceptable
+    // and the next app launch will re-populate it from Cloudflare.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_32_33 = object : Migration(32, 33) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Step 1: create the new table with the target schema
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `draft_sets_new` (
+                    `id` TEXT NOT NULL,
+                    `code` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `releasedAt` TEXT NOT NULL,
+                    `iconSvgUri` TEXT NOT NULL,
+                    `guideVersion` TEXT NOT NULL DEFAULT '',
+                    `tierListVersion` TEXT NOT NULL DEFAULT '',
+                    `cachedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            // Step 2: copy rows that exist in both schemas, using empty strings for new columns
+            db.execSQL(
+                """
+                INSERT INTO `draft_sets_new` (`id`, `code`, `name`, `releasedAt`, `iconSvgUri`, `guideVersion`, `tierListVersion`, `cachedAt`)
+                SELECT `id`, `code`, `name`, `releasedAt`, `iconSvgUri`, '', '', `cachedAt`
+                FROM `draft_sets`
+                """.trimIndent()
+            )
+            // Step 3: drop old table
+            db.execSQL("DROP TABLE IF EXISTS `draft_sets`")
+            // Step 4: rename new table to target name
+            db.execSQL("ALTER TABLE `draft_sets_new` RENAME TO `draft_sets`")
         }
     }
 
