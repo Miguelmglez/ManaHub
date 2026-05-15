@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
 import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
+import com.mmg.manahub.feature.friends.data.local.entity.OutgoingFriendRequestEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -40,4 +41,30 @@ interface FriendDao {
 
     @Query("DELETE FROM friend_requests")
     suspend fun clearRequests()
+
+    // ── Outgoing friend requests ──────────────────────────────────────────────
+
+    /** Emits the list of requests the current user has sent that are still PENDING. */
+    @Query("SELECT * FROM outgoing_friend_requests ORDER BY created_at DESC")
+    fun observeOutgoingRequests(): Flow<List<OutgoingFriendRequestEntity>>
+
+    /** Count of pending outgoing requests — used to show badge on "Sent" tab. */
+    @Query("SELECT COUNT(*) FROM outgoing_friend_requests")
+    fun observeOutgoingCount(): Flow<Int>
+
+    /**
+     * Replaces the cached outgoing requests with the latest snapshot from Supabase.
+     * Uses REPLACE conflict strategy because [OutgoingFriendRequestEntity.id] is the
+     * Supabase row id — identical ids simply overwrite stale cached data.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertOutgoingRequests(requests: List<OutgoingFriendRequestEntity>)
+
+    /** Removes a single outgoing request by its Supabase friendship id. */
+    @Query("DELETE FROM outgoing_friend_requests WHERE id = :id")
+    suspend fun deleteOutgoingRequest(id: String)
+
+    /** Clears all outgoing requests — called before a full re-fetch from Supabase. */
+    @Query("DELETE FROM outgoing_friend_requests")
+    suspend fun clearOutgoingRequests()
 }

@@ -30,6 +30,7 @@ import com.mmg.manahub.feature.draft.data.local.DraftSetEntity
 import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
 import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
 import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
+import com.mmg.manahub.feature.friends.data.local.entity.OutgoingFriendRequestEntity
 import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
 import com.mmg.manahub.feature.news.data.local.NewsDao
@@ -59,10 +60,11 @@ import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
         DraftSetEntity::class,
         FriendEntity::class,
         FriendRequestEntity::class,
+        OutgoingFriendRequestEntity::class,
         LocalWishlistEntity::class,
         LocalOpenForTradeEntity::class,
     ],
-    version = 31,
+    version = 32,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

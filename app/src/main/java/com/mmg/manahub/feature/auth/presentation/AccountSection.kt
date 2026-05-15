@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
@@ -40,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -75,6 +78,7 @@ fun AccountSection(
     modifier: Modifier = Modifier,
     playerName: String? = null,
     avatarUrl: String? = null,
+    shareUrl: String? = null,
 ) {
     when (sessionState) {
         SessionState.Loading -> AccountSectionSkeleton(modifier = modifier)
@@ -95,6 +99,7 @@ fun AccountSection(
                 modifier = modifier,
                 displayName = playerName,
                 displayAvatarUrl = avatarUrl,
+                shareUrl = shareUrl,
             )
         }
     }
@@ -382,6 +387,7 @@ private fun AuthenticatedCard(
     modifier: Modifier = Modifier,
     displayName: String? = null,
     displayAvatarUrl: String? = null,
+    shareUrl: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -526,6 +532,42 @@ private fun AuthenticatedCard(
                             )
                         }
                     }
+                }
+            }
+
+            // ── Share invite link button ───────────────────────────────────────
+            if (shareUrl != null) {
+                val context = LocalContext.current
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, shareUrl)
+                        }
+                        context.startActivity(
+                            Intent.createChooser(
+                                intent,
+                                context.getString(com.mmg.manahub.R.string.friends_share_chooser_title)
+                            )
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
+                ) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = mc.primaryAccent,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(com.mmg.manahub.R.string.friends_share_my_link),
+                        style = ty.labelLarge,
+                    )
                 }
             }
 

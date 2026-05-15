@@ -47,7 +47,7 @@ import com.mmg.manahub.feature.trades.domain.model.SharedListResult
  * Landing screen for shared trade-list deep links.
  *
  * Reached via [Screen.TradesSharedList] when a user taps a link of the form:
- * `https://trades.manahub.app/list/{shareId}`
+ * `https://miguelmglez.github.io/list/{shareId}`
  *
  * Phase 3 will render card images and enable "Add to my wishlist" actions.
  * In Phase 2, this screen renders raw card IDs from the resolved list.

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,9 +24,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,20 +35,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,84 +61,36 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicToastHost
-import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.model.FriendRequest
+import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToFriendDetail: (userId: String) -> Unit,
     viewModel: FriendsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val toastState = rememberMagicToastState()
-    var selectedFriend by remember { mutableStateOf<Friend?>(null) }
-    var showRemoveConfirm by remember { mutableStateOf(false) }
 
     val errorMsg = stringResource(R.string.friends_error_generic)
     val sendErrorMsg = stringResource(R.string.friends_error_send)
+    val sentMsg = stringResource(R.string.friends_invitation_sent)
+    val acceptedMsg = stringResource(R.string.friends_invitation_accepted)
+    val rejectedMsg = stringResource(R.string.friends_invitation_declined)
+    val cancelledMsg = stringResource(R.string.friends_invitation_cancelled)
+    val cancelErrorMsg = stringResource(R.string.friends_error_cancel_outgoing)
 
     LaunchedEffect(uiState.toastMessage) {
         val msg = uiState.toastMessage ?: return@LaunchedEffect
-        toastState.show(msg, MagicToastType.ERROR)
+        toastState.show(msg, uiState.toastType)
         viewModel.clearToast()
-    }
-
-    selectedFriend?.let { friend ->
-        FriendDetailSheet(
-            friend = friend,
-            onDismiss = { selectedFriend = null },
-            onRemoveFriend = { showRemoveConfirm = true },
-        )
-    }
-
-    if (showRemoveConfirm) {
-        val friendName = selectedFriend?.nickname ?: ""
-        AlertDialog(
-            onDismissRequest = { showRemoveConfirm = false },
-            title = {
-                Text(
-                    stringResource(R.string.friends_remove_confirm_title),
-                    color = mc.textPrimary,
-                    style = MaterialTheme.magicTypography.titleMedium,
-                )
-            },
-            text = {
-                Text(
-                    stringResource(R.string.friends_remove_confirm_body, friendName),
-                    color = mc.textSecondary,
-                    style = MaterialTheme.magicTypography.bodySmall,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    selectedFriend?.let { f ->
-                        viewModel.removeFriend(f.id, errorMsg)
-                    }
-                    showRemoveConfirm = false
-                    selectedFriend = null
-                }) {
-                    Text(
-                        stringResource(R.string.friends_remove_confirm_ok),
-                        color = mc.lifeNegative,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRemoveConfirm = false }) {
-                    Text(
-                        stringResource(R.string.friends_remove_confirm_cancel),
-                        color = mc.textSecondary,
-                    )
-                }
-            },
-            containerColor = mc.backgroundSecondary,
-        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -211,7 +157,7 @@ fun FriendsScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // Pending requests section
+                // Incoming pending requests section
                 if (uiState.pendingRequests.isNotEmpty()) {
                     item {
                         SectionLabel(
@@ -222,8 +168,26 @@ fun FriendsScreen(
                     items(uiState.pendingRequests, key = { it.id }) { request ->
                         PendingRequestRow(
                             request = request,
-                            onAccept = { viewModel.acceptRequest(request.id, errorMsg) },
-                            onReject = { viewModel.rejectRequest(request.id, errorMsg) },
+                            onAccept = { viewModel.acceptRequest(request.id, errorMsg, acceptedMsg) },
+                            onReject = { viewModel.rejectRequest(request.id, errorMsg, rejectedMsg) },
+                        )
+                    }
+                }
+
+                // Outgoing pending invitations section
+                if (uiState.outgoingRequests.isNotEmpty()) {
+                    item {
+                        SectionLabel(
+                            stringResource(R.string.friends_section_outgoing, uiState.outgoingRequests.size),
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                        )
+                    }
+                    items(uiState.outgoingRequests, key = { it.id }) { request ->
+                        OutgoingRequestRow(
+                            request = request,
+                            onCancel = {
+                                viewModel.cancelOutgoingRequest(request.id, cancelErrorMsg, cancelledMsg)
+                            },
                         )
                     }
                 }
@@ -238,6 +202,12 @@ fun FriendsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
+                        Text(
+                            text = "#",
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(end = 6.dp),
+                        )
                         OutlinedTextField(
                             value = uiState.searchQuery,
                             onValueChange = viewModel::onSearchQueryChange,
@@ -284,7 +254,9 @@ fun FriendsScreen(
                         Spacer(Modifier.height(8.dp))
                         SearchResultCard(
                             friend = result,
-                            onSendInvitation = { viewModel.sendFriendRequest(result.userId, sendErrorMsg) },
+                            onSendInvitation = {
+                                viewModel.sendFriendRequest(result.userId, sendErrorMsg, sentMsg)
+                            },
                         )
                     } ?: run {
                         if (uiState.searchPerformed && uiState.searchQuery.isNotBlank() && !uiState.isSearching) {
@@ -293,6 +265,32 @@ fun FriendsScreen(
                                 style = MaterialTheme.magicTypography.bodySmall,
                                 color = mc.textDisabled,
                                 modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
+                }
+
+                // Share invite link section — only visible when the URL is ready
+                if (uiState.shareUrl != null) {
+                    item {
+                        val context = LocalContext.current
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.onShareMyLinkClicked(context) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, mc.primaryAccent),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
+                        ) {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stringResource(R.string.friends_share_my_link),
+                                style = MaterialTheme.magicTypography.labelLarge,
                             )
                         }
                     }
@@ -316,7 +314,7 @@ fun FriendsScreen(
                     }
                 } else {
                     items(uiState.friends, key = { it.id }) { friend ->
-                        FriendRow(friend = friend, onClick = { selectedFriend = friend })
+                        FriendRow(friend = friend, onClick = { onNavigateToFriendDetail(friend.userId) })
                     }
                 }
             }
@@ -371,6 +369,46 @@ private fun PendingRequestRow(
             }
             IconButton(onClick = onReject) {
                 Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OutgoingRequestRow(
+    request: OutgoingFriendRequest,
+    onCancel: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(shape = RoundedCornerShape(12.dp), color = mc.surface, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AvatarImage(
+                avatarUrl = request.toAvatarUrl,
+                initials = request.toNickname.take(1).uppercase(),
+                size = 40,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    request.toNickname,
+                    style = MaterialTheme.magicTypography.bodyMedium,
+                    color = mc.textPrimary,
+                )
+                Text(
+                    request.toGameTag,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
+                )
+            }
+            IconButton(onClick = onCancel) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.friends_outgoing_cancel_hint),
+                    tint = mc.textDisabled,
+                )
             }
         }
     }
@@ -432,63 +470,6 @@ private fun FriendRow(friend: Friend, onClick: () -> Unit) {
                 Text(friend.nickname, style = MaterialTheme.magicTypography.bodyMedium, color = mc.textPrimary)
                 Text(friend.gameTag, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FriendDetailSheet(
-    friend: Friend,
-    onDismiss: () -> Unit,
-    onRemoveFriend: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = mc.backgroundSecondary,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        dragHandle = { Spacer(Modifier.height(8.dp)) },
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            AvatarImage(
-                avatarUrl = friend.avatarUrl,
-                initials = friend.nickname.take(1).uppercase(),
-                size = 72,
-            )
-            Text(
-                friend.nickname,
-                style = MaterialTheme.magicTypography.titleLarge,
-                color = mc.textPrimary,
-            )
-            Text(
-                friend.gameTag,
-                style = MaterialTheme.magicTypography.bodySmall,
-                color = mc.textSecondary,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onRemoveFriend,
-                colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    Icons.Default.PersonRemove,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.friends_remove_friend), color = Color.White)
-            }
-            Spacer(Modifier.navigationBarsPadding())
         }
     }
 }

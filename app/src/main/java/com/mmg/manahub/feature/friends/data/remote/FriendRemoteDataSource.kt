@@ -102,6 +102,119 @@ class FriendRemoteDataSource @Inject constructor(
                 if (!response.isSuccessful) error("Remove failed: ${response.code()}")
             }
         }
+
+    /**
+     * Fetches the referral code for [userId] from `user_profiles`.
+     * Returns null if the user has no referral code or on any network error.
+     */
+    suspend fun getMyReferralCode(@Suppress("UNUSED_PARAMETER") userId: String): String? =
+        withContext(dispatcher) {
+            try {
+                // Uses the server-side get_my_referral_code() RPC (SECURITY DEFINER)
+                // so the caller cannot query another user's code by passing a different userId.
+                service.getMyReferralCode().firstOrNull()?.referralCode
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+    /**
+     * Calls the `accept_invite` RPC with the given [referralCode].
+     *
+     * @throws retrofit2.HttpException when Supabase returns a PostgreSQL error
+     *   (e.g. INVALID_CODE or SELF_INVITE). The error body contains the message.
+     * @throws Exception on network failures.
+     */
+    suspend fun acceptInvite(referralCode: String): AcceptInviteResultDto =
+        withContext(dispatcher) {
+            service.acceptInvite(AcceptInviteRequestDto(referralCode)).firstOrNull()
+                ?: throw IllegalStateException("accept_invite returned empty result")
+        }
+
+    /**
+     * Calls the `get_friend_collection` RPC and returns the raw DTO list.
+     *
+     * @param friendUserId Auth UUID of the friend.
+     * @param list         Which list to fetch: 'collection', 'wishlist', or 'trade'.
+     * @param query        Optional name filter; empty string means no filter.
+     */
+    suspend fun getFriendCollection(
+        friendUserId: String,
+        list: String,
+        query: String,
+    ): List<FriendCardDto> =
+        withContext(dispatcher) {
+            service.getFriendCollection(
+                GetFriendCollectionRequestDto(
+                    pFriendUserId = friendUserId,
+                    pList = list,
+                    pQuery = query,
+                )
+            )
+        }
+
+    /**
+     * Fetches the collection stats for [friendUserId] from `user_collection_stats`.
+     * Returns the first row or null if the user has no stats row yet.
+     *
+     * @throws Exception on network failure; callers should wrap with [runCatching].
+     */
+    suspend fun getFriendStats(friendUserId: String): FriendStatsDto? =
+        withContext(dispatcher) {
+            service.getFriendStats(userIdFilter = "eq.$friendUserId").firstOrNull()
+        }
+
+    /**
+     * Calls the `upsert_collection_stats` RPC to persist the caller's own stats.
+     *
+     * @return [Result.success] on HTTP 2xx; [Result.failure] on any error.
+     */
+    suspend fun upsertCollectionStats(
+        uniqueCards: Int,
+        totalCards: Int,
+        totalValueEur: Double,
+        totalValueUsd: Double,
+        favouriteColor: String?,
+        mostValuableColor: String?,
+    ): Result<Unit> =
+        withContext(dispatcher) {
+            runCatching {
+                val response = service.upsertCollectionStats(
+                    UpsertCollectionStatsDto(
+                        pUniqueCards = uniqueCards,
+                        pTotalCards = totalCards,
+                        pTotalValueEur = totalValueEur,
+                        pTotalValueUsd = totalValueUsd,
+                        pFavouriteColor = favouriteColor,
+                        pMostValuableColor = mostValuableColor,
+                    )
+                )
+                if (!response.isSuccessful) error("upsert_collection_stats failed: ${response.code()}")
+            }
+        }
+
+    suspend fun getOutgoingRequests(currentUserId: String): Result<List<OutgoingRequestWithProfile>> =
+        withContext(dispatcher) {
+            runCatching {
+                val requests = service.getOutgoingPendingRequests(userId1Filter = "eq.$currentUserId")
+                if (requests.isEmpty()) return@runCatching emptyList()
+                val receiverIds = requests.map { it.userId2 }.distinct()
+                val profiles = service
+                    .getProfilesByIds(idFilter = "in.(${receiverIds.joinToString(",")})")
+                    .associateBy { it.id }
+                requests.mapNotNull { fs ->
+                    val profile = profiles[fs.userId2] ?: return@mapNotNull null
+                    OutgoingRequestWithProfile(
+                        id = fs.id,
+                        toUserId = fs.userId2,
+                        toNickname = profile.nickname ?: fs.userId2,
+                        toGameTag = profile.gameTag ?: "",
+                        toAvatarUrl = profile.avatarUrl,
+                        createdAt = 0L,
+                    )
+                }
+            }
+        }
 }
 
 data class FriendWithProfile(
@@ -118,5 +231,14 @@ data class FriendRequestWithProfile(
     val fromNickname: String,
     val fromGameTag: String,
     val fromAvatarUrl: String?,
+    val createdAt: Long,
+)
+
+data class OutgoingRequestWithProfile(
+    val id: String,
+    val toUserId: String,
+    val toNickname: String,
+    val toGameTag: String,
+    val toAvatarUrl: String?,
     val createdAt: Long,
 )
