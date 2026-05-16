@@ -18,6 +18,8 @@ import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -30,6 +32,8 @@ abstract class DraftModule {
     abstract fun bindDraftRepository(impl: DraftRepositoryImpl): DraftRepository
 
     companion object {
+
+        private const val MAX_RESPONSE_BYTES = 5L * 1024 * 1024 // 5 MB
 
         @Provides
         @Singleton
@@ -68,18 +72,37 @@ abstract class DraftModule {
         // -----------------------------------------------------------------------
 
         /**
-         * Retrofit instance pointed at the ManaHub Cloudflare Worker.
-         * Uses the shared OkHttpClient (includes logging, cache, User-Agent).
+         * Dedicated OkHttpClient for the Cloudflare Worker.
+         * - 30 s read timeout: tier-list files can be ~70 KB on slow connections.
+         * - 5 MB response-size guard: rejects unexpectedly large bodies before Gson
+         *   allocates memory for them, protecting against OOM on misconfigured or
+         *   tampered responses.
          */
         @Provides
         @Singleton
         @Named("cloudflare")
-        fun provideCloudflareRetrofit(client: OkHttpClient): Retrofit =
-            Retrofit.Builder()
-                .baseUrl("https://manahub-draft-api.miguel-mglez.workers.dev/")
-                .client(client)
+        fun provideCloudflareRetrofit(client: OkHttpClient): Retrofit {
+            val cloudflareClient = client.newBuilder()
+                .readTimeout(30, TimeUnit.SECONDS)
+                .addNetworkInterceptor { chain ->
+                    val response = chain.proceed(chain.request())
+                    val contentLength = response.header("Content-Length")?.toLongOrNull()
+                    if (contentLength != null && contentLength > MAX_RESPONSE_BYTES) {
+                        response.close()
+                        throw IOException(
+                            "Cloudflare response too large: ${contentLength / 1024} KB " +
+                                "(limit ${MAX_RESPONSE_BYTES / 1024 / 1024} MB)"
+                        )
+                    }
+                    response
+                }
+                .build()
+            return Retrofit.Builder()
+                .baseUrl(BuildConfig.CLOUDFLARE_WORKER_URL)
+                .client(cloudflareClient)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
+        }
 
         @Provides
         @Singleton

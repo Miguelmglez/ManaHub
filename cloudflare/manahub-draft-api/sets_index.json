@@ -1,0 +1,26 @@
+{
+  "index_version": "1.1",
+  "last_updated": "2026-05-16",
+  "sets": [
+    {
+      "code": "sos",
+      "name": "Secrets of Strixhaven",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/sos.svg",
+      "released_at": "2026-05-01",
+      "content_versions": {
+        "guide": "2026-05",
+        "tier_list": "2026-05"
+      }
+    },
+    {
+      "code": "eoe",
+      "name": "Edge of Eternities",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/eoe.svg",
+      "released_at": "2025-08-08",
+      "content_versions": {
+        "guide": "2025-08-08-v2",
+        "tier_list": "2025-08-26"
+      }
+    }
+  ]
+}

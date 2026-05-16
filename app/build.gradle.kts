@@ -48,6 +48,11 @@ android {
             "GOOGLE_CLIENT_ID",
             "\"${localProperties.getProperty("GOOGLE_CLIENT_ID", "")}\""
         )
+        buildConfigField(
+            "String",
+            "CLOUDFLARE_WORKER_URL",
+            "\"https://manahub-draft-api.miguel-mglez.workers.dev/\""
+        )
     }
 
     testOptions {
