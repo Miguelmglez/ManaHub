@@ -42,14 +42,47 @@ data class MechanicGuide(
 )
 
 /**
+ * A key card within a mechanic's examples, carrying direct image URLs from the JSON.
+ * All image-bearing fields default to empty string for cards that omit image_uris.
+ *
+ * @property name Card name.
+ * @property scryfallId Scryfall UUID (empty when the JSON omits the "id" field).
+ * @property artCropUri Direct CDN URL for the art crop image (empty when image_uris is absent).
+ * @property imageNormalUri Direct CDN URL for the full card image (empty when image_uris is absent).
+ * @property note Draft note describing the card's role in the mechanic.
+ * @property tierRating Tier rating string (e.g. "A", "C-").
+ * @property pickOrderRank Numeric pick-order position (0 when absent).
+ * @property color Single-color letter string (e.g. "B", "WR").
+ * @property rarity Card rarity string.
+ * @property colors List of color identity letters (e.g. ["B"]).
+ * @property typeLine Card type line.
+ */
+data class MechanicKeyCard(
+    val name: String,
+    val scryfallId: String = "",
+    val artCropUri: String = "",
+    val imageNormalUri: String = "",
+    val note: String = "",
+    val tierRating: String = "",
+    val pickOrderRank: Int = 0,
+    val color: String = "",
+    val rarity: String = "",
+    val colors: List<String> = emptyList(),
+    val typeLine: String = "",
+)
+
+/**
  * Key example cards for a mechanic, split by performance.
  *
- * @property overperformers Cards that perform better than expected.
+ * When the JSON provides a flat array (Variant B), all cards are placed in [overperformers]
+ * and [underperformers] is empty; callers should treat this as a generic "Key Cards" list.
+ *
+ * @property overperformers Cards that perform better than expected (also used for flat-array variant).
  * @property underperformers Cards that perform worse than expected.
  */
 data class MechanicExamples(
-    val overperformers: List<String>,
-    val underperformers: List<String>,
+    val overperformers: List<MechanicKeyCard> = emptyList(),
+    val underperformers: List<MechanicKeyCard> = emptyList(),
 )
 
 /**

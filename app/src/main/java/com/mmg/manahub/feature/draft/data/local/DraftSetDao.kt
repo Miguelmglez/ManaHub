@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -26,8 +27,11 @@ interface DraftSetDao {
     @Query("SELECT * FROM draft_sets WHERE code = :code LIMIT 1")
     suspend fun getSetByCode(code: String): DraftSetEntity?
 
-    /** Returns the earliest cachedAt timestamp across all rows, used for TTL checks. */
-    @Query("SELECT cachedAt FROM draft_sets ORDER BY cachedAt ASC LIMIT 1")
+    /**
+     * Returns the most-recent cachedAt timestamp across all rows, used for TTL checks.
+     * Using DESC (not ASC) so that a freshly-inserted row makes the cache appear fresh.
+     */
+    @Query("SELECT cachedAt FROM draft_sets ORDER BY cachedAt DESC LIMIT 1")
     suspend fun getLastCachedTime(): Long?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -35,4 +39,15 @@ interface DraftSetDao {
 
     @Query("DELETE FROM draft_sets")
     suspend fun deleteAll()
+
+    /**
+     * Atomically replaces all sets in the table within a single transaction.
+     * Prefer this over calling [deleteAll] + [insertAll] separately to avoid
+     * a window where the table is empty between the two operations.
+     */
+    @Transaction
+    suspend fun replaceAll(sets: List<DraftSetEntity>) {
+        deleteAll()
+        insertAll(sets)
+    }
 }
