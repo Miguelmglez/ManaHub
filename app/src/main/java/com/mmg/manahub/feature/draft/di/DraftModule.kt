@@ -15,9 +15,12 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Cache
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
@@ -81,17 +84,43 @@ abstract class DraftModule {
         @Provides
         @Singleton
         @Named("cloudflare")
-        fun provideCloudflareRetrofit(client: OkHttpClient): Retrofit {
-            val cloudflareClient = client.newBuilder()
+        fun provideCloudflareRetrofit(@ApplicationContext context: Context): Retrofit {
+            // Built from scratch — must NOT inherit the global OkHttpClient whose
+            // network interceptor forces Cache-Control: max-age=86400, which would
+            // silently override the Worker's max-age=300 and break version-based cache invalidation.
+            val cloudflareClient = OkHttpClient.Builder()
                 .readTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .header("User-Agent", "ManaHub/1.0 Android")
+                        .build()
+                    chain.proceed(request)
+                }
+                .addInterceptor(HttpLoggingInterceptor().apply {
+                    level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                            else HttpLoggingInterceptor.Level.NONE
+                })
+                .cache(Cache(File(context.cacheDir, "http_cache_cloudflare"), 10L * 1024 * 1024))
                 .addNetworkInterceptor { chain ->
                     val response = chain.proceed(chain.request())
                     val contentLength = response.header("Content-Length")?.toLongOrNull()
+                    // Guard 1: reject early if Content-Length already exceeds limit
                     if (contentLength != null && contentLength > MAX_RESPONSE_BYTES) {
                         response.close()
                         throw IOException(
                             "Cloudflare response too large: ${contentLength / 1024} KB " +
                                 "(limit ${MAX_RESPONSE_BYTES / 1024 / 1024} MB)"
+                        )
+                    }
+                    // Guard 2: for chunked/unknown-length responses, pre-buffer up to limit+1
+                    // bytes so we can detect overflow before Gson allocates memory for the body.
+                    val body = response.body
+                    val source = body.source()
+                    source.request(MAX_RESPONSE_BYTES + 1)
+                    if (source.buffer.size > MAX_RESPONSE_BYTES) {
+                        body.close()
+                        throw IOException(
+                            "Cloudflare response exceeds ${MAX_RESPONSE_BYTES / 1024 / 1024} MB limit"
                         )
                     }
                     response
