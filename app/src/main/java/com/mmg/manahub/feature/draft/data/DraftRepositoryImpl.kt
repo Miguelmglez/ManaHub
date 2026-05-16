@@ -30,6 +30,8 @@ import com.mmg.manahub.feature.draft.domain.model.TierGroup
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -74,6 +76,11 @@ class DraftRepositoryImpl @Inject constructor(
     }
 
     private val videoCache = ConcurrentHashMap<String, Pair<Long, List<DraftVideo>>>()
+    private val guideMutexes = ConcurrentHashMap<String, Mutex>()
+    private val tierMutexes = ConcurrentHashMap<String, Mutex>()
+
+    private fun guideMutex(code: String) = guideMutexes.computeIfAbsent(code) { Mutex() }
+    private fun tierMutex(code: String) = tierMutexes.computeIfAbsent(code) { Mutex() }
 
     // -------------------------------------------------------------------------
     // getDraftableSets — Cloudflare sets-index.json with Room cache
@@ -117,29 +124,31 @@ class DraftRepositoryImpl @Inject constructor(
         return withContext(ioDispatcher) {
             try {
                 val safeCode = sanitizeSetCode(setCode)
-                val localFile = guideFile(safeCode)
-                val storedVersion = draftPrefs.getString(PREF_GUIDE_VERSION.format(safeCode), null)
-                val remoteVersion = getRemoteGuideVersion(safeCode)
+                guideMutex(safeCode).withLock {
+                    val localFile = guideFile(safeCode)
+                    val storedVersion = draftPrefs.getString(PREF_GUIDE_VERSION.format(safeCode), null)
+                    val remoteVersion = getRemoteGuideVersion(safeCode)
 
-                val needsRefresh = !localFile.exists() ||
-                    (remoteVersion != null && remoteVersion != storedVersion)
+                    val needsRefresh = !localFile.exists() ||
+                        (remoteVersion != null && remoteVersion != storedVersion)
 
-                if (needsRefresh) {
-                    val json = cloudflareApi.getSetGuide(safeCode)
-                    saveJsonToFile(json, localFile)
-                    if (remoteVersion != null) {
-                        draftPrefs.edit()
-                            .putString(PREF_GUIDE_VERSION.format(safeCode), remoteVersion)
-                            .apply()
+                    if (needsRefresh) {
+                        val json = cloudflareApi.getSetGuide(safeCode)
+                        saveJsonToFile(json, localFile)
+                        if (remoteVersion != null) {
+                            draftPrefs.edit()
+                                .putString(PREF_GUIDE_VERSION.format(safeCode), remoteVersion)
+                                .apply()
+                        }
+                    }
+
+                    if (!localFile.exists()) {
+                        DataResult.Error("Guide not available for $safeCode")
+                    } else {
+                        val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
+                        DataResult.Success(parseGuide(safeCode, jsonObject))
                     }
                 }
-
-                if (!localFile.exists()) {
-                    return@withContext DataResult.Error("Guide not available for $safeCode")
-                }
-
-                val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                DataResult.Success(parseGuide(safeCode, jsonObject))
             } catch (e: Exception) {
                 DataResult.Error(e.message ?: "Failed to load guide for $setCode")
             }
@@ -154,29 +163,31 @@ class DraftRepositoryImpl @Inject constructor(
         return withContext(ioDispatcher) {
             try {
                 val safeCode = sanitizeSetCode(setCode)
-                val localFile = tierListFile(safeCode)
-                val storedVersion = draftPrefs.getString(PREF_TIER_VERSION.format(safeCode), null)
-                val remoteVersion = getRemoteTierVersion(safeCode)
+                tierMutex(safeCode).withLock {
+                    val localFile = tierListFile(safeCode)
+                    val storedVersion = draftPrefs.getString(PREF_TIER_VERSION.format(safeCode), null)
+                    val remoteVersion = getRemoteTierVersion(safeCode)
 
-                val needsRefresh = !localFile.exists() ||
-                    (remoteVersion != null && remoteVersion != storedVersion)
+                    val needsRefresh = !localFile.exists() ||
+                        (remoteVersion != null && remoteVersion != storedVersion)
 
-                if (needsRefresh) {
-                    val json = cloudflareApi.getSetTierList(safeCode)
-                    saveJsonToFile(json, localFile)
-                    if (remoteVersion != null) {
-                        draftPrefs.edit()
-                            .putString(PREF_TIER_VERSION.format(safeCode), remoteVersion)
-                            .apply()
+                    if (needsRefresh) {
+                        val json = cloudflareApi.getSetTierList(safeCode)
+                        saveJsonToFile(json, localFile)
+                        if (remoteVersion != null) {
+                            draftPrefs.edit()
+                                .putString(PREF_TIER_VERSION.format(safeCode), remoteVersion)
+                                .apply()
+                        }
+                    }
+
+                    if (!localFile.exists()) {
+                        DataResult.Error("Tier list not available for $safeCode")
+                    } else {
+                        val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
+                        DataResult.Success(parseTierList(safeCode, jsonObject))
                     }
                 }
-
-                if (!localFile.exists()) {
-                    return@withContext DataResult.Error("Tier list not available for $safeCode")
-                }
-
-                val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                DataResult.Success(parseTierList(safeCode, jsonObject))
             } catch (e: Exception) {
                 DataResult.Error(e.message ?: "Failed to load tier list for $setCode")
             }

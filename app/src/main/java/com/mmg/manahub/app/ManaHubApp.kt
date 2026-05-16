@@ -20,6 +20,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -29,6 +31,7 @@ class ManaHubApp : Application() {
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
     @Inject lateinit var authRepository: AuthRepository
+    @Inject lateinit var okHttpClient: OkHttpClient
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -38,8 +41,28 @@ class ManaHubApp : Application() {
 
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
 
-        Coil.setImageLoader(ImageLoader.Builder(this).components { add(SvgDecoder.Factory()) }
-            .build())
+        val allowedImageHosts = setOf(
+            "cards.scryfall.io",
+            "svgs.scryfall.io",
+            "c1.scryfall.com",
+            "i.ytimg.com",
+        )
+        Coil.setImageLoader(
+            ImageLoader.Builder(this)
+                .okHttpClient(
+                    okHttpClient.newBuilder()
+                        .addInterceptor { chain ->
+                            val host = chain.request().url.host
+                            if (host !in allowedImageHosts) {
+                                throw IOException("Image host not in allowlist: $host")
+                            }
+                            chain.proceed(chain.request())
+                        }
+                        .build()
+                )
+                .components { add(SvgDecoder.Factory()) }
+                .build()
+        )
 
         appScope.launch {
             runCatching { syncManaSymbols() }
