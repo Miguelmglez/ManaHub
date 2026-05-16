@@ -12,6 +12,8 @@
         <!-- Exclude downloaded card hash database — large binary, reconstructed on demand -->
         <exclude domain="file" path="card_hashes.bin" />
         <exclude domain="file" path="card_hashes.bin.tmp" />
+        <!-- Exclude per-set draft guide and tier-list JSON cache — refetched from Cloudflare on demand -->
+        <exclude domain="file" path="draft/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/" />
@@ -25,5 +27,7 @@
         <!-- Exclude downloaded card hash database — large binary, reconstructed on demand -->
         <exclude domain="file" path="card_hashes.bin" />
         <exclude domain="file" path="card_hashes.bin.tmp" />
+        <!-- Exclude per-set draft guide and tier-list JSON cache — refetched from Cloudflare on demand -->
+        <exclude domain="file" path="draft/" />
     </device-transfer>
 </data-extraction-rules>

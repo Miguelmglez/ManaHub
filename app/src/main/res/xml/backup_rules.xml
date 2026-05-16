@@ -11,4 +11,6 @@
     <!-- Exclude downloaded card hash database — large binary, reconstructed on demand -->
     <exclude domain="file" path="card_hashes.bin" />
     <exclude domain="file" path="card_hashes.bin.tmp" />
+    <!-- Exclude per-set draft guide and tier-list JSON cache — refetched from Cloudflare on demand -->
+    <exclude domain="file" path="draft/" />
 </full-backup-content>

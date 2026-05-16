@@ -1205,6 +1205,7 @@
     <string name="draft_key_notes_label">Key Notes:</string>
     <string name="draft_mechanic_overperformers">Overperformers</string>
     <string name="draft_mechanic_underperformers">Underperformers</string>
+    <string name="draft_mechanic_key_cards">Key Cards</string>
     <string name="draft_archetype_difficulty">Difficulty: %1$s</string>
     <string name="draft_pick_order_rank">Pick #%1$d</string>
 

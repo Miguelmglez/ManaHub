@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.draft.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallApi
@@ -21,6 +22,7 @@ import com.mmg.manahub.feature.draft.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.MechanicExamples
 import com.mmg.manahub.feature.draft.domain.model.MechanicGuide
+import com.mmg.manahub.feature.draft.domain.model.MechanicKeyCard
 import com.mmg.manahub.feature.draft.domain.model.SetDraftGuide
 import com.mmg.manahub.feature.draft.domain.model.SetTierList
 import com.mmg.manahub.feature.draft.domain.model.TierCard
@@ -30,6 +32,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Named
@@ -65,6 +68,9 @@ class DraftRepositoryImpl @Inject constructor(
         private const val VIDEO_CACHE_DURATION_MS = 60 * 60 * 1000L // 1 hour
         private const val PREF_GUIDE_VERSION = "pref_draft_%s_guide_version"
         private const val PREF_TIER_VERSION = "pref_draft_%s_tier_version"
+
+        /** Allowlist: set codes must be 2–6 lowercase ASCII letters only. */
+        private val VALID_SET_CODE = Regex("^[a-z]{2,6}$")
     }
 
     private val videoCache = ConcurrentHashMap<String, Pair<Long, List<DraftVideo>>>()
@@ -89,8 +95,7 @@ class DraftRepositoryImpl @Inject constructor(
 
                 val response = cloudflareApi.getSetsIndex()
                 val entities = response.sets.map { it.toEntity() }
-                draftSetDao.deleteAll()
-                draftSetDao.insertAll(entities)
+                draftSetDao.replaceAll(entities)
 
                 DataResult.Success(entities.map { it.toDomain() })
             } catch (e: Exception) {
@@ -111,29 +116,30 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun getSetGuide(setCode: String): DataResult<SetDraftGuide> {
         return withContext(ioDispatcher) {
             try {
-                val localFile = guideFile(setCode)
-                val storedVersion = draftPrefs.getString(PREF_GUIDE_VERSION.format(setCode), null)
-                val remoteVersion = getRemoteGuideVersion(setCode)
+                val safeCode = sanitizeSetCode(setCode)
+                val localFile = guideFile(safeCode)
+                val storedVersion = draftPrefs.getString(PREF_GUIDE_VERSION.format(safeCode), null)
+                val remoteVersion = getRemoteGuideVersion(safeCode)
 
                 val needsRefresh = !localFile.exists() ||
                     (remoteVersion != null && remoteVersion != storedVersion)
 
                 if (needsRefresh) {
-                    val json = cloudflareApi.getSetGuide(setCode.lowercase())
+                    val json = cloudflareApi.getSetGuide(safeCode)
                     saveJsonToFile(json, localFile)
                     if (remoteVersion != null) {
                         draftPrefs.edit()
-                            .putString(PREF_GUIDE_VERSION.format(setCode), remoteVersion)
+                            .putString(PREF_GUIDE_VERSION.format(safeCode), remoteVersion)
                             .apply()
                     }
                 }
 
                 if (!localFile.exists()) {
-                    return@withContext DataResult.Error("Guide not available for $setCode")
+                    return@withContext DataResult.Error("Guide not available for $safeCode")
                 }
 
                 val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                DataResult.Success(parseGuide(setCode, jsonObject))
+                DataResult.Success(parseGuide(safeCode, jsonObject))
             } catch (e: Exception) {
                 DataResult.Error(e.message ?: "Failed to load guide for $setCode")
             }
@@ -147,29 +153,30 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun getSetTierList(setCode: String): DataResult<SetTierList> {
         return withContext(ioDispatcher) {
             try {
-                val localFile = tierListFile(setCode)
-                val storedVersion = draftPrefs.getString(PREF_TIER_VERSION.format(setCode), null)
-                val remoteVersion = getRemoteTierVersion(setCode)
+                val safeCode = sanitizeSetCode(setCode)
+                val localFile = tierListFile(safeCode)
+                val storedVersion = draftPrefs.getString(PREF_TIER_VERSION.format(safeCode), null)
+                val remoteVersion = getRemoteTierVersion(safeCode)
 
                 val needsRefresh = !localFile.exists() ||
                     (remoteVersion != null && remoteVersion != storedVersion)
 
                 if (needsRefresh) {
-                    val json = cloudflareApi.getSetTierList(setCode.lowercase())
+                    val json = cloudflareApi.getSetTierList(safeCode)
                     saveJsonToFile(json, localFile)
                     if (remoteVersion != null) {
                         draftPrefs.edit()
-                            .putString(PREF_TIER_VERSION.format(setCode), remoteVersion)
+                            .putString(PREF_TIER_VERSION.format(safeCode), remoteVersion)
                             .apply()
                     }
                 }
 
                 if (!localFile.exists()) {
-                    return@withContext DataResult.Error("Tier list not available for $setCode")
+                    return@withContext DataResult.Error("Tier list not available for $safeCode")
                 }
 
                 val jsonObject = gson.fromJson(localFile.readText(), JsonObject::class.java)
-                DataResult.Success(parseTierList(setCode, jsonObject))
+                DataResult.Success(parseTierList(safeCode, jsonObject))
             } catch (e: Exception) {
                 DataResult.Error(e.message ?: "Failed to load tier list for $setCode")
             }
@@ -277,8 +284,30 @@ class DraftRepositoryImpl @Inject constructor(
     // Private helpers — file paths
     // -------------------------------------------------------------------------
 
+    /**
+     * Sanitizes [setCode] to a safe, lowercase string matching [VALID_SET_CODE].
+     * Throws [IllegalArgumentException] for any code that does not match, preventing
+     * path-traversal attacks when the value is used as a directory component.
+     */
+    private fun sanitizeSetCode(setCode: String): String {
+        val normalized = setCode.lowercase().trim()
+        require(VALID_SET_CODE.matches(normalized)) { "Invalid set code: '$normalized'" }
+        return normalized
+    }
+
+    /**
+     * Returns (and creates if necessary) the per-set cache directory.
+     * Throws [IOException] if the directory cannot be created — callers must not
+     * swallow this, as it indicates the device is out of storage or has a permissions issue.
+     *
+     * @param setCode Already-sanitized (lowercase) set code.
+     */
     private fun draftDir(setCode: String): File {
-        return File(context.filesDir, "draft/${setCode.lowercase()}").also { it.mkdirs() }
+        val dir = File(context.filesDir, "draft/$setCode")
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw IOException("Failed to create draft cache directory: ${dir.absolutePath}")
+        }
+        return dir
     }
 
     private fun guideFile(setCode: String): File =
@@ -287,8 +316,19 @@ class DraftRepositoryImpl @Inject constructor(
     private fun tierListFile(setCode: String): File =
         File(draftDir(setCode), "tier-list.json")
 
+    /**
+     * Writes [json] to [file] atomically: first writes to a sibling `.tmp` file,
+     * then renames it into place. This prevents a partially-written file from being
+     * read as valid JSON if the process is killed mid-write.
+     */
     private fun saveJsonToFile(json: JsonObject, file: File) {
-        file.writeText(gson.toJson(json))
+        val tmp = File(file.parent, "${file.name}.tmp")
+        tmp.writeText(gson.toJson(json))
+        if (!tmp.renameTo(file)) {
+            // renameTo can fail across filesystems; fall back to a plain copy + delete.
+            file.writeText(tmp.readText())
+            tmp.delete()
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -296,16 +336,14 @@ class DraftRepositoryImpl @Inject constructor(
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the guide version stored in Room for [setCode], or null if not cached.
+     * Returns the guide version stored in Room for [safeCode] (already lowercase), or null if not cached.
      * This avoids a network call just to check if the version changed.
      */
-    private suspend fun getRemoteGuideVersion(setCode: String): String? {
-        return draftSetDao.getSetByCode(setCode.lowercase())?.guideVersion
-    }
+    private suspend fun getRemoteGuideVersion(safeCode: String): String? =
+        draftSetDao.getSetByCode(safeCode)?.guideVersion
 
-    private suspend fun getRemoteTierVersion(setCode: String): String? {
-        return draftSetDao.getSetByCode(setCode.lowercase())?.tierListVersion
-    }
+    private suspend fun getRemoteTierVersion(safeCode: String): String? =
+        draftSetDao.getSetByCode(safeCode)?.tierListVersion
 
     // -------------------------------------------------------------------------
     // Private helpers — JSON parsing (guide)
@@ -326,11 +364,11 @@ class DraftRepositoryImpl @Inject constructor(
      */
     private fun parseGuide(setCode: String, json: JsonObject): SetDraftGuide {
         val metadata = json.getAsJsonObject("metadata")
-        val setName = metadata?.get("set_name")?.asString ?: ""
-        val lastUpdated = metadata?.get("last_updated")?.asString ?: ""
+        val setName = metadata?.get("set_name").safeAsString()
+        val lastUpdated = metadata?.get("last_updated").safeAsString()
 
         val overview = json.getAsJsonObject("set_overview")
-        val summary = overview?.get("summary")?.asString ?: ""
+        val summary = overview?.get("summary").safeAsString()
 
         val colorRanking = overview?.getAsJsonArray("color_ranking")
             ?.map { it.asString } ?: emptyList()
@@ -360,22 +398,64 @@ class DraftRepositoryImpl @Inject constructor(
         )
     }
 
+    /**
+     * Parses a single mechanic object from the JSON array.
+     *
+     * The `key_examples` field has two legal shapes:
+     * - **JsonObject** with optional `overperformers`/`underperformers` arrays of card objects.
+     * - **JsonArray** of card objects (flat list; placed in [MechanicExamples.overperformers]).
+     * - Absent or JsonNull → [MechanicGuide.keyExamples] is null.
+     */
     private fun parseMechanic(obj: JsonObject): MechanicGuide {
-        val keyExamplesObj = obj.getAsJsonObject("key_examples")
-        val examples = if (keyExamplesObj != null) {
-            MechanicExamples(
-                overperformers = keyExamplesObj.getAsJsonArray("overperformers")
-                    ?.map { it.asString } ?: emptyList(),
-                underperformers = keyExamplesObj.getAsJsonArray("underperformers")
-                    ?.map { it.asString } ?: emptyList(),
-            )
-        } else null
+        val keyExamplesElement = obj.get("key_examples")
+        val examples: MechanicExamples? = when {
+            keyExamplesElement == null || keyExamplesElement.isJsonNull -> null
+            keyExamplesElement.isJsonObject -> {
+                val ex = keyExamplesElement.asJsonObject
+                MechanicExamples(
+                    overperformers = ex.getAsJsonArray("overperformers")
+                        ?.map { parseMechanicKeyCard(it.asJsonObject) } ?: emptyList(),
+                    underperformers = ex.getAsJsonArray("underperformers")
+                        ?.map { parseMechanicKeyCard(it.asJsonObject) } ?: emptyList(),
+                )
+            }
+            keyExamplesElement.isJsonArray -> {
+                MechanicExamples(
+                    overperformers = keyExamplesElement.asJsonArray
+                        .map { parseMechanicKeyCard(it.asJsonObject) },
+                    underperformers = emptyList(),
+                )
+            }
+            else -> null
+        }
 
         return MechanicGuide(
-            name = obj.get("name")?.asString ?: "",
-            summary = obj.get("summary")?.asString ?: "",
-            performance = obj.get("performance")?.asString ?: "",
+            name = obj.get("name").safeAsString(),
+            summary = obj.get("summary").safeAsString(),
+            performance = obj.get("performance").safeAsString(),
             keyExamples = examples,
+        )
+    }
+
+    /**
+     * Parses a single card object inside `key_examples`.
+     * Image fields default to empty string when the card omits `image_uris`.
+     */
+    private fun parseMechanicKeyCard(obj: JsonObject): MechanicKeyCard {
+        val imageUris = obj.getAsJsonObject("image_uris")
+        val colors = obj.getAsJsonArray("colors")?.map { it.asString } ?: emptyList()
+        return MechanicKeyCard(
+            name = obj.get("name").safeAsString(),
+            scryfallId = obj.get("id").safeAsString(),
+            artCropUri = imageUris?.get("art_crop").safeAsString(),
+            imageNormalUri = imageUris?.get("normal").safeAsString(),
+            note = obj.get("note").safeAsString(),
+            tierRating = obj.get("tier_rating").safeAsString(),
+            pickOrderRank = obj.get("pick_order_rank").safeAsInt(),
+            color = obj.get("color").safeAsString(),
+            rarity = obj.get("rarity").safeAsString(),
+            colors = colors,
+            typeLine = obj.get("type_line").safeAsString(),
         )
     }
 
@@ -400,11 +480,11 @@ class DraftRepositoryImpl @Inject constructor(
             ?.map { parseArchetypeKeyCard(it.asJsonObject) } ?: emptyList()
 
         return ArchetypeGuide(
-            colors = obj.get("colors")?.asString ?: "",
-            name = obj.get("name")?.asString ?: "",
-            tier = obj.get("tier")?.asString ?: "",
-            strategy = obj.get("strategy")?.asString ?: "",
-            difficulty = obj.get("difficulty")?.asString ?: "",
+            colors = obj.get("colors").safeAsString(),
+            name = obj.get("name").safeAsString(),
+            tier = obj.get("tier").safeAsString(),
+            strategy = obj.get("strategy").safeAsString(),
+            difficulty = obj.get("difficulty").safeAsString(),
             keyCards = keyCards,
         )
     }
@@ -414,13 +494,13 @@ class DraftRepositoryImpl @Inject constructor(
         val colors = obj.getAsJsonArray("colors")
             ?.map { it.asString } ?: emptyList()
         return ArchetypeKeyCard(
-            name = obj.get("name")?.asString ?: "",
-            scryfallId = obj.get("id")?.asString ?: "",
+            name = obj.get("name").safeAsString(),
+            scryfallId = obj.get("id").safeAsString(),
             colors = colors,
-            typeLine = obj.get("type_line")?.asString ?: "",
-            artCropUri = imageUris?.get("art_crop")?.asString ?: "",
-            imageNormalUri = imageUris?.get("normal")?.asString ?: "",
-            rarity = obj.get("rarity")?.asString ?: "",
+            typeLine = obj.get("type_line").safeAsString(),
+            artCropUri = imageUris?.get("art_crop").safeAsString(),
+            imageNormalUri = imageUris?.get("normal").safeAsString(),
+            rarity = obj.get("rarity").safeAsString(),
         )
     }
 
@@ -443,8 +523,8 @@ class DraftRepositoryImpl @Inject constructor(
      */
     private fun parseTierList(setCode: String, json: JsonObject): SetTierList {
         val metadata = json.getAsJsonObject("metadata")
-        val setName = metadata?.get("set_name")?.asString ?: ""
-        val lastUpdated = metadata?.get("last_updated")?.asString ?: ""
+        val setName = metadata?.get("set_name").safeAsString()
+        val lastUpdated = metadata?.get("last_updated").safeAsString()
         val tierKey = metadata?.getAsJsonObject("tier_key")
             ?.entrySet()
             ?.associate { (k, v) -> k to v.asString } ?: emptyMap()
@@ -462,9 +542,9 @@ class DraftRepositoryImpl @Inject constructor(
     }
 
     private fun parseTierGroup(obj: JsonObject): TierGroup {
-        val tier = obj.get("tier_label")?.asString ?: ""
-        val label = obj.get("priority")?.asString ?: ""
-        val description = obj.get("description")?.asString ?: ""
+        val tier = obj.get("tier_label").safeAsString()
+        val label = obj.get("priority").safeAsString()
+        val description = obj.get("description").safeAsString()
         val cards = obj.getAsJsonArray("cards")
             ?.map { parseTierCard(it.asJsonObject) } ?: emptyList()
 
@@ -481,17 +561,35 @@ class DraftRepositoryImpl @Inject constructor(
         val colors = obj.getAsJsonArray("colors")
             ?.map { it.asString } ?: emptyList()
         return TierCard(
-            name = obj.get("name")?.asString ?: "",
-            scryfallId = obj.get("id")?.asString ?: "",
-            color = obj.get("color")?.asString ?: colors.joinToString(""),
+            name = obj.get("name").safeAsString(),
+            scryfallId = obj.get("id").safeAsString(),
+            color = obj.get("color").safeAsString(colors.joinToString("")),
             colors = colors,
-            rarity = obj.get("rarity")?.asString ?: "",
-            pickOrderRank = obj.get("pick_order_rank")?.asInt ?: 0,
-            tierRating = obj.get("tier_rating")?.asString ?: "",
-            note = obj.get("note")?.asString ?: "",
-            artCropUri = imageUris?.get("art_crop")?.asString ?: "",
-            imageNormalUri = imageUris?.get("normal")?.asString ?: "",
-            typeLine = obj.get("type_line")?.asString ?: "",
+            rarity = obj.get("rarity").safeAsString(),
+            pickOrderRank = obj.get("pick_order_rank").safeAsInt(),
+            tierRating = obj.get("tier_rating").safeAsString(),
+            note = obj.get("note").safeAsString(),
+            artCropUri = imageUris?.get("art_crop").safeAsString(),
+            imageNormalUri = imageUris?.get("normal").safeAsString(),
+            typeLine = obj.get("type_line").safeAsString(),
         )
     }
+
+    // -------------------------------------------------------------------------
+    // Null-safe JsonElement extension functions — guard against JsonNull values
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns [JsonElement.asString] or [default] if the element is null or [com.google.gson.JsonNull].
+     * Using `?.asString` alone does NOT protect against JsonNull — Gson throws
+     * [UnsupportedOperationException] when `asString` is called on a JsonNull element.
+     */
+    private fun JsonElement?.safeAsString(default: String = ""): String =
+        if (this == null || isJsonNull) default else asString
+
+    /**
+     * Returns [JsonElement.asInt] or [default] if the element is null or [com.google.gson.JsonNull].
+     */
+    private fun JsonElement?.safeAsInt(default: Int = 0): Int =
+        if (this == null || isJsonNull) default else asInt
 }

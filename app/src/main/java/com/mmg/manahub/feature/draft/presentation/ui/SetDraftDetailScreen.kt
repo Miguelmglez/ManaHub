@@ -86,6 +86,7 @@ import com.mmg.manahub.feature.draft.domain.model.ArchetypeGuide
 import com.mmg.manahub.feature.draft.domain.model.ArchetypeKeyCard
 import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.MechanicGuide
+import com.mmg.manahub.feature.draft.domain.model.MechanicKeyCard
 import com.mmg.manahub.feature.draft.domain.model.TierCard
 import com.mmg.manahub.feature.draft.presentation.viewmodel.CardSortOption
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailUiState
@@ -340,7 +341,7 @@ private fun GuideTab(
                     item {
                         ExpandableSection(stringResource(R.string.draft_guide_mechanics)) {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                guide.mechanics.forEach { MechanicCard(it) }
+                                guide.mechanics.forEach { MechanicCard(mechanic = it, setIconUri = setIconUri) }
                             }
                         }
                     }
@@ -383,9 +384,17 @@ private fun GuideTab(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun MechanicCard(mechanic: MechanicGuide) {
+private fun MechanicCard(mechanic: MechanicGuide, setIconUri: String) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
+
+    // Determine if this is a flat-array variant (overperformers only, no underperformers)
+    // vs the two-bucket variant. In the flat-array case we hide the "Overperformers" label.
+    val examples = mechanic.keyExamples
+    val isFlatArray = examples != null &&
+        examples.overperformers.isNotEmpty() &&
+        examples.underperformers.isEmpty()
+
     Surface(shape = RoundedCornerShape(8.dp), color = colors.surface) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(mechanic.name, style = typography.labelLarge, color = colors.primaryAccent, fontWeight = FontWeight.Bold)
@@ -402,37 +411,140 @@ private fun MechanicCard(mechanic: MechanicGuide) {
                 }
             }
 
-            val examples = mechanic.keyExamples
             if (examples != null) {
                 if (examples.overperformers.isNotEmpty()) {
-                    Row(verticalAlignment = Alignment.Top) {
-                        Icon(Icons.Default.TrendingUp, null, tint = Color(0xFF81C784), modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Column {
+                    Spacer(Modifier.height(2.dp))
+                    if (!isFlatArray) {
+                        // Two-bucket variant: show the labelled "Overperformers" header
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.TrendingUp, null, tint = Color(0xFF81C784), modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
                             Text(
                                 stringResource(R.string.draft_mechanic_overperformers),
                                 style = typography.labelSmall,
                                 color = Color(0xFF81C784),
                                 fontWeight = FontWeight.Medium,
                             )
-                            Text(examples.overperformers.joinToString(", "), style = typography.labelSmall, color = colors.textSecondary)
+                        }
+                    } else {
+                        // Flat-array variant: generic "Key Cards" label
+                        Text(
+                            stringResource(R.string.draft_mechanic_key_cards),
+                            style = typography.labelSmall,
+                            color = colors.textDisabled,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        examples.overperformers.forEach { card ->
+                            MechanicKeyCardItem(card = card, setIconUri = setIconUri)
                         }
                     }
                 }
+
                 if (examples.underperformers.isNotEmpty()) {
-                    Row(verticalAlignment = Alignment.Top) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.TrendingDown, null, tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Column {
-                            Text(
-                                stringResource(R.string.draft_mechanic_underperformers),
-                                style = typography.labelSmall,
-                                color = Color(0xFFE57373),
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(examples.underperformers.joinToString(", "), style = typography.labelSmall, color = colors.textSecondary)
+                        Text(
+                            stringResource(R.string.draft_mechanic_underperformers),
+                            style = typography.labelSmall,
+                            color = Color(0xFFE57373),
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        examples.underperformers.forEach { card ->
+                            MechanicKeyCardItem(card = card, setIconUri = setIconUri)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Compact art-crop row for a [MechanicKeyCard].
+ * Mirrors [ArchetypeKeyCardItem] but is non-clickable (mechanic cards are for reference only).
+ * Cards without image_uris show the set icon as a placeholder.
+ */
+@Composable
+private fun MechanicKeyCardItem(card: MechanicKeyCard, setIconUri: String) {
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+    var imageError by remember(card.artCropUri) { mutableStateOf(false) }
+    val showArtCrop = card.artCropUri.isNotBlank() && !imageError
+
+    Surface(shape = RoundedCornerShape(6.dp), color = colors.surfaceVariant.copy(alpha = 0.5f)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Art crop thumbnail
+            Box(
+                modifier = Modifier
+                    .width(64.dp)
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(colors.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (showArtCrop) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(card.artCropUri).crossfade(true).build(),
+                        contentDescription = card.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        onError = { imageError = true },
+                    )
+                } else {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(setIconUri)
+                            .decoderFactory(SvgDecoder.Factory())
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        colorFilter = ColorFilter.tint(colors.textDisabled.copy(alpha = 0.5f)),
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    card.colors.forEach { colorLetter ->
+                        colorToManaToken(colorLetter)?.let { token ->
+                            ManaSymbolImage(token = token, size = 12.dp)
+                        }
+                    }
+                    Text(
+                        card.name,
+                        style = typography.bodySmall,
+                        color = colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (card.tierRating.isNotBlank()) {
+                        val tierColor = TIER_COLORS[card.tierRating.take(1)] ?: colors.textSecondary
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(tierColor.copy(alpha = 0.2f))
+                                .padding(horizontal = 4.dp, vertical = 1.dp),
+                        ) {
+                            Text(card.tierRating, style = typography.labelSmall, color = tierColor, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                if (card.note.isNotBlank()) {
+                    Text(
+                        card.note,
+                        style = typography.labelSmall,
+                        color = colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
