@@ -34,46 +34,6 @@ enum class DeckFormat(
         requiresCommander = false,
         uniqueCards       = false,
     );
-    /*MODERN(
-        displayNameRes    = R.string.format_modern,
-        targetDeckSize    = 60,
-        targetLandCount   = 24,
-        maxCopies         = 4,
-        requiresCommander = false,
-        uniqueCards       = false,
-    ),
-    PIONEER(
-        displayNameRes    = R.string.format_pioneer,
-        targetDeckSize    = 60,
-        targetLandCount   = 24,
-        maxCopies         = 4,
-        requiresCommander = false,
-        uniqueCards       = false,
-    ),
-    PAUPER(
-        displayNameRes    = R.string.format_pauper,
-        targetDeckSize    = 60,
-        targetLandCount   = 24,
-        maxCopies         = 4,
-        requiresCommander = false,
-        uniqueCards       = false,
-    ),
-    LEGACY(
-        displayNameRes    = R.string.format_legacy,
-        targetDeckSize    = 60,
-        targetLandCount   = 24,
-        maxCopies         = 4,
-        requiresCommander = false,
-        uniqueCards       = false,
-    ),
-    VINTAGE(
-        displayNameRes    = R.string.format_vintage,
-        targetDeckSize    = 60,
-        targetLandCount   = 24,
-        maxCopies         = 4,
-        requiresCommander = false,
-        uniqueCards       = false,
-    );*/
 
     val nonLandSlots: Int get() = targetDeckSize - targetLandCount
 }

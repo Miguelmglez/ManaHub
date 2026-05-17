@@ -377,6 +377,36 @@
     <string name="stats_tab_collection">Collection</string>
     <string name="stats_tab_games">Games</string>
     <string name="stats_tab_trades">Trades</string>
+
+    <!-- Games tab KPIs -->
+    <string name="stats_kpi_total_games">Total Games</string>
+    <string name="stats_kpi_winrate">Win Rate</string>
+    <string name="stats_kpi_avg_duration">Avg Duration</string>
+    <string name="stats_kpi_favorite_mode">Fav. Mode</string>
+    <string name="stats_pending_surveys">%d pending survey(s)</string>
+
+    <!-- Games tab sections -->
+    <string name="stats_section_deck_performance">Deck Performance</string>
+    <string name="stats_section_history">History</string>
+    <string name="stats_empty_decks_subtitle">Associate games with decks via the post-game survey to see deck stats here</string>
+    <string name="stats_empty_history_subtitle">Recorded game sessions will appear here</string>
+
+    <!-- Survey status chips -->
+    <string name="survey_pending">Pending survey</string>
+    <string name="survey_partial">Survey in progress</string>
+    <string name="survey_completed">Survey completed</string>
+    <string name="survey_skipped">Survey skipped</string>
+
+    <!-- Delete game dialogs -->
+    <string name="delete_game_title">Delete game?</string>
+    <string name="delete_game_message_1">Delete this game? It will also remove the linked survey.</string>
+    <string name="delete_game_final_title">Are you absolutely sure?</string>
+    <string name="delete_game_final_message">This action cannot be undone.</string>
+    <string name="delete_game_toast">Game deleted</string>
+
+    <!-- Game actions -->
+    <string name="action_review_survey">Review survey</string>
+    <string name="action_delete_game">Delete game</string>
     <string name="stats_label_total_cards">Total cards</string>
     <string name="stats_label_mana_value">Mana Value</string>
     <string name="stats_label_unique_cards">Unique cards</string>
@@ -404,6 +434,18 @@
     <string name="stats_not_available">N/A</string>
     <string name="stats_label_total">total</string>
     <string name="stats_label_more">+ %1$d more</string>
+
+    <!-- Deck stats card (DeckStatsCard) -->
+    <string name="deck_stats_title">Deck performance</string>
+    <string name="deck_stats_winrate">%1$d%% win rate</string>
+    <string name="deck_stats_games_count">%1$d games</string>
+    <string name="deck_stats_avg_duration">Avg %1$s</string>
+    <string name="deck_stats_top_cards">Most impactful cards</string>
+    <string name="deck_stats_weakest_cards">Consider replacing</string>
+    <string name="deck_stats_recent_games">Recent games</string>
+    <string name="deck_stats_replace_button">Replace</string>
+    <string name="deck_stats_no_data">No game data for this deck yet</string>
+    <string name="deck_stats_card_appearances">%1$dx</string>
 
     <!-- ══════════════════════════════════════════
          DECK LIST SCREEN
@@ -763,6 +805,51 @@
     <string name="survey_hand_3">Playable hand</string>
     <string name="survey_hand_4">Good hand</string>
     <string name="survey_hand_5">Perfect hand</string>
+
+    <!-- Survey v2 — panels & new question/answer keys -->
+    <string name="survey_panel_mood">Mood</string>
+    <string name="survey_panel_fundamentals">Fundamentals</string>
+    <string name="survey_panel_cards">Card Impact</string>
+    <string name="survey_panel_summary">Summary</string>
+
+    <string name="survey_q_decisive_moment">What was the decisive moment?</string>
+    <string name="survey_a_key_turn">Key turn</string>
+    <string name="survey_a_top_deck">Top-deck</string>
+    <string name="survey_a_rival_error">Rival mistake</string>
+    <string name="survey_a_unclear">Unclear</string>
+
+    <string name="survey_q_matchup_difficulty">How hard was the matchup?</string>
+
+    <string name="survey_q_result_context_win">How did the win feel?</string>
+    <string name="survey_q_result_context_loss">What cost you the game?</string>
+
+    <string name="survey_q_card_impact">Did any card make a difference?</string>
+    <string name="survey_a_card_key">Key card</string>
+    <string name="survey_a_card_average">Average</string>
+    <string name="survey_a_card_weak">Weak</string>
+
+    <string name="survey_action_later">Later</string>
+    <string name="survey_action_save_finish">Save &amp; finish</string>
+    <string name="survey_action_save_changes">Save changes</string>
+    <string name="survey_action_add_card">Add card</string>
+
+    <string name="survey_recap_win">Victory</string>
+    <string name="survey_recap_loss">Defeat</string>
+    <string name="survey_recap_turns">%1$d turns</string>
+    <string name="survey_recap_vs">vs %1$s</string>
+    <string name="survey_recap_commander_kill">Commander damage win</string>
+
+    <string name="survey_deck_picker_title">Which deck did you play?</string>
+    <string name="survey_deck_picker_none">No deck</string>
+    <string name="survey_deck_associated">Deck: %1$s</string>
+
+    <string name="survey_reviewing_title">Reviewing game</string>
+
+    <string name="survey_skipped_count">%1$d skipped — that\'s fine</string>
+    <string name="survey_saved_toast">Game review saved</string>
+    <string name="survey_no_deck_prompt">Associate this game with one of your decks</string>
+    <string name="survey_no_deck_notice">No deck associated — card impact tracking unavailable</string>
+    <string name="survey_duration_min">%1$d min</string>
 
     <!-- ══════════════════════════════════════════
          TOURNAMENT SCREEN
@@ -1356,7 +1443,7 @@
     <string name="friend_detail_tab_history">History</string>
     <string name="friend_folder_tab_all">All</string>
     <string name="friend_folder_tab_wishlist">Wishlist</string>
-    <string name="friend_folder_tab_trade">Offer for trade</string>
+    <string name="friend_folder_tab_trade">For Trade</string>
     <string name="friend_folder_search_hint">Search cards by name</string>
     <string name="friend_folder_empty_collection">%1$s\'s collection is empty or not public</string>
     <string name="friend_folder_empty_wishlist">%1$s\'s wishlist is empty or not public</string>
@@ -1400,7 +1487,7 @@
     <string name="trades_no_friends_cta">Add friends to see their trade lists</string>
     <string name="trades_view_full_list">View full list</string>
     <string name="trades_friend_sheet_wishlist">Wishlist</string>
-    <string name="trades_friend_sheet_offers">Offer for Trade</string>
+    <string name="trades_friend_sheet_offers">For Trade</string>
     <string name="trades_friend_sheet_collection">Collection</string>
     <string name="trades_pick_friend_title">Select a friend</string>
     <string name="trades_no_friends">You have no friends yet. Add friends to start trading.</string>

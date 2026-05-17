@@ -14,6 +14,7 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -62,8 +63,9 @@ class AuthViewModelTest {
     private val signInWithEmailUseCase  = mockk<SignInWithEmailUseCase>()
     private val signUpWithEmailUseCase  = mockk<SignUpWithEmailUseCase>()
     private val signInWithGoogleUseCase = mockk<SignInWithGoogleUseCase>()
-    private val signUpWithGoogleUseCase = mockk<SignUpWithGoogleUseCase>()
-    private val signOutUseCase          = mockk<SignOutUseCase>()
+    private val signUpWithGoogleUseCase  = mockk<SignUpWithGoogleUseCase>()
+    private val linkGoogleIdentityUseCase = mockk<LinkGoogleIdentityUseCase>(relaxed = true)
+    private val signOutUseCase           = mockk<SignOutUseCase>()
     private val getSessionState         = mockk<GetSessionStateUseCase>()
     private val resetPasswordUseCase    = mockk<ResetPasswordUseCase>()
     private val deleteAccountUseCase    = mockk<DeleteAccountUseCase>()
@@ -153,18 +155,18 @@ class AuthViewModelTest {
     }
 
     private fun buildViewModel(): AuthViewModel = AuthViewModel(
-        signInWithEmailUseCase  = signInWithEmailUseCase,
-        signUpWithEmailUseCase  = signUpWithEmailUseCase,
-        signInWithGoogleUseCase = signInWithGoogleUseCase,
-        signUpWithGoogleUseCase = signUpWithGoogleUseCase,
-        signOutUseCase          = signOutUseCase,
-        getSessionState         = getSessionState,
-        resetPasswordUseCase    = resetPasswordUseCase,
-        deleteAccountUseCase    = deleteAccountUseCase,
-        updateNicknameUseCase   = updateNicknameUseCase,
-        userPreferencesDataStore = mockk(relaxed = true),
-        analyticsHelper         = mockk(relaxed = true),
-        appContext               = appContext,
+        signInWithEmailUseCase    = signInWithEmailUseCase,
+        signUpWithEmailUseCase    = signUpWithEmailUseCase,
+        signInWithGoogleUseCase   = signInWithGoogleUseCase,
+        signUpWithGoogleUseCase   = signUpWithGoogleUseCase,
+        linkGoogleIdentityUseCase = linkGoogleIdentityUseCase,
+        signOutUseCase            = signOutUseCase,
+        getSessionState           = getSessionState,
+        resetPasswordUseCase      = resetPasswordUseCase,
+        deleteAccountUseCase      = deleteAccountUseCase,
+        updateNicknameUseCase     = updateNicknameUseCase,
+        analyticsHelper           = mockk(relaxed = true),
+        appContext                 = appContext,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────

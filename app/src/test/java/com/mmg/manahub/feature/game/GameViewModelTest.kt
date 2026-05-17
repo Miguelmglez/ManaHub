@@ -4,10 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
-import com.mmg.manahub.feature.game.model.CounterType
-import com.mmg.manahub.feature.game.model.GameMode
-import com.mmg.manahub.feature.game.model.GamePhase
-import com.mmg.manahub.feature.game.model.Player
+import com.mmg.manahub.feature.game.domain.model.CounterType
+import com.mmg.manahub.feature.game.domain.model.GameMode
+import com.mmg.manahub.feature.game.domain.model.GamePhase
+import com.mmg.manahub.feature.game.domain.model.Player
+import com.mmg.manahub.feature.game.presentation.GameViewModel
+import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

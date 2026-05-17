@@ -114,6 +114,7 @@ import com.mmg.manahub.core.ui.components.OracleText
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
+import com.mmg.manahub.feature.decks.presentation.components.DeckStatsCard
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
 
@@ -122,9 +123,12 @@ import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestion
 fun DeckMagicDetailScreen(
     onBack: () -> Unit,
     onImproveDeck: (String) -> Unit,
+    onReviewSurvey: (Long) -> Unit = {},
     viewModel: DeckMagicDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
+    val playerName by viewModel.playerNameFlow.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val context = LocalContext.current
@@ -235,6 +239,13 @@ fun DeckMagicDetailScreen(
                 viewModel.showCollectionCards()
                 showCommanderSearchSheet = true
             },
+            onReviewSurvey = onReviewSurvey,
+            onReplaceCard = { card ->
+                viewModel.onAddCardsQueryChange(card.name)
+                showAddCardsSheet = true
+            },
+            deckStats = deckStats,
+            playerName = playerName,
             modifier = Modifier.padding(padding)
         )
     }
@@ -385,6 +396,10 @@ private fun ViewStepContent(
     onCardClick: (String) -> Unit,
     onAddBasicLands: () -> Unit,
     onChooseCommander: () -> Unit,
+    onReviewSurvey: (Long) -> Unit,
+    onReplaceCard: (com.mmg.manahub.core.domain.model.Card) -> Unit,
+    deckStats: com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase.Result?,
+    playerName: String,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -429,6 +444,17 @@ private fun ViewStepContent(
                             maxInCurve = maxInCurve,
                             deckCards = deckCards,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).animateItem()
+                        )
+                    }
+
+                    item(key = "deck_stats") {
+                        DeckStatsCard(
+                            stats = deckStats,
+                            playerName = playerName,
+                            onCardClick = onCardClick,
+                            onReviewSurvey = onReviewSurvey,
+                            onReplaceCard = onReplaceCard,
+                            modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
                         )
                     }
 
@@ -975,7 +1001,7 @@ private fun CardDetailSheet(
                     HorizontalDivider(color = mc.surfaceVariant)
 
                     val oracleDisplayText = card.oracleText?.takeIf { it.isNotBlank() } ?: card.printedText ?: ""
-                    OracleText(text = oracleDisplayText, style = MaterialTheme.typography.bodySmall)
+                    OracleText(text = oracleDisplayText, style = MaterialTheme.magicTypography.bodySmall)
 
                     // Tag section
                     if (tags.isNotEmpty()) {

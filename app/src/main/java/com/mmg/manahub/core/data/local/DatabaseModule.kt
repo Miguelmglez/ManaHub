@@ -71,6 +71,7 @@ object DatabaseModule {
                 MIGRATION_30_31,
                 MIGRATION_31_32,
                 MIGRATION_32_33,
+                MIGRATION_33_34,
             )
             .build()
 
@@ -294,6 +295,53 @@ object DatabaseModule {
             db.execSQL("DROP TABLE IF EXISTS `draft_sets`")
             // Step 4: rename new table to target name
             db.execSQL("ALTER TABLE `draft_sets_new` RENAME TO `draft_sets`")
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v33 → v34
+    // Survey & game-stats overhaul:
+    //   - game_sessions gains surveyStatus (TEXT, default 'PENDING'), surveyCompletedAt
+    //     (nullable INTEGER) and deckId (nullable TEXT, UUID).
+    //   - survey_answers gains deckId (nullable TEXT, UUID) and updatedAt (NOT NULL,
+    //     default = answeredAt) plus an index on deckId for per-deck queries.
+    //
+    // Legacy rows: existing surveys that contain at least one answer row are bumped
+    // to surveyStatus = 'COMPLETED' so the new UI shows them as reviewable. The
+    // deckId backfill is intentionally left NULL — pre-migration games did not track
+    // the app user's deck UUID (player_sessions.deckId is a legacy Long that no
+    // longer maps to anything), so we let the user re-associate via the survey
+    // edit flow rather than guess.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_33_34 = object : Migration(33, 34) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "game_sessions", "surveyStatus")) {
+                db.execSQL("ALTER TABLE game_sessions ADD COLUMN surveyStatus TEXT NOT NULL DEFAULT 'PENDING'")
+            }
+            if (!columnExists(db, "game_sessions", "surveyCompletedAt")) {
+                db.execSQL("ALTER TABLE game_sessions ADD COLUMN surveyCompletedAt INTEGER")
+            }
+            if (!columnExists(db, "game_sessions", "deckId")) {
+                db.execSQL("ALTER TABLE game_sessions ADD COLUMN deckId TEXT")
+            }
+            if (!columnExists(db, "survey_answers", "deckId")) {
+                db.execSQL("ALTER TABLE survey_answers ADD COLUMN deckId TEXT")
+            }
+            if (!columnExists(db, "survey_answers", "updatedAt")) {
+                db.execSQL("ALTER TABLE survey_answers ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE survey_answers SET updatedAt = MAX(answeredAt, 1) WHERE updatedAt = 0")
+            }
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_survey_answers_deckId ON survey_answers(deckId)")
+
+            // Mark pre-migration surveys as COMPLETED if they have any answer rows.
+            db.execSQL(
+                """
+                UPDATE game_sessions
+                SET surveyStatus = 'COMPLETED',
+                    surveyCompletedAt = playedAt
+                WHERE id IN (SELECT DISTINCT sessionId FROM survey_answers)
+                """.trimIndent()
+            )
         }
     }
 

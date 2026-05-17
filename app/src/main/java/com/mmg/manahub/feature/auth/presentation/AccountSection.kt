@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.auth.presentation
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -12,13 +13,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
 import androidx.compose.material.icons.Icons
@@ -38,23 +39,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
@@ -70,7 +74,6 @@ import com.mmg.manahub.feature.auth.domain.model.SessionState
 @Composable
 fun AccountSection(
     sessionState: SessionState,
-    authUiState: AuthUiState,
     onLoginClick: () -> Unit,
     onSignUpClick: () -> Unit,
     onSignOutClick: () -> Unit,
@@ -150,42 +153,14 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(16.dp),
         ) {
-            // ── Identity Row ───────────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Avatar circle placeholder
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(shimmerColor),
-                )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Text line placeholders
-                Column(modifier = Modifier.weight(1f)) {
-                    // Name line
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.55f)
-                            .height(14.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(shimmerColor),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // Email / subtitle line
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.75f)
-                            .height(11.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(shimmerBase),
-                    )
-                }
-            }
+            // ── Hero placeholder ──────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.77f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(shimmerColor),
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -460,77 +435,91 @@ private fun AuthenticatedCard(
                 .fillMaxWidth()
                 .padding(16.dp),
         ) {
-            // ── Identity Row ───────────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            // ── Hero Section ───────────────────────────────────────────────────
+            var imageRatio by remember(avatarUrl) { mutableFloatStateOf(1.77f) }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
+                    .animateContentSize()
+                    .clip(RoundedCornerShape(16.dp)),
             ) {
-                // ── Avatar ─────────────────────────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(mc.primaryAccent.copy(alpha = 0.1f))
-                        .border(1.dp, mc.primaryAccent.copy(alpha = 0.3f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (avatarUrl != null) {
-                        AsyncImage(
-                            model = avatarUrl,
-                            contentDescription = "Avatar of $nickname",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        // Fallback: initials circle
+                if (avatarUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(avatarUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter,
+                        onSuccess = { state ->
+                            val size = state.painter.intrinsicSize
+                            if (size.width > 0 && size.height > 0) {
+                                imageRatio = size.width / size.height
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        mc.primaryAccent.copy(alpha = 0.3f),
+                                        mc.background,
+                                    ),
+                                ),
+                            ),
+                    ) {
+                        ThemeBackground(modifier = Modifier.fillMaxSize())
                         Text(
-                            text = nickname.take(1).uppercase(),
-                            style = ty.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = mc.primaryAccent,
+                            text = nickname.take(1).uppercase().ifEmpty { "✦" },
+                            style = ty.lifeNumberMd.copy(
+                                fontSize = 72.sp,
+                                color = mc.primaryAccent.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier.align(Alignment.Center),
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // ── User Details ───────────────────────────────────────────────
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = nickname,
-                        style = ty.titleMedium,
-                        color = mc.textPrimary,
-                        maxLines = 1,
-                    )
-                    
-                    if (user.email != null) {
-                        Text(
-                            text = user.email,
-                            style = ty.labelSmall,
-                            color = mc.textSecondary,
-                            maxLines = 1,
-                        )
-                    }
-
-                    if (gameTag != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        // ── Game Tag Badge ─────────────────────────────────────
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = mc.primaryAccent.copy(alpha = 0.1f),
-                                    shape = RoundedCornerShape(6.dp),
-                                )
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = gameTag,
-                                style = ty.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
+                // Dark gradient overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.5f),
+                                    Color.Black.copy(alpha = 0.85f),
                                 ),
-                                color = mc.primaryAccent,
+                            ),
+                        ),
+                )
+
+                // Game tag badge — bottom start
+                if (gameTag != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(12.dp)
+                            .background(
+                                color = mc.primaryAccent.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(6.dp),
                             )
-                        }
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = gameTag,
+                            color = mc.primaryAccent,
+                            style = ty.labelSmall.copy(fontSize = 11.sp),
+                        )
                     }
                 }
             }

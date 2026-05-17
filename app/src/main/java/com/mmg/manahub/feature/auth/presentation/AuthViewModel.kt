@@ -11,7 +11,6 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
@@ -50,7 +49,6 @@ class AuthViewModel @Inject constructor(
     private val resetPasswordUseCase: ResetPasswordUseCase,
     private val deleteAccountUseCase: DeleteAccountUseCase,
     private val updateNicknameUseCase: UpdateNicknameUseCase,
-    private val userPreferencesDataStore: UserPreferencesDataStore,
     private val analyticsHelper: AnalyticsHelper,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {

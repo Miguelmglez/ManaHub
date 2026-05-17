@@ -30,8 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,7 +38,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -49,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -64,12 +63,12 @@ fun TradeNegotiationDetailScreen(
     viewModel: TradeNegotiationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val toastState = rememberMagicToastState()
     val mc = MaterialTheme.magicColors
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
+        toastState.show(msg)
         viewModel.onSnackbarDismissed()
     }
 
@@ -86,84 +85,89 @@ fun TradeNegotiationDetailScreen(
         )
     }
 
-    Scaffold(
-        snackbarHost        = { SnackbarHost(snackbarHostState) },
-        containerColor      = mc.background,
-        contentWindowInsets = WindowInsets.statusBars,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.trades_negotiation_title),
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = mc.textPrimary,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textPrimary)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        if (uiState.isRefreshing) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = mc.textPrimary, strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_refresh), tint = mc.textPrimary)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor      = mc.background,
+            contentWindowInsets = WindowInsets.statusBars,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            stringResource(R.string.trades_negotiation_title),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textPrimary,
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textPrimary)
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
-        },
-    ) { innerPadding ->
-        when {
-            uiState.isLoading -> Box(
-                modifier        = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = mc.primaryAccent)
-            }
-
-            uiState.thread.isEmpty() -> Box(
-                modifier        = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text  = stringResource(R.string.trades_no_proposals_yet),
-                    style = MaterialTheme.magicTypography.bodyMedium,
-                    color = mc.textSecondary,
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.refresh() }) {
+                            if (uiState.isRefreshing) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = mc.textPrimary, strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_refresh), tint = mc.textPrimary)
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
                 )
-            }
+            },
+        ) { innerPadding ->
+            when {
+                uiState.isLoading -> Box(
+                    modifier         = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = mc.primaryAccent)
+                }
 
-            else -> LazyColumn(
-                modifier            = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding      = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                items(uiState.thread, key = { it.id }) { proposal ->
-                    ProposalCard(
-                        proposal      = proposal,
-                        currentUserId = uiState.currentUserId,
-                        isProcessing  = uiState.isProcessing,
-                        onAccept      = { viewModel.onAccept(proposal.id) },
-                        onDecline     = { viewModel.onDecline(proposal.id) },
-                        onCancel      = { viewModel.onCancel(proposal.id) },
-                        onRevoke      = { viewModel.onRevoke(proposal.id) },
-                        onMarkCompleted = { viewModel.onMarkCompleted(proposal.id) },
-                        onCounter     = { viewModel.onCounter(proposal.id) },
-                        onEdit        = { viewModel.onEdit(proposal.id) },
+                uiState.thread.isEmpty() -> Box(
+                    modifier         = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text  = stringResource(R.string.trades_no_proposals_yet),
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textSecondary,
                     )
                 }
-                item(key = "bottom_spacer") { Spacer(Modifier.height(16.dp).navigationBarsPadding()) }
+
+                else -> LazyColumn(
+                    modifier            = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentPadding      = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(uiState.thread, key = { it.id }) { proposal ->
+                        ProposalCard(
+                            proposal        = proposal,
+                            currentUserId   = uiState.currentUserId,
+                            isProcessing    = uiState.isProcessing,
+                            onAccept        = { viewModel.onAccept(proposal.id) },
+                            onDecline       = { viewModel.onDecline(proposal.id) },
+                            onCancel        = { viewModel.onCancel(proposal.id) },
+                            onRevoke        = { viewModel.onRevoke(proposal.id) },
+                            onMarkCompleted = { viewModel.onMarkCompleted(proposal.id) },
+                            onCounter       = { viewModel.onCounter(proposal.id) },
+                            onEdit          = { viewModel.onEdit(proposal.id) },
+                        )
+                    }
+                    item(key = "bottom_spacer") { Spacer(Modifier.height(16.dp).navigationBarsPadding()) }
+                }
             }
         }
+        MagicToastHost(
+            state    = toastState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 

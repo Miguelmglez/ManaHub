@@ -57,7 +57,6 @@ class UserCardRepositoryImplSyncTest {
         language:         String  = "en",
         isAlternativeArt: Boolean = false,
         isForTrade:       Boolean = false,
-        isInWishlist:     Boolean = false,
         isDeleted:        Boolean = false,
         updatedAt:        Long    = 1_000L,
         createdAt:        Long    = 1_000L,
@@ -71,7 +70,6 @@ class UserCardRepositoryImplSyncTest {
         language         = language,
         isAlternativeArt = isAlternativeArt,
         isForTrade       = isForTrade,
-        isInWishlist     = isInWishlist,
         isDeleted        = isDeleted,
         updatedAt        = updatedAt,
         createdAt        = createdAt,
@@ -105,7 +103,6 @@ class UserCardRepositoryImplSyncTest {
             language         = "en",
             isAlternativeArt = false,
             isForTrade       = false,
-            isInWishlist     = false,
             userId           = "user-001",
         )
 
@@ -124,7 +121,6 @@ class UserCardRepositoryImplSyncTest {
             language         = "ja",
             isAlternativeArt = true,
             isForTrade       = true,
-            isInWishlist     = false,
             userId           = "user-001",
         )
 
@@ -135,7 +131,6 @@ class UserCardRepositoryImplSyncTest {
         assertEquals("ja", entity.language)
         assertTrue(entity.isAlternativeArt)
         assertTrue(entity.isForTrade)
-        assertFalse(entity.isInWishlist)
         assertEquals("user-001", entity.userId)
     }
 
@@ -144,7 +139,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
 
         assertFalse(captured.captured.isDeleted)
     }
@@ -154,7 +149,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
 
         assertTrue(captured.captured.id.isNotBlank())
         assertEquals(36, captured.captured.id.length)   // UUID length
@@ -165,7 +160,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, null)
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, null)
 
         assertEquals(null, captured.captured.userId)
     }
@@ -175,7 +170,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
 
         assertEquals(1, captured.captured.quantity)
     }
@@ -188,7 +183,7 @@ class UserCardRepositoryImplSyncTest {
     fun `given entity exists when updateAttributes then userCardCollectionDao upsert is called`() = runTest {
         every { userCardCollectionDao.getById("entity-001") } returns buildEntity(id = "entity-001")
 
-        repository.updateAttributes(id = "entity-001", isForTrade = true, isInWishlist = false, quantity = 3)
+        repository.updateAttributes(id = "entity-001", isForTrade = true, quantity = 3)
 
         verify(exactly = 1) { userCardCollectionDao.upsert(any()) }
     }
@@ -196,15 +191,14 @@ class UserCardRepositoryImplSyncTest {
     @Test
     fun `given entity exists when updateAttributes then updated fields are propagated`() = runTest {
         every { userCardCollectionDao.getById("entity-001") } returns buildEntity(
-            id = "entity-001", isForTrade = false, isInWishlist = false, quantity = 1
+            id = "entity-001", isForTrade = false, quantity = 1
         )
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.updateAttributes(id = "entity-001", isForTrade = true, isInWishlist = true, quantity = 5)
+        repository.updateAttributes(id = "entity-001", isForTrade = true, quantity = 5)
 
         assertTrue(captured.captured.isForTrade)
-        assertTrue(captured.captured.isInWishlist)
         assertEquals(5, captured.captured.quantity)
     }
 
@@ -214,7 +208,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.updateAttributes("entity-001", false, false, 2)
+        repository.updateAttributes("entity-001", false, 2)
 
         assertTrue("updatedAt must be bumped", captured.captured.updatedAt > 100L)
     }
@@ -223,7 +217,7 @@ class UserCardRepositoryImplSyncTest {
     fun `given entity not found when updateAttributes then upsert is NOT called`() = runTest {
         every { userCardCollectionDao.getById("entity-001") } returns null
 
-        repository.updateAttributes("entity-001", true, false, 2)
+        repository.updateAttributes("entity-001", true, 2)
 
         verify(exactly = 0) { userCardCollectionDao.upsert(any()) }
     }

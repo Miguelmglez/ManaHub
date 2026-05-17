@@ -1,0 +1,735 @@
+{
+  "metadata": {
+    "set_name": "Streets of New Capenna",
+    "set_code": "SNC",
+    "source_url": "https://draftsim.com/mtg-snc-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "June 28, 2025"
+  },
+  "set_overview": {
+    "summary": "Streets of New Capenna features five three-color crime families, each with distinct mechanics. Most decks play as a 2-color base plus a splash into an adjacent family's gold cards. Inspiring Overseer is the best common in the set.",
+    "color_ranking": [
+      "Best pair: Azorius (WU) — Inspiring Overseer engine",
+      "Strong pairs: Dimir (UB), Selesnya (GW), Gruul (RG)",
+      "Weak pair: Rakdos (BR) — red generally underperforms"
+    ],
+    "color_notes": {
+      "Note": "SNC is family-driven (5 three-color clans). Most decks start as a 2-color base (ally pair) and splash adjacent family gold cards via dual lands."
+    },
+    "key_gameplay_notes": [
+      "Find primary two-color lane first; solidify with gold cards from adjacent families.",
+      "Splash bombs via dual lands and fixing.",
+      "Priority: top commons → removal → curve → dual lands.",
+      "Track multicolor cards as signal indicators.",
+      "Inspiring Overseer is worth most commons and several rares."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Alliance (Cabaretti)",
+      "summary": "Landfall for creatures — triggers when creatures enter the battlefield under your control. Rewards keeping many creatures in play.",
+      "performance": "Easy to enable in token / go-wide decks.",
+      "key_examples": []
+    },
+    {
+      "name": "Blitz (Riveteers)",
+      "summary": "Play creatures with haste; sacrifice them at end of turn and draw a card. Functions as cantripping removal when opponents avoid trading.",
+      "performance": "Reliable; the bonus is built into every Blitz creature.",
+      "key_examples": [
+        {
+          "name": "Mayhem Patrol",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 133,
+          "tier_rating": "C",
+          "note": null,
+          "id": "50162cdd-ba30-48df-93ff-197c7f4a2913",
+          "scryfall_uri": "https://scryfall.com/card/snc/114/mayhem-patrol",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Devil Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50162cdd-ba30-48df-93ff-197c7f4a2913.jpg?1664411640",
+            "normal": "https://cards.scryfall.io/normal/front/5/0/50162cdd-ba30-48df-93ff-197c7f4a2913.jpg?1664411640"
+          },
+          "set": "snc",
+          "set_name": "Streets of New Capenna"
+        },
+        {
+          "name": "Plasma Jockey",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 164,
+          "tier_rating": "C",
+          "note": null,
+          "id": "741ed811-cbcd-4178-a874-dc79d2a5d6f1",
+          "scryfall_uri": "https://scryfall.com/card/snc/115/plasma-jockey",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Lizard Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/741ed811-cbcd-4178-a874-dc79d2a5d6f1.jpg?1664411660",
+            "normal": "https://cards.scryfall.io/normal/front/7/4/741ed811-cbcd-4178-a874-dc79d2a5d6f1.jpg?1664411660"
+          },
+          "set": "snc",
+          "set_name": "Streets of New Capenna"
+        }
+      ]
+    },
+    {
+      "name": "Casualty (Maestros)",
+      "summary": "When you cast this spell, sacrifice a creature with power N or greater to copy it.",
+      "performance": "Works with expendable creatures and synergizes with Blitz.",
+      "key_examples": []
+    },
+    {
+      "name": "Connive (Obscura)",
+      "summary": "Draw a card and discard a card; if you discarded a nonland card, put a +1/+1 counter on the creature.",
+      "performance": "Provides consistency and graveyard setup.",
+      "key_examples": [
+        {
+          "name": "Raffine's Silencer",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 97,
+          "tier_rating": "C",
+          "note": null,
+          "id": "4ba72399-c827-43f3-b072-08597dbafb2d",
+          "scryfall_uri": "https://scryfall.com/card/snc/90/raffines-silencer",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Human Assassin",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4ba72399-c827-43f3-b072-08597dbafb2d.jpg?1664411171",
+            "normal": "https://cards.scryfall.io/normal/front/4/b/4ba72399-c827-43f3-b072-08597dbafb2d.jpg?1664411171"
+          },
+          "set": "snc",
+          "set_name": "Streets of New Capenna"
+        },
+        {
+          "name": "Syndicate Infiltrator",
+          "color": "UB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 75,
+          "tier_rating": "B",
+          "note": null,
+          "id": "bf86c5f2-0caf-48ca-b7ad-a1cdcd014539",
+          "scryfall_uri": "https://scryfall.com/card/snc/226/syndicate-infiltrator",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Creature — Vampire Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/f/bf86c5f2-0caf-48ca-b7ad-a1cdcd014539.jpg?1664413852",
+            "normal": "https://cards.scryfall.io/normal/front/b/f/bf86c5f2-0caf-48ca-b7ad-a1cdcd014539.jpg?1664413852"
+          },
+          "set": "snc",
+          "set_name": "Streets of New Capenna"
+        }
+      ]
+    },
+    {
+      "name": "Shield Counters (Brokers)",
+      "summary": "Protects creatures from one instance of damage or destruction. Removed when triggered.",
+      "performance": "Requires understanding blocking dynamics and bypass strategies.",
+      "key_examples": []
+    }
+  ],
+  "archetype_tier_list": {
+    "crime_families": [
+      {
+        "colors": "{G}{W}{U}",
+        "name": "Brokers (GWU)",
+        "strategy": "Midrange with shield counter focus. Variants: Azorius-focused (fliers + green splash), Selesnya-based (Citizen synergies), Simic Brokers (unofficial control).",
+        "difficulty": "Medium",
+        "key_cards": []
+      },
+      {
+        "colors": "{W}{U}{B}",
+        "name": "Obscura (WUB)",
+        "strategy": "Control/tempo with connive emphasis. Variants: Dimir-focused (self-mill, graveyard payoffs), Azorius-based (aggressive with counter payoffs).",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Inspiring Overseer",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 39,
+            "tier_rating": "B",
+            "note": null,
+            "id": "35d9da1d-8678-4252-b0f8-9960795642f0",
+            "scryfall_uri": "https://scryfall.com/card/snc/18/inspiring-overseer",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Angel Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748"
+            },
+            "set": "snc",
+            "set_name": "Streets of New Capenna"
+          },
+          {
+            "name": "Raffine's Silencer",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 97,
+            "tier_rating": "C",
+            "note": null,
+            "id": "4ba72399-c827-43f3-b072-08597dbafb2d",
+            "scryfall_uri": "https://scryfall.com/card/snc/90/raffines-silencer",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Assassin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4ba72399-c827-43f3-b072-08597dbafb2d.jpg?1664411171",
+              "normal": "https://cards.scryfall.io/normal/front/4/b/4ba72399-c827-43f3-b072-08597dbafb2d.jpg?1664411171"
+            },
+            "set": "snc",
+            "set_name": "Streets of New Capenna"
+          },
+          {
+            "name": "Syndicate Infiltrator",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 75,
+            "tier_rating": "B",
+            "note": null,
+            "id": "bf86c5f2-0caf-48ca-b7ad-a1cdcd014539",
+            "scryfall_uri": "https://scryfall.com/card/snc/226/syndicate-infiltrator",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Vampire Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/f/bf86c5f2-0caf-48ca-b7ad-a1cdcd014539.jpg?1664413852",
+              "normal": "https://cards.scryfall.io/normal/front/b/f/bf86c5f2-0caf-48ca-b7ad-a1cdcd014539.jpg?1664413852"
+            },
+            "set": "snc",
+            "set_name": "Streets of New Capenna"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}{R}",
+        "name": "Maestros (UBR)",
+        "strategy": "Casualty-based sacrificing for value. Variants: Dimir-focused (mana values matter), Rakdos-focused (Blitz creatures, aggressive).",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{B}{R}{G}",
+        "name": "Riveteers (BRG)",
+        "strategy": "Advertised aggressive but typically midrange. Variants: Gruul-based (Treasure synergies), Rakdos-focused (Blitz-heavy), Golgari Riveteers (unofficial stompy).",
+        "difficulty": "Medium",
+        "key_cards": []
+      },
+      {
+        "colors": "{R}{G}{W}",
+        "name": "Cabaretti (RGW)",
+        "strategy": "Midrange \"go wide\" theme. Variants: Selesnya-focused (Citizen tokens), Gruul-based (Treasure + alliance).",
+        "difficulty": "Medium",
+        "key_cards": []
+      }
+    ],
+    "two_color_pairs": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Skies/Tempo",
+        "note": "Best performer. Inspiring Overseer is the best common in the set.",
+        "key_cards": [
+          {
+            "name": "Inspiring Overseer",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 39,
+            "tier_rating": "B",
+            "note": null,
+            "id": "35d9da1d-8678-4252-b0f8-9960795642f0",
+            "scryfall_uri": "https://scryfall.com/card/snc/18/inspiring-overseer",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Angel Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748"
+            },
+            "set": "snc",
+            "set_name": "Streets of New Capenna"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Graveyard",
+        "note": "Five-or-more-mana-values-in-graveyard payoffs. Requires mana curve diversity.",
+        "key_cards": []
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Sacrifice",
+        "note": "Weaker than other pairs; red generally underperforms.",
+        "key_cards": []
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Treasure",
+        "note": "Treasure generation with splash utility. Requires synergy-heavy deckbuilding.",
+        "key_cards": []
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Citizens",
+        "note": "Citizen tribal. Strong Brokers base; plays well with token generation.",
+        "key_cards": []
+      }
+    ]
+  },
+  "top_commons": [
+    {
+      "name": "Inspiring Overseer",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 39,
+      "tier_rating": "B",
+      "note": "Best common in the set.",
+      "id": "35d9da1d-8678-4252-b0f8-9960795642f0",
+      "scryfall_uri": "https://scryfall.com/card/snc/18/inspiring-overseer",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Angel Cleric",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748",
+        "normal": "https://cards.scryfall.io/normal/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Murder",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 50,
+      "tier_rating": "B",
+      "note": null,
+      "id": "1c13ac76-7cd9-456f-9b89-92bfa07c64c5",
+      "scryfall_uri": "https://scryfall.com/card/snc/88/murder",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c13ac76-7cd9-456f-9b89-92bfa07c64c5.jpg?1664411132",
+        "normal": "https://cards.scryfall.io/normal/front/1/c/1c13ac76-7cd9-456f-9b89-92bfa07c64c5.jpg?1664411132"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Jewel Thief",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 52,
+      "tier_rating": "B",
+      "note": null,
+      "id": "736e498e-1245-40c1-96a4-c9bcfd1cfe1f",
+      "scryfall_uri": "https://scryfall.com/card/snc/151/jewel-thief",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Cat Rogue",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/736e498e-1245-40c1-96a4-c9bcfd1cfe1f.jpg?1664412359",
+        "normal": "https://cards.scryfall.io/normal/front/7/3/736e498e-1245-40c1-96a4-c9bcfd1cfe1f.jpg?1664412359"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Strangle",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 66,
+      "tier_rating": "B",
+      "note": null,
+      "id": "4b91d727-c0ee-4bf0-8c7d-8475ecb88083",
+      "scryfall_uri": "https://scryfall.com/card/snc/125/strangle",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4b91d727-c0ee-4bf0-8c7d-8475ecb88083.jpg?1664411845",
+        "normal": "https://cards.scryfall.io/normal/front/4/b/4b91d727-c0ee-4bf0-8c7d-8475ecb88083.jpg?1664411845"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Echo Inspector",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 78,
+      "tier_rating": "C",
+      "note": null,
+      "id": "d7e530ea-ba51-4f7a-bf56-b657a48e86ae",
+      "scryfall_uri": "https://scryfall.com/card/snc/40/echo-inspector",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Bird Rogue",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/7/d7e530ea-ba51-4f7a-bf56-b657a48e86ae.jpg?1664410174",
+        "normal": "https://cards.scryfall.io/normal/front/d/7/d7e530ea-ba51-4f7a-bf56-b657a48e86ae.jpg?1664410174"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Girder Goons",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 96,
+      "tier_rating": "C",
+      "note": null,
+      "id": "4bfd6449-31a1-4572-8f9c-3f6f4670dc9d",
+      "scryfall_uri": "https://scryfall.com/card/snc/80/girder-goons",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Ogre Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4bfd6449-31a1-4572-8f9c-3f6f4670dc9d.jpg?1664410963",
+        "normal": "https://cards.scryfall.io/normal/front/4/b/4bfd6449-31a1-4572-8f9c-3f6f4670dc9d.jpg?1664410963"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    }
+  ],
+  "strong_uncommons_by_color": {
+    "{W} White": [
+      {
+        "name": "Inspiring Overseer",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 39,
+        "tier_rating": "B",
+        "note": null,
+        "id": "35d9da1d-8678-4252-b0f8-9960795642f0",
+        "scryfall_uri": "https://scryfall.com/card/snc/18/inspiring-overseer",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Angel Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748",
+          "normal": "https://cards.scryfall.io/normal/front/3/5/35d9da1d-8678-4252-b0f8-9960795642f0.jpg?1664409748"
+        },
+        "set": "snc",
+        "set_name": "Streets of New Capenna"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Raffine's Silencer",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 97,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4ba72399-c827-43f3-b072-08597dbafb2d",
+        "scryfall_uri": "https://scryfall.com/card/snc/90/raffines-silencer",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Assassin",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4ba72399-c827-43f3-b072-08597dbafb2d.jpg?1664411171",
+          "normal": "https://cards.scryfall.io/normal/front/4/b/4ba72399-c827-43f3-b072-08597dbafb2d.jpg?1664411171"
+        },
+        "set": "snc",
+        "set_name": "Streets of New Capenna"
+      },
+      {
+        "name": "Syndicate Infiltrator",
+        "color": "UB",
+        "rarity": "Uncommon",
+        "pick_order_rank": 75,
+        "tier_rating": "B",
+        "note": null,
+        "id": "bf86c5f2-0caf-48ca-b7ad-a1cdcd014539",
+        "scryfall_uri": "https://scryfall.com/card/snc/226/syndicate-infiltrator",
+        "colors": [
+          "B",
+          "U"
+        ],
+        "type_line": "Creature — Vampire Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/f/bf86c5f2-0caf-48ca-b7ad-a1cdcd014539.jpg?1664413852",
+          "normal": "https://cards.scryfall.io/normal/front/b/f/bf86c5f2-0caf-48ca-b7ad-a1cdcd014539.jpg?1664413852"
+        },
+        "set": "snc",
+        "set_name": "Streets of New Capenna"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Mayhem Patrol",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 133,
+        "tier_rating": "C",
+        "note": null,
+        "id": "50162cdd-ba30-48df-93ff-197c7f4a2913",
+        "scryfall_uri": "https://scryfall.com/card/snc/114/mayhem-patrol",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Devil Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50162cdd-ba30-48df-93ff-197c7f4a2913.jpg?1664411640",
+          "normal": "https://cards.scryfall.io/normal/front/5/0/50162cdd-ba30-48df-93ff-197c7f4a2913.jpg?1664411640"
+        },
+        "set": "snc",
+        "set_name": "Streets of New Capenna"
+      },
+      {
+        "name": "Plasma Jockey",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 164,
+        "tier_rating": "C",
+        "note": null,
+        "id": "741ed811-cbcd-4178-a874-dc79d2a5d6f1",
+        "scryfall_uri": "https://scryfall.com/card/snc/115/plasma-jockey",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Lizard Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/741ed811-cbcd-4178-a874-dc79d2a5d6f1.jpg?1664411660",
+          "normal": "https://cards.scryfall.io/normal/front/7/4/741ed811-cbcd-4178-a874-dc79d2a5d6f1.jpg?1664411660"
+        },
+        "set": "snc",
+        "set_name": "Streets of New Capenna"
+      }
+    ]
+  },
+  "bomb_rares": [
+    {
+      "name": "Sanctuary Warden",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": null,
+      "id": "4dfdab77-d7c3-4e6a-bb4b-55153bd2fd4d",
+      "scryfall_uri": "https://scryfall.com/card/snc/30/sanctuary-warden",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Angel Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4dfdab77-d7c3-4e6a-bb4b-55153bd2fd4d.jpg?1664409970",
+        "normal": "https://cards.scryfall.io/normal/front/4/d/4dfdab77-d7c3-4e6a-bb4b-55153bd2fd4d.jpg?1664409970"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Raffine, Scheming Seer",
+      "color": "WUB",
+      "rarity": "Mythic",
+      "pick_order_rank": 8,
+      "tier_rating": "S",
+      "note": null,
+      "id": "716a44b4-f6b0-4f14-a270-6442aed3251f",
+      "scryfall_uri": "https://scryfall.com/card/snc/213/raffine-scheming-seer",
+      "colors": [
+        "B",
+        "U",
+        "W"
+      ],
+      "type_line": "Legendary Creature — Sphinx Demon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/716a44b4-f6b0-4f14-a270-6442aed3251f.jpg?1711471750",
+        "normal": "https://cards.scryfall.io/normal/front/7/1/716a44b4-f6b0-4f14-a270-6442aed3251f.jpg?1711471750"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Hostile Takeover",
+      "color": "UBR",
+      "rarity": "Rare",
+      "pick_order_rank": 7,
+      "tier_rating": "S",
+      "note": null,
+      "id": "bd7df727-50ea-4ea8-bdb9-d7ef16199d8a",
+      "scryfall_uri": "https://scryfall.com/card/snc/191/hostile-takeover",
+      "colors": [
+        "B",
+        "R",
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/d/bd7df727-50ea-4ea8-bdb9-d7ef16199d8a.jpg?1664413107",
+        "normal": "https://cards.scryfall.io/normal/front/b/d/bd7df727-50ea-4ea8-bdb9-d7ef16199d8a.jpg?1664413107"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Titan of Industry",
+      "color": "G",
+      "rarity": "Mythic",
+      "pick_order_rank": 10,
+      "tier_rating": "S",
+      "note": null,
+      "id": "5b6f03c1-9e9d-4a0c-af3b-9753b440cd9f",
+      "scryfall_uri": "https://scryfall.com/card/snc/159/titan-of-industry",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Elemental",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5b6f03c1-9e9d-4a0c-af3b-9753b440cd9f.jpg?1664412518",
+        "normal": "https://cards.scryfall.io/normal/front/5/b/5b6f03c1-9e9d-4a0c-af3b-9753b440cd9f.jpg?1664412518"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Brokers Ascendancy",
+      "color": "WUG",
+      "rarity": "Rare",
+      "pick_order_rank": 5,
+      "tier_rating": "S",
+      "note": null,
+      "id": "799de0f1-6bf2-4158-8a4f-bedc3d2f6578",
+      "scryfall_uri": "https://scryfall.com/card/snc/170/brokers-ascendancy",
+      "colors": [
+        "G",
+        "U",
+        "W"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/9/799de0f1-6bf2-4158-8a4f-bedc3d2f6578.jpg?1664412722",
+        "normal": "https://cards.scryfall.io/normal/front/7/9/799de0f1-6bf2-4158-8a4f-bedc3d2f6578.jpg?1664412722"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Elspeth Resplendent",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 4,
+      "tier_rating": "S",
+      "note": null,
+      "id": "7c606af0-f3d1-44a4-b24e-ee1263569b1f",
+      "scryfall_uri": "https://scryfall.com/card/snc/11/elspeth-resplendent",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Planeswalker — Elspeth",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/c/7c606af0-f3d1-44a4-b24e-ee1263569b1f.jpg?1664409608",
+        "normal": "https://cards.scryfall.io/normal/front/7/c/7c606af0-f3d1-44a4-b24e-ee1263569b1f.jpg?1664409608"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    }
+  ],
+  "rares_to_avoid": [
+    {
+      "name": "Cemetery Tampering",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 258,
+      "tier_rating": "D",
+      "note": "Decking risk.",
+      "id": "6c6e8d37-badd-4b9a-94e5-2d50ec78182c",
+      "scryfall_uri": "https://scryfall.com/card/snc/69/cemetery-tampering",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c6e8d37-badd-4b9a-94e5-2d50ec78182c.jpg?1664410736",
+        "normal": "https://cards.scryfall.io/normal/front/6/c/6c6e8d37-badd-4b9a-94e5-2d50ec78182c.jpg?1664410736"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Cut Your Losses",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 257,
+      "tier_rating": "D",
+      "note": "Poor efficiency.",
+      "id": "31184dd0-4080-44c1-a3e0-f6d10a4d1fcb",
+      "scryfall_uri": "https://scryfall.com/card/snc/38/cut-your-losses",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/31184dd0-4080-44c1-a3e0-f6d10a4d1fcb.jpg?1664410135",
+        "normal": "https://cards.scryfall.io/normal/front/3/1/31184dd0-4080-44c1-a3e0-f6d10a4d1fcb.jpg?1664410135"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "name": "Riveteers Ascendancy",
+      "color": "BRG",
+      "rarity": "Rare",
+      "pick_order_rank": 242,
+      "tier_rating": "D",
+      "note": "Demanding conditions.",
+      "id": "21235916-2379-470c-b9ee-84246043d703",
+      "scryfall_uri": "https://scryfall.com/card/snc/216/riveteers-ascendancy",
+      "colors": [
+        "B",
+        "G",
+        "R"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/21235916-2379-470c-b9ee-84246043d703.jpg?1664413638",
+        "normal": "https://cards.scryfall.io/normal/front/2/1/21235916-2379-470c-b9ee-84246043d703.jpg?1664413638"
+      },
+      "set": "snc",
+      "set_name": "Streets of New Capenna"
+    }
+  ],
+  "sealed_build_order": [
+    "Check rares.",
+    "Look at multicolor cards.",
+    "Assess fixing.",
+    "Evaluate individual colors.",
+    "Sketch deck ideas.",
+    "Finalize mana."
+  ],
+  "general_tips": [
+    "Find your primary two-color lane first; pivot in late by adding adjacent family gold cards.",
+    "Splash bombs via dual lands and fixing — SNC has plenty of fixing.",
+    "Prioritize: top commons → removal → curve → dual lands.",
+    "Track multicolor cards as signals — they reveal what families are open.",
+    "Inspiring Overseer warrants top priority — worth most commons and several rares."
+  ]
+}

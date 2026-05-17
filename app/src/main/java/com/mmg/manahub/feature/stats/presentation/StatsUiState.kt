@@ -1,15 +1,69 @@
 package com.mmg.manahub.feature.stats.presentation
 
+import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.MagicSet
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.util.PriceFormatter
 
-enum class StatsTab { COLLECTION, GAMES, TRADES }
+/** Selectable top-level tabs on the Stats screen. */
+enum class StatsTab { COLLECTION, GAMES }
+
+/**
+ * Aggregated KPI snapshot for the Games tab.
+ *
+ * @param totalGames Total number of recorded sessions.
+ * @param wins Number of sessions where the app user won.
+ * @param winrate Fraction in [0f, 1f]; 0f when totalGames == 0.
+ * @param avgDurationMs Rounded average game duration in milliseconds.
+ * @param favoriteMode Mode string played most often, null when no data.
+ * @param mostFrequentLoss Most common elimination reason, null when no data.
+ * @param pendingSurveys Count of sessions with PENDING or PARTIAL survey status.
+ */
+data class GameStats(
+    val totalGames: Int,
+    val wins: Int,
+    val winrate: Float,
+    val avgDurationMs: Long,
+    val favoriteMode: String?,
+    val mostFrequentLoss: String?,
+    val pendingSurveys: Int,
+)
+
+/**
+ * Single row in the session history list.
+ *
+ * @param isWin True when [winnerName] matches the app user's player name.
+ * @param deckName Resolved deck name from [deckId]; null when no deck associated.
+ */
+data class GameHistoryItem(
+    val sessionId: Long,
+    val playedAt: Long,
+    val mode: String,
+    val durationMs: Long,
+    val winnerName: String,
+    val isWin: Boolean,
+    val surveyStatus: SurveyStatus,
+    val deckId: String?,
+    val deckName: String?,
+)
+
+/**
+ * Per-deck win/loss summary for the deck performance section.
+ *
+ * @param winrate Fraction in [0f, 1f].
+ */
+data class DeckPerformance(
+    val deckId: String,
+    val deckName: String,
+    val totalGames: Int,
+    val wins: Int,
+    val winrate: Float,
+)
 
 data class StatsUiState(
-    val selectedTab:         StatsTab         = StatsTab.COLLECTION,
+    // ── Collection tab ────────────────────────────────────────────────────────
     val selectedColor:       MtgColor?        = null,
     val selectedSet:         MagicSet?        = null,
     val stats:               CollectionStats? = null,
@@ -22,21 +76,14 @@ data class StatsUiState(
     val lastRefreshedAt:     Long?            = null,
     val refreshError:        String?          = null,
     val refreshResult:       String?          = null,
-    
-    // Placeholder for Games and Trades data
-    val gameStats:           GameStatsSummary?  = null,
-    val tradeStats:          TradeStatsSummary? = null,
-)
 
-data class GameStatsSummary(
-    val totalGames:      Int,
-    val winRate:         Double,
-    val favoriteMode:    String?,
-    val favoriteDeck:    String?,
-)
+    // ── Tab selection ─────────────────────────────────────────────────────────
+    val selectedTab:         StatsTab         = StatsTab.COLLECTION,
 
-data class TradeStatsSummary(
-    val openForTradeCount: Int,
-    val wishlistCount:     Int,
-    val totalTradeValue:   Double,
+    // ── Games tab ─────────────────────────────────────────────────────────────
+    /** True when at least one game session exists; controls whether tabs are shown. */
+    val hasGameStats:        Boolean          = false,
+    val gameStats:           GameStats?       = null,
+    val sessionHistory:      List<GameHistoryItem>   = emptyList(),
+    val deckPerformance:     List<DeckPerformance>   = emptyList(),
 )

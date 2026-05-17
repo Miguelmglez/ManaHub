@@ -58,7 +58,6 @@ class UserCardRepositoryImplTest {
         language:         String  = "en",
         isAlternativeArt: Boolean = false,
         isForTrade:       Boolean = false,
-        isInWishlist:     Boolean = false,
         isDeleted:        Boolean = false,
         updatedAt:        Long    = 1_000L,
         createdAt:        Long    = 1_000L,
@@ -72,7 +71,6 @@ class UserCardRepositoryImplTest {
         language         = language,
         isAlternativeArt = isAlternativeArt,
         isForTrade       = isForTrade,
-        isInWishlist     = isInWishlist,
         isDeleted        = isDeleted,
         updatedAt        = updatedAt,
         createdAt        = createdAt,
@@ -104,11 +102,11 @@ class UserCardRepositoryImplTest {
 
         every { userCardCollectionDao.upsert(capture(captured1)) } returns 1L andThen 1L
 
-        repository.addOrIncrement("card-a", false, "NM", "en", false, false, false, "user-001")
+        repository.addOrIncrement("card-a", false, "NM", "en", false, false, "user-001")
 
         every { userCardCollectionDao.upsert(capture(captured2)) } returns 1L
 
-        repository.addOrIncrement("card-b", false, "NM", "en", false, false, false, "user-001")
+        repository.addOrIncrement("card-b", false, "NM", "en", false, false, "user-001")
 
         assertNotEquals(captured1.captured.id, captured2.captured.id)
     }
@@ -119,7 +117,7 @@ class UserCardRepositoryImplTest {
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
         val before = System.currentTimeMillis()
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
         val after = System.currentTimeMillis()
 
         val entity = captured.captured
@@ -139,7 +137,6 @@ class UserCardRepositoryImplTest {
             language         = "fr",
             isAlternativeArt = true,
             isForTrade       = true,
-            isInWishlist     = true,
             userId           = "user-001",
         )
 
@@ -147,7 +144,6 @@ class UserCardRepositoryImplTest {
         assertTrue(entity.isFoil)
         assertTrue(entity.isAlternativeArt)
         assertTrue(entity.isForTrade)
-        assertTrue(entity.isInWishlist)
         assertEquals("LP", entity.condition)
         assertEquals("fr", entity.language)
     }
@@ -157,13 +153,12 @@ class UserCardRepositoryImplTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
 
         val entity = captured.captured
         assertFalse(entity.isFoil)
         assertFalse(entity.isAlternativeArt)
         assertFalse(entity.isForTrade)
-        assertFalse(entity.isInWishlist)
         assertFalse(entity.isDeleted)
     }
 
@@ -172,7 +167,7 @@ class UserCardRepositoryImplTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, false, null)
+        repository.addOrIncrement("card-001", false, "NM", "en", false, false, null)
 
         assertNull(captured.captured.userId)
     }
@@ -190,14 +185,13 @@ class UserCardRepositoryImplTest {
             language     = "de",
             isFoil       = true,
             isForTrade   = false,
-            isInWishlist = false,
             quantity     = 3,
         )
         every { userCardCollectionDao.getById("e-001") } returns original
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.updateAttributes(id = "e-001", isForTrade = true, isInWishlist = false, quantity = 3)
+        repository.updateAttributes(id = "e-001", isForTrade = true, quantity = 3)
 
         val entity = captured.captured
         // Changed field:
@@ -217,7 +211,7 @@ class UserCardRepositoryImplTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.updateAttributes("e-001", false, false, 1)
+        repository.updateAttributes("e-001", false, 1)
 
         val entity = captured.captured
         assertTrue("updatedAt must be bumped", entity.updatedAt > 100L)
@@ -230,7 +224,7 @@ class UserCardRepositoryImplTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.updateAttributes("e-001", false, false, 2)
+        repository.updateAttributes("e-001", false, 2)
 
         assertEquals(2, captured.captured.quantity)
     }

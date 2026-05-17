@@ -3,11 +3,9 @@ package com.mmg.manahub.feature.addcard.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
-import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,7 +25,6 @@ import javax.inject.Inject
 @HiltViewModel
 class AddCardViewModel @Inject constructor(
     private val searchCards:        SearchCardsUseCase,
-    private val addToCollection:    AddCardToCollectionUseCase,
     private val userPreferences:    UserPreferencesRepository,
     private val buildScryfallQuery: BuildScryfallQueryUseCase,
 ) : ViewModel() {
@@ -35,8 +32,7 @@ class AddCardViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AddCardUiState())
     val uiState: StateFlow<AddCardUiState> = _uiState.asStateFlow()
 
-    /** Debounce source — only the latest query that survives 400 ms is searched. */
-    private val textQueryFlow = MutableStateFlow("")
+    private val textQueryFlow  = MutableStateFlow("")
     private val activeQueryFlow = MutableStateFlow<AdvancedSearchQuery?>(null)
 
     init {
@@ -53,9 +49,9 @@ class AddCardViewModel @Inject constructor(
                     val advancedString = active?.let { buildScryfallQuery(it) } ?: ""
                     val combinedQuery = when {
                         text.isNotBlank() && advancedString.isNotBlank() -> "$text $advancedString"
-                        text.isNotBlank() -> text
-                        advancedString.isNotBlank() -> advancedString
-                        else -> ""
+                        text.isNotBlank()                                -> text
+                        advancedString.isNotBlank()                      -> advancedString
+                        else                                             -> ""
                     }
 
                     if (combinedQuery.isBlank() || (text.length < 2 && advancedString.isBlank())) {
@@ -65,7 +61,6 @@ class AddCardViewModel @Inject constructor(
 
                     _uiState.update { it.copy(isSearching = true) }
                     val lang = prefs.cardLanguage.code
-                    // If combinedQuery already contains a language filter, don't append default
                     val effectiveQuery = if (lang != "en" && !combinedQuery.contains("lang:")) {
                         "$combinedQuery lang:$lang"
                     } else {
@@ -89,40 +84,7 @@ class AddCardViewModel @Inject constructor(
         textQueryFlow.value = query
     }
 
-    fun onCardSelected(card: Card) {
-        _uiState.update { it.copy(selectedCard = card, showConfirmSheet = true) }
-    }
-
-    fun onConfirmAdd(
-        scryfallId: String,
-        isFoil:     Boolean,
-        condition:  String,
-        language:   String,
-        quantity:   Int,
-    ) {
-        viewModelScope.launch {
-            when (val result = addToCollection(scryfallId = scryfallId, isFoil = isFoil, condition = condition, language = language)) {
-                is DataResult.Success -> _uiState.update {
-                    it.copy(
-                        showConfirmSheet  = false,
-                        selectedCard      = null,
-                        addedSuccessfully = true,
-                        error             = null,
-                    )
-                }
-                is DataResult.Error -> _uiState.update {
-                    it.copy(error = result.message, showConfirmSheet = false)
-                }
-            }
-        }
-    }
-
-    fun onDismissConfirmSheet() {
-        _uiState.update { it.copy(showConfirmSheet = false, selectedCard = null) }
-    }
-
-    /** Direct search with a raw Scryfall query (bypasses debounce and lang appending). */
-    fun onAdvancedQuerySearch(query: AdvancedSearchQuery, rawQuery: String) {
+    fun onAdvancedQuerySearch(query: AdvancedSearchQuery) {
         _uiState.update { it.copy(activeQuery = query) }
         activeQueryFlow.value = query
     }
@@ -132,6 +94,5 @@ class AddCardViewModel @Inject constructor(
         activeQueryFlow.value = null
     }
 
-    fun onErrorDismissed()   = _uiState.update { it.copy(error = null) }
-    fun onSuccessDismissed() = _uiState.update { it.copy(addedSuccessfully = false) }
+    fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 }

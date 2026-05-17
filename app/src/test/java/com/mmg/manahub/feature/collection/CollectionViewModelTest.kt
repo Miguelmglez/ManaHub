@@ -10,8 +10,9 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
-import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
+import com.mmg.manahub.feature.collection.presentation.SortOrder
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
@@ -63,7 +64,6 @@ class CollectionViewModelTest {
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val getCollection          = mockk<GetCollectionUseCase>()
-    private val removeCard             = mockk<RemoveCardUseCase>(relaxed = true)
     private val cardRepository         = mockk<CardRepository>(relaxed = true)
     private val userCardRepository     = mockk<UserCardRepository>(relaxed = true)
     private val authRepository         = mockk<AuthRepository>(relaxed = true)
@@ -87,7 +87,6 @@ class CollectionViewModelTest {
         cmc:        Double  = 1.0,
         createdAt:  Long    = 1_000L,
         isFoil:     Boolean = false,
-        isInWishlist: Boolean = false,
         isForTrade:   Boolean = false,
         legalityStandard:  String = "not_legal",
         legalityPioneer:   String = "legal",
@@ -102,7 +101,6 @@ class CollectionViewModelTest {
         userCard = TestFixtures.buildUserCard(
             id           = id,
             scryfallId   = scryfallId,
-            isInWishlist = isInWishlist,
             isForTrade   = isForTrade,
             createdAt    = createdAt,
             isFoil       = isFoil,
@@ -138,7 +136,6 @@ class CollectionViewModelTest {
 
         return CollectionViewModel(
             getCollection          = getCollection,
-            removeCard             = removeCard,
             cardRepository         = cardRepository,
             userCardRepository     = userCardRepository,
             authRepository         = authRepository,
@@ -421,34 +418,6 @@ class CollectionViewModelTest {
         viewModel.onViewModeToggle()   // LIST → GRID
         advanceUntilIdle()
         assertEquals(CollectionViewMode.GRID, viewModel.uiState.value.viewMode)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — Delete card
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given valid id when onDeleteCard then removeCard use case is called`() = runTest {
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-        coEvery { removeCard(any()) } returns Unit
-
-        viewModel.onDeleteCard("id-007")
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { removeCard("id-007") }
-    }
-
-    @Test
-    fun `given delete fails when onDeleteCard then error is set in state`() = runTest {
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-        coEvery { removeCard(any()) } throws RuntimeException("FK violation")
-
-        viewModel.onDeleteCard("id-007")
-        advanceUntilIdle()
-
-        assertNotNull(viewModel.uiState.value.error)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -750,19 +719,6 @@ class CollectionViewModelTest {
 
         assertNotNull(viewModel.uiState.value.error)
         assertFalse(viewModel.uiState.value.isLoading)
-    }
-
-    @Test
-    fun `given error in state when onErrorDismissed then error is cleared`() = runTest {
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-        coEvery { removeCard(any()) } throws RuntimeException("error")
-        viewModel.onDeleteCard("id-001")
-        advanceUntilIdle()
-
-        viewModel.onErrorDismissed()
-
-        assertNull(viewModel.uiState.value.error)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

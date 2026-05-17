@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.domain.model
 
-// Operadores de comparación para valores numéricos
+/** Comparison operators for numeric search criteria. */
 enum class ComparisonOperator(val symbol: String) {
     LESS("<"),
     LESS_OR_EQUAL("<="),
@@ -10,7 +10,7 @@ enum class ComparisonOperator(val symbol: String) {
     NOT_EQUAL("!=")
 }
 
-// Un criterio individual de búsqueda
+/** An individual search criterion contributed to a Scryfall query. */
 sealed class SearchCriterion {
 
     data class Name(

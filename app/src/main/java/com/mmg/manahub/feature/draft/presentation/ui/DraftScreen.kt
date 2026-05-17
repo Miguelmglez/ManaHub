@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.draft.presentation.ui
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,8 +24,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +40,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,6 +49,8 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -124,39 +125,14 @@ fun DraftScreen(
                     }
                 }
                 state.error != null && state.sets.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                state.error ?: "",
-                                color = colors.lifeNegative,
-                                style = typography.bodyMedium,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Button(
-                                onClick = { viewModel.loadSets(forceRefresh = true) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.primaryAccent,
-                                ),
-                            ) {
-                                Text(stringResource(R.string.draft_retry))
-                            }
-                        }
-                    }
+                    FullErrorState(
+                        message = state.error ?: "",
+                        retryLabel = stringResource(R.string.draft_retry),
+                        onRetry = { viewModel.loadSets(forceRefresh = true) },
+                    )
                 }
                 state.filteredSets.isEmpty() && state.searchQuery.isNotBlank() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            stringResource(R.string.draft_no_sets),
-                            color = colors.textSecondary,
-                            style = typography.bodyMedium,
-                        )
-                    }
+                    EmptyState(title = stringResource(R.string.draft_no_sets))
                 }
                 else -> {
                     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -193,7 +169,6 @@ private fun DraftSetCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         color = colors.surface,
@@ -221,7 +196,10 @@ private fun DraftSetCard(
                 color = colors.textPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 40.dp),
+                textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(4.dp))
             Row(

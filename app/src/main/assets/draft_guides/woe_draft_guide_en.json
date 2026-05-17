@@ -1,0 +1,3179 @@
+{
+  "metadata": {
+    "set_name": "Wilds of Eldraine",
+    "set_code": "WOE",
+    "source_url": "https://draftsim.com/mtg-woe-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "October 4, 2024"
+  },
+  "set_overview": {
+    "summary": "Wilds of Eldraine is a fast but balanced format with several viable playstyles and decks. The format features a rock-paper-scissors dynamic: Rx aggro beats Ux control, Golgari Food counters aggro, and control beats Food.",
+    "color_ranking": [
+      "{R} Red",
+      "{B} Black",
+      "{G} Green",
+      "{W} White",
+      "{U} Blue"
+    ],
+    "color_notes": {
+      "{R} Red": "Best color. Excellent removal, efficient creatures, three common Treasure-makers enabling splashes.",
+      "{B} Black": "Best common (Candy Grapple), solid curve filler, strong bargain setup.",
+      "{G} Green": "Strong ramp/fixing spells and fatties, but lacks removal.",
+      "{W} White": "Sweet combat tricks (Archon's Glory), good cheap creatures.",
+      "{U} Blue": "Strongest card-draw spells but struggles creating independent board presence."
+    },
+    "key_gameplay_notes": [
+      "Bargain spells exceed baseline expectations — prioritize enablers like Food tokens and enchantments.",
+      "Red is strongest (removal + creatures), blue is weakest (needs support to matter).",
+      "Even Selesnya Roles succeeds on curve before role synergies — build mana curves first.",
+      "Most decks play 17 lands; Simic plays 18; Boros may trim to 15-16.",
+      "Three common Treasure-makers enable splashes; green fixing via Rootrider Faun and Brave the Wilds."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Bargain",
+      "summary": "Pay an alternative cost by sacrificing a resource (enchantment, Food, etc.) when casting the spell.",
+      "performance": "Overperforms baseline expectations. Enablers (Food tokens, cheap enchantments) are premium.",
+      "key_examples": [
+        {
+          "name": "Candy Grapple",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 40,
+          "tier_rating": "A",
+          "note": null,
+          "id": "190d97bc-dbef-496d-9bd1-b785bdf8a964",
+          "scryfall_uri": "https://scryfall.com/card/woe/83/candy-grapple",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/190d97bc-dbef-496d-9bd1-b785bdf8a964.jpg?1692937514",
+            "normal": "https://cards.scryfall.io/normal/front/1/9/190d97bc-dbef-496d-9bd1-b785bdf8a964.jpg?1692937514"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        },
+        {
+          "name": "Hopeless Nightmare",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 33,
+          "tier_rating": "A",
+          "note": null,
+          "id": "2c2ee817-9ca9-4f09-bc71-7994c19a9470",
+          "scryfall_uri": "https://scryfall.com/card/woe/95/hopeless-nightmare",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c2ee817-9ca9-4f09-bc71-7994c19a9470.jpg?1752091345",
+            "normal": "https://cards.scryfall.io/normal/front/2/c/2c2ee817-9ca9-4f09-bc71-7994c19a9470.jpg?1752091345"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        },
+        {
+          "name": "Kellan's Lightblades",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 187,
+          "tier_rating": "C",
+          "note": null,
+          "id": "0cc727a6-f875-49b1-b7a4-67f22fbc3d50",
+          "scryfall_uri": "https://scryfall.com/card/woe/18/kellans-lightblades",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0cc727a6-f875-49b1-b7a4-67f22fbc3d50.jpg?1710276551",
+            "normal": "https://cards.scryfall.io/normal/front/0/c/0cc727a6-f875-49b1-b7a4-67f22fbc3d50.jpg?1710276551"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        }
+      ]
+    },
+    {
+      "name": "Food Tokens",
+      "summary": "Artifact tokens you can sacrifice for 3 life. Created by Golgari payoffs; fuel for sacrifice synergies and Greta activation.",
+      "performance": "Engine of Golgari Food.",
+      "key_examples": [
+        {
+          "name": "Greta, Sweettooth Scourge",
+          "color": "BG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 59,
+          "tier_rating": "B",
+          "note": null,
+          "id": "2cfd365e-34d1-4224-b925-119000311934",
+          "scryfall_uri": "https://scryfall.com/card/woe/205/greta-sweettooth-scourge",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Legendary Creature — Human Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cfd365e-34d1-4224-b925-119000311934.jpg?1692939325",
+            "normal": "https://cards.scryfall.io/normal/front/2/c/2cfd365e-34d1-4224-b925-119000311934.jpg?1692939325"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        },
+        {
+          "name": "Welcome to Sweettooth",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 26,
+          "tier_rating": "A",
+          "note": null,
+          "id": "8e629a31-2e06-4f95-9628-34670dcf68b9",
+          "scryfall_uri": "https://scryfall.com/card/woe/198/welcome-to-sweettooth",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment — Saga",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8e629a31-2e06-4f95-9628-34670dcf68b9.jpg?1692939226",
+            "normal": "https://cards.scryfall.io/normal/front/8/e/8e629a31-2e06-4f95-9628-34670dcf68b9.jpg?1692939226"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        }
+      ]
+    },
+    {
+      "name": "Celebration",
+      "summary": "Triggers when you cast two or more spells of different colors in a turn.",
+      "performance": "Easy to trigger in Boros/Rakdos; payoffs are solid creatures.",
+      "key_examples": [
+        {
+          "name": "Ratcatcher Trainee",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 88,
+          "tier_rating": "B",
+          "note": null,
+          "id": "7f4c0959-a107-4d61-9e51-256b2955f6ba",
+          "scryfall_uri": "https://scryfall.com/card/woe/144/ratcatcher-trainee-pest-problem",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Human Peasant // Instant — Adventure",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f4c0959-a107-4d61-9e51-256b2955f6ba.jpg?1739663117",
+            "normal": "https://cards.scryfall.io/normal/front/7/f/7f4c0959-a107-4d61-9e51-256b2955f6ba.jpg?1739663117"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        },
+        {
+          "name": "Grand Ball Guest",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 131,
+          "tier_rating": "C",
+          "note": null,
+          "id": "d6e75228-16af-42b0-8441-ed253a660cc9",
+          "scryfall_uri": "https://scryfall.com/card/woe/134/grand-ball-guest",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Human Peasant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/6/d6e75228-16af-42b0-8441-ed253a660cc9.jpg?1692938279",
+            "normal": "https://cards.scryfall.io/normal/front/d/6/d6e75228-16af-42b0-8441-ed253a660cc9.jpg?1692938279"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "summary": "Enchantment tokens (Cursed, Young Hero, Royal, Sorcerer, Wicked, Virtuous, Monster) placed on creatures.",
+      "performance": "Selesnya-focused; flexible utility for combat tricks elsewhere.",
+      "key_examples": [
+        {
+          "name": "Curse of the Werefox",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 153,
+          "tier_rating": "C",
+          "note": null,
+          "id": "89148458-1fd6-48ef-a2d9-7b434c9723ec",
+          "scryfall_uri": "https://scryfall.com/card/woe/167/curse-of-the-werefox",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89148458-1fd6-48ef-a2d9-7b434c9723ec.jpg?1692938776",
+            "normal": "https://cards.scryfall.io/normal/front/8/9/89148458-1fd6-48ef-a2d9-7b434c9723ec.jpg?1692938776"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        },
+        {
+          "name": "Cooped Up",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 119,
+          "tier_rating": "B",
+          "note": null,
+          "id": "8acb8758-09c5-4e19-ada1-904e36ece1fc",
+          "scryfall_uri": "https://scryfall.com/card/woe/8/cooped-up",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384",
+            "normal": "https://cards.scryfall.io/normal/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        }
+      ]
+    },
+    {
+      "name": "Adventures",
+      "summary": "Split-card spells playable in two modes — Adventure (instant/sorcery) or creature side.",
+      "performance": "Universal value; Johann, Apprentice Sorcerer enables recurring use.",
+      "key_examples": [
+        {
+          "name": "Johann, Apprentice Sorcerer",
+          "color": "UR",
+          "rarity": "Uncommon",
+          "pick_order_rank": 126,
+          "tier_rating": "C",
+          "note": null,
+          "id": "b88a762d-19ed-451d-a3a9-b3e7eea40f67",
+          "scryfall_uri": "https://scryfall.com/card/woe/207/johann-apprentice-sorcerer",
+          "colors": [
+            "R",
+            "U"
+          ],
+          "type_line": "Legendary Creature — Human Wizard Sorcerer",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b88a762d-19ed-451d-a3a9-b3e7eea40f67.jpg?1767960026",
+            "normal": "https://cards.scryfall.io/normal/front/b/8/b88a762d-19ed-451d-a3a9-b3e7eea40f67.jpg?1767960026"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        }
+      ]
+    },
+    {
+      "name": "Treasure Tokens",
+      "summary": "Artifact mana sources enabling color fixing. Created by several red commons.",
+      "performance": "Top splash enabler.",
+      "key_examples": []
+    },
+    {
+      "name": "Tapping Effects",
+      "summary": "Azorius Frost theme (Icewrought Sentry, Hylda cards). Underpowered — payoffs depend on rares.",
+      "performance": "Weakest format theme.",
+      "key_examples": [
+        {
+          "name": "Icewrought Sentry",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 185,
+          "tier_rating": "C",
+          "note": null,
+          "id": "859419d3-cd15-4362-98b3-a7ff98e29692",
+          "scryfall_uri": "https://scryfall.com/card/woe/55/icewrought-sentry",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Elemental Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/859419d3-cd15-4362-98b3-a7ff98e29692.jpg?1692937080",
+            "normal": "https://cards.scryfall.io/normal/front/8/5/859419d3-cd15-4362-98b3-a7ff98e29692.jpg?1692937080"
+          },
+          "set": "woe",
+          "set_name": "Wilds of Eldraine"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Food (BG)",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Midrange with removal + curve filler + fatties; minimal flier density.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Greta, Sweettooth Scourge",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 59,
+            "tier_rating": "B",
+            "note": null,
+            "id": "2cfd365e-34d1-4224-b925-119000311934",
+            "scryfall_uri": "https://scryfall.com/card/woe/205/greta-sweettooth-scourge",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Legendary Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cfd365e-34d1-4224-b925-119000311934.jpg?1692939325",
+              "normal": "https://cards.scryfall.io/normal/front/2/c/2cfd365e-34d1-4224-b925-119000311934.jpg?1692939325"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Gingerbread Hunter",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 17,
+            "tier_rating": "A",
+            "note": null,
+            "id": "e77a8fd4-af5f-42b3-a87e-788baf2562dd",
+            "scryfall_uri": "https://scryfall.com/card/woe/227/gingerbread-hunter-puny-snack",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Giant // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e77a8fd4-af5f-42b3-a87e-788baf2562dd.jpg?1692939646",
+              "normal": "https://cards.scryfall.io/normal/front/e/7/e77a8fd4-af5f-42b3-a87e-788baf2562dd.jpg?1692939646"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Tough Cookie",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 19,
+            "tier_rating": "A",
+            "note": null,
+            "id": "7aa37f85-5336-4372-97a2-9c8b00798c7a",
+            "scryfall_uri": "https://scryfall.com/card/woe/193/tough-cookie",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Artifact Creature — Food Golem",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7aa37f85-5336-4372-97a2-9c8b00798c7a.jpg?1692939153",
+              "normal": "https://cards.scryfall.io/normal/front/7/a/7aa37f85-5336-4372-97a2-9c8b00798c7a.jpg?1692939153"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Welcome to Sweettooth",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 26,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8e629a31-2e06-4f95-9628-34670dcf68b9",
+            "scryfall_uri": "https://scryfall.com/card/woe/198/welcome-to-sweettooth",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Enchantment — Saga",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8e629a31-2e06-4f95-9628-34670dcf68b9.jpg?1692939226",
+              "normal": "https://cards.scryfall.io/normal/front/8/e/8e629a31-2e06-4f95-9628-34670dcf68b9.jpg?1692939226"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Feed the Cauldron",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 135,
+            "tier_rating": "C",
+            "note": null,
+            "id": "0cfd18a5-e06a-4cb5-b78e-de18ec641321",
+            "scryfall_uri": "https://scryfall.com/card/woe/91/feed-the-cauldron",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0cfd18a5-e06a-4cb5-b78e-de18ec641321.jpg?1692937630",
+              "normal": "https://cards.scryfall.io/normal/front/0/c/0cfd18a5-e06a-4cb5-b78e-de18ec641321.jpg?1692937630"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hamlet Glutton",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a4ec5544-c138-44bb-a807-5798313c9a50",
+            "scryfall_uri": "https://scryfall.com/card/woe/173/hamlet-glutton",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Giant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4ec5544-c138-44bb-a807-5798313c9a50.jpg?1692938861",
+              "normal": "https://cards.scryfall.io/normal/front/a/4/a4ec5544-c138-44bb-a807-5798313c9a50.jpg?1692938861"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Sweettooth Witch",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a6bdb984-06f8-4bca-a943-17fe5db97682",
+            "scryfall_uri": "https://scryfall.com/card/woe/111/sweettooth-witch",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a6bdb984-06f8-4bca-a943-17fe5db97682.jpg?1692937929",
+              "normal": "https://cards.scryfall.io/normal/front/a/6/a6bdb984-06f8-4bca-a943-17fe5db97682.jpg?1692937929"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hollow Scavenger",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 94,
+            "tier_rating": "B",
+            "note": null,
+            "id": "0ad345b6-7077-4dd2-b515-c774a3185fe4",
+            "scryfall_uri": "https://scryfall.com/card/woe/174/hollow-scavenger-bakery-raid",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Wolf // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0ad345b6-7077-4dd2-b515-c774a3185fe4.jpg?1692938875",
+              "normal": "https://cards.scryfall.io/normal/front/0/a/0ad345b6-7077-4dd2-b515-c774a3185fe4.jpg?1692938875"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Mintstrosity",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 99,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d902f154-6fe8-4b97-aa67-4d4696abf887",
+            "scryfall_uri": "https://scryfall.com/card/woe/100/mintstrosity",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/9/d902f154-6fe8-4b97-aa67-4d4696abf887.jpg?1692937759",
+              "normal": "https://cards.scryfall.io/normal/front/d/9/d902f154-6fe8-4b97-aa67-4d4696abf887.jpg?1692937759"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Aggro (RW)",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Fast with strong redundancy in creature slots. Many creatures at 1-4 CMC; triggers celebration easily.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Ash, Party Crasher",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 43,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d51e6610-25b6-4d8e-92d7-c50a2ff844ff",
+            "scryfall_uri": "https://scryfall.com/card/woe/201/ash-party-crasher",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Peasant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/5/d51e6610-25b6-4d8e-92d7-c50a2ff844ff.jpg?1692939268",
+              "normal": "https://cards.scryfall.io/normal/front/d/5/d51e6610-25b6-4d8e-92d7-c50a2ff844ff.jpg?1692939268"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Imodane's Recruiter",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 9,
+            "tier_rating": "S",
+            "note": null,
+            "id": "4dbaa855-3f8e-42e6-8ec8-5ffbc5c8acf0",
+            "scryfall_uri": "https://scryfall.com/card/woe/229/imodanes-recruiter-train-troops",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Knight // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4dbaa855-3f8e-42e6-8ec8-5ffbc5c8acf0.jpg?1692939679",
+              "normal": "https://cards.scryfall.io/normal/front/4/d/4dbaa855-3f8e-42e6-8ec8-5ffbc5c8acf0.jpg?1692939679"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Belligerent of the Ball",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 130,
+            "tier_rating": "C",
+            "note": null,
+            "id": "6658398a-46a5-4f41-9b1b-4a47f2822cf8",
+            "scryfall_uri": "https://scryfall.com/card/woe/120/belligerent-of-the-ball",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Ogre Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/6658398a-46a5-4f41-9b1b-4a47f2822cf8.jpg?1692938073",
+              "normal": "https://cards.scryfall.io/normal/front/6/6/6658398a-46a5-4f41-9b1b-4a47f2822cf8.jpg?1692938073"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Goddric, Cloaked Reveler",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 35,
+            "tier_rating": "A",
+            "note": null,
+            "id": "fe93ef82-51de-40ad-9b52-8f3fd11c144f",
+            "scryfall_uri": "https://scryfall.com/card/woe/132/goddric-cloaked-reveler",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe93ef82-51de-40ad-9b52-8f3fd11c144f.jpg?1692938249",
+              "normal": "https://cards.scryfall.io/normal/front/f/e/fe93ef82-51de-40ad-9b52-8f3fd11c144f.jpg?1692938249"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Harried Spearguard",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 93,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1db79785-4f55-445f-93f2-14c6e4606fc5",
+            "scryfall_uri": "https://scryfall.com/card/woe/135/harried-spearguard",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1db79785-4f55-445f-93f2-14c6e4606fc5.jpg?1692938293",
+              "normal": "https://cards.scryfall.io/normal/front/1/d/1db79785-4f55-445f-93f2-14c6e4606fc5.jpg?1692938293"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Gingerbrute",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 150,
+            "tier_rating": "C",
+            "note": null,
+            "id": "09a4578a-7dc6-4da3-93ee-913b10be5740",
+            "scryfall_uri": "https://scryfall.com/card/woe/246/gingerbrute",
+            "colors": [],
+            "type_line": "Artifact Creature — Food Golem",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09a4578a-7dc6-4da3-93ee-913b10be5740.jpg?1692939880",
+              "normal": "https://cards.scryfall.io/normal/front/0/9/09a4578a-7dc6-4da3-93ee-913b10be5740.jpg?1692939880"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Grand Ball Guest",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 131,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d6e75228-16af-42b0-8441-ed253a660cc9",
+            "scryfall_uri": "https://scryfall.com/card/woe/134/grand-ball-guest",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Peasant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/6/d6e75228-16af-42b0-8441-ed253a660cc9.jpg?1692938279",
+              "normal": "https://cards.scryfall.io/normal/front/d/6/d6e75228-16af-42b0-8441-ed253a660cc9.jpg?1692938279"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Ratcatcher Trainee",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 88,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7f4c0959-a107-4d61-9e51-256b2955f6ba",
+            "scryfall_uri": "https://scryfall.com/card/woe/144/ratcatcher-trainee-pest-problem",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Peasant // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f4c0959-a107-4d61-9e51-256b2955f6ba.jpg?1739663117",
+              "normal": "https://cards.scryfall.io/normal/front/7/f/7f4c0959-a107-4d61-9e51-256b2955f6ba.jpg?1739663117"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hopeful Vigil",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 65,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9",
+            "scryfall_uri": "https://scryfall.com/card/woe/17/hopeful-vigil",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9.jpg?1692936516",
+              "normal": "https://cards.scryfall.io/normal/front/d/3/d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9.jpg?1692936516"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Minecart Daredevil",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 115,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5b2a02f3-3921-4f40-9ffa-70bc08b052e1",
+            "scryfall_uri": "https://scryfall.com/card/woe/141/minecart-daredevil-ride-the-rails",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Dwarf Knight // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5b2a02f3-3921-4f40-9ffa-70bc08b052e1.jpg?1708138644",
+              "normal": "https://cards.scryfall.io/normal/front/5/b/5b2a02f3-3921-4f40-9ffa-70bc08b052e1.jpg?1708138644"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Edgewall Pack",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 97,
+            "tier_rating": "B",
+            "note": null,
+            "id": "acda9d02-00fc-49e2-a9f3-176e9c0a8c5f",
+            "scryfall_uri": "https://scryfall.com/card/woe/126/edgewall-pack",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Dog",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/acda9d02-00fc-49e2-a9f3-176e9c0a8c5f.jpg?1692938160",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/acda9d02-00fc-49e2-a9f3-176e9c0a8c5f.jpg?1692938160"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Merry Bards",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 177,
+            "tier_rating": "C",
+            "note": null,
+            "id": "b0058b9b-e919-45eb-9da0-690f62aa252e",
+            "scryfall_uri": "https://scryfall.com/card/woe/140/merry-bards",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Bard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b0058b9b-e919-45eb-9da0-690f62aa252e.jpg?1692938364",
+              "normal": "https://cards.scryfall.io/normal/front/b/0/b0058b9b-e919-45eb-9da0-690f62aa252e.jpg?1692938364"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Rats (BR)",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Midrange/aggro creating wide boards. Synergizes with Enchanting Tales bonus sheet cards (Goblin Bombardment, Shared Animosity). Particularly strong against Simic.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Totentanz, Swarm Piper",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 57,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1422d6db-fe5b-4a89-951a-fbd7985a29fc",
+            "scryfall_uri": "https://scryfall.com/card/woe/216/totentanz-swarm-piper",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Warlock Bard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/1422d6db-fe5b-4a89-951a-fbd7985a29fc.jpg?1692939482",
+              "normal": "https://cards.scryfall.io/normal/front/1/4/1422d6db-fe5b-4a89-951a-fbd7985a29fc.jpg?1692939482"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Redcap Gutter-Dweller",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 3,
+            "tier_rating": "S",
+            "note": null,
+            "id": "96bcd5f0-da79-47ab-83cf-976198b458d1",
+            "scryfall_uri": "https://scryfall.com/card/woe/146/redcap-gutter-dweller",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/96bcd5f0-da79-47ab-83cf-976198b458d1.jpg?1692938456",
+              "normal": "https://cards.scryfall.io/normal/front/9/6/96bcd5f0-da79-47ab-83cf-976198b458d1.jpg?1692938456"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Song of Totentanz",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 36,
+            "tier_rating": "A",
+            "note": null,
+            "id": "940e8bb7-0251-4fac-945c-d83618c10447",
+            "scryfall_uri": "https://scryfall.com/card/woe/150/song-of-totentanz",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/940e8bb7-0251-4fac-945c-d83618c10447.jpg?1692938518",
+              "normal": "https://cards.scryfall.io/normal/front/9/4/940e8bb7-0251-4fac-945c-d83618c10447.jpg?1692938518"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Lord Skitter, Sewer King",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 6,
+            "tier_rating": "S",
+            "note": null,
+            "id": "729877be-4894-4ef5-9e60-de8a8fb2bdc0",
+            "scryfall_uri": "https://scryfall.com/card/woe/97/lord-skitter-sewer-king",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Legendary Creature — Rat Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/2/729877be-4894-4ef5-9e60-de8a8fb2bdc0.jpg?1722161627",
+              "normal": "https://cards.scryfall.io/normal/front/7/2/729877be-4894-4ef5-9e60-de8a8fb2bdc0.jpg?1722161627"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Voracious Vermin",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 112,
+            "tier_rating": "B",
+            "note": null,
+            "id": "8059be65-3c73-49bb-a3b6-c346ce2f9fa4",
+            "scryfall_uri": "https://scryfall.com/card/woe/116/voracious-vermin",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Rat",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/8059be65-3c73-49bb-a3b6-c346ce2f9fa4.jpg?1692938011",
+              "normal": "https://cards.scryfall.io/normal/front/8/0/8059be65-3c73-49bb-a3b6-c346ce2f9fa4.jpg?1692938011"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Edgewall Pack",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 97,
+            "tier_rating": "B",
+            "note": null,
+            "id": "acda9d02-00fc-49e2-a9f3-176e9c0a8c5f",
+            "scryfall_uri": "https://scryfall.com/card/woe/126/edgewall-pack",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Dog",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/acda9d02-00fc-49e2-a9f3-176e9c0a8c5f.jpg?1692938160",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/acda9d02-00fc-49e2-a9f3-176e9c0a8c5f.jpg?1692938160"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Gnawing Crescendo",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 98,
+            "tier_rating": "B",
+            "note": null,
+            "id": "254fc64a-9734-44a6-8869-ab03512f1a99",
+            "scryfall_uri": "https://scryfall.com/card/woe/131/gnawing-crescendo",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/254fc64a-9734-44a6-8869-ab03512f1a99.jpg?1692938235",
+              "normal": "https://cards.scryfall.io/normal/front/2/5/254fc64a-9734-44a6-8869-ab03512f1a99.jpg?1692938235"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Rat Out",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 56,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f2c42755-bf91-4c75-95c6-d2a60ba3492a",
+            "scryfall_uri": "https://scryfall.com/card/woe/103/rat-out",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f2c42755-bf91-4c75-95c6-d2a60ba3492a.jpg?1692937802",
+              "normal": "https://cards.scryfall.io/normal/front/f/2/f2c42755-bf91-4c75-95c6-d2a60ba3492a.jpg?1692937802"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Goblin Bombardment",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 14,
+            "tier_rating": "S",
+            "note": null,
+            "id": "e92af114-ad34-4106-a7fa-5676dbcd4960",
+            "scryfall_uri": "https://scryfall.com/card/wot/43/goblin-bombardment",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e92af114-ad34-4106-a7fa-5676dbcd4960.jpg?1692932670",
+              "normal": "https://cards.scryfall.io/normal/front/e/9/e92af114-ad34-4106-a7fa-5676dbcd4960.jpg?1692932670"
+            },
+            "set": "wot",
+            "set_name": "Wilds of Eldraine: Enchanting Tales"
+          },
+          {
+            "name": "Shared Animosity",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 280,
+            "tier_rating": "F",
+            "note": null,
+            "id": "299a807e-21cb-4b49-ad2b-c9ce7eef393a",
+            "scryfall_uri": "https://scryfall.com/card/wot/49/shared-animosity",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/299a807e-21cb-4b49-ad2b-c9ce7eef393a.jpg?1692973558",
+              "normal": "https://cards.scryfall.io/normal/front/2/9/299a807e-21cb-4b49-ad2b-c9ce7eef393a.jpg?1692973558"
+            },
+            "set": "wot",
+            "set_name": "Wilds of Eldraine: Enchanting Tales"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Monsters (RG)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Straightforward curve emphasizing large creatures (4/x theme rarely matters).",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Ruby, Daring Tracker",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 71,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ffb5786b-6825-4ebf-a1e1-80011340adbb",
+            "scryfall_uri": "https://scryfall.com/card/woe/212/ruby-daring-tracker",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ffb5786b-6825-4ebf-a1e1-80011340adbb.jpg?1692939424",
+              "normal": "https://cards.scryfall.io/normal/front/f/f/ffb5786b-6825-4ebf-a1e1-80011340adbb.jpg?1692939424"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Picnic Ruiner",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 61,
+            "tier_rating": "B",
+            "note": null,
+            "id": "66485c3e-3b21-4db4-ac12-af04e35b49b1",
+            "scryfall_uri": "https://scryfall.com/card/woe/232/picnic-ruiner-stolen-goodies",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin Rogue // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66485c3e-3b21-4db4-ac12-af04e35b49b1.jpg?1692939722",
+              "normal": "https://cards.scryfall.io/normal/front/6/6/66485c3e-3b21-4db4-ac12-af04e35b49b1.jpg?1692939722"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Two-Headed Hunter",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 91,
+            "tier_rating": "B",
+            "note": null,
+            "id": "70c12e75-7e65-4706-b976-e47835910928",
+            "scryfall_uri": "https://scryfall.com/card/woe/155/two-headed-hunter-twice-the-rage",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Giant // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70c12e75-7e65-4706-b976-e47835910928.jpg?1692938593",
+              "normal": "https://cards.scryfall.io/normal/front/7/0/70c12e75-7e65-4706-b976-e47835910928.jpg?1692938593"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Garruk's Uprising",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 292,
+            "tier_rating": "F",
+            "note": null,
+            "id": "7931a072-b688-4a0b-a32e-9a2082738745",
+            "scryfall_uri": "https://scryfall.com/card/wot/53/garruks-uprising",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/9/7931a072-b688-4a0b-a32e-9a2082738745.jpg?1692932816",
+              "normal": "https://cards.scryfall.io/normal/front/7/9/7931a072-b688-4a0b-a32e-9a2082738745.jpg?1692932816"
+            },
+            "set": "wot",
+            "set_name": "Wilds of Eldraine: Enchanting Tales"
+          },
+          {
+            "name": "Ferocious Werefox",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 134,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ac1907e8-0713-47dd-ac42-bf1323c5bec0",
+            "scryfall_uri": "https://scryfall.com/card/woe/170/ferocious-werefox-guard-change",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elf Fox Warrior // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/ac1907e8-0713-47dd-ac42-bf1323c5bec0.jpg?1692938817",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/ac1907e8-0713-47dd-ac42-bf1323c5bec0.jpg?1692938817"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Bellowing Bruiser",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 178,
+            "tier_rating": "C",
+            "note": null,
+            "id": "26ece013-f3ef-4c12-9dea-b2789f61f8a0",
+            "scryfall_uri": "https://scryfall.com/card/woe/121/bellowing-bruiser-beat-a-path",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Ogre // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/6/26ece013-f3ef-4c12-9dea-b2789f61f8a0.jpg?1692938088",
+              "normal": "https://cards.scryfall.io/normal/front/2/6/26ece013-f3ef-4c12-9dea-b2789f61f8a0.jpg?1692938088"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Grabby Giant",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 116,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fab7646a-61e8-446b-9dba-ac6e0db82f10",
+            "scryfall_uri": "https://scryfall.com/card/woe/133/grabby-giant-thats-mine",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Giant // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/a/fab7646a-61e8-446b-9dba-ac6e0db82f10.jpg?1692938264",
+              "normal": "https://cards.scryfall.io/normal/front/f/a/fab7646a-61e8-446b-9dba-ac6e0db82f10.jpg?1692938264"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Minecart Daredevil",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 115,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5b2a02f3-3921-4f40-9ffa-70bc08b052e1",
+            "scryfall_uri": "https://scryfall.com/card/woe/141/minecart-daredevil-ride-the-rails",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Dwarf Knight // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5b2a02f3-3921-4f40-9ffa-70bc08b052e1.jpg?1708138644",
+              "normal": "https://cards.scryfall.io/normal/front/5/b/5b2a02f3-3921-4f40-9ffa-70bc08b052e1.jpg?1708138644"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Verdant Outrider",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 221,
+            "tier_rating": "D",
+            "note": null,
+            "id": "c34830e4-823a-40fa-ba41-bb2afbf1e499",
+            "scryfall_uri": "https://scryfall.com/card/woe/196/verdant-outrider",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c34830e4-823a-40fa-ba41-bb2afbf1e499.jpg?1692939199",
+              "normal": "https://cards.scryfall.io/normal/front/c/3/c34830e4-823a-40fa-ba41-bb2afbf1e499.jpg?1692939199"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Roles (GW)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Enchantment-focused. Role creatures excel; Curse generates value.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Syr Armont, the Redeemer",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 107,
+            "tier_rating": "B",
+            "note": null,
+            "id": "85050609-baf0-430a-ab33-83a6ea6d4741",
+            "scryfall_uri": "https://scryfall.com/card/woe/214/syr-armont-the-redeemer",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85050609-baf0-430a-ab33-83a6ea6d4741.jpg?1692939452",
+              "normal": "https://cards.scryfall.io/normal/front/8/5/85050609-baf0-430a-ab33-83a6ea6d4741.jpg?1692939452"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Tanglespan Lookout",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 123,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3bc5c32d-be0a-4a5f-a8c7-9767a895bc76",
+            "scryfall_uri": "https://scryfall.com/card/woe/188/tanglespan-lookout",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Satyr",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/b/3bc5c32d-be0a-4a5f-a8c7-9767a895bc76.jpg?1692939080",
+              "normal": "https://cards.scryfall.io/normal/front/3/b/3bc5c32d-be0a-4a5f-a8c7-9767a895bc76.jpg?1692939080"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Redtooth Vanguard",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 176,
+            "tier_rating": "C",
+            "note": null,
+            "id": "55271960-b9bd-4bea-93ca-3321bf30be78",
+            "scryfall_uri": "https://scryfall.com/card/woe/180/redtooth-vanguard",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elf Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/55271960-b9bd-4bea-93ca-3321bf30be78.jpg?1692938959",
+              "normal": "https://cards.scryfall.io/normal/front/5/5/55271960-b9bd-4bea-93ca-3321bf30be78.jpg?1692938959"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Elvish Archivist",
+            "color": "G",
+            "rarity": "Rare",
+            "pick_order_rank": 85,
+            "tier_rating": "B",
+            "note": null,
+            "id": "0670dbf0-b150-4e8d-bb40-f768b2f06fe5",
+            "scryfall_uri": "https://scryfall.com/card/woe/168/elvish-archivist",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elf Artificer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/0670dbf0-b150-4e8d-bb40-f768b2f06fe5.jpg?1692938791",
+              "normal": "https://cards.scryfall.io/normal/front/0/6/0670dbf0-b150-4e8d-bb40-f768b2f06fe5.jpg?1692938791"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Yenna, Redtooth Regent",
+            "color": "WG",
+            "rarity": "Rare",
+            "pick_order_rank": 145,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e635d461-254a-434e-8e5d-dea61dd8ca4f",
+            "scryfall_uri": "https://scryfall.com/card/woe/219/yenna-redtooth-regent",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Elf Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e635d461-254a-434e-8e5d-dea61dd8ca4f.jpg?1692939524",
+              "normal": "https://cards.scryfall.io/normal/front/e/6/e635d461-254a-434e-8e5d-dea61dd8ca4f.jpg?1692939524"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Ferocious Werefox",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 134,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ac1907e8-0713-47dd-ac42-bf1323c5bec0",
+            "scryfall_uri": "https://scryfall.com/card/woe/170/ferocious-werefox-guard-change",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elf Fox Warrior // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/ac1907e8-0713-47dd-ac42-bf1323c5bec0.jpg?1692938817",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/ac1907e8-0713-47dd-ac42-bf1323c5bec0.jpg?1692938817"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Redtooth Genealogist",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 152,
+            "tier_rating": "C",
+            "note": null,
+            "id": "99c81440-66eb-4443-a83f-e2f15cb68a3e",
+            "scryfall_uri": "https://scryfall.com/card/woe/179/redtooth-genealogist",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elf Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/99c81440-66eb-4443-a83f-e2f15cb68a3e.jpg?1692938945",
+              "normal": "https://cards.scryfall.io/normal/front/9/9/99c81440-66eb-4443-a83f-e2f15cb68a3e.jpg?1692938945"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Unassuming Sage",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 235,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a66fbaeb-1624-43b3-83e2-a37ce7588a5a",
+            "scryfall_uri": "https://scryfall.com/card/woe/37/unassuming-sage",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Peasant Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a66fbaeb-1624-43b3-83e2-a37ce7588a5a.jpg?1692936823",
+              "normal": "https://cards.scryfall.io/normal/front/a/6/a66fbaeb-1624-43b3-83e2-a37ce7588a5a.jpg?1692936823"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Besotted Knight",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 182,
+            "tier_rating": "C",
+            "note": null,
+            "id": "5980a930-c7f8-45e1-a18a-87734d9ed09e",
+            "scryfall_uri": "https://scryfall.com/card/woe/4/besotted-knight-betroth-the-beast",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Knight // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/5980a930-c7f8-45e1-a18a-87734d9ed09e.jpg?1708138623",
+              "normal": "https://cards.scryfall.io/normal/front/5/9/5980a930-c7f8-45e1-a18a-87734d9ed09e.jpg?1708138623"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Charmed Clothier",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 219,
+            "tier_rating": "D",
+            "note": null,
+            "id": "994f4473-dfc9-45cd-8528-945db3aa6a9a",
+            "scryfall_uri": "https://scryfall.com/card/woe/6/charmed-clothier",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Faerie Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/994f4473-dfc9-45cd-8528-945db3aa6a9a.jpg?1692936355",
+              "normal": "https://cards.scryfall.io/normal/front/9/9/994f4473-dfc9-45cd-8528-945db3aa6a9a.jpg?1692936355"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Curse of the Werefox",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 153,
+            "tier_rating": "C",
+            "note": null,
+            "id": "89148458-1fd6-48ef-a2d9-7b434c9723ec",
+            "scryfall_uri": "https://scryfall.com/card/woe/167/curse-of-the-werefox",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89148458-1fd6-48ef-a2d9-7b434c9723ec.jpg?1692938776",
+              "normal": "https://cards.scryfall.io/normal/front/8/9/89148458-1fd6-48ef-a2d9-7b434c9723ec.jpg?1692938776"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Cooped Up",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 119,
+            "tier_rating": "B",
+            "note": null,
+            "id": "8acb8758-09c5-4e19-ada1-904e36ece1fc",
+            "scryfall_uri": "https://scryfall.com/card/woe/8/cooped-up",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384",
+              "normal": "https://cards.scryfall.io/normal/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Faeries (UB)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Tempo deck with cheap fliers, removal, and countermagic. Ideal build: cheap curve, heavy interaction, two Into the Fae Court at top.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Obyra, Dreaming Duelist",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 90,
+            "tier_rating": "B",
+            "note": null,
+            "id": "63ce03ee-279b-4955-98e3-9ce1990f8b7b",
+            "scryfall_uri": "https://scryfall.com/card/woe/210/obyra-dreaming-duelist",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Faerie Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/63ce03ee-279b-4955-98e3-9ce1990f8b7b.jpg?1692939395",
+              "normal": "https://cards.scryfall.io/normal/front/6/3/63ce03ee-279b-4955-98e3-9ce1990f8b7b.jpg?1692939395"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Picklock Prankster",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 50,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5ebac73a-1ecf-4e6d-87b1-ea560bfeb064",
+            "scryfall_uri": "https://scryfall.com/card/woe/64/picklock-prankster-free-the-fae",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Faerie Rogue // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/e/5ebac73a-1ecf-4e6d-87b1-ea560bfeb064.jpg?1692937214",
+              "normal": "https://cards.scryfall.io/normal/front/5/e/5ebac73a-1ecf-4e6d-87b1-ea560bfeb064.jpg?1692937214"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Faerie Fencing",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 72,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6bdcaf24-4352-47cf-a043-899be47ab1bb",
+            "scryfall_uri": "https://scryfall.com/card/woe/90/faerie-fencing",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6bdcaf24-4352-47cf-a043-899be47ab1bb.jpg?1692937615",
+              "normal": "https://cards.scryfall.io/normal/front/6/b/6bdcaf24-4352-47cf-a043-899be47ab1bb.jpg?1692937615"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Ego Drain",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 258,
+            "tier_rating": "F",
+            "note": null,
+            "id": "8faf36da-bbad-4d6e-a530-502d47a2dd23",
+            "scryfall_uri": "https://scryfall.com/card/woe/86/ego-drain",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8faf36da-bbad-4d6e-a530-502d47a2dd23.jpg?1692937556",
+              "normal": "https://cards.scryfall.io/normal/front/8/f/8faf36da-bbad-4d6e-a530-502d47a2dd23.jpg?1692937556"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Talion's Messenger",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 12,
+            "tier_rating": "S",
+            "note": null,
+            "id": "35fb0640-5b04-4687-b863-46a8b8d36809",
+            "scryfall_uri": "https://scryfall.com/card/woe/73/talions-messenger",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Faerie Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35fb0640-5b04-4687-b863-46a8b8d36809.jpg?1692937364",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/35fb0640-5b04-4687-b863-46a8b8d36809.jpg?1692937364"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Spell Stutter",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 79,
+            "tier_rating": "B",
+            "note": null,
+            "id": "24447e36-a42f-40a9-ad44-e904b6f9b276",
+            "scryfall_uri": "https://scryfall.com/card/woe/69/spell-stutter",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24447e36-a42f-40a9-ad44-e904b6f9b276.jpg?1692937299",
+              "normal": "https://cards.scryfall.io/normal/front/2/4/24447e36-a42f-40a9-ad44-e904b6f9b276.jpg?1692937299"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Barrow Naughty",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 114,
+            "tier_rating": "B",
+            "note": null,
+            "id": "67da5ad8-4de2-4bd4-8b95-f2657e1fdee5",
+            "scryfall_uri": "https://scryfall.com/card/woe/81/barrow-naughty",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Faerie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/67da5ad8-4de2-4bd4-8b95-f2657e1fdee5.jpg?1692937484",
+              "normal": "https://cards.scryfall.io/normal/front/6/7/67da5ad8-4de2-4bd4-8b95-f2657e1fdee5.jpg?1692937484"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Into the Fae Court",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 77,
+            "tier_rating": "B",
+            "note": null,
+            "id": "969b13bb-6411-41f9-b6b4-af4ffca62e17",
+            "scryfall_uri": "https://scryfall.com/card/woe/57/into-the-fae-court",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/969b13bb-6411-41f9-b6b4-af4ffca62e17.jpg?1692937111",
+              "normal": "https://cards.scryfall.io/normal/front/9/6/969b13bb-6411-41f9-b6b4-af4ffca62e17.jpg?1692937111"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Midrange (WB)",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Grindy long-game with incremental card/board advantage. Leverages bargain spells; enchantment-to-graveyard triggers Neva.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Neva, Stalked by Nightmares",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 200,
+            "tier_rating": "D",
+            "note": null,
+            "id": "e6f925ab-ade7-4da8-a791-185e098d18f2",
+            "scryfall_uri": "https://scryfall.com/card/woe/209/neva-stalked-by-nightmares",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e6f925ab-ade7-4da8-a791-185e098d18f2.jpg?1692939381",
+              "normal": "https://cards.scryfall.io/normal/front/e/6/e6f925ab-ade7-4da8-a791-185e098d18f2.jpg?1692939381"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Knight of Doves",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 263,
+            "tier_rating": "F",
+            "note": null,
+            "id": "b4f33617-ad19-4d42-ab94-6f21a7fb3dd4",
+            "scryfall_uri": "https://scryfall.com/card/woe/19/knight-of-doves",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4f33617-ad19-4d42-ab94-6f21a7fb3dd4.jpg?1692936545",
+              "normal": "https://cards.scryfall.io/normal/front/b/4/b4f33617-ad19-4d42-ab94-6f21a7fb3dd4.jpg?1692936545"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Ashiok's Reaper",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 250,
+            "tier_rating": "F",
+            "note": null,
+            "id": "83957fe0-6500-420c-9b7a-2448a1c1d3b3",
+            "scryfall_uri": "https://scryfall.com/card/woe/79/ashioks-reaper",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Nightmare",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/83957fe0-6500-420c-9b7a-2448a1c1d3b3.jpg?1692937454",
+              "normal": "https://cards.scryfall.io/normal/front/8/3/83957fe0-6500-420c-9b7a-2448a1c1d3b3.jpg?1692937454"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hopeless Nightmare",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 33,
+            "tier_rating": "A",
+            "note": null,
+            "id": "2c2ee817-9ca9-4f09-bc71-7994c19a9470",
+            "scryfall_uri": "https://scryfall.com/card/woe/95/hopeless-nightmare",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c2ee817-9ca9-4f09-bc71-7994c19a9470.jpg?1752091345",
+              "normal": "https://cards.scryfall.io/normal/front/2/c/2c2ee817-9ca9-4f09-bc71-7994c19a9470.jpg?1752091345"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hopeful Vigil",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 65,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9",
+            "scryfall_uri": "https://scryfall.com/card/woe/17/hopeful-vigil",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9.jpg?1692936516",
+              "normal": "https://cards.scryfall.io/normal/front/d/3/d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9.jpg?1692936516"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Stockpiling Celebrant",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 136,
+            "tier_rating": "C",
+            "note": null,
+            "id": "0214ebc6-c59f-4170-8dd2-ce07caa6e6ad",
+            "scryfall_uri": "https://scryfall.com/card/woe/32/stockpiling-celebrant",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Dwarf Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/0214ebc6-c59f-4170-8dd2-ce07caa6e6ad.jpg?1692936744",
+              "normal": "https://cards.scryfall.io/normal/front/0/2/0214ebc6-c59f-4170-8dd2-ce07caa6e6ad.jpg?1692936744"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Rowan's Grim Search",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 215,
+            "tier_rating": "D",
+            "note": null,
+            "id": "1be6786e-0569-42dd-b03c-82da7b32a14f",
+            "scryfall_uri": "https://scryfall.com/card/woe/104/rowans-grim-search",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1be6786e-0569-42dd-b03c-82da7b32a14f.jpg?1692937818",
+              "normal": "https://cards.scryfall.io/normal/front/1/b/1be6786e-0569-42dd-b03c-82da7b32a14f.jpg?1692937818"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Spells (UR)",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Controlling. Sits behind Unruly Catapult and Johann to build incremental advantage. Lacks sweepers; Treasure-makers enable splashes.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Johann, Apprentice Sorcerer",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 126,
+            "tier_rating": "C",
+            "note": "Strongest signpost in the set.",
+            "id": "b88a762d-19ed-451d-a3a9-b3e7eea40f67",
+            "scryfall_uri": "https://scryfall.com/card/woe/207/johann-apprentice-sorcerer",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Wizard Sorcerer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b88a762d-19ed-451d-a3a9-b3e7eea40f67.jpg?1767960026",
+              "normal": "https://cards.scryfall.io/normal/front/b/8/b88a762d-19ed-451d-a3a9-b3e7eea40f67.jpg?1767960026"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Frolicking Familiar",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "64c432d5-4f5b-44ac-9d61-891e78460d58",
+            "scryfall_uri": "https://scryfall.com/card/woe/226/frolicking-familiar-blow-off-steam",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Otter Wizard // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/64c432d5-4f5b-44ac-9d61-891e78460d58.jpg?1692939632",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/64c432d5-4f5b-44ac-9d61-891e78460d58.jpg?1692939632"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Gadwick's First Duel",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 241,
+            "tier_rating": "D",
+            "note": null,
+            "id": "af07c47f-8b4e-43cb-b469-2efb82aa5590",
+            "scryfall_uri": "https://scryfall.com/card/woe/51/gadwicks-first-duel",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Enchantment — Saga",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/f/af07c47f-8b4e-43cb-b469-2efb82aa5590.jpg?1693033327",
+              "normal": "https://cards.scryfall.io/normal/front/a/f/af07c47f-8b4e-43cb-b469-2efb82aa5590.jpg?1693033327"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Tenacious Tomeseeker",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 154,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c40be735-0780-459b-8dd2-a298575beaab",
+            "scryfall_uri": "https://scryfall.com/card/woe/74/tenacious-tomeseeker",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c40be735-0780-459b-8dd2-a298575beaab.jpg?1692937380",
+              "normal": "https://cards.scryfall.io/normal/front/c/4/c40be735-0780-459b-8dd2-a298575beaab.jpg?1692937380"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Frantic Firebolt",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 173,
+            "tier_rating": "C",
+            "note": null,
+            "id": "efd85f5a-258b-4ced-bf9e-3abe7fe72395",
+            "scryfall_uri": "https://scryfall.com/card/woe/130/frantic-firebolt",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/efd85f5a-258b-4ced-bf9e-3abe7fe72395.jpg?1692938220",
+              "normal": "https://cards.scryfall.io/normal/front/e/f/efd85f5a-258b-4ced-bf9e-3abe7fe72395.jpg?1692938220"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Unruly Catapult",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 189,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3dc275f8-f060-4c15-9b8f-63cf3857eaa7",
+            "scryfall_uri": "https://scryfall.com/card/woe/156/unruly-catapult",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Artifact Creature — Construct",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3dc275f8-f060-4c15-9b8f-63cf3857eaa7.jpg?1692938608",
+              "normal": "https://cards.scryfall.io/normal/front/3/d/3dc275f8-f060-4c15-9b8f-63cf3857eaa7.jpg?1692938608"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Aquatic Alchemist",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 175,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e6f03f21-aeb9-428b-9167-b2604919bdd8",
+            "scryfall_uri": "https://scryfall.com/card/woe/40/aquatic-alchemist-bubble-up",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Elemental // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e6f03f21-aeb9-428b-9167-b2604919bdd8.jpg?1692936865",
+              "normal": "https://cards.scryfall.io/normal/front/e/6/e6f03f21-aeb9-428b-9167-b2604919bdd8.jpg?1692936865"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Flick a Coin",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 34,
+            "tier_rating": "A",
+            "note": null,
+            "id": "673a67b2-fbb0-4be4-9edd-93946a583f23",
+            "scryfall_uri": "https://scryfall.com/card/woe/128/flick-a-coin",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/673a67b2-fbb0-4be4-9edd-93946a583f23.jpg?1692938189",
+              "normal": "https://cards.scryfall.io/normal/front/6/7/673a67b2-fbb0-4be4-9edd-93946a583f23.jpg?1692938189"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Redcap Thief",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 96,
+            "tier_rating": "B",
+            "note": null,
+            "id": "cda6bdeb-a0d6-46ca-ba8c-317ee0096416",
+            "scryfall_uri": "https://scryfall.com/card/woe/147/redcap-thief",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/d/cda6bdeb-a0d6-46ca-ba8c-317ee0096416.jpg?1692938472",
+              "normal": "https://cards.scryfall.io/normal/front/c/d/cda6bdeb-a0d6-46ca-ba8c-317ee0096416.jpg?1692938472"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Grabby Giant",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 116,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fab7646a-61e8-446b-9dba-ac6e0db82f10",
+            "scryfall_uri": "https://scryfall.com/card/woe/133/grabby-giant-thats-mine",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Giant // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/a/fab7646a-61e8-446b-9dba-ac6e0db82f10.jpg?1692938264",
+              "normal": "https://cards.scryfall.io/normal/front/f/a/fab7646a-61e8-446b-9dba-ac6e0db82f10.jpg?1692938264"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Ramp (GU)",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Mana-hungry ramp/control. Outclassed by Golgari. Most demanding mana count (17-18 lands).",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Troyan, Gutsy Explorer",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 226,
+            "tier_rating": "D",
+            "note": null,
+            "id": "eadd2a1a-93a0-4257-897d-1aaee279449f",
+            "scryfall_uri": "https://scryfall.com/card/woe/217/troyan-gutsy-explorer",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Vedalken Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/eadd2a1a-93a0-4257-897d-1aaee279449f.jpg?1692939496",
+              "normal": "https://cards.scryfall.io/normal/front/e/a/eadd2a1a-93a0-4257-897d-1aaee279449f.jpg?1692939496"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Up the Beanstalk",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 78,
+            "tier_rating": "B",
+            "note": null,
+            "id": "2d5e991f-23b2-4db0-a452-7755125b1fd2",
+            "scryfall_uri": "https://scryfall.com/card/woe/195/up-the-beanstalk",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d5e991f-23b2-4db0-a452-7755125b1fd2.jpg?1752091355",
+              "normal": "https://cards.scryfall.io/normal/front/2/d/2d5e991f-23b2-4db0-a452-7755125b1fd2.jpg?1752091355"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Tempest Hart",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 205,
+            "tier_rating": "D",
+            "note": null,
+            "id": "559bacc8-facc-4d93-90b5-8ac21d3246f5",
+            "scryfall_uri": "https://scryfall.com/card/woe/238/tempest-hart-scan-the-clouds",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elemental Elk // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/559bacc8-facc-4d93-90b5-8ac21d3246f5.jpg?1692939790",
+              "normal": "https://cards.scryfall.io/normal/front/5/5/559bacc8-facc-4d93-90b5-8ac21d3246f5.jpg?1692939790"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Galvanic Giant",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 251,
+            "tier_rating": "F",
+            "note": null,
+            "id": "60976109-30ad-4f12-99eb-c5ef560fcf1b",
+            "scryfall_uri": "https://scryfall.com/card/woe/52/galvanic-giant-storm-reading",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Giant Wizard // Instant — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/0/60976109-30ad-4f12-99eb-c5ef560fcf1b.jpg?1692937037",
+              "normal": "https://cards.scryfall.io/normal/front/6/0/60976109-30ad-4f12-99eb-c5ef560fcf1b.jpg?1692937037"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hamlet Glutton",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a4ec5544-c138-44bb-a807-5798313c9a50",
+            "scryfall_uri": "https://scryfall.com/card/woe/173/hamlet-glutton",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Giant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4ec5544-c138-44bb-a807-5798313c9a50.jpg?1692938861",
+              "normal": "https://cards.scryfall.io/normal/front/a/4/a4ec5544-c138-44bb-a807-5798313c9a50.jpg?1692938861"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Rootrider Faun",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 140,
+            "tier_rating": "C",
+            "note": null,
+            "id": "4e87db5a-1a70-42df-83a2-c0f71fe8533a",
+            "scryfall_uri": "https://scryfall.com/card/woe/182/rootrider-faun",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Satyr Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4e87db5a-1a70-42df-83a2-c0f71fe8533a.jpg?1692938988",
+              "normal": "https://cards.scryfall.io/normal/front/4/e/4e87db5a-1a70-42df-83a2-c0f71fe8533a.jpg?1692938988"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Return from the Wilds",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 183,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9597d9ea-d9b2-4009-8e7c-02caa3585bc5",
+            "scryfall_uri": "https://scryfall.com/card/woe/181/return-from-the-wilds",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/9597d9ea-d9b2-4009-8e7c-02caa3585bc5.jpg?1693012661",
+              "normal": "https://cards.scryfall.io/normal/front/9/5/9597d9ea-d9b2-4009-8e7c-02caa3585bc5.jpg?1693012661"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Beanstalk Wurm",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 197,
+            "tier_rating": "D",
+            "note": null,
+            "id": "19f20c0a-22be-4a9c-96ce-4047f7a2d424",
+            "scryfall_uri": "https://scryfall.com/card/woe/161/beanstalk-wurm-plant-beans",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Plant Wurm // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/19f20c0a-22be-4a9c-96ce-4047f7a2d424.jpg?1693078399",
+              "normal": "https://cards.scryfall.io/normal/front/1/9/19f20c0a-22be-4a9c-96ce-4047f7a2d424.jpg?1693078399"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Prophetic Prism",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 147,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1fae351c-b918-4648-a361-d5239ae63156",
+            "scryfall_uri": "https://scryfall.com/card/woe/249/prophetic-prism",
+            "colors": [],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/f/1fae351c-b918-4648-a361-d5239ae63156.jpg?1743419067",
+              "normal": "https://cards.scryfall.io/normal/front/1/f/1fae351c-b918-4648-a361-d5239ae63156.jpg?1743419067"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Brave the Wilds",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 143,
+            "tier_rating": "C",
+            "note": null,
+            "id": "821b9e86-d108-42e5-b642-c5e07ab16c37",
+            "scryfall_uri": "https://scryfall.com/card/woe/165/brave-the-wilds",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/821b9e86-d108-42e5-b642-c5e07ab16c37.jpg?1692938745",
+              "normal": "https://cards.scryfall.io/normal/front/8/2/821b9e86-d108-42e5-b642-c5e07ab16c37.jpg?1692938745"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      }
+    ],
+    "tier_4": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Frost (WU)",
+        "tier": "Tier 4 — Avoid",
+        "strategy": "Only truly bad archetype. Depends on rare payoffs. 60% win rate when payoffs drawn, 49% without them.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Icewrought Sentry",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 185,
+            "tier_rating": "C",
+            "note": null,
+            "id": "859419d3-cd15-4362-98b3-a7ff98e29692",
+            "scryfall_uri": "https://scryfall.com/card/woe/55/icewrought-sentry",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Elemental Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/859419d3-cd15-4362-98b3-a7ff98e29692.jpg?1692937080",
+              "normal": "https://cards.scryfall.io/normal/front/8/5/859419d3-cd15-4362-98b3-a7ff98e29692.jpg?1692937080"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hylda's Crown of Winter",
+            "color": "C",
+            "rarity": "Rare",
+            "pick_order_rank": 160,
+            "tier_rating": "C",
+            "note": null,
+            "id": "b0d4a6c0-f00e-45a7-9c88-899460007020",
+            "scryfall_uri": "https://scryfall.com/card/woe/247/hyldas-crown-of-winter",
+            "colors": [],
+            "type_line": "Legendary Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b0d4a6c0-f00e-45a7-9c88-899460007020.jpg?1692939889",
+              "normal": "https://cards.scryfall.io/normal/front/b/0/b0d4a6c0-f00e-45a7-9c88-899460007020.jpg?1692939889"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Hylda of the Icy Crown",
+            "color": "WU",
+            "rarity": "Mythic",
+            "pick_order_rank": 201,
+            "tier_rating": "D",
+            "note": null,
+            "id": "ae9231fd-053d-4b84-a7a8-86063465bc49",
+            "scryfall_uri": "https://scryfall.com/card/woe/206/hylda-of-the-icy-crown",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/ae9231fd-053d-4b84-a7a8-86063465bc49.jpg?1692939339",
+              "normal": "https://cards.scryfall.io/normal/front/a/e/ae9231fd-053d-4b84-a7a8-86063465bc49.jpg?1692939339"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Solitary Sanctuary",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 274,
+            "tier_rating": "F",
+            "note": null,
+            "id": "d155693c-def0-4290-b662-ab9932e07fe5",
+            "scryfall_uri": "https://scryfall.com/card/woe/30/solitary-sanctuary",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d155693c-def0-4290-b662-ab9932e07fe5.jpg?1692936715",
+              "normal": "https://cards.scryfall.io/normal/front/d/1/d155693c-def0-4290-b662-ab9932e07fe5.jpg?1692936715"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Succumb to the Cold",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 278,
+            "tier_rating": "F",
+            "note": null,
+            "id": "c14d9fc0-bfbf-4359-93bf-5e53466965d6",
+            "scryfall_uri": "https://scryfall.com/card/woe/72/succumb-to-the-cold",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c14d9fc0-bfbf-4359-93bf-5e53466965d6.jpg?1692937348",
+              "normal": "https://cards.scryfall.io/normal/front/c/1/c14d9fc0-bfbf-4359-93bf-5e53466965d6.jpg?1692937348"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Frostbridge Guard",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 236,
+            "tier_rating": "D",
+            "note": null,
+            "id": "b9dec431-a20e-4c1c-9855-904779756509",
+            "scryfall_uri": "https://scryfall.com/card/woe/14/frostbridge-guard",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Elemental Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/9/b9dec431-a20e-4c1c-9855-904779756509.jpg?1692936472",
+              "normal": "https://cards.scryfall.io/normal/front/b/9/b9dec431-a20e-4c1c-9855-904779756509.jpg?1692936472"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Plunge into Winter",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 279,
+            "tier_rating": "F",
+            "note": null,
+            "id": "fe4aceba-f386-457c-bc68-6382eda46754",
+            "scryfall_uri": "https://scryfall.com/card/woe/22/plunge-into-winter",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe4aceba-f386-457c-bc68-6382eda46754.jpg?1692936589",
+              "normal": "https://cards.scryfall.io/normal/front/f/e/fe4aceba-f386-457c-bc68-6382eda46754.jpg?1692936589"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Vantress Transmuter",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 166,
+            "tier_rating": "C",
+            "note": null,
+            "id": "11507fa1-ef9e-41c9-b987-be57a03bd0df",
+            "scryfall_uri": "https://scryfall.com/card/woe/75/vantress-transmuter-croaking-curse",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Wizard // Sorcery — Adventure",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11507fa1-ef9e-41c9-b987-be57a03bd0df.jpg?1708138656",
+              "normal": "https://cards.scryfall.io/normal/front/1/1/11507fa1-ef9e-41c9-b987-be57a03bd0df.jpg?1708138656"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Rimefur Reindeer",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 254,
+            "tier_rating": "F",
+            "note": null,
+            "id": "60acc0b7-6842-44aa-a7cc-c5d315d90287",
+            "scryfall_uri": "https://scryfall.com/card/woe/27/rimefur-reindeer",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Elk",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/0/60acc0b7-6842-44aa-a7cc-c5d315d90287.jpg?1692936667",
+              "normal": "https://cards.scryfall.io/normal/front/6/0/60acc0b7-6842-44aa-a7cc-c5d315d90287.jpg?1692936667"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          },
+          {
+            "name": "Snaremaster Sprite",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 220,
+            "tier_rating": "D",
+            "note": null,
+            "id": "eaa37390-5c32-46ae-89d1-c094c9aa01e5",
+            "scryfall_uri": "https://scryfall.com/card/woe/68/snaremaster-sprite",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Faerie Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/eaa37390-5c32-46ae-89d1-c094c9aa01e5.jpg?1692937279",
+              "normal": "https://cards.scryfall.io/normal/front/e/a/eaa37390-5c32-46ae-89d1-c094c9aa01e5.jpg?1692937279"
+            },
+            "set": "woe",
+            "set_name": "Wilds of Eldraine"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Hopeful Vigil",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 65,
+        "tier_rating": "B",
+        "note": null,
+        "id": "d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9",
+        "scryfall_uri": "https://scryfall.com/card/woe/17/hopeful-vigil",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9.jpg?1692936516",
+          "normal": "https://cards.scryfall.io/normal/front/d/3/d382fd32-b1f5-4ec7-9d42-fc2915ed3bc9.jpg?1692936516"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Cooped Up",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 119,
+        "tier_rating": "B",
+        "note": null,
+        "id": "8acb8758-09c5-4e19-ada1-904e36ece1fc",
+        "scryfall_uri": "https://scryfall.com/card/woe/8/cooped-up",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384",
+          "normal": "https://cards.scryfall.io/normal/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Archon's Glory",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 100,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e71768e7-4ef7-4fb2-838b-eb3a7f662d38",
+        "scryfall_uri": "https://scryfall.com/card/woe/2/archons-glory",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e71768e7-4ef7-4fb2-838b-eb3a7f662d38.jpg?1692936296",
+          "normal": "https://cards.scryfall.io/normal/front/e/7/e71768e7-4ef7-4fb2-838b-eb3a7f662d38.jpg?1692936296"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Stockpiling Celebrant",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 136,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0214ebc6-c59f-4170-8dd2-ce07caa6e6ad",
+        "scryfall_uri": "https://scryfall.com/card/woe/32/stockpiling-celebrant",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Dwarf Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/0214ebc6-c59f-4170-8dd2-ce07caa6e6ad.jpg?1692936744",
+          "normal": "https://cards.scryfall.io/normal/front/0/2/0214ebc6-c59f-4170-8dd2-ce07caa6e6ad.jpg?1692936744"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Kellan's Lightblades",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 187,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0cc727a6-f875-49b1-b7a4-67f22fbc3d50",
+        "scryfall_uri": "https://scryfall.com/card/woe/18/kellans-lightblades",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0cc727a6-f875-49b1-b7a4-67f22fbc3d50.jpg?1710276551",
+          "normal": "https://cards.scryfall.io/normal/front/0/c/0cc727a6-f875-49b1-b7a4-67f22fbc3d50.jpg?1710276551"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Spell Stutter",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 79,
+        "tier_rating": "B",
+        "note": null,
+        "id": "24447e36-a42f-40a9-ad44-e904b6f9b276",
+        "scryfall_uri": "https://scryfall.com/card/woe/69/spell-stutter",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24447e36-a42f-40a9-ad44-e904b6f9b276.jpg?1692937299",
+          "normal": "https://cards.scryfall.io/normal/front/2/4/24447e36-a42f-40a9-ad44-e904b6f9b276.jpg?1692937299"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Into the Fae Court",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 77,
+        "tier_rating": "B",
+        "note": null,
+        "id": "969b13bb-6411-41f9-b6b4-af4ffca62e17",
+        "scryfall_uri": "https://scryfall.com/card/woe/57/into-the-fae-court",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/969b13bb-6411-41f9-b6b4-af4ffca62e17.jpg?1692937111",
+          "normal": "https://cards.scryfall.io/normal/front/9/6/969b13bb-6411-41f9-b6b4-af4ffca62e17.jpg?1692937111"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Johann's Stopgap",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 102,
+        "tier_rating": "B",
+        "note": null,
+        "id": "31408397-36f5-479f-b822-fa97411b7872",
+        "scryfall_uri": "https://scryfall.com/card/woe/58/johanns-stopgap",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/31408397-36f5-479f-b822-fa97411b7872.jpg?1692937126",
+          "normal": "https://cards.scryfall.io/normal/front/3/1/31408397-36f5-479f-b822-fa97411b7872.jpg?1692937126"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Sleight of Hand",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 101,
+        "tier_rating": "B",
+        "note": null,
+        "id": "80dea5c0-ada3-488a-9f2b-f895b92c762f",
+        "scryfall_uri": "https://scryfall.com/card/woe/67/sleight-of-hand",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/80dea5c0-ada3-488a-9f2b-f895b92c762f.jpg?1692937263",
+          "normal": "https://cards.scryfall.io/normal/front/8/0/80dea5c0-ada3-488a-9f2b-f895b92c762f.jpg?1692937263"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Ice Out",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 103,
+        "tier_rating": "B",
+        "note": null,
+        "id": "88ffafda-c852-497a-8156-4f759cdf3693",
+        "scryfall_uri": "https://scryfall.com/card/woe/54/ice-out",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88ffafda-c852-497a-8156-4f759cdf3693.jpg?1692937066",
+          "normal": "https://cards.scryfall.io/normal/front/8/8/88ffafda-c852-497a-8156-4f759cdf3693.jpg?1692937066"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Candy Grapple",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 40,
+        "tier_rating": "A",
+        "note": "Best common in the set.",
+        "id": "190d97bc-dbef-496d-9bd1-b785bdf8a964",
+        "scryfall_uri": "https://scryfall.com/card/woe/83/candy-grapple",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/190d97bc-dbef-496d-9bd1-b785bdf8a964.jpg?1692937514",
+          "normal": "https://cards.scryfall.io/normal/front/1/9/190d97bc-dbef-496d-9bd1-b785bdf8a964.jpg?1692937514"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Hopeless Nightmare",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 33,
+        "tier_rating": "A",
+        "note": null,
+        "id": "2c2ee817-9ca9-4f09-bc71-7994c19a9470",
+        "scryfall_uri": "https://scryfall.com/card/woe/95/hopeless-nightmare",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c2ee817-9ca9-4f09-bc71-7994c19a9470.jpg?1752091345",
+          "normal": "https://cards.scryfall.io/normal/front/2/c/2c2ee817-9ca9-4f09-bc71-7994c19a9470.jpg?1752091345"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Rat Out",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 56,
+        "tier_rating": "B",
+        "note": null,
+        "id": "f2c42755-bf91-4c75-95c6-d2a60ba3492a",
+        "scryfall_uri": "https://scryfall.com/card/woe/103/rat-out",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f2c42755-bf91-4c75-95c6-d2a60ba3492a.jpg?1692937802",
+          "normal": "https://cards.scryfall.io/normal/front/f/2/f2c42755-bf91-4c75-95c6-d2a60ba3492a.jpg?1692937802"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Sweettooth Witch",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 69,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a6bdb984-06f8-4bca-a943-17fe5db97682",
+        "scryfall_uri": "https://scryfall.com/card/woe/111/sweettooth-witch",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Warlock",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a6bdb984-06f8-4bca-a943-17fe5db97682.jpg?1692937929",
+          "normal": "https://cards.scryfall.io/normal/front/a/6/a6bdb984-06f8-4bca-a943-17fe5db97682.jpg?1692937929"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Mintstrosity",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "B",
+        "note": null,
+        "id": "d902f154-6fe8-4b97-aa67-4d4696abf887",
+        "scryfall_uri": "https://scryfall.com/card/woe/100/mintstrosity",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/9/d902f154-6fe8-4b97-aa67-4d4696abf887.jpg?1692937759",
+          "normal": "https://cards.scryfall.io/normal/front/d/9/d902f154-6fe8-4b97-aa67-4d4696abf887.jpg?1692937759"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Torch the Tower",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 29,
+        "tier_rating": "A",
+        "note": null,
+        "id": "b3d6027c-813f-46df-95b4-e2e305a67620",
+        "scryfall_uri": "https://scryfall.com/card/woe/153/torch-the-tower",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3d6027c-813f-46df-95b4-e2e305a67620.jpg?1692938564",
+          "normal": "https://cards.scryfall.io/normal/front/b/3/b3d6027c-813f-46df-95b4-e2e305a67620.jpg?1692938564"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Flick a Coin",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 34,
+        "tier_rating": "A",
+        "note": null,
+        "id": "673a67b2-fbb0-4be4-9edd-93946a583f23",
+        "scryfall_uri": "https://scryfall.com/card/woe/128/flick-a-coin",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/673a67b2-fbb0-4be4-9edd-93946a583f23.jpg?1692938189",
+          "normal": "https://cards.scryfall.io/normal/front/6/7/673a67b2-fbb0-4be4-9edd-93946a583f23.jpg?1692938189"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Cut In",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 46,
+        "tier_rating": "B",
+        "note": null,
+        "id": "8ea4d40a-7657-4ff8-9fc2-915b99432275",
+        "scryfall_uri": "https://scryfall.com/card/woe/125/cut-in",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8ea4d40a-7657-4ff8-9fc2-915b99432275.jpg?1692938146",
+          "normal": "https://cards.scryfall.io/normal/front/8/e/8ea4d40a-7657-4ff8-9fc2-915b99432275.jpg?1692938146"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Edgewall Pack",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 97,
+        "tier_rating": "B",
+        "note": null,
+        "id": "acda9d02-00fc-49e2-a9f3-176e9c0a8c5f",
+        "scryfall_uri": "https://scryfall.com/card/woe/126/edgewall-pack",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Dog",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/acda9d02-00fc-49e2-a9f3-176e9c0a8c5f.jpg?1692938160",
+          "normal": "https://cards.scryfall.io/normal/front/a/c/acda9d02-00fc-49e2-a9f3-176e9c0a8c5f.jpg?1692938160"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Ratcatcher Trainee",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 88,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7f4c0959-a107-4d61-9e51-256b2955f6ba",
+        "scryfall_uri": "https://scryfall.com/card/woe/144/ratcatcher-trainee-pest-problem",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Peasant // Instant — Adventure",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f4c0959-a107-4d61-9e51-256b2955f6ba.jpg?1739663117",
+          "normal": "https://cards.scryfall.io/normal/front/7/f/7f4c0959-a107-4d61-9e51-256b2955f6ba.jpg?1739663117"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Hamlet Glutton",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 84,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a4ec5544-c138-44bb-a807-5798313c9a50",
+        "scryfall_uri": "https://scryfall.com/card/woe/173/hamlet-glutton",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Giant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4ec5544-c138-44bb-a807-5798313c9a50.jpg?1692938861",
+          "normal": "https://cards.scryfall.io/normal/front/a/4/a4ec5544-c138-44bb-a807-5798313c9a50.jpg?1692938861"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Hollow Scavenger",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 94,
+        "tier_rating": "B",
+        "note": null,
+        "id": "0ad345b6-7077-4dd2-b515-c774a3185fe4",
+        "scryfall_uri": "https://scryfall.com/card/woe/174/hollow-scavenger-bakery-raid",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Wolf // Sorcery — Adventure",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0ad345b6-7077-4dd2-b515-c774a3185fe4.jpg?1692938875",
+          "normal": "https://cards.scryfall.io/normal/front/0/a/0ad345b6-7077-4dd2-b515-c774a3185fe4.jpg?1692938875"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Ferocious Werefox",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 134,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ac1907e8-0713-47dd-ac42-bf1323c5bec0",
+        "scryfall_uri": "https://scryfall.com/card/woe/170/ferocious-werefox-guard-change",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elf Fox Warrior // Instant — Adventure",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/ac1907e8-0713-47dd-ac42-bf1323c5bec0.jpg?1692938817",
+          "normal": "https://cards.scryfall.io/normal/front/a/c/ac1907e8-0713-47dd-ac42-bf1323c5bec0.jpg?1692938817"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Rootrider Faun",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 140,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4e87db5a-1a70-42df-83a2-c0f71fe8533a",
+        "scryfall_uri": "https://scryfall.com/card/woe/182/rootrider-faun",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Satyr Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4e87db5a-1a70-42df-83a2-c0f71fe8533a.jpg?1692938988",
+          "normal": "https://cards.scryfall.io/normal/front/4/e/4e87db5a-1a70-42df-83a2-c0f71fe8533a.jpg?1692938988"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Redtooth Genealogist",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 152,
+        "tier_rating": "C",
+        "note": null,
+        "id": "99c81440-66eb-4443-a83f-e2f15cb68a3e",
+        "scryfall_uri": "https://scryfall.com/card/woe/179/redtooth-genealogist",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elf Advisor",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/99c81440-66eb-4443-a83f-e2f15cb68a3e.jpg?1692938945",
+          "normal": "https://cards.scryfall.io/normal/front/9/9/99c81440-66eb-4443-a83f-e2f15cb68a3e.jpg?1692938945"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      }
+    ]
+  },
+  "removal_priority": {
+    "best": [
+      {
+        "name": "Candy Grapple",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 40,
+        "tier_rating": "A",
+        "note": "First-pick quality.",
+        "id": "190d97bc-dbef-496d-9bd1-b785bdf8a964",
+        "scryfall_uri": "https://scryfall.com/card/woe/83/candy-grapple",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/190d97bc-dbef-496d-9bd1-b785bdf8a964.jpg?1692937514",
+          "normal": "https://cards.scryfall.io/normal/front/1/9/190d97bc-dbef-496d-9bd1-b785bdf8a964.jpg?1692937514"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Torch the Tower",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 29,
+        "tier_rating": "A",
+        "note": null,
+        "id": "b3d6027c-813f-46df-95b4-e2e305a67620",
+        "scryfall_uri": "https://scryfall.com/card/woe/153/torch-the-tower",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3d6027c-813f-46df-95b4-e2e305a67620.jpg?1692938564",
+          "normal": "https://cards.scryfall.io/normal/front/b/3/b3d6027c-813f-46df-95b4-e2e305a67620.jpg?1692938564"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Cooped Up",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 119,
+        "tier_rating": "B",
+        "note": null,
+        "id": "8acb8758-09c5-4e19-ada1-904e36ece1fc",
+        "scryfall_uri": "https://scryfall.com/card/woe/8/cooped-up",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384",
+          "normal": "https://cards.scryfall.io/normal/front/8/a/8acb8758-09c5-4e19-ada1-904e36ece1fc.jpg?1692936384"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Kellan's Lightblades",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 187,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0cc727a6-f875-49b1-b7a4-67f22fbc3d50",
+        "scryfall_uri": "https://scryfall.com/card/woe/18/kellans-lightblades",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0cc727a6-f875-49b1-b7a4-67f22fbc3d50.jpg?1710276551",
+          "normal": "https://cards.scryfall.io/normal/front/0/c/0cc727a6-f875-49b1-b7a4-67f22fbc3d50.jpg?1710276551"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      }
+    ],
+    "matchup_specific": [
+      {
+        "name": "Moment of Valor",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 211,
+        "tier_rating": "D",
+        "note": "Excellent vs Gruul.",
+        "id": "6f257fd6-24a4-4cc1-89e0-99cf5d821e3a",
+        "scryfall_uri": "https://scryfall.com/card/woe/20/moment-of-valor",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/f/6f257fd6-24a4-4cc1-89e0-99cf5d821e3a.jpg?1692936561",
+          "normal": "https://cards.scryfall.io/normal/front/6/f/6f257fd6-24a4-4cc1-89e0-99cf5d821e3a.jpg?1692936561"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Rat Out",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 56,
+        "tier_rating": "B",
+        "note": "Best vs x/1-heavy decks.",
+        "id": "f2c42755-bf91-4c75-95c6-d2a60ba3492a",
+        "scryfall_uri": "https://scryfall.com/card/woe/103/rat-out",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f2c42755-bf91-4c75-95c6-d2a60ba3492a.jpg?1692937802",
+          "normal": "https://cards.scryfall.io/normal/front/f/2/f2c42755-bf91-4c75-95c6-d2a60ba3492a.jpg?1692937802"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Ice Out",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 103,
+        "tier_rating": "B",
+        "note": "Best vs Hamlet Glutton decks; worst vs Boros/Rats.",
+        "id": "88ffafda-c852-497a-8156-4f759cdf3693",
+        "scryfall_uri": "https://scryfall.com/card/woe/54/ice-out",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88ffafda-c852-497a-8156-4f759cdf3693.jpg?1692937066",
+          "normal": "https://cards.scryfall.io/normal/front/8/8/88ffafda-c852-497a-8156-4f759cdf3693.jpg?1692937066"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      },
+      {
+        "name": "Spider Food",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 242,
+        "tier_rating": "D",
+        "note": "Sideboard vs fliers or broken rares (Virtue of Loyalty).",
+        "id": "b9fd720b-e9c2-4e82-917e-bab6c544afb0",
+        "scryfall_uri": "https://scryfall.com/card/woe/186/spider-food",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/9/b9fd720b-e9c2-4e82-917e-bab6c544afb0.jpg?1692939048",
+          "normal": "https://cards.scryfall.io/normal/front/b/9/b9fd720b-e9c2-4e82-917e-bab6c544afb0.jpg?1692939048"
+        },
+        "set": "woe",
+        "set_name": "Wilds of Eldraine"
+      }
+    ]
+  },
+  "commons_to_avoid": [
+    {
+      "name": "Slumbering Keepguard",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 244,
+      "tier_rating": "D",
+      "note": null,
+      "id": "d7f41ae2-ebc6-439f-95af-c34818a3f4e6",
+      "scryfall_uri": "https://scryfall.com/card/woe/29/slumbering-keepguard",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Human Knight",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/7/d7f41ae2-ebc6-439f-95af-c34818a3f4e6.jpg?1692936699",
+        "normal": "https://cards.scryfall.io/normal/front/d/7/d7f41ae2-ebc6-439f-95af-c34818a3f4e6.jpg?1692936699"
+      },
+      "set": "woe",
+      "set_name": "Wilds of Eldraine"
+    },
+    {
+      "name": "Freeze in Place",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 273,
+      "tier_rating": "F",
+      "note": null,
+      "id": "1a8bb9c7-2c4b-48a1-806e-742addb72b4b",
+      "scryfall_uri": "https://scryfall.com/card/woe/50/freeze-in-place",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1a8bb9c7-2c4b-48a1-806e-742addb72b4b.jpg?1692937009",
+        "normal": "https://cards.scryfall.io/normal/front/1/a/1a8bb9c7-2c4b-48a1-806e-742addb72b4b.jpg?1692937009"
+      },
+      "set": "woe",
+      "set_name": "Wilds of Eldraine"
+    },
+    {
+      "name": "Misleading Motes",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 209,
+      "tier_rating": "D",
+      "note": null,
+      "id": "4c6c7a43-c3d1-450e-834a-54e1b9def1cd",
+      "scryfall_uri": "https://scryfall.com/card/woe/61/misleading-motes",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c6c7a43-c3d1-450e-834a-54e1b9def1cd.jpg?1692937169",
+        "normal": "https://cards.scryfall.io/normal/front/4/c/4c6c7a43-c3d1-450e-834a-54e1b9def1cd.jpg?1692937169"
+      },
+      "set": "woe",
+      "set_name": "Wilds of Eldraine"
+    },
+    {
+      "name": "Warehouse Tabby",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 199,
+      "tier_rating": "D",
+      "note": null,
+      "id": "d500ad81-9659-4a00-8f99-8be7c23587e8",
+      "scryfall_uri": "https://scryfall.com/card/woe/117/warehouse-tabby",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Cat",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/5/d500ad81-9659-4a00-8f99-8be7c23587e8.jpg?1692938026",
+        "normal": "https://cards.scryfall.io/normal/front/d/5/d500ad81-9659-4a00-8f99-8be7c23587e8.jpg?1692938026"
+      },
+      "set": "woe",
+      "set_name": "Wilds of Eldraine"
+    },
+    {
+      "name": "Bespoke Battlegarb",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 232,
+      "tier_rating": "D",
+      "note": null,
+      "id": "a28ecd59-9166-473c-bafc-cb3c54c21388",
+      "scryfall_uri": "https://scryfall.com/card/woe/122/bespoke-battlegarb",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a28ecd59-9166-473c-bafc-cb3c54c21388.jpg?1692938103",
+        "normal": "https://cards.scryfall.io/normal/front/a/2/a28ecd59-9166-473c-bafc-cb3c54c21388.jpg?1692938103"
+      },
+      "set": "woe",
+      "set_name": "Wilds of Eldraine"
+    },
+    {
+      "name": "Bestial Bloodline",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 234,
+      "tier_rating": "D",
+      "note": null,
+      "id": "55b9b8e5-1ed8-4be0-aad5-041a599c6841",
+      "scryfall_uri": "https://scryfall.com/card/woe/162/bestial-bloodline",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/55b9b8e5-1ed8-4be0-aad5-041a599c6841.jpg?1692938697",
+        "normal": "https://cards.scryfall.io/normal/front/5/5/55b9b8e5-1ed8-4be0-aad5-041a599c6841.jpg?1692938697"
+      },
+      "set": "woe",
+      "set_name": "Wilds of Eldraine"
+    },
+    {
+      "name": "Toadstool Admirer",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 252,
+      "tier_rating": "F",
+      "note": null,
+      "id": "f0a6349a-beff-4abd-b005-86d27c1e2957",
+      "scryfall_uri": "https://scryfall.com/card/woe/192/toadstool-admirer",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Ouphe",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0a6349a-beff-4abd-b005-86d27c1e2957.jpg?1692939139",
+        "normal": "https://cards.scryfall.io/normal/front/f/0/f0a6349a-beff-4abd-b005-86d27c1e2957.jpg?1692939139"
+      },
+      "set": "woe",
+      "set_name": "Wilds of Eldraine"
+    }
+  ],
+  "general_tips": [
+    "Prioritize signpost cards (Johann, Candy Grapple, Greta, Ash) — they reveal archetype directions.",
+    "Bargain overperforms; prioritize enablers like Food tokens and cheap enchantments.",
+    "Build mana curves first; theme synergies are secondary.",
+    "Avoid Azorius Frost unless Icewrought Sentry and tapping payoffs flow your way.",
+    "In BO3, side out mediocre creatures vs fast decks; side in removal/greedy cards based on matchup.",
+    "Aggro decks race (Boros, Rakdos); midrange balances (Golgari, Gruul); control grinds (Izzet, Dimir)."
+  ]
+}

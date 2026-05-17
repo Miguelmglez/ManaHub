@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.scanner
 
 import android.content.Context
+import com.mmg.manahub.feature.scanner.data.EmbeddingDatabase
+import com.mmg.manahub.feature.scanner.domain.model.CardMatch
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

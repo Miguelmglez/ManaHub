@@ -68,7 +68,6 @@ class AddCardToCollectionUseCaseTest {
                 language         = "en",
                 isAlternativeArt = false,
                 isForTrade       = false,
-                isInWishlist     = false,
                 userId           = null,
             )
         }
@@ -88,7 +87,6 @@ class AddCardToCollectionUseCaseTest {
                 language         = any(),
                 isAlternativeArt = any(),
                 isForTrade       = any(),
-                isInWishlist     = any(),
                 userId           = any(),
             )
         }
@@ -108,7 +106,6 @@ class AddCardToCollectionUseCaseTest {
                 language         = any(),
                 isAlternativeArt = true,
                 isForTrade       = any(),
-                isInWishlist     = any(),
                 userId           = any(),
             )
         }
@@ -128,7 +125,6 @@ class AddCardToCollectionUseCaseTest {
                 language         = "de",
                 isAlternativeArt = any(),
                 isForTrade       = any(),
-                isInWishlist     = any(),
                 userId           = any(),
             )
         }
@@ -148,7 +144,6 @@ class AddCardToCollectionUseCaseTest {
                 language         = any(),
                 isAlternativeArt = any(),
                 isForTrade       = any(),
-                isInWishlist     = any(),
                 userId           = "user-abc",
             )
         }
@@ -209,11 +204,11 @@ class AddCardToCollectionUseCaseTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — isInWishlist defaults to false for collection entries
+    //  GROUP 3 — isForTrade defaults to false for collection entries
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given invoke with default params then isInWishlist forwarded as false`() = runTest {
+    fun `given invoke with default params then isForTrade forwarded as false`() = runTest {
         coEvery { cardRepository.getCardById("id-001") } returns DataResult.Success(TestFixtures.buildCard("id-001"))
 
         useCase(scryfallId = "id-001")
@@ -225,8 +220,7 @@ class AddCardToCollectionUseCaseTest {
                 condition        = any(),
                 language         = any(),
                 isAlternativeArt = any(),
-                isForTrade       = any(),
-                isInWishlist     = false,
+                isForTrade       = false,
                 userId           = any(),
             )
         }

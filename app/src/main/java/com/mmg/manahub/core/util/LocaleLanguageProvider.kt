@@ -53,8 +53,8 @@ class LocaleLanguageProvider @Inject constructor() {
         )
 
         /**
-         * Determina si el dispositivo usa formato europeo (utilizado para el valor inicial por defecto).
-         * Utiliza un fallback al language tag si el campo country está vacío.
+         * Returns true when the device locale uses European number formatting.
+         * Falls back to the language tag when the country field is empty.
          */
         fun isEuropeanLocale(): Boolean {
             val locale = Locale.getDefault()

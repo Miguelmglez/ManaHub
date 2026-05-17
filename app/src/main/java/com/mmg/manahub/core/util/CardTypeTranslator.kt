@@ -24,7 +24,7 @@ object CardTypeTranslator {
         "Tribal"       to mapOf("es" to "Tribal",       "de" to "Tribal")
     )
 
-    // Subtypes de criatura más comunes
+    // Most common creature subtypes
     private val creatureSubtypes = mapOf(
         "Human"       to mapOf("es" to "Humano",        "de" to "Mensch"),
         "Wizard"      to mapOf("es" to "Mago",          "de" to "Zauberer"),
@@ -118,7 +118,7 @@ object CardTypeTranslator {
 
     // Traduce la type_line completa
     // Input:  "Legendary Creature — Elf Wizard"
-    // Output: "Criatura Legendaria — Elfo Mago" (en español)
+    // Output: "Criatura Legendaria — Elfo Mago" (in Spanish)
     fun translateTypeLine(typeLine: String, lang: String = currentLang()): String {
         if (lang == "en") return typeLine
 

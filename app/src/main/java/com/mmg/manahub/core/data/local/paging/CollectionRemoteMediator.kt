@@ -69,7 +69,7 @@ class CollectionRemoteMediator(
                     ?: return MediatorResult.Success(endOfPaginationReached = true)
                 key.nextOffset ?: return MediatorResult.Success(endOfPaginationReached = true)
             }
-            LoadType.PREPEND -> return MediatorResult.Success(endOfPaginationReached = true)
+            else -> return MediatorResult.Success(endOfPaginationReached = true)
         }
 
         return try {

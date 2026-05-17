@@ -1,0 +1,2041 @@
+{
+  "metadata": {
+    "set_name": "Tarkir: Dragonstorm",
+    "set_code": "TDM",
+    "source_url": "https://draftsim.com/mtg-tdm-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "April 18, 2025"
+  },
+  "set_overview": {
+    "summary": "Tarkir: Dragonstorm is a dragon-focused Limited format where five-color \"good stuff\" decks have become dominant. The developers intentionally extended game length through toughness-focused sizing and efficient removal to make dragons viable at all rarities. The format rewards taking the best card each pack rather than forcing archetypes early.",
+    "color_ranking": [
+      "{G}{U}{R} Temur",
+      "{U}{R}{W} Jeskai",
+      "{R}{W}{B} Mardu",
+      "{B}{G}{U} Sultai",
+      "{W}{B}{G} Abzan"
+    ],
+    "color_notes": {
+      "{G}{U}{R} Temur": "Best clan. Strong fixing, excellent multicolor payoffs, and premium uncommons. Harmonize is the most consistent value mechanic.",
+      "{U}{R}{W} Jeskai": "Flurry delivers reliably and the clan supports multiple viable flavors (aggro, midrange, control good-stuff).",
+      "{R}{W}{B} Mardu": "Challenging but rewarding. Requires careful deckbuilding; Mobilize is the archetype glue.",
+      "{B}{G}{U} Sultai": "Solid graveyard synergies and fixing. Renew creatures range from mediocre to good.",
+      "{W}{B}{G} Abzan": "Endure can underperform without sufficient counter density."
+    },
+    "key_gameplay_notes": [
+      "Five-color \"good stuff\" piles built around Dragonstorm Globe are the dominant strategy.",
+      "Behold commons (Molten Exhale, Caustic Exhale, Dispelling Exhale) are premium removal and extend games.",
+      "Flurry is easier to trigger than initial predictions suggested — Jeskai card advantage payoffs scale fast.",
+      "Hybrid mana cards (Rakshasa's Bargain, Temur Tawnyback, Kin-Tree Severance) cost 3 or 4 mana depending on the draw — flexibility is valuable.",
+      "Two-color aggro decks punish greedy 4-5c piles with tight mana curves and premium removal.",
+      "Clan-specific payoffs often go late if the archetype isn't open."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Endure (Abzan)",
+      "summary": "Value mechanic on Abzan creatures, not a required build-around. Overlaps with token payoffs and counter synergies.",
+      "performance": "Works best with counter density; otherwise underperforms.",
+      "key_examples": [
+        {
+          "name": "Synchronized Charge",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 137,
+          "tier_rating": "C",
+          "note": null,
+          "id": "1f721f8d-fd2f-480b-8645-4bf6ce38dde9",
+          "scryfall_uri": "https://scryfall.com/card/tdm/162/synchronized-charge",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/f/1f721f8d-fd2f-480b-8645-4bf6ce38dde9.jpg?1743204617",
+            "normal": "https://cards.scryfall.io/normal/front/1/f/1f721f8d-fd2f-480b-8645-4bf6ce38dde9.jpg?1743204617"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Champion of Dusan",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 147,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c51dcdab-38ee-4804-8859-09adc353c182",
+          "scryfall_uri": "https://scryfall.com/card/tdm/137/champion-of-dusan",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c51dcdab-38ee-4804-8859-09adc353c182.jpg?1743204513",
+            "normal": "https://cards.scryfall.io/normal/front/c/5/c51dcdab-38ee-4804-8859-09adc353c182.jpg?1743204513"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Flurry (Jeskai)",
+      "summary": "Triggered by casting two or more spells in a turn. Easier to achieve than expected; focus on card advantage to enable repeated triggers.",
+      "performance": "Reliable. Defines Jeskai tempo and control variants alike.",
+      "key_examples": [
+        {
+          "name": "Jeskai Devotee",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 157,
+          "tier_rating": "C",
+          "note": null,
+          "id": "27f31f9c-7149-4608-9b18-b3530a2efd4a",
+          "scryfall_uri": "https://scryfall.com/card/tdm/110/jeskai-devotee",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Orc Monk",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/27f31f9c-7149-4608-9b18-b3530a2efd4a.jpg?1743204404",
+            "normal": "https://cards.scryfall.io/normal/front/2/7/27f31f9c-7149-4608-9b18-b3530a2efd4a.jpg?1743204404"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Jeskai Shrinekeeper",
+          "color": "WUR",
+          "rarity": "Uncommon",
+          "pick_order_rank": 49,
+          "tier_rating": "B",
+          "note": null,
+          "id": "6ec8fa0b-c695-4326-aebd-042cb1974925",
+          "scryfall_uri": "https://scryfall.com/card/tdm/197/jeskai-shrinekeeper",
+          "colors": [
+            "R",
+            "U",
+            "W"
+          ],
+          "type_line": "Creature — Dragon",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6ec8fa0b-c695-4326-aebd-042cb1974925.jpg?1743204771",
+            "normal": "https://cards.scryfall.io/normal/front/6/e/6ec8fa0b-c695-4326-aebd-042cb1974925.jpg?1743204771"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Renew (Sultai)",
+      "summary": "Activated ability from the graveyard. Free-value Renew is the best version; creature Renew ranges from mediocre to good depending on rarity and color.",
+      "performance": "Light graveyard commitments slot into full Sultai strategies.",
+      "key_examples": [
+        {
+          "name": "Lotuslight Dancers",
+          "color": "UBG",
+          "rarity": "Rare",
+          "pick_order_rank": 65,
+          "tier_rating": "B",
+          "note": null,
+          "id": "82aa2593-4a79-46f1-a2bd-b71fb504d0ab",
+          "scryfall_uri": "https://scryfall.com/card/tdm/204/lotuslight-dancers",
+          "colors": [
+            "B",
+            "G",
+            "U"
+          ],
+          "type_line": "Creature — Zombie Bard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/82aa2593-4a79-46f1-a2bd-b71fb504d0ab.jpg?1743204801",
+            "normal": "https://cards.scryfall.io/normal/front/8/2/82aa2593-4a79-46f1-a2bd-b71fb504d0ab.jpg?1743204801"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Lasyd Prowler",
+          "color": "G",
+          "rarity": "Rare",
+          "pick_order_rank": 59,
+          "tier_rating": "B",
+          "note": null,
+          "id": "c7f5c8ef-8e9e-4264-a7d2-126a30a5d341",
+          "scryfall_uri": "https://scryfall.com/card/tdm/149/lasyd-prowler",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Snake Ranger",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7f5c8ef-8e9e-4264-a7d2-126a30a5d341.jpg?1743204564",
+            "normal": "https://cards.scryfall.io/normal/front/c/7/c7f5c8ef-8e9e-4264-a7d2-126a30a5d341.jpg?1743204564"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Kishla Skimmer",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 60,
+          "tier_rating": "B",
+          "note": null,
+          "id": "b5f1acb0-d73e-4814-8158-3645daf5c4cc",
+          "scryfall_uri": "https://scryfall.com/card/tdm/201/kishla-skimmer",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Creature — Bird Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5f1acb0-d73e-4814-8158-3645daf5c4cc.jpg?1743204788",
+            "normal": "https://cards.scryfall.io/normal/front/b/5/b5f1acb0-d73e-4814-8158-3645daf5c4cc.jpg?1743204788"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Kheru Goldkeeper",
+          "color": "UBG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 181,
+          "tier_rating": "C",
+          "note": null,
+          "id": "8d11183a-57f5-4ddb-8a6e-15fff704b114",
+          "scryfall_uri": "https://scryfall.com/card/tdm/199/kheru-goldkeeper",
+          "colors": [
+            "B",
+            "G",
+            "U"
+          ],
+          "type_line": "Creature — Dragon",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d11183a-57f5-4ddb-8a6e-15fff704b114.jpg?1743204780",
+            "normal": "https://cards.scryfall.io/normal/front/8/d/8d11183a-57f5-4ddb-8a6e-15fff704b114.jpg?1743204780"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Essence Anchor",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 208,
+          "tier_rating": "D",
+          "note": null,
+          "id": "e91c4509-918e-44ba-aa13-1991199fee9f",
+          "scryfall_uri": "https://scryfall.com/card/tdm/44/essence-anchor",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Artifact",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e91c4509-918e-44ba-aa13-1991199fee9f.jpg?1743204135",
+            "normal": "https://cards.scryfall.io/normal/front/e/9/e91c4509-918e-44ba-aa13-1991199fee9f.jpg?1743204135"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Attuned Hunter",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 211,
+          "tier_rating": "D",
+          "note": null,
+          "id": "d1a4f502-86a9-49fb-9cb9-7918d13c5313",
+          "scryfall_uri": "https://scryfall.com/card/tdm/135/attuned-hunter",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Ranger",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1a4f502-86a9-49fb-9cb9-7918d13c5313.jpg?1743204506",
+            "normal": "https://cards.scryfall.io/normal/front/d/1/d1a4f502-86a9-49fb-9cb9-7918d13c5313.jpg?1743204506"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Mobilize (Mardu)",
+      "summary": "Forms its own archetype. Original payoff predictions (Worthy Cost, Barrensteppe Siege) proved incorrect; the actual mobilize payoffs are different.",
+      "performance": "Hybrid mana flexibility makes mobilize-specific payoffs less critical than expected.",
+      "key_examples": [
+        {
+          "name": "Dalkovan Packbeasts",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 81,
+          "tier_rating": "B",
+          "note": null,
+          "id": "4df7b253-6107-47d6-b650-cb4d3e0aec6b",
+          "scryfall_uri": "https://scryfall.com/card/tdm/7/dalkovan-packbeasts",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Ox",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4df7b253-6107-47d6-b650-cb4d3e0aec6b.jpg?1743203980",
+            "normal": "https://cards.scryfall.io/normal/front/4/d/4df7b253-6107-47d6-b650-cb4d3e0aec6b.jpg?1743203980"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Thunder of Unity",
+          "color": "WBR",
+          "rarity": "Rare",
+          "pick_order_rank": 221,
+          "tier_rating": "D",
+          "note": null,
+          "id": "5c953b36-f5e4-4258-91cb-f07e799321f7",
+          "scryfall_uri": "https://scryfall.com/card/tdm/231/thunder-of-unity",
+          "colors": [
+            "B",
+            "R",
+            "W"
+          ],
+          "type_line": "Enchantment — Saga",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c953b36-f5e4-4258-91cb-f07e799321f7.jpg?1744578016",
+            "normal": "https://cards.scryfall.io/normal/front/5/c/5c953b36-f5e4-4258-91cb-f07e799321f7.jpg?1744578016"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Worthy Cost",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 262,
+          "tier_rating": "F",
+          "note": null,
+          "id": "adc18edc-01d8-4a7e-a87b-a854e50aa75e",
+          "scryfall_uri": "https://scryfall.com/card/tdm/99/worthy-cost",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/d/adc18edc-01d8-4a7e-a87b-a854e50aa75e.jpg?1743204359",
+            "normal": "https://cards.scryfall.io/normal/front/a/d/adc18edc-01d8-4a7e-a87b-a854e50aa75e.jpg?1743204359"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Barrensteppe Siege",
+          "color": "WB",
+          "rarity": "Rare",
+          "pick_order_rank": 244,
+          "tier_rating": "D",
+          "note": null,
+          "id": "2556a35b-2229-42c7-8cb3-c8c668403dd2",
+          "scryfall_uri": "https://scryfall.com/card/tdm/171/barrensteppe-siege",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/2556a35b-2229-42c7-8cb3-c8c668403dd2.jpg?1743204657",
+            "normal": "https://cards.scryfall.io/normal/front/2/5/2556a35b-2229-42c7-8cb3-c8c668403dd2.jpg?1743204657"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Harmonize (Temur)",
+      "summary": "Primary value mechanic for Temur. Best with board-affecting spells.",
+      "performance": "Format-defining for Temur Stompy.",
+      "key_examples": [
+        {
+          "name": "Glacial Dragonhunt",
+          "color": "UR",
+          "rarity": "Uncommon",
+          "pick_order_rank": 39,
+          "tier_rating": "A",
+          "note": null,
+          "id": "95994c88-e404-4a4f-8be6-b99d703d4609",
+          "scryfall_uri": "https://scryfall.com/card/tdm/188/glacial-dragonhunt",
+          "colors": [
+            "R",
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95994c88-e404-4a4f-8be6-b99d703d4609.jpg?1743204732",
+            "normal": "https://cards.scryfall.io/normal/front/9/5/95994c88-e404-4a4f-8be6-b99d703d4609.jpg?1743204732"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Mammoth Bellow",
+          "color": "URG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 148,
+          "tier_rating": "C",
+          "note": null,
+          "id": "468b17b4-79ce-4dfa-8873-a9cfc347e38f",
+          "scryfall_uri": "https://scryfall.com/card/tdm/205/mammoth-bellow",
+          "colors": [
+            "G",
+            "R",
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/6/468b17b4-79ce-4dfa-8873-a9cfc347e38f.jpg?1743204808",
+            "normal": "https://cards.scryfall.io/normal/front/4/6/468b17b4-79ce-4dfa-8873-a9cfc347e38f.jpg?1743204808"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Omens",
+      "summary": "Enable dragon density across the set. Many rare and uncommon omens rank among the set's best cards.",
+      "performance": "High impact at all rarities; common omens are still solid.",
+      "key_examples": [
+        {
+          "name": "Feral Deathgorger",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 198,
+          "tier_rating": "C",
+          "note": "Dragon with omen cycle.",
+          "id": "a147b94f-dfcf-44ce-8a73-b2fe6c4efc0e",
+          "scryfall_uri": "https://scryfall.com/card/tdm/80/feral-deathgorger-dusk-sight",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Dragon // Sorcery — Omen",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a147b94f-dfcf-44ce-8a73-b2fe6c4efc0e.jpg?1743204282",
+            "normal": "https://cards.scryfall.io/normal/front/a/1/a147b94f-dfcf-44ce-8a73-b2fe6c4efc0e.jpg?1743204282"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Behold",
+      "summary": "Efficient common cycle (Molten Exhale, Caustic Exhale, Dispelling Exhale, Piercing Exhale, Sagu Wildling) that extends game length and powers the slower formats.",
+      "performance": "Premium removal/value. Draft these highly.",
+      "key_examples": [
+        {
+          "name": "Molten Exhale",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 57,
+          "tier_rating": "B",
+          "note": null,
+          "id": "0ab95aab-a4bf-4131-83a0-2c138b6f20c3",
+          "scryfall_uri": "https://scryfall.com/card/tdm/113/molten-exhale",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0ab95aab-a4bf-4131-83a0-2c138b6f20c3.jpg?1743204414",
+            "normal": "https://cards.scryfall.io/normal/front/0/a/0ab95aab-a4bf-4131-83a0-2c138b6f20c3.jpg?1743204414"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Caustic Exhale",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 87,
+          "tier_rating": "B",
+          "note": null,
+          "id": "488152ce-2048-4ccb-b2d6-b9628958286f",
+          "scryfall_uri": "https://scryfall.com/card/tdm/74/caustic-exhale",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/488152ce-2048-4ccb-b2d6-b9628958286f.jpg?1743204258",
+            "normal": "https://cards.scryfall.io/normal/front/4/8/488152ce-2048-4ccb-b2d6-b9628958286f.jpg?1743204258"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Dispelling Exhale",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 56,
+          "tier_rating": "B",
+          "note": null,
+          "id": "1c9af3f1-711e-42ae-803a-1100eba3fb13",
+          "scryfall_uri": "https://scryfall.com/card/tdm/41/dispelling-exhale",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c9af3f1-711e-42ae-803a-1100eba3fb13.jpg?1743204126",
+            "normal": "https://cards.scryfall.io/normal/front/1/c/1c9af3f1-711e-42ae-803a-1100eba3fb13.jpg?1743204126"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Piercing Exhale",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 74,
+          "tier_rating": "B",
+          "note": null,
+          "id": "b2a0deb9-5bc3-42d5-9e1e-5f463d176aef",
+          "scryfall_uri": "https://scryfall.com/card/tdm/151/piercing-exhale",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b2a0deb9-5bc3-42d5-9e1e-5f463d176aef.jpg?1743204571",
+            "normal": "https://cards.scryfall.io/normal/front/b/2/b2a0deb9-5bc3-42d5-9e1e-5f463d176aef.jpg?1743204571"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Sagu Wildling",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 100,
+          "tier_rating": "B",
+          "note": null,
+          "id": "d8b43b00-f4d1-436c-bf3f-6d414cd4ce38",
+          "scryfall_uri": "https://scryfall.com/card/tdm/157/sagu-wildling-roost-seek",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Dragon // Sorcery — Omen",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d8b43b00-f4d1-436c-bf3f-6d414cd4ce38.jpg?1743204593",
+            "normal": "https://cards.scryfall.io/normal/front/d/8/d8b43b00-f4d1-436c-bf3f-6d414cd4ce38.jpg?1743204593"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Hybrid Mana",
+      "summary": "Several spells with hybrid mana costs (Rakshasa's Bargain, Temur Tawnyback, Kin-Tree Severance) often cost 3 or 4 mana depending on draw, giving flexible color requirements.",
+      "performance": "Splashable role-players. Reduces clan lock-in.",
+      "key_examples": [
+        {
+          "name": "Rakshasa's Bargain",
+          "color": "C",
+          "rarity": "Uncommon",
+          "pick_order_rank": 50,
+          "tier_rating": "B",
+          "note": null,
+          "id": "5c409f4f-3b2c-4c33-b850-55b2a46f51ca",
+          "scryfall_uri": "https://scryfall.com/card/tdm/214/rakshasas-bargain",
+          "colors": [
+            "B",
+            "G",
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c409f4f-3b2c-4c33-b850-55b2a46f51ca.jpg?1743204844",
+            "normal": "https://cards.scryfall.io/normal/front/5/c/5c409f4f-3b2c-4c33-b850-55b2a46f51ca.jpg?1743204844"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Temur Tawnyback",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 76,
+          "tier_rating": "B",
+          "note": null,
+          "id": "3cdb383f-bc04-46d1-aa3a-7459d57f1fec",
+          "scryfall_uri": "https://scryfall.com/card/tdm/229/temur-tawnyback",
+          "colors": [
+            "G",
+            "R",
+            "U"
+          ],
+          "type_line": "Creature — Beast",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3cdb383f-bc04-46d1-aa3a-7459d57f1fec.jpg?1743204904",
+            "normal": "https://cards.scryfall.io/normal/front/3/c/3cdb383f-bc04-46d1-aa3a-7459d57f1fec.jpg?1743204904"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Kin-Tree Severance",
+          "color": "C",
+          "rarity": "Uncommon",
+          "pick_order_rank": 117,
+          "tier_rating": "C",
+          "note": null,
+          "id": "b577e246-3377-42aa-856e-b9fa89f3603a",
+          "scryfall_uri": "https://scryfall.com/card/tdm/200/kin-tree-severance",
+          "colors": [
+            "B",
+            "G",
+            "W"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b577e246-3377-42aa-856e-b9fa89f3603a.jpg?1743204786",
+            "normal": "https://cards.scryfall.io/normal/front/b/5/b577e246-3377-42aa-856e-b9fa89f3603a.jpg?1743204786"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    },
+    {
+      "name": "Surveil",
+      "summary": "Smoothing mechanic best in Sultai. Mostly enabled via Piercing Exhale and Boulderborn Dragon.",
+      "performance": "Light support; works as deck consistency rather than a payoff theme.",
+      "key_examples": [
+        {
+          "name": "Piercing Exhale",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 74,
+          "tier_rating": "B",
+          "note": null,
+          "id": "b2a0deb9-5bc3-42d5-9e1e-5f463d176aef",
+          "scryfall_uri": "https://scryfall.com/card/tdm/151/piercing-exhale",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b2a0deb9-5bc3-42d5-9e1e-5f463d176aef.jpg?1743204571",
+            "normal": "https://cards.scryfall.io/normal/front/b/2/b2a0deb9-5bc3-42d5-9e1e-5f463d176aef.jpg?1743204571"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        },
+        {
+          "name": "Boulderborn Dragon",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 250,
+          "tier_rating": "D",
+          "note": null,
+          "id": "50c6e815-bfe7-4599-9227-d36504a3640f",
+          "scryfall_uri": "https://scryfall.com/card/tdm/239/boulderborn-dragon",
+          "colors": [],
+          "type_line": "Artifact Creature — Dragon",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50c6e815-bfe7-4599-9227-d36504a3640f.jpg?1743204948",
+            "normal": "https://cards.scryfall.io/normal/front/5/0/50c6e815-bfe7-4599-9227-d36504a3640f.jpg?1743204948"
+          },
+          "set": "tdm",
+          "set_name": "Tarkir: Dragonstorm"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{W}{U}{B}{R}{G}",
+        "name": "5c Dragonstorm (Globe Deck)",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Take the best card each pack: bombs first, then efficient removal, card advantage, fixing, and finally curve filler. Dragonstorm Globe is the centerpiece. Mardu being weaker creates space for greedy piles.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Ugin, Eye of the Storms",
+            "color": "C",
+            "rarity": "Mythic",
+            "pick_order_rank": 1,
+            "tier_rating": "S",
+            "note": null,
+            "id": "64a5d494-efa1-446b-bebe-2ad36e154376",
+            "scryfall_uri": "https://scryfall.com/card/tdm/1/ugin-eye-of-the-storms",
+            "colors": [],
+            "type_line": "Legendary Planeswalker — Ugin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/64a5d494-efa1-446b-bebe-2ad36e154376.jpg?1761770162",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/64a5d494-efa1-446b-bebe-2ad36e154376.jpg?1761770162"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Jeskai Revelation",
+            "color": "WUR",
+            "rarity": "Mythic",
+            "pick_order_rank": 5,
+            "tier_rating": "S",
+            "note": null,
+            "id": "3cac0ad3-5107-4ed6-a688-d44bbd65e407",
+            "scryfall_uri": "https://scryfall.com/card/tdm/196/jeskai-revelation",
+            "colors": [
+              "R",
+              "U",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3cac0ad3-5107-4ed6-a688-d44bbd65e407.jpg?1743204770",
+              "normal": "https://cards.scryfall.io/normal/front/3/c/3cac0ad3-5107-4ed6-a688-d44bbd65e407.jpg?1743204770"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Dragonstorm Globe",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 141,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7f50aa6e-ce6a-4479-9725-202926245f2c",
+            "scryfall_uri": "https://scryfall.com/card/tdm/241/dragonstorm-globe",
+            "colors": [],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f50aa6e-ce6a-4479-9725-202926245f2c.jpg?1743204954",
+              "normal": "https://cards.scryfall.io/normal/front/7/f/7f50aa6e-ce6a-4479-9725-202926245f2c.jpg?1743204954"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Marang River Regent",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 3,
+            "tier_rating": "S",
+            "note": null,
+            "id": "f890bdc7-32e6-4492-bac7-7cabf54a8bfd",
+            "scryfall_uri": "https://scryfall.com/card/tdm/51/marang-river-regent-coil-and-catch",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Dragon // Instant — Omen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f890bdc7-32e6-4492-bac7-7cabf54a8bfd.jpg?1764062994",
+              "normal": "https://cards.scryfall.io/normal/front/f/8/f890bdc7-32e6-4492-bac7-7cabf54a8bfd.jpg?1764062994"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}{R}",
+        "name": "Temur Stompy",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Play large creatures and removal. Temur Tawnyback is that good in multiple copies. Harmonize spells like Glacial Dragonhunt and Mammoth Bellow snowball.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Temur Tawnyback",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 76,
+            "tier_rating": "B",
+            "note": null,
+            "id": "3cdb383f-bc04-46d1-aa3a-7459d57f1fec",
+            "scryfall_uri": "https://scryfall.com/card/tdm/229/temur-tawnyback",
+            "colors": [
+              "G",
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Beast",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3cdb383f-bc04-46d1-aa3a-7459d57f1fec.jpg?1743204904",
+              "normal": "https://cards.scryfall.io/normal/front/3/c/3cdb383f-bc04-46d1-aa3a-7459d57f1fec.jpg?1743204904"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Glacial Dragonhunt",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 39,
+            "tier_rating": "A",
+            "note": null,
+            "id": "95994c88-e404-4a4f-8be6-b99d703d4609",
+            "scryfall_uri": "https://scryfall.com/card/tdm/188/glacial-dragonhunt",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95994c88-e404-4a4f-8be6-b99d703d4609.jpg?1743204732",
+              "normal": "https://cards.scryfall.io/normal/front/9/5/95994c88-e404-4a4f-8be6-b99d703d4609.jpg?1743204732"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Mammoth Bellow",
+            "color": "URG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 148,
+            "tier_rating": "C",
+            "note": null,
+            "id": "468b17b4-79ce-4dfa-8873-a9cfc347e38f",
+            "scryfall_uri": "https://scryfall.com/card/tdm/205/mammoth-bellow",
+            "colors": [
+              "G",
+              "R",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/6/468b17b4-79ce-4dfa-8873-a9cfc347e38f.jpg?1743204808",
+              "normal": "https://cards.scryfall.io/normal/front/4/6/468b17b4-79ce-4dfa-8873-a9cfc347e38f.jpg?1743204808"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{U}{R}{W}",
+        "name": "Jeskai Tempo",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Multiple flavors: (1) aggro/midrange using 2-drops like Jeskai Devotee with removal, (2) hyper-aggro with cheap creatures and flurry synergies, (3) control/good-stuff foundation for 4-5c piles.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Jeskai Devotee",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 157,
+            "tier_rating": "C",
+            "note": null,
+            "id": "27f31f9c-7149-4608-9b18-b3530a2efd4a",
+            "scryfall_uri": "https://scryfall.com/card/tdm/110/jeskai-devotee",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Orc Monk",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/27f31f9c-7149-4608-9b18-b3530a2efd4a.jpg?1743204404",
+              "normal": "https://cards.scryfall.io/normal/front/2/7/27f31f9c-7149-4608-9b18-b3530a2efd4a.jpg?1743204404"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Jeskai Shrinekeeper",
+            "color": "WUR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 49,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6ec8fa0b-c695-4326-aebd-042cb1974925",
+            "scryfall_uri": "https://scryfall.com/card/tdm/197/jeskai-shrinekeeper",
+            "colors": [
+              "R",
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Dragon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6ec8fa0b-c695-4326-aebd-042cb1974925.jpg?1743204771",
+              "normal": "https://cards.scryfall.io/normal/front/6/e/6ec8fa0b-c695-4326-aebd-042cb1974925.jpg?1743204771"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Rally the Monastery",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 46,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b56e0037-8143-4c13-83e1-0c3f44e685ea",
+            "scryfall_uri": "https://scryfall.com/card/tdm/19/rally-the-monastery",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b56e0037-8143-4c13-83e1-0c3f44e685ea.jpg?1743204029",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b56e0037-8143-4c13-83e1-0c3f44e685ea.jpg?1743204029"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}{U}",
+        "name": "Sultai Midrange",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Light graveyard commitments to full strategies. Payoffs ranked: Lotuslight Dancers > Lasyd Prowler > Kishla Skimmer > Kheru Goldkeeper > Essence Anchor > Attuned Hunter.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Lotuslight Dancers",
+            "color": "UBG",
+            "rarity": "Rare",
+            "pick_order_rank": 65,
+            "tier_rating": "B",
+            "note": null,
+            "id": "82aa2593-4a79-46f1-a2bd-b71fb504d0ab",
+            "scryfall_uri": "https://scryfall.com/card/tdm/204/lotuslight-dancers",
+            "colors": [
+              "B",
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Zombie Bard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/82aa2593-4a79-46f1-a2bd-b71fb504d0ab.jpg?1743204801",
+              "normal": "https://cards.scryfall.io/normal/front/8/2/82aa2593-4a79-46f1-a2bd-b71fb504d0ab.jpg?1743204801"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Lasyd Prowler",
+            "color": "G",
+            "rarity": "Rare",
+            "pick_order_rank": 59,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c7f5c8ef-8e9e-4264-a7d2-126a30a5d341",
+            "scryfall_uri": "https://scryfall.com/card/tdm/149/lasyd-prowler",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Snake Ranger",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7f5c8ef-8e9e-4264-a7d2-126a30a5d341.jpg?1743204564",
+              "normal": "https://cards.scryfall.io/normal/front/c/7/c7f5c8ef-8e9e-4264-a7d2-126a30a5d341.jpg?1743204564"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Kishla Skimmer",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b5f1acb0-d73e-4814-8158-3645daf5c4cc",
+            "scryfall_uri": "https://scryfall.com/card/tdm/201/kishla-skimmer",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Bird Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5f1acb0-d73e-4814-8158-3645daf5c4cc.jpg?1743204788",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b5f1acb0-d73e-4814-8158-3645daf5c4cc.jpg?1743204788"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Kheru Goldkeeper",
+            "color": "UBG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 181,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8d11183a-57f5-4ddb-8a6e-15fff704b114",
+            "scryfall_uri": "https://scryfall.com/card/tdm/199/kheru-goldkeeper",
+            "colors": [
+              "B",
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Dragon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d11183a-57f5-4ddb-8a6e-15fff704b114.jpg?1743204780",
+              "normal": "https://cards.scryfall.io/normal/front/8/d/8d11183a-57f5-4ddb-8a6e-15fff704b114.jpg?1743204780"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}{B}",
+        "name": "Mardu Aggro",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Base RW: fast pressure with a turn-5 clock focus. Base BW: build to critical mass with mobilize synergies. Stay 2-3 colors for curve consistency; avoid overextending mana bases.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Dalkovan Packbeasts",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 81,
+            "tier_rating": "B",
+            "note": null,
+            "id": "4df7b253-6107-47d6-b650-cb4d3e0aec6b",
+            "scryfall_uri": "https://scryfall.com/card/tdm/7/dalkovan-packbeasts",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Ox",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4df7b253-6107-47d6-b650-cb4d3e0aec6b.jpg?1743203980",
+              "normal": "https://cards.scryfall.io/normal/front/4/d/4df7b253-6107-47d6-b650-cb4d3e0aec6b.jpg?1743203980"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Thunder of Unity",
+            "color": "WBR",
+            "rarity": "Rare",
+            "pick_order_rank": 221,
+            "tier_rating": "D",
+            "note": null,
+            "id": "5c953b36-f5e4-4258-91cb-f07e799321f7",
+            "scryfall_uri": "https://scryfall.com/card/tdm/231/thunder-of-unity",
+            "colors": [
+              "B",
+              "R",
+              "W"
+            ],
+            "type_line": "Enchantment — Saga",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c953b36-f5e4-4258-91cb-f07e799321f7.jpg?1744578016",
+              "normal": "https://cards.scryfall.io/normal/front/5/c/5c953b36-f5e4-4258-91cb-f07e799321f7.jpg?1744578016"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{W}{B}{G}",
+        "name": "Abzan Midrange",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Flavor 1: standard midrange with token synergies. Flavor 2: counter-focused with aggressive payoffs like Synchronized Charge and Champion of Dusan.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Synchronized Charge",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 137,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1f721f8d-fd2f-480b-8645-4bf6ce38dde9",
+            "scryfall_uri": "https://scryfall.com/card/tdm/162/synchronized-charge",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/f/1f721f8d-fd2f-480b-8645-4bf6ce38dde9.jpg?1743204617",
+              "normal": "https://cards.scryfall.io/normal/front/1/f/1f721f8d-fd2f-480b-8645-4bf6ce38dde9.jpg?1743204617"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Champion of Dusan",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 147,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c51dcdab-38ee-4804-8859-09adc353c182",
+            "scryfall_uri": "https://scryfall.com/card/tdm/137/champion-of-dusan",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c51dcdab-38ee-4804-8859-09adc353c182.jpg?1743204513",
+              "normal": "https://cards.scryfall.io/normal/front/c/5/c51dcdab-38ee-4804-8859-09adc353c182.jpg?1743204513"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          }
+        ]
+      },
+      {
+        "colors": "2c",
+        "name": "2-Color Aggro",
+        "tier": "Tier 3 — Punish Pile",
+        "strategy": "Punish greedy 4-5c piles with tight mana curves and premium removal. Premium 2-drops and efficient removal are the engine.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Shock Brigade",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 99,
+            "tier_rating": "B",
+            "note": null,
+            "id": "66940466-8e9d-4a85-bfb0-e92189b7a121",
+            "scryfall_uri": "https://scryfall.com/card/tdm/120/shock-brigade",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66940466-8e9d-4a85-bfb0-e92189b7a121.jpg?1743204444",
+              "normal": "https://cards.scryfall.io/normal/front/6/6/66940466-8e9d-4a85-bfb0-e92189b7a121.jpg?1743204444"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          },
+          {
+            "name": "Fortress Kin-Guard",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 82,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b647a018-1d70-43a1-a265-928bcd863689",
+            "scryfall_uri": "https://scryfall.com/card/tdm/12/fortress-kin-guard",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Dog Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b647a018-1d70-43a1-a265-928bcd863689.jpg?1743204000",
+              "normal": "https://cards.scryfall.io/normal/front/b/6/b647a018-1d70-43a1-a265-928bcd863689.jpg?1743204000"
+            },
+            "set": "tdm",
+            "set_name": "Tarkir: Dragonstorm"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Mardu Devotee",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 45,
+        "tier_rating": "B",
+        "note": "Fixer/curve smoother.",
+        "id": "da45e9b0-a4f6-413b-9e62-666c511eb5b0",
+        "scryfall_uri": "https://scryfall.com/card/tdm/16/mardu-devotee",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/da45e9b0-a4f6-413b-9e62-666c511eb5b0.jpg?1743204014",
+          "normal": "https://cards.scryfall.io/normal/front/d/a/da45e9b0-a4f6-413b-9e62-666c511eb5b0.jpg?1743204014"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Salt Road Packbeast",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 67,
+        "tier_rating": "B",
+        "note": "Repeatable value.",
+        "id": "98d548c9-42bc-4155-8211-0aea801c3724",
+        "scryfall_uri": "https://scryfall.com/card/tdm/23/salt-road-packbeast",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Beast",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/98d548c9-42bc-4155-8211-0aea801c3724.jpg?1763487067",
+          "normal": "https://cards.scryfall.io/normal/front/9/8/98d548c9-42bc-4155-8211-0aea801c3724.jpg?1763487067"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Fortress Kin-Guard",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 82,
+        "tier_rating": "B",
+        "note": "Solid 2-drop with flexibility.",
+        "id": "b647a018-1d70-43a1-a265-928bcd863689",
+        "scryfall_uri": "https://scryfall.com/card/tdm/12/fortress-kin-guard",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Dog Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b647a018-1d70-43a1-a265-928bcd863689.jpg?1743204000",
+          "normal": "https://cards.scryfall.io/normal/front/b/6/b647a018-1d70-43a1-a265-928bcd863689.jpg?1743204000"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Stormplain Detainment",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 129,
+        "tier_rating": "C",
+        "note": "Removal with removal caution.",
+        "id": "39f3aab5-7b54-4b55-8114-c6f9f79c255d",
+        "scryfall_uri": "https://scryfall.com/card/tdm/28/stormplain-detainment",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/9/39f3aab5-7b54-4b55-8114-c6f9f79c255d.jpg?1743204069",
+          "normal": "https://cards.scryfall.io/normal/front/3/9/39f3aab5-7b54-4b55-8114-c6f9f79c255d.jpg?1743204069"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Sibsig Appraiser",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 32,
+        "tier_rating": "A",
+        "note": "Card advantage engine.",
+        "id": "670c5b96-bac6-449b-a2bd-cb43750d3911",
+        "scryfall_uri": "https://scryfall.com/card/tdm/56/sibsig-appraiser",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Zombie Advisor",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/670c5b96-bac6-449b-a2bd-cb43750d3911.jpg?1743204185",
+          "normal": "https://cards.scryfall.io/normal/front/6/7/670c5b96-bac6-449b-a2bd-cb43750d3911.jpg?1743204185"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Dispelling Exhale",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 56,
+        "tier_rating": "B",
+        "note": "Interaction with behold.",
+        "id": "1c9af3f1-711e-42ae-803a-1100eba3fb13",
+        "scryfall_uri": "https://scryfall.com/card/tdm/41/dispelling-exhale",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c9af3f1-711e-42ae-803a-1100eba3fb13.jpg?1743204126",
+          "normal": "https://cards.scryfall.io/normal/front/1/c/1c9af3f1-711e-42ae-803a-1100eba3fb13.jpg?1743204126"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Riverwalk Technique",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 94,
+        "tier_rating": "B",
+        "note": "Counter option vs noncreatures.",
+        "id": "043c25d5-13ee-4cab-98d5-fb89db9cf6e3",
+        "scryfall_uri": "https://scryfall.com/card/tdm/54/riverwalk-technique",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/043c25d5-13ee-4cab-98d5-fb89db9cf6e3.jpg?1743204178",
+          "normal": "https://cards.scryfall.io/normal/front/0/4/043c25d5-13ee-4cab-98d5-fb89db9cf6e3.jpg?1743204178"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Unending Whisper",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 85,
+        "tier_rating": "B",
+        "note": "Value cantrip with synergies.",
+        "id": "fc48180a-ccac-469f-938d-c050821d0160",
+        "scryfall_uri": "https://scryfall.com/card/tdm/62/unending-whisper",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/c/fc48180a-ccac-469f-938d-c050821d0160.jpg?1743204207",
+          "normal": "https://cards.scryfall.io/normal/front/f/c/fc48180a-ccac-469f-938d-c050821d0160.jpg?1743204207"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Caustic Exhale",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 87,
+        "tier_rating": "B",
+        "note": "Most efficient removal.",
+        "id": "488152ce-2048-4ccb-b2d6-b9628958286f",
+        "scryfall_uri": "https://scryfall.com/card/tdm/74/caustic-exhale",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/488152ce-2048-4ccb-b2d6-b9628958286f.jpg?1743204258",
+          "normal": "https://cards.scryfall.io/normal/front/4/8/488152ce-2048-4ccb-b2d6-b9628958286f.jpg?1743204258"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Dragon's Prey",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 131,
+        "tier_rating": "C",
+        "note": "Solid backup.",
+        "id": "7a6004ff-4180-4332-8b51-960f8c7521d9",
+        "scryfall_uri": "https://scryfall.com/card/tdm/79/dragons-prey",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a6004ff-4180-4332-8b51-960f8c7521d9.jpg?1743204277",
+          "normal": "https://cards.scryfall.io/normal/front/7/a/7a6004ff-4180-4332-8b51-960f8c7521d9.jpg?1743204277"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Aggressive Negotiations",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 169,
+        "tier_rating": "C",
+        "note": "Single copy strong.",
+        "id": "993ade84-031f-4a3e-bd68-55f61b559248",
+        "scryfall_uri": "https://scryfall.com/card/tdm/70/aggressive-negotiations",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/993ade84-031f-4a3e-bd68-55f61b559248.jpg?1743204240",
+          "normal": "https://cards.scryfall.io/normal/front/9/9/993ade84-031f-4a3e-bd68-55f61b559248.jpg?1743204240"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Feral Deathgorger",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 198,
+        "tier_rating": "C",
+        "note": "Dragon with omen cycle.",
+        "id": "a147b94f-dfcf-44ce-8a73-b2fe6c4efc0e",
+        "scryfall_uri": "https://scryfall.com/card/tdm/80/feral-deathgorger-dusk-sight",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Dragon // Sorcery — Omen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a147b94f-dfcf-44ce-8a73-b2fe6c4efc0e.jpg?1743204282",
+          "normal": "https://cards.scryfall.io/normal/front/a/1/a147b94f-dfcf-44ce-8a73-b2fe6c4efc0e.jpg?1743204282"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Molten Exhale",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "B",
+        "note": "Universal relevance.",
+        "id": "0ab95aab-a4bf-4131-83a0-2c138b6f20c3",
+        "scryfall_uri": "https://scryfall.com/card/tdm/113/molten-exhale",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0ab95aab-a4bf-4131-83a0-2c138b6f20c3.jpg?1743204414",
+          "normal": "https://cards.scryfall.io/normal/front/0/a/0ab95aab-a4bf-4131-83a0-2c138b6f20c3.jpg?1743204414"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Shock Brigade",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "B",
+        "note": "Best aggressive 2-drop.",
+        "id": "66940466-8e9d-4a85-bfb0-e92189b7a121",
+        "scryfall_uri": "https://scryfall.com/card/tdm/120/shock-brigade",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Goblin Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66940466-8e9d-4a85-bfb0-e92189b7a121.jpg?1743204444",
+          "normal": "https://cards.scryfall.io/normal/front/6/6/66940466-8e9d-4a85-bfb0-e92189b7a121.jpg?1743204444"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Narset's Rebuke",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 114,
+        "tier_rating": "C",
+        "note": "Synergy with Focus the Mind.",
+        "id": "5098bd73-d51c-4db4-bf06-fd4854089d37",
+        "scryfall_uri": "https://scryfall.com/card/tdm/114/narsets-rebuke",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/5098bd73-d51c-4db4-bf06-fd4854089d37.jpg?1743204422",
+          "normal": "https://cards.scryfall.io/normal/front/5/0/5098bd73-d51c-4db4-bf06-fd4854089d37.jpg?1743204422"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Stormshriek Feral",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 159,
+        "tier_rating": "C",
+        "note": "Hand smoothing with firebreathing.",
+        "id": "0ec92c44-7cf0-48a5-a3ca-bc633496d887",
+        "scryfall_uri": "https://scryfall.com/card/tdm/124/stormshriek-feral-flush-out",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Dragon // Sorcery — Omen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/e/0ec92c44-7cf0-48a5-a3ca-bc633496d887.jpg?1743204459",
+          "normal": "https://cards.scryfall.io/normal/front/0/e/0ec92c44-7cf0-48a5-a3ca-bc633496d887.jpg?1743204459"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Ainok Wayfarer",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 78,
+        "tier_rating": "B",
+        "note": "Graveyard/mana fix enabler.",
+        "id": "57695a9b-8f72-4ccc-a946-5d5037b09b8f",
+        "scryfall_uri": "https://scryfall.com/card/tdm/134/ainok-wayfarer",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dog Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/57695a9b-8f72-4ccc-a946-5d5037b09b8f.jpg?1743204503",
+          "normal": "https://cards.scryfall.io/normal/front/5/7/57695a9b-8f72-4ccc-a946-5d5037b09b8f.jpg?1743204503"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Sagu Wildling",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 100,
+        "tier_rating": "B",
+        "note": "Exhale trigger, mana fix.",
+        "id": "d8b43b00-f4d1-436c-bf3f-6d414cd4ce38",
+        "scryfall_uri": "https://scryfall.com/card/tdm/157/sagu-wildling-roost-seek",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dragon // Sorcery — Omen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d8b43b00-f4d1-436c-bf3f-6d414cd4ce38.jpg?1743204593",
+          "normal": "https://cards.scryfall.io/normal/front/d/8/d8b43b00-f4d1-436c-bf3f-6d414cd4ce38.jpg?1743204593"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Piercing Exhale",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 74,
+        "tier_rating": "B",
+        "note": "Removal with deckbuilding consideration.",
+        "id": "b2a0deb9-5bc3-42d5-9e1e-5f463d176aef",
+        "scryfall_uri": "https://scryfall.com/card/tdm/151/piercing-exhale",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b2a0deb9-5bc3-42d5-9e1e-5f463d176aef.jpg?1743204571",
+          "normal": "https://cards.scryfall.io/normal/front/b/2/b2a0deb9-5bc3-42d5-9e1e-5f463d176aef.jpg?1743204571"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Snakeskin Veil",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 101,
+        "tier_rating": "B",
+        "note": "First copy invaluable.",
+        "id": "a3d2c692-7566-468e-9c86-47a9f768fde2",
+        "scryfall_uri": "https://scryfall.com/card/tdm/159/snakeskin-veil",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a3d2c692-7566-468e-9c86-47a9f768fde2.jpg?1743204601",
+          "normal": "https://cards.scryfall.io/normal/front/a/3/a3d2c692-7566-468e-9c86-47a9f768fde2.jpg?1743204601"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      }
+    ],
+    "Colorless_Artifacts": [
+      {
+        "name": "Dragonstorm Globe",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 141,
+        "tier_rating": "C",
+        "note": "Overperformed due to dragon focus.",
+        "id": "7f50aa6e-ce6a-4479-9725-202926245f2c",
+        "scryfall_uri": "https://scryfall.com/card/tdm/241/dragonstorm-globe",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f50aa6e-ce6a-4479-9725-202926245f2c.jpg?1743204954",
+          "normal": "https://cards.scryfall.io/normal/front/7/f/7f50aa6e-ce6a-4479-9725-202926245f2c.jpg?1743204954"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      },
+      {
+        "name": "Boulderborn Dragon",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 250,
+        "tier_rating": "D",
+        "note": "Comparable to other common dragons.",
+        "id": "50c6e815-bfe7-4599-9227-d36504a3640f",
+        "scryfall_uri": "https://scryfall.com/card/tdm/239/boulderborn-dragon",
+        "colors": [],
+        "type_line": "Artifact Creature — Dragon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50c6e815-bfe7-4599-9227-d36504a3640f.jpg?1743204948",
+          "normal": "https://cards.scryfall.io/normal/front/5/0/50c6e815-bfe7-4599-9227-d36504a3640f.jpg?1743204948"
+        },
+        "set": "tdm",
+        "set_name": "Tarkir: Dragonstorm"
+      }
+    ]
+  },
+  "top_uncommons": [
+    {
+      "name": "Sonic Shrieker",
+      "color": "WBR",
+      "rarity": "Uncommon",
+      "pick_order_rank": 17,
+      "tier_rating": "A",
+      "note": "5c staple.",
+      "id": "7c231437-8bec-42e0-9175-af74c752b119",
+      "scryfall_uri": "https://scryfall.com/card/tdm/226/sonic-shrieker",
+      "colors": [
+        "B",
+        "R",
+        "W"
+      ],
+      "type_line": "Creature — Dragon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/c/7c231437-8bec-42e0-9175-af74c752b119.jpg?1743204895",
+        "normal": "https://cards.scryfall.io/normal/front/7/c/7c231437-8bec-42e0-9175-af74c752b119.jpg?1743204895"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Karakyk Guardian",
+      "color": "URG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 27,
+      "tier_rating": "A",
+      "note": "Strong flyer; dirty with Dragonologist.",
+      "id": "a4c77b08-c3f6-4458-8636-f226f9843b6d",
+      "scryfall_uri": "https://scryfall.com/card/tdm/198/karakyk-guardian",
+      "colors": [
+        "G",
+        "R",
+        "U"
+      ],
+      "type_line": "Creature — Dragon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4c77b08-c3f6-4458-8636-f226f9843b6d.jpg?1743233806",
+        "normal": "https://cards.scryfall.io/normal/front/a/4/a4c77b08-c3f6-4458-8636-f226f9843b6d.jpg?1743233806"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Twinmaw Stormbrood",
+      "color": "W",
+      "rarity": "Uncommon",
+      "pick_order_rank": 34,
+      "tier_rating": "A",
+      "note": "Flexible premium removal.",
+      "id": "2999e3b1-6510-42b2-9429-28c07a64a44f",
+      "scryfall_uri": "https://scryfall.com/card/tdm/232/twinmaw-stormbrood-charring-bite",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Dragon // Sorcery — Omen",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/2999e3b1-6510-42b2-9429-28c07a64a44f.jpg?1743204919",
+        "normal": "https://cards.scryfall.io/normal/front/2/9/2999e3b1-6510-42b2-9429-28c07a64a44f.jpg?1743204919"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Roiling Dragonstorm",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 33,
+      "tier_rating": "A",
+      "note": "Best Dragonstorm variant.",
+      "id": "455f4c96-684b-4b14-bd21-6799da2e1fa7",
+      "scryfall_uri": "https://scryfall.com/card/tdm/55/roiling-dragonstorm",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/5/455f4c96-684b-4b14-bd21-6799da2e1fa7.jpg?1743204180",
+        "normal": "https://cards.scryfall.io/normal/front/4/5/455f4c96-684b-4b14-bd21-6799da2e1fa7.jpg?1743204180"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Glacial Dragonhunt",
+      "color": "UR",
+      "rarity": "Uncommon",
+      "pick_order_rank": 39,
+      "tier_rating": "A",
+      "note": "Repeatable removal.",
+      "id": "95994c88-e404-4a4f-8be6-b99d703d4609",
+      "scryfall_uri": "https://scryfall.com/card/tdm/188/glacial-dragonhunt",
+      "colors": [
+        "R",
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95994c88-e404-4a4f-8be6-b99d703d4609.jpg?1743204732",
+        "normal": "https://cards.scryfall.io/normal/front/9/5/95994c88-e404-4a4f-8be6-b99d703d4609.jpg?1743204732"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Traveling Botanist",
+      "color": "G",
+      "rarity": "Uncommon",
+      "pick_order_rank": 44,
+      "tier_rating": "A",
+      "note": "Early curve acceleration.",
+      "id": "890b11b4-777a-4f1e-8c4d-21c5ebbfb0a2",
+      "scryfall_uri": "https://scryfall.com/card/tdm/164/traveling-botanist",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Dog Scout",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/890b11b4-777a-4f1e-8c4d-21c5ebbfb0a2.jpg?1743204626",
+        "normal": "https://cards.scryfall.io/normal/front/8/9/890b11b4-777a-4f1e-8c4d-21c5ebbfb0a2.jpg?1743204626"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Knockout Maneuver",
+      "color": "G",
+      "rarity": "Uncommon",
+      "pick_order_rank": 43,
+      "tier_rating": "A",
+      "note": "Excellent sorcery-speed removal.",
+      "id": "9d218831-2a41-46a3-8e9d-93462cae5cab",
+      "scryfall_uri": "https://scryfall.com/card/tdm/147/knockout-maneuver",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9d218831-2a41-46a3-8e9d-93462cae5cab.jpg?1743204555",
+        "normal": "https://cards.scryfall.io/normal/front/9/d/9d218831-2a41-46a3-8e9d-93462cae5cab.jpg?1743204555"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Rally the Monastery",
+      "color": "W",
+      "rarity": "Uncommon",
+      "pick_order_rank": 46,
+      "tier_rating": "B",
+      "note": "Flexible modal spell.",
+      "id": "b56e0037-8143-4c13-83e1-0c3f44e685ea",
+      "scryfall_uri": "https://scryfall.com/card/tdm/19/rally-the-monastery",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b56e0037-8143-4c13-83e1-0c3f44e685ea.jpg?1743204029",
+        "normal": "https://cards.scryfall.io/normal/front/b/5/b56e0037-8143-4c13-83e1-0c3f44e685ea.jpg?1743204029"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Jeskai Shrinekeeper",
+      "color": "WUR",
+      "rarity": "Uncommon",
+      "pick_order_rank": 49,
+      "tier_rating": "B",
+      "note": "Game-winning if unchecked.",
+      "id": "6ec8fa0b-c695-4326-aebd-042cb1974925",
+      "scryfall_uri": "https://scryfall.com/card/tdm/197/jeskai-shrinekeeper",
+      "colors": [
+        "R",
+        "U",
+        "W"
+      ],
+      "type_line": "Creature — Dragon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6ec8fa0b-c695-4326-aebd-042cb1974925.jpg?1743204771",
+        "normal": "https://cards.scryfall.io/normal/front/6/e/6ec8fa0b-c695-4326-aebd-042cb1974925.jpg?1743204771"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Disruptive Stormbrood",
+      "color": "G",
+      "rarity": "Uncommon",
+      "pick_order_rank": 48,
+      "tier_rating": "B",
+      "note": "Flexible dragon.",
+      "id": "bd78e8ae-e927-40e7-9580-966c5e81f53c",
+      "scryfall_uri": "https://scryfall.com/card/tdm/178/disruptive-stormbrood-petty-revenge",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Dragon // Sorcery — Omen",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/d/bd78e8ae-e927-40e7-9580-966c5e81f53c.jpg?1743204689",
+        "normal": "https://cards.scryfall.io/normal/front/b/d/bd78e8ae-e927-40e7-9580-966c5e81f53c.jpg?1743204689"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Wingblade Disciple",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 62,
+      "tier_rating": "B",
+      "note": "Token generation.",
+      "id": "71de7dca-0231-4407-86a0-c7fc95f5aaa0",
+      "scryfall_uri": "https://scryfall.com/card/tdm/65/wingblade-disciple",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Human Monk",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/71de7dca-0231-4407-86a0-c7fc95f5aaa0.jpg?1743204222",
+        "normal": "https://cards.scryfall.io/normal/front/7/1/71de7dca-0231-4407-86a0-c7fc95f5aaa0.jpg?1743204222"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Rakshasa's Bargain",
+      "color": "C",
+      "rarity": "Uncommon",
+      "pick_order_rank": 50,
+      "tier_rating": "B",
+      "note": "Best card draw spell.",
+      "id": "5c409f4f-3b2c-4c33-b850-55b2a46f51ca",
+      "scryfall_uri": "https://scryfall.com/card/tdm/214/rakshasas-bargain",
+      "colors": [
+        "B",
+        "G",
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c409f4f-3b2c-4c33-b850-55b2a46f51ca.jpg?1743204844",
+        "normal": "https://cards.scryfall.io/normal/front/5/c/5c409f4f-3b2c-4c33-b850-55b2a46f51ca.jpg?1743204844"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Kishla Skimmer",
+      "color": "UG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 60,
+      "tier_rating": "B",
+      "note": "Graveyard payoff.",
+      "id": "b5f1acb0-d73e-4814-8158-3645daf5c4cc",
+      "scryfall_uri": "https://scryfall.com/card/tdm/201/kishla-skimmer",
+      "colors": [
+        "G",
+        "U"
+      ],
+      "type_line": "Creature — Bird Scout",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5f1acb0-d73e-4814-8158-3645daf5c4cc.jpg?1743204788",
+        "normal": "https://cards.scryfall.io/normal/front/b/5/b5f1acb0-d73e-4814-8158-3645daf5c4cc.jpg?1743204788"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Riverwheel Sweep",
+      "color": "C",
+      "rarity": "Uncommon",
+      "pick_order_rank": 61,
+      "tier_rating": "B",
+      "note": "Repeatable freeze effect.",
+      "id": "686fe623-ee50-407d-87c9-664fb039f4d9",
+      "scryfall_uri": "https://scryfall.com/card/tdm/219/riverwheel-sweep",
+      "colors": [
+        "R",
+        "U",
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/686fe623-ee50-407d-87c9-664fb039f4d9.jpg?1743204865",
+        "normal": "https://cards.scryfall.io/normal/front/6/8/686fe623-ee50-407d-87c9-664fb039f4d9.jpg?1743204865"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Dragonbroods' Relic",
+      "color": "G",
+      "rarity": "Uncommon",
+      "pick_order_rank": 58,
+      "tier_rating": "B",
+      "note": "Sleeper 5c enabler.",
+      "id": "3d634087-77ba-4543-aa7a-8a3774d69cd7",
+      "scryfall_uri": "https://scryfall.com/card/tdm/140/dragonbroods-relic",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d634087-77ba-4543-aa7a-8a3774d69cd7.jpg?1743204527",
+        "normal": "https://cards.scryfall.io/normal/front/3/d/3d634087-77ba-4543-aa7a-8a3774d69cd7.jpg?1743204527"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    }
+  ],
+  "top_busted_rares": [
+    {
+      "name": "Ugin, Eye of the Storms",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": "Most broken; goes in every deck.",
+      "id": "64a5d494-efa1-446b-bebe-2ad36e154376",
+      "scryfall_uri": "https://scryfall.com/card/tdm/1/ugin-eye-of-the-storms",
+      "colors": [],
+      "type_line": "Legendary Planeswalker — Ugin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/64a5d494-efa1-446b-bebe-2ad36e154376.jpg?1761770162",
+        "normal": "https://cards.scryfall.io/normal/front/6/4/64a5d494-efa1-446b-bebe-2ad36e154376.jpg?1761770162"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Marang River Regent",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 3,
+      "tier_rating": "S",
+      "note": "Best non-mythic rare.",
+      "id": "f890bdc7-32e6-4492-bac7-7cabf54a8bfd",
+      "scryfall_uri": "https://scryfall.com/card/tdm/51/marang-river-regent-coil-and-catch",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Dragon // Instant — Omen",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f890bdc7-32e6-4492-bac7-7cabf54a8bfd.jpg?1764062994",
+        "normal": "https://cards.scryfall.io/normal/front/f/8/f890bdc7-32e6-4492-bac7-7cabf54a8bfd.jpg?1764062994"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Jeskai Revelation",
+      "color": "WUR",
+      "rarity": "Mythic",
+      "pick_order_rank": 5,
+      "tier_rating": "S",
+      "note": "Absurd win rate.",
+      "id": "3cac0ad3-5107-4ed6-a688-d44bbd65e407",
+      "scryfall_uri": "https://scryfall.com/card/tdm/196/jeskai-revelation",
+      "colors": [
+        "R",
+        "U",
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3cac0ad3-5107-4ed6-a688-d44bbd65e407.jpg?1743204770",
+        "normal": "https://cards.scryfall.io/normal/front/3/c/3cac0ad3-5107-4ed6-a688-d44bbd65e407.jpg?1743204770"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Ureni, the Song Unending",
+      "color": "URG",
+      "rarity": "Mythic",
+      "pick_order_rank": 6,
+      "tier_rating": "S",
+      "note": "\"Win the game\" effect.",
+      "id": "227802c0-4ff6-43a8-a850-ed0f546dc5ac",
+      "scryfall_uri": "https://scryfall.com/card/tdm/233/ureni-the-song-unending",
+      "colors": [
+        "G",
+        "R",
+        "U"
+      ],
+      "type_line": "Legendary Creature — Spirit Dragon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/2/227802c0-4ff6-43a8-a850-ed0f546dc5ac.jpg?1743204921",
+        "normal": "https://cards.scryfall.io/normal/front/2/2/227802c0-4ff6-43a8-a850-ed0f546dc5ac.jpg?1743204921"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Dragonback Assault",
+      "color": "URG",
+      "rarity": "Mythic",
+      "pick_order_rank": 4,
+      "tier_rating": "S",
+      "note": "Diet win condition.",
+      "id": "d54cc838-d79d-433a-99fb-d6e4d1c1431d",
+      "scryfall_uri": "https://scryfall.com/card/tdm/179/dragonback-assault",
+      "colors": [
+        "G",
+        "R",
+        "U"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/5/d54cc838-d79d-433a-99fb-d6e4d1c1431d.jpg?1743204697",
+        "normal": "https://cards.scryfall.io/normal/front/d/5/d54cc838-d79d-433a-99fb-d6e4d1c1431d.jpg?1743204697"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    },
+    {
+      "name": "Roar of Endless Song",
+      "color": "URG",
+      "rarity": "Rare",
+      "pick_order_rank": 8,
+      "tier_rating": "S",
+      "note": null,
+      "id": "7a9c3531-61a8-43f5-82a2-5166e5f5a6b9",
+      "scryfall_uri": "https://scryfall.com/card/tdm/220/roar-of-endless-song",
+      "colors": [
+        "G",
+        "R",
+        "U"
+      ],
+      "type_line": "Enchantment — Saga",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a9c3531-61a8-43f5-82a2-5166e5f5a6b9.jpg?1744577948",
+        "normal": "https://cards.scryfall.io/normal/front/7/a/7a9c3531-61a8-43f5-82a2-5166e5f5a6b9.jpg?1744577948"
+      },
+      "set": "tdm",
+      "set_name": "Tarkir: Dragonstorm"
+    }
+  ],
+  "general_tips": [
+    "Clan-specific payoffs often go late if the archetype isn't open — read signals before committing.",
+    "Behold commons are premium removal; draft them highly across colors.",
+    "Flurry is easier to trigger than initial predictions suggested — Jeskai card advantage scales.",
+    "Don't overvalue mobilize-specific payoffs; hybrid mana gives flexibility.",
+    "Two-color aggro decks punish greedy piles effectively — keep an eye on the metagame at your table.",
+    "Endure synergies work best with counter density.",
+    "Post-sideboard adjustments using cards like Riverwalk Technique help counter specific bombs."
+  ]
+}

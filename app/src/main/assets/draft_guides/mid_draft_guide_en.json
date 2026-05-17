@@ -1,0 +1,2173 @@
+{
+  "metadata": {
+    "set_name": "Innistrad: Midnight Hunt",
+    "set_code": "MID",
+    "source_url": "https://draftsim.com/mtg-mid-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "December 26, 2025"
+  },
+  "set_overview": {
+    "summary": "Midnight Hunt is a faster-paced Limited format with a lower mana curve than typical sets. The format features robust common removal, particularly in black, which significantly impacts deckbuilding decisions. Powerful rares exist but the set maintains a relatively balanced power level between rarities due to efficient answers.",
+    "color_ranking": [
+      "{U} Blue — Best color",
+      "{B} Black — Best removal density",
+      "{W} White / {G} Green — Solid pairs",
+      "{R} Red — Weakest color"
+    ],
+    "color_notes": {
+      "{U} Blue": "Best color overall. Organ Hoarder is among the strongest commons. Deep playable support across all archetypes.",
+      "{B} Black": "Best removal density at common; devastating against werewolves.",
+      "{W} White": "Solid creatures and removal; supports multiple archetypes.",
+      "{R} Red": "Weakest color. Underperforming werewolves and situational combat tricks become dead draws when behind.",
+      "{G} Green": "Lacks efficient common removal; relies on combat tricks and uncommons."
+    },
+    "key_gameplay_notes": [
+      "Stick to two colors in most cases; splash single-color bombs strategically.",
+      "Lower average mana curve than typical; flashback provides late-game utility.",
+      "Faster than average sets but control-focused decks perform equally.",
+      "Blue pairs exceptionally well across all color pairs; red combinations are generally weakest.",
+      "Substantial sideboard depth available — swap removal, upgrade creatures, and add hate cards."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Day / Night and Daybound / Nightbound",
+      "summary": "Persistent cycle tracked across the game. Daybound creatures enter flipped at night. Day becomes night when a player doesn't cast spells on their turn; night becomes day when a player casts two or more spells on their turn.",
+      "performance": "Anchors werewolves; passive global state for everyone.",
+      "key_examples": []
+    },
+    {
+      "name": "Disturb",
+      "summary": "Cast creatures with disturb from the graveyard in transformed form as flying spirits. Exclusive to Azorius with one exception.",
+      "performance": "Engine of Azorius Spirits.",
+      "key_examples": [
+        {
+          "name": "Lunarch Veteran",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 96,
+          "tier_rating": "B",
+          "note": null,
+          "id": "d2704743-2e23-40b9-a367-c73d2db45afc",
+          "scryfall_uri": "https://scryfall.com/card/mid/27/lunarch-veteran-luminous-phantom",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Cleric // Creature — Spirit Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/2/d2704743-2e23-40b9-a367-c73d2db45afc.jpg?1634347175",
+            "normal": "https://cards.scryfall.io/normal/front/d/2/d2704743-2e23-40b9-a367-c73d2db45afc.jpg?1634347175"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        },
+        {
+          "name": "Baithook Angler",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 126,
+          "tier_rating": "C",
+          "note": null,
+          "id": "36e71d16-0964-489d-bea2-9cec7991fc99",
+          "scryfall_uri": "https://scryfall.com/card/mid/42/baithook-angler-hook-haunt-drifter",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Human Peasant // Creature — Spirit",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/6/36e71d16-0964-489d-bea2-9cec7991fc99.jpg?1634347296",
+            "normal": "https://cards.scryfall.io/normal/front/3/6/36e71d16-0964-489d-bea2-9cec7991fc99.jpg?1634347296"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        },
+        {
+          "name": "Mourning Patrol",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 164,
+          "tier_rating": "C",
+          "note": null,
+          "id": "2d3687e2-09e0-4753-aa02-88a19bde3330",
+          "scryfall_uri": "https://scryfall.com/card/mid/28/mourning-patrol-morning-apparition",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier // Creature — Spirit Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d3687e2-09e0-4753-aa02-88a19bde3330.jpg?1634347239",
+            "normal": "https://cards.scryfall.io/normal/front/2/d/2d3687e2-09e0-4753-aa02-88a19bde3330.jpg?1634347239"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        },
+        {
+          "name": "Devoted Grafkeeper",
+          "color": "WU",
+          "rarity": "Uncommon",
+          "pick_order_rank": 93,
+          "tier_rating": "B",
+          "note": null,
+          "id": "965e6bd5-dc32-406c-bc99-ceb15be4d3f2",
+          "scryfall_uri": "https://scryfall.com/card/mid/218/devoted-grafkeeper-departed-soulkeeper",
+          "colors": [
+            "U",
+            "W"
+          ],
+          "type_line": "Creature — Human Peasant // Creature — Spirit",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/965e6bd5-dc32-406c-bc99-ceb15be4d3f2.jpg?1739650209",
+            "normal": "https://cards.scryfall.io/normal/front/9/6/965e6bd5-dc32-406c-bc99-ceb15be4d3f2.jpg?1739650209"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        }
+      ]
+    },
+    {
+      "name": "Coven",
+      "summary": "Reward mechanic requiring three or more creatures with different power values. Exclusive to Selesnya.",
+      "performance": "Defines Selesnya Coven.",
+      "key_examples": [
+        {
+          "name": "Gavony Silversmith",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 108,
+          "tier_rating": "C",
+          "note": null,
+          "id": "2c53b007-96aa-4db6-8c3e-529d1e845b19",
+          "scryfall_uri": "https://scryfall.com/card/mid/21/gavony-silversmith",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173",
+            "normal": "https://cards.scryfall.io/normal/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        },
+        {
+          "name": "Gavony Trapper",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 140,
+          "tier_rating": "C",
+          "note": null,
+          "id": "5a1309ea-4411-4116-841f-5aef8611400c",
+          "scryfall_uri": "https://scryfall.com/card/mid/22/gavony-trapper",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a1309ea-4411-4116-841f-5aef8611400c.jpg?1634348201",
+            "normal": "https://cards.scryfall.io/normal/front/5/a/5a1309ea-4411-4116-841f-5aef8611400c.jpg?1634348201"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        },
+        {
+          "name": "Dawnhart Wardens",
+          "color": "WG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 81,
+          "tier_rating": "B",
+          "note": null,
+          "id": "7eb2f0a7-f3a6-4487-b847-4ef26ad5ecad",
+          "scryfall_uri": "https://scryfall.com/card/mid/216/dawnhart-wardens",
+          "colors": [
+            "G",
+            "W"
+          ],
+          "type_line": "Creature — Human Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7eb2f0a7-f3a6-4487-b847-4ef26ad5ecad.jpg?1636683941",
+            "normal": "https://cards.scryfall.io/normal/front/7/e/7eb2f0a7-f3a6-4487-b847-4ef26ad5ecad.jpg?1636683941"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        }
+      ]
+    },
+    {
+      "name": "Decayed",
+      "summary": "Keyword on zombie tokens. Creatures with decayed can't block and sacrifice after attacking. Fairly costed in reality.",
+      "performance": "Core to Dimir Zombies tokens.",
+      "key_examples": []
+    },
+    {
+      "name": "Flashback",
+      "summary": "Returning mechanic — cast from graveyard by paying flashback cost. Appears at common in every color and uncommon in each pair.",
+      "performance": "Primary mana flood outlet; limited graveyard hate makes it reliable.",
+      "key_examples": []
+    },
+    {
+      "name": "Investigate",
+      "summary": "Returning mechanic — create Clue tokens. Mana sink and card draw outlet.",
+      "performance": "Sparingly featured (5 cards total, 3 rare).",
+      "key_examples": []
+    },
+    {
+      "name": "Curse Cycle",
+      "summary": "Four rare player-targeting auras. Only Curse of Leeches rates as playable; others are essentially unplayable.",
+      "performance": "Mostly unplayable.",
+      "key_examples": [
+        {
+          "name": "Curse of Leeches",
+          "color": "B",
+          "rarity": "Rare",
+          "pick_order_rank": 143,
+          "tier_rating": "C",
+          "note": null,
+          "id": "0a3c8532-92f5-41db-92b4-a871aa05e0c7",
+          "scryfall_uri": "https://scryfall.com/card/mid/94/curse-of-leeches-leeching-lurker",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment — Aura Curse // Creature — Leech Horror",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0a3c8532-92f5-41db-92b4-a871aa05e0c7.jpg?1634347802",
+            "normal": "https://cards.scryfall.io/normal/front/0/a/0a3c8532-92f5-41db-92b4-a871aa05e0c7.jpg?1634347802"
+          },
+          "set": "mid",
+          "set_name": "Innistrad: Midnight Hunt"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Spirits",
+        "tier": "Tier 1 (48%+ win rate)",
+        "strategy": "Grindy archetype leveraging disturb creatures and flying pressure. Ground-based curve filler becomes aerial threats post-board.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Dennick, Pious Apprentice",
+            "color": "WU",
+            "rarity": "Rare",
+            "pick_order_rank": 23,
+            "tier_rating": "A",
+            "note": null,
+            "id": "35cf2d72-931f-47b1-a1b4-916f0383551a",
+            "scryfall_uri": "https://scryfall.com/card/mid/217/dennick-pious-apprentice-dennick-pious-apparition",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Soldier // Legendary Creature — Spirit Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35cf2d72-931f-47b1-a1b4-916f0383551a.jpg?1636683976",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/35cf2d72-931f-47b1-a1b4-916f0383551a.jpg?1636683976"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Organ Hoarder",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 55,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9716d384-88d1-415e-882f-7fed9be1adc6",
+            "scryfall_uri": "https://scryfall.com/card/mid/66/organ-hoarder",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Lunarch Veteran",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 96,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d2704743-2e23-40b9-a367-c73d2db45afc",
+            "scryfall_uri": "https://scryfall.com/card/mid/27/lunarch-veteran-luminous-phantom",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Cleric // Creature — Spirit Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/2/d2704743-2e23-40b9-a367-c73d2db45afc.jpg?1634347175",
+              "normal": "https://cards.scryfall.io/normal/front/d/2/d2704743-2e23-40b9-a367-c73d2db45afc.jpg?1634347175"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Shipwreck Sifters",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 156,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8f295833-a83e-4b18-8007-c7f5d78e5624",
+            "scryfall_uri": "https://scryfall.com/card/mid/74/shipwreck-sifters",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8f295833-a83e-4b18-8007-c7f5d78e5624.jpg?1634349252",
+              "normal": "https://cards.scryfall.io/normal/front/8/f/8f295833-a83e-4b18-8007-c7f5d78e5624.jpg?1634349252"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Baithook Angler",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 126,
+            "tier_rating": "C",
+            "note": null,
+            "id": "36e71d16-0964-489d-bea2-9cec7991fc99",
+            "scryfall_uri": "https://scryfall.com/card/mid/42/baithook-angler-hook-haunt-drifter",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Peasant // Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/6/36e71d16-0964-489d-bea2-9cec7991fc99.jpg?1634347296",
+              "normal": "https://cards.scryfall.io/normal/front/3/6/36e71d16-0964-489d-bea2-9cec7991fc99.jpg?1634347296"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Mourning Patrol",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 164,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2d3687e2-09e0-4753-aa02-88a19bde3330",
+            "scryfall_uri": "https://scryfall.com/card/mid/28/mourning-patrol-morning-apparition",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier // Creature — Spirit Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d3687e2-09e0-4753-aa02-88a19bde3330.jpg?1634347239",
+              "normal": "https://cards.scryfall.io/normal/front/2/d/2d3687e2-09e0-4753-aa02-88a19bde3330.jpg?1634347239"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Patrician Geist",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 109,
+            "tier_rating": "C",
+            "note": null,
+            "id": "de2b0c63-c929-42ec-aada-dddb2a26550c",
+            "scryfall_uri": "https://scryfall.com/card/mid/69/patrician-geist",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/de2b0c63-c929-42ec-aada-dddb2a26550c.jpg?1634349157",
+              "normal": "https://cards.scryfall.io/normal/front/d/e/de2b0c63-c929-42ec-aada-dddb2a26550c.jpg?1634349157"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Devoted Grafkeeper",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 93,
+            "tier_rating": "B",
+            "note": null,
+            "id": "965e6bd5-dc32-406c-bc99-ceb15be4d3f2",
+            "scryfall_uri": "https://scryfall.com/card/mid/218/devoted-grafkeeper-departed-soulkeeper",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Human Peasant // Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/965e6bd5-dc32-406c-bc99-ceb15be4d3f2.jpg?1739650209",
+              "normal": "https://cards.scryfall.io/normal/front/9/6/965e6bd5-dc32-406c-bc99-ceb15be4d3f2.jpg?1739650209"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Zombies",
+        "tier": "Tier 1 (58%+ win rate)",
+        "strategy": "Accumulates decayed tokens through gameplay, sacrificing for value payoffs. Less dependent on high-rarity cards.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Skaab Wrangler",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 58,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9771d9e8-97d5-44af-8612-dc5c44d65ceb",
+            "scryfall_uri": "https://scryfall.com/card/mid/75/skaab-wrangler",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/9771d9e8-97d5-44af-8612-dc5c44d65ceb.jpg?1634349275",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/9771d9e8-97d5-44af-8612-dc5c44d65ceb.jpg?1634349275"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Organ Hoarder",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 55,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9716d384-88d1-415e-882f-7fed9be1adc6",
+            "scryfall_uri": "https://scryfall.com/card/mid/66/organ-hoarder",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Siege Zombie",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 111,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d94b5270-840b-4905-815a-057029d7352f",
+            "scryfall_uri": "https://scryfall.com/card/mid/121/siege-zombie",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/9/d94b5270-840b-4905-815a-057029d7352f.jpg?1634350240",
+              "normal": "https://cards.scryfall.io/normal/front/d/9/d94b5270-840b-4905-815a-057029d7352f.jpg?1634350240"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Larder Zombie",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 133,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a7c0dcac-f3d4-4d6e-9c6e-9295bb1cd47f",
+            "scryfall_uri": "https://scryfall.com/card/mid/58/larder-zombie",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/7/a7c0dcac-f3d4-4d6e-9c6e-9295bb1cd47f.jpg?1665819571",
+              "normal": "https://cards.scryfall.io/normal/front/a/7/a7c0dcac-f3d4-4d6e-9c6e-9295bb1cd47f.jpg?1665819571"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Eaten Alive",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 102,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e7975a3c-570a-4bff-a60d-d274f758b93f",
+            "scryfall_uri": "https://scryfall.com/card/mid/99/eaten-alive",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7975a3c-570a-4bff-a60d-d274f758b93f.jpg?1634349790",
+              "normal": "https://cards.scryfall.io/normal/front/e/7/e7975a3c-570a-4bff-a60d-d274f758b93f.jpg?1634349790"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Ecstatic Awakener",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 95,
+            "tier_rating": "B",
+            "note": null,
+            "id": "bbdad18e-e262-41f9-b252-1cbdcdd1b5f9",
+            "scryfall_uri": "https://scryfall.com/card/mid/100/ecstatic-awakener-awoken-demon",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Wizard // Creature — Demon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbdad18e-e262-41f9-b252-1cbdcdd1b5f9.jpg?1646412434",
+              "normal": "https://cards.scryfall.io/normal/front/b/b/bbdad18e-e262-41f9-b252-1cbdcdd1b5f9.jpg?1646412434"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Bladestitched Skaab",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 54,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b8a73f77-aab5-47e3-bfc1-97f6374f40fc",
+            "scryfall_uri": "https://scryfall.com/card/mid/212/bladestitched-skaab",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Zombie Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b8a73f77-aab5-47e3-bfc1-97f6374f40fc.jpg?1636683786",
+              "normal": "https://cards.scryfall.io/normal/front/b/8/b8a73f77-aab5-47e3-bfc1-97f6374f40fc.jpg?1636683786"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Corpse Cobble",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 150,
+            "tier_rating": "C",
+            "note": null,
+            "id": "dfe4f48d-179a-47d7-aed6-9751dd2f7d8c",
+            "scryfall_uri": "https://scryfall.com/card/mid/214/corpse-cobble",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/f/dfe4f48d-179a-47d7-aed6-9751dd2f7d8c.jpg?1636683863",
+              "normal": "https://cards.scryfall.io/normal/front/d/f/dfe4f48d-179a-47d7-aed6-9751dd2f7d8c.jpg?1636683863"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Flashback",
+        "tier": "Tier 1 (58%+ win rate)",
+        "strategy": "Ranges from pure durdle to efficient creature piles. Self-mill fuels flashback and graveyard payoffs. Most splash-friendly pair.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Rootcoil Creeper",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "3743cf9c-226f-43a3-b385-375a25414792",
+            "scryfall_uri": "https://scryfall.com/card/mid/238/rootcoil-creeper",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Plant Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/3743cf9c-226f-43a3-b385-375a25414792.jpg?1636684840",
+              "normal": "https://cards.scryfall.io/normal/front/3/7/3743cf9c-226f-43a3-b385-375a25414792.jpg?1636684840"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Organ Hoarder",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 55,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9716d384-88d1-415e-882f-7fed9be1adc6",
+            "scryfall_uri": "https://scryfall.com/card/mid/66/organ-hoarder",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Eccentric Farmer",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 73,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b5339f6e-9ed7-4734-91c9-c2ed59ca1052",
+            "scryfall_uri": "https://scryfall.com/card/mid/185/eccentric-farmer",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Peasant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5339f6e-9ed7-4734-91c9-c2ed59ca1052.jpg?1636224326",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b5339f6e-9ed7-4734-91c9-c2ed59ca1052.jpg?1636224326"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Shadowbeast Sighting",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 91,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1b12e978-4deb-4ccc-8ae6-462bc4598c90",
+            "scryfall_uri": "https://scryfall.com/card/mid/198/shadowbeast-sighting",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b12e978-4deb-4ccc-8ae6-462bc4598c90.jpg?1636224740",
+              "normal": "https://cards.scryfall.io/normal/front/1/b/1b12e978-4deb-4ccc-8ae6-462bc4598c90.jpg?1636224740"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Slogurk, the Overslime",
+            "color": "UG",
+            "rarity": "Rare",
+            "pick_order_rank": 47,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f94e888b-6eeb-4ef3-ab21-5ed2bf0036a3",
+            "scryfall_uri": "https://scryfall.com/card/mid/242/slogurk-the-overslime",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Ooze",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/9/f94e888b-6eeb-4ef3-ab21-5ed2bf0036a3.jpg?1637114233",
+              "normal": "https://cards.scryfall.io/normal/front/f/9/f94e888b-6eeb-4ef3-ab21-5ed2bf0036a3.jpg?1637114233"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Winterthorn Blessing",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 137,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f1e9edd3-151d-4bf6-b491-03db9db32234",
+            "scryfall_uri": "https://scryfall.com/card/mid/251/winterthorn-blessing",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f1e9edd3-151d-4bf6-b491-03db9db32234.jpg?1637114483",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f1e9edd3-151d-4bf6-b491-03db9db32234.jpg?1637114483"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Coven / Humans",
+        "tier": "Tier 2",
+        "strategy": "Aggressive creature-heavy deck maximizing coven synergies. Humans theme is present but lacks common payoffs.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Dawnhart Wardens",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 81,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7eb2f0a7-f3a6-4487-b847-4ef26ad5ecad",
+            "scryfall_uri": "https://scryfall.com/card/mid/216/dawnhart-wardens",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7eb2f0a7-f3a6-4487-b847-4ef26ad5ecad.jpg?1636683941",
+              "normal": "https://cards.scryfall.io/normal/front/7/e/7eb2f0a7-f3a6-4487-b847-4ef26ad5ecad.jpg?1636683941"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Gavony Silversmith",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 108,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2c53b007-96aa-4db6-8c3e-529d1e845b19",
+            "scryfall_uri": "https://scryfall.com/card/mid/21/gavony-silversmith",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173",
+              "normal": "https://cards.scryfall.io/normal/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Gavony Trapper",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 140,
+            "tier_rating": "C",
+            "note": null,
+            "id": "5a1309ea-4411-4116-841f-5aef8611400c",
+            "scryfall_uri": "https://scryfall.com/card/mid/22/gavony-trapper",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a1309ea-4411-4116-841f-5aef8611400c.jpg?1634348201",
+              "normal": "https://cards.scryfall.io/normal/front/5/a/5a1309ea-4411-4116-841f-5aef8611400c.jpg?1634348201"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Duel for Dominance",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 136,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9bb0a0c8-158e-4a6f-976e-3de9f57c3463",
+            "scryfall_uri": "https://scryfall.com/card/mid/184/duel-for-dominance",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9bb0a0c8-158e-4a6f-976e-3de9f57c3463.jpg?1636224300",
+              "normal": "https://cards.scryfall.io/normal/front/9/b/9bb0a0c8-158e-4a6f-976e-3de9f57c3463.jpg?1636224300"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Timberland Guide",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 189,
+            "tier_rating": "D",
+            "note": null,
+            "id": "6b215b6a-82e3-4ce8-b288-d7341761cad0",
+            "scryfall_uri": "https://scryfall.com/card/mid/202/timberland-guide",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6b215b6a-82e3-4ce8-b288-d7341761cad0.jpg?1636224841",
+              "normal": "https://cards.scryfall.io/normal/front/6/b/6b215b6a-82e3-4ce8-b288-d7341761cad0.jpg?1636224841"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Candlegrove Witch",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 172,
+            "tier_rating": "C",
+            "note": null,
+            "id": "dedfe6ea-cd43-4ec4-83a1-1f0f74e27f56",
+            "scryfall_uri": "https://scryfall.com/card/mid/8/candlegrove-witch",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/dedfe6ea-cd43-4ec4-83a1-1f0f74e27f56.jpg?1634346614",
+              "normal": "https://cards.scryfall.io/normal/front/d/e/dedfe6ea-cd43-4ec4-83a1-1f0f74e27f56.jpg?1634346614"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Sigarda, Champion of Light",
+            "color": "WG",
+            "rarity": "Mythic",
+            "pick_order_rank": 4,
+            "tier_rating": "S",
+            "note": null,
+            "id": "5c6cf357-c231-4512-aa9a-ab4a60007136",
+            "scryfall_uri": "https://scryfall.com/card/mid/240/sigarda-champion-of-light",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Angel",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c6cf357-c231-4512-aa9a-ab4a60007136.jpg?1636684917",
+              "normal": "https://cards.scryfall.io/normal/front/5/c/5c6cf357-c231-4512-aa9a-ab4a60007136.jpg?1636684917"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Katilda, Dawnhart Prime",
+            "color": "WG",
+            "rarity": "Rare",
+            "pick_order_rank": 29,
+            "tier_rating": "A",
+            "note": null,
+            "id": "673cd775-d417-4652-a91d-825ad5c89e8a",
+            "scryfall_uri": "https://scryfall.com/card/mid/230/katilda-dawnhart-prime",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/673cd775-d417-4652-a91d-825ad5c89e8a.jpg?1636684486",
+              "normal": "https://cards.scryfall.io/normal/front/6/7/673cd775-d417-4652-a91d-825ad5c89e8a.jpg?1636684486"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Sacrifice",
+        "tier": "Tier 2",
+        "strategy": "Midrange sacrificial synergy deck. Accumulates small creatures and tokens, sacrificing for incremental value.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Fleshtaker",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 82,
+            "tier_rating": "B",
+            "note": null,
+            "id": "2ed8c0ef-2b53-49b5-bc2f-428628cb3975",
+            "scryfall_uri": "https://scryfall.com/card/mid/222/fleshtaker",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Human Assassin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/e/2ed8c0ef-2b53-49b5-bc2f-428628cb3975.jpg?1636684197",
+              "normal": "https://cards.scryfall.io/normal/front/2/e/2ed8c0ef-2b53-49b5-bc2f-428628cb3975.jpg?1636684197"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Novice Occultist",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 192,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a541ac79-a969-42b4-b989-f6e37572ec90",
+            "scryfall_uri": "https://scryfall.com/card/mid/117/novice-occultist",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a541ac79-a969-42b4-b989-f6e37572ec90.jpg?1634350136",
+              "normal": "https://cards.scryfall.io/normal/front/a/5/a541ac79-a969-42b4-b989-f6e37572ec90.jpg?1634350136"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Ecstatic Awakener",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 95,
+            "tier_rating": "B",
+            "note": null,
+            "id": "bbdad18e-e262-41f9-b252-1cbdcdd1b5f9",
+            "scryfall_uri": "https://scryfall.com/card/mid/100/ecstatic-awakener-awoken-demon",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Wizard // Creature — Demon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbdad18e-e262-41f9-b252-1cbdcdd1b5f9.jpg?1646412434",
+              "normal": "https://cards.scryfall.io/normal/front/b/b/bbdad18e-e262-41f9-b252-1cbdcdd1b5f9.jpg?1646412434"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Eaten Alive",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 102,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e7975a3c-570a-4bff-a60d-d274f758b93f",
+            "scryfall_uri": "https://scryfall.com/card/mid/99/eaten-alive",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7975a3c-570a-4bff-a60d-d274f758b93f.jpg?1634349790",
+              "normal": "https://cards.scryfall.io/normal/front/e/7/e7975a3c-570a-4bff-a60d-d274f758b93f.jpg?1634349790"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Gavony Silversmith",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 108,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2c53b007-96aa-4db6-8c3e-529d1e845b19",
+            "scryfall_uri": "https://scryfall.com/card/mid/21/gavony-silversmith",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173",
+              "normal": "https://cards.scryfall.io/normal/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Search Party Captain",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 123,
+            "tier_rating": "C",
+            "note": null,
+            "id": "cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964",
+            "scryfall_uri": "https://scryfall.com/card/mid/32/search-party-captain",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/b/cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964.jpg?1634348412",
+              "normal": "https://cards.scryfall.io/normal/front/c/b/cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964.jpg?1634348412"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Liesa, Forgotten Archangel",
+            "color": "WB",
+            "rarity": "Rare",
+            "pick_order_rank": 5,
+            "tier_rating": "S",
+            "note": null,
+            "id": "532fca6b-f788-43f8-b29f-7273e7a48449",
+            "scryfall_uri": "https://scryfall.com/card/mid/232/liesa-forgotten-archangel",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Angel",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/3/532fca6b-f788-43f8-b29f-7273e7a48449.jpg?1636684609",
+              "normal": "https://cards.scryfall.io/normal/front/5/3/532fca6b-f788-43f8-b29f-7273e7a48449.jpg?1636684609"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Rite of Oblivion",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 89,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fe1f8d52-565e-4900-8357-fd29f2022dc1",
+            "scryfall_uri": "https://scryfall.com/card/mid/237/rite-of-oblivion",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe1f8d52-565e-4900-8357-fd29f2022dc1.jpg?1636684799",
+              "normal": "https://cards.scryfall.io/normal/front/f/e/fe1f8d52-565e-4900-8357-fd29f2022dc1.jpg?1636684799"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Vampires",
+        "tier": "Tier 2",
+        "strategy": "Aggressive strategy leveraging \"life loss matters\" payoffs. Pressures opponent while enabling recursive effects.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Vampire Socialite",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f07cbf04-2864-4407-800e-4d55c10d3426",
+            "scryfall_uri": "https://scryfall.com/card/mid/249/vampire-socialite",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Creature — Vampire Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f07cbf04-2864-4407-800e-4d55c10d3426.jpg?1637114433",
+              "normal": "https://cards.scryfall.io/normal/front/f/0/f07cbf04-2864-4407-800e-4d55c10d3426.jpg?1637114433"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Vampire Interloper",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 121,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c3e2ea59-36f1-4e95-bfe8-7008b085194f",
+            "scryfall_uri": "https://scryfall.com/card/mid/125/vampire-interloper",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3e2ea59-36f1-4e95-bfe8-7008b085194f.jpg?1634350330",
+              "normal": "https://cards.scryfall.io/normal/front/c/3/c3e2ea59-36f1-4e95-bfe8-7008b085194f.jpg?1634350330"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Voldaren Stinger",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 190,
+            "tier_rating": "D",
+            "note": null,
+            "id": "f27a7c78-3a64-42fc-8808-15b1f41976a1",
+            "scryfall_uri": "https://scryfall.com/card/mid/167/voldaren-stinger",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Vampire Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f27a7c78-3a64-42fc-8808-15b1f41976a1.jpg?1636223805",
+              "normal": "https://cards.scryfall.io/normal/front/f/2/f27a7c78-3a64-42fc-8808-15b1f41976a1.jpg?1636223805"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Neonate's Rush",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 179,
+            "tier_rating": "C",
+            "note": null,
+            "id": "dee17e12-e08f-4449-9f49-05f20e0d1670",
+            "scryfall_uri": "https://scryfall.com/card/mid/151/neonates-rush",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/dee17e12-e08f-4449-9f49-05f20e0d1670.jpg?1636223275",
+              "normal": "https://cards.scryfall.io/normal/front/d/e/dee17e12-e08f-4449-9f49-05f20e0d1670.jpg?1636223275"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Florian, Voldaren Scion",
+            "color": "BR",
+            "rarity": "Rare",
+            "pick_order_rank": 13,
+            "tier_rating": "S",
+            "note": null,
+            "id": "53289e69-74da-46d2-91c2-a11378ba76ef",
+            "scryfall_uri": "https://scryfall.com/card/mid/223/florian-voldaren-scion",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Vampire Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/3/53289e69-74da-46d2-91c2-a11378ba76ef.jpg?1636684231",
+              "normal": "https://cards.scryfall.io/normal/front/5/3/53289e69-74da-46d2-91c2-a11378ba76ef.jpg?1636684231"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Hungry for More",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 134,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ce09c0df-d022-4ebf-8f7f-8a913249e75f",
+            "scryfall_uri": "https://scryfall.com/card/mid/228/hungry-for-more",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/ce09c0df-d022-4ebf-8f7f-8a913249e75f.jpg?1636684429",
+              "normal": "https://cards.scryfall.io/normal/front/c/e/ce09c0df-d022-4ebf-8f7f-8a913249e75f.jpg?1636684429"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Day/Night Aggro",
+        "tier": "Tier 3",
+        "strategy": "Most aggressive archetype with typical Boros limitations (card disadvantage, weak late game). Day/Night provides a unique angle.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Moonrager's Slash",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 59,
+            "tier_rating": "B",
+            "note": null,
+            "id": "eb4f266b-c41c-4047-ae6f-b2226c7459e8",
+            "scryfall_uri": "https://scryfall.com/card/mid/148/moonragers-slash",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/b/eb4f266b-c41c-4047-ae6f-b2226c7459e8.jpg?1636223196",
+              "normal": "https://cards.scryfall.io/normal/front/e/b/eb4f266b-c41c-4047-ae6f-b2226c7459e8.jpg?1636223196"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Gavony Silversmith",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 108,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2c53b007-96aa-4db6-8c3e-529d1e845b19",
+            "scryfall_uri": "https://scryfall.com/card/mid/21/gavony-silversmith",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173",
+              "normal": "https://cards.scryfall.io/normal/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Search Party Captain",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 123,
+            "tier_rating": "C",
+            "note": null,
+            "id": "cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964",
+            "scryfall_uri": "https://scryfall.com/card/mid/32/search-party-captain",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/b/cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964.jpg?1634348412",
+              "normal": "https://cards.scryfall.io/normal/front/c/b/cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964.jpg?1634348412"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Lambholt Harrier",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 155,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e2a732ca-cd68-465f-8e44-783e1fe34e44",
+            "scryfall_uri": "https://scryfall.com/card/mid/145/lambholt-harrier",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Wolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e2a732ca-cd68-465f-8e44-783e1fe34e44.jpg?1636223126",
+              "normal": "https://cards.scryfall.io/normal/front/e/2/e2a732ca-cd68-465f-8e44-783e1fe34e44.jpg?1636223126"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Candlegrove Witch",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 172,
+            "tier_rating": "C",
+            "note": null,
+            "id": "dedfe6ea-cd43-4ec4-83a1-1f0f74e27f56",
+            "scryfall_uri": "https://scryfall.com/card/mid/8/candlegrove-witch",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/dedfe6ea-cd43-4ec4-83a1-1f0f74e27f56.jpg?1634346614",
+              "normal": "https://cards.scryfall.io/normal/front/d/e/dedfe6ea-cd43-4ec4-83a1-1f0f74e27f56.jpg?1634346614"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Angelfire Ignition",
+            "color": "WR",
+            "rarity": "Rare",
+            "pick_order_rank": 21,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8ba4c7a2-6243-43ed-8c1c-e3edee43a583",
+            "scryfall_uri": "https://scryfall.com/card/mid/209/angelfire-ignition",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/b/8ba4c7a2-6243-43ed-8c1c-e3edee43a583.jpg?1636225070",
+              "normal": "https://cards.scryfall.io/normal/front/8/b/8ba4c7a2-6243-43ed-8c1c-e3edee43a583.jpg?1636225070"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Sacred Fire",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 66,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c0b1dcd7-6dd9-4134-bc6c-9dc7754006a2",
+            "scryfall_uri": "https://scryfall.com/card/mid/239/sacred-fire",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0b1dcd7-6dd9-4134-bc6c-9dc7754006a2.jpg?1636684880",
+              "normal": "https://cards.scryfall.io/normal/front/c/0/c0b1dcd7-6dd9-4134-bc6c-9dc7754006a2.jpg?1636684880"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Morbid",
+        "tier": "Tier 3",
+        "strategy": "Clunky midrange deck with self-mill and morbid synergies. Simic is generally superior at a similar plan.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Eccentric Farmer",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 73,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b5339f6e-9ed7-4734-91c9-c2ed59ca1052",
+            "scryfall_uri": "https://scryfall.com/card/mid/185/eccentric-farmer",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Peasant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5339f6e-9ed7-4734-91c9-c2ed59ca1052.jpg?1636224326",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b5339f6e-9ed7-4734-91c9-c2ed59ca1052.jpg?1636224326"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Duel for Dominance",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 136,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9bb0a0c8-158e-4a6f-976e-3de9f57c3463",
+            "scryfall_uri": "https://scryfall.com/card/mid/184/duel-for-dominance",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9bb0a0c8-158e-4a6f-976e-3de9f57c3463.jpg?1636224300",
+              "normal": "https://cards.scryfall.io/normal/front/9/b/9bb0a0c8-158e-4a6f-976e-3de9f57c3463.jpg?1636224300"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Diregraf Horde",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 88,
+            "tier_rating": "B",
+            "note": null,
+            "id": "153be768-ddad-44f2-bcdd-c40353c807d7",
+            "scryfall_uri": "https://scryfall.com/card/mid/96/diregraf-horde",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/5/153be768-ddad-44f2-bcdd-c40353c807d7.jpg?1634349717",
+              "normal": "https://cards.scryfall.io/normal/front/1/5/153be768-ddad-44f2-bcdd-c40353c807d7.jpg?1634349717"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Shadowbeast Sighting",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 91,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1b12e978-4deb-4ccc-8ae6-462bc4598c90",
+            "scryfall_uri": "https://scryfall.com/card/mid/198/shadowbeast-sighting",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b12e978-4deb-4ccc-8ae6-462bc4598c90.jpg?1636224740",
+              "normal": "https://cards.scryfall.io/normal/front/1/b/1b12e978-4deb-4ccc-8ae6-462bc4598c90.jpg?1636224740"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Old Stickfingers",
+            "color": "BG",
+            "rarity": "Rare",
+            "pick_order_rank": 86,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b203be6f-c565-4d8f-b200-b537569a0292",
+            "scryfall_uri": "https://scryfall.com/card/mid/234/old-stickfingers",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Legendary Creature — Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b203be6f-c565-4d8f-b200-b537569a0292.jpg?1721690812",
+              "normal": "https://cards.scryfall.io/normal/front/b/2/b203be6f-c565-4d8f-b200-b537569a0292.jpg?1721690812"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          },
+          {
+            "name": "Diregraf Rebirth",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 64,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b51ed1ea-661e-49c6-9751-1eb7bb651bb1",
+            "scryfall_uri": "https://scryfall.com/card/mid/220/diregraf-rebirth",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b51ed1ea-661e-49c6-9751-1eb7bb651bb1.jpg?1636684125",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b51ed1ea-661e-49c6-9751-1eb7bb651bb1.jpg?1636684125"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Spells",
+        "tier": "Tier 3",
+        "strategy": "Spell-focused tempo or control variant. Clunky but functional with proper construction.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Moonrager's Slash",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 59,
+            "tier_rating": "B",
+            "note": null,
+            "id": "eb4f266b-c41c-4047-ae6f-b2226c7459e8",
+            "scryfall_uri": "https://scryfall.com/card/mid/148/moonragers-slash",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/b/eb4f266b-c41c-4047-ae6f-b2226c7459e8.jpg?1636223196",
+              "normal": "https://cards.scryfall.io/normal/front/e/b/eb4f266b-c41c-4047-ae6f-b2226c7459e8.jpg?1636223196"
+            },
+            "set": "mid",
+            "set_name": "Innistrad: Midnight Hunt"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Candletrap",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 131,
+        "tier_rating": "C",
+        "note": null,
+        "id": "32869a36-f21e-4348-a787-871daa6151df",
+        "scryfall_uri": "https://scryfall.com/card/mid/9/candletrap",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32869a36-f21e-4348-a787-871daa6151df.jpg?1634346639",
+          "normal": "https://cards.scryfall.io/normal/front/3/2/32869a36-f21e-4348-a787-871daa6151df.jpg?1634346639"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Sungold Barrage",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 209,
+        "tier_rating": "D",
+        "note": null,
+        "id": "ee507688-9890-47c4-bb04-43c51eb48e22",
+        "scryfall_uri": "https://scryfall.com/card/mid/36/sungold-barrage",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee507688-9890-47c4-bb04-43c51eb48e22.jpg?1634348527",
+          "normal": "https://cards.scryfall.io/normal/front/e/e/ee507688-9890-47c4-bb04-43c51eb48e22.jpg?1634348527"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Gavony Silversmith",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 108,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2c53b007-96aa-4db6-8c3e-529d1e845b19",
+        "scryfall_uri": "https://scryfall.com/card/mid/21/gavony-silversmith",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173",
+          "normal": "https://cards.scryfall.io/normal/front/2/c/2c53b007-96aa-4db6-8c3e-529d1e845b19.jpg?1634348173"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Search Party Captain",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 123,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964",
+        "scryfall_uri": "https://scryfall.com/card/mid/32/search-party-captain",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/b/cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964.jpg?1634348412",
+          "normal": "https://cards.scryfall.io/normal/front/c/b/cb9006c1-2e6f-4bca-a1c4-3cf2a8b6e964.jpg?1634348412"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Organ Hoarder",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 55,
+        "tier_rating": "B",
+        "note": "Arguably the best common in the set.",
+        "id": "9716d384-88d1-415e-882f-7fed9be1adc6",
+        "scryfall_uri": "https://scryfall.com/card/mid/66/organ-hoarder",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Zombie",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110",
+          "normal": "https://cards.scryfall.io/normal/front/9/7/9716d384-88d1-415e-882f-7fed9be1adc6.jpg?1634349110"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Shipwreck Sifters",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 156,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8f295833-a83e-4b18-8007-c7f5d78e5624",
+        "scryfall_uri": "https://scryfall.com/card/mid/74/shipwreck-sifters",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Spirit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8f295833-a83e-4b18-8007-c7f5d78e5624.jpg?1634349252",
+          "normal": "https://cards.scryfall.io/normal/front/8/f/8f295833-a83e-4b18-8007-c7f5d78e5624.jpg?1634349252"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Geistwave",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 194,
+        "tier_rating": "D",
+        "note": null,
+        "id": "f0e3d1ac-bec2-4bba-a6cf-a823996dde2d",
+        "scryfall_uri": "https://scryfall.com/card/mid/56/geistwave",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0e3d1ac-bec2-4bba-a6cf-a823996dde2d.jpg?1634348915",
+          "normal": "https://cards.scryfall.io/normal/front/f/0/f0e3d1ac-bec2-4bba-a6cf-a823996dde2d.jpg?1634348915"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Revenge of the Drowned",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 106,
+        "tier_rating": "C",
+        "note": null,
+        "id": "93be7d72-927a-40ce-8de4-04a3f21c134b",
+        "scryfall_uri": "https://scryfall.com/card/mid/72/revenge-of-the-drowned",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/3/93be7d72-927a-40ce-8de4-04a3f21c134b.jpg?1634349205",
+          "normal": "https://cards.scryfall.io/normal/front/9/3/93be7d72-927a-40ce-8de4-04a3f21c134b.jpg?1634349205"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Defenestrate",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 80,
+        "tier_rating": "B",
+        "note": null,
+        "id": "df3abdcc-83a8-45c3-9bfd-23f929705018",
+        "scryfall_uri": "https://scryfall.com/card/mid/95/defenestrate",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/f/df3abdcc-83a8-45c3-9bfd-23f929705018.jpg?1634349688",
+          "normal": "https://cards.scryfall.io/normal/front/d/f/df3abdcc-83a8-45c3-9bfd-23f929705018.jpg?1634349688"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Eaten Alive",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 102,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e7975a3c-570a-4bff-a60d-d274f758b93f",
+        "scryfall_uri": "https://scryfall.com/card/mid/99/eaten-alive",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7975a3c-570a-4bff-a60d-d274f758b93f.jpg?1634349790",
+          "normal": "https://cards.scryfall.io/normal/front/e/7/e7975a3c-570a-4bff-a60d-d274f758b93f.jpg?1634349790"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Olivia's Midnight Ambush",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "9c1adede-22ad-4c1c-9501-ad731fbe1742",
+        "scryfall_uri": "https://scryfall.com/card/mid/118/olivias-midnight-ambush",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9c1adede-22ad-4c1c-9501-ad731fbe1742.jpg?1634350180",
+          "normal": "https://cards.scryfall.io/normal/front/9/c/9c1adede-22ad-4c1c-9501-ad731fbe1742.jpg?1634350180"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Moonrager's Slash",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 59,
+        "tier_rating": "B",
+        "note": null,
+        "id": "eb4f266b-c41c-4047-ae6f-b2226c7459e8",
+        "scryfall_uri": "https://scryfall.com/card/mid/148/moonragers-slash",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/b/eb4f266b-c41c-4047-ae6f-b2226c7459e8.jpg?1636223196",
+          "normal": "https://cards.scryfall.io/normal/front/e/b/eb4f266b-c41c-4047-ae6f-b2226c7459e8.jpg?1636223196"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Burn the Accursed",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 120,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ff4d4e6b-564d-46da-8e32-09ed08c8ddc5",
+        "scryfall_uri": "https://scryfall.com/card/mid/132/burn-the-accursed",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ff4d4e6b-564d-46da-8e32-09ed08c8ddc5.jpg?1634350484",
+          "normal": "https://cards.scryfall.io/normal/front/f/f/ff4d4e6b-564d-46da-8e32-09ed08c8ddc5.jpg?1634350484"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Immolation",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 200,
+        "tier_rating": "D",
+        "note": null,
+        "id": "606b1148-4aa6-4d78-bedd-e31573282921",
+        "scryfall_uri": "https://scryfall.com/card/mid/144/immolation",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/0/606b1148-4aa6-4d78-bedd-e31573282921.jpg?1636223098",
+          "normal": "https://cards.scryfall.io/normal/front/6/0/606b1148-4aa6-4d78-bedd-e31573282921.jpg?1636223098"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Neonate's Rush",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 179,
+        "tier_rating": "C",
+        "note": null,
+        "id": "dee17e12-e08f-4449-9f49-05f20e0d1670",
+        "scryfall_uri": "https://scryfall.com/card/mid/151/neonates-rush",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/dee17e12-e08f-4449-9f49-05f20e0d1670.jpg?1636223275",
+          "normal": "https://cards.scryfall.io/normal/front/d/e/dee17e12-e08f-4449-9f49-05f20e0d1670.jpg?1636223275"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Eccentric Farmer",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 73,
+        "tier_rating": "B",
+        "note": null,
+        "id": "b5339f6e-9ed7-4734-91c9-c2ed59ca1052",
+        "scryfall_uri": "https://scryfall.com/card/mid/185/eccentric-farmer",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Peasant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5339f6e-9ed7-4734-91c9-c2ed59ca1052.jpg?1636224326",
+          "normal": "https://cards.scryfall.io/normal/front/b/5/b5339f6e-9ed7-4734-91c9-c2ed59ca1052.jpg?1636224326"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Duel for Dominance",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 136,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9bb0a0c8-158e-4a6f-976e-3de9f57c3463",
+        "scryfall_uri": "https://scryfall.com/card/mid/184/duel-for-dominance",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9bb0a0c8-158e-4a6f-976e-3de9f57c3463.jpg?1636224300",
+          "normal": "https://cards.scryfall.io/normal/front/9/b/9bb0a0c8-158e-4a6f-976e-3de9f57c3463.jpg?1636224300"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Plummet",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 258,
+        "tier_rating": "F",
+        "note": null,
+        "id": "5469e696-bbf1-43e3-9c25-fe089b36caed",
+        "scryfall_uri": "https://scryfall.com/card/mid/193/plummet",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/5469e696-bbf1-43e3-9c25-fe089b36caed.jpg?1636224615",
+          "normal": "https://cards.scryfall.io/normal/front/5/4/5469e696-bbf1-43e3-9c25-fe089b36caed.jpg?1636224615"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Dawnhart Rejuvenator",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 149,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cf4b5ad9-3de6-4d53-93a0-3b8d2e484687",
+        "scryfall_uri": "https://scryfall.com/card/mid/180/dawnhart-rejuvenator",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Warlock",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf4b5ad9-3de6-4d53-93a0-3b8d2e484687.jpg?1636224166",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cf4b5ad9-3de6-4d53-93a0-3b8d2e484687.jpg?1636224166"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      }
+    ]
+  },
+  "mana_fixing": {
+    "green_options": [
+      {
+        "name": "Dawnhart Rejuvenator",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 149,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cf4b5ad9-3de6-4d53-93a0-3b8d2e484687",
+        "scryfall_uri": "https://scryfall.com/card/mid/180/dawnhart-rejuvenator",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Warlock",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf4b5ad9-3de6-4d53-93a0-3b8d2e484687.jpg?1636224166",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cf4b5ad9-3de6-4d53-93a0-3b8d2e484687.jpg?1636224166"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Path to the Festival",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 211,
+        "tier_rating": "D",
+        "note": null,
+        "id": "153f545d-bdbf-42c7-837a-a7076bbe5027",
+        "scryfall_uri": "https://scryfall.com/card/mid/191/path-to-the-festival",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/5/153f545d-bdbf-42c7-837a-a7076bbe5027.jpg?1636224556",
+          "normal": "https://cards.scryfall.io/normal/front/1/5/153f545d-bdbf-42c7-837a-a7076bbe5027.jpg?1636224556"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Rootcoil Creeper",
+        "color": "UG",
+        "rarity": "Uncommon",
+        "pick_order_rank": 60,
+        "tier_rating": "B",
+        "note": null,
+        "id": "3743cf9c-226f-43a3-b385-375a25414792",
+        "scryfall_uri": "https://scryfall.com/card/mid/238/rootcoil-creeper",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Creature — Plant Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/3743cf9c-226f-43a3-b385-375a25414792.jpg?1636684840",
+          "normal": "https://cards.scryfall.io/normal/front/3/7/3743cf9c-226f-43a3-b385-375a25414792.jpg?1636684840"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      }
+    ],
+    "non_green_options": [
+      {
+        "name": "Jack-o'-Lantern",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 188,
+        "tier_rating": "D",
+        "note": null,
+        "id": "21b589ab-45a0-480a-a891-581c34f8a9bf",
+        "scryfall_uri": "https://scryfall.com/card/mid/254/jack-o-lantern",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/21b589ab-45a0-480a-a891-581c34f8a9bf.jpg?1637114561",
+          "normal": "https://cards.scryfall.io/normal/front/2/1/21b589ab-45a0-480a-a891-581c34f8a9bf.jpg?1637114561"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Crossroads Candleguide",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 226,
+        "tier_rating": "D",
+        "note": null,
+        "id": "5cad1524-9e75-47e0-b817-47110634802a",
+        "scryfall_uri": "https://scryfall.com/card/mid/253/crossroads-candleguide",
+        "colors": [],
+        "type_line": "Artifact Creature — Scarecrow",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5cad1524-9e75-47e0-b817-47110634802a.jpg?1637114536",
+          "normal": "https://cards.scryfall.io/normal/front/5/c/5cad1524-9e75-47e0-b817-47110634802a.jpg?1637114536"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      },
+      {
+        "name": "Evolving Wilds",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 139,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cb471f90-46f2-4037-87fc-f523fc9d004f",
+        "scryfall_uri": "https://scryfall.com/card/mid/261/evolving-wilds",
+        "colors": [],
+        "type_line": "Land",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/b/cb471f90-46f2-4037-87fc-f523fc9d004f.jpg?1637114771",
+          "normal": "https://cards.scryfall.io/normal/front/c/b/cb471f90-46f2-4037-87fc-f523fc9d004f.jpg?1637114771"
+        },
+        "set": "mid",
+        "set_name": "Innistrad: Midnight Hunt"
+      }
+    ]
+  },
+  "sideboard_cards": [
+    {
+      "name": "Plummet",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 258,
+      "tier_rating": "F",
+      "note": null,
+      "id": "5469e696-bbf1-43e3-9c25-fe089b36caed",
+      "scryfall_uri": "https://scryfall.com/card/mid/193/plummet",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/5469e696-bbf1-43e3-9c25-fe089b36caed.jpg?1636224615",
+        "normal": "https://cards.scryfall.io/normal/front/5/4/5469e696-bbf1-43e3-9c25-fe089b36caed.jpg?1636224615"
+      },
+      "set": "mid",
+      "set_name": "Innistrad: Midnight Hunt"
+    },
+    {
+      "name": "Thraben Exorcism",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 261,
+      "tier_rating": "F",
+      "note": null,
+      "id": "a0700298-30d2-45a6-bd64-4fd7fa4d7d30",
+      "scryfall_uri": "https://scryfall.com/card/mid/39/thraben-exorcism",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a0700298-30d2-45a6-bd64-4fd7fa4d7d30.jpg?1634348604",
+        "normal": "https://cards.scryfall.io/normal/front/a/0/a0700298-30d2-45a6-bd64-4fd7fa4d7d30.jpg?1634348604"
+      },
+      "set": "mid",
+      "set_name": "Innistrad: Midnight Hunt"
+    },
+    {
+      "name": "Duress",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 259,
+      "tier_rating": "F",
+      "note": null,
+      "id": "c0a72721-2a4a-4d48-a7b0-2370b90b8619",
+      "scryfall_uri": "https://scryfall.com/card/mid/98/duress",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0a72721-2a4a-4d48-a7b0-2370b90b8619.jpg?1634349768",
+        "normal": "https://cards.scryfall.io/normal/front/c/0/c0a72721-2a4a-4d48-a7b0-2370b90b8619.jpg?1634349768"
+      },
+      "set": "mid",
+      "set_name": "Innistrad: Midnight Hunt"
+    },
+    {
+      "name": "Return to Nature",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 257,
+      "tier_rating": "F",
+      "note": null,
+      "id": "6e25c252-4177-4193-914c-b6933d9c0d7d",
+      "scryfall_uri": "https://scryfall.com/card/mid/195/return-to-nature",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e25c252-4177-4193-914c-b6933d9c0d7d.jpg?1636224670",
+        "normal": "https://cards.scryfall.io/normal/front/6/e/6e25c252-4177-4193-914c-b6933d9c0d7d.jpg?1636224670"
+      },
+      "set": "mid",
+      "set_name": "Innistrad: Midnight Hunt"
+    },
+    {
+      "name": "Immolation",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 200,
+      "tier_rating": "D",
+      "note": null,
+      "id": "606b1148-4aa6-4d78-bedd-e31573282921",
+      "scryfall_uri": "https://scryfall.com/card/mid/144/immolation",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/0/606b1148-4aa6-4d78-bedd-e31573282921.jpg?1636223098",
+        "normal": "https://cards.scryfall.io/normal/front/6/0/606b1148-4aa6-4d78-bedd-e31573282921.jpg?1636223098"
+      },
+      "set": "mid",
+      "set_name": "Innistrad: Midnight Hunt"
+    },
+    {
+      "name": "Devious Cover-Up",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 242,
+      "tier_rating": "D",
+      "note": null,
+      "id": "648281fe-89fb-4d8d-b944-3af28fb044f6",
+      "scryfall_uri": "https://scryfall.com/card/mid/48/devious-cover-up",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/648281fe-89fb-4d8d-b944-3af28fb044f6.jpg?1634348751",
+        "normal": "https://cards.scryfall.io/normal/front/6/4/648281fe-89fb-4d8d-b944-3af28fb044f6.jpg?1634348751"
+      },
+      "set": "mid",
+      "set_name": "Innistrad: Midnight Hunt"
+    },
+    {
+      "name": "Rotten Reunion",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 240,
+      "tier_rating": "D",
+      "note": null,
+      "id": "97398ad2-675b-4a34-aab7-935dd6714f1c",
+      "scryfall_uri": "https://scryfall.com/card/mid/119/rotten-reunion",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97398ad2-675b-4a34-aab7-935dd6714f1c.jpg?1675567516",
+        "normal": "https://cards.scryfall.io/normal/front/9/7/97398ad2-675b-4a34-aab7-935dd6714f1c.jpg?1675567516"
+      },
+      "set": "mid",
+      "set_name": "Innistrad: Midnight Hunt"
+    }
+  ],
+  "general_tips": [
+    "Stick to two colors in most cases; splash single-color bombs strategically.",
+    "Lower average mana curve than typical sets — aggression scales well.",
+    "Flashback provides late-game utility despite the low curve.",
+    "Blue is the universal pair-up; red is the worst pair-up.",
+    "Sideboard aggressively in BO3 with removal swaps and hate inclusions."
+  ]
+}

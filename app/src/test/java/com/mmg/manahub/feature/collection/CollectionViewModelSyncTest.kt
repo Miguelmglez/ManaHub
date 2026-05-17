@@ -7,8 +7,8 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
-import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
 import com.mmg.manahub.core.sync.SyncResult
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
@@ -58,7 +58,6 @@ class CollectionViewModelSyncTest {
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val getCollection          = mockk<GetCollectionUseCase>()
-    private val removeCard             = mockk<RemoveCardUseCase>(relaxed = true)
     private val cardRepository         = mockk<CardRepository>(relaxed = true)
     private val userCardRepository     = mockk<UserCardRepository>(relaxed = true)
     private val authRepository         = mockk<AuthRepository>(relaxed = true)
@@ -104,7 +103,6 @@ class CollectionViewModelSyncTest {
 
     private fun buildViewModel(): CollectionViewModel = CollectionViewModel(
         getCollection          = getCollection,
-        removeCard             = removeCard,
         cardRepository         = cardRepository,
         userCardRepository     = userCardRepository,
         authRepository         = authRepository,

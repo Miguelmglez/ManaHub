@@ -108,14 +108,13 @@ class UserCardRepositoryImpl @Inject constructor(
     override fun observeByScryfallId(scryfallId: String, userId: String?): Flow<List<UserCard>> {
         // If caller passes an explicit userId, use it directly.
         // If null, follow the current session so logged-in users see their cards.
-        val resolvedFlow: Flow<List<UserCard>> = if (userId != null) {
+        return if (userId != null) {
             userCardCollectionDao.observeByScryfall(scryfallId, userId).map { it.toUserCards() }
         } else {
             currentUserIdFlow.flatMapLatest { resolvedId ->
                 userCardCollectionDao.observeByScryfall(scryfallId, resolvedId).map { it.toUserCards() }
             }
         }
-        return resolvedFlow
     }
 
     private fun List<UserCardCollectionEntity>.toUserCards() =

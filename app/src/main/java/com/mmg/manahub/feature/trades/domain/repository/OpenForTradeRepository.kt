@@ -10,11 +10,11 @@ interface OpenForTradeRepository {
     suspend fun addLocal(
         scryfallId: String,
         localCollectionId: String,
-        quantity: Int,
-        isFoil: Boolean,
-        condition: String,
-        language: String,
-        isAltArt: Boolean,
+        quantity: Int = 1,
+        isFoil: Boolean = false,
+        condition: String = "NM",
+        language: String = "en",
+        isAltArt: Boolean = false,
     ): Result<Unit>
     suspend fun removeByCollectionId(localCollectionId: String): Result<Unit>
     suspend fun removeLocal(id: String): Result<Unit>

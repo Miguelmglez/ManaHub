@@ -1,7 +1,5 @@
 package com.mmg.manahub.core.data.remote.mapper
 
-import com.mmg.manahub.core.data.local.entity.CardEntity
-import com.mmg.manahub.core.data.local.mapper.toEntityCard
 import com.mmg.manahub.core.data.remote.dto.CardDto
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardFace
@@ -47,9 +45,9 @@ fun CardDto.toDomain(): Card {
         isStale = false,
         staleReason = null,
         cachedAt = System.currentTimeMillis(),
-        printedName = printedName?:"",
-        printedText = printedText?:"",
-        printedTypeLine = printedTypeLine?:"",
+        printedName = printedName,
+        printedText = printedText,
+        printedTypeLine = printedTypeLine,
         relatedUris = relatedUris ?: emptyMap(),
         purchaseUris = purchaseUris ?: emptyMap(),
         gameChanger = gameChanger ?: false,
@@ -71,6 +69,4 @@ fun CardDto.toDomain(): Card {
     )
 }
 
-fun CardDto.toEntity(): CardEntity         = toDomain().toEntityCard()
-fun List<CardDto>.toDomain(): List<Card>   = map { it.toDomain() }
-fun List<CardDto>.toEntity(): List<CardEntity> = map { it.toEntity() }
+fun List<CardDto>.toDomain(): List<Card> = map { it.toDomain() }

@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.friends.presentation.detail
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -131,10 +132,7 @@ private fun TradesHistoryContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                horizontal = 16.dp,
-                vertical = 12.dp,
-            ),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         ) {
             items(tradeHistory, key = { it.id }) { proposal ->
                 TradeHistoryRow(proposal = proposal)

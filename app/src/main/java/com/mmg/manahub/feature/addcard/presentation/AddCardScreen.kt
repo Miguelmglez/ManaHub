@@ -26,7 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
@@ -124,7 +124,7 @@ fun AddCardScreen(
                 ) {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
-                            Icons.Default.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
@@ -192,8 +192,8 @@ fun AddCardScreen(
             if (showAdvancedSearch) {
                 AdvancedSearchSheet(
                     onDismiss = { showAdvancedSearch = false },
-                    onSearch = { query, rawQuery ->
-                        viewModel.onAdvancedQuerySearch(query, rawQuery)
+                    onSearch = { query, _ ->
+                        viewModel.onAdvancedQuerySearch(query)
                         showAdvancedSearch = false
                     },
                 )

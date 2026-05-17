@@ -1,0 +1,1427 @@
+{
+  "metadata": {
+    "set_name": "Dominaria United",
+    "set_code": "DMU",
+    "source_url": "https://draftsim.com/mtg-dmu-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "April 26, 2025"
+  },
+  "set_overview": {
+    "summary": "Dominaria United is a colorful and diverse set with a lot of depth, supporting multiple viable archetypes across two, three, or even five colors.",
+    "color_ranking": [
+      "Color balance is even — pair-driven format."
+    ],
+    "color_notes": {
+      "{W} White": "Primarily aggressive with tokens theme. Destroy Evil, Citizen's Arrest, Argivian Cavalier, Captain's Call, Take Up the Shield.",
+      "{U} Blue": "Versatile for control, tempo, and domain. Tolarian Geyser, Essence Scatter, Talas Lookout, Tolarian Terror, Shore Up.",
+      "{B} Black": "Grindiest color with strong 2-for-1 value. Extinguish the Light, Phyrexian Rager, Urborg Repossession, Tribute to Urborg, Eerie Soultender.",
+      "{R} Red": "Weakest standalone color for aggression. Meria's Outrider (sleeper common), Lightning Strike, Flowstone Infusion, Flowstone Kavu, Keldon Strike Team.",
+      "{G} Green": "Mana fixing specialist with domain support. Gaea's Might, Bite Down, Floriferous Vinewall, Sunbathing Rootwalla, Yavimaya Sojourner."
+    },
+    "key_gameplay_notes": [
+      "Domain requires careful mana base construction — walk a tightrope between dual lands and mana generation.",
+      "Kicker cards usually played for their kicked modes except for certain utility creatures.",
+      "Sagas underperform except three exceptions (Elder Dragon War, Weatherseed Treaty, Cruelty of Gix).",
+      "Green provides crucial mana fixing for multicolor strategies.",
+      "Red aggro struggles with a weak common creature base."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Kicker",
+      "summary": "Every kicker card functions as two cards in one. No card has a kicker cost of the same color as its base cost, requiring two-color pairs or mana fixing.",
+      "performance": "Universal value mechanic; flexible across all archetypes.",
+      "key_examples": []
+    },
+    {
+      "name": "Domain",
+      "summary": "Rewards controlling multiple basic land types. Two basics is baseline; more triggers additional payoffs.",
+      "performance": "Defines multicolor builds. Big rewards come from Herd Migration and similar cards.",
+      "key_examples": [
+        {
+          "name": "Herd Migration",
+          "color": "G",
+          "rarity": "Rare",
+          "pick_order_rank": 9,
+          "tier_rating": "A",
+          "note": null,
+          "id": "b0244a1f-e696-4223-9c14-22c2ca3cb738",
+          "scryfall_uri": "https://scryfall.com/card/dmu/165/herd-migration",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b0244a1f-e696-4223-9c14-22c2ca3cb738.jpg?1673307696",
+            "normal": "https://cards.scryfall.io/normal/front/b/0/b0244a1f-e696-4223-9c14-22c2ca3cb738.jpg?1673307696"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        },
+        {
+          "name": "Meria's Outrider",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 62,
+          "tier_rating": "B",
+          "note": null,
+          "id": "48aa964f-99b5-4b6b-b158-42f39514c910",
+          "scryfall_uri": "https://scryfall.com/card/dmu/138/merias-outrider",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Elf Archer",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/48aa964f-99b5-4b6b-b158-42f39514c910.jpg?1673307457",
+            "normal": "https://cards.scryfall.io/normal/front/4/8/48aa964f-99b5-4b6b-b158-42f39514c910.jpg?1673307457"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        },
+        {
+          "name": "Gaea's Might",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 108,
+          "tier_rating": "C",
+          "note": null,
+          "id": "89c46e9c-ae7c-466c-bb11-4f4d01ea7a63",
+          "scryfall_uri": "https://scryfall.com/card/dmu/164/gaeas-might",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89c46e9c-ae7c-466c-bb11-4f4d01ea7a63.jpg?1673307688",
+            "normal": "https://cards.scryfall.io/normal/front/8/9/89c46e9c-ae7c-466c-bb11-4f4d01ea7a63.jpg?1673307688"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        },
+        {
+          "name": "Sunbathing Rootwalla",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 112,
+          "tier_rating": "C",
+          "note": null,
+          "id": "7ae6f015-2ad6-4b8e-8590-c2c2d01b6d98",
+          "scryfall_uri": "https://scryfall.com/card/dmu/181/sunbathing-rootwalla",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Lizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7ae6f015-2ad6-4b8e-8590-c2c2d01b6d98.jpg?1673307812",
+            "normal": "https://cards.scryfall.io/normal/front/7/a/7ae6f015-2ad6-4b8e-8590-c2c2d01b6d98.jpg?1673307812"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        }
+      ]
+    },
+    {
+      "name": "Enlist",
+      "summary": "When this creature attacks, you may tap a non-attacking untapped creature you control to add its power to this one. Lets you attack into unfavorable boards.",
+      "performance": "Anchors Boros aggro.",
+      "key_examples": [
+        {
+          "name": "Guardian of New Benalia",
+          "color": "W",
+          "rarity": "Rare",
+          "pick_order_rank": 17,
+          "tier_rating": "A",
+          "note": "Easily the best enlist card in the set.",
+          "id": "43da76ee-fec3-4b2e-915d-10cf8d518d2c",
+          "scryfall_uri": "https://scryfall.com/card/dmu/19/guardian-of-new-benalia",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/43da76ee-fec3-4b2e-915d-10cf8d518d2c.jpg?1673306449",
+            "normal": "https://cards.scryfall.io/normal/front/4/3/43da76ee-fec3-4b2e-915d-10cf8d518d2c.jpg?1673306449"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        }
+      ]
+    },
+    {
+      "name": "Read Ahead (Sagas)",
+      "summary": "Sagas function as three cards in one by choosing the starting chapter. Only three sagas are rated excellent.",
+      "performance": "Most sagas underperform. Top three: The Elder Dragon War, The Weatherseed Treaty, The Cruelty of Gix.",
+      "key_examples": [
+        {
+          "name": "The Elder Dragon War",
+          "color": "R",
+          "rarity": "Rare",
+          "pick_order_rank": 13,
+          "tier_rating": "A",
+          "note": null,
+          "id": "0c52c7d4-a350-4518-8c9a-72cf7b14603d",
+          "scryfall_uri": "https://scryfall.com/card/dmu/121/the-elder-dragon-war",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment — Saga",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0c52c7d4-a350-4518-8c9a-72cf7b14603d.jpg?1673307316",
+            "normal": "https://cards.scryfall.io/normal/front/0/c/0c52c7d4-a350-4518-8c9a-72cf7b14603d.jpg?1673307316"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        },
+        {
+          "name": "The Weatherseed Treaty",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 49,
+          "tier_rating": "B",
+          "note": null,
+          "id": "e2a54461-1f75-4304-b6d7-635171419456",
+          "scryfall_uri": "https://scryfall.com/card/dmu/188/the-weatherseed-treaty",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment — Saga",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e2a54461-1f75-4304-b6d7-635171419456.jpg?1675812018",
+            "normal": "https://cards.scryfall.io/normal/front/e/2/e2a54461-1f75-4304-b6d7-635171419456.jpg?1675812018"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        },
+        {
+          "name": "The Cruelty of Gix",
+          "color": "B",
+          "rarity": "Rare",
+          "pick_order_rank": 15,
+          "tier_rating": "A",
+          "note": null,
+          "id": "3d6e5eb3-25ab-4e9e-96e8-655e0ce74675",
+          "scryfall_uri": "https://scryfall.com/card/dmu/87/the-cruelty-of-gix",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment — Saga",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d6e5eb3-25ab-4e9e-96e8-655e0ce74675.jpg?1673307042",
+            "normal": "https://cards.scryfall.io/normal/front/3/d/3d6e5eb3-25ab-4e9e-96e8-655e0ce74675.jpg?1673307042"
+          },
+          "set": "dmu",
+          "set_name": "Dominaria United"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "archetypes": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Tokens/Spells",
+        "strategy": "Go-wide tempo deck mixing tokens with instants/sorceries. Fliers, bounce, and token generators.",
+        "key_cards": [
+          {
+            "name": "Raff, Weatherlight Stalwart",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 42,
+            "tier_rating": "B",
+            "note": null,
+            "id": "cc0cba4c-d9f0-421f-acf4-ab1adcd59c80",
+            "scryfall_uri": "https://scryfall.com/card/dmu/212/raff-weatherlight-stalwart",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cc0cba4c-d9f0-421f-acf4-ab1adcd59c80.jpg?1673308039",
+              "normal": "https://cards.scryfall.io/normal/front/c/c/cc0cba4c-d9f0-421f-acf4-ab1adcd59c80.jpg?1673308039"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Prowess",
+        "strategy": "Aggressive spell-focused deck leveraging prowess creatures. Capable of sudden lethal damage.",
+        "key_cards": [
+          {
+            "name": "Balmor, Battlemage Captain",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 53,
+            "tier_rating": "B",
+            "note": null,
+            "id": "959ba62e-bb3a-49ad-8b1b-e787e413e5d4",
+            "scryfall_uri": "https://scryfall.com/card/dmu/196/balmor-battlemage-captain",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Bird Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/959ba62e-bb3a-49ad-8b1b-e787e413e5d4.jpg?1673307921",
+              "normal": "https://cards.scryfall.io/normal/front/9/5/959ba62e-bb3a-49ad-8b1b-e787e413e5d4.jpg?1673307921"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          },
+          {
+            "name": "Lightning Strike",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 59,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d",
+            "scryfall_uri": "https://scryfall.com/card/dmu/137/lightning-strike",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d.jpg?1673307449",
+              "normal": "https://cards.scryfall.io/normal/front/7/d/7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d.jpg?1673307449"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          },
+          {
+            "name": "Tolarian Terror",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 89,
+            "tier_rating": "C",
+            "note": null,
+            "id": "42f01cba-43d4-46ad-b7a5-d7631b0e1347",
+            "scryfall_uri": "https://scryfall.com/card/dmu/72/tolarian-terror",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Serpent",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/42f01cba-43d4-46ad-b7a5-d7631b0e1347.jpg?1673306903",
+              "normal": "https://cards.scryfall.io/normal/front/4/2/42f01cba-43d4-46ad-b7a5-d7631b0e1347.jpg?1673306903"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Self-Mill",
+        "strategy": "Graveyard-focused good-stuff deck. Synergizes with self-mill and Urborg Repossession.",
+        "key_cards": [
+          {
+            "name": "Uurg, Spawn of Turg",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 84,
+            "tier_rating": "C",
+            "note": null,
+            "id": "dd3fc36c-682b-4352-a66f-eddd2baf0bf6",
+            "scryfall_uri": "https://scryfall.com/card/dmu/225/uurg-spawn-of-turg",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Legendary Creature — Frog Beast",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dd3fc36c-682b-4352-a66f-eddd2baf0bf6.jpg?1673308136",
+              "normal": "https://cards.scryfall.io/normal/front/d/d/dd3fc36c-682b-4352-a66f-eddd2baf0bf6.jpg?1673308136"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          },
+          {
+            "name": "Urborg Repossession",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 92,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ecb8dab0-ecce-4321-b382-c58b296c2fd3",
+            "scryfall_uri": "https://scryfall.com/card/dmu/114/urborg-repossession",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/ecb8dab0-ecce-4321-b382-c58b296c2fd3.jpg?1673307261",
+              "normal": "https://cards.scryfall.io/normal/front/e/c/ecb8dab0-ecce-4321-b382-c58b296c2fd3.jpg?1673307261"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Control",
+        "strategy": "Most controlling color pair. Overlaps with blue spells. Sustained value via Vohar plus Urborg Repossession.",
+        "key_cards": [
+          {
+            "name": "Vohar, Vodalian Desecrator",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 68,
+            "tier_rating": "B",
+            "note": null,
+            "id": "807c7812-c108-45a7-a5b2-08cc693bc500",
+            "scryfall_uri": "https://scryfall.com/card/dmu/226/vohar-vodalian-desecrator",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Phyrexian Merfolk Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/807c7812-c108-45a7-a5b2-08cc693bc500.jpg?1673308144",
+              "normal": "https://cards.scryfall.io/normal/front/8/0/807c7812-c108-45a7-a5b2-08cc693bc500.jpg?1673308144"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          },
+          {
+            "name": "Urborg Repossession",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 92,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ecb8dab0-ecce-4321-b382-c58b296c2fd3",
+            "scryfall_uri": "https://scryfall.com/card/dmu/114/urborg-repossession",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/ecb8dab0-ecce-4321-b382-c58b296c2fd3.jpg?1673307261",
+              "normal": "https://cards.scryfall.io/normal/front/e/c/ecb8dab0-ecce-4321-b382-c58b296c2fd3.jpg?1673307261"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Tokens",
+        "strategy": "Better pure tokens strategy. Strength of the Coalition is a must-have mass pump spell.",
+        "key_cards": [
+          {
+            "name": "Queen Allenal of Ruadach",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 67,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b44b4e8b-7675-4c6a-a16a-92f8b6a0259f",
+            "scryfall_uri": "https://scryfall.com/card/dmu/210/queen-allenal-of-ruadach",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Elf Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b44b4e8b-7675-4c6a-a16a-92f8b6a0259f.jpg?1673308026",
+              "normal": "https://cards.scryfall.io/normal/front/b/4/b44b4e8b-7675-4c6a-a16a-92f8b6a0259f.jpg?1673308026"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          },
+          {
+            "name": "Strength of the Coalition",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 93,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8418c504-24fe-470f-8102-dcad68ba1520",
+            "scryfall_uri": "https://scryfall.com/card/dmu/180/strength-of-the-coalition",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/8418c504-24fe-470f-8102-dcad68ba1520.jpg?1673307805",
+              "normal": "https://cards.scryfall.io/normal/front/8/4/8418c504-24fe-470f-8102-dcad68ba1520.jpg?1673307805"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Sacrifice",
+        "strategy": "Midrange/value tokens variant. Balances curve, card advantage, and removal.",
+        "key_cards": [
+          {
+            "name": "Aron, Benalia's Ruin",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 52,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f1f8bf98-8911-4c86-978a-427377700544",
+            "scryfall_uri": "https://scryfall.com/card/dmu/193/aron-benalias-ruin",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Phyrexian Human",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f1f8bf98-8911-4c86-978a-427377700544.jpg?1673307897",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f1f8bf98-8911-4c86-978a-427377700544.jpg?1673307897"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          },
+          {
+            "name": "Elas il-Kor, Sadistic Pilgrim",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 63,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1c3f0ffe-cf51-4c30-8cd5-9e3c7e92c019",
+            "scryfall_uri": "https://scryfall.com/card/dmu/198/elas-il-kor-sadistic-pilgrim",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Phyrexian Kor Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c3f0ffe-cf51-4c30-8cd5-9e3c7e92c019.jpg?1673307936",
+              "normal": "https://cards.scryfall.io/normal/front/1/c/1c3f0ffe-cf51-4c30-8cd5-9e3c7e92c019.jpg?1673307936"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Aggro",
+        "strategy": "Traditional attack-focused strategy with tokens sub-theme. Synergizes with enlist creatures.",
+        "key_cards": [
+          {
+            "name": "Baird, Argivian Recruiter",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1f643d78-d8d8-4645-9357-a68ebd0d3517",
+            "scryfall_uri": "https://scryfall.com/card/dmu/195/baird-argivian-recruiter",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/f/1f643d78-d8d8-4645-9357-a68ebd0d3517.jpg?1673307913",
+              "normal": "https://cards.scryfall.io/normal/front/1/f/1f643d78-d8d8-4645-9357-a68ebd0d3517.jpg?1673307913"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          },
+          {
+            "name": "Guardian of New Benalia",
+            "color": "W",
+            "rarity": "Rare",
+            "pick_order_rank": 17,
+            "tier_rating": "A",
+            "note": null,
+            "id": "43da76ee-fec3-4b2e-915d-10cf8d518d2c",
+            "scryfall_uri": "https://scryfall.com/card/dmu/19/guardian-of-new-benalia",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/43da76ee-fec3-4b2e-915d-10cf8d518d2c.jpg?1673306449",
+              "normal": "https://cards.scryfall.io/normal/front/4/3/43da76ee-fec3-4b2e-915d-10cf8d518d2c.jpg?1673306449"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Sacrifice",
+        "strategy": "Blends aggression with sacrifice synergies. Lacks great 2-drops and adequate common fodder for the sacrifice theme.",
+        "key_cards": []
+      },
+      {
+        "colors": "Multi",
+        "name": "Domain Variants (5c)",
+        "strategy": "Five-color strategy rewarding mana base diversity. Three approaches: Simic-based, Gruul-based, and non-green versions.",
+        "key_cards": [
+          {
+            "name": "Herd Migration",
+            "color": "G",
+            "rarity": "Rare",
+            "pick_order_rank": 9,
+            "tier_rating": "A",
+            "note": null,
+            "id": "b0244a1f-e696-4223-9c14-22c2ca3cb738",
+            "scryfall_uri": "https://scryfall.com/card/dmu/165/herd-migration",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b0244a1f-e696-4223-9c14-22c2ca3cb738.jpg?1673307696",
+              "normal": "https://cards.scryfall.io/normal/front/b/0/b0244a1f-e696-4223-9c14-22c2ca3cb738.jpg?1673307696"
+            },
+            "set": "dmu",
+            "set_name": "Dominaria United"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Destroy Evil",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 98,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4f7862ef-2c8d-4d28-9e50-7cc41861f245",
+        "scryfall_uri": "https://scryfall.com/card/dmu/17/destroy-evil",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f7862ef-2c8d-4d28-9e50-7cc41861f245.jpg?1673306430",
+          "normal": "https://cards.scryfall.io/normal/front/4/f/4f7862ef-2c8d-4d28-9e50-7cc41861f245.jpg?1673306430"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Citizen's Arrest",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 87,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9806370b-51e3-4144-a847-6b367fb937ef",
+        "scryfall_uri": "https://scryfall.com/card/dmu/11/citizens-arrest",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/9806370b-51e3-4144-a847-6b367fb937ef.jpg?1673306377",
+          "normal": "https://cards.scryfall.io/normal/front/9/8/9806370b-51e3-4144-a847-6b367fb937ef.jpg?1673306377"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Argivian Cavalier",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 101,
+        "tier_rating": "C",
+        "note": null,
+        "id": "57746e72-ba9f-4717-a4a2-6c6a039080c3",
+        "scryfall_uri": "https://scryfall.com/card/dmu/4/argivian-cavalier",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Orc Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/57746e72-ba9f-4717-a4a2-6c6a039080c3.jpg?1673306316",
+          "normal": "https://cards.scryfall.io/normal/front/5/7/57746e72-ba9f-4717-a4a2-6c6a039080c3.jpg?1673306316"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Captain's Call",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 159,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0c7ed7e0-0e80-44d3-a7af-b4c321239df8",
+        "scryfall_uri": "https://scryfall.com/card/dmu/9/captains-call",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0c7ed7e0-0e80-44d3-a7af-b4c321239df8.jpg?1673306360",
+          "normal": "https://cards.scryfall.io/normal/front/0/c/0c7ed7e0-0e80-44d3-a7af-b4c321239df8.jpg?1673306360"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Take Up the Shield",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 168,
+        "tier_rating": "C",
+        "note": null,
+        "id": "851e842e-a497-4c36-90ee-8d64f806c378",
+        "scryfall_uri": "https://scryfall.com/card/dmu/35/take-up-the-shield",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/851e842e-a497-4c36-90ee-8d64f806c378.jpg?1673306597",
+          "normal": "https://cards.scryfall.io/normal/front/8/5/851e842e-a497-4c36-90ee-8d64f806c378.jpg?1673306597"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Tolarian Geyser",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 75,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5dd5f389-fea2-4aed-a218-eca162902775",
+        "scryfall_uri": "https://scryfall.com/card/dmu/71/tolarian-geyser",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5dd5f389-fea2-4aed-a218-eca162902775.jpg?1673306895",
+          "normal": "https://cards.scryfall.io/normal/front/5/d/5dd5f389-fea2-4aed-a218-eca162902775.jpg?1673306895"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Essence Scatter",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 97,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b7ad4441-e300-4267-bedb-4ae6a64f59cd",
+        "scryfall_uri": "https://scryfall.com/card/dmu/49/essence-scatter",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b7ad4441-e300-4267-bedb-4ae6a64f59cd.jpg?1673306711",
+          "normal": "https://cards.scryfall.io/normal/front/b/7/b7ad4441-e300-4267-bedb-4ae6a64f59cd.jpg?1673306711"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Talas Lookout",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 96,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0a4b9afe-aeb7-4c56-8a22-96e19a7a938c",
+        "scryfall_uri": "https://scryfall.com/card/dmu/68/talas-lookout",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0a4b9afe-aeb7-4c56-8a22-96e19a7a938c.jpg?1673306869",
+          "normal": "https://cards.scryfall.io/normal/front/0/a/0a4b9afe-aeb7-4c56-8a22-96e19a7a938c.jpg?1673306869"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Tolarian Terror",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 89,
+        "tier_rating": "C",
+        "note": null,
+        "id": "42f01cba-43d4-46ad-b7a5-d7631b0e1347",
+        "scryfall_uri": "https://scryfall.com/card/dmu/72/tolarian-terror",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Serpent",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/42f01cba-43d4-46ad-b7a5-d7631b0e1347.jpg?1673306903",
+          "normal": "https://cards.scryfall.io/normal/front/4/2/42f01cba-43d4-46ad-b7a5-d7631b0e1347.jpg?1673306903"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Shore Up",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 157,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9d933bf1-14f0-4150-a0d2-6b845b9624cf",
+        "scryfall_uri": "https://scryfall.com/card/dmu/64/shore-up",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9d933bf1-14f0-4150-a0d2-6b845b9624cf.jpg?1673306836",
+          "normal": "https://cards.scryfall.io/normal/front/9/d/9d933bf1-14f0-4150-a0d2-6b845b9624cf.jpg?1673306836"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Extinguish the Light",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 56,
+        "tier_rating": "B",
+        "note": null,
+        "id": "01a51d08-f90e-4b72-8dce-fb2a6c72f181",
+        "scryfall_uri": "https://scryfall.com/card/dmu/94/extinguish-the-light",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/01a51d08-f90e-4b72-8dce-fb2a6c72f181.jpg?1673307103",
+          "normal": "https://cards.scryfall.io/normal/front/0/1/01a51d08-f90e-4b72-8dce-fb2a6c72f181.jpg?1673307103"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Phyrexian Rager",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 77,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6fd574e7-705f-4a65-aad0-68ff6d63bf0f",
+        "scryfall_uri": "https://scryfall.com/card/dmu/99/phyrexian-rager",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Phyrexian Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/f/6fd574e7-705f-4a65-aad0-68ff6d63bf0f.jpg?1673307142",
+          "normal": "https://cards.scryfall.io/normal/front/6/f/6fd574e7-705f-4a65-aad0-68ff6d63bf0f.jpg?1673307142"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Urborg Repossession",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ecb8dab0-ecce-4321-b382-c58b296c2fd3",
+        "scryfall_uri": "https://scryfall.com/card/dmu/114/urborg-repossession",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/ecb8dab0-ecce-4321-b382-c58b296c2fd3.jpg?1673307261",
+          "normal": "https://cards.scryfall.io/normal/front/e/c/ecb8dab0-ecce-4321-b382-c58b296c2fd3.jpg?1673307261"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Tribute to Urborg",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 91,
+        "tier_rating": "C",
+        "note": null,
+        "id": "31274707-3e16-4f46-8450-6927d936064b",
+        "scryfall_uri": "https://scryfall.com/card/dmu/113/tribute-to-urborg",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/31274707-3e16-4f46-8450-6927d936064b.jpg?1673307253",
+          "normal": "https://cards.scryfall.io/normal/front/3/1/31274707-3e16-4f46-8450-6927d936064b.jpg?1673307253"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Eerie Soultender",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 116,
+        "tier_rating": "C",
+        "note": null,
+        "id": "335f3146-743c-4a25-86b5-c45e9c66eb15",
+        "scryfall_uri": "https://scryfall.com/card/dmu/92/eerie-soultender",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Spirit Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/3/335f3146-743c-4a25-86b5-c45e9c66eb15.jpg?1673307088",
+          "normal": "https://cards.scryfall.io/normal/front/3/3/335f3146-743c-4a25-86b5-c45e9c66eb15.jpg?1673307088"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Meria's Outrider",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 62,
+        "tier_rating": "B",
+        "note": "Sleeper common.",
+        "id": "48aa964f-99b5-4b6b-b158-42f39514c910",
+        "scryfall_uri": "https://scryfall.com/card/dmu/138/merias-outrider",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Elf Archer",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/48aa964f-99b5-4b6b-b158-42f39514c910.jpg?1673307457",
+          "normal": "https://cards.scryfall.io/normal/front/4/8/48aa964f-99b5-4b6b-b158-42f39514c910.jpg?1673307457"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Lightning Strike",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 59,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d",
+        "scryfall_uri": "https://scryfall.com/card/dmu/137/lightning-strike",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d.jpg?1673307449",
+          "normal": "https://cards.scryfall.io/normal/front/7/d/7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d.jpg?1673307449"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Flowstone Infusion",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 115,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b57c3674-9a31-4418-b306-e6b0a2514d8f",
+        "scryfall_uri": "https://scryfall.com/card/dmu/124/flowstone-infusion",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b57c3674-9a31-4418-b306-e6b0a2514d8f.jpg?1673307342",
+          "normal": "https://cards.scryfall.io/normal/front/b/5/b57c3674-9a31-4418-b306-e6b0a2514d8f.jpg?1673307342"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Flowstone Kavu",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 153,
+        "tier_rating": "C",
+        "note": null,
+        "id": "73e40916-3502-448a-a509-f6a6ff3cd73d",
+        "scryfall_uri": "https://scryfall.com/card/dmu/125/flowstone-kavu",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Kavu",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73e40916-3502-448a-a509-f6a6ff3cd73d.jpg?1673307350",
+          "normal": "https://cards.scryfall.io/normal/front/7/3/73e40916-3502-448a-a509-f6a6ff3cd73d.jpg?1673307350"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Keldon Strike Team",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 151,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4af4031e-b14e-4568-b047-b3d470d9b18e",
+        "scryfall_uri": "https://scryfall.com/card/dmu/136/keldon-strike-team",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/a/4af4031e-b14e-4568-b047-b3d470d9b18e.jpg?1673307440",
+          "normal": "https://cards.scryfall.io/normal/front/4/a/4af4031e-b14e-4568-b047-b3d470d9b18e.jpg?1673307440"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Gaea's Might",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 108,
+        "tier_rating": "C",
+        "note": null,
+        "id": "89c46e9c-ae7c-466c-bb11-4f4d01ea7a63",
+        "scryfall_uri": "https://scryfall.com/card/dmu/164/gaeas-might",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89c46e9c-ae7c-466c-bb11-4f4d01ea7a63.jpg?1673307688",
+          "normal": "https://cards.scryfall.io/normal/front/8/9/89c46e9c-ae7c-466c-bb11-4f4d01ea7a63.jpg?1673307688"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Bite Down",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 95,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0eacd3de-b803-4322-8d88-d533761aa748",
+        "scryfall_uri": "https://scryfall.com/card/dmu/155/bite-down",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/e/0eacd3de-b803-4322-8d88-d533761aa748.jpg?1673307608",
+          "normal": "https://cards.scryfall.io/normal/front/0/e/0eacd3de-b803-4322-8d88-d533761aa748.jpg?1673307608"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Floriferous Vinewall",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 114,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8382b7c7-762e-43f6-b285-e0cebe749fab",
+        "scryfall_uri": "https://scryfall.com/card/dmu/163/floriferous-vinewall",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Plant Wall",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/8382b7c7-762e-43f6-b285-e0cebe749fab.jpg?1673307680",
+          "normal": "https://cards.scryfall.io/normal/front/8/3/8382b7c7-762e-43f6-b285-e0cebe749fab.jpg?1673307680"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Sunbathing Rootwalla",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 112,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7ae6f015-2ad6-4b8e-8590-c2c2d01b6d98",
+        "scryfall_uri": "https://scryfall.com/card/dmu/181/sunbathing-rootwalla",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Lizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7ae6f015-2ad6-4b8e-8590-c2c2d01b6d98.jpg?1673307812",
+          "normal": "https://cards.scryfall.io/normal/front/7/a/7ae6f015-2ad6-4b8e-8590-c2c2d01b6d98.jpg?1673307812"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Yavimaya Sojourner",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 135,
+        "tier_rating": "C",
+        "note": null,
+        "id": "c7fdb424-4d2c-437e-b2a2-8bc56c028338",
+        "scryfall_uri": "https://scryfall.com/card/dmu/191/yavimaya-sojourner",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Treefolk",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7fdb424-4d2c-437e-b2a2-8bc56c028338.jpg?1673307884",
+          "normal": "https://cards.scryfall.io/normal/front/c/7/c7fdb424-4d2c-437e-b2a2-8bc56c028338.jpg?1673307884"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ]
+  },
+  "weak_commons_to_avoid": {
+    "{W} White": [
+      {
+        "name": "Benalish Faithbonder",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 254,
+        "tier_rating": "D",
+        "note": null,
+        "id": "084d77df-a899-406f-9d79-e3fa3abeaebc",
+        "scryfall_uri": "https://scryfall.com/card/dmu/7/benalish-faithbonder",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/084d77df-a899-406f-9d79-e3fa3abeaebc.jpg?1673306342",
+          "normal": "https://cards.scryfall.io/normal/front/0/8/084d77df-a899-406f-9d79-e3fa3abeaebc.jpg?1673306342"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Samite Herbalist",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 213,
+        "tier_rating": "D",
+        "note": null,
+        "id": "409189da-53c9-4daf-b6b2-d155fc14f91a",
+        "scryfall_uri": "https://scryfall.com/card/dmu/31/samite-herbalist",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/0/409189da-53c9-4daf-b6b2-d155fc14f91a.jpg?1673306562",
+          "normal": "https://cards.scryfall.io/normal/front/4/0/409189da-53c9-4daf-b6b2-d155fc14f91a.jpg?1673306562"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Impede Momentum",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 242,
+        "tier_rating": "D",
+        "note": null,
+        "id": "259c04f7-86f2-4584-97fb-8278dca9a213",
+        "scryfall_uri": "https://scryfall.com/card/dmu/54/impede-momentum",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/259c04f7-86f2-4584-97fb-8278dca9a213.jpg?1673306753",
+          "normal": "https://cards.scryfall.io/normal/front/2/5/259c04f7-86f2-4584-97fb-8278dca9a213.jpg?1673306753"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Tidepool Turtle",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 237,
+        "tier_rating": "D",
+        "note": null,
+        "id": "d397fb84-8573-4b2c-be2c-f8fd820342f0",
+        "scryfall_uri": "https://scryfall.com/card/dmu/69/tidepool-turtle",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Turtle",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d397fb84-8573-4b2c-be2c-f8fd820342f0.jpg?1673306878",
+          "normal": "https://cards.scryfall.io/normal/front/d/3/d397fb84-8573-4b2c-be2c-f8fd820342f0.jpg?1673306878"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Bone Splinters",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 229,
+        "tier_rating": "D",
+        "note": null,
+        "id": "106b5c96-d1bd-433d-955e-ace0b60d3bc3",
+        "scryfall_uri": "https://scryfall.com/card/dmu/83/bone-splinters",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/106b5c96-d1bd-433d-955e-ace0b60d3bc3.jpg?1673307007",
+          "normal": "https://cards.scryfall.io/normal/front/1/0/106b5c96-d1bd-433d-955e-ace0b60d3bc3.jpg?1673307007"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Tattered Apparition",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 246,
+        "tier_rating": "D",
+        "note": null,
+        "id": "0368e91c-31ee-4b81-a361-30a4555b1a42",
+        "scryfall_uri": "https://scryfall.com/card/dmu/111/tattered-apparition",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Shade",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/3/0368e91c-31ee-4b81-a361-30a4555b1a42.jpg?1673307236",
+          "normal": "https://cards.scryfall.io/normal/front/0/3/0368e91c-31ee-4b81-a361-30a4555b1a42.jpg?1673307236"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Hammerhand",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 253,
+        "tier_rating": "D",
+        "note": null,
+        "id": "8d858e9e-452b-4281-9379-641ef6ebef39",
+        "scryfall_uri": "https://scryfall.com/card/dmu/129/hammerhand",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d858e9e-452b-4281-9379-641ef6ebef39.jpg?1673307382",
+          "normal": "https://cards.scryfall.io/normal/front/8/d/8d858e9e-452b-4281-9379-641ef6ebef39.jpg?1673307382"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Smash to Dust",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 247,
+        "tier_rating": "D",
+        "note": null,
+        "id": "747881c7-3788-4dd6-b78d-b2a5ded20e14",
+        "scryfall_uri": "https://scryfall.com/card/dmu/144/smash-to-dust",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/747881c7-3788-4dd6-b78d-b2a5ded20e14.jpg?1673307504",
+          "normal": "https://cards.scryfall.io/normal/front/7/4/747881c7-3788-4dd6-b78d-b2a5ded20e14.jpg?1673307504"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Yavimaya Steelcrusher",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 185,
+        "tier_rating": "C",
+        "note": null,
+        "id": "25175622-7b68-4916-adf2-3bf2d82e8356",
+        "scryfall_uri": "https://scryfall.com/card/dmu/152/yavimaya-steelcrusher",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Ape Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25175622-7b68-4916-adf2-3bf2d82e8356.jpg?1673307575",
+          "normal": "https://cards.scryfall.io/normal/front/2/5/25175622-7b68-4916-adf2-3bf2d82e8356.jpg?1673307575"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Llanowar Stalker",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 251,
+        "tier_rating": "D",
+        "note": null,
+        "id": "e2d714d8-0e9b-4761-a0ef-3429b4e2f5b7",
+        "scryfall_uri": "https://scryfall.com/card/dmu/171/llanowar-stalker",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elf Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e2d714d8-0e9b-4761-a0ef-3429b4e2f5b7.jpg?1673307739",
+          "normal": "https://cards.scryfall.io/normal/front/e/2/e2d714d8-0e9b-4761-a0ef-3429b4e2f5b7.jpg?1673307739"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Hexbane Tortoise",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 233,
+        "tier_rating": "D",
+        "note": null,
+        "id": "acd5a635-bcf5-4a05-b00b-bf40322823fe",
+        "scryfall_uri": "https://scryfall.com/card/dmu/166/hexbane-tortoise",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Turtle",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/acd5a635-bcf5-4a05-b00b-bf40322823fe.jpg?1683034479",
+          "normal": "https://cards.scryfall.io/normal/front/a/c/acd5a635-bcf5-4a05-b00b-bf40322823fe.jpg?1683034479"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      },
+      {
+        "name": "Broken Wings",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 252,
+        "tier_rating": "D",
+        "note": null,
+        "id": "0ced8d87-ac22-41b0-a632-298159cbb316",
+        "scryfall_uri": "https://scryfall.com/card/dmu/157/broken-wings",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0ced8d87-ac22-41b0-a632-298159cbb316.jpg?1673307627",
+          "normal": "https://cards.scryfall.io/normal/front/0/c/0ced8d87-ac22-41b0-a632-298159cbb316.jpg?1673307627"
+        },
+        "set": "dmu",
+        "set_name": "Dominaria United"
+      }
+    ]
+  },
+  "removal_priority": [
+    {
+      "name": "Extinguish the Light",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 56,
+      "tier_rating": "B",
+      "note": null,
+      "id": "01a51d08-f90e-4b72-8dce-fb2a6c72f181",
+      "scryfall_uri": "https://scryfall.com/card/dmu/94/extinguish-the-light",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/01a51d08-f90e-4b72-8dce-fb2a6c72f181.jpg?1673307103",
+        "normal": "https://cards.scryfall.io/normal/front/0/1/01a51d08-f90e-4b72-8dce-fb2a6c72f181.jpg?1673307103"
+      },
+      "set": "dmu",
+      "set_name": "Dominaria United"
+    },
+    {
+      "name": "Destroy Evil",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 98,
+      "tier_rating": "C",
+      "note": null,
+      "id": "4f7862ef-2c8d-4d28-9e50-7cc41861f245",
+      "scryfall_uri": "https://scryfall.com/card/dmu/17/destroy-evil",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f7862ef-2c8d-4d28-9e50-7cc41861f245.jpg?1673306430",
+        "normal": "https://cards.scryfall.io/normal/front/4/f/4f7862ef-2c8d-4d28-9e50-7cc41861f245.jpg?1673306430"
+      },
+      "set": "dmu",
+      "set_name": "Dominaria United"
+    },
+    {
+      "name": "Lightning Strike",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 59,
+      "tier_rating": "B",
+      "note": null,
+      "id": "7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d",
+      "scryfall_uri": "https://scryfall.com/card/dmu/137/lightning-strike",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d.jpg?1673307449",
+        "normal": "https://cards.scryfall.io/normal/front/7/d/7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d.jpg?1673307449"
+      },
+      "set": "dmu",
+      "set_name": "Dominaria United"
+    }
+  ],
+  "general_tips": [
+    "Evaluate kicker cards for both base and kicked modes.",
+    "Understand domain thresholds before drafting payoff cards.",
+    "Prioritize removal (Extinguish the Light, Destroy Evil) highly.",
+    "Be aware of sweepers when building token strategies.",
+    "Sagas are usually traps — only three sagas merit dedicated draft priority.",
+    "Green is the splash enabler — Floriferous Vinewall and similar fix mana for 3c+ builds."
+  ]
+}

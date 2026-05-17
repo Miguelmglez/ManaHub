@@ -15,7 +15,6 @@ object CardConstants {
         "PL" to R.string.card_condition_pl,
         "PO" to R.string.card_condition_p
     )
-    
 
     val languages = listOf(
         "en" to "🇺🇸",

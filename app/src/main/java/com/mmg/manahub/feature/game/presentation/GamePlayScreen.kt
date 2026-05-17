@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.game.presentation
 
-import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -221,7 +220,6 @@ private fun GamePlayContent(
     onToggleLand: (playerId: Int) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    var showGameResult by remember { mutableStateOf(false) }
     var showExitDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     var showManagePlayersSheet by remember { mutableStateOf(false) }
@@ -399,7 +397,6 @@ private fun GamePlayContent(
 //  Player grid  (template-driven layout)
 // ─────────────────────────────────────────────────────────────────────────────
 
-@SuppressLint("ResourceAsColor")
 @Composable
 private fun GamePlayerGrid(
     players: List<Player>,
@@ -429,7 +426,6 @@ private fun GamePlayerGrid(
     onTournament: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    MaterialTheme.magicColors
     val (targetFirst, targetSecond) = when (activeLayout.gridRows.keys.size) {
         2 -> {
             if (activeLayout.gridRows.keys.contains(ScreenedGridSlotPosition.MID)) {

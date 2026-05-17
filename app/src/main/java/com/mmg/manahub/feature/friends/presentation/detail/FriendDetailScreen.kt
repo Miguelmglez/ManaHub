@@ -1,18 +1,19 @@
 package com.mmg.manahub.feature.friends.presentation.detail
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,16 +37,18 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,9 +58,11 @@ import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.friends.domain.model.Friend
+import java.util.Locale
 
 /**
  * Root composable for the friend detail screen.
@@ -233,8 +238,9 @@ fun FriendDetailScreen(
                 val tabs = FriendTab.entries
                 TabRow(
                     selectedTabIndex = uiState.selectedTab.ordinal,
-                    containerColor = mc.backgroundSecondary,
+                    containerColor = mc.backgroundSecondary.copy(alpha = 0.9f),
                     contentColor = mc.primaryAccent,
+                    divider = {}
                 ) {
                     tabs.forEach { tab ->
                         Tab(
@@ -242,7 +248,7 @@ fun FriendDetailScreen(
                             onClick = { viewModel.selectTab(tab) },
                             text = {
                                 Text(
-                                    text = tabLabel(tab),
+                                    text = tabLabel(tab).uppercase(Locale.getDefault()),
                                     style = MaterialTheme.magicTypography.labelLarge,
                                 )
                             },
@@ -280,75 +286,96 @@ fun FriendDetailScreen(
 //  Private composables
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Centred header block showing avatar, nickname, and game tag. */
+/** Hero-style header block showing avatar background and game tag. */
 @Composable
 private fun FriendDetailHeader(friend: Friend) {
     val mc = MaterialTheme.magicColors
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        AvatarImage(
-            avatarUrl = friend.avatarUrl,
-            initials = friend.nickname.take(1).uppercase(),
-            size = 80,
-        )
-        Text(
-            text = friend.nickname,
-            style = MaterialTheme.magicTypography.titleLarge,
-            color = mc.textPrimary,
-        )
-        // Game tag badge
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(mc.surface)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-        ) {
-            Text(
-                text = friend.gameTag,
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary,
-            )
-        }
-    }
-}
+    val ty = MaterialTheme.magicTypography
 
-/**
- * Circular avatar that shows the friend's image when available,
- * or a single-letter initials fallback otherwise.
- */
-@Composable
-private fun AvatarImage(avatarUrl: String?, initials: String, size: Int) {
-    val mc = MaterialTheme.magicColors
+    // State to track the image's aspect ratio (defaults to 16:9)
+    var imageRatio by remember(friend.avatarUrl) { mutableFloatStateOf(1.77f) }
+
     Box(
         modifier = Modifier
-            .size(size.dp)
-            .clip(CircleShape)
-            .background(mc.primaryAccent.copy(alpha = 0.2f)),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .fillMaxWidth()
+            .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
+            .animateContentSize()
+            .clip(RoundedCornerShape(16.dp)),
     ) {
-        if (avatarUrl != null) {
+        if (friend.avatarUrl != null) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarUrl)
+                    .data(friend.avatarUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape),
+                alignment = Alignment.TopCenter,
+                onSuccess = { state ->
+                    val size = state.painter.intrinsicSize
+                    if (size.width > 0 && size.height > 0) {
+                        imageRatio = size.width / size.height
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
             )
         } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                mc.primaryAccent.copy(alpha = 0.3f),
+                                mc.background,
+                            ),
+                        ),
+                    ),
+            ) {
+                ThemeBackground(modifier = Modifier.fillMaxSize())
+                Text(
+                    text = friend.nickname.take(1).uppercase().ifEmpty { "✦" },
+                    style = ty.lifeNumberMd.copy(
+                        fontSize = 72.sp,
+                        color = mc.primaryAccent.copy(alpha = 0.3f)
+                    ),
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+        }
+
+        // Dark gradient overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.5f),
+                            Color.Black.copy(alpha = 0.85f),
+                        ),
+                    ),
+                ),
+        )
+
+        // Game tag badge — bottom start
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(12.dp)
+                .background(
+                    color = mc.primaryAccent.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(6.dp),
+                )
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        ) {
             Text(
-                initials,
+                text = friend.gameTag,
                 color = mc.primaryAccent,
-                fontWeight = FontWeight.Bold,
-                fontSize = (size / 2.5).sp,
+                style = ty.labelSmall.copy(fontSize = 11.sp),
             )
         }
     }

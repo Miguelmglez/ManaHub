@@ -1,0 +1,1289 @@
+{
+  "metadata": {
+    "set_name": "Murders at Karlov Manor",
+    "set_code": "MKM",
+    "source_url": "https://draftsim.com/the-ultimate-guide-to-murders-at-karlov-manor-draft/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "February 16, 2024"
+  },
+  "set_overview": {
+    "summary": "Murders at Karlov Manor is a medium-paced Limited format where blocking is challenging due to strong combat tricks and disguise mechanics. The set features excellent removal at uncommon/rare but lacks common sweepers, making go-wide strategies particularly effective.",
+    "color_ranking": [
+      "{W} White",
+      "{R} Red",
+      "{G} Green",
+      "{U} Blue",
+      "{B} Black"
+    ],
+    "color_notes": {
+      "{W} White": "Best color. Top commons and creatures; excels at small creature strategies.",
+      "{R} Red": "Efficient removal but weaker creature quality. Excellent support color.",
+      "{G} Green": "Premium mana fixers enable 5-color strategies; solid creatures.",
+      "{U} Blue": "Good creatures and tempo spells; weak removal and poor 2-drops.",
+      "{B} Black": "Quality removal hindered by Ward 2 on disguise creatures; weak creatures."
+    },
+    "key_gameplay_notes": [
+      "Format rewards tempo and aggressive strategies.",
+      "Sweepers (No Witnesses, Deadly Cover-Up, Ill-Timed Explosion) are rares only.",
+      "Combat tricks (Auspicious Arrival, The Chase Is On, On the Job) are exceptionally strong.",
+      "Green's mana fixers (Tunnel Tipster, Loxodon Eavesdropper, Nervous Gardener) enable ambitious multicolor decks.",
+      "Draft with tempo in mind; board states escalate quickly."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Disguise",
+      "summary": "Morph variant with Ward 2; creatures often have \"turn face up\" effects on payoff.",
+      "performance": "Format-defining. Ward 2 makes black removal less reliable against these creatures.",
+      "key_examples": []
+    },
+    {
+      "name": "Cloak",
+      "summary": "Manifest variant with Ward 2; opponents can flip cloaked cards by paying the mana cost.",
+      "performance": "Provides hidden information and tempo plays.",
+      "key_examples": []
+    },
+    {
+      "name": "Suspect",
+      "summary": "Aggressive keyword that suspects opponents' creatures (gives them menace, prevents blocking). Limited impact on format — Rakdos archetype underperforms.",
+      "performance": "Underperforms relative to design expectations.",
+      "key_examples": []
+    },
+    {
+      "name": "Collect Evidence",
+      "summary": "Delve-style mechanic that exiles cards from your graveyard with combined mana value at least N. Works as an accessory or a build-around in Simic/Golgari.",
+      "performance": "Solid value engine in graveyard-leaning decks.",
+      "key_examples": []
+    },
+    {
+      "name": "Cases",
+      "summary": "Enchantments with three clauses that activate when an objective is solved. Quality varies widely; standouts include Case of the Gateway Express and Case of the Burning Masks.",
+      "performance": "Best cases are fantastic; worst are unplayable.",
+      "key_examples": [
+        {
+          "name": "Case of the Gateway Express",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 58,
+          "tier_rating": "B",
+          "note": null,
+          "id": "0862bf07-8a76-4e80-bba2-20d22f8eee30",
+          "scryfall_uri": "https://scryfall.com/card/mkm/8/case-of-the-gateway-express",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment — Case",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/0862bf07-8a76-4e80-bba2-20d22f8eee30.jpg?1706735531",
+            "normal": "https://cards.scryfall.io/normal/front/0/8/0862bf07-8a76-4e80-bba2-20d22f8eee30.jpg?1706735531"
+          },
+          "set": "mkm",
+          "set_name": "Murders at Karlov Manor"
+        },
+        {
+          "name": "Case of the Burning Masks",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 122,
+          "tier_rating": "C",
+          "note": null,
+          "id": "29ee07df-215f-45a6-9a5a-708143d73e45",
+          "scryfall_uri": "https://scryfall.com/card/mkm/113/case-of-the-burning-masks",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment — Case",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/29ee07df-215f-45a6-9a5a-708143d73e45.jpg?1706241824",
+            "normal": "https://cards.scryfall.io/normal/front/2/9/29ee07df-215f-45a6-9a5a-708143d73e45.jpg?1706241824"
+          },
+          "set": "mkm",
+          "set_name": "Murders at Karlov Manor"
+        }
+      ]
+    },
+    {
+      "name": "Investigate",
+      "summary": "Creates Clue tokens — primary mana sink in the format. Essential in most decks.",
+      "performance": "Core engine across all archetypes.",
+      "key_examples": []
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{R}{W}",
+        "name": "RW Aggro",
+        "tier": "Tier 1 — \"Turn Them Sideways\"",
+        "strategy": "Premier aggressive strategy that exploits the format's lack of sweepers. Efficient curve plus reach.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Person of Interest",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 55,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7d56ebff-67c8-4bc7-a533-ddde4ce0c2af",
+            "scryfall_uri": "https://scryfall.com/card/mkm/139/person-of-interest",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d56ebff-67c8-4bc7-a533-ddde4ce0c2af.jpg?1706241902",
+              "normal": "https://cards.scryfall.io/normal/front/7/d/7d56ebff-67c8-4bc7-a533-ddde4ce0c2af.jpg?1706241902"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Shock",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 63,
+            "tier_rating": "B",
+            "note": null,
+            "id": "298747bb-eb40-4b58-bb22-4ac2bc1d795c",
+            "scryfall_uri": "https://scryfall.com/card/mkm/144/shock",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/298747bb-eb40-4b58-bb22-4ac2bc1d795c.jpg?1706241920",
+              "normal": "https://cards.scryfall.io/normal/front/2/9/298747bb-eb40-4b58-bb22-4ac2bc1d795c.jpg?1706241920"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Galvanize",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 85,
+            "tier_rating": "B",
+            "note": null,
+            "id": "64ed3bfa-3294-45dd-825e-3afc2580f0d4",
+            "scryfall_uri": "https://scryfall.com/card/mkm/128/galvanize",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/64ed3bfa-3294-45dd-825e-3afc2580f0d4.jpg?1706241871",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/64ed3bfa-3294-45dd-825e-3afc2580f0d4.jpg?1706241871"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Novice Inspector",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 27,
+            "tier_rating": "A",
+            "note": null,
+            "id": "0ad38866-fc5f-4f62-89c1-afc0f50765aa",
+            "scryfall_uri": "https://scryfall.com/card/mkm/29/novice-inspector",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Detective",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0ad38866-fc5f-4f62-89c1-afc0f50765aa.jpg?1706241527",
+              "normal": "https://cards.scryfall.io/normal/front/0/a/0ad38866-fc5f-4f62-89c1-afc0f50765aa.jpg?1706241527"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Makeshift Binding",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 45,
+            "tier_rating": "A",
+            "note": null,
+            "id": "e45d2e0c-d70d-40e5-8c3d-db6803393516",
+            "scryfall_uri": "https://scryfall.com/card/mkm/23/makeshift-binding",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e45d2e0c-d70d-40e5-8c3d-db6803393516.jpg?1706241508",
+              "normal": "https://cards.scryfall.io/normal/front/e/4/e45d2e0c-d70d-40e5-8c3d-db6803393516.jpg?1706241508"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{G}{W}",
+        "name": "GW Go-Wide",
+        "tier": "Tier 2 — Other White Decks",
+        "strategy": "Disguise creatures and mass pump effects. Token-and-anthem plan punishes the lack of sweepers.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Loxodon Eavesdropper",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 74,
+            "tier_rating": "B",
+            "note": null,
+            "id": "bbbf8c3a-6c74-42fd-bb8d-61e3f0a77848",
+            "scryfall_uri": "https://scryfall.com/card/mkm/168/loxodon-eavesdropper",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elephant Detective",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbbf8c3a-6c74-42fd-bb8d-61e3f0a77848.jpg?1706242059",
+              "normal": "https://cards.scryfall.io/normal/front/b/b/bbbf8c3a-6c74-42fd-bb8d-61e3f0a77848.jpg?1706242059"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Fanatical Strength",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 83,
+            "tier_rating": "B",
+            "note": null,
+            "id": "4941fa74-c7b9-4468-8080-de8057d3d27b",
+            "scryfall_uri": "https://scryfall.com/card/mkm/159/fanatical-strength",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/4941fa74-c7b9-4468-8080-de8057d3d27b.jpg?1706241967",
+              "normal": "https://cards.scryfall.io/normal/front/4/9/4941fa74-c7b9-4468-8080-de8057d3d27b.jpg?1706241967"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Inside Source",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 57,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1548d181-3f83-457a-b2d3-eb88cfb2afda",
+            "scryfall_uri": "https://scryfall.com/card/mkm/19/inside-source",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Citizen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/5/1548d181-3f83-457a-b2d3-eb88cfb2afda.jpg?1706241496",
+              "normal": "https://cards.scryfall.io/normal/front/1/5/1548d181-3f83-457a-b2d3-eb88cfb2afda.jpg?1706241496"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{U}",
+        "name": "UW Detectives",
+        "tier": "Tier 2 — Other White Decks",
+        "strategy": "Tempo-focused detective synergies. Trade efficiently and build a clue base for late-game card advantage.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Projektor Inspector",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 105,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ad378843-e2b0-48d6-90dc-b584e857473d",
+            "scryfall_uri": "https://scryfall.com/card/mkm/68/projektor-inspector",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Detective",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/d/ad378843-e2b0-48d6-90dc-b584e857473d.jpg?1706241642",
+              "normal": "https://cards.scryfall.io/normal/front/a/d/ad378843-e2b0-48d6-90dc-b584e857473d.jpg?1706241642"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Unauthorized Exit",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 130,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8a458474-d721-46d7-b487-6a47dc063cfd",
+            "scryfall_uri": "https://scryfall.com/card/mkm/74/unauthorized-exit",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8a458474-d721-46d7-b487-6a47dc063cfd.jpg?1706241660",
+              "normal": "https://cards.scryfall.io/normal/front/8/a/8a458474-d721-46d7-b487-6a47dc063cfd.jpg?1706241660"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Reasonable Doubt",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 110,
+            "tier_rating": "C",
+            "note": null,
+            "id": "270570a3-8637-4e4e-92d9-e985474cd5d2",
+            "scryfall_uri": "https://scryfall.com/card/mkm/69/reasonable-doubt",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/270570a3-8637-4e4e-92d9-e985474cd5d2.jpg?1706241643",
+              "normal": "https://cards.scryfall.io/normal/front/2/7/270570a3-8637-4e4e-92d9-e985474cd5d2.jpg?1706241643"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "WB Pint-Size",
+        "tier": "Tier 2 — Other White Decks",
+        "strategy": "Grindy removal-heavy control. Picks off opponent's threats and accumulates incremental value.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Extract a Confession",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 94,
+            "tier_rating": "C",
+            "note": null,
+            "id": "256c8b6e-4031-458b-8eb9-bbfe58405a0c",
+            "scryfall_uri": "https://scryfall.com/card/mkm/84/extract-a-confession",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/256c8b6e-4031-458b-8eb9-bbfe58405a0c.jpg?1706241687",
+              "normal": "https://cards.scryfall.io/normal/front/2/5/256c8b6e-4031-458b-8eb9-bbfe58405a0c.jpg?1706241687"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Unscrupulous Agent",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 140,
+            "tier_rating": "C",
+            "note": null,
+            "id": "37692f9a-3825-43aa-aacb-1bb92cb5bd07",
+            "scryfall_uri": "https://scryfall.com/card/mkm/109/unscrupulous-agent",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Elf Detective",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37692f9a-3825-43aa-aacb-1bb92cb5bd07.jpg?1706241798",
+              "normal": "https://cards.scryfall.io/normal/front/3/7/37692f9a-3825-43aa-aacb-1bb92cb5bd07.jpg?1706241798"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          },
+          {
+            "name": "Makeshift Binding",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 45,
+            "tier_rating": "A",
+            "note": null,
+            "id": "e45d2e0c-d70d-40e5-8c3d-db6803393516",
+            "scryfall_uri": "https://scryfall.com/card/mkm/23/makeshift-binding",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e45d2e0c-d70d-40e5-8c3d-db6803393516.jpg?1706241508",
+              "normal": "https://cards.scryfall.io/normal/front/e/4/e45d2e0c-d70d-40e5-8c3d-db6803393516.jpg?1706241508"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{U}{R}",
+        "name": "UR Artifacts",
+        "tier": "Tier 3 — Decent Non-White Deck",
+        "strategy": "Artifact synergies and tempo. Clue tokens fuel artifact payoffs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Cold Case Cracker",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 129,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f082111b-9b1c-4a25-8c5d-d6ef77533a9b",
+            "scryfall_uri": "https://scryfall.com/card/mkm/46/cold-case-cracker",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit Detective",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f082111b-9b1c-4a25-8c5d-d6ef77533a9b.jpg?1706241576",
+              "normal": "https://cards.scryfall.io/normal/front/f/0/f082111b-9b1c-4a25-8c5d-d6ef77533a9b.jpg?1706241576"
+            },
+            "set": "mkm",
+            "set_name": "Murders at Karlov Manor"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "UG Graveyard",
+        "tier": "Tier 3 — Decent Non-White Deck",
+        "strategy": "Graveyard-focused spell strategies built around Collect Evidence.",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "RG Disguise",
+        "tier": "Tier 3 — Decent Non-White Deck",
+        "strategy": "Morph-heavy aggressive midrange. Disguise creatures with combat tricks for surprise damage.",
+        "difficulty": "Medium",
+        "key_cards": []
+      }
+    ],
+    "tier_4": [
+      {
+        "colors": "{B}{R}",
+        "name": "BR Aggro",
+        "tier": "Tier 4 — Mediocre Deck",
+        "strategy": "Suspect mechanic is underutilized. Lacks payoffs for the strategy.",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "BG Graveyard",
+        "tier": "Tier 4 — Mediocre Deck",
+        "strategy": "Creature-based graveyard synergies. Thin payoffs and poor creature quality drag it down.",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Control",
+        "tier": "Tier 4 — Mediocre Deck",
+        "strategy": "Removal-focused but the environment is removal-hostile due to Ward 2 on disguise creatures.",
+        "difficulty": "Hard",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Novice Inspector",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 27,
+        "tier_rating": "A",
+        "note": null,
+        "id": "0ad38866-fc5f-4f62-89c1-afc0f50765aa",
+        "scryfall_uri": "https://scryfall.com/card/mkm/29/novice-inspector",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0ad38866-fc5f-4f62-89c1-afc0f50765aa.jpg?1706241527",
+          "normal": "https://cards.scryfall.io/normal/front/0/a/0ad38866-fc5f-4f62-89c1-afc0f50765aa.jpg?1706241527"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Makeshift Binding",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 45,
+        "tier_rating": "A",
+        "note": null,
+        "id": "e45d2e0c-d70d-40e5-8c3d-db6803393516",
+        "scryfall_uri": "https://scryfall.com/card/mkm/23/makeshift-binding",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e45d2e0c-d70d-40e5-8c3d-db6803393516.jpg?1706241508",
+          "normal": "https://cards.scryfall.io/normal/front/e/4/e45d2e0c-d70d-40e5-8c3d-db6803393516.jpg?1706241508"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Inside Source",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1548d181-3f83-457a-b2d3-eb88cfb2afda",
+        "scryfall_uri": "https://scryfall.com/card/mkm/19/inside-source",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Citizen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/5/1548d181-3f83-457a-b2d3-eb88cfb2afda.jpg?1706241496",
+          "normal": "https://cards.scryfall.io/normal/front/1/5/1548d181-3f83-457a-b2d3-eb88cfb2afda.jpg?1706241496"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "On the Job",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 111,
+        "tier_rating": "C",
+        "note": null,
+        "id": "48b92629-4196-4943-91fd-8c8d5f3fcaef",
+        "scryfall_uri": "https://scryfall.com/card/mkm/30/on-the-job",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/48b92629-4196-4943-91fd-8c8d5f3fcaef.jpg?1706241527",
+          "normal": "https://cards.scryfall.io/normal/front/4/8/48b92629-4196-4943-91fd-8c8d5f3fcaef.jpg?1706241527"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Projektor Inspector",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 105,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ad378843-e2b0-48d6-90dc-b584e857473d",
+        "scryfall_uri": "https://scryfall.com/card/mkm/68/projektor-inspector",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/d/ad378843-e2b0-48d6-90dc-b584e857473d.jpg?1706241642",
+          "normal": "https://cards.scryfall.io/normal/front/a/d/ad378843-e2b0-48d6-90dc-b584e857473d.jpg?1706241642"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Unauthorized Exit",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 130,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8a458474-d721-46d7-b487-6a47dc063cfd",
+        "scryfall_uri": "https://scryfall.com/card/mkm/74/unauthorized-exit",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8a458474-d721-46d7-b487-6a47dc063cfd.jpg?1706241660",
+          "normal": "https://cards.scryfall.io/normal/front/8/a/8a458474-d721-46d7-b487-6a47dc063cfd.jpg?1706241660"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Reasonable Doubt",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 110,
+        "tier_rating": "C",
+        "note": null,
+        "id": "270570a3-8637-4e4e-92d9-e985474cd5d2",
+        "scryfall_uri": "https://scryfall.com/card/mkm/69/reasonable-doubt",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/270570a3-8637-4e4e-92d9-e985474cd5d2.jpg?1706241643",
+          "normal": "https://cards.scryfall.io/normal/front/2/7/270570a3-8637-4e4e-92d9-e985474cd5d2.jpg?1706241643"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Cold Case Cracker",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 129,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f082111b-9b1c-4a25-8c5d-d6ef77533a9b",
+        "scryfall_uri": "https://scryfall.com/card/mkm/46/cold-case-cracker",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Spirit Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f082111b-9b1c-4a25-8c5d-d6ef77533a9b.jpg?1706241576",
+          "normal": "https://cards.scryfall.io/normal/front/f/0/f082111b-9b1c-4a25-8c5d-d6ef77533a9b.jpg?1706241576"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Extract a Confession",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 94,
+        "tier_rating": "C",
+        "note": null,
+        "id": "256c8b6e-4031-458b-8eb9-bbfe58405a0c",
+        "scryfall_uri": "https://scryfall.com/card/mkm/84/extract-a-confession",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/256c8b6e-4031-458b-8eb9-bbfe58405a0c.jpg?1706241687",
+          "normal": "https://cards.scryfall.io/normal/front/2/5/256c8b6e-4031-458b-8eb9-bbfe58405a0c.jpg?1706241687"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Unscrupulous Agent",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 140,
+        "tier_rating": "C",
+        "note": null,
+        "id": "37692f9a-3825-43aa-aacb-1bb92cb5bd07",
+        "scryfall_uri": "https://scryfall.com/card/mkm/109/unscrupulous-agent",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Elf Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37692f9a-3825-43aa-aacb-1bb92cb5bd07.jpg?1706241798",
+          "normal": "https://cards.scryfall.io/normal/front/3/7/37692f9a-3825-43aa-aacb-1bb92cb5bd07.jpg?1706241798"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Snarling Gorehound",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 156,
+        "tier_rating": "C",
+        "note": null,
+        "id": "93ab3e11-8584-406f-b9ae-9e1df4396cbc",
+        "scryfall_uri": "https://scryfall.com/card/mkm/105/snarling-gorehound",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Dog",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/3/93ab3e11-8584-406f-b9ae-9e1df4396cbc.jpg?1706241754",
+          "normal": "https://cards.scryfall.io/normal/front/9/3/93ab3e11-8584-406f-b9ae-9e1df4396cbc.jpg?1706241754"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Murder",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 159,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1ea6438b-0e6c-4d65-8bcd-34a988717c81",
+        "scryfall_uri": "https://scryfall.com/card/mkm/95/murder",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1ea6438b-0e6c-4d65-8bcd-34a988717c81.jpg?1706241725",
+          "normal": "https://cards.scryfall.io/normal/front/1/e/1ea6438b-0e6c-4d65-8bcd-34a988717c81.jpg?1706241725"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Person of Interest",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 55,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7d56ebff-67c8-4bc7-a533-ddde4ce0c2af",
+        "scryfall_uri": "https://scryfall.com/card/mkm/139/person-of-interest",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d56ebff-67c8-4bc7-a533-ddde4ce0c2af.jpg?1706241902",
+          "normal": "https://cards.scryfall.io/normal/front/7/d/7d56ebff-67c8-4bc7-a533-ddde4ce0c2af.jpg?1706241902"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Shock",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 63,
+        "tier_rating": "B",
+        "note": null,
+        "id": "298747bb-eb40-4b58-bb22-4ac2bc1d795c",
+        "scryfall_uri": "https://scryfall.com/card/mkm/144/shock",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/298747bb-eb40-4b58-bb22-4ac2bc1d795c.jpg?1706241920",
+          "normal": "https://cards.scryfall.io/normal/front/2/9/298747bb-eb40-4b58-bb22-4ac2bc1d795c.jpg?1706241920"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Galvanize",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 85,
+        "tier_rating": "B",
+        "note": null,
+        "id": "64ed3bfa-3294-45dd-825e-3afc2580f0d4",
+        "scryfall_uri": "https://scryfall.com/card/mkm/128/galvanize",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/64ed3bfa-3294-45dd-825e-3afc2580f0d4.jpg?1706241871",
+          "normal": "https://cards.scryfall.io/normal/front/6/4/64ed3bfa-3294-45dd-825e-3afc2580f0d4.jpg?1706241871"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Offender at Large",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 104,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f096ff4a-85f4-46f1-9478-e8921f21309d",
+        "scryfall_uri": "https://scryfall.com/card/mkm/138/offender-at-large",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Giant Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f096ff4a-85f4-46f1-9478-e8921f21309d.jpg?1706241900",
+          "normal": "https://cards.scryfall.io/normal/front/f/0/f096ff4a-85f4-46f1-9478-e8921f21309d.jpg?1706241900"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Loxodon Eavesdropper",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 74,
+        "tier_rating": "B",
+        "note": null,
+        "id": "bbbf8c3a-6c74-42fd-bb8d-61e3f0a77848",
+        "scryfall_uri": "https://scryfall.com/card/mkm/168/loxodon-eavesdropper",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elephant Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbbf8c3a-6c74-42fd-bb8d-61e3f0a77848.jpg?1706242059",
+          "normal": "https://cards.scryfall.io/normal/front/b/b/bbbf8c3a-6c74-42fd-bb8d-61e3f0a77848.jpg?1706242059"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Fanatical Strength",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 83,
+        "tier_rating": "B",
+        "note": null,
+        "id": "4941fa74-c7b9-4468-8080-de8057d3d27b",
+        "scryfall_uri": "https://scryfall.com/card/mkm/159/fanatical-strength",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/4941fa74-c7b9-4468-8080-de8057d3d27b.jpg?1706241967",
+          "normal": "https://cards.scryfall.io/normal/front/4/9/4941fa74-c7b9-4468-8080-de8057d3d27b.jpg?1706241967"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Nervous Gardener",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 78,
+        "tier_rating": "B",
+        "note": null,
+        "id": "93b747c7-b342-47f8-a190-16c393b20607",
+        "scryfall_uri": "https://scryfall.com/card/mkm/169/nervous-gardener",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dryad",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/3/93b747c7-b342-47f8-a190-16c393b20607.jpg?1706242060",
+          "normal": "https://cards.scryfall.io/normal/front/9/3/93b747c7-b342-47f8-a190-16c393b20607.jpg?1706242060"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Bite Down on Crime",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 75,
+        "tier_rating": "B",
+        "note": null,
+        "id": "29bbfe93-8225-444c-835b-33ffa006ef66",
+        "scryfall_uri": "https://scryfall.com/card/mkm/154/bite-down-on-crime",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/29bbfe93-8225-444c-835b-33ffa006ef66.jpg?1706241952",
+          "normal": "https://cards.scryfall.io/normal/front/2/9/29bbfe93-8225-444c-835b-33ffa006ef66.jpg?1706241952"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ]
+  },
+  "multicolor_disguise_creatures": {
+    "tier_1": [
+      {
+        "name": "Dog Walker",
+        "color": "WR",
+        "rarity": "Common",
+        "pick_order_rank": 47,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a6e0adb7-a030-4dcc-9284-cd91c7598a22",
+        "scryfall_uri": "https://scryfall.com/card/mkm/197/dog-walker",
+        "colors": [
+          "R",
+          "W"
+        ],
+        "type_line": "Creature — Human Citizen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a6e0adb7-a030-4dcc-9284-cd91c7598a22.jpg?1706242142",
+          "normal": "https://cards.scryfall.io/normal/front/a/6/a6e0adb7-a030-4dcc-9284-cd91c7598a22.jpg?1706242142"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ],
+    "tier_2": [
+      {
+        "name": "Granite Witness",
+        "color": "WU",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "C",
+        "note": null,
+        "id": "daee9d98-f8c6-4980-8f23-c6c636b69430",
+        "scryfall_uri": "https://scryfall.com/card/mkm/206/granite-witness",
+        "colors": [
+          "U",
+          "W"
+        ],
+        "type_line": "Artifact Creature — Gargoyle Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/daee9d98-f8c6-4980-8f23-c6c636b69430.jpg?1706242170",
+          "normal": "https://cards.scryfall.io/normal/front/d/a/daee9d98-f8c6-4980-8f23-c6c636b69430.jpg?1706242170"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Gadget Technician",
+        "color": "UR",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "C",
+        "note": null,
+        "id": "3b489a54-ee43-4962-be7b-16e0e28800e0",
+        "scryfall_uri": "https://scryfall.com/card/mkm/204/gadget-technician",
+        "colors": [
+          "R",
+          "U"
+        ],
+        "type_line": "Creature — Goblin Artificer",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/b/3b489a54-ee43-4962-be7b-16e0e28800e0.jpg?1706242168",
+          "normal": "https://cards.scryfall.io/normal/front/3/b/3b489a54-ee43-4962-be7b-16e0e28800e0.jpg?1706242168"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Crowd-Control Warden",
+        "color": "WG",
+        "rarity": "Common",
+        "pick_order_rank": 141,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cdf0578f-4966-4ecd-81e1-83ae13126f13",
+        "scryfall_uri": "https://scryfall.com/card/mkm/193/crowd-control-warden",
+        "colors": [
+          "G",
+          "W"
+        ],
+        "type_line": "Creature — Centaur Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/d/cdf0578f-4966-4ecd-81e1-83ae13126f13.jpg?1706242133",
+          "normal": "https://cards.scryfall.io/normal/front/c/d/cdf0578f-4966-4ecd-81e1-83ae13126f13.jpg?1706242133"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ],
+    "tier_3": [
+      {
+        "name": "Faerie Snoop",
+        "color": "UB",
+        "rarity": "Common",
+        "pick_order_rank": 170,
+        "tier_rating": "C",
+        "note": null,
+        "id": "20267dab-8898-4b44-8ef4-8a239967662c",
+        "scryfall_uri": "https://scryfall.com/card/mkm/203/faerie-snoop",
+        "colors": [
+          "B",
+          "U"
+        ],
+        "type_line": "Creature — Faerie Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/20267dab-8898-4b44-8ef4-8a239967662c.jpg?1706242161",
+          "normal": "https://cards.scryfall.io/normal/front/2/0/20267dab-8898-4b44-8ef4-8a239967662c.jpg?1706242161"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Sanguine Savior",
+        "color": "WB",
+        "rarity": "Common",
+        "pick_order_rank": 154,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9cba5503-ba99-43d8-8062-66d905e0d86b",
+        "scryfall_uri": "https://scryfall.com/card/mkm/230/sanguine-savior",
+        "colors": [
+          "B",
+          "W"
+        ],
+        "type_line": "Creature — Vampire Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9cba5503-ba99-43d8-8062-66d905e0d86b.jpg?1706242243",
+          "normal": "https://cards.scryfall.io/normal/front/9/c/9cba5503-ba99-43d8-8062-66d905e0d86b.jpg?1706242243"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Undercover Crocodelf",
+        "color": "UG",
+        "rarity": "Common",
+        "pick_order_rank": 169,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5bc669c8-6f39-4d52-82d3-a4005d41c8a5",
+        "scryfall_uri": "https://scryfall.com/card/mkm/239/undercover-crocodelf",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Creature — Elf Crocodile Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5bc669c8-6f39-4d52-82d3-a4005d41c8a5.jpg?1706242271",
+          "normal": "https://cards.scryfall.io/normal/front/5/b/5bc669c8-6f39-4d52-82d3-a4005d41c8a5.jpg?1706242271"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Riftburst Hellion",
+        "color": "RG",
+        "rarity": "Common",
+        "pick_order_rank": 185,
+        "tier_rating": "D",
+        "note": null,
+        "id": "9fae9044-a859-434d-8dc6-4f9d455ca5e1",
+        "scryfall_uri": "https://scryfall.com/card/mkm/228/riftburst-hellion",
+        "colors": [
+          "G",
+          "R"
+        ],
+        "type_line": "Creature — Hellion",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9fae9044-a859-434d-8dc6-4f9d455ca5e1.jpg?1706242241",
+          "normal": "https://cards.scryfall.io/normal/front/9/f/9fae9044-a859-434d-8dc6-4f9d455ca5e1.jpg?1706242241"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ],
+    "tier_4_avoid": [
+      {
+        "name": "Shady Informant",
+        "color": "BR",
+        "rarity": "Common",
+        "pick_order_rank": 221,
+        "tier_rating": "D",
+        "note": null,
+        "id": "0de36e63-8190-415f-b65b-bae1e595845d",
+        "scryfall_uri": "https://scryfall.com/card/mkm/231/shady-informant",
+        "colors": [
+          "B",
+          "R"
+        ],
+        "type_line": "Creature — Ogre Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0de36e63-8190-415f-b65b-bae1e595845d.jpg?1706242250",
+          "normal": "https://cards.scryfall.io/normal/front/0/d/0de36e63-8190-415f-b65b-bae1e595845d.jpg?1706242250"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      },
+      {
+        "name": "Rakish Scoundrel",
+        "color": "BG",
+        "rarity": "Common",
+        "pick_order_rank": 222,
+        "tier_rating": "D",
+        "note": null,
+        "id": "6aaa8c6b-7ef7-45db-99c9-4a6e7f177b94",
+        "scryfall_uri": "https://scryfall.com/card/mkm/225/rakish-scoundrel",
+        "colors": [
+          "B",
+          "G"
+        ],
+        "type_line": "Creature — Elf Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/a/6aaa8c6b-7ef7-45db-99c9-4a6e7f177b94.jpg?1706242231",
+          "normal": "https://cards.scryfall.io/normal/front/6/a/6aaa8c6b-7ef7-45db-99c9-4a6e7f177b94.jpg?1706242231"
+        },
+        "set": "mkm",
+        "set_name": "Murders at Karlov Manor"
+      }
+    ]
+  },
+  "commons_to_avoid": [
+    {
+      "name": "Benthic Criminologists",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 207,
+      "tier_rating": "D",
+      "note": null,
+      "id": "283b6b5a-acdf-4255-a294-0964d9c62686",
+      "scryfall_uri": "https://scryfall.com/card/mkm/40/benthic-criminologists",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Merfolk Wizard",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/8/283b6b5a-acdf-4255-a294-0964d9c62686.jpg?1706241559",
+        "normal": "https://cards.scryfall.io/normal/front/2/8/283b6b5a-acdf-4255-a294-0964d9c62686.jpg?1706241559"
+      },
+      "set": "mkm",
+      "set_name": "Murders at Karlov Manor"
+    },
+    {
+      "name": "Cerebral Confiscation",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 284,
+      "tier_rating": "F",
+      "note": null,
+      "id": "3c3c3d15-b775-44a2-91ea-4abcc3cf2dba",
+      "scryfall_uri": "https://scryfall.com/card/mkm/81/cerebral-confiscation",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3c3c3d15-b775-44a2-91ea-4abcc3cf2dba.jpg?1706241678",
+        "normal": "https://cards.scryfall.io/normal/front/3/c/3c3c3d15-b775-44a2-91ea-4abcc3cf2dba.jpg?1706241678"
+      },
+      "set": "mkm",
+      "set_name": "Murders at Karlov Manor"
+    },
+    {
+      "name": "Agency Coroner",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 248,
+      "tier_rating": "F",
+      "note": null,
+      "id": "d63f2c23-e877-42e3-9362-5d003a173c6d",
+      "scryfall_uri": "https://scryfall.com/card/mkm/75/agency-coroner",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Ogre Cleric",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/6/d63f2c23-e877-42e3-9362-5d003a173c6d.jpg?1706241661",
+        "normal": "https://cards.scryfall.io/normal/front/d/6/d63f2c23-e877-42e3-9362-5d003a173c6d.jpg?1706241661"
+      },
+      "set": "mkm",
+      "set_name": "Murders at Karlov Manor"
+    },
+    {
+      "name": "Suspicious Detonation",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 239,
+      "tier_rating": "D",
+      "note": null,
+      "id": "6e280482-ed7e-4011-899e-096ff7bd4c41",
+      "scryfall_uri": "https://scryfall.com/card/mkm/145/suspicious-detonation",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e280482-ed7e-4011-899e-096ff7bd4c41.jpg?1706241923",
+        "normal": "https://cards.scryfall.io/normal/front/6/e/6e280482-ed7e-4011-899e-096ff7bd4c41.jpg?1706241923"
+      },
+      "set": "mkm",
+      "set_name": "Murders at Karlov Manor"
+    },
+    {
+      "name": "Demand Answers",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 242,
+      "tier_rating": "F",
+      "note": null,
+      "id": "eca092fc-7c67-4a73-989e-5297bbaaea76",
+      "scryfall_uri": "https://scryfall.com/card/mkm/122/demand-answers",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/eca092fc-7c67-4a73-989e-5297bbaaea76.jpg?1706241852",
+        "normal": "https://cards.scryfall.io/normal/front/e/c/eca092fc-7c67-4a73-989e-5297bbaaea76.jpg?1706241852"
+      },
+      "set": "mkm",
+      "set_name": "Murders at Karlov Manor"
+    },
+    {
+      "name": "Rubblebelt Braggart",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 229,
+      "tier_rating": "D",
+      "note": null,
+      "id": "f90f8691-210a-4bf0-9fc2-fb2efcf057fb",
+      "scryfall_uri": "https://scryfall.com/card/mkm/143/rubblebelt-braggart",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Creature — Lizard Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/9/f90f8691-210a-4bf0-9fc2-fb2efcf057fb.jpg?1706241918",
+        "normal": "https://cards.scryfall.io/normal/front/f/9/f90f8691-210a-4bf0-9fc2-fb2efcf057fb.jpg?1706241918"
+      },
+      "set": "mkm",
+      "set_name": "Murders at Karlov Manor"
+    },
+    {
+      "name": "Slime Against Humanity",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 275,
+      "tier_rating": "F",
+      "note": "Format too fast for build-around.",
+      "id": "1eb21318-d32e-4724-8908-c0d7613de2f4",
+      "scryfall_uri": "https://scryfall.com/card/mkm/177/slime-against-humanity",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1eb21318-d32e-4724-8908-c0d7613de2f4.jpg?1706242086",
+        "normal": "https://cards.scryfall.io/normal/front/1/e/1eb21318-d32e-4724-8908-c0d7613de2f4.jpg?1706242086"
+      },
+      "set": "mkm",
+      "set_name": "Murders at Karlov Manor"
+    }
+  ],
+  "general_tips": [
+    "Sweepers exist only at rare — go-wide strategies are safer than usual.",
+    "Combat tricks are exceptional in MKM; respect open mana and play around On the Job, The Chase Is On, and Auspicious Arrival.",
+    "Green is the splash-enabler thanks to its mana fixers — multicolor is on the table.",
+    "Disguise creatures have Ward 2 — keep that in mind when sizing your removal.",
+    "Tempo matters more than pure card quality; pressure early and finish before the opponent stabilizes."
+  ]
+}

@@ -223,18 +223,6 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
-    fun onUpdateCondition(userCard: UserCard, condition: String) {
-        viewModelScope.launch {
-            runCatching {
-                userCardRepo.updateAttributes(
-                    id = userCard.id,
-                    isForTrade = userCard.isForTrade,
-                    quantity = userCard.quantity,
-                )
-            }.onFailure { e -> _uiState.update { it.copy(error = e.message) } }
-        }
-    }
-
     fun onConfirmTradeSelection(selections: Map<String, Int>) {
         val userCards = _uiState.value.userCards
         val currentQty = _uiState.value.tradeQuantities
@@ -297,18 +285,6 @@ class CardDetailViewModel @Inject constructor(
     }
 
     // ── Auto-tag mutations ────────────────────────────────────────────────────
-
-    fun onAddTag(tag: CardTag) {
-        val current = _uiState.value.card?.tags ?: return
-        if (tag in current) return
-        val updated = current + tag
-        _uiState.update { it.copy(card = it.card?.copy(tags = updated)) }
-        viewModelScope.launch {
-            runCatching { cardRepo.updateCardTags(scryfallId, updated) }
-                .onSuccess { _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label}' added")) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
-        }
-    }
 
     fun onRemoveTag(tag: CardTag) {
         val current = _uiState.value.card?.tags ?: return
