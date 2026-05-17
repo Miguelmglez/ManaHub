@@ -1,10 +1,28 @@
 package com.mmg.manahub.feature.profile.presentation
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,8 +31,23 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Badge
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,9 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.capitalize
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,13 +66,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.data.local.dao.DeckStatsRow
-import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
-import com.mmg.manahub.core.domain.model.Achievement
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.theme.MarcellusFontFamily
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -51,8 +78,7 @@ import com.mmg.manahub.feature.auth.presentation.AccountSection
 import com.mmg.manahub.feature.auth.presentation.AuthUiState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
-import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,7 +119,7 @@ fun ProfileScreen(
         LoginSheet(
             authViewModel = authViewModel,
             initialTab = loginSheetInitialTab,
-            initialNickname = "",
+            initialNickname = uiState.playerName,
             initialAvatarUrl = uiState.avatarUrl,
             onDismiss = { showLoginSheet = false },
         )
@@ -108,7 +134,6 @@ fun ProfileScreen(
         ) {
             AccountSection(
                 sessionState = sessionState,
-                authUiState = authUiState,
                 onLoginClick = {
                     showAccountSheet = false
                     loginSheetInitialTab = 0
@@ -226,53 +251,6 @@ fun ProfileScreen(
                         .clickable { onStatsClick() },
                 )
             }
-            /*
-                        // ── Best deck ─────────────────────────────────────────────────────
-                        if (uiState.deckStats.isNotEmpty()) {
-                            item {
-                                BestDeckSection(
-                                    deck = uiState.deckStats.first(),
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                )
-                            }
-                        }
-
-                                    // ── Survey insights ───────────────────────────────────────────────
-                                    if (uiState.surveyCount > 0) {
-                                        item {
-                                            SurveyInsightsSection(
-                                                uiState = uiState,
-                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                            )
-                                        }
-                                    }
-
-                                                // ── Achievements ──────────────────────────────────────────────────
-                                                if (uiState.achievements.isNotEmpty()) {
-                                                    item {
-                                                        AchievementsSection(
-                                                            achievements = uiState.achievements,
-                                                            modifier     = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                                        )
-                                                    }
-                                                }*/
-
-            /* // ── Recent games ──────────────────────────────────────────────────
-             if (uiState.recentSessions.isNotEmpty()) {
-                 item {
-                     SectionTitle(
-                         text = stringResource(R.string.profile_recent_games),
-                         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
-                     )
-                 }
-                 items(uiState.recentSessions) { session ->
-                     RecentGameRow(
-                         session = session,
-                         playerName = uiState.playerName,
-                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
-                     )
-                 }
-             }*/
 
             // ── Collection summary ────────────────────────────────────────────
             uiState.collectionStats?.let { stats ->
@@ -534,399 +512,6 @@ private fun KpiCell(
     }
 }
 
-// ── Best deck section ─────────────────────────────────────────────────────────
-
-@Composable
-private fun BestDeckSection(
-    deck: DeckStatsRow,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val winRate = if (deck.totalGames > 0) deck.wins.toFloat() / deck.totalGames else 0f
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SectionTitle(stringResource(R.string.profile_best_deck))
-        Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = deck.deckName ?: "???",
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textPrimary,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "${deck.totalGames}G · ${(winRate * 100).roundToInt()}% WR",
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.primaryAccent,
-                    )
-                }
-                LinearProgressIndicator(
-                    progress = { winRate },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                    color = mc.primaryAccent,
-                    trackColor = mc.surfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-// ── Survey insights section ───────────────────────────────────────────────────
-
-@Composable
-private fun SurveyInsightsSection(
-    uiState: ProfileViewModel.UiState,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SectionTitle(stringResource(R.string.profile_survey_insights))
-        Surface(shape = RoundedCornerShape(14.dp), color = mc.surface) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                InsightRow(
-                    stringResource(R.string.profile_insight_hand_quality),
-                    "${(uiState.avgHandRating * 20).roundToInt()}%",
-                    (uiState.avgHandRating / 5f).toFloat()
-                )
-                InsightRow(
-                    stringResource(R.string.profile_insight_mana_issues),
-                    stringResource(R.string.profile_insight_mana_games, uiState.manaIssueCount),
-                    (uiState.manaIssueCount.toFloat() / uiState.totalGames.coerceAtLeast(1)).coerceAtMost(
-                        1f
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun InsightRow(label: String, value: String, progress: Float) {
-    val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
-            Text(value, style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
-        }
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp)),
-            color = mc.primaryAccent,
-            trackColor = mc.surfaceVariant,
-        )
-    }
-}
-
-// ── Achievements section ──────────────────────────────────────────────────────
-
-@Composable
-private fun AchievementsSection(
-    achievements: List<Achievement>,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val unlocked = achievements.filter { it.isUnlocked }
-    val inProgress = achievements.filter { !it.isUnlocked && (it.progress ?: 0f) > 0f }
-    val locked = achievements.filter { !it.isUnlocked && (it.progress ?: 0f) == 0f }
-
-    var selectedAchievement by remember { mutableStateOf<Achievement?>(null) }
-    var showLocked by remember { mutableStateOf(false) }
-
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle(
-            stringResource(R.string.profile_achievements),
-            modifier = Modifier.padding(top = 8.dp)
-        )
-
-        // Unlocked grid
-        if (unlocked.isNotEmpty()) {
-            Text(
-                stringResource(R.string.profile_achievements_unlocked, unlocked.size),
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary
-            )
-            unlocked.chunked(4).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { ach ->
-                        AchievementBadge(
-                            achievement = ach,
-                            onClick = { selectedAchievement = ach },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
-        }
-
-        // In-progress
-        if (inProgress.isNotEmpty()) {
-            Text(
-                stringResource(R.string.profile_achievements_in_progress, inProgress.size),
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary
-            )
-            inProgress.forEach { ach ->
-                AchievementProgressRow(
-                    achievement = ach,
-                    onClick = { selectedAchievement = ach },
-                )
-            }
-        }
-
-        // Locked — collapsed
-        if (locked.isNotEmpty()) {
-            TextButton(
-                onClick = { showLocked = !showLocked },
-                contentPadding = PaddingValues(0.dp),
-            ) {
-                Text(
-                    text = if (showLocked) stringResource(R.string.profile_achievements_hide_locked) else stringResource(
-                        R.string.profile_achievements_locked_count,
-                        locked.size
-                    ),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textDisabled,
-                )
-            }
-            if (showLocked) {
-                locked.chunked(4).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { ach ->
-                            AchievementBadge(
-                                achievement = ach,
-                                onClick = { selectedAchievement = ach },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
-                }
-            }
-        }
-    }
-
-    selectedAchievement?.let { ach ->
-        AchievementDetailDialog(
-            achievement = ach,
-            onDismiss = { selectedAchievement = null },
-        )
-    }
-}
-
-@Composable
-private fun AchievementBadge(
-    achievement: Achievement,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = if (achievement.isUnlocked) mc.surface else mc.surface.copy(alpha = 0.4f),
-        border = if (achievement.isUnlocked)
-            BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f))
-        else null,
-    ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = achievement.emoji,
-                style = MaterialTheme.magicTypography.bodyLarge.copy(
-                    fontSize = 22.sp,
-                    color = if (achievement.isUnlocked) Color.Unspecified else mc.textDisabled
-                ),
-            )
-            Text(
-                text = achievement.title,
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = if (achievement.isUnlocked) mc.textPrimary else mc.textDisabled,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AchievementProgressRow(
-    achievement: Achievement,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = mc.surface,
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                achievement.emoji,
-                style = MaterialTheme.magicTypography.bodyLarge.copy(fontSize = 20.sp),
-                modifier = Modifier.padding(end = 12.dp)
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        achievement.title,
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.textPrimary
-                    )
-                    achievement.progressLabel?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.primaryAccent
-                        )
-                    }
-                }
-                achievement.progress?.let { prog ->
-                    LinearProgressIndicator(
-                        progress = { prog },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = mc.primaryAccent,
-                        trackColor = mc.surfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AchievementDetailDialog(
-    achievement: Achievement,
-    onDismiss: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.profile_achievement_ok)) }
-        },
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    achievement.emoji,
-                    style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 28.sp)
-                )
-                Text(
-                    achievement.title,
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.textPrimary
-                )
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = mc.primaryAccent.copy(alpha = 0.1f),
-                ) {
-                    Text(
-                        text = achievement.category.label,
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.primaryAccent,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
-                Text(
-                    achievement.description,
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textSecondary
-                )
-                if (!achievement.isUnlocked) {
-                    achievement.progress?.let { prog ->
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    stringResource(R.string.profile_progress),
-                                    style = MaterialTheme.magicTypography.labelSmall,
-                                    color = mc.textDisabled
-                                )
-                                achievement.progressLabel?.let {
-                                    Text(
-                                        it,
-                                        style = MaterialTheme.magicTypography.labelSmall,
-                                        color = mc.primaryAccent
-                                    )
-                                }
-                            }
-                            LinearProgressIndicator(
-                                progress = { prog },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = mc.primaryAccent,
-                                trackColor = mc.surfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        containerColor = mc.backgroundSecondary,
-    )
-}
-
 // ── Color stat card ───────────────────────────────────────────────────────────
 
 @Composable
@@ -958,50 +543,6 @@ private fun ColorStatCard(
     }
 }
 
-// ── Recent games row ──────────────────────────────────────────────────────────
-
-@Composable
-private fun RecentGameRow(
-    session: GameSessionWithPlayers,
-    playerName: String,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
-    val dateStr = dateFormat.format(Date(session.session.playedAt))
-
-    val myPlayer = session.players.find { it.playerName == playerName }
-    val isWin = myPlayer?.isWinner == true
-
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = mc.surface,
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = session.session.mode,
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = mc.textSecondary,
-                )
-                Text(
-                    text = dateStr,
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textDisabled,
-                )
-            }
-            Text(
-                text = if (isWin) stringResource(R.string.profile_win) else stringResource(R.string.profile_loss),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = if (isWin) mc.primaryAccent else mc.textDisabled,
-            )
-        }
-    }
-}
 
 // ── Collection summary ────────────────────────────────────────────────────────
 
@@ -1207,12 +748,3 @@ private fun FriendsSummaryRow(
     }
 }
 
-private fun formatDuration(ms: Long): String {
-    val minutes = ms / 60_000L
-    val hours = minutes / 60
-    val mins = minutes % 60
-    return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
-}
-
-private fun formatDate(timestamp: Long): String =
-    SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))

@@ -12,7 +12,6 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
-import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
@@ -42,7 +41,6 @@ import javax.inject.Inject
 @HiltViewModel
 class CollectionViewModel @Inject constructor(
     private val getCollection: GetCollectionUseCase,
-    private val removeCard: RemoveCardUseCase,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
     private val authRepository: AuthRepository,
@@ -205,13 +203,6 @@ class CollectionViewModel @Inject constructor(
                 CollectionViewMode.GRID
             }
             userPreferencesRepository.saveCollectionViewMode(newMode)
-        }
-    }
-
-    fun onDeleteCard(userCardId: String) {
-        viewModelScope.launch {
-            runCatching { removeCard(userCardId) }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
         }
     }
 

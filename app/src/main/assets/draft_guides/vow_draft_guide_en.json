@@ -1,0 +1,1778 @@
+{
+  "metadata": {
+    "set_name": "Innistrad: Crimson Vow",
+    "set_code": "VOW",
+    "source_url": "https://draftsim.com/mtg-vow-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "October 3, 2024"
+  },
+  "set_overview": {
+    "summary": "Crimson Vow is a \"prince format\" dominated by powerful rares rather than common synergies. The format plays at a medium pace with strong midrange decks and is heavily dependent on removal quality and managing broken rares. Black contains the densest concentration of powerful rares.",
+    "color_ranking": [
+      "{B} Black",
+      "{R} Red",
+      "{W} White",
+      "{U} Blue",
+      "{G} Green"
+    ],
+    "color_notes": {
+      "{B} Black": "Best overall. Highest density of efficient removal (Bleed Dry, Hero's Downfall) and broken rares (Dreadfeast Demon, Toxrill, Henrika Domnathi).",
+      "{R} Red": "Strong removal suite (Flame-Blessed Bolt, Abrade, Rending Flame) but struggles against creatures with 5+ toughness.",
+      "{W} White": "Solid removal access (Fierce Retribution, Sigarda's Imprisonment) supporting multiple archetypes.",
+      "{U} Blue": "Limited hard removal; relies on bounce and counterspells (Syncopate, Wash Away, Geistlight Snare).",
+      "{G} Green": "Minimal interaction; dependent on combat tricks (Wolf Strike) and other colors for answers."
+    },
+    "key_gameplay_notes": [
+      "Splash broken rares with adequate mana sources (minimum 3 sources for 6-turn casting windows).",
+      "Avoid double-colored mana requirements in splashes.",
+      "Play around sweepers (By Invitation Only, Path of Peril) when ahead.",
+      "Hard removal (Bleed Dry, Hero's Downfall) significantly outperforms soft options.",
+      "Prioritize proactivity against late-game rares through aggressive early strategies."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Training (Selesnya)",
+      "summary": "Aggressive mechanic that plays best with low-curve, high-creature-density decks. Pumps trained creatures when they attack with a stronger creature.",
+      "performance": "High variance — requires multiple creatures to set up.",
+      "key_examples": [
+        {
+          "name": "Markov Waltzer",
+          "color": "WR",
+          "rarity": "Uncommon",
+          "pick_order_rank": 69,
+          "tier_rating": "B",
+          "note": null,
+          "id": "c2f45bc0-36ed-44ec-9bc8-31ea7c7fafdb",
+          "scryfall_uri": "https://scryfall.com/card/vow/242/markov-waltzer",
+          "colors": [
+            "R",
+            "W"
+          ],
+          "type_line": "Creature — Vampire",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2f45bc0-36ed-44ec-9bc8-31ea7c7fafdb.jpg?1643594226",
+            "normal": "https://cards.scryfall.io/normal/front/c/2/c2f45bc0-36ed-44ec-9bc8-31ea7c7fafdb.jpg?1643594226"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Daybreak Combatants",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 152,
+          "tier_rating": "C",
+          "note": null,
+          "id": "8697a861-0f67-4ed3-bed8-f264fc78565e",
+          "scryfall_uri": "https://scryfall.com/card/vow/153/daybreak-combatants",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Human Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/6/8697a861-0f67-4ed3-bed8-f264fc78565e.jpg?1643591098",
+            "normal": "https://cards.scryfall.io/normal/front/8/6/8697a861-0f67-4ed3-bed8-f264fc78565e.jpg?1643591098"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Parish-Blade Trainee",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 171,
+          "tier_rating": "D",
+          "note": null,
+          "id": "9845cdf2-e5ba-44a0-8136-72a1eb03a6a1",
+          "scryfall_uri": "https://scryfall.com/card/vow/29/parish-blade-trainee",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/9845cdf2-e5ba-44a0-8136-72a1eb03a6a1.jpg?1643586810",
+            "normal": "https://cards.scryfall.io/normal/front/9/8/9845cdf2-e5ba-44a0-8136-72a1eb03a6a1.jpg?1643586810"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Apprentice Sharpshooter",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 124,
+          "tier_rating": "C",
+          "note": null,
+          "id": "f03f0790-cdc9-4bb4-ae54-2c248435b0a4",
+          "scryfall_uri": "https://scryfall.com/card/vow/185/apprentice-sharpshooter",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Archer",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f03f0790-cdc9-4bb4-ae54-2c248435b0a4.jpg?1643592227",
+            "normal": "https://cards.scryfall.io/normal/front/f/0/f03f0790-cdc9-4bb4-ae54-2c248435b0a4.jpg?1643592227"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        }
+      ]
+    },
+    {
+      "name": "Cleave",
+      "summary": "Dual-purpose utility spells — pay the cleave cost to remove the bracketed text and get a stronger version.",
+      "performance": "Modular efficiency; rate-positive.",
+      "key_examples": []
+    },
+    {
+      "name": "Blood Tokens",
+      "summary": "Mana-smoothing mechanic primarily in Rakdos. Sacrifice + discard + draw enables card selection in extended games.",
+      "performance": "Defines Rakdos Vampires.",
+      "key_examples": [
+        {
+          "name": "Bloodtithe Harvester",
+          "color": "BR",
+          "rarity": "Uncommon",
+          "pick_order_rank": 50,
+          "tier_rating": "B",
+          "note": null,
+          "id": "f0192cf7-3391-4720-b9c8-72dec5dde01e",
+          "scryfall_uri": "https://scryfall.com/card/vow/232/bloodtithe-harvester",
+          "colors": [
+            "B",
+            "R"
+          ],
+          "type_line": "Creature — Vampire",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0192cf7-3391-4720-b9c8-72dec5dde01e.jpg?1643593808",
+            "normal": "https://cards.scryfall.io/normal/front/f/0/f0192cf7-3391-4720-b9c8-72dec5dde01e.jpg?1643593808"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Blood Fountain",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 200,
+          "tier_rating": "D",
+          "note": null,
+          "id": "dd03651e-ada0-41dc-8722-0eba476943e3",
+          "scryfall_uri": "https://scryfall.com/card/vow/95/blood-fountain",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Artifact",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dd03651e-ada0-41dc-8722-0eba476943e3.jpg?1643589142",
+            "normal": "https://cards.scryfall.io/normal/front/d/d/dd03651e-ada0-41dc-8722-0eba476943e3.jpg?1643589142"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        }
+      ]
+    },
+    {
+      "name": "Daybound / Nightbound (Gruul)",
+      "summary": "Global state — nightbound sides offer significant creature upgrades.",
+      "performance": "Anchors Gruul Werewolves.",
+      "key_examples": [
+        {
+          "name": "Avabruck Caretaker",
+          "color": "G",
+          "rarity": "Mythic",
+          "pick_order_rank": 1,
+          "tier_rating": "S",
+          "note": null,
+          "id": "c0c358b4-5af2-438f-8bd5-beb0ee6b518b",
+          "scryfall_uri": "https://scryfall.com/card/vow/187/avabruck-caretaker-hollowhenge-huntmaster",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0c358b4-5af2-438f-8bd5-beb0ee6b518b.jpg?1643592307",
+            "normal": "https://cards.scryfall.io/normal/front/c/0/c0c358b4-5af2-438f-8bd5-beb0ee6b518b.jpg?1643592307"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Hookhand Mariner",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 143,
+          "tier_rating": "C",
+          "note": null,
+          "id": "54a4b031-0919-44aa-a35e-68da7a27235a",
+          "scryfall_uri": "https://scryfall.com/card/vow/203/hookhand-mariner-riphook-raider",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54a4b031-0919-44aa-a35e-68da7a27235a.jpg?1643592840",
+            "normal": "https://cards.scryfall.io/normal/front/5/4/54a4b031-0919-44aa-a35e-68da7a27235a.jpg?1643592840"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Weaver of Blossoms",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 111,
+          "tier_rating": "C",
+          "note": null,
+          "id": "73bf2a0a-b97d-4b90-abd6-d1755734ea15",
+          "scryfall_uri": "https://scryfall.com/card/vow/226/weaver-of-blossoms-blossom-clad-werewolf",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73bf2a0a-b97d-4b90-abd6-d1755734ea15.jpg?1643593617",
+            "normal": "https://cards.scryfall.io/normal/front/7/3/73bf2a0a-b97d-4b90-abd6-d1755734ea15.jpg?1643593617"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        }
+      ]
+    },
+    {
+      "name": "Disturb (Azorius)",
+      "summary": "Dead creatures return as auras rather than spirits, enabling aggressive tempo strategies.",
+      "performance": "Defines Azorius Spirits.",
+      "key_examples": [
+        {
+          "name": "Drogskol Infantry",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 110,
+          "tier_rating": "C",
+          "note": null,
+          "id": "f88e269e-ff3d-4775-8520-5b7a6dddf23d",
+          "scryfall_uri": "https://scryfall.com/card/vow/10/drogskol-infantry-drogskol-armaments",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Spirit Soldier // Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f88e269e-ff3d-4775-8520-5b7a6dddf23d.jpg?1643586120",
+            "normal": "https://cards.scryfall.io/normal/front/f/8/f88e269e-ff3d-4775-8520-5b7a6dddf23d.jpg?1643586120"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Kindly Ancestor",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 99,
+          "tier_rating": "C",
+          "note": null,
+          "id": "25193485-7f41-4b05-9a69-4c112679f97c",
+          "scryfall_uri": "https://scryfall.com/card/vow/22/kindly-ancestor-ancestors-embrace",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Spirit // Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25193485-7f41-4b05-9a69-4c112679f97c.jpg?1643586581",
+            "normal": "https://cards.scryfall.io/normal/front/2/5/25193485-7f41-4b05-9a69-4c112679f97c.jpg?1643586581"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Lantern Bearer",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 137,
+          "tier_rating": "C",
+          "note": null,
+          "id": "a4d3652a-6774-4b16-aa8b-cb11d72ec7aa",
+          "scryfall_uri": "https://scryfall.com/card/vow/66/lantern-bearer-lanterns-lift",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Spirit // Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4d3652a-6774-4b16-aa8b-cb11d72ec7aa.jpg?1643588090",
+            "normal": "https://cards.scryfall.io/normal/front/a/4/a4d3652a-6774-4b16-aa8b-cb11d72ec7aa.jpg?1643588090"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Binding Geist",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 146,
+          "tier_rating": "C",
+          "note": null,
+          "id": "730e4629-dc54-415d-9493-88885788ca19",
+          "scryfall_uri": "https://scryfall.com/card/vow/48/binding-geist-spectral-binding",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Spirit // Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/730e4629-dc54-415d-9493-88885788ca19.jpg?1643587483",
+            "normal": "https://cards.scryfall.io/normal/front/7/3/730e4629-dc54-415d-9493-88885788ca19.jpg?1643587483"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        }
+      ]
+    },
+    {
+      "name": "Exploit (Dimir)",
+      "summary": "Sacrifice mechanic that creates card advantage through zombie payoffs. Exploit creatures can sacrifice themselves and trigger effects.",
+      "performance": "Defines Dimir Zombies.",
+      "key_examples": [
+        {
+          "name": "Stitched Assistant",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 118,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c1debb8c-d5e0-49e5-ab27-2d50e6f9d8d2",
+          "scryfall_uri": "https://scryfall.com/card/vow/81/stitched-assistant",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Zombie",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c1debb8c-d5e0-49e5-ab27-2d50e6f9d8d2.jpg?1643588685",
+            "normal": "https://cards.scryfall.io/normal/front/c/1/c1debb8c-d5e0-49e5-ab27-2d50e6f9d8d2.jpg?1643588685"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Diver Skaab",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 86,
+          "tier_rating": "C",
+          "note": null,
+          "id": "38b5fdf4-3884-436f-8066-bc7593e72b02",
+          "scryfall_uri": "https://scryfall.com/card/vow/56/diver-skaab",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Zombie",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/38b5fdf4-3884-436f-8066-bc7593e72b02.jpg?1643587735",
+            "normal": "https://cards.scryfall.io/normal/front/3/8/38b5fdf4-3884-436f-8066-bc7593e72b02.jpg?1643587735"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Rot-Tide Gargantua",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 122,
+          "tier_rating": "C",
+          "note": null,
+          "id": "1eafefd0-3a9e-400e-8c75-0825aeb2ded1",
+          "scryfall_uri": "https://scryfall.com/card/vow/129/rot-tide-gargantua",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Zombie Kraken",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1eafefd0-3a9e-400e-8c75-0825aeb2ded1.jpg?1643590284",
+            "normal": "https://cards.scryfall.io/normal/front/1/e/1eafefd0-3a9e-400e-8c75-0825aeb2ded1.jpg?1643590284"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Doomed Dissenter",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 119,
+          "tier_rating": "C",
+          "note": null,
+          "id": "f7c0cf16-81ea-45e3-99cc-4424d59bb44b",
+          "scryfall_uri": "https://scryfall.com/card/vow/106/doomed-dissenter",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Human",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7c0cf16-81ea-45e3-99cc-4424d59bb44b.jpg?1643589534",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f7c0cf16-81ea-45e3-99cc-4424d59bb44b.jpg?1643589534"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        },
+        {
+          "name": "Persistent Specimen",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 201,
+          "tier_rating": "D",
+          "note": null,
+          "id": "f7baf973-3202-4fea-8861-a4a5ec228640",
+          "scryfall_uri": "https://scryfall.com/card/vow/125/persistent-specimen",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Skeleton",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7baf973-3202-4fea-8861-a4a5ec228640.jpg?1742990705",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f7baf973-3202-4fea-8861-a4a5ec228640.jpg?1742990705"
+          },
+          "set": "vow",
+          "set_name": "Innistrad: Crimson Vow"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "ally_pairs": [
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Blood / Vampires",
+        "strategy": "Midrange leveraging Blood tokens for mana smoothing and card advantage.",
+        "key_cards": [
+          {
+            "name": "Bloodtithe Harvester",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 50,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f0192cf7-3391-4720-b9c8-72dec5dde01e",
+            "scryfall_uri": "https://scryfall.com/card/vow/232/bloodtithe-harvester",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0192cf7-3391-4720-b9c8-72dec5dde01e.jpg?1643593808",
+              "normal": "https://cards.scryfall.io/normal/front/f/0/f0192cf7-3391-4720-b9c8-72dec5dde01e.jpg?1643593808"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Dreadfeast Demon",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 2,
+            "tier_rating": "S",
+            "note": null,
+            "id": "269199ea-2106-4299-ade0-10cce1320434",
+            "scryfall_uri": "https://scryfall.com/card/vow/108/dreadfeast-demon",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Demon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/6/269199ea-2106-4299-ade0-10cce1320434.jpg?1643589589",
+              "normal": "https://cards.scryfall.io/normal/front/2/6/269199ea-2106-4299-ade0-10cce1320434.jpg?1643589589"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Henrika Domnathi",
+            "color": "B",
+            "rarity": "Mythic",
+            "pick_order_rank": 7,
+            "tier_rating": "S",
+            "note": null,
+            "id": "946ca338-5f43-4cff-bd93-1b28449c5fdc",
+            "scryfall_uri": "https://scryfall.com/card/vow/119/henrika-domnathi-henrika-infernal-seer",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Legendary Creature — Vampire // Legendary Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/946ca338-5f43-4cff-bd93-1b28449c5fdc.jpg?1643589923",
+              "normal": "https://cards.scryfall.io/normal/front/9/4/946ca338-5f43-4cff-bd93-1b28449c5fdc.jpg?1643589923"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Edgar's Awakening",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 173,
+            "tier_rating": "D",
+            "note": null,
+            "id": "96ff9de6-f9ae-4b1c-9fd1-4ba9663922af",
+            "scryfall_uri": "https://scryfall.com/card/vow/110/edgars-awakening",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/96ff9de6-f9ae-4b1c-9fd1-4ba9663922af.jpg?1643589644",
+              "normal": "https://cards.scryfall.io/normal/front/9/6/96ff9de6-f9ae-4b1c-9fd1-4ba9663922af.jpg?1643589644"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Dying to Serve",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 43,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c2ea16cd-801e-478a-b924-5431582b70d1",
+            "scryfall_uri": "https://scryfall.com/card/vow/109/dying-to-serve",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2ea16cd-801e-478a-b924-5431582b70d1.jpg?1643589617",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c2ea16cd-801e-478a-b924-5431582b70d1.jpg?1643589617"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Pointed Discussion",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 175,
+            "tier_rating": "D",
+            "note": null,
+            "id": "076deb63-f7e2-498f-a66a-8a190370a3b3",
+            "scryfall_uri": "https://scryfall.com/card/vow/126/pointed-discussion",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/7/076deb63-f7e2-498f-a66a-8a190370a3b3.jpg?1643590144",
+              "normal": "https://cards.scryfall.io/normal/front/0/7/076deb63-f7e2-498f-a66a-8a190370a3b3.jpg?1643590144"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Blood Fountain",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 200,
+            "tier_rating": "D",
+            "note": null,
+            "id": "dd03651e-ada0-41dc-8722-0eba476943e3",
+            "scryfall_uri": "https://scryfall.com/card/vow/95/blood-fountain",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dd03651e-ada0-41dc-8722-0eba476943e3.jpg?1643589142",
+              "normal": "https://cards.scryfall.io/normal/front/d/d/dd03651e-ada0-41dc-8722-0eba476943e3.jpg?1643589142"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Grisly Ritual",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 221,
+            "tier_rating": "D",
+            "note": null,
+            "id": "53cdf2ab-3acd-49bd-8273-84c1cfc92883",
+            "scryfall_uri": "https://scryfall.com/card/vow/116/grisly-ritual",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/3/53cdf2ab-3acd-49bd-8273-84c1cfc92883.jpg?1643589817",
+              "normal": "https://cards.scryfall.io/normal/front/5/3/53cdf2ab-3acd-49bd-8273-84c1cfc92883.jpg?1643589817"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Exploit / Zombies",
+        "strategy": "Grindy value deck sacrificing creatures with exploit triggers. Synergizes with death triggers and self-mill.",
+        "key_cards": [
+          {
+            "name": "Stitched Assistant",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 118,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c1debb8c-d5e0-49e5-ab27-2d50e6f9d8d2",
+            "scryfall_uri": "https://scryfall.com/card/vow/81/stitched-assistant",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c1debb8c-d5e0-49e5-ab27-2d50e6f9d8d2.jpg?1643588685",
+              "normal": "https://cards.scryfall.io/normal/front/c/1/c1debb8c-d5e0-49e5-ab27-2d50e6f9d8d2.jpg?1643588685"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Diver Skaab",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 86,
+            "tier_rating": "C",
+            "note": null,
+            "id": "38b5fdf4-3884-436f-8066-bc7593e72b02",
+            "scryfall_uri": "https://scryfall.com/card/vow/56/diver-skaab",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/38b5fdf4-3884-436f-8066-bc7593e72b02.jpg?1643587735",
+              "normal": "https://cards.scryfall.io/normal/front/3/8/38b5fdf4-3884-436f-8066-bc7593e72b02.jpg?1643587735"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Rot-Tide Gargantua",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 122,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1eafefd0-3a9e-400e-8c75-0825aeb2ded1",
+            "scryfall_uri": "https://scryfall.com/card/vow/129/rot-tide-gargantua",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie Kraken",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1eafefd0-3a9e-400e-8c75-0825aeb2ded1.jpg?1643590284",
+              "normal": "https://cards.scryfall.io/normal/front/1/e/1eafefd0-3a9e-400e-8c75-0825aeb2ded1.jpg?1643590284"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Doomed Dissenter",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 119,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f7c0cf16-81ea-45e3-99cc-4424d59bb44b",
+            "scryfall_uri": "https://scryfall.com/card/vow/106/doomed-dissenter",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7c0cf16-81ea-45e3-99cc-4424d59bb44b.jpg?1643589534",
+              "normal": "https://cards.scryfall.io/normal/front/f/7/f7c0cf16-81ea-45e3-99cc-4424d59bb44b.jpg?1643589534"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Persistent Specimen",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 201,
+            "tier_rating": "D",
+            "note": null,
+            "id": "f7baf973-3202-4fea-8861-a4a5ec228640",
+            "scryfall_uri": "https://scryfall.com/card/vow/125/persistent-specimen",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Skeleton",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7baf973-3202-4fea-8861-a4a5ec228640.jpg?1742990705",
+              "normal": "https://cards.scryfall.io/normal/front/f/7/f7baf973-3202-4fea-8861-a4a5ec228640.jpg?1742990705"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Disturb / Spirits",
+        "strategy": "Tempo-oriented with fliers and removal. Disturb creatures provide recursive threats as auras.",
+        "key_cards": [
+          {
+            "name": "Drogskol Infantry",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 110,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f88e269e-ff3d-4775-8520-5b7a6dddf23d",
+            "scryfall_uri": "https://scryfall.com/card/vow/10/drogskol-infantry-drogskol-armaments",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Spirit Soldier // Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f88e269e-ff3d-4775-8520-5b7a6dddf23d.jpg?1643586120",
+              "normal": "https://cards.scryfall.io/normal/front/f/8/f88e269e-ff3d-4775-8520-5b7a6dddf23d.jpg?1643586120"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Kindly Ancestor",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 99,
+            "tier_rating": "C",
+            "note": null,
+            "id": "25193485-7f41-4b05-9a69-4c112679f97c",
+            "scryfall_uri": "https://scryfall.com/card/vow/22/kindly-ancestor-ancestors-embrace",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Spirit // Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25193485-7f41-4b05-9a69-4c112679f97c.jpg?1643586581",
+              "normal": "https://cards.scryfall.io/normal/front/2/5/25193485-7f41-4b05-9a69-4c112679f97c.jpg?1643586581"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Lantern Bearer",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 137,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a4d3652a-6774-4b16-aa8b-cb11d72ec7aa",
+            "scryfall_uri": "https://scryfall.com/card/vow/66/lantern-bearer-lanterns-lift",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit // Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4d3652a-6774-4b16-aa8b-cb11d72ec7aa.jpg?1643588090",
+              "normal": "https://cards.scryfall.io/normal/front/a/4/a4d3652a-6774-4b16-aa8b-cb11d72ec7aa.jpg?1643588090"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Binding Geist",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 146,
+            "tier_rating": "C",
+            "note": null,
+            "id": "730e4629-dc54-415d-9493-88885788ca19",
+            "scryfall_uri": "https://scryfall.com/card/vow/48/binding-geist-spectral-binding",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit // Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/730e4629-dc54-415d-9493-88885788ca19.jpg?1643587483",
+              "normal": "https://cards.scryfall.io/normal/front/7/3/730e4629-dc54-415d-9493-88885788ca19.jpg?1643587483"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Daybound / Werewolves",
+        "strategy": "Aggressive werewolves leveraging nightbound upgrades. Benefits from spells triggering day/night transitions.",
+        "key_cards": [
+          {
+            "name": "Avabruck Caretaker",
+            "color": "G",
+            "rarity": "Mythic",
+            "pick_order_rank": 1,
+            "tier_rating": "S",
+            "note": null,
+            "id": "c0c358b4-5af2-438f-8bd5-beb0ee6b518b",
+            "scryfall_uri": "https://scryfall.com/card/vow/187/avabruck-caretaker-hollowhenge-huntmaster",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0c358b4-5af2-438f-8bd5-beb0ee6b518b.jpg?1643592307",
+              "normal": "https://cards.scryfall.io/normal/front/c/0/c0c358b4-5af2-438f-8bd5-beb0ee6b518b.jpg?1643592307"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Hookhand Mariner",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 143,
+            "tier_rating": "C",
+            "note": null,
+            "id": "54a4b031-0919-44aa-a35e-68da7a27235a",
+            "scryfall_uri": "https://scryfall.com/card/vow/203/hookhand-mariner-riphook-raider",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54a4b031-0919-44aa-a35e-68da7a27235a.jpg?1643592840",
+              "normal": "https://cards.scryfall.io/normal/front/5/4/54a4b031-0919-44aa-a35e-68da7a27235a.jpg?1643592840"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Weaver of Blossoms",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 111,
+            "tier_rating": "C",
+            "note": null,
+            "id": "73bf2a0a-b97d-4b90-abd6-d1755734ea15",
+            "scryfall_uri": "https://scryfall.com/card/vow/226/weaver-of-blossoms-blossom-clad-werewolf",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73bf2a0a-b97d-4b90-abd6-d1755734ea15.jpg?1643593617",
+              "normal": "https://cards.scryfall.io/normal/front/7/3/73bf2a0a-b97d-4b90-abd6-d1755734ea15.jpg?1643593617"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Wolf Strike",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 77,
+            "tier_rating": "C",
+            "note": null,
+            "id": "02e9cd00-7ffd-44e1-aa0f-c94489ff4a0f",
+            "scryfall_uri": "https://scryfall.com/card/vow/228/wolf-strike",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02e9cd00-7ffd-44e1-aa0f-c94489ff4a0f.jpg?1643593665",
+              "normal": "https://cards.scryfall.io/normal/front/0/2/02e9cd00-7ffd-44e1-aa0f-c94489ff4a0f.jpg?1643593665"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Training / Humans",
+        "strategy": "Aggressive human-focused deck pumping creatures through training. High variance due to training's conditional nature.",
+        "key_cards": [
+          {
+            "name": "Markov Waltzer",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c2f45bc0-36ed-44ec-9bc8-31ea7c7fafdb",
+            "scryfall_uri": "https://scryfall.com/card/vow/242/markov-waltzer",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2f45bc0-36ed-44ec-9bc8-31ea7c7fafdb.jpg?1643594226",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c2f45bc0-36ed-44ec-9bc8-31ea7c7fafdb.jpg?1643594226"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Daybreak Combatants",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 152,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8697a861-0f67-4ed3-bed8-f264fc78565e",
+            "scryfall_uri": "https://scryfall.com/card/vow/153/daybreak-combatants",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/6/8697a861-0f67-4ed3-bed8-f264fc78565e.jpg?1643591098",
+              "normal": "https://cards.scryfall.io/normal/front/8/6/8697a861-0f67-4ed3-bed8-f264fc78565e.jpg?1643591098"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Parish-Blade Trainee",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 171,
+            "tier_rating": "D",
+            "note": null,
+            "id": "9845cdf2-e5ba-44a0-8136-72a1eb03a6a1",
+            "scryfall_uri": "https://scryfall.com/card/vow/29/parish-blade-trainee",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/9845cdf2-e5ba-44a0-8136-72a1eb03a6a1.jpg?1643586810",
+              "normal": "https://cards.scryfall.io/normal/front/9/8/9845cdf2-e5ba-44a0-8136-72a1eb03a6a1.jpg?1643586810"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          },
+          {
+            "name": "Apprentice Sharpshooter",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 124,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f03f0790-cdc9-4bb4-ae54-2c248435b0a4",
+            "scryfall_uri": "https://scryfall.com/card/vow/185/apprentice-sharpshooter",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Archer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f03f0790-cdc9-4bb4-ae54-2c248435b0a4.jpg?1643592227",
+              "normal": "https://cards.scryfall.io/normal/front/f/0/f03f0790-cdc9-4bb4-ae54-2c248435b0a4.jpg?1643592227"
+            },
+            "set": "vow",
+            "set_name": "Innistrad: Crimson Vow"
+          }
+        ]
+      }
+    ],
+    "enemy_pairs": [
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Lifegain",
+        "strategy": "Cumulative lifegain payoffs with removal and creatures rewarding life gain.",
+        "key_cards": []
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Butts / Midrange",
+        "strategy": "Toughness-focused creatures with removal; leverages high-toughness blockers.",
+        "key_cards": []
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Spells",
+        "strategy": "Tempo deck with instant/sorcery synergies and cantrips providing card advantage.",
+        "key_cards": []
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Aggro",
+        "strategy": "Fastest archetype — pressures opponents before broken rares resolve.",
+        "key_cards": []
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Self-Mill",
+        "strategy": "Only explicitly durdly archetype. Mills for value and graveyard synergies.",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Traveling Minister",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 85,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e672a05c-5f1a-4aa6-9398-e33df01c7c96",
+        "scryfall_uri": "https://scryfall.com/card/vow/39/traveling-minister",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e672a05c-5f1a-4aa6-9398-e33df01c7c96.jpg?1643587131",
+          "normal": "https://cards.scryfall.io/normal/front/e/6/e672a05c-5f1a-4aa6-9398-e33df01c7c96.jpg?1643587131"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Drogskol Infantry",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 110,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f88e269e-ff3d-4775-8520-5b7a6dddf23d",
+        "scryfall_uri": "https://scryfall.com/card/vow/10/drogskol-infantry-drogskol-armaments",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Spirit Soldier // Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f88e269e-ff3d-4775-8520-5b7a6dddf23d.jpg?1643586120",
+          "normal": "https://cards.scryfall.io/normal/front/f/8/f88e269e-ff3d-4775-8520-5b7a6dddf23d.jpg?1643586120"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Fierce Retribution",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 83,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9597b163-5c6b-4f64-b1f1-5f1fa2e23e5d",
+        "scryfall_uri": "https://scryfall.com/card/vow/13/fierce-retribution",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/9597b163-5c6b-4f64-b1f1-5f1fa2e23e5d.jpg?1643586258",
+          "normal": "https://cards.scryfall.io/normal/front/9/5/9597b163-5c6b-4f64-b1f1-5f1fa2e23e5d.jpg?1643586258"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Kindly Ancestor",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "C",
+        "note": null,
+        "id": "25193485-7f41-4b05-9a69-4c112679f97c",
+        "scryfall_uri": "https://scryfall.com/card/vow/22/kindly-ancestor-ancestors-embrace",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Spirit // Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25193485-7f41-4b05-9a69-4c112679f97c.jpg?1643586581",
+          "normal": "https://cards.scryfall.io/normal/front/2/5/25193485-7f41-4b05-9a69-4c112679f97c.jpg?1643586581"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Sigarda's Imprisonment",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 114,
+        "tier_rating": "C",
+        "note": null,
+        "id": "118995a6-8471-47ac-9404-700ce7fc46f6",
+        "scryfall_uri": "https://scryfall.com/card/vow/35/sigardas-imprisonment",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/118995a6-8471-47ac-9404-700ce7fc46f6.jpg?1643587023",
+          "normal": "https://cards.scryfall.io/normal/front/1/1/118995a6-8471-47ac-9404-700ce7fc46f6.jpg?1643587023"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Lantern Bearer",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 137,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a4d3652a-6774-4b16-aa8b-cb11d72ec7aa",
+        "scryfall_uri": "https://scryfall.com/card/vow/66/lantern-bearer-lanterns-lift",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Spirit // Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4d3652a-6774-4b16-aa8b-cb11d72ec7aa.jpg?1643588090",
+          "normal": "https://cards.scryfall.io/normal/front/a/4/a4d3652a-6774-4b16-aa8b-cb11d72ec7aa.jpg?1643588090"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Cruel Witness",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 116,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5bf2c686-efb0-46c7-b34e-c77987914b96",
+        "scryfall_uri": "https://scryfall.com/card/vow/55/cruel-witness",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Bird Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5bf2c686-efb0-46c7-b34e-c77987914b96.jpg?1665819360",
+          "normal": "https://cards.scryfall.io/normal/front/5/b/5bf2c686-efb0-46c7-b34e-c77987914b96.jpg?1665819360"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Scattered Thoughts",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 128,
+        "tier_rating": "C",
+        "note": null,
+        "id": "dc5c6675-6e0f-427d-9399-a6e7fc6215f1",
+        "scryfall_uri": "https://scryfall.com/card/vow/74/scattered-thoughts",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/c/dc5c6675-6e0f-427d-9399-a6e7fc6215f1.jpg?1643588449",
+          "normal": "https://cards.scryfall.io/normal/front/d/c/dc5c6675-6e0f-427d-9399-a6e7fc6215f1.jpg?1643588449"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Chill of the Grave",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 115,
+        "tier_rating": "C",
+        "note": null,
+        "id": "60222e91-a688-4113-a8c2-ab08f52bb6e1",
+        "scryfall_uri": "https://scryfall.com/card/vow/51/chill-of-the-grave",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/0/60222e91-a688-4113-a8c2-ab08f52bb6e1.jpg?1643587605",
+          "normal": "https://cards.scryfall.io/normal/front/6/0/60222e91-a688-4113-a8c2-ab08f52bb6e1.jpg?1643587605"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Binding Geist",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 146,
+        "tier_rating": "C",
+        "note": null,
+        "id": "730e4629-dc54-415d-9493-88885788ca19",
+        "scryfall_uri": "https://scryfall.com/card/vow/48/binding-geist-spectral-binding",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Spirit // Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/730e4629-dc54-415d-9493-88885788ca19.jpg?1643587483",
+          "normal": "https://cards.scryfall.io/normal/front/7/3/730e4629-dc54-415d-9493-88885788ca19.jpg?1643587483"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Bleed Dry",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 53,
+        "tier_rating": "B",
+        "note": null,
+        "id": "3db65755-f104-4de9-bcc9-0a4a7bc66b51",
+        "scryfall_uri": "https://scryfall.com/card/vow/94/bleed-dry",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3db65755-f104-4de9-bcc9-0a4a7bc66b51.jpg?1643589104",
+          "normal": "https://cards.scryfall.io/normal/front/3/d/3db65755-f104-4de9-bcc9-0a4a7bc66b51.jpg?1643589104"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Diregraf Scavenger",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 103,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f72eb127-3f4c-42ed-8ba6-b6d83ea18545",
+        "scryfall_uri": "https://scryfall.com/card/vow/105/diregraf-scavenger",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Zombie Bear",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f72eb127-3f4c-42ed-8ba6-b6d83ea18545.jpg?1643589502",
+          "normal": "https://cards.scryfall.io/normal/front/f/7/f72eb127-3f4c-42ed-8ba6-b6d83ea18545.jpg?1643589502"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Bloodcrazed Socialite",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 130,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8b12c378-1103-4a50-88fa-cf5a2deef463",
+        "scryfall_uri": "https://scryfall.com/card/vow/96/bloodcrazed-socialite",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Vampire",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/b/8b12c378-1103-4a50-88fa-cf5a2deef463.jpg?1643589167",
+          "normal": "https://cards.scryfall.io/normal/front/8/b/8b12c378-1103-4a50-88fa-cf5a2deef463.jpg?1643589167"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Gluttonous Guest",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 121,
+        "tier_rating": "C",
+        "note": null,
+        "id": "18c07288-1c71-4e71-bdf5-910eb583a1d8",
+        "scryfall_uri": "https://scryfall.com/card/vow/114/gluttonous-guest",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Vampire",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/18c07288-1c71-4e71-bdf5-910eb583a1d8.jpg?1643589761",
+          "normal": "https://cards.scryfall.io/normal/front/1/8/18c07288-1c71-4e71-bdf5-910eb583a1d8.jpg?1643589761"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Gift of Fangs",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 120,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a864375f-99c3-4c68-9440-bc25ff6d0dc0",
+        "scryfall_uri": "https://scryfall.com/card/vow/113/gift-of-fangs",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/8/a864375f-99c3-4c68-9440-bc25ff6d0dc0.jpg?1643589732",
+          "normal": "https://cards.scryfall.io/normal/front/a/8/a864375f-99c3-4c68-9440-bc25ff6d0dc0.jpg?1643589732"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Abrade",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 63,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a0e47d11-cb21-402b-a39e-588a94cc57b4",
+        "scryfall_uri": "https://scryfall.com/card/vow/139/abrade",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a0e47d11-cb21-402b-a39e-588a94cc57b4.jpg?1643590610",
+          "normal": "https://cards.scryfall.io/normal/front/a/0/a0e47d11-cb21-402b-a39e-588a94cc57b4.jpg?1643590610"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Flame-Blessed Bolt",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 90,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b1771a8f-7bea-4bb0-9949-566ee6613b93",
+        "scryfall_uri": "https://scryfall.com/card/vow/158/flame-blessed-bolt",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/1/b1771a8f-7bea-4bb0-9949-566ee6613b93.jpg?1643591339",
+          "normal": "https://cards.scryfall.io/normal/front/b/1/b1771a8f-7bea-4bb0-9949-566ee6613b93.jpg?1643591339"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Reckless Impulse",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 107,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6943c07f-ab0d-4f5a-bbe9-c0a83dc98546",
+        "scryfall_uri": "https://scryfall.com/card/vow/174/reckless-impulse",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/6943c07f-ab0d-4f5a-bbe9-c0a83dc98546.jpg?1643591880",
+          "normal": "https://cards.scryfall.io/normal/front/6/9/6943c07f-ab0d-4f5a-bbe9-c0a83dc98546.jpg?1643591880"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Blood Petal Celebrant",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 123,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0c3a4927-f06c-424d-92a9-b40cf8e3e209",
+        "scryfall_uri": "https://scryfall.com/card/vow/146/blood-petal-celebrant",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Vampire",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0c3a4927-f06c-424d-92a9-b40cf8e3e209.jpg?1643590861",
+          "normal": "https://cards.scryfall.io/normal/front/0/c/0c3a4927-f06c-424d-92a9-b40cf8e3e209.jpg?1643590861"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Falkenrath Celebrants",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 104,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4c3c5778-4760-4a8c-8d8d-693e29a0a74b",
+        "scryfall_uri": "https://scryfall.com/card/vow/156/falkenrath-celebrants",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Vampire",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c3c5778-4760-4a8c-8d8d-693e29a0a74b.jpg?1643591201",
+          "normal": "https://cards.scryfall.io/normal/front/4/c/4c3c5778-4760-4a8c-8d8d-693e29a0a74b.jpg?1643591201"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Wolf Strike",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 77,
+        "tier_rating": "C",
+        "note": null,
+        "id": "02e9cd00-7ffd-44e1-aa0f-c94489ff4a0f",
+        "scryfall_uri": "https://scryfall.com/card/vow/228/wolf-strike",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02e9cd00-7ffd-44e1-aa0f-c94489ff4a0f.jpg?1643593665",
+          "normal": "https://cards.scryfall.io/normal/front/0/2/02e9cd00-7ffd-44e1-aa0f-c94489ff4a0f.jpg?1643593665"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Flourishing Hunter",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 134,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2abc54df-773d-4f46-b241-e1f42af8ab95",
+        "scryfall_uri": "https://scryfall.com/card/vow/199/flourishing-hunter",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Wolf Spirit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/a/2abc54df-773d-4f46-b241-e1f42af8ab95.jpg?1643592635",
+          "normal": "https://cards.scryfall.io/normal/front/2/a/2abc54df-773d-4f46-b241-e1f42af8ab95.jpg?1643592635"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Spore Crawler",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 106,
+        "tier_rating": "C",
+        "note": null,
+        "id": "628dbc4c-3640-44a9-8439-873103989409",
+        "scryfall_uri": "https://scryfall.com/card/vow/222/spore-crawler",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Fungus",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/628dbc4c-3640-44a9-8439-873103989409.jpg?1643593445",
+          "normal": "https://cards.scryfall.io/normal/front/6/2/628dbc4c-3640-44a9-8439-873103989409.jpg?1643593445"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Hookhand Mariner",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 143,
+        "tier_rating": "C",
+        "note": null,
+        "id": "54a4b031-0919-44aa-a35e-68da7a27235a",
+        "scryfall_uri": "https://scryfall.com/card/vow/203/hookhand-mariner-riphook-raider",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54a4b031-0919-44aa-a35e-68da7a27235a.jpg?1643592840",
+          "normal": "https://cards.scryfall.io/normal/front/5/4/54a4b031-0919-44aa-a35e-68da7a27235a.jpg?1643592840"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      },
+      {
+        "name": "Weaver of Blossoms",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 111,
+        "tier_rating": "C",
+        "note": null,
+        "id": "73bf2a0a-b97d-4b90-abd6-d1755734ea15",
+        "scryfall_uri": "https://scryfall.com/card/vow/226/weaver-of-blossoms-blossom-clad-werewolf",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73bf2a0a-b97d-4b90-abd6-d1755734ea15.jpg?1643593617",
+          "normal": "https://cards.scryfall.io/normal/front/7/3/73bf2a0a-b97d-4b90-abd6-d1755734ea15.jpg?1643593617"
+        },
+        "set": "vow",
+        "set_name": "Innistrad: Crimson Vow"
+      }
+    ]
+  },
+  "removal_priority": [
+    {
+      "name": "Bleed Dry",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 53,
+      "tier_rating": "B",
+      "note": null,
+      "id": "3db65755-f104-4de9-bcc9-0a4a7bc66b51",
+      "scryfall_uri": "https://scryfall.com/card/vow/94/bleed-dry",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3db65755-f104-4de9-bcc9-0a4a7bc66b51.jpg?1643589104",
+        "normal": "https://cards.scryfall.io/normal/front/3/d/3db65755-f104-4de9-bcc9-0a4a7bc66b51.jpg?1643589104"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Hero's Downfall",
+      "color": "B",
+      "rarity": "Uncommon",
+      "pick_order_rank": 45,
+      "tier_rating": "B",
+      "note": null,
+      "id": "c1b0751e-3a7e-4568-8c64-7429d6829687",
+      "scryfall_uri": "https://scryfall.com/card/vow/120/heros-downfall",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c1b0751e-3a7e-4568-8c64-7429d6829687.jpg?1643589948",
+        "normal": "https://cards.scryfall.io/normal/front/c/1/c1b0751e-3a7e-4568-8c64-7429d6829687.jpg?1643589948"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Fierce Retribution",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 83,
+      "tier_rating": "C",
+      "note": null,
+      "id": "9597b163-5c6b-4f64-b1f1-5f1fa2e23e5d",
+      "scryfall_uri": "https://scryfall.com/card/vow/13/fierce-retribution",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/9597b163-5c6b-4f64-b1f1-5f1fa2e23e5d.jpg?1643586258",
+        "normal": "https://cards.scryfall.io/normal/front/9/5/9597b163-5c6b-4f64-b1f1-5f1fa2e23e5d.jpg?1643586258"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Sigarda's Imprisonment",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 114,
+      "tier_rating": "C",
+      "note": null,
+      "id": "118995a6-8471-47ac-9404-700ce7fc46f6",
+      "scryfall_uri": "https://scryfall.com/card/vow/35/sigardas-imprisonment",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/118995a6-8471-47ac-9404-700ce7fc46f6.jpg?1643587023",
+        "normal": "https://cards.scryfall.io/normal/front/1/1/118995a6-8471-47ac-9404-700ce7fc46f6.jpg?1643587023"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Flame-Blessed Bolt",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 90,
+      "tier_rating": "C",
+      "note": null,
+      "id": "b1771a8f-7bea-4bb0-9949-566ee6613b93",
+      "scryfall_uri": "https://scryfall.com/card/vow/158/flame-blessed-bolt",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/1/b1771a8f-7bea-4bb0-9949-566ee6613b93.jpg?1643591339",
+        "normal": "https://cards.scryfall.io/normal/front/b/1/b1771a8f-7bea-4bb0-9949-566ee6613b93.jpg?1643591339"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Abrade",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 63,
+      "tier_rating": "B",
+      "note": null,
+      "id": "a0e47d11-cb21-402b-a39e-588a94cc57b4",
+      "scryfall_uri": "https://scryfall.com/card/vow/139/abrade",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a0e47d11-cb21-402b-a39e-588a94cc57b4.jpg?1643590610",
+        "normal": "https://cards.scryfall.io/normal/front/a/0/a0e47d11-cb21-402b-a39e-588a94cc57b4.jpg?1643590610"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Rending Flame",
+      "color": "R",
+      "rarity": "Uncommon",
+      "pick_order_rank": 55,
+      "tier_rating": "B",
+      "note": null,
+      "id": "51332c31-41df-4379-aa63-6a734a4df618",
+      "scryfall_uri": "https://scryfall.com/card/vow/175/rending-flame",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/1/51332c31-41df-4379-aa63-6a734a4df618.jpg?1643591905",
+        "normal": "https://cards.scryfall.io/normal/front/5/1/51332c31-41df-4379-aa63-6a734a4df618.jpg?1643591905"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    }
+  ],
+  "broken_rares": [
+    {
+      "name": "Dreadfeast Demon",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 2,
+      "tier_rating": "S",
+      "note": null,
+      "id": "269199ea-2106-4299-ade0-10cce1320434",
+      "scryfall_uri": "https://scryfall.com/card/vow/108/dreadfeast-demon",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Demon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/6/269199ea-2106-4299-ade0-10cce1320434.jpg?1643589589",
+        "normal": "https://cards.scryfall.io/normal/front/2/6/269199ea-2106-4299-ade0-10cce1320434.jpg?1643589589"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Toxrill, the Corrosive",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 3,
+      "tier_rating": "S",
+      "note": null,
+      "id": "84e64f38-b1f3-47cd-8cfb-a4861369aca3",
+      "scryfall_uri": "https://scryfall.com/card/vow/132/toxrill-the-corrosive",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Creature — Slug Horror",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/84e64f38-b1f3-47cd-8cfb-a4861369aca3.jpg?1643590379",
+        "normal": "https://cards.scryfall.io/normal/front/8/4/84e64f38-b1f3-47cd-8cfb-a4861369aca3.jpg?1643590379"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Henrika Domnathi",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 7,
+      "tier_rating": "S",
+      "note": null,
+      "id": "946ca338-5f43-4cff-bd93-1b28449c5fdc",
+      "scryfall_uri": "https://scryfall.com/card/vow/119/henrika-domnathi-henrika-infernal-seer",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Creature — Vampire // Legendary Creature — Vampire",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/946ca338-5f43-4cff-bd93-1b28449c5fdc.jpg?1643589923",
+        "normal": "https://cards.scryfall.io/normal/front/9/4/946ca338-5f43-4cff-bd93-1b28449c5fdc.jpg?1643589923"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    }
+  ],
+  "sweepers_to_play_around": [
+    {
+      "name": "By Invitation Only",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 10,
+      "tier_rating": "S",
+      "note": null,
+      "id": "46764e49-64da-4a94-b61c-75e006b2c5a9",
+      "scryfall_uri": "https://scryfall.com/card/vow/5/by-invitation-only",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/6/46764e49-64da-4a94-b61c-75e006b2c5a9.jpg?1643585907",
+        "normal": "https://cards.scryfall.io/normal/front/4/6/46764e49-64da-4a94-b61c-75e006b2c5a9.jpg?1643585907"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "name": "Path of Peril",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 54,
+      "tier_rating": "B",
+      "note": null,
+      "id": "f0c5449a-d63b-4b22-9432-8f0365c3c4d9",
+      "scryfall_uri": "https://scryfall.com/card/vow/124/path-of-peril",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0c5449a-d63b-4b22-9432-8f0365c3c4d9.jpg?1643590080",
+        "normal": "https://cards.scryfall.io/normal/front/f/0/f0c5449a-d63b-4b22-9432-8f0365c3c4d9.jpg?1643590080"
+      },
+      "set": "vow",
+      "set_name": "Innistrad: Crimson Vow"
+    }
+  ],
+  "general_tips": [
+    "Splash broken rares with at least 3 mana sources for 6-turn casting windows.",
+    "Avoid double-colored mana requirements in splashes.",
+    "Play around sweepers (By Invitation Only, Path of Peril) when ahead.",
+    "Hard removal (Bleed Dry, Hero's Downfall) significantly outperforms soft options.",
+    "Pressure opponents before late-game rares can resolve.",
+    "Sideboard aggressively in BO3 — swap low-impact cards based on the matchup."
+  ]
+}

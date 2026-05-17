@@ -8,8 +8,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Helper para centralizar el registro de eventos en Firebase Analytics.
- * Puede ser inyectado en ViewModels, Repositorios o cualquier clase gestionada por Hilt.
+ * Centralizes Firebase Analytics event logging.
+ * Can be injected into ViewModels, Repositories, or any Hilt-managed class.
  */
 @Singleton
 class AnalyticsHelper @Inject constructor(
@@ -17,9 +17,9 @@ class AnalyticsHelper @Inject constructor(
 ) {
 
     /**
-     * Registra un evento personalizado.
-     * @param name Nombre del evento (máximo 40 caracteres, usar guiones bajos).
-     * @param params Mapa opcional de parámetros (String, Int, Long, Double, Boolean).
+     * Logs a custom event.
+     * @param name Event name (max 40 characters, use underscores).
+     * @param params Optional map of parameters (String, Int, Long, Double, Boolean).
      */
     fun logEvent(name: String, params: Map<String, Any?>? = null) {
         if (BuildConfig.DEBUG) {
@@ -45,9 +45,7 @@ class AnalyticsHelper @Inject constructor(
         firebaseAnalytics.logEvent(name, bundle)
     }
 
-    /**
-     * Establece una propiedad de usuario persistente.
-     */
+    /** Sets a persistent user property. */
     fun setUserProperty(name: String, value: String?) {
         if (BuildConfig.DEBUG) {
             Log.d("AnalyticsHelper", "UserProperty: $name = $value")
@@ -55,9 +53,7 @@ class AnalyticsHelper @Inject constructor(
         firebaseAnalytics.setUserProperty(name, value)
     }
 
-    /**
-     * Identifica al usuario para el seguimiento cross-device.
-     */
+    /** Sets the user ID for cross-device tracking. */
     fun setUserId(id: String?) {
         if (BuildConfig.DEBUG) {
             Log.d("AnalyticsHelper", "UserId: $id")
@@ -65,9 +61,7 @@ class AnalyticsHelper @Inject constructor(
         firebaseAnalytics.setUserId(id)
     }
 
-    /**
-     * Helper para eventos comunes de navegación o pantalla.
-     */
+    /** Logs a screen view event. */
     fun logScreenView(screenName: String, screenClass: String? = null) {
         logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, mapOf(
             FirebaseAnalytics.Param.SCREEN_NAME to screenName,

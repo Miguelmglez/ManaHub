@@ -7,6 +7,10 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.scanner.data.EmbeddingDatabase
+import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
+import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
+import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery

@@ -58,8 +58,8 @@ sealed class Screen(val route: String) {
         fun createRoute(mode: String, playerCount: Int) = "game/play/$mode/$playerCount"
     }
     object GameResult : Screen("game/result")
-    object GameSurvey : Screen("game/survey/{sessionId}") {
-        fun createRoute(sessionId: Long) = "game/survey/$sessionId"
+    object GameSurvey : Screen("game/survey/{sessionId}?mode={mode}") {
+        fun createRoute(sessionId: Long, mode: String = "COMPLETE") = "game/survey/$sessionId?mode=$mode"
     }
 
     // ── Tournament flow ───────────────────────────────────────────────────────
@@ -72,6 +72,10 @@ sealed class Screen(val route: String) {
     // ── News ──────────────────────────────────────────────────────────────────
     object News : Screen("news")
     object NewsSourcesSettings : Screen("news_sources_settings")
+    object NewsVideoPlayer : Screen("news/video/{videoId}?title={title}") {
+        fun createRoute(videoId: String, title: String) =
+            "news/video/${Uri.encode(videoId)}?title=${Uri.encode(title)}"
+    }
 
     // ── Draft ─────────────────────────────────────────────────────────────────
     object Draft : Screen("draft")

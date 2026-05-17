@@ -1,0 +1,2932 @@
+{
+  "metadata": {
+    "set_name": "March of the Machine",
+    "set_code": "MOM",
+    "source_url": "https://draftsim.com/mtg-mom-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "December 29, 2023"
+  },
+  "set_overview": {
+    "summary": "March of the Machine is a sluggish, value-heavy format containing more text than any previously printed set. The format emphasizes diverse strategies with powerful rares like Sunfall and Etali, Primal Conqueror serving as nearly unbeatable haymakers.",
+    "color_ranking": [
+      "{B} Black — best removal density",
+      "{U} Blue — Preening Champion + tempo",
+      "{G} Green — ramp engine for splashy decks",
+      "{W} White — solid creatures + tricks",
+      "{R} Red — weakest by word of mouth"
+    ],
+    "color_notes": {
+      "Note": "MOM is archetype-driven. Three main approaches dominate: aggro/tempo (with convoke and backup), midrange/ramp (green-based good stuff piles), and Dimir control. Multiverse Legends bonus sheet adds 65 reprints but many underperform due to lacking synergies."
+    },
+    "key_gameplay_notes": [
+      "Splashing is common — most decks lean on one of the set's two aggressive mechanics or the green ramp engine.",
+      "Convoke is the name of the game; bait opponent's convoke spells when possible.",
+      "Battles enable instant-speed blowouts with removal.",
+      "Multiverse Legends reprints often lack synergy — evaluate critically."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Convoke",
+      "summary": "Tap creatures to help cast spells; each tapped creature pays one mana of its color.",
+      "performance": "Format-defining for blue/red/white aggressive shells.",
+      "key_examples": [
+        {
+          "name": "Preening Champion",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 133,
+          "tier_rating": "B",
+          "note": "Best convoke common.",
+          "id": "44178ece-af31-4a94-88bc-c9ce43bb4573",
+          "scryfall_uri": "https://scryfall.com/card/mom/73/preening-champion",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Bird Knight",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361",
+            "normal": "https://cards.scryfall.io/normal/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Artistic Refusal",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 100,
+          "tier_rating": "B",
+          "note": null,
+          "id": "2bd05f97-ef8b-4cbe-a44b-6501aa5895b0",
+          "scryfall_uri": "https://scryfall.com/card/mom/46/artistic-refusal",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/b/2bd05f97-ef8b-4cbe-a44b-6501aa5895b0.jpg?1682202981",
+            "normal": "https://cards.scryfall.io/normal/front/2/b/2bd05f97-ef8b-4cbe-a44b-6501aa5895b0.jpg?1682202981"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Collective Nightmare",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 76,
+          "tier_rating": "B",
+          "note": null,
+          "id": "05864d3a-d8bb-4ddf-b721-883632050cb1",
+          "scryfall_uri": "https://scryfall.com/card/mom/95/collective-nightmare",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/5/05864d3a-d8bb-4ddf-b721-883632050cb1.jpg?1682203630",
+            "normal": "https://cards.scryfall.io/normal/front/0/5/05864d3a-d8bb-4ddf-b721-883632050cb1.jpg?1682203630"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Ral's Reinforcements",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 167,
+          "tier_rating": "C",
+          "note": null,
+          "id": "74d0bb76-075c-49d7-9afb-e5bcf5b654f7",
+          "scryfall_uri": "https://scryfall.com/card/mom/158/rals-reinforcements",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429",
+            "normal": "https://cards.scryfall.io/normal/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Stoke the Flames",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 57,
+          "tier_rating": "A",
+          "note": null,
+          "id": "04113b3c-cc8f-4b15-9091-f82ea3df2e7c",
+          "scryfall_uri": "https://scryfall.com/card/mom/166/stoke-the-flames",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04113b3c-cc8f-4b15-9091-f82ea3df2e7c.jpg?1682204515",
+            "normal": "https://cards.scryfall.io/normal/front/0/4/04113b3c-cc8f-4b15-9091-f82ea3df2e7c.jpg?1682204515"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Zephyr Singer",
+          "color": "U",
+          "rarity": "Rare",
+          "pick_order_rank": 37,
+          "tier_rating": "A",
+          "note": null,
+          "id": "9678966b-65f1-405c-b8db-5f2d4f434933",
+          "scryfall_uri": "https://scryfall.com/card/mom/86/zephyr-singer",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Siren Pirate",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/9678966b-65f1-405c-b8db-5f2d4f434933.jpg?1682203503",
+            "normal": "https://cards.scryfall.io/normal/front/9/6/9678966b-65f1-405c-b8db-5f2d4f434933.jpg?1682203503"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        }
+      ]
+    },
+    {
+      "name": "Backup",
+      "summary": "When this creature enters, choose another creature; it gains the backup ability until end of turn.",
+      "performance": "Anchors Boros Backup aggro.",
+      "key_examples": [
+        {
+          "name": "Bola Slinger",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 289,
+          "tier_rating": "D",
+          "note": null,
+          "id": "896043a7-c7a2-4542-8739-7b4f09c6e1f1",
+          "scryfall_uri": "https://scryfall.com/card/mom/8/bola-slinger",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Cat Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505",
+            "normal": "https://cards.scryfall.io/normal/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        }
+      ]
+    },
+    {
+      "name": "Battles",
+      "summary": "New card type — double-faced permanents that require the opponent to defend until they flip into a permanent for you.",
+      "performance": "Aggressive battles excel in tempo decks; mediocre battles should be cut.",
+      "key_examples": [
+        {
+          "name": "Invasion of Kamigawa",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 141,
+          "tier_rating": "B",
+          "note": null,
+          "id": "3140320d-b932-441f-bff3-9bdf4419b88a",
+          "scryfall_uri": "https://scryfall.com/card/mom/62/invasion-of-kamigawa-rooftop-saboteurs",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Battle — Siege // Creature — Moonfolk Ninja",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/3140320d-b932-441f-bff3-9bdf4419b88a.jpg?1739655980",
+            "normal": "https://cards.scryfall.io/normal/front/3/1/3140320d-b932-441f-bff3-9bdf4419b88a.jpg?1739655980"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Zendikar",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 140,
+          "tier_rating": "B",
+          "note": null,
+          "id": "8fed056f-a8f5-41ec-a7d2-a80a238872d1",
+          "scryfall_uri": "https://scryfall.com/card/mom/194/invasion-of-zendikar-awakened-skyclave",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Battle — Siege // Creature — Elemental",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1739656250",
+            "normal": "https://cards.scryfall.io/normal/front/8/f/8fed056f-a8f5-41ec-a7d2-a80a238872d1.jpg?1739656250"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of New Phyrexia",
+          "color": "WU",
+          "rarity": "Mythic",
+          "pick_order_rank": 4,
+          "tier_rating": "S",
+          "note": null,
+          "id": "1b83af86-e1a9-4be1-83dc-0c1ab81b129e",
+          "scryfall_uri": "https://scryfall.com/card/mom/239/invasion-of-new-phyrexia-teferi-akosa-of-zhalfir",
+          "colors": [
+            "U",
+            "W"
+          ],
+          "type_line": "Battle — Siege // Legendary Planeswalker — Teferi",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b83af86-e1a9-4be1-83dc-0c1ab81b129e.jpg?1692183624",
+            "normal": "https://cards.scryfall.io/normal/front/1/b/1b83af86-e1a9-4be1-83dc-0c1ab81b129e.jpg?1692183624"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Fiora",
+          "color": "B",
+          "rarity": "Rare",
+          "pick_order_rank": 42,
+          "tier_rating": "A",
+          "note": null,
+          "id": "b3af679b-6ee6-4a1d-8ec3-b659bdd90b4a",
+          "scryfall_uri": "https://scryfall.com/card/mom/114/invasion-of-fiora-marchesa-resolute-monarch",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Battle — Siege // Legendary Creature — Human Noble",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3af679b-6ee6-4a1d-8ec3-b659bdd90b4a.jpg?1739657237",
+            "normal": "https://cards.scryfall.io/normal/front/b/3/b3af679b-6ee6-4a1d-8ec3-b659bdd90b4a.jpg?1739657237"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Innistrad",
+          "color": "B",
+          "rarity": "Mythic",
+          "pick_order_rank": 45,
+          "tier_rating": "A",
+          "note": null,
+          "id": "77720d2e-2b7b-492b-852c-eea5061eb31b",
+          "scryfall_uri": "https://scryfall.com/card/mom/115/invasion-of-innistrad-deluge-of-the-dead",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Battle — Siege // Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/77720d2e-2b7b-492b-852c-eea5061eb31b.jpg?1682715272",
+            "normal": "https://cards.scryfall.io/normal/front/7/7/77720d2e-2b7b-492b-852c-eea5061eb31b.jpg?1682715272"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Amonkhet",
+          "color": "UB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 116,
+          "tier_rating": "B",
+          "note": null,
+          "id": "981f091a-17f8-412e-9752-69070ebed4ea",
+          "scryfall_uri": "https://scryfall.com/card/mom/231/invasion-of-amonkhet-lazotep-convert",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Battle — Siege // Creature — Zombie",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/981f091a-17f8-412e-9752-69070ebed4ea.jpg?1739663369",
+            "normal": "https://cards.scryfall.io/normal/front/9/8/981f091a-17f8-412e-9752-69070ebed4ea.jpg?1739663369"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Ergamon",
+          "color": "RG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 180,
+          "tier_rating": "C",
+          "note": null,
+          "id": "b3e0fc49-f765-4bd1-a2b9-23e703388b50",
+          "scryfall_uri": "https://scryfall.com/card/mom/233/invasion-of-ergamon-truga-cliffcharger",
+          "colors": [
+            "G",
+            "R"
+          ],
+          "type_line": "Battle — Siege // Creature — Rhino",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3e0fc49-f765-4bd1-a2b9-23e703388b50.jpg?1739663416",
+            "normal": "https://cards.scryfall.io/normal/front/b/3/b3e0fc49-f765-4bd1-a2b9-23e703388b50.jpg?1739663416"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Moag",
+          "color": "WG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 69,
+          "tier_rating": "A",
+          "note": null,
+          "id": "e454bf31-5aa0-4109-a3f5-c3f9cc838682",
+          "scryfall_uri": "https://scryfall.com/card/mom/237/invasion-of-moag-bloomwielder-dryads",
+          "colors": [
+            "G",
+            "W"
+          ],
+          "type_line": "Battle — Siege // Creature — Dryad",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e454bf31-5aa0-4109-a3f5-c3f9cc838682.jpg?1682715370",
+            "normal": "https://cards.scryfall.io/normal/front/e/4/e454bf31-5aa0-4109-a3f5-c3f9cc838682.jpg?1682715370"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        }
+      ]
+    },
+    {
+      "name": "Incubate",
+      "summary": "Create face-down 0/0 artifact creature tokens with N +1/+1 counters; flip them into Phyrexians by paying 2.",
+      "performance": "Solid value mechanic; pairs well with sacrifice synergies.",
+      "key_examples": [
+        {
+          "name": "Elvish Vatkeeper",
+          "color": "BG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 80,
+          "tier_rating": "B",
+          "note": null,
+          "id": "b3227c07-9ef2-46a6-9b4f-bbd6ef12f4a5",
+          "scryfall_uri": "https://scryfall.com/card/mom/223/elvish-vatkeeper",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Creature — Phyrexian Elf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3227c07-9ef2-46a6-9b4f-bbd6ef12f4a5.jpg?1682205237",
+            "normal": "https://cards.scryfall.io/normal/front/b/3/b3227c07-9ef2-46a6-9b4f-bbd6ef12f4a5.jpg?1682205237"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Eyes of Gitaxias",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 153,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c4303347-3fbd-4bbd-ab3f-e7ddbe0e0a9d",
+          "scryfall_uri": "https://scryfall.com/card/mom/57/eyes-of-gitaxias",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c4303347-3fbd-4bbd-ab3f-e7ddbe0e0a9d.jpg?1682203095",
+            "normal": "https://cards.scryfall.io/normal/front/c/4/c4303347-3fbd-4bbd-ab3f-e7ddbe0e0a9d.jpg?1682203095"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Phyrexian Awakening",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 113,
+          "tier_rating": "B",
+          "note": null,
+          "id": "6b9ed068-b6bb-4c9e-a8c9-56aa9b62037a",
+          "scryfall_uri": "https://scryfall.com/card/mom/30/phyrexian-awakening",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6b9ed068-b6bb-4c9e-a8c9-56aa9b62037a.jpg?1682202794",
+            "normal": "https://cards.scryfall.io/normal/front/6/b/6b9ed068-b6bb-4c9e-a8c9-56aa9b62037a.jpg?1682202794"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Gift of Compleation",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 252,
+          "tier_rating": "D",
+          "note": null,
+          "id": "97e08244-bbdb-402a-8dde-93e17d989467",
+          "scryfall_uri": "https://scryfall.com/card/mom/106/gift-of-compleation",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97e08244-bbdb-402a-8dde-93e17d989467.jpg?1682203731",
+            "normal": "https://cards.scryfall.io/normal/front/9/7/97e08244-bbdb-402a-8dde-93e17d989467.jpg?1682203731"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        }
+      ]
+    },
+    {
+      "name": "+1/+1 Counters",
+      "summary": "Soft Selesnya theme.",
+      "performance": "Reliable subtheme.",
+      "key_examples": [
+        {
+          "name": "Botanical Brawler",
+          "color": "WG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 48,
+          "tier_rating": "A",
+          "note": null,
+          "id": "977c15c9-2aad-4d1d-86a6-1f9d78ad7af6",
+          "scryfall_uri": "https://scryfall.com/card/mom/220/botanical-brawler",
+          "colors": [
+            "G",
+            "W"
+          ],
+          "type_line": "Creature — Elemental Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/977c15c9-2aad-4d1d-86a6-1f9d78ad7af6.jpg?1682205206",
+            "normal": "https://cards.scryfall.io/normal/front/9/7/977c15c9-2aad-4d1d-86a6-1f9d78ad7af6.jpg?1682205206"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Moag",
+          "color": "WG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 69,
+          "tier_rating": "A",
+          "note": null,
+          "id": "e454bf31-5aa0-4109-a3f5-c3f9cc838682",
+          "scryfall_uri": "https://scryfall.com/card/mom/237/invasion-of-moag-bloomwielder-dryads",
+          "colors": [
+            "G",
+            "W"
+          ],
+          "type_line": "Battle — Siege // Creature — Dryad",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e454bf31-5aa0-4109-a3f5-c3f9cc838682.jpg?1682715370",
+            "normal": "https://cards.scryfall.io/normal/front/e/4/e454bf31-5aa0-4109-a3f5-c3f9cc838682.jpg?1682715370"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Dusk Legion Duelist",
+          "color": "W",
+          "rarity": "Rare",
+          "pick_order_rank": 75,
+          "tier_rating": "B",
+          "note": null,
+          "id": "7305a8d3-5403-4483-92af-863dc91c6084",
+          "scryfall_uri": "https://scryfall.com/card/mom/11/dusk-legion-duelist",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Vampire Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/7305a8d3-5403-4483-92af-863dc91c6084.jpg?1682202535",
+            "normal": "https://cards.scryfall.io/normal/front/7/3/7305a8d3-5403-4483-92af-863dc91c6084.jpg?1682202535"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        }
+      ]
+    },
+    {
+      "name": "Sacrifice Synergies",
+      "summary": "Rakdos engine — sacrifice cheap creatures for value.",
+      "performance": "Top-tier Rakdos archetype glue.",
+      "key_examples": [
+        {
+          "name": "Furnace Reins",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 253,
+          "tier_rating": "D",
+          "note": null,
+          "id": "e91bfea6-0e80-4239-bede-7cb971e64c1a",
+          "scryfall_uri": "https://scryfall.com/card/mom/141/furnace-reins",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e91bfea6-0e80-4239-bede-7cb971e64c1a.jpg?1682204171",
+            "normal": "https://cards.scryfall.io/normal/front/e/9/e91bfea6-0e80-4239-bede-7cb971e64c1a.jpg?1682204171"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Corrupted Conviction",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 203,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ce133ad5-8748-4a3d-ae8c-7b2a5938927d",
+          "scryfall_uri": "https://scryfall.com/card/mom/98/corrupted-conviction",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/ce133ad5-8748-4a3d-ae8c-7b2a5938927d.jpg?1682203658",
+            "normal": "https://cards.scryfall.io/normal/front/c/e/ce133ad5-8748-4a3d-ae8c-7b2a5938927d.jpg?1682203658"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Mirrodin Avenged",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 328,
+          "tier_rating": "F",
+          "note": null,
+          "id": "750b2090-7fd4-4048-a148-9a5fc7b6f265",
+          "scryfall_uri": "https://scryfall.com/card/mom/118/mirrodin-avenged",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/750b2090-7fd4-4048-a148-9a5fc7b6f265.jpg?1682203878",
+            "normal": "https://cards.scryfall.io/normal/front/7/5/750b2090-7fd4-4048-a148-9a5fc7b6f265.jpg?1682203878"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Final Flourish",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 154,
+          "tier_rating": "C",
+          "note": null,
+          "id": "09a4dcdb-6939-4d9f-8921-549e0ddc9f63",
+          "scryfall_uri": "https://scryfall.com/card/mom/104/final-flourish",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713",
+            "normal": "https://cards.scryfall.io/normal/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        }
+      ]
+    },
+    {
+      "name": "Graveyard / Mill",
+      "summary": "Dimir Control engine. Halo-Charged Skaab loops with Unseal the Necropolis or Ephara's Dispersal.",
+      "performance": "Defines Dimir Graveyard control.",
+      "key_examples": [
+        {
+          "name": "Halo-Charged Skaab",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 149,
+          "tier_rating": "C",
+          "note": null,
+          "id": "5c6bdac3-6762-41a4-821f-ab7034a823d9",
+          "scryfall_uri": "https://scryfall.com/card/mom/60/halo-charged-skaab",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Zombie",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c6bdac3-6762-41a4-821f-ab7034a823d9.jpg?1682203122",
+            "normal": "https://cards.scryfall.io/normal/front/5/c/5c6bdac3-6762-41a4-821f-ab7034a823d9.jpg?1682203122"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Unseal the Necropolis",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 264,
+          "tier_rating": "D",
+          "note": null,
+          "id": "9f9825ac-c186-4a10-b9e3-e73b10f75ed9",
+          "scryfall_uri": "https://scryfall.com/card/mom/128/unseal-the-necropolis",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f9825ac-c186-4a10-b9e3-e73b10f75ed9.jpg?1682204028",
+            "normal": "https://cards.scryfall.io/normal/front/9/f/9f9825ac-c186-4a10-b9e3-e73b10f75ed9.jpg?1682204028"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Halo Forager",
+          "color": "UB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 58,
+          "tier_rating": "A",
+          "note": null,
+          "id": "edb5f0cc-c826-4e7b-882c-63f6e51fa932",
+          "scryfall_uri": "https://scryfall.com/card/mom/227/halo-forager",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Creature — Faerie Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/edb5f0cc-c826-4e7b-882c-63f6e51fa932.jpg?1682205278",
+            "normal": "https://cards.scryfall.io/normal/front/e/d/edb5f0cc-c826-4e7b-882c-63f6e51fa932.jpg?1682205278"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        },
+        {
+          "name": "Invasion of Amonkhet",
+          "color": "UB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 116,
+          "tier_rating": "B",
+          "note": null,
+          "id": "981f091a-17f8-412e-9752-69070ebed4ea",
+          "scryfall_uri": "https://scryfall.com/card/mom/231/invasion-of-amonkhet-lazotep-convert",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Battle — Siege // Creature — Zombie",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/981f091a-17f8-412e-9752-69070ebed4ea.jpg?1739663369",
+            "normal": "https://cards.scryfall.io/normal/front/9/8/981f091a-17f8-412e-9752-69070ebed4ea.jpg?1739663369"
+          },
+          "set": "mom",
+          "set_name": "March of the Machine"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "archetypes": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Knights (Aggro/Tempo)",
+        "strategy": "Soft knights tribal with minimal payoffs. Builds as good stuff piles leveraging convoke.",
+        "key_cards": [
+          {
+            "name": "Marshal of Zhalfir",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 54,
+            "tier_rating": "A",
+            "note": null,
+            "id": "c2418f5c-a85f-4249-8a53-c94b011b9714",
+            "scryfall_uri": "https://scryfall.com/card/mom/246/marshal-of-zhalfir",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2418f5c-a85f-4249-8a53-c94b011b9714.jpg?1682205612",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c2418f5c-a85f-4249-8a53-c94b011b9714.jpg?1682205612"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Invasion of New Phyrexia",
+            "color": "WU",
+            "rarity": "Mythic",
+            "pick_order_rank": 4,
+            "tier_rating": "S",
+            "note": null,
+            "id": "1b83af86-e1a9-4be1-83dc-0c1ab81b129e",
+            "scryfall_uri": "https://scryfall.com/card/mom/239/invasion-of-new-phyrexia-teferi-akosa-of-zhalfir",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Battle — Siege // Legendary Planeswalker — Teferi",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b83af86-e1a9-4be1-83dc-0c1ab81b129e.jpg?1692183624",
+              "normal": "https://cards.scryfall.io/normal/front/1/b/1b83af86-e1a9-4be1-83dc-0c1ab81b129e.jpg?1692183624"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Preening Champion",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 133,
+            "tier_rating": "B",
+            "note": null,
+            "id": "44178ece-af31-4a94-88bc-c9ce43bb4573",
+            "scryfall_uri": "https://scryfall.com/card/mom/73/preening-champion",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Bird Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361",
+              "normal": "https://cards.scryfall.io/normal/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Invasion of Tolvada",
+            "color": "WB",
+            "rarity": "Rare",
+            "pick_order_rank": 44,
+            "tier_rating": "A",
+            "note": null,
+            "id": "00255899-aaaf-46c6-8037-bd0e3c06250c",
+            "scryfall_uri": "https://scryfall.com/card/mom/241/invasion-of-tolvada-the-broken-sky",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Battle — Siege // Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/00255899-aaaf-46c6-8037-bd0e3c06250c.jpg?1682715701",
+              "normal": "https://cards.scryfall.io/normal/front/0/0/00255899-aaaf-46c6-8037-bd0e3c06250c.jpg?1682715701"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Quintorius, Loremaster",
+            "color": "WR",
+            "rarity": "Rare",
+            "pick_order_rank": 13,
+            "tier_rating": "S",
+            "note": null,
+            "id": "a19b152c-8376-42f9-9daf-e139dc29c9ca",
+            "scryfall_uri": "https://scryfall.com/card/mom/250/quintorius-loremaster",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Elephant Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a19b152c-8376-42f9-9daf-e139dc29c9ca.jpg?1682205653",
+              "normal": "https://cards.scryfall.io/normal/front/a/1/a19b152c-8376-42f9-9daf-e139dc29c9ca.jpg?1682205653"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "17"
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Graveyard (Control)",
+        "strategy": "Grindiest deck. Trades 1-for-1 and wins with remaining threats. Loops Halo-Charged Skaab with Unseal the Necropolis or Ephara's Dispersal.",
+        "key_cards": [
+          {
+            "name": "Invasion of Vryn",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 177,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c0ef6737-8e85-42ca-8ee6-6a34f9462de3",
+            "scryfall_uri": "https://scryfall.com/card/mom/64/invasion-of-vryn-overloaded-mage-ring",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Battle — Siege // Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0ef6737-8e85-42ca-8ee6-6a34f9462de3.jpg?1739657380",
+              "normal": "https://cards.scryfall.io/normal/front/c/0/c0ef6737-8e85-42ca-8ee6-6a34f9462de3.jpg?1739657380"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Deadly Derision",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 145,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1ec1a02f-128c-44aa-b708-6fcda34b40c0",
+            "scryfall_uri": "https://scryfall.com/card/mom/99/deadly-derision",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1ec1a02f-128c-44aa-b708-6fcda34b40c0.jpg?1682203667",
+              "normal": "https://cards.scryfall.io/normal/front/1/e/1ec1a02f-128c-44aa-b708-6fcda34b40c0.jpg?1682203667"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Final Flourish",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 154,
+            "tier_rating": "C",
+            "note": null,
+            "id": "09a4dcdb-6939-4d9f-8921-549e0ddc9f63",
+            "scryfall_uri": "https://scryfall.com/card/mom/104/final-flourish",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713",
+              "normal": "https://cards.scryfall.io/normal/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Merciless Repurposing",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 88,
+            "tier_rating": "B",
+            "note": null,
+            "id": "70edec35-1770-47f0-9ad2-32e597ee0327",
+            "scryfall_uri": "https://scryfall.com/card/mom/117/merciless-repurposing",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70edec35-1770-47f0-9ad2-32e597ee0327.jpg?1682203870",
+              "normal": "https://cards.scryfall.io/normal/front/7/0/70edec35-1770-47f0-9ad2-32e597ee0327.jpg?1682203870"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Assimilate Essence",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 291,
+            "tier_rating": "D",
+            "note": null,
+            "id": "f6ee12ba-0e6c-485a-a1ff-61726ed72fea",
+            "scryfall_uri": "https://scryfall.com/card/mom/47/assimilate-essence",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/6/f6ee12ba-0e6c-485a-a1ff-61726ed72fea.jpg?1682202991",
+              "normal": "https://cards.scryfall.io/normal/front/f/6/f6ee12ba-0e6c-485a-a1ff-61726ed72fea.jpg?1682202991"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Halo Forager",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 58,
+            "tier_rating": "A",
+            "note": null,
+            "id": "edb5f0cc-c826-4e7b-882c-63f6e51fa932",
+            "scryfall_uri": "https://scryfall.com/card/mom/227/halo-forager",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Faerie Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/edb5f0cc-c826-4e7b-882c-63f6e51fa932.jpg?1682205278",
+              "normal": "https://cards.scryfall.io/normal/front/e/d/edb5f0cc-c826-4e7b-882c-63f6e51fa932.jpg?1682205278"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Nezumi Informant",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 213,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e36fbff8-471e-4cf8-8946-e1e5cdf598af",
+            "scryfall_uri": "https://scryfall.com/card/mom/120/nezumi-informant",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Rat Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e36fbff8-471e-4cf8-8946-e1e5cdf598af.jpg?1682203908",
+              "normal": "https://cards.scryfall.io/normal/front/e/3/e36fbff8-471e-4cf8-8946-e1e5cdf598af.jpg?1682203908"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Aetherblade Agent",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 190,
+            "tier_rating": "C",
+            "note": null,
+            "id": "dad34ae5-56b4-4394-be02-e043dc1cc23d",
+            "scryfall_uri": "https://scryfall.com/card/mom/88/aetherblade-agent-gitaxian-mindstinger",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Rogue // Creature — Phyrexian Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/dad34ae5-56b4-4394-be02-e043dc1cc23d.jpg?1739658148",
+              "normal": "https://cards.scryfall.io/normal/front/d/a/dad34ae5-56b4-4394-be02-e043dc1cc23d.jpg?1739658148"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "17-18"
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Sacrifice (Aggro/Midrange)",
+        "strategy": "Play cheap creatures and sacrifice for value.",
+        "key_cards": [
+          {
+            "name": "Furnace Reins",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 253,
+            "tier_rating": "D",
+            "note": null,
+            "id": "e91bfea6-0e80-4239-bede-7cb971e64c1a",
+            "scryfall_uri": "https://scryfall.com/card/mom/141/furnace-reins",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e91bfea6-0e80-4239-bede-7cb971e64c1a.jpg?1682204171",
+              "normal": "https://cards.scryfall.io/normal/front/e/9/e91bfea6-0e80-4239-bede-7cb971e64c1a.jpg?1682204171"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Ichor Drinker",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 170,
+            "tier_rating": "C",
+            "note": null,
+            "id": "91fd7350-cc97-4c35-a072-2c826984293c",
+            "scryfall_uri": "https://scryfall.com/card/mom/111/ichor-drinker",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Phyrexian Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/91fd7350-cc97-4c35-a072-2c826984293c.jpg?1682203776",
+              "normal": "https://cards.scryfall.io/normal/front/9/1/91fd7350-cc97-4c35-a072-2c826984293c.jpg?1682203776"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Ral's Reinforcements",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 167,
+            "tier_rating": "C",
+            "note": null,
+            "id": "74d0bb76-075c-49d7-9afb-e5bcf5b654f7",
+            "scryfall_uri": "https://scryfall.com/card/mom/158/rals-reinforcements",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429",
+              "normal": "https://cards.scryfall.io/normal/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Corrupted Conviction",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 203,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ce133ad5-8748-4a3d-ae8c-7b2a5938927d",
+            "scryfall_uri": "https://scryfall.com/card/mom/98/corrupted-conviction",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/ce133ad5-8748-4a3d-ae8c-7b2a5938927d.jpg?1682203658",
+              "normal": "https://cards.scryfall.io/normal/front/c/e/ce133ad5-8748-4a3d-ae8c-7b2a5938927d.jpg?1682203658"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Mirrodin Avenged",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 328,
+            "tier_rating": "F",
+            "note": null,
+            "id": "750b2090-7fd4-4048-a148-9a5fc7b6f265",
+            "scryfall_uri": "https://scryfall.com/card/mom/118/mirrodin-avenged",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/750b2090-7fd4-4048-a148-9a5fc7b6f265.jpg?1682203878",
+              "normal": "https://cards.scryfall.io/normal/front/7/5/750b2090-7fd4-4048-a148-9a5fc7b6f265.jpg?1682203878"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Stormclaw Rager",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 91,
+            "tier_rating": "B",
+            "note": null,
+            "id": "3b00c6e1-dfda-4c47-b1d8-4c114a921477",
+            "scryfall_uri": "https://scryfall.com/card/mom/254/stormclaw-rager",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Creature — Ogre Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/b/3b00c6e1-dfda-4c47-b1d8-4c114a921477.jpg?1682205692",
+              "normal": "https://cards.scryfall.io/normal/front/3/b/3b00c6e1-dfda-4c47-b1d8-4c114a921477.jpg?1682205692"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Compleated Huntmaster",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 148,
+            "tier_rating": "C",
+            "note": null,
+            "id": "4fc23af5-18dd-45f9-8d82-76b48aaf6d4d",
+            "scryfall_uri": "https://scryfall.com/card/mom/96/compleated-huntmaster",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Phyrexian Elf Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4fc23af5-18dd-45f9-8d82-76b48aaf6d4d.jpg?1682203640",
+              "normal": "https://cards.scryfall.io/normal/front/4/f/4fc23af5-18dd-45f9-8d82-76b48aaf6d4d.jpg?1682203640"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "16-17"
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Battles (Midrange)",
+        "strategy": "Maximize battle interactions. Tutor powerful battles and flip them with creatures. Splashes for bomb rares.",
+        "key_cards": [
+          {
+            "name": "Rampaging Geoderm",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 90,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a973e70f-9e3e-47a3-94b9-7bb8a198a438",
+            "scryfall_uri": "https://scryfall.com/card/mom/251/rampaging-geoderm",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Creature — Dinosaur Beast",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a973e70f-9e3e-47a3-94b9-7bb8a198a438.jpg?1682205662",
+              "normal": "https://cards.scryfall.io/normal/front/a/9/a973e70f-9e3e-47a3-94b9-7bb8a198a438.jpg?1682205662"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Invasion of Ergamon",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 180,
+            "tier_rating": "C",
+            "note": null,
+            "id": "b3e0fc49-f765-4bd1-a2b9-23e703388b50",
+            "scryfall_uri": "https://scryfall.com/card/mom/233/invasion-of-ergamon-truga-cliffcharger",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Battle — Siege // Creature — Rhino",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3e0fc49-f765-4bd1-a2b9-23e703388b50.jpg?1739663416",
+              "normal": "https://cards.scryfall.io/normal/front/b/3/b3e0fc49-f765-4bd1-a2b9-23e703388b50.jpg?1739663416"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "War Historian",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 298,
+            "tier_rating": "D",
+            "note": null,
+            "id": "0007efdf-417d-48a7-b119-3a2fda3e1158",
+            "scryfall_uri": "https://scryfall.com/card/mom/214/war-historian",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Monk",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/0007efdf-417d-48a7-b119-3a2fda3e1158.jpg?1682205143",
+              "normal": "https://cards.scryfall.io/normal/front/0/0/0007efdf-417d-48a7-b119-3a2fda3e1158.jpg?1682205143"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Thrashing Frontliner",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 302,
+            "tier_rating": "D",
+            "note": null,
+            "id": "77fd9ccb-2cb0-4fe1-9eb0-ba929bb527be",
+            "scryfall_uri": "https://scryfall.com/card/mom/167/thrashing-frontliner",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Phyrexian Lizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/77fd9ccb-2cb0-4fe1-9eb0-ba929bb527be.jpg?1682204526",
+              "normal": "https://cards.scryfall.io/normal/front/7/7/77fd9ccb-2cb0-4fe1-9eb0-ba929bb527be.jpg?1682204526"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Volcanic Spite",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 114,
+            "tier_rating": "B",
+            "note": null,
+            "id": "69490262-afc2-4692-8fac-b771a972c8f8",
+            "scryfall_uri": "https://scryfall.com/card/mom/170/volcanic-spite",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/69490262-afc2-4692-8fac-b771a972c8f8.jpg?1682204570",
+              "normal": "https://cards.scryfall.io/normal/front/6/9/69490262-afc2-4692-8fac-b771a972c8f8.jpg?1682204570"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Cosmic Hunger",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 151,
+            "tier_rating": "C",
+            "note": null,
+            "id": "b8eef541-6851-4312-ad2b-74f45c7ede6c",
+            "scryfall_uri": "https://scryfall.com/card/mom/182/cosmic-hunger",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b8eef541-6851-4312-ad2b-74f45c7ede6c.jpg?1682204714",
+              "normal": "https://cards.scryfall.io/normal/front/b/8/b8eef541-6851-4312-ad2b-74f45c7ede6c.jpg?1682204714"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "17"
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Counters (Aggro)",
+        "strategy": "Soft +1/+1 counter theme. Builds as aggressive deck or rampy green pile with white removal.",
+        "key_cards": [
+          {
+            "name": "Botanical Brawler",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 48,
+            "tier_rating": "A",
+            "note": null,
+            "id": "977c15c9-2aad-4d1d-86a6-1f9d78ad7af6",
+            "scryfall_uri": "https://scryfall.com/card/mom/220/botanical-brawler",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Elemental Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/977c15c9-2aad-4d1d-86a6-1f9d78ad7af6.jpg?1682205206",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/977c15c9-2aad-4d1d-86a6-1f9d78ad7af6.jpg?1682205206"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Invasion of Moag",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 69,
+            "tier_rating": "A",
+            "note": null,
+            "id": "e454bf31-5aa0-4109-a3f5-c3f9cc838682",
+            "scryfall_uri": "https://scryfall.com/card/mom/237/invasion-of-moag-bloomwielder-dryads",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Battle — Siege // Creature — Dryad",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e454bf31-5aa0-4109-a3f5-c3f9cc838682.jpg?1682715370",
+              "normal": "https://cards.scryfall.io/normal/front/e/4/e454bf31-5aa0-4109-a3f5-c3f9cc838682.jpg?1682715370"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Bola Slinger",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 289,
+            "tier_rating": "D",
+            "note": null,
+            "id": "896043a7-c7a2-4542-8739-7b4f09c6e1f1",
+            "scryfall_uri": "https://scryfall.com/card/mom/8/bola-slinger",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Cat Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505",
+              "normal": "https://cards.scryfall.io/normal/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Dusk Legion Duelist",
+            "color": "W",
+            "rarity": "Rare",
+            "pick_order_rank": 75,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7305a8d3-5403-4483-92af-863dc91c6084",
+            "scryfall_uri": "https://scryfall.com/card/mom/11/dusk-legion-duelist",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Vampire Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/7305a8d3-5403-4483-92af-863dc91c6084.jpg?1682202535",
+              "normal": "https://cards.scryfall.io/normal/front/7/3/7305a8d3-5403-4483-92af-863dc91c6084.jpg?1682202535"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Angelic Intervention",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 278,
+            "tier_rating": "D",
+            "note": null,
+            "id": "09fb5876-5b47-4a05-be57-7ad3890c8953",
+            "scryfall_uri": "https://scryfall.com/card/mom/5/angelic-intervention",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09fb5876-5b47-4a05-be57-7ad3890c8953.jpg?1682202475",
+              "normal": "https://cards.scryfall.io/normal/front/0/9/09fb5876-5b47-4a05-be57-7ad3890c8953.jpg?1682202475"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "16-17"
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Phyrexians (Aggro/Midrange)",
+        "strategy": "Minimal Phyrexian payoffs; often plays as midrange leveraging black synergies.",
+        "key_cards": [
+          {
+            "name": "Invasion of New Capenna",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 120,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f5926c8e-8049-418e-9a84-f8558e5ba9d1",
+            "scryfall_uri": "https://scryfall.com/card/mom/238/invasion-of-new-capenna-holy-frazzle-cannon",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Battle — Siege // Artifact — Equipment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f5926c8e-8049-418e-9a84-f8558e5ba9d1.jpg?1682715382",
+              "normal": "https://cards.scryfall.io/normal/front/f/5/f5926c8e-8049-418e-9a84-f8558e5ba9d1.jpg?1682715382"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Sculpted Perfection",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 144,
+            "tier_rating": "C",
+            "note": null,
+            "id": "594aefa2-7a5b-4ec1-841b-a6ef4f5aa2b1",
+            "scryfall_uri": "https://scryfall.com/card/mom/253/sculpted-perfection",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/594aefa2-7a5b-4ec1-841b-a6ef4f5aa2b1.jpg?1682205682",
+              "normal": "https://cards.scryfall.io/normal/front/5/9/594aefa2-7a5b-4ec1-841b-a6ef4f5aa2b1.jpg?1682205682"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Phyrexian Censor",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 130,
+            "tier_rating": "B",
+            "note": null,
+            "id": "150e17b1-b9fd-4ec4-b305-19596fed14d1",
+            "scryfall_uri": "https://scryfall.com/card/mom/31/phyrexian-censor",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Phyrexian Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/5/150e17b1-b9fd-4ec4-b305-19596fed14d1.jpg?1682202804",
+              "normal": "https://cards.scryfall.io/normal/front/1/5/150e17b1-b9fd-4ec4-b305-19596fed14d1.jpg?1682202804"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Bloated Processor",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 78,
+            "tier_rating": "B",
+            "note": null,
+            "id": "66ddcca8-5720-4341-acce-c6694ddc97f8",
+            "scryfall_uri": "https://scryfall.com/card/mom/93/bloated-processor",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Phyrexian",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66ddcca8-5720-4341-acce-c6694ddc97f8.jpg?1682203612",
+              "normal": "https://cards.scryfall.io/normal/front/6/6/66ddcca8-5720-4341-acce-c6694ddc97f8.jpg?1682203612"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Grafted Butcher",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 52,
+            "tier_rating": "A",
+            "note": null,
+            "id": "e22f11a1-0cbd-4b36-8dbd-37ba29ad4608",
+            "scryfall_uri": "https://scryfall.com/card/mom/109/grafted-butcher",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Phyrexian Samurai",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e22f11a1-0cbd-4b36-8dbd-37ba29ad4608.jpg?1682203758",
+              "normal": "https://cards.scryfall.io/normal/front/e/2/e22f11a1-0cbd-4b36-8dbd-37ba29ad4608.jpg?1682203758"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Phyrexian Awakening",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 113,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6b9ed068-b6bb-4c9e-a8c9-56aa9b62037a",
+            "scryfall_uri": "https://scryfall.com/card/mom/30/phyrexian-awakening",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6b9ed068-b6bb-4c9e-a8c9-56aa9b62037a.jpg?1682202794",
+              "normal": "https://cards.scryfall.io/normal/front/6/b/6b9ed068-b6bb-4c9e-a8c9-56aa9b62037a.jpg?1682202794"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Gift of Compleation",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 252,
+            "tier_rating": "D",
+            "note": null,
+            "id": "97e08244-bbdb-402a-8dde-93e17d989467",
+            "scryfall_uri": "https://scryfall.com/card/mom/106/gift-of-compleation",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97e08244-bbdb-402a-8dde-93e17d989467.jpg?1682203731",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/97e08244-bbdb-402a-8dde-93e17d989467.jpg?1682203731"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "16-18"
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Convoke (Aggro/Tempo)",
+        "strategy": "Highest ceiling of all 2-color archetypes. Leverages small creatures with convoke payoffs.",
+        "key_cards": [
+          {
+            "name": "Joyful Stormsculptor",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 192,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c4dabe69-a88f-4e61-a5fb-c4b9ef1c7569",
+            "scryfall_uri": "https://scryfall.com/card/mom/243/joyful-stormsculptor",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Human Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c4dabe69-a88f-4e61-a5fb-c4b9ef1c7569.jpg?1682205582",
+              "normal": "https://cards.scryfall.io/normal/front/c/4/c4dabe69-a88f-4e61-a5fb-c4b9ef1c7569.jpg?1682205582"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Invasion of Segovia",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 98,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9df3e743-7bb8-482a-afd1-4d51119d416c",
+            "scryfall_uri": "https://scryfall.com/card/mom/63/invasion-of-segovia-caetus-sea-tyrant-of-segovia",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Battle — Siege // Legendary Creature — Serpent",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9df3e743-7bb8-482a-afd1-4d51119d416c.jpg?1682715625",
+              "normal": "https://cards.scryfall.io/normal/front/9/d/9df3e743-7bb8-482a-afd1-4d51119d416c.jpg?1682715625"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Ral's Reinforcements",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 167,
+            "tier_rating": "C",
+            "note": null,
+            "id": "74d0bb76-075c-49d7-9afb-e5bcf5b654f7",
+            "scryfall_uri": "https://scryfall.com/card/mom/158/rals-reinforcements",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429",
+              "normal": "https://cards.scryfall.io/normal/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Preening Champion",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 133,
+            "tier_rating": "B",
+            "note": null,
+            "id": "44178ece-af31-4a94-88bc-c9ce43bb4573",
+            "scryfall_uri": "https://scryfall.com/card/mom/73/preening-champion",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Bird Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361",
+              "normal": "https://cards.scryfall.io/normal/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Stoke the Flames",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 57,
+            "tier_rating": "A",
+            "note": null,
+            "id": "04113b3c-cc8f-4b15-9091-f82ea3df2e7c",
+            "scryfall_uri": "https://scryfall.com/card/mom/166/stoke-the-flames",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04113b3c-cc8f-4b15-9091-f82ea3df2e7c.jpg?1682204515",
+              "normal": "https://cards.scryfall.io/normal/front/0/4/04113b3c-cc8f-4b15-9091-f82ea3df2e7c.jpg?1682204515"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          },
+          {
+            "name": "Zephyr Singer",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 37,
+            "tier_rating": "A",
+            "note": null,
+            "id": "9678966b-65f1-405c-b8db-5f2d4f434933",
+            "scryfall_uri": "https://scryfall.com/card/mom/86/zephyr-singer",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Siren Pirate",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/9678966b-65f1-405c-b8db-5f2d4f434933.jpg?1682203503",
+              "normal": "https://cards.scryfall.io/normal/front/9/6/9678966b-65f1-405c-b8db-5f2d4f434933.jpg?1682203503"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "17"
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Incubate (Midrange)",
+        "strategy": "Incubate synergies with sacrifice payoffs.",
+        "key_cards": [],
+        "land_count": "17"
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Backup (Aggro)",
+        "strategy": "Backup mechanic synergies with aggressive positioning.",
+        "key_cards": [
+          {
+            "name": "Bola Slinger",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 289,
+            "tier_rating": "D",
+            "note": null,
+            "id": "896043a7-c7a2-4542-8739-7b4f09c6e1f1",
+            "scryfall_uri": "https://scryfall.com/card/mom/8/bola-slinger",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Cat Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505",
+              "normal": "https://cards.scryfall.io/normal/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505"
+            },
+            "set": "mom",
+            "set_name": "March of the Machine"
+          }
+        ],
+        "land_count": "16-17"
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Transformers (Midrange/Tempo)",
+        "strategy": "Transformer (DFC) synergies and creature-based midrange.",
+        "key_cards": [],
+        "land_count": "17"
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Bola Slinger",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 289,
+        "tier_rating": "D",
+        "note": null,
+        "id": "896043a7-c7a2-4542-8739-7b4f09c6e1f1",
+        "scryfall_uri": "https://scryfall.com/card/mom/8/bola-slinger",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Cat Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505",
+          "normal": "https://cards.scryfall.io/normal/front/8/9/896043a7-c7a2-4542-8739-7b4f09c6e1f1.jpg?1682202505"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Angelic Intervention",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 278,
+        "tier_rating": "D",
+        "note": null,
+        "id": "09fb5876-5b47-4a05-be57-7ad3890c8953",
+        "scryfall_uri": "https://scryfall.com/card/mom/5/angelic-intervention",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09fb5876-5b47-4a05-be57-7ad3890c8953.jpg?1682202475",
+          "normal": "https://cards.scryfall.io/normal/front/0/9/09fb5876-5b47-4a05-be57-7ad3890c8953.jpg?1682202475"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Cut Short",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 279,
+        "tier_rating": "D",
+        "note": null,
+        "id": "b0a45d4d-d16a-43c6-843c-916d4629aae1",
+        "scryfall_uri": "https://scryfall.com/card/mom/10/cut-short",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b0a45d4d-d16a-43c6-843c-916d4629aae1.jpg?1682202526",
+          "normal": "https://cards.scryfall.io/normal/front/b/0/b0a45d4d-d16a-43c6-843c-916d4629aae1.jpg?1682202526"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Alabaster Host Intercessor",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 184,
+        "tier_rating": "C",
+        "note": null,
+        "id": "165357cc-ec74-490f-aec3-7048bb43c8f9",
+        "scryfall_uri": "https://scryfall.com/card/mom/3/alabaster-host-intercessor",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Phyrexian Samurai",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/6/165357cc-ec74-490f-aec3-7048bb43c8f9.jpg?1687243716",
+          "normal": "https://cards.scryfall.io/normal/front/1/6/165357cc-ec74-490f-aec3-7048bb43c8f9.jpg?1687243716"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Preening Champion",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 133,
+        "tier_rating": "B",
+        "note": "Best common in the set.",
+        "id": "44178ece-af31-4a94-88bc-c9ce43bb4573",
+        "scryfall_uri": "https://scryfall.com/card/mom/73/preening-champion",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Bird Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361",
+          "normal": "https://cards.scryfall.io/normal/front/4/4/44178ece-af31-4a94-88bc-c9ce43bb4573.jpg?1682203361"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Ephara's Dispersal",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 152,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b0bcc71f-72ec-4a76-9393-ed3ea61eeeb6",
+        "scryfall_uri": "https://scryfall.com/card/mom/55/epharas-dispersal",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b0bcc71f-72ec-4a76-9393-ed3ea61eeeb6.jpg?1682203075",
+          "normal": "https://cards.scryfall.io/normal/front/b/0/b0bcc71f-72ec-4a76-9393-ed3ea61eeeb6.jpg?1682203075"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Eyes of Gitaxias",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 153,
+        "tier_rating": "C",
+        "note": null,
+        "id": "c4303347-3fbd-4bbd-ab3f-e7ddbe0e0a9d",
+        "scryfall_uri": "https://scryfall.com/card/mom/57/eyes-of-gitaxias",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c4303347-3fbd-4bbd-ab3f-e7ddbe0e0a9d.jpg?1682203095",
+          "normal": "https://cards.scryfall.io/normal/front/c/4/c4303347-3fbd-4bbd-ab3f-e7ddbe0e0a9d.jpg?1682203095"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Assimilate Essence",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 291,
+        "tier_rating": "D",
+        "note": null,
+        "id": "f6ee12ba-0e6c-485a-a1ff-61726ed72fea",
+        "scryfall_uri": "https://scryfall.com/card/mom/47/assimilate-essence",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/6/f6ee12ba-0e6c-485a-a1ff-61726ed72fea.jpg?1682202991",
+          "normal": "https://cards.scryfall.io/normal/front/f/6/f6ee12ba-0e6c-485a-a1ff-61726ed72fea.jpg?1682202991"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Deadly Derision",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 145,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1ec1a02f-128c-44aa-b708-6fcda34b40c0",
+        "scryfall_uri": "https://scryfall.com/card/mom/99/deadly-derision",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1ec1a02f-128c-44aa-b708-6fcda34b40c0.jpg?1682203667",
+          "normal": "https://cards.scryfall.io/normal/front/1/e/1ec1a02f-128c-44aa-b708-6fcda34b40c0.jpg?1682203667"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Final Flourish",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 154,
+        "tier_rating": "C",
+        "note": null,
+        "id": "09a4dcdb-6939-4d9f-8921-549e0ddc9f63",
+        "scryfall_uri": "https://scryfall.com/card/mom/104/final-flourish",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713",
+          "normal": "https://cards.scryfall.io/normal/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Nezumi Informant",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 213,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e36fbff8-471e-4cf8-8946-e1e5cdf598af",
+        "scryfall_uri": "https://scryfall.com/card/mom/120/nezumi-informant",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Rat Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e36fbff8-471e-4cf8-8946-e1e5cdf598af.jpg?1682203908",
+          "normal": "https://cards.scryfall.io/normal/front/e/3/e36fbff8-471e-4cf8-8946-e1e5cdf598af.jpg?1682203908"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Unseal the Necropolis",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 264,
+        "tier_rating": "D",
+        "note": null,
+        "id": "9f9825ac-c186-4a10-b9e3-e73b10f75ed9",
+        "scryfall_uri": "https://scryfall.com/card/mom/128/unseal-the-necropolis",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f9825ac-c186-4a10-b9e3-e73b10f75ed9.jpg?1682204028",
+          "normal": "https://cards.scryfall.io/normal/front/9/f/9f9825ac-c186-4a10-b9e3-e73b10f75ed9.jpg?1682204028"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Volcanic Spite",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 114,
+        "tier_rating": "B",
+        "note": null,
+        "id": "69490262-afc2-4692-8fac-b771a972c8f8",
+        "scryfall_uri": "https://scryfall.com/card/mom/170/volcanic-spite",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/69490262-afc2-4692-8fac-b771a972c8f8.jpg?1682204570",
+          "normal": "https://cards.scryfall.io/normal/front/6/9/69490262-afc2-4692-8fac-b771a972c8f8.jpg?1682204570"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Ral's Reinforcements",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 167,
+        "tier_rating": "C",
+        "note": null,
+        "id": "74d0bb76-075c-49d7-9afb-e5bcf5b654f7",
+        "scryfall_uri": "https://scryfall.com/card/mom/158/rals-reinforcements",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429",
+          "normal": "https://cards.scryfall.io/normal/front/7/4/74d0bb76-075c-49d7-9afb-e5bcf5b654f7.jpg?1682204429"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Marauding Dreadship",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 202,
+        "tier_rating": "C",
+        "note": null,
+        "id": "15625d6a-3844-4d23-ab35-ee3c3508db8d",
+        "scryfall_uri": "https://scryfall.com/card/mom/153/marauding-dreadship",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Artifact — Vehicle",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/5/15625d6a-3844-4d23-ab35-ee3c3508db8d.jpg?1682291743",
+          "normal": "https://cards.scryfall.io/normal/front/1/5/15625d6a-3844-4d23-ab35-ee3c3508db8d.jpg?1682291743"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Beamtown Beatstick",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 164,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2443cb94-b27e-4a96-93cb-ac7880149bcc",
+        "scryfall_uri": "https://scryfall.com/card/mom/131/beamtown-beatstick",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/2443cb94-b27e-4a96-93cb-ac7880149bcc.jpg?1682204059",
+          "normal": "https://cards.scryfall.io/normal/front/2/4/2443cb94-b27e-4a96-93cb-ac7880149bcc.jpg?1682204059"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Overgrown Pest",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 181,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a1e04eed-9a6c-491b-8f1f-1c76ac40452d",
+        "scryfall_uri": "https://scryfall.com/card/mom/197/overgrown-pest",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Pest",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1e04eed-9a6c-491b-8f1f-1c76ac40452d.jpg?1682204948",
+          "normal": "https://cards.scryfall.io/normal/front/a/1/a1e04eed-9a6c-491b-8f1f-1c76ac40452d.jpg?1682204948"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Cosmic Hunger",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 151,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b8eef541-6851-4312-ad2b-74f45c7ede6c",
+        "scryfall_uri": "https://scryfall.com/card/mom/182/cosmic-hunger",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b8eef541-6851-4312-ad2b-74f45c7ede6c.jpg?1682204714",
+          "normal": "https://cards.scryfall.io/normal/front/b/8/b8eef541-6851-4312-ad2b-74f45c7ede6c.jpg?1682204714"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Blighted Burgeoning",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 258,
+        "tier_rating": "D",
+        "note": null,
+        "id": "007324b3-b8a9-4a32-a5a1-ad78f3a07bc3",
+        "scryfall_uri": "https://scryfall.com/card/mom/177/blighted-burgeoning",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/007324b3-b8a9-4a32-a5a1-ad78f3a07bc3.jpg?1682204648",
+          "normal": "https://cards.scryfall.io/normal/front/0/0/007324b3-b8a9-4a32-a5a1-ad78f3a07bc3.jpg?1682204648"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Portent Tracker",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 183,
+        "tier_rating": "C",
+        "note": null,
+        "id": "bc6104d4-d0af-40da-8227-14243d778e96",
+        "scryfall_uri": "https://scryfall.com/card/mom/201/portent-tracker",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Satyr Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/c/bc6104d4-d0af-40da-8227-14243d778e96.jpg?1682204997",
+          "normal": "https://cards.scryfall.io/normal/front/b/c/bc6104d4-d0af-40da-8227-14243d778e96.jpg?1682204997"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ]
+  },
+  "top_uncommons": [
+    {
+      "name": "Invasion of Amonkhet",
+      "color": "UB",
+      "rarity": "Uncommon",
+      "pick_order_rank": 116,
+      "tier_rating": "B",
+      "note": "#1 — completely bonkers; one of the easiest 3-for-1s.",
+      "id": "981f091a-17f8-412e-9752-69070ebed4ea",
+      "scryfall_uri": "https://scryfall.com/card/mom/231/invasion-of-amonkhet-lazotep-convert",
+      "colors": [
+        "B",
+        "U"
+      ],
+      "type_line": "Battle — Siege // Creature — Zombie",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/981f091a-17f8-412e-9752-69070ebed4ea.jpg?1739663369",
+        "normal": "https://cards.scryfall.io/normal/front/9/8/981f091a-17f8-412e-9752-69070ebed4ea.jpg?1739663369"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Captive Weird",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 227,
+      "tier_rating": "C",
+      "note": "#2 — easy 2-for-1; goes in every deck.",
+      "id": "70668650-0fb1-4486-a4e6-ab9a12be5626",
+      "scryfall_uri": "https://scryfall.com/card/mom/49/captive-weird-compleated-conjurer",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Weird // Creature — Phyrexian Weird",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70668650-0fb1-4486-a4e6-ab9a12be5626.jpg?1682203019",
+        "normal": "https://cards.scryfall.io/normal/front/7/0/70668650-0fb1-4486-a4e6-ab9a12be5626.jpg?1682203019"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Marshal of Zhalfir",
+      "color": "WU",
+      "rarity": "Uncommon",
+      "pick_order_rank": 54,
+      "tier_rating": "A",
+      "note": "#3 — incredible rate for a lord with a tapping ability.",
+      "id": "c2418f5c-a85f-4249-8a53-c94b011b9714",
+      "scryfall_uri": "https://scryfall.com/card/mom/246/marshal-of-zhalfir",
+      "colors": [
+        "U",
+        "W"
+      ],
+      "type_line": "Creature — Human Knight",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2418f5c-a85f-4249-8a53-c94b011b9714.jpg?1682205612",
+        "normal": "https://cards.scryfall.io/normal/front/c/2/c2418f5c-a85f-4249-8a53-c94b011b9714.jpg?1682205612"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Halo Forager",
+      "color": "UB",
+      "rarity": "Uncommon",
+      "pick_order_rank": 58,
+      "tier_rating": "A",
+      "note": "#4 — \"graveyard\" wording enables flexibility.",
+      "id": "edb5f0cc-c826-4e7b-882c-63f6e51fa932",
+      "scryfall_uri": "https://scryfall.com/card/mom/227/halo-forager",
+      "colors": [
+        "B",
+        "U"
+      ],
+      "type_line": "Creature — Faerie Rogue",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/edb5f0cc-c826-4e7b-882c-63f6e51fa932.jpg?1682205278",
+        "normal": "https://cards.scryfall.io/normal/front/e/d/edb5f0cc-c826-4e7b-882c-63f6e51fa932.jpg?1682205278"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Norn's Inquisitor",
+      "color": "W",
+      "rarity": "Uncommon",
+      "pick_order_rank": 71,
+      "tier_rating": "B",
+      "note": "#5 — awesome 2-drop; good with incubate.",
+      "id": "d387b608-ba4e-49c8-bd81-37594290a352",
+      "scryfall_uri": "https://scryfall.com/card/mom/29/norns-inquisitor",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Phyrexian Knight",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d387b608-ba4e-49c8-bd81-37594290a352.jpg?1682202784",
+        "normal": "https://cards.scryfall.io/normal/front/d/3/d387b608-ba4e-49c8-bd81-37594290a352.jpg?1682202784"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Skyclave Aerialist",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 107,
+      "tier_rating": "B",
+      "note": "#6 — premium 2-for-1.",
+      "id": "cd1c8e1a-bd38-47a2-a55a-682ebaede960",
+      "scryfall_uri": "https://scryfall.com/card/mom/78/skyclave-aerialist-skyclave-invader",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Merfolk Scout // Creature — Phyrexian Merfolk Scout",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/d/cd1c8e1a-bd38-47a2-a55a-682ebaede960.jpg?1682203429",
+        "normal": "https://cards.scryfall.io/normal/front/c/d/cd1c8e1a-bd38-47a2-a55a-682ebaede960.jpg?1682203429"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Collective Nightmare",
+      "color": "B",
+      "rarity": "Uncommon",
+      "pick_order_rank": 76,
+      "tier_rating": "B",
+      "note": "#7 — convoke -3/-3 effect.",
+      "id": "05864d3a-d8bb-4ddf-b721-883632050cb1",
+      "scryfall_uri": "https://scryfall.com/card/mom/95/collective-nightmare",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/5/05864d3a-d8bb-4ddf-b721-883632050cb1.jpg?1682203630",
+        "normal": "https://cards.scryfall.io/normal/front/0/5/05864d3a-d8bb-4ddf-b721-883632050cb1.jpg?1682203630"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Artistic Refusal",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 100,
+      "tier_rating": "B",
+      "note": "#8 — scary convoke card; brutal 2-for-1.",
+      "id": "2bd05f97-ef8b-4cbe-a44b-6501aa5895b0",
+      "scryfall_uri": "https://scryfall.com/card/mom/46/artistic-refusal",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/b/2bd05f97-ef8b-4cbe-a44b-6501aa5895b0.jpg?1682202981",
+        "normal": "https://cards.scryfall.io/normal/front/2/b/2bd05f97-ef8b-4cbe-a44b-6501aa5895b0.jpg?1682202981"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Imoti, Celebrant of Bounty",
+      "color": "UG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 175,
+      "tier_rating": "C",
+      "note": "#9 — excellent value; commonly splashed.",
+      "id": "ab58b800-2caa-4b0b-9548-9c43e97bc213",
+      "scryfall_uri": "https://scryfall.com/card/mul/43/imoti-celebrant-of-bounty",
+      "colors": [
+        "G",
+        "U"
+      ],
+      "type_line": "Legendary Creature — Snake Druid",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/ab58b800-2caa-4b0b-9548-9c43e97bc213.jpg?1682200711",
+        "normal": "https://cards.scryfall.io/normal/front/a/b/ab58b800-2caa-4b0b-9548-9c43e97bc213.jpg?1682200711"
+      },
+      "set": "mul",
+      "set_name": "Multiverse Legends"
+    },
+    {
+      "name": "Elvish Vatkeeper",
+      "color": "BG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 80,
+      "tier_rating": "B",
+      "note": "#10 — 3/3 for three plus incubate 2.",
+      "id": "b3227c07-9ef2-46a6-9b4f-bbd6ef12f4a5",
+      "scryfall_uri": "https://scryfall.com/card/mom/223/elvish-vatkeeper",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Creature — Phyrexian Elf",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3227c07-9ef2-46a6-9b4f-bbd6ef12f4a5.jpg?1682205237",
+        "normal": "https://cards.scryfall.io/normal/front/b/3/b3227c07-9ef2-46a6-9b4f-bbd6ef12f4a5.jpg?1682205237"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    }
+  ],
+  "underperforming_uncommons": [
+    {
+      "name": "Radha, Coalition Warlord",
+      "color": "RG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 327,
+      "tier_rating": "D",
+      "note": null,
+      "id": "ca9bdaae-55f4-4e90-b6b5-28eb1cec198b",
+      "scryfall_uri": "https://scryfall.com/card/mul/55/radha-coalition-warlord",
+      "colors": [
+        "G",
+        "R"
+      ],
+      "type_line": "Legendary Creature — Elf Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/ca9bdaae-55f4-4e90-b6b5-28eb1cec198b.jpg?1682228283",
+        "normal": "https://cards.scryfall.io/normal/front/c/a/ca9bdaae-55f4-4e90-b6b5-28eb1cec198b.jpg?1682228283"
+      },
+      "set": "mul",
+      "set_name": "Multiverse Legends"
+    },
+    {
+      "name": "Kitesail",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 310,
+      "tier_rating": "D",
+      "note": null,
+      "id": "fdc3bf6e-e011-4334-a142-c09941c6f213",
+      "scryfall_uri": "https://scryfall.com/card/mom/261/kitesail",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/fdc3bf6e-e011-4334-a142-c09941c6f213.jpg?1682205766",
+        "normal": "https://cards.scryfall.io/normal/front/f/d/fdc3bf6e-e011-4334-a142-c09941c6f213.jpg?1682205766"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Dina, Soul Steeper",
+      "color": "BG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 268,
+      "tier_rating": "D",
+      "note": null,
+      "id": "8d07b9f4-7a92-41ee-bdd8-2c8dbe247ac5",
+      "scryfall_uri": "https://scryfall.com/card/mul/37/dina-soul-steeper",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Legendary Creature — Dryad Druid",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d07b9f4-7a92-41ee-bdd8-2c8dbe247ac5.jpg?1682200653",
+        "normal": "https://cards.scryfall.io/normal/front/8/d/8d07b9f4-7a92-41ee-bdd8-2c8dbe247ac5.jpg?1682200653"
+      },
+      "set": "mul",
+      "set_name": "Multiverse Legends"
+    },
+    {
+      "name": "Kwende, Pride of Femeref",
+      "color": "W",
+      "rarity": "Uncommon",
+      "pick_order_rank": 241,
+      "tier_rating": "C",
+      "note": null,
+      "id": "427cf253-71c1-40cf-bdc3-eeb0431ae37f",
+      "scryfall_uri": "https://scryfall.com/card/mul/5/kwende-pride-of-femeref",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Creature — Human Knight",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/427cf253-71c1-40cf-bdc3-eeb0431ae37f.jpg?1682200324",
+        "normal": "https://cards.scryfall.io/normal/front/4/2/427cf253-71c1-40cf-bdc3-eeb0431ae37f.jpg?1682200324"
+      },
+      "set": "mul",
+      "set_name": "Multiverse Legends"
+    },
+    {
+      "name": "Zada, Hedron Grinder",
+      "color": "R",
+      "rarity": "Uncommon",
+      "pick_order_rank": 267,
+      "tier_rating": "D",
+      "note": null,
+      "id": "8994524c-b9ff-4ca0-9ff0-2d074911bfe6",
+      "scryfall_uri": "https://scryfall.com/card/mul/25/zada-hedron-grinder",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Legendary Creature — Goblin Ally",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/8994524c-b9ff-4ca0-9ff0-2d074911bfe6.jpg?1778822802",
+        "normal": "https://cards.scryfall.io/normal/front/8/9/8994524c-b9ff-4ca0-9ff0-2d074911bfe6.jpg?1778822802"
+      },
+      "set": "mul",
+      "set_name": "Multiverse Legends"
+    }
+  ],
+  "weak_commons": {
+    "{W} White": [
+      {
+        "name": "Infected Defector",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 281,
+        "tier_rating": "D",
+        "note": null,
+        "id": "2777f8b5-2f8e-4cb8-9206-8a4978488657",
+        "scryfall_uri": "https://scryfall.com/card/mom/18/infected-defector",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Phyrexian Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/2777f8b5-2f8e-4cb8-9206-8a4978488657.jpg?1682202626",
+          "normal": "https://cards.scryfall.io/normal/front/2/7/2777f8b5-2f8e-4cb8-9206-8a4978488657.jpg?1682202626"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Attentive Skywarden",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 255,
+        "tier_rating": "D",
+        "note": null,
+        "id": "83d89bd5-95cc-41fc-aea2-2dde52231919",
+        "scryfall_uri": "https://scryfall.com/card/mom/7/attentive-skywarden",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Phyrexian Kor",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/83d89bd5-95cc-41fc-aea2-2dde52231919.jpg?1682202495",
+          "normal": "https://cards.scryfall.io/normal/front/8/3/83d89bd5-95cc-41fc-aea2-2dde52231919.jpg?1682202495"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Inspired Charge",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 317,
+        "tier_rating": "D",
+        "note": null,
+        "id": "9f17e624-219a-4e76-bfe0-f49c9ddd4a6d",
+        "scryfall_uri": "https://scryfall.com/card/mom/19/inspired-charge",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f17e624-219a-4e76-bfe0-f49c9ddd4a6d.jpg?1682202637",
+          "normal": "https://cards.scryfall.io/normal/front/9/f/9f17e624-219a-4e76-bfe0-f49c9ddd4a6d.jpg?1682202637"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Furtive Analyst",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 321,
+        "tier_rating": "D",
+        "note": null,
+        "id": "98c55aff-baed-4fb5-a490-abd59b8df5e7",
+        "scryfall_uri": "https://scryfall.com/card/mom/59/furtive-analyst",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/98c55aff-baed-4fb5-a490-abd59b8df5e7.jpg?1682203113",
+          "normal": "https://cards.scryfall.io/normal/front/9/8/98c55aff-baed-4fb5-a490-abd59b8df5e7.jpg?1682203113"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Oculus Whelp",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 300,
+        "tier_rating": "D",
+        "note": null,
+        "id": "58b35399-79af-49fa-989e-867a85320cc2",
+        "scryfall_uri": "https://scryfall.com/card/mom/69/oculus-whelp",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Phyrexian Dragon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/8/58b35399-79af-49fa-989e-867a85320cc2.jpg?1682203313",
+          "normal": "https://cards.scryfall.io/normal/front/5/8/58b35399-79af-49fa-989e-867a85320cc2.jpg?1682203313"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Negate",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 275,
+        "tier_rating": "D",
+        "note": null,
+        "id": "81752db1-374e-4723-b695-a2f4a634dfc6",
+        "scryfall_uri": "https://scryfall.com/card/mom/68/negate",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/1/81752db1-374e-4723-b695-a2f4a634dfc6.jpg?1682203304",
+          "normal": "https://cards.scryfall.io/normal/front/8/1/81752db1-374e-4723-b695-a2f4a634dfc6.jpg?1682203304"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Tenured Oilcaster",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 306,
+        "tier_rating": "D",
+        "note": null,
+        "id": "65721bc1-87fa-45b9-8b45-ee77c1aab6ac",
+        "scryfall_uri": "https://scryfall.com/card/mom/126/tenured-oilcaster",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Phyrexian Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/65721bc1-87fa-45b9-8b45-ee77c1aab6ac.jpg?1682203989",
+          "normal": "https://cards.scryfall.io/normal/front/6/5/65721bc1-87fa-45b9-8b45-ee77c1aab6ac.jpg?1682203989"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Mirrodin Avenged",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 328,
+        "tier_rating": "F",
+        "note": null,
+        "id": "750b2090-7fd4-4048-a148-9a5fc7b6f265",
+        "scryfall_uri": "https://scryfall.com/card/mom/118/mirrodin-avenged",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/750b2090-7fd4-4048-a148-9a5fc7b6f265.jpg?1682203878",
+          "normal": "https://cards.scryfall.io/normal/front/7/5/750b2090-7fd4-4048-a148-9a5fc7b6f265.jpg?1682203878"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Failed Conversion",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 239,
+        "tier_rating": "C",
+        "note": null,
+        "id": "358c18b7-5321-4793-b54a-e48e39548b9c",
+        "scryfall_uri": "https://scryfall.com/card/mom/103/failed-conversion",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/358c18b7-5321-4793-b54a-e48e39548b9c.jpg?1682203704",
+          "normal": "https://cards.scryfall.io/normal/front/3/5/358c18b7-5321-4793-b54a-e48e39548b9c.jpg?1682203704"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Burning Sun's Fury",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 293,
+        "tier_rating": "D",
+        "note": null,
+        "id": "2731e181-f59c-446c-bb86-8f93bfbb10e9",
+        "scryfall_uri": "https://scryfall.com/card/mom/133/burning-suns-fury",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/2731e181-f59c-446c-bb86-8f93bfbb10e9.jpg?1682204080",
+          "normal": "https://cards.scryfall.io/normal/front/2/7/2731e181-f59c-446c-bb86-8f93bfbb10e9.jpg?1682204080"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Trailblazing Historian",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 313,
+        "tier_rating": "D",
+        "note": null,
+        "id": "a53088da-25b5-4c7e-9a11-456fbc814dfc",
+        "scryfall_uri": "https://scryfall.com/card/mom/168/trailblazing-historian",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Shaman",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a53088da-25b5-4c7e-9a11-456fbc814dfc.jpg?1682204537",
+          "normal": "https://cards.scryfall.io/normal/front/a/5/a53088da-25b5-4c7e-9a11-456fbc814dfc.jpg?1682204537"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Coming In Hot",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 316,
+        "tier_rating": "D",
+        "note": null,
+        "id": "4f6eb966-67af-4b18-8899-4a99a5179aa3",
+        "scryfall_uri": "https://scryfall.com/card/mom/136/coming-in-hot",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f6eb966-67af-4b18-8899-4a99a5179aa3.jpg?1682204111",
+          "normal": "https://cards.scryfall.io/normal/front/4/f/4f6eb966-67af-4b18-8899-4a99a5179aa3.jpg?1682204111"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Crystal Carapace",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 332,
+        "tier_rating": "F",
+        "note": null,
+        "id": "e1888c61-dc2d-4a33-9ba4-439d97f490be",
+        "scryfall_uri": "https://scryfall.com/card/mom/183/crystal-carapace",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e1888c61-dc2d-4a33-9ba4-439d97f490be.jpg?1682204725",
+          "normal": "https://cards.scryfall.io/normal/front/e/1/e1888c61-dc2d-4a33-9ba4-439d97f490be.jpg?1682204725"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Vengeant Earth",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 339,
+        "tier_rating": "F",
+        "note": null,
+        "id": "16e20076-5d24-4c59-b707-6d20e121032f",
+        "scryfall_uri": "https://scryfall.com/card/mom/212/vengeant-earth",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/6/16e20076-5d24-4c59-b707-6d20e121032f.jpg?1682205112",
+          "normal": "https://cards.scryfall.io/normal/front/1/6/16e20076-5d24-4c59-b707-6d20e121032f.jpg?1682205112"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Placid Rottentail",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 308,
+        "tier_rating": "D",
+        "note": null,
+        "id": "7a87c5d2-3ebc-442b-8618-963cfc63855f",
+        "scryfall_uri": "https://scryfall.com/card/mom/199/placid-rottentail",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Fungus Rabbit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a87c5d2-3ebc-442b-8618-963cfc63855f.jpg?1682204968",
+          "normal": "https://cards.scryfall.io/normal/front/7/a/7a87c5d2-3ebc-442b-8618-963cfc63855f.jpg?1682204968"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      }
+    ]
+  },
+  "multiverse_legends": {
+    "description": "Bonus sheet (mul) adding 65 reprinted legendary creatures from across Magic's history. Many underperform in MOM due to lacking synergy support.",
+    "cards_to_avoid": [
+      {
+        "name": "Radha, Coalition Warlord",
+        "color": "RG",
+        "rarity": "Uncommon",
+        "pick_order_rank": 327,
+        "tier_rating": "D",
+        "note": "Lacks force-tap effects.",
+        "id": "ca9bdaae-55f4-4e90-b6b5-28eb1cec198b",
+        "scryfall_uri": "https://scryfall.com/card/mul/55/radha-coalition-warlord",
+        "colors": [
+          "G",
+          "R"
+        ],
+        "type_line": "Legendary Creature — Elf Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/ca9bdaae-55f4-4e90-b6b5-28eb1cec198b.jpg?1682228283",
+          "normal": "https://cards.scryfall.io/normal/front/c/a/ca9bdaae-55f4-4e90-b6b5-28eb1cec198b.jpg?1682228283"
+        },
+        "set": "mul",
+        "set_name": "Multiverse Legends"
+      },
+      {
+        "name": "Kitesail",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 310,
+        "tier_rating": "D",
+        "note": "Limited without Yargle synergy.",
+        "id": "fdc3bf6e-e011-4334-a142-c09941c6f213",
+        "scryfall_uri": "https://scryfall.com/card/mom/261/kitesail",
+        "colors": [],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/fdc3bf6e-e011-4334-a142-c09941c6f213.jpg?1682205766",
+          "normal": "https://cards.scryfall.io/normal/front/f/d/fdc3bf6e-e011-4334-a142-c09941c6f213.jpg?1682205766"
+        },
+        "set": "mom",
+        "set_name": "March of the Machine"
+      },
+      {
+        "name": "Dina, Soul Steeper",
+        "color": "BG",
+        "rarity": "Uncommon",
+        "pick_order_rank": 268,
+        "tier_rating": "D",
+        "note": "Set lacks Pest and lifegain payoffs.",
+        "id": "8d07b9f4-7a92-41ee-bdd8-2c8dbe247ac5",
+        "scryfall_uri": "https://scryfall.com/card/mul/37/dina-soul-steeper",
+        "colors": [
+          "B",
+          "G"
+        ],
+        "type_line": "Legendary Creature — Dryad Druid",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d07b9f4-7a92-41ee-bdd8-2c8dbe247ac5.jpg?1682200653",
+          "normal": "https://cards.scryfall.io/normal/front/8/d/8d07b9f4-7a92-41ee-bdd8-2c8dbe247ac5.jpg?1682200653"
+        },
+        "set": "mul",
+        "set_name": "Multiverse Legends"
+      },
+      {
+        "name": "Kwende, Pride of Femeref",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 241,
+        "tier_rating": "C",
+        "note": "Poor base stats for color.",
+        "id": "427cf253-71c1-40cf-bdc3-eeb0431ae37f",
+        "scryfall_uri": "https://scryfall.com/card/mul/5/kwende-pride-of-femeref",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Legendary Creature — Human Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/427cf253-71c1-40cf-bdc3-eeb0431ae37f.jpg?1682200324",
+          "normal": "https://cards.scryfall.io/normal/front/4/2/427cf253-71c1-40cf-bdc3-eeb0431ae37f.jpg?1682200324"
+        },
+        "set": "mul",
+        "set_name": "Multiverse Legends"
+      },
+      {
+        "name": "Zada, Hedron Grinder",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 267,
+        "tier_rating": "D",
+        "note": "Insufficient combat trick support.",
+        "id": "8994524c-b9ff-4ca0-9ff0-2d074911bfe6",
+        "scryfall_uri": "https://scryfall.com/card/mul/25/zada-hedron-grinder",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Legendary Creature — Goblin Ally",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/8994524c-b9ff-4ca0-9ff0-2d074911bfe6.jpg?1778822802",
+          "normal": "https://cards.scryfall.io/normal/front/8/9/8994524c-b9ff-4ca0-9ff0-2d074911bfe6.jpg?1778822802"
+        },
+        "set": "mul",
+        "set_name": "Multiverse Legends"
+      }
+    ]
+  },
+  "removal_priority": [
+    {
+      "name": "Deadly Derision",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 145,
+      "tier_rating": "C",
+      "note": "Premium rate; BB cost is the only drawback.",
+      "id": "1ec1a02f-128c-44aa-b708-6fcda34b40c0",
+      "scryfall_uri": "https://scryfall.com/card/mom/99/deadly-derision",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1ec1a02f-128c-44aa-b708-6fcda34b40c0.jpg?1682203667",
+        "normal": "https://cards.scryfall.io/normal/front/1/e/1ec1a02f-128c-44aa-b708-6fcda34b40c0.jpg?1682203667"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Volcanic Spite",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 114,
+      "tier_rating": "B",
+      "note": "Instant-speed blowouts with battles.",
+      "id": "69490262-afc2-4692-8fac-b771a972c8f8",
+      "scryfall_uri": "https://scryfall.com/card/mom/170/volcanic-spite",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/69490262-afc2-4692-8fac-b771a972c8f8.jpg?1682204570",
+        "normal": "https://cards.scryfall.io/normal/front/6/9/69490262-afc2-4692-8fac-b771a972c8f8.jpg?1682204570"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Cosmic Hunger",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 151,
+      "tier_rating": "C",
+      "note": "Good rate; pops battles.",
+      "id": "b8eef541-6851-4312-ad2b-74f45c7ede6c",
+      "scryfall_uri": "https://scryfall.com/card/mom/182/cosmic-hunger",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b8eef541-6851-4312-ad2b-74f45c7ede6c.jpg?1682204714",
+        "normal": "https://cards.scryfall.io/normal/front/b/8/b8eef541-6851-4312-ad2b-74f45c7ede6c.jpg?1682204714"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Final Flourish",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 154,
+      "tier_rating": "C",
+      "note": "-3/-3 with sacrifice synergy.",
+      "id": "09a4dcdb-6939-4d9f-8921-549e0ddc9f63",
+      "scryfall_uri": "https://scryfall.com/card/mom/104/final-flourish",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713",
+        "normal": "https://cards.scryfall.io/normal/front/0/9/09a4dcdb-6939-4d9f-8921-549e0ddc9f63.jpg?1682203713"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    },
+    {
+      "name": "Cut Short",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 279,
+      "tier_rating": "D",
+      "note": "Quick answer to large creatures.",
+      "id": "b0a45d4d-d16a-43c6-843c-916d4629aae1",
+      "scryfall_uri": "https://scryfall.com/card/mom/10/cut-short",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b0a45d4d-d16a-43c6-843c-916d4629aae1.jpg?1682202526",
+        "normal": "https://cards.scryfall.io/normal/front/b/0/b0a45d4d-d16a-43c6-843c-916d4629aae1.jpg?1682202526"
+      },
+      "set": "mom",
+      "set_name": "March of the Machine"
+    }
+  ],
+  "general_tips": [
+    "Green midrange decks enable heavy splashing — prioritize lands and Skittering Surveyor.",
+    "Evaluate battles by flipping capability; cut mediocre battles from non-dedicated decks.",
+    "Convoke spells glue green ramp pieces together — Portent Tracker, Blighted Burgeoning, Overgrown Pest fit naturally.",
+    "Play around Cut Short, Volcanic Spite, and Angelic Intervention.",
+    "Red is rated as the weakest color — lean on convoke (Ral's Reinforcements) or use red as a support color.",
+    "Expect a diverse, complicated format — adapt strategies based on signals."
+  ]
+}

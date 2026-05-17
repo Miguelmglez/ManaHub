@@ -18,7 +18,7 @@ object AnalyticsModule {
     @Singleton
     fun provideFirebaseAnalytics(@ApplicationContext context: Context): FirebaseAnalytics {
         val analytics = FirebaseAnalytics.getInstance(context)
-        // Solo habilitar el envío de analíticas en builds de release
+        // Only enable analytics collection in release builds.
         analytics.setAnalyticsCollectionEnabled(!BuildConfig.DEBUG)
         return analytics
     }

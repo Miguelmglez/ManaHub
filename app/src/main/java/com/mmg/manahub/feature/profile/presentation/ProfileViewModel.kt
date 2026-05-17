@@ -249,9 +249,15 @@ class ProfileViewModel @Inject constructor(
         authRepository.sessionState
             .onEach { session ->
                 if (session is SessionState.Authenticated) {
-                    shareInviteUseCase(session.user.id).onSuccess { url ->
+                    val userId = session.user.id
+                    shareInviteUseCase(userId).onSuccess { url ->
                         _uiState.update { it.copy(shareUrl = url) }
                     }
+
+                    // Also refresh friends and requests to ensure the UI shows up-to-date counts
+                    // after login or when returning to the profile screen.
+                    friendRepository.refreshFriends(userId)
+                    friendRepository.refreshRequests(userId)
                 } else {
                     _uiState.update { it.copy(shareUrl = null) }
                 }

@@ -1,0 +1,1613 @@
+{
+  "metadata": {
+    "set_name": "Modern Horizons 3",
+    "set_code": "MH3",
+    "source_url": "https://draftsim.com/mtg-mh3-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "January 12, 2025"
+  },
+  "set_overview": {
+    "summary": "Modern Horizons 3 is a complicated set offering extensive deckbuilding flexibility beyond the ten basic two-color archetypes. The exceptional mana-fixing through the Landscape cycle enables aggressive splashing and three-color configurations.",
+    "color_ranking": [
+      "Tier 1: Gruul Eldrazi, Boros Aggro",
+      "Tier 2: Azorius Energy, Selesnya Aggro, Dimir Draw, Golgari Modified",
+      "Tier 3: Izzet Energy, Simic Eldrazi, Orzhov Modified/Sacrifice",
+      "Tier 4: Rakdos Artifacts"
+    ],
+    "color_notes": {
+      "Note": "MH3 is archetype-driven rather than color-driven. Rank pairs and themes (Eldrazi, Energy, Modified) rather than individual colors. The Landscape cycle and Nightshade Dryad make 3-color decks comfortable."
+    },
+    "key_gameplay_notes": [
+      "The ten Sheltering Landscape cards provide untapped tri-land fixing superior to previous sets.",
+      "Splash generously — the fixing supports even greedy configurations.",
+      "Prioritize synergistic payoffs over individually powerful cards.",
+      "Writhing Chrysalis is format-warping; prioritize accordingly.",
+      "Board sweepers are rare; token strategies thrive."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Eldrazi Spawn Tokens",
+      "summary": "Function as mana acceleration, chump blockers, and fuel for payoff cards like Writhing Chrysalis and Titans' Vanguard.",
+      "performance": "Core to Gruul Eldrazi (tier 1) and Simic Eldrazi (tier 3).",
+      "key_examples": [
+        {
+          "name": "Writhing Chrysalis",
+          "color": "RG",
+          "rarity": "Common",
+          "pick_order_rank": 6,
+          "tier_rating": "S",
+          "note": "The \"mythic common\"; single-handedly carries its archetype.",
+          "id": "f54dbeb1-51f8-40e2-912a-ec25457de5a2",
+          "scryfall_uri": "https://scryfall.com/card/mh3/208/writhing-chrysalis",
+          "colors": [],
+          "type_line": "Creature — Eldrazi Drone",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f54dbeb1-51f8-40e2-912a-ec25457de5a2.jpg?1717012884",
+            "normal": "https://cards.scryfall.io/normal/front/f/5/f54dbeb1-51f8-40e2-912a-ec25457de5a2.jpg?1717012884"
+          },
+          "set": "mh3",
+          "set_name": "Modern Horizons 3"
+        },
+        {
+          "name": "Titans' Vanguard",
+          "color": "RG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 29,
+          "tier_rating": "A",
+          "note": null,
+          "id": "fb3ea14e-44ac-4f69-bfea-cb6bf1bfbd74",
+          "scryfall_uri": "https://scryfall.com/card/mh3/206/titans-vanguard",
+          "colors": [],
+          "type_line": "Creature — Eldrazi",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/b/fb3ea14e-44ac-4f69-bfea-cb6bf1bfbd74.jpg?1717012866",
+            "normal": "https://cards.scryfall.io/normal/front/f/b/fb3ea14e-44ac-4f69-bfea-cb6bf1bfbd74.jpg?1717012866"
+          },
+          "set": "mh3",
+          "set_name": "Modern Horizons 3"
+        }
+      ]
+    },
+    {
+      "name": "Energy",
+      "summary": "Powers draw engines and removal through cards like Izzet Generatorium and various energy sinks.",
+      "performance": "Defines Azorius, Izzet, and Boros archetypes.",
+      "key_examples": [
+        {
+          "name": "Izzet Generatorium",
+          "color": "UR",
+          "rarity": "Uncommon",
+          "pick_order_rank": 272,
+          "tier_rating": "F",
+          "note": null,
+          "id": "c6d9537d-c6b9-46ef-834b-87750d79f1ae",
+          "scryfall_uri": "https://scryfall.com/card/mh3/191/izzet-generatorium",
+          "colors": [
+            "R",
+            "U"
+          ],
+          "type_line": "Artifact",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/6/c6d9537d-c6b9-46ef-834b-87750d79f1ae.jpg?1718364531",
+            "normal": "https://cards.scryfall.io/normal/front/c/6/c6d9537d-c6b9-46ef-834b-87750d79f1ae.jpg?1718364531"
+          },
+          "set": "mh3",
+          "set_name": "Modern Horizons 3"
+        }
+      ]
+    },
+    {
+      "name": "Modified",
+      "summary": "Creatures with counters, equipment, or Auras trigger payoffs like Cursed Wombat and Expanding Ooze.",
+      "performance": "Anchors Golgari, Orzhov, and Selesnya archetypes.",
+      "key_examples": [
+        {
+          "name": "Cursed Wombat",
+          "color": "BG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 183,
+          "tier_rating": "C",
+          "note": null,
+          "id": "a09a8de1-98b3-49e0-82f6-d90f1048de44",
+          "scryfall_uri": "https://scryfall.com/card/mh3/181/cursed-wombat",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Creature — Nightmare Wombat",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a09a8de1-98b3-49e0-82f6-d90f1048de44.jpg?1717012671",
+            "normal": "https://cards.scryfall.io/normal/front/a/0/a09a8de1-98b3-49e0-82f6-d90f1048de44.jpg?1717012671"
+          },
+          "set": "mh3",
+          "set_name": "Modern Horizons 3"
+        },
+        {
+          "name": "Expanding Ooze",
+          "color": "BG",
+          "rarity": "Common",
+          "pick_order_rank": 250,
+          "tier_rating": "D",
+          "note": null,
+          "id": "bbdb095d-b826-4e3e-8c61-0d408e52d6b8",
+          "scryfall_uri": "https://scryfall.com/card/mh3/184/expanding-ooze",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Creature — Ooze",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbdb095d-b826-4e3e-8c61-0d408e52d6b8.jpg?1717012693",
+            "normal": "https://cards.scryfall.io/normal/front/b/b/bbdb095d-b826-4e3e-8c61-0d408e52d6b8.jpg?1717012693"
+          },
+          "set": "mh3",
+          "set_name": "Modern Horizons 3"
+        }
+      ]
+    },
+    {
+      "name": "Sacrifice",
+      "summary": "Enables graveyard synergies and value through cards like Chthonian Nightmare and Accursed Marauder.",
+      "performance": "Core to Orzhov Modified/Sacrifice.",
+      "key_examples": [
+        {
+          "name": "Chthonian Nightmare",
+          "color": "B",
+          "rarity": "Rare",
+          "pick_order_rank": 84,
+          "tier_rating": "B",
+          "note": null,
+          "id": "ce5dd2c1-b6e0-4914-b5c9-7dd451c29e22",
+          "scryfall_uri": "https://scryfall.com/card/mh3/83/chthonian-nightmare",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/ce5dd2c1-b6e0-4914-b5c9-7dd451c29e22.jpg?1717011882",
+            "normal": "https://cards.scryfall.io/normal/front/c/e/ce5dd2c1-b6e0-4914-b5c9-7dd451c29e22.jpg?1717011882"
+          },
+          "set": "mh3",
+          "set_name": "Modern Horizons 3"
+        },
+        {
+          "name": "Accursed Marauder",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 83,
+          "tier_rating": "B",
+          "note": null,
+          "id": "5da14d86-0780-4821-a799-96f64b377df4",
+          "scryfall_uri": "https://scryfall.com/card/mh3/80/accursed-marauder",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Zombie Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5da14d86-0780-4821-a799-96f64b377df4.jpg?1717011855",
+            "normal": "https://cards.scryfall.io/normal/front/5/d/5da14d86-0780-4821-a799-96f64b377df4.jpg?1717011855"
+          },
+          "set": "mh3",
+          "set_name": "Modern Horizons 3"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Eldrazi",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Ramp into Eldrazi using Spawn tokens. Writhing Chrysalis is the centerpiece. Combine spawn generators with removal and bombs.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Writhing Chrysalis",
+            "color": "RG",
+            "rarity": "Common",
+            "pick_order_rank": 6,
+            "tier_rating": "S",
+            "note": null,
+            "id": "f54dbeb1-51f8-40e2-912a-ec25457de5a2",
+            "scryfall_uri": "https://scryfall.com/card/mh3/208/writhing-chrysalis",
+            "colors": [],
+            "type_line": "Creature — Eldrazi Drone",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f54dbeb1-51f8-40e2-912a-ec25457de5a2.jpg?1717012884",
+              "normal": "https://cards.scryfall.io/normal/front/f/5/f54dbeb1-51f8-40e2-912a-ec25457de5a2.jpg?1717012884"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Eldrazi Repurposer",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 23,
+            "tier_rating": "A",
+            "note": null,
+            "id": "37f79ba7-7b65-4387-b498-f770816ce8dd",
+            "scryfall_uri": "https://scryfall.com/card/mh3/150/eldrazi-repurposer",
+            "colors": [],
+            "type_line": "Creature — Eldrazi Drone",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37f79ba7-7b65-4387-b498-f770816ce8dd.jpg?1717012430",
+              "normal": "https://cards.scryfall.io/normal/front/3/7/37f79ba7-7b65-4387-b498-f770816ce8dd.jpg?1717012430"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Malevolent Rumble",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 18,
+            "tier_rating": "A",
+            "note": null,
+            "id": "a178cfe8-f9fa-4255-88d0-54a0bed079f5",
+            "scryfall_uri": "https://scryfall.com/card/mh3/161/malevolent-rumble",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a178cfe8-f9fa-4255-88d0-54a0bed079f5.jpg?1717012517",
+              "normal": "https://cards.scryfall.io/normal/front/a/1/a178cfe8-f9fa-4255-88d0-54a0bed079f5.jpg?1717012517"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Aggro",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Fast beats with energy payoffs. Curve out cheap threats and finish with burn.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Galvanic Discharge",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 15,
+            "tier_rating": "A",
+            "note": null,
+            "id": "32aa6e33-221f-414c-9b51-850d97a7e051",
+            "scryfall_uri": "https://scryfall.com/card/mh3/122/galvanic-discharge",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32aa6e33-221f-414c-9b51-850d97a7e051.jpg?1717012186",
+              "normal": "https://cards.scryfall.io/normal/front/3/2/32aa6e33-221f-414c-9b51-850d97a7e051.jpg?1717012186"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Aerie Auxiliary",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 36,
+            "tier_rating": "A",
+            "note": null,
+            "id": "5e4c134b-a416-467e-a158-def84c92c6af",
+            "scryfall_uri": "https://scryfall.com/card/mh3/18/aerie-auxiliary",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Bird Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/e/5e4c134b-a416-467e-a158-def84c92c6af.jpg?1717011339",
+              "normal": "https://cards.scryfall.io/normal/front/5/e/5e4c134b-a416-467e-a158-def84c92c6af.jpg?1717011339"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Energy",
+        "tier": "Tier 2 — Great Deck",
+        "strategy": "Control-oriented energy midrange. Trade efficiently while accumulating energy for late-game payoffs.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Serum Visionary",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 44,
+            "tier_rating": "B",
+            "note": null,
+            "id": "08a587f5-5910-405e-8982-c889dbbc7f98",
+            "scryfall_uri": "https://scryfall.com/card/mh3/69/serum-visionary",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Vedalken Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08a587f5-5910-405e-8982-c889dbbc7f98.jpg?1717011772",
+              "normal": "https://cards.scryfall.io/normal/front/0/8/08a587f5-5910-405e-8982-c889dbbc7f98.jpg?1717011772"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Aether Spike",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 101,
+            "tier_rating": "C",
+            "note": null,
+            "id": "012f5195-10ab-4b32-a5de-a79341cd536a",
+            "scryfall_uri": "https://scryfall.com/card/mh3/50/aether-spike",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/012f5195-10ab-4b32-a5de-a79341cd536a.jpg?1717011606",
+              "normal": "https://cards.scryfall.io/normal/front/0/1/012f5195-10ab-4b32-a5de-a79341cd536a.jpg?1717011606"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Aggro",
+        "tier": "Tier 2 — Great Deck",
+        "strategy": "Modified-focused creatures. Counters and equipment scale threats into game-winners.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Solstice Zealot",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 82,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f10539e3-d4bc-4f71-a00f-8e94bb97509d",
+            "scryfall_uri": "https://scryfall.com/card/mh3/43/solstice-zealot",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Rhino Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f10539e3-d4bc-4f71-a00f-8e94bb97509d.jpg?1717104022",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f10539e3-d4bc-4f71-a00f-8e94bb97509d.jpg?1717104022"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Nightshade Dryad",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 39,
+            "tier_rating": "A",
+            "note": null,
+            "id": "71f9252d-241f-45ea-9d80-663150963b59",
+            "scryfall_uri": "https://scryfall.com/card/mh3/163/nightshade-dryad",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Dryad",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/71f9252d-241f-45ea-9d80-663150963b59.jpg?1717012532",
+              "normal": "https://cards.scryfall.io/normal/front/7/1/71f9252d-241f-45ea-9d80-663150963b59.jpg?1717012532"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Draw",
+        "tier": "Tier 2 — Great Deck",
+        "strategy": "Card advantage through draw engines. Petrifying Meddler and Refurbished Familiar generate value.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Unfathomable Truths",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 53,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f95b8eb1-4dbb-4bb9-aa31-b7a12e3b4618",
+            "scryfall_uri": "https://scryfall.com/card/mh3/77/unfathomable-truths",
+            "colors": [],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/9/f95b8eb1-4dbb-4bb9-aa31-b7a12e3b4618.jpg?1717011831",
+              "normal": "https://cards.scryfall.io/normal/front/f/9/f95b8eb1-4dbb-4bb9-aa31-b7a12e3b4618.jpg?1717011831"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Petrifying Meddler",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 122,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f0f2bdfd-1cbc-456e-aba7-4e0b6485cf8a",
+            "scryfall_uri": "https://scryfall.com/card/mh3/66/petrifying-meddler",
+            "colors": [],
+            "type_line": "Creature — Eldrazi",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0f2bdfd-1cbc-456e-aba7-4e0b6485cf8a.jpg?1717011747",
+              "normal": "https://cards.scryfall.io/normal/front/f/0/f0f2bdfd-1cbc-456e-aba7-4e0b6485cf8a.jpg?1717011747"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Refurbished Familiar",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 70,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b338e078-629c-4cac-bd1d-e1f0a132728d",
+            "scryfall_uri": "https://scryfall.com/card/mh3/105/refurbished-familiar",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Artifact Creature — Zombie Rat",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b338e078-629c-4cac-bd1d-e1f0a132728d.jpg?1717012055",
+              "normal": "https://cards.scryfall.io/normal/front/b/3/b338e078-629c-4cac-bd1d-e1f0a132728d.jpg?1717012055"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Modified",
+        "tier": "Tier 2 — Great Deck",
+        "strategy": "Counter synergies with creature growth. Stack counters via Modified triggers and overwhelm the board.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Wither and Bloom",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 63,
+            "tier_rating": "B",
+            "note": null,
+            "id": "95c2390f-71f1-4e42-83da-d603ca86a8d0",
+            "scryfall_uri": "https://scryfall.com/card/mh3/111/wither-and-bloom",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95c2390f-71f1-4e42-83da-d603ca86a8d0.jpg?1717012101",
+              "normal": "https://cards.scryfall.io/normal/front/9/5/95c2390f-71f1-4e42-83da-d603ca86a8d0.jpg?1717012101"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Nightshade Dryad",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 39,
+            "tier_rating": "A",
+            "note": null,
+            "id": "71f9252d-241f-45ea-9d80-663150963b59",
+            "scryfall_uri": "https://scryfall.com/card/mh3/163/nightshade-dryad",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Dryad",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/71f9252d-241f-45ea-9d80-663150963b59.jpg?1717012532",
+              "normal": "https://cards.scryfall.io/normal/front/7/1/71f9252d-241f-45ea-9d80-663150963b59.jpg?1717012532"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Energy",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Tempo-focused energy deck. Cheap spells fuel energy for bigger payoffs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Glimpse the Impossible",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 64,
+            "tier_rating": "B",
+            "note": null,
+            "id": "133ad0dd-5b61-4c38-9264-0b0e75b95d95",
+            "scryfall_uri": "https://scryfall.com/card/mh3/124/glimpse-the-impossible",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/133ad0dd-5b61-4c38-9264-0b0e75b95d95.jpg?1717012201",
+              "normal": "https://cards.scryfall.io/normal/front/1/3/133ad0dd-5b61-4c38-9264-0b0e75b95d95.jpg?1717012201"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Skoa, Embermage",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 152,
+            "tier_rating": "C",
+            "note": null,
+            "id": "cf34b0f8-a68a-428f-9f2c-9556229367ec",
+            "scryfall_uri": "https://scryfall.com/card/mh3/138/skoa-embermage",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature — Goblin Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf34b0f8-a68a-428f-9f2c-9556229367ec.jpg?1717063064",
+              "normal": "https://cards.scryfall.io/normal/front/c/f/cf34b0f8-a68a-428f-9f2c-9556229367ec.jpg?1717063064"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Eldrazi",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Alternative Eldrazi ramp strategy. Combines green ramp with blue card draw.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Eldrazi Repurposer",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 23,
+            "tier_rating": "A",
+            "note": null,
+            "id": "37f79ba7-7b65-4387-b498-f770816ce8dd",
+            "scryfall_uri": "https://scryfall.com/card/mh3/150/eldrazi-repurposer",
+            "colors": [],
+            "type_line": "Creature — Eldrazi Drone",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37f79ba7-7b65-4387-b498-f770816ce8dd.jpg?1717012430",
+              "normal": "https://cards.scryfall.io/normal/front/3/7/37f79ba7-7b65-4387-b498-f770816ce8dd.jpg?1717012430"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Modified / Sacrifice",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Sacrifice synergies with modified creatures. Chthonian Nightmare and Accursed Marauder enable repeated value.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Chthonian Nightmare",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ce5dd2c1-b6e0-4914-b5c9-7dd451c29e22",
+            "scryfall_uri": "https://scryfall.com/card/mh3/83/chthonian-nightmare",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/ce5dd2c1-b6e0-4914-b5c9-7dd451c29e22.jpg?1717011882",
+              "normal": "https://cards.scryfall.io/normal/front/c/e/ce5dd2c1-b6e0-4914-b5c9-7dd451c29e22.jpg?1717011882"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          },
+          {
+            "name": "Accursed Marauder",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 83,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5da14d86-0780-4821-a799-96f64b377df4",
+            "scryfall_uri": "https://scryfall.com/card/mh3/80/accursed-marauder",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5da14d86-0780-4821-a799-96f64b377df4.jpg?1717011855",
+              "normal": "https://cards.scryfall.io/normal/front/5/d/5da14d86-0780-4821-a799-96f64b377df4.jpg?1717011855"
+            },
+            "set": "mh3",
+            "set_name": "Modern Horizons 3"
+          }
+        ]
+      }
+    ],
+    "tier_4": [
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Artifacts",
+        "tier": "Tier 4 — Weakest Deck",
+        "strategy": "Artifact sacrifice synergies. Lacks density and consistency compared to other archetypes.",
+        "difficulty": "Hard",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Aerie Auxiliary",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 36,
+        "tier_rating": "A",
+        "note": null,
+        "id": "5e4c134b-a416-467e-a158-def84c92c6af",
+        "scryfall_uri": "https://scryfall.com/card/mh3/18/aerie-auxiliary",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Bird Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/e/5e4c134b-a416-467e-a158-def84c92c6af.jpg?1717011339",
+          "normal": "https://cards.scryfall.io/normal/front/5/e/5e4c134b-a416-467e-a158-def84c92c6af.jpg?1717011339"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Mandibular Kite",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 50,
+        "tier_rating": "B",
+        "note": null,
+        "id": "6b922f71-18e6-4a74-b792-d477d4a1deca",
+        "scryfall_uri": "https://scryfall.com/card/mh3/34/mandibular-kite",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6b922f71-18e6-4a74-b792-d477d4a1deca.jpg?1717011474",
+          "normal": "https://cards.scryfall.io/normal/front/6/b/6b922f71-18e6-4a74-b792-d477d4a1deca.jpg?1717011474"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Solstice Zealot",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 82,
+        "tier_rating": "B",
+        "note": null,
+        "id": "f10539e3-d4bc-4f71-a00f-8e94bb97509d",
+        "scryfall_uri": "https://scryfall.com/card/mh3/43/solstice-zealot",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Rhino Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f10539e3-d4bc-4f71-a00f-8e94bb97509d.jpg?1717104022",
+          "normal": "https://cards.scryfall.io/normal/front/f/1/f10539e3-d4bc-4f71-a00f-8e94bb97509d.jpg?1717104022"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Thraben Charm",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 67,
+        "tier_rating": "B",
+        "note": null,
+        "id": "dd28a646-f38f-4cdf-948c-969cd979e5e6",
+        "scryfall_uri": "https://scryfall.com/card/mh3/45/thraben-charm",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dd28a646-f38f-4cdf-948c-969cd979e5e6.jpg?1717011565",
+          "normal": "https://cards.scryfall.io/normal/front/d/d/dd28a646-f38f-4cdf-948c-969cd979e5e6.jpg?1717011565"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Serum Visionary",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 44,
+        "tier_rating": "B",
+        "note": "Best blue common overall.",
+        "id": "08a587f5-5910-405e-8982-c889dbbc7f98",
+        "scryfall_uri": "https://scryfall.com/card/mh3/69/serum-visionary",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Vedalken Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08a587f5-5910-405e-8982-c889dbbc7f98.jpg?1717011772",
+          "normal": "https://cards.scryfall.io/normal/front/0/8/08a587f5-5910-405e-8982-c889dbbc7f98.jpg?1717011772"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Unfathomable Truths",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 53,
+        "tier_rating": "B",
+        "note": null,
+        "id": "f95b8eb1-4dbb-4bb9-aa31-b7a12e3b4618",
+        "scryfall_uri": "https://scryfall.com/card/mh3/77/unfathomable-truths",
+        "colors": [],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/9/f95b8eb1-4dbb-4bb9-aa31-b7a12e3b4618.jpg?1717011831",
+          "normal": "https://cards.scryfall.io/normal/front/f/9/f95b8eb1-4dbb-4bb9-aa31-b7a12e3b4618.jpg?1717011831"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Aether Spike",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 101,
+        "tier_rating": "C",
+        "note": null,
+        "id": "012f5195-10ab-4b32-a5de-a79341cd536a",
+        "scryfall_uri": "https://scryfall.com/card/mh3/50/aether-spike",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/012f5195-10ab-4b32-a5de-a79341cd536a.jpg?1717011606",
+          "normal": "https://cards.scryfall.io/normal/front/0/1/012f5195-10ab-4b32-a5de-a79341cd536a.jpg?1717011606"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Petrifying Meddler",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 122,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f0f2bdfd-1cbc-456e-aba7-4e0b6485cf8a",
+        "scryfall_uri": "https://scryfall.com/card/mh3/66/petrifying-meddler",
+        "colors": [],
+        "type_line": "Creature — Eldrazi",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0f2bdfd-1cbc-456e-aba7-4e0b6485cf8a.jpg?1717011747",
+          "normal": "https://cards.scryfall.io/normal/front/f/0/f0f2bdfd-1cbc-456e-aba7-4e0b6485cf8a.jpg?1717011747"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Wither and Bloom",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 63,
+        "tier_rating": "B",
+        "note": null,
+        "id": "95c2390f-71f1-4e42-83da-d603ca86a8d0",
+        "scryfall_uri": "https://scryfall.com/card/mh3/111/wither-and-bloom",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95c2390f-71f1-4e42-83da-d603ca86a8d0.jpg?1717012101",
+          "normal": "https://cards.scryfall.io/normal/front/9/5/95c2390f-71f1-4e42-83da-d603ca86a8d0.jpg?1717012101"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Breathe Your Last",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 102,
+        "tier_rating": "C",
+        "note": null,
+        "id": "50eac71d-54f9-46c2-aa1d-c04c37e61f74",
+        "scryfall_uri": "https://scryfall.com/card/mh3/82/breathe-your-last",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50eac71d-54f9-46c2-aa1d-c04c37e61f74.jpg?1717011871",
+          "normal": "https://cards.scryfall.io/normal/front/5/0/50eac71d-54f9-46c2-aa1d-c04c37e61f74.jpg?1717011871"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Accursed Marauder",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 83,
+        "tier_rating": "B",
+        "note": null,
+        "id": "5da14d86-0780-4821-a799-96f64b377df4",
+        "scryfall_uri": "https://scryfall.com/card/mh3/80/accursed-marauder",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Zombie Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5da14d86-0780-4821-a799-96f64b377df4.jpg?1717011855",
+          "normal": "https://cards.scryfall.io/normal/front/5/d/5da14d86-0780-4821-a799-96f64b377df4.jpg?1717011855"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Refurbished Familiar",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 70,
+        "tier_rating": "B",
+        "note": null,
+        "id": "b338e078-629c-4cac-bd1d-e1f0a132728d",
+        "scryfall_uri": "https://scryfall.com/card/mh3/105/refurbished-familiar",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Artifact Creature — Zombie Rat",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b338e078-629c-4cac-bd1d-e1f0a132728d.jpg?1717012055",
+          "normal": "https://cards.scryfall.io/normal/front/b/3/b338e078-629c-4cac-bd1d-e1f0a132728d.jpg?1717012055"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Galvanic Discharge",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 15,
+        "tier_rating": "A",
+        "note": null,
+        "id": "32aa6e33-221f-414c-9b51-850d97a7e051",
+        "scryfall_uri": "https://scryfall.com/card/mh3/122/galvanic-discharge",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32aa6e33-221f-414c-9b51-850d97a7e051.jpg?1717012186",
+          "normal": "https://cards.scryfall.io/normal/front/3/2/32aa6e33-221f-414c-9b51-850d97a7e051.jpg?1717012186"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Fanged Flames",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 104,
+        "tier_rating": "C",
+        "note": null,
+        "id": "fcfac301-55db-49a7-9a0d-918c907703da",
+        "scryfall_uri": "https://scryfall.com/card/mh3/118/fanged-flames",
+        "colors": [],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/c/fcfac301-55db-49a7-9a0d-918c907703da.jpg?1717012155",
+          "normal": "https://cards.scryfall.io/normal/front/f/c/fcfac301-55db-49a7-9a0d-918c907703da.jpg?1717012155"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Glimpse the Impossible",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 64,
+        "tier_rating": "B",
+        "note": null,
+        "id": "133ad0dd-5b61-4c38-9264-0b0e75b95d95",
+        "scryfall_uri": "https://scryfall.com/card/mh3/124/glimpse-the-impossible",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/133ad0dd-5b61-4c38-9264-0b0e75b95d95.jpg?1717012201",
+          "normal": "https://cards.scryfall.io/normal/front/1/3/133ad0dd-5b61-4c38-9264-0b0e75b95d95.jpg?1717012201"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Skoa, Embermage",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 152,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cf34b0f8-a68a-428f-9f2c-9556229367ec",
+        "scryfall_uri": "https://scryfall.com/card/mh3/138/skoa-embermage",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Legendary Creature — Goblin Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf34b0f8-a68a-428f-9f2c-9556229367ec.jpg?1717063064",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cf34b0f8-a68a-428f-9f2c-9556229367ec.jpg?1717063064"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Nightshade Dryad",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 39,
+        "tier_rating": "A",
+        "note": null,
+        "id": "71f9252d-241f-45ea-9d80-663150963b59",
+        "scryfall_uri": "https://scryfall.com/card/mh3/163/nightshade-dryad",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dryad",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/71f9252d-241f-45ea-9d80-663150963b59.jpg?1717012532",
+          "normal": "https://cards.scryfall.io/normal/front/7/1/71f9252d-241f-45ea-9d80-663150963b59.jpg?1717012532"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Eldrazi Repurposer",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 23,
+        "tier_rating": "A",
+        "note": null,
+        "id": "37f79ba7-7b65-4387-b498-f770816ce8dd",
+        "scryfall_uri": "https://scryfall.com/card/mh3/150/eldrazi-repurposer",
+        "colors": [],
+        "type_line": "Creature — Eldrazi Drone",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37f79ba7-7b65-4387-b498-f770816ce8dd.jpg?1717012430",
+          "normal": "https://cards.scryfall.io/normal/front/3/7/37f79ba7-7b65-4387-b498-f770816ce8dd.jpg?1717012430"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Malevolent Rumble",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 18,
+        "tier_rating": "A",
+        "note": null,
+        "id": "a178cfe8-f9fa-4255-88d0-54a0bed079f5",
+        "scryfall_uri": "https://scryfall.com/card/mh3/161/malevolent-rumble",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a178cfe8-f9fa-4255-88d0-54a0bed079f5.jpg?1717012517",
+          "normal": "https://cards.scryfall.io/normal/front/a/1/a178cfe8-f9fa-4255-88d0-54a0bed079f5.jpg?1717012517"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Horrific Assault",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 33,
+        "tier_rating": "A",
+        "note": null,
+        "id": "cfa6ed13-7bba-40c0-8e0e-4ffd3cea6241",
+        "scryfall_uri": "https://scryfall.com/card/mh3/157/horrific-assault",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cfa6ed13-7bba-40c0-8e0e-4ffd3cea6241.jpg?1717012485",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cfa6ed13-7bba-40c0-8e0e-4ffd3cea6241.jpg?1717012485"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "Multicolor": [
+      {
+        "name": "Writhing Chrysalis",
+        "color": "RG",
+        "rarity": "Common",
+        "pick_order_rank": 6,
+        "tier_rating": "S",
+        "note": "Single-handedly carries its archetype.",
+        "id": "f54dbeb1-51f8-40e2-912a-ec25457de5a2",
+        "scryfall_uri": "https://scryfall.com/card/mh3/208/writhing-chrysalis",
+        "colors": [],
+        "type_line": "Creature — Eldrazi Drone",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f54dbeb1-51f8-40e2-912a-ec25457de5a2.jpg?1717012884",
+          "normal": "https://cards.scryfall.io/normal/front/f/5/f54dbeb1-51f8-40e2-912a-ec25457de5a2.jpg?1717012884"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Conduit Goblin",
+        "color": "WR",
+        "rarity": "Common",
+        "pick_order_rank": 35,
+        "tier_rating": "A",
+        "note": null,
+        "id": "5c9ad04d-c4d4-4d06-93bb-a881be733717",
+        "scryfall_uri": "https://scryfall.com/card/mh3/179/conduit-goblin",
+        "colors": [
+          "R",
+          "W"
+        ],
+        "type_line": "Creature — Goblin Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c9ad04d-c4d4-4d06-93bb-a881be733717.jpg?1717012655",
+          "normal": "https://cards.scryfall.io/normal/front/5/c/5c9ad04d-c4d4-4d06-93bb-a881be733717.jpg?1717012655"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Faithful Watchdog",
+        "color": "WG",
+        "rarity": "Common",
+        "pick_order_rank": 116,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b9afac99-a094-41a8-8323-90dec29691c4",
+        "scryfall_uri": "https://scryfall.com/card/mh3/185/faithful-watchdog",
+        "colors": [
+          "G",
+          "W"
+        ],
+        "type_line": "Creature — Dog",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/9/b9afac99-a094-41a8-8323-90dec29691c4.jpg?1739496664",
+          "normal": "https://cards.scryfall.io/normal/front/b/9/b9afac99-a094-41a8-8323-90dec29691c4.jpg?1739496664"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ]
+  },
+  "evaluation_corrections": {
+    "overvalued": [
+      {
+        "name": "Omo, Queen of Vesuva",
+        "color": "UG",
+        "rarity": "Mythic",
+        "pick_order_rank": 300,
+        "tier_rating": "F",
+        "note": null,
+        "id": "e5d1c814-4c22-4917-95ae-dffaf491db32",
+        "scryfall_uri": "https://scryfall.com/card/m3c/2/omo-queen-of-vesuva",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Legendary Creature — Shapeshifter Noble",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/5/e5d1c814-4c22-4917-95ae-dffaf491db32.jpg?1727175657",
+          "normal": "https://cards.scryfall.io/normal/front/e/5/e5d1c814-4c22-4917-95ae-dffaf491db32.jpg?1727175657"
+        },
+        "set": "m3c",
+        "set_name": "Modern Horizons 3 Commander"
+      },
+      {
+        "name": "Wrath of the Skies",
+        "color": "W",
+        "rarity": "Rare",
+        "pick_order_rank": 148,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4ef1882e-b422-4f30-8a6c-bd71c2601660",
+        "scryfall_uri": "https://scryfall.com/card/mh3/49/wrath-of-the-skies",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4ef1882e-b422-4f30-8a6c-bd71c2601660.jpg?1717011598",
+          "normal": "https://cards.scryfall.io/normal/front/4/e/4ef1882e-b422-4f30-8a6c-bd71c2601660.jpg?1717011598"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Imskir Iron-Eater",
+        "color": "BR",
+        "rarity": "Rare",
+        "pick_order_rank": 280,
+        "tier_rating": "F",
+        "note": null,
+        "id": "541209fa-38b6-4d61-a72d-26bfb6ad5ead",
+        "scryfall_uri": "https://scryfall.com/card/mh3/189/imskir-iron-eater",
+        "colors": [
+          "B",
+          "R"
+        ],
+        "type_line": "Legendary Creature — Demon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/541209fa-38b6-4d61-a72d-26bfb6ad5ead.jpg?1717012728",
+          "normal": "https://cards.scryfall.io/normal/front/5/4/541209fa-38b6-4d61-a72d-26bfb6ad5ead.jpg?1717012728"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Annoyed Altisaur",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 97,
+        "tier_rating": "B",
+        "note": null,
+        "id": "4aa9354d-3496-47f4-81c9-aead15efb8bb",
+        "scryfall_uri": "https://scryfall.com/card/mh3/284/annoyed-altisaur",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/a/4aa9354d-3496-47f4-81c9-aead15efb8bb.jpg?1720655652",
+          "normal": "https://cards.scryfall.io/normal/front/4/a/4aa9354d-3496-47f4-81c9-aead15efb8bb.jpg?1720655652"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "undervalued": [
+      {
+        "name": "Coram, the Undertaker",
+        "color": "BRG",
+        "rarity": "Mythic",
+        "pick_order_rank": 301,
+        "tier_rating": "F",
+        "note": null,
+        "id": "ab5cfb0c-8e95-4d2d-9e23-cf58c1c7e51c",
+        "scryfall_uri": "https://scryfall.com/card/m3c/7/coram-the-undertaker",
+        "colors": [
+          "B",
+          "G",
+          "R"
+        ],
+        "type_line": "Legendary Creature — Human Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/ab5cfb0c-8e95-4d2d-9e23-cf58c1c7e51c.jpg?1727175651",
+          "normal": "https://cards.scryfall.io/normal/front/a/b/ab5cfb0c-8e95-4d2d-9e23-cf58c1c7e51c.jpg?1727175651"
+        },
+        "set": "m3c",
+        "set_name": "Modern Horizons 3 Commander"
+      },
+      {
+        "name": "Shadow of the Second Sun",
+        "color": "U",
+        "rarity": "Mythic",
+        "pick_order_rank": 52,
+        "tier_rating": "B",
+        "note": null,
+        "id": "0da72736-574d-4d99-98ba-3a91c374cd10",
+        "scryfall_uri": "https://scryfall.com/card/mh3/70/shadow-of-the-second-sun",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0da72736-574d-4d99-98ba-3a91c374cd10.jpg?1717011779",
+          "normal": "https://cards.scryfall.io/normal/front/0/d/0da72736-574d-4d99-98ba-3a91c374cd10.jpg?1717011779"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Arna Kennerüd, Skycaptain",
+        "color": "WUB",
+        "rarity": "Mythic",
+        "pick_order_rank": 129,
+        "tier_rating": "C",
+        "note": null,
+        "id": "19266b5a-ff78-436c-b0f1-457e80bb647e",
+        "scryfall_uri": "https://scryfall.com/card/mh3/178/arna-kenner%C3%BCd-skycaptain",
+        "colors": [
+          "B",
+          "U",
+          "W"
+        ],
+        "type_line": "Legendary Creature — Human Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/19266b5a-ff78-436c-b0f1-457e80bb647e.jpg?1717012648",
+          "normal": "https://cards.scryfall.io/normal/front/1/9/19266b5a-ff78-436c-b0f1-457e80bb647e.jpg?1717012648"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Volatile Stormdrake",
+        "color": "U",
+        "rarity": "Rare",
+        "pick_order_rank": 54,
+        "tier_rating": "B",
+        "note": null,
+        "id": "2e6e3232-8bb8-4504-9597-dfdfc6d634bd",
+        "scryfall_uri": "https://scryfall.com/card/mh3/79/volatile-stormdrake",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Drake",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/e/2e6e3232-8bb8-4504-9597-dfdfc6d634bd.jpg?1717011847",
+          "normal": "https://cards.scryfall.io/normal/front/2/e/2e6e3232-8bb8-4504-9597-dfdfc6d634bd.jpg?1717011847"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Branching Evolution",
+        "color": "G",
+        "rarity": "Rare",
+        "pick_order_rank": 288,
+        "tier_rating": "F",
+        "note": null,
+        "id": "c0f1a736-8b12-4f58-a031-bf1733f65c51",
+        "scryfall_uri": "https://scryfall.com/card/mh3/285/branching-evolution",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0f1a736-8b12-4f58-a031-bf1733f65c51.jpg?1717013706",
+          "normal": "https://cards.scryfall.io/normal/front/c/0/c0f1a736-8b12-4f58-a031-bf1733f65c51.jpg?1717013706"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ]
+  },
+  "notable_picks": {
+    "spawning_payoffs": [
+      {
+        "name": "Spawn-Gang Commander",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 26,
+        "tier_rating": "A",
+        "note": null,
+        "id": "ecac9885-6f4e-4413-90dc-c8b44f883357",
+        "scryfall_uri": "https://scryfall.com/card/mh3/140/spawn-gang-commander",
+        "colors": [],
+        "type_line": "Creature — Eldrazi Goblin",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/ecac9885-6f4e-4413-90dc-c8b44f883357.jpg?1717012343",
+          "normal": "https://cards.scryfall.io/normal/front/e/c/ecac9885-6f4e-4413-90dc-c8b44f883357.jpg?1717012343"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Propagator Drone",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "4f5b2d89-d641-4815-8e6c-5dba0d31419e",
+        "scryfall_uri": "https://scryfall.com/card/mh3/167/propagator-drone",
+        "colors": [],
+        "type_line": "Creature — Eldrazi Drone",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f5b2d89-d641-4815-8e6c-5dba0d31419e.jpg?1717012563",
+          "normal": "https://cards.scryfall.io/normal/front/4/f/4f5b2d89-d641-4815-8e6c-5dba0d31419e.jpg?1717012563"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Path of Annihilation",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 12,
+        "tier_rating": "A",
+        "note": null,
+        "id": "28493c98-a11c-4bcc-bf55-412c884ffa7a",
+        "scryfall_uri": "https://scryfall.com/card/mh3/165/path-of-annihilation",
+        "colors": [],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/8/28493c98-a11c-4bcc-bf55-412c884ffa7a.jpg?1717012548",
+          "normal": "https://cards.scryfall.io/normal/front/2/8/28493c98-a11c-4bcc-bf55-412c884ffa7a.jpg?1717012548"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Glaring Fleshraker",
+        "color": "C",
+        "rarity": "Uncommon",
+        "pick_order_rank": 98,
+        "tier_rating": "C",
+        "note": null,
+        "id": "80c2a3c7-1486-4ff9-88ec-79ec67a437f8",
+        "scryfall_uri": "https://scryfall.com/card/mh3/7/glaring-fleshraker",
+        "colors": [],
+        "type_line": "Creature — Eldrazi Drone",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/80c2a3c7-1486-4ff9-88ec-79ec67a437f8.jpg?1717011246",
+          "normal": "https://cards.scryfall.io/normal/front/8/0/80c2a3c7-1486-4ff9-88ec-79ec67a437f8.jpg?1717011246"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "energy_payoffs": [
+      {
+        "name": "Amped Raptor",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 3,
+        "tier_rating": "S",
+        "note": null,
+        "id": "1ac0e78b-0fdd-44f9-8b7b-c4f28a32782e",
+        "scryfall_uri": "https://scryfall.com/card/mh3/114/amped-raptor",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1ac0e78b-0fdd-44f9-8b7b-c4f28a32782e.jpg?1734350317",
+          "normal": "https://cards.scryfall.io/normal/front/1/a/1ac0e78b-0fdd-44f9-8b7b-c4f28a32782e.jpg?1734350317"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Phyrexian Ironworks",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 223,
+        "tier_rating": "D",
+        "note": null,
+        "id": "6d64e1a8-cb4f-4968-b3e0-c9ca7c7894a3",
+        "scryfall_uri": "https://scryfall.com/card/mh3/130/phyrexian-ironworks",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d64e1a8-cb4f-4968-b3e0-c9ca7c7894a3.jpg?1717047318",
+          "normal": "https://cards.scryfall.io/normal/front/6/d/6d64e1a8-cb4f-4968-b3e0-c9ca7c7894a3.jpg?1717047318"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Static Prison",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 32,
+        "tier_rating": "A",
+        "note": null,
+        "id": "dd16222e-349c-4a2b-a7c8-8eb35a8ab332",
+        "scryfall_uri": "https://scryfall.com/card/mh3/44/static-prison",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dd16222e-349c-4a2b-a7c8-8eb35a8ab332.jpg?1717011554",
+          "normal": "https://cards.scryfall.io/normal/front/d/d/dd16222e-349c-4a2b-a7c8-8eb35a8ab332.jpg?1717011554"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Voltstorm Angel",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 68,
+        "tier_rating": "B",
+        "note": null,
+        "id": "b5495f34-423e-4012-808c-b267e6fabf2c",
+        "scryfall_uri": "https://scryfall.com/card/mh3/46/voltstorm-angel",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Angel",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5495f34-423e-4012-808c-b267e6fabf2c.jpg?1717011574",
+          "normal": "https://cards.scryfall.io/normal/front/b/5/b5495f34-423e-4012-808c-b267e6fabf2c.jpg?1717011574"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "removal": [
+      {
+        "name": "Breathe Your Last",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 102,
+        "tier_rating": "C",
+        "note": null,
+        "id": "50eac71d-54f9-46c2-aa1d-c04c37e61f74",
+        "scryfall_uri": "https://scryfall.com/card/mh3/82/breathe-your-last",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50eac71d-54f9-46c2-aa1d-c04c37e61f74.jpg?1717011871",
+          "normal": "https://cards.scryfall.io/normal/front/5/0/50eac71d-54f9-46c2-aa1d-c04c37e61f74.jpg?1717011871"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Dog Umbra",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8d4ba710-eddb-40ca-b2fe-0e4e778aab9c",
+        "scryfall_uri": "https://scryfall.com/card/mh3/22/dog-umbra",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d4ba710-eddb-40ca-b2fe-0e4e778aab9c.jpg?1717011374",
+          "normal": "https://cards.scryfall.io/normal/front/8/d/8d4ba710-eddb-40ca-b2fe-0e4e778aab9c.jpg?1717011374"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Thraben Charm",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 67,
+        "tier_rating": "B",
+        "note": null,
+        "id": "dd28a646-f38f-4cdf-948c-969cd979e5e6",
+        "scryfall_uri": "https://scryfall.com/card/mh3/45/thraben-charm",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dd28a646-f38f-4cdf-948c-969cd979e5e6.jpg?1717011565",
+          "normal": "https://cards.scryfall.io/normal/front/d/d/dd28a646-f38f-4cdf-948c-969cd979e5e6.jpg?1717011565"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      }
+    ],
+    "build_arounds": [
+      {
+        "name": "Ugin's Binding",
+        "color": "U",
+        "rarity": "Mythic",
+        "pick_order_rank": 24,
+        "tier_rating": "A",
+        "note": "Colorless creatures only.",
+        "id": "be13786a-f967-456b-bbc6-f4312467a827",
+        "scryfall_uri": "https://scryfall.com/card/mh3/76/ugins-binding",
+        "colors": [],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/e/be13786a-f967-456b-bbc6-f4312467a827.jpg?1717011823",
+          "normal": "https://cards.scryfall.io/normal/front/b/e/be13786a-f967-456b-bbc6-f4312467a827.jpg?1717011823"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Herigast, Erupting Nullkite",
+        "color": "C",
+        "rarity": "Mythic",
+        "pick_order_rank": 199,
+        "tier_rating": "D",
+        "note": null,
+        "id": "7baf9549-1869-4bd3-a52a-2f0b30ba0b16",
+        "scryfall_uri": "https://scryfall.com/card/mh3/8/herigast-erupting-nullkite",
+        "colors": [],
+        "type_line": "Legendary Creature — Eldrazi Dragon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7baf9549-1869-4bd3-a52a-2f0b30ba0b16.jpg?1740308390",
+          "normal": "https://cards.scryfall.io/normal/front/7/b/7baf9549-1869-4bd3-a52a-2f0b30ba0b16.jpg?1740308390"
+        },
+        "set": "mh3",
+        "set_name": "Modern Horizons 3"
+      },
+      {
+        "name": "Coram, the Undertaker",
+        "color": "BRG",
+        "rarity": "Mythic",
+        "pick_order_rank": 301,
+        "tier_rating": "F",
+        "note": null,
+        "id": "ab5cfb0c-8e95-4d2d-9e23-cf58c1c7e51c",
+        "scryfall_uri": "https://scryfall.com/card/m3c/7/coram-the-undertaker",
+        "colors": [
+          "B",
+          "G",
+          "R"
+        ],
+        "type_line": "Legendary Creature — Human Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/ab5cfb0c-8e95-4d2d-9e23-cf58c1c7e51c.jpg?1727175651",
+          "normal": "https://cards.scryfall.io/normal/front/a/b/ab5cfb0c-8e95-4d2d-9e23-cf58c1c7e51c.jpg?1727175651"
+        },
+        "set": "m3c",
+        "set_name": "Modern Horizons 3 Commander"
+      }
+    ]
+  },
+  "general_tips": [
+    "The Landscape cycle enables comfortable mana bases even in three-color decks — splash freely.",
+    "Writhing Chrysalis is format-warping; prioritize over almost anything else in green.",
+    "Energy decks prefer focused synergies; modified decks scale well with splashing.",
+    "Eldrazi decks benefit from multiple spawn generators and removal.",
+    "Board sweepers are rare; token strategies thrive.",
+    "Find an open lane and make your cards work together cohesively — MH3 rewards coherent synergy-building."
+  ]
+}

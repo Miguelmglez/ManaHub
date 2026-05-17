@@ -3,6 +3,7 @@ package com.mmg.manahub.core.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -15,16 +16,42 @@ data class CardScoreRow(
 data class AnswerCount(val answer: String, val count: Int)
 
 @Dao
-interface SurveyAnswerDao {
+abstract class SurveyAnswerDao {
+
+    // ── Write ──────────────────────────────────────────────────────────────────
 
     @Insert
-    suspend fun insertAnswers(answers: List<SurveyAnswerEntity>)
+    abstract suspend fun insertAnswers(answers: List<SurveyAnswerEntity>)
+
+    @Query("DELETE FROM survey_answers WHERE sessionId = :sessionId")
+    abstract suspend fun deleteForSession(sessionId: Long)
+
+    /**
+     * Atomically replaces all answers for a session. Used for edit/REVIEW mode and for
+     * the auto-save-by-panel flow so that re-answering doesn't accumulate stale rows.
+     *
+     * Intentionally NOT using OnConflictStrategy.REPLACE on the entity: the project
+     * convention is to avoid REPLACE since it does DELETE + INSERT which would cascade
+     * to dependent tables. A scoped DELETE + INSERT inside a @Transaction is explicit
+     * and safe.
+     */
+    @Transaction
+    open suspend fun replaceAnswersForSession(sessionId: Long, answers: List<SurveyAnswerEntity>) {
+        deleteForSession(sessionId)
+        if (answers.isNotEmpty()) insertAnswers(answers)
+    }
+
+    // ── Read ───────────────────────────────────────────────────────────────────
 
     @Query("SELECT * FROM survey_answers WHERE sessionId = :id")
-    suspend fun getAnswersForSession(id: Long): List<SurveyAnswerEntity>
+    abstract suspend fun getAnswersForSession(id: Long): List<SurveyAnswerEntity>
 
-    // Histórico de impacto de una carta: KEY_CARD=2, AVERAGE=1, WEAK=0
-    // Usado por DeckBuilder para scoring futuro
+    @Query("SELECT * FROM survey_answers WHERE sessionId = :id")
+    abstract fun observeAnswersForSession(id: Long): Flow<List<SurveyAnswerEntity>>
+
+    // ── Card-impact insights ───────────────────────────────────────────────────
+
+    // KEY_CARD=2, AVERAGE=1, WEAK=0 — used globally by DeckBuilder when no deck filter applies.
     @Query("""
         SELECT COALESCE(AVG(
             CASE answer
@@ -38,9 +65,8 @@ interface SurveyAnswerDao {
         WHERE cardReference = :scryfallId
         AND questionType = 'CARD_IMPACT'
     """)
-    fun observeCardImpactScore(scryfallId: String): Flow<Double>
+    abstract fun observeCardImpactScore(scryfallId: String): Flow<Double>
 
-    // Para futura pantalla de insights del mazo
     @Query("""
         SELECT sa.cardReference,
                COUNT(*) AS appearances,
@@ -56,7 +82,44 @@ interface SurveyAnswerDao {
         ORDER BY avgScore ASC
         LIMIT :limit
     """)
-    fun observeWeakestCards(limit: Int): Flow<List<CardScoreRow>>
+    abstract fun observeWeakestCards(limit: Int): Flow<List<CardScoreRow>>
+
+    // Per-deck card-impact aggregates (used by DeckStatsCard).
+    @Query("""
+        SELECT sa.cardReference,
+               COUNT(*) AS appearances,
+               AVG(CASE answer
+                   WHEN 'KEY_CARD' THEN 2.0
+                   WHEN 'AVERAGE'  THEN 1.0
+                   WHEN 'WEAK'     THEN 0.0
+                   ELSE 1.0 END) AS avgScore
+        FROM survey_answers sa
+        WHERE sa.questionType = 'CARD_IMPACT'
+        AND sa.cardReference IS NOT NULL
+        AND sa.deckId = :deckId
+        GROUP BY sa.cardReference
+        ORDER BY avgScore DESC
+        LIMIT :limit
+    """)
+    abstract fun observeTopCardsForDeck(deckId: String, limit: Int): Flow<List<CardScoreRow>>
+
+    @Query("""
+        SELECT sa.cardReference,
+               COUNT(*) AS appearances,
+               AVG(CASE answer
+                   WHEN 'KEY_CARD' THEN 2.0
+                   WHEN 'AVERAGE'  THEN 1.0
+                   WHEN 'WEAK'     THEN 0.0
+                   ELSE 1.0 END) AS avgScore
+        FROM survey_answers sa
+        WHERE sa.questionType = 'CARD_IMPACT'
+        AND sa.cardReference IS NOT NULL
+        AND sa.deckId = :deckId
+        GROUP BY sa.cardReference
+        ORDER BY avgScore ASC
+        LIMIT :limit
+    """)
+    abstract fun observeWeakestCardsForDeck(deckId: String, limit: Int): Flow<List<CardScoreRow>>
 
     // ── Profile insights ───────────────────────────────────────────────────────
 
@@ -65,17 +128,17 @@ interface SurveyAnswerDao {
         WHERE questionType = 'MANA'
         AND answer NOT IN ('SMOOTH', 'NONE')
     """)
-    fun observeManaIssueCount(): Flow<Int>
+    abstract fun observeManaIssueCount(): Flow<Int>
 
     @Query("SELECT COUNT(DISTINCT sessionId) FROM survey_answers")
-    fun observeSurveyCount(): Flow<Int>
+    abstract fun observeSurveyCount(): Flow<Int>
 
     @Query("""
         SELECT AVG(CAST(answer AS REAL))
         FROM survey_answers
         WHERE questionType = 'HAND'
     """)
-    fun observeAvgHandRating(): Flow<Double?>
+    abstract fun observeAvgHandRating(): Flow<Double?>
 
     @Query("""
         SELECT answer, COUNT(*) AS count
@@ -86,5 +149,5 @@ interface SurveyAnswerDao {
         ORDER BY count DESC
         LIMIT 1
     """)
-    fun observeFavoriteWinStyle(): Flow<AnswerCount?>
+    abstract fun observeFavoriteWinStyle(): Flow<AnswerCount?>
 }

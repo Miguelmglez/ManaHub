@@ -153,7 +153,8 @@ class ProfileEditViewModel @Inject constructor(
 
     fun confirmChanges(onNicknameUpdate: ((String) -> Unit)? = null) {
         val state = _uiState.value
-        if (!state.isNameValid) return
+        val nameWasEdited = state.pendingName != state.currentName
+        if (nameWasEdited && !state.isNameValid) return
 
         viewModelScope.launch {
             // Save Name

@@ -5,6 +5,7 @@ import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardLanguage
 import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.TagCategory
@@ -122,7 +123,6 @@ object TestFixtures {
         condition:        String  = "NM",
         language:         String  = "en",
         isForTrade:       Boolean = false,
-        isInWishlist:     Boolean = false,
         createdAt:        Long    = System.currentTimeMillis(),
     ) = UserCard(
         id               = id,
@@ -133,7 +133,6 @@ object TestFixtures {
         condition        = condition,
         language         = language,
         isForTrade       = isForTrade,
-        isInWishlist     = isInWishlist,
         createdAt        = createdAt,
     )
 
@@ -148,10 +147,11 @@ object TestFixtures {
         cardLanguage:      CardLanguage      = CardLanguage.ENGLISH,
         preferredCurrency: PreferredCurrency = PreferredCurrency.EUR,
     ) = UserPreferences(
-        appLanguage       = AppLanguage.ENGLISH,
-        cardLanguage      = cardLanguage,
-        newsLanguages     = setOf(NewsLanguage.ENGLISH),
-        preferredCurrency = preferredCurrency,
+        appLanguage        = AppLanguage.ENGLISH,
+        cardLanguage       = cardLanguage,
+        newsLanguages      = setOf(NewsLanguage.ENGLISH),
+        preferredCurrency  = preferredCurrency,
+        collectionViewMode = CollectionViewMode.GRID,
     )
 
     // ── CardEntity (Room entity) ──────────────────────────────────────────────

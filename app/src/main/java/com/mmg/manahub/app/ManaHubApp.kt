@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -29,6 +30,7 @@ class ManaHubApp : Application() {
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
     @Inject lateinit var authRepository: AuthRepository
+    @Inject lateinit var okHttpClient: OkHttpClient
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -38,8 +40,12 @@ class ManaHubApp : Application() {
 
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
 
-        Coil.setImageLoader(ImageLoader.Builder(this).components { add(SvgDecoder.Factory()) }
-            .build())
+        Coil.setImageLoader(
+            ImageLoader.Builder(this)
+                .okHttpClient(okHttpClient)
+                .components { add(SvgDecoder.Factory()) }
+                .build()
+        )
 
         appScope.launch {
             runCatching { syncManaSymbols() }

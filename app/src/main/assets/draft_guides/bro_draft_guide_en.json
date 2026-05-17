@@ -1,0 +1,1603 @@
+{
+  "metadata": {
+    "set_name": "The Brothers' War",
+    "set_code": "BRO",
+    "source_url": "https://draftsim.com/mtg-bro-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "March 19, 2024"
+  },
+  "set_overview": {
+    "summary": "The Brothers' War is faster than expected with significant color tension and synergy-driven decks. The format rewards either piles of removal and bombs or highly-synergistic aggro decks. It's neither a pure prince format nor a pauper format — sits between, featuring unbeatable bomb rares alongside viable commons-based strategies.",
+    "color_ranking": [
+      "{W} White — aggressive soldiers with quality interaction",
+      "{B} Black — premium removal, below-average creatures",
+      "{R} Red — highly offensive focus",
+      "{G} Green — traditionally non-artifact color struggles slightly",
+      "{U} Blue — control/tempo with limited removal; support color"
+    ],
+    "color_notes": {
+      "{W} White": "Aggressive soldiers with quality interaction. Dualistic between aggressive bodies and removal spells.",
+      "{U} Blue": "Controlling/tempo-oriented commons with limited hard removal. Better as support color than base color.",
+      "{B} Black": "Premium removal suite with below-average creature quality except Trench Stalker. Works as support or base color.",
+      "{R} Red": "Highly offensive focus. Strong commons like Excavation Explosion and Goblin Blast-Runner. Limited control options.",
+      "{G} Green": "Traditionally non-artifact color struggles slightly. Offers pump spells, good beaters, and dual-mode removal (Epic Confrontation, Shoot Down)."
+    },
+    "key_gameplay_notes": [
+      "Color tension is substantially higher than previous sets — splash only the best cards.",
+      "Powerstone tokens are a key currency: prototype, abilities, Tocasia's Dig Site, unearth costs, sacrifice payoffs.",
+      "Multiple 2-drops are critical for aggro variants.",
+      "Play around Gaea's Gift as combat trick/pump spell.",
+      "Sideboarding matters; adjust pacing expectations (fast vs slow matchups).",
+      "Land counts: aggro 15-17, midrange 16-17, control/ramp 17-18."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Powerstone Tokens",
+      "summary": "Colorless mana that only pays for activated abilities and non-creature spells. Key currency for prototype, unearth, sacrifice payoffs, and Tocasia's Dig Site.",
+      "performance": "Format-defining resource. Evaluate utility by archetype.",
+      "key_examples": []
+    },
+    {
+      "name": "Prototype",
+      "summary": "Scaled casting — cast the creature at a reduced cost with smaller power/toughness, or at full cost for the full stats.",
+      "performance": "Flexible casting; enables earlier curve plays.",
+      "key_examples": []
+    },
+    {
+      "name": "Unearth",
+      "summary": "Pay the unearth cost to return the card from your graveyard with haste; exile it at end of turn.",
+      "performance": "Recursive value; enables graveyard strategies.",
+      "key_examples": []
+    },
+    {
+      "name": "Artifact Synergy",
+      "summary": "Extensive mechanic supporting multiple archetypes (Selesnya, Izzet, Simic).",
+      "performance": "Universal subtheme.",
+      "key_examples": []
+    },
+    {
+      "name": "Menace",
+      "summary": "Returning keyword in Rakdos making creatures difficult to block effectively.",
+      "performance": "Anchors Rakdos Sacrifice aggression.",
+      "key_examples": []
+    }
+  ],
+  "archetype_tier_list": {
+    "archetypes": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Soldiers",
+        "speed": "Fast",
+        "strategy": "Tribal aggro with flying evasion emphasis.",
+        "key_cards": [
+          {
+            "name": "Myrel, Shield of Argive",
+            "color": "W",
+            "rarity": "Mythic",
+            "pick_order_rank": 16,
+            "tier_rating": "A",
+            "note": null,
+            "id": "e632ed57-bb00-4493-adef-7b4805edd7ea",
+            "scryfall_uri": "https://scryfall.com/card/bro/18/myrel-shield-of-argive",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e632ed57-bb00-4493-adef-7b4805edd7ea.jpg?1674420256",
+              "normal": "https://cards.scryfall.io/normal/front/e/6/e632ed57-bb00-4493-adef-7b4805edd7ea.jpg?1674420256"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Skystrike Officer",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 18,
+            "tier_rating": "A",
+            "note": null,
+            "id": "925fa343-d9c3-4ed9-bd1f-aaa31c0badd7",
+            "scryfall_uri": "https://scryfall.com/card/bro/62/skystrike-officer",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/925fa343-d9c3-4ed9-bd1f-aaa31c0badd7.jpg?1674420595",
+              "normal": "https://cards.scryfall.io/normal/front/9/2/925fa343-d9c3-4ed9-bd1f-aaa31c0badd7.jpg?1674420595"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Siege Veteran",
+            "color": "W",
+            "rarity": "Rare",
+            "pick_order_rank": 17,
+            "tier_rating": "A",
+            "note": null,
+            "id": "f57e2a32-6e52-4f6e-96ec-55f5b7ba77e0",
+            "scryfall_uri": "https://scryfall.com/card/bro/25/siege-veteran",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f57e2a32-6e52-4f6e-96ec-55f5b7ba77e0.jpg?1674420312",
+              "normal": "https://cards.scryfall.io/normal/front/f/5/f57e2a32-6e52-4f6e-96ec-55f5b7ba77e0.jpg?1674420312"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Draw Two",
+        "speed": "Slow",
+        "strategy": "Looting payoff creatures with card advantage.",
+        "key_cards": [
+          {
+            "name": "Gixian Puppeteer",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 21,
+            "tier_rating": "A",
+            "note": null,
+            "id": "2cc86e18-ffbc-4c5f-a694-922332b146cc",
+            "scryfall_uri": "https://scryfall.com/card/bro/99/gixian-puppeteer",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Phyrexian Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cc86e18-ffbc-4c5f-a694-922332b146cc.jpg?1674420879",
+              "normal": "https://cards.scryfall.io/normal/front/2/c/2cc86e18-ffbc-4c5f-a694-922332b146cc.jpg?1674420879"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Evangel of Synthesis",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e8b60003-a987-49b0-a0f8-bb825c97da4d",
+            "scryfall_uri": "https://scryfall.com/card/bro/209/evangel-of-synthesis",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Phyrexian Human Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/8/e8b60003-a987-49b0-a0f8-bb825c97da4d.jpg?1674421763",
+              "normal": "https://cards.scryfall.io/normal/front/e/8/e8b60003-a987-49b0-a0f8-bb825c97da4d.jpg?1674421763"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Gurgling Anointer",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 83,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9ce0d139-2bea-48df-a007-cee7c8ce07bd",
+            "scryfall_uri": "https://scryfall.com/card/bro/104/gurgling-anointer",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Phyrexian Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9ce0d139-2bea-48df-a007-cee7c8ce07bd.jpg?1674420917",
+              "normal": "https://cards.scryfall.io/normal/front/9/c/9ce0d139-2bea-48df-a007-cee7c8ce07bd.jpg?1674420917"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Sacrifice",
+        "speed": "Fast",
+        "strategy": "Artifact/creature sacrifice synergies with menace.",
+        "key_cards": [
+          {
+            "name": "Junkyard Genius",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 62,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a15b0676-b698-4160-8d2f-a22a1011bac0",
+            "scryfall_uri": "https://scryfall.com/card/bro/214/junkyard-genius",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Creature — Human Artificer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a15b0676-b698-4160-8d2f-a22a1011bac0.jpg?1674421798",
+              "normal": "https://cards.scryfall.io/normal/front/a/1/a15b0676-b698-4160-8d2f-a22a1011bac0.jpg?1674421798"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Goblin Blast-Runner",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 231,
+            "tier_rating": "D",
+            "note": null,
+            "id": "bd77c575-93a4-44ec-8940-adcbfc6e7a84",
+            "scryfall_uri": "https://scryfall.com/card/bro/137/goblin-blast-runner",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/d/bd77c575-93a4-44ec-8940-adcbfc6e7a84.jpg?1674421154",
+              "normal": "https://cards.scryfall.io/normal/front/b/d/bd77c575-93a4-44ec-8940-adcbfc6e7a84.jpg?1674421154"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Penregon Strongbull",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 122,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1c2deb43-7134-4f9c-b02d-78407a8986b1",
+            "scryfall_uri": "https://scryfall.com/card/bro/147/penregon-strongbull",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Minotaur",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c2deb43-7134-4f9c-b02d-78407a8986b1.jpg?1674421227",
+              "normal": "https://cards.scryfall.io/normal/front/1/c/1c2deb43-7134-4f9c-b02d-78407a8986b1.jpg?1674421227"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Midrange",
+        "speed": "Medium",
+        "strategy": "Flexible — aggro, midrange, or ramp variant options.",
+        "key_cards": [
+          {
+            "name": "Arbalest Engineers",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 88,
+            "tier_rating": "C",
+            "note": null,
+            "id": "df343bf9-f535-42c7-a2d0-8adfd068b354",
+            "scryfall_uri": "https://scryfall.com/card/bro/206/arbalest-engineers",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Creature — Human Artificer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/f/df343bf9-f535-42c7-a2d0-8adfd068b354.jpg?1674421739",
+              "normal": "https://cards.scryfall.io/normal/front/d/f/df343bf9-f535-42c7-a2d0-8adfd068b354.jpg?1674421739"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Hajar, Loyal Bodyguard",
+            "color": "RG",
+            "rarity": "Rare",
+            "pick_order_rank": 73,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5a0a2f82-57d3-45d8-b1c8-357883c62728",
+            "scryfall_uri": "https://scryfall.com/card/bro/211/hajar-loyal-bodyguard",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a0a2f82-57d3-45d8-b1c8-357883c62728.jpg?1674421777",
+              "normal": "https://cards.scryfall.io/normal/front/5/a/5a0a2f82-57d3-45d8-b1c8-357883c62728.jpg?1674421777"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Artifacts",
+        "speed": "Medium",
+        "strategy": "Quantity-focused artifact generation for value.",
+        "key_cards": [
+          {
+            "name": "Yotian Dissident",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 89,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1eb02f00-c188-4193-a049-d26f7643e5da",
+            "scryfall_uri": "https://scryfall.com/card/bro/227/yotian-dissident",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Human Artificer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1eb02f00-c188-4193-a049-d26f7643e5da.jpg?1674421903",
+              "normal": "https://cards.scryfall.io/normal/front/1/e/1eb02f00-c188-4193-a049-d26f7643e5da.jpg?1674421903"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          },
+          {
+            "name": "Sarinth Steelseeker",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 87,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d96761b2-eb9c-4963-a496-ba53a01f4b17",
+            "scryfall_uri": "https://scryfall.com/card/bro/189/sarinth-steelseeker",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Artificer Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/9/d96761b2-eb9c-4963-a496-ba53a01f4b17.jpg?1674421617",
+              "normal": "https://cards.scryfall.io/normal/front/d/9/d96761b2-eb9c-4963-a496-ba53a01f4b17.jpg?1674421617"
+            },
+            "set": "bro",
+            "set_name": "The Brothers' War"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Weenies",
+        "speed": "Fast",
+        "strategy": "Small creature-focused aggression.",
+        "key_cards": []
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Spells",
+        "speed": "Medium",
+        "strategy": "Spell synergy deck.",
+        "key_cards": []
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Graveyard",
+        "speed": "Medium",
+        "strategy": "Self-mill / graveyard payoff synergies.",
+        "key_cards": []
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Aggro",
+        "speed": "Fast",
+        "strategy": "Pure aggressive small creatures.",
+        "key_cards": []
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Robots",
+        "speed": "Slow",
+        "strategy": "Large prototype creatures and ramp payoffs.",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Prison Sentence",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 90,
+        "tier_rating": "C",
+        "note": null,
+        "id": "76832ca8-95b2-4bc8-a191-9e2f50b77626",
+        "scryfall_uri": "https://scryfall.com/card/bro/21/prison-sentence",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/6/76832ca8-95b2-4bc8-a191-9e2f50b77626.jpg?1674420280",
+          "normal": "https://cards.scryfall.io/normal/front/7/6/76832ca8-95b2-4bc8-a191-9e2f50b77626.jpg?1674420280"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Scrapwork Cohort",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 132,
+        "tier_rating": "C",
+        "note": null,
+        "id": "91b0f17e-603a-4840-b2c3-381ec6f102f3",
+        "scryfall_uri": "https://scryfall.com/card/bro/37/scrapwork-cohort",
+        "colors": [],
+        "type_line": "Artifact Creature — Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/91b0f17e-603a-4840-b2c3-381ec6f102f3.jpg?1674420409",
+          "normal": "https://cards.scryfall.io/normal/front/9/1/91b0f17e-603a-4840-b2c3-381ec6f102f3.jpg?1674420409"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Aeronaut Cavalry",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 162,
+        "tier_rating": "C",
+        "note": null,
+        "id": "38a62bb2-bc33-44d4-9a7e-92c9ea7d3c2c",
+        "scryfall_uri": "https://scryfall.com/card/bro/1/aeronaut-cavalry",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/38a62bb2-bc33-44d4-9a7e-92c9ea7d3c2c.jpg?1674420122",
+          "normal": "https://cards.scryfall.io/normal/front/3/8/38a62bb2-bc33-44d4-9a7e-92c9ea7d3c2c.jpg?1674420122"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Airlift Chaplain",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 130,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7ad55575-6053-43b1-9496-bcb1ea25e2a1",
+        "scryfall_uri": "https://scryfall.com/card/bro/2/airlift-chaplain",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7ad55575-6053-43b1-9496-bcb1ea25e2a1.jpg?1674420131",
+          "normal": "https://cards.scryfall.io/normal/front/7/a/7ad55575-6053-43b1-9496-bcb1ea25e2a1.jpg?1674420131"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Disenchant",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 163,
+        "tier_rating": "C",
+        "note": null,
+        "id": "658c5caa-d739-4d30-a512-43ac4de900cb",
+        "scryfall_uri": "https://scryfall.com/card/bro/6/disenchant",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/658c5caa-d739-4d30-a512-43ac4de900cb.jpg?1674420161",
+          "normal": "https://cards.scryfall.io/normal/front/6/5/658c5caa-d739-4d30-a512-43ac4de900cb.jpg?1674420161"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Desynchronize",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 154,
+        "tier_rating": "C",
+        "note": null,
+        "id": "46e101e5-2b20-48dd-aac4-15a3c32a7441",
+        "scryfall_uri": "https://scryfall.com/card/bro/46/desynchronize",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/6/46e101e5-2b20-48dd-aac4-15a3c32a7441.jpg?1674420476",
+          "normal": "https://cards.scryfall.io/normal/front/4/6/46e101e5-2b20-48dd-aac4-15a3c32a7441.jpg?1674420476"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Mightstone's Animation",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 134,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8c540e42-22e2-4127-bbd9-2e9200023fec",
+        "scryfall_uri": "https://scryfall.com/card/bro/58/mightstones-animation",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/c/8c540e42-22e2-4127-bbd9-2e9200023fec.jpg?1674420567",
+          "normal": "https://cards.scryfall.io/normal/front/8/c/8c540e42-22e2-4127-bbd9-2e9200023fec.jpg?1674420567"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Combat Courier",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 137,
+        "tier_rating": "C",
+        "note": null,
+        "id": "171edf80-ffc1-4894-9be5-c3e93a96f734",
+        "scryfall_uri": "https://scryfall.com/card/bro/77/combat-courier",
+        "colors": [],
+        "type_line": "Artifact Creature — Construct",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/7/171edf80-ffc1-4894-9be5-c3e93a96f734.jpg?1674420713",
+          "normal": "https://cards.scryfall.io/normal/front/1/7/171edf80-ffc1-4894-9be5-c3e93a96f734.jpg?1674420713"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Stern Lesson",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 112,
+        "tier_rating": "C",
+        "note": null,
+        "id": "3151caa2-10ed-4f30-83eb-cd1bd3f642ce",
+        "scryfall_uri": "https://scryfall.com/card/bro/64/stern-lesson",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/3151caa2-10ed-4f30-83eb-cd1bd3f642ce.jpg?1674420610",
+          "normal": "https://cards.scryfall.io/normal/front/3/1/3151caa2-10ed-4f30-83eb-cd1bd3f642ce.jpg?1674420610"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Overwhelming Remorse",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 68,
+        "tier_rating": "B",
+        "note": null,
+        "id": "202cbfa4-3b3d-47fd-84a6-892692c906d6",
+        "scryfall_uri": "https://scryfall.com/card/bro/110/overwhelming-remorse",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/202cbfa4-3b3d-47fd-84a6-892692c906d6.jpg?1674420959",
+          "normal": "https://cards.scryfall.io/normal/front/2/0/202cbfa4-3b3d-47fd-84a6-892692c906d6.jpg?1674420959"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Disfigure",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "C",
+        "note": null,
+        "id": "aaa9c6f1-3938-448b-bdc3-22420c5984d3",
+        "scryfall_uri": "https://scryfall.com/card/bro/91/disfigure",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aaa9c6f1-3938-448b-bdc3-22420c5984d3.jpg?1674420814",
+          "normal": "https://cards.scryfall.io/normal/front/a/a/aaa9c6f1-3938-448b-bdc3-22420c5984d3.jpg?1674420814"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Gix's Caress",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 140,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f1140cb9-6c48-4054-966e-5cc02aa7d5a4",
+        "scryfall_uri": "https://scryfall.com/card/bro/96/gixs-caress",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f1140cb9-6c48-4054-966e-5cc02aa7d5a4.jpg?1674420856",
+          "normal": "https://cards.scryfall.io/normal/front/f/1/f1140cb9-6c48-4054-966e-5cc02aa7d5a4.jpg?1674420856"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Trench Stalker",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 105,
+        "tier_rating": "C",
+        "note": null,
+        "id": "aa1b987a-a3b9-4cd1-85b0-e58df4130934",
+        "scryfall_uri": "https://scryfall.com/card/bro/116/trench-stalker",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Beast Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aa1b987a-a3b9-4cd1-85b0-e58df4130934.jpg?1674421001",
+          "normal": "https://cards.scryfall.io/normal/front/a/a/aa1b987a-a3b9-4cd1-85b0-e58df4130934.jpg?1674421001"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Excavation Explosion",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 63,
+        "tier_rating": "B",
+        "note": "Best red common.",
+        "id": "a169612e-f5de-4653-bc31-9ede8c5bdc75",
+        "scryfall_uri": "https://scryfall.com/card/bro/132/excavation-explosion",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a169612e-f5de-4653-bc31-9ede8c5bdc75.jpg?1674421117",
+          "normal": "https://cards.scryfall.io/normal/front/a/1/a169612e-f5de-4653-bc31-9ede8c5bdc75.jpg?1674421117"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Scrapwork Mutt",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 108,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4742800a-4872-4c2d-b884-01e0ba16950c",
+        "scryfall_uri": "https://scryfall.com/card/bro/164/scrapwork-mutt",
+        "colors": [],
+        "type_line": "Artifact Creature — Dog",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/7/4742800a-4872-4c2d-b884-01e0ba16950c.jpg?1674421370",
+          "normal": "https://cards.scryfall.io/normal/front/4/7/4742800a-4872-4c2d-b884-01e0ba16950c.jpg?1674421370"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Unleash Shell",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 208,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1be13abf-b717-4122-ab2b-7e597a251d52",
+        "scryfall_uri": "https://scryfall.com/card/bro/155/unleash-shell",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1be13abf-b717-4122-ab2b-7e597a251d52.jpg?1674421295",
+          "normal": "https://cards.scryfall.io/normal/front/1/b/1be13abf-b717-4122-ab2b-7e597a251d52.jpg?1674421295"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Penregon Strongbull",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 122,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1c2deb43-7134-4f9c-b02d-78407a8986b1",
+        "scryfall_uri": "https://scryfall.com/card/bro/147/penregon-strongbull",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Minotaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c2deb43-7134-4f9c-b02d-78407a8986b1.jpg?1674421227",
+          "normal": "https://cards.scryfall.io/normal/front/1/c/1c2deb43-7134-4f9c-b02d-78407a8986b1.jpg?1674421227"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Boulderbranch Golem",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 106,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6e6e5338-9b95-4ac7-a57c-5efaa6423531",
+        "scryfall_uri": "https://scryfall.com/card/bro/197/boulderbranch-golem",
+        "colors": [],
+        "type_line": "Artifact Creature — Golem",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e6e5338-9b95-4ac7-a57c-5efaa6423531.jpg?1739650295",
+          "normal": "https://cards.scryfall.io/normal/front/6/e/6e6e5338-9b95-4ac7-a57c-5efaa6423531.jpg?1739650295"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Gaea's Gift",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 145,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5503186a-46fe-4956-8ae3-5ab3343f8a93",
+        "scryfall_uri": "https://scryfall.com/card/bro/182/gaeas-gift",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/5503186a-46fe-4956-8ae3-5ab3343f8a93.jpg?1674421566",
+          "normal": "https://cards.scryfall.io/normal/front/5/5/5503186a-46fe-4956-8ae3-5ab3343f8a93.jpg?1674421566"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Argothian Opportunist",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 117,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b22586ce-efcc-4b20-83f9-c23b8eeaa88c",
+        "scryfall_uri": "https://scryfall.com/card/bro/167/argothian-opportunist",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b22586ce-efcc-4b20-83f9-c23b8eeaa88c.jpg?1674421392",
+          "normal": "https://cards.scryfall.io/normal/front/b/2/b22586ce-efcc-4b20-83f9-c23b8eeaa88c.jpg?1674421392"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Blanchwood Prowler",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 125,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9c6988b6-ade0-4cd5-b27c-146e5e7ae91f",
+        "scryfall_uri": "https://scryfall.com/card/bro/172/blanchwood-prowler",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elemental",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9c6988b6-ade0-4cd5-b27c-146e5e7ae91f.jpg?1674421438",
+          "normal": "https://cards.scryfall.io/normal/front/9/c/9c6988b6-ade0-4cd5-b27c-146e5e7ae91f.jpg?1674421438"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      }
+    ]
+  },
+  "top_uncommons": [
+    {
+      "name": "Skyfisher Spider",
+      "color": "BG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 34,
+      "tier_rating": "B",
+      "note": "#1 — strongest uncommon in the set.",
+      "id": "87300ac8-8b6f-4c37-8058-beb59eaa66be",
+      "scryfall_uri": "https://scryfall.com/card/bro/221/skyfisher-spider",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Creature — Spider",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/87300ac8-8b6f-4c37-8058-beb59eaa66be.jpg?1674421851",
+        "normal": "https://cards.scryfall.io/normal/front/8/7/87300ac8-8b6f-4c37-8058-beb59eaa66be.jpg?1674421851"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Static Net",
+      "color": "W",
+      "rarity": "Uncommon",
+      "pick_order_rank": 53,
+      "tier_rating": "B",
+      "note": "#2 — premium removal with lifegain/Powerstone bonus.",
+      "id": "5ab5cb30-3ced-4450-a3c4-b519f3762620",
+      "scryfall_uri": "https://scryfall.com/card/bro/27/static-net",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5ab5cb30-3ced-4450-a3c4-b519f3762620.jpg?1674420327",
+        "normal": "https://cards.scryfall.io/normal/front/5/a/5ab5cb30-3ced-4450-a3c4-b519f3762620.jpg?1674420327"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Thopter Mechanic",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 65,
+      "tier_rating": "B",
+      "note": "#3 — efficient 2-drop value.",
+      "id": "7577b5c7-91ed-4201-bdfd-0919142124eb",
+      "scryfall_uri": "https://scryfall.com/card/bro/68/thopter-mechanic",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Human Artificer",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/7577b5c7-91ed-4201-bdfd-0919142124eb.jpg?1674420643",
+        "normal": "https://cards.scryfall.io/normal/front/7/5/7577b5c7-91ed-4201-bdfd-0919142124eb.jpg?1674420643"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Self-Assembler",
+      "color": "C",
+      "rarity": "Uncommon",
+      "pick_order_rank": 161,
+      "tier_rating": "C",
+      "note": "#4 — assembly-worker synergy payoff.",
+      "id": "8dddb553-7c29-48df-9aeb-c9dd0efc3563",
+      "scryfall_uri": "https://scryfall.com/card/brr/51/self-assembler",
+      "colors": [],
+      "type_line": "Artifact Creature — Assembly-Worker",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8dddb553-7c29-48df-9aeb-c9dd0efc3563.jpg?1674092172",
+        "normal": "https://cards.scryfall.io/normal/front/8/d/8dddb553-7c29-48df-9aeb-c9dd0efc3563.jpg?1674092172"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Zephyr Sentinel",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 66,
+      "tier_rating": "B",
+      "note": "#5 — efficient 2-drop punishing removal.",
+      "id": "f935adbb-d2e3-48d0-b38c-41f3b583fecb",
+      "scryfall_uri": "https://scryfall.com/card/bro/74/zephyr-sentinel",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Human Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/9/f935adbb-d2e3-48d0-b38c-41f3b583fecb.jpg?1674420690",
+        "normal": "https://cards.scryfall.io/normal/front/f/9/f935adbb-d2e3-48d0-b38c-41f3b583fecb.jpg?1674420690"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Go for the Throat",
+      "color": "B",
+      "rarity": "Uncommon",
+      "pick_order_rank": 46,
+      "tier_rating": "B",
+      "note": "#6 — efficient creature removal.",
+      "id": "94117b09-d852-4f2e-be8e-68ee0ee3c3d8",
+      "scryfall_uri": "https://scryfall.com/card/bro/102/go-for-the-throat",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/94117b09-d852-4f2e-be8e-68ee0ee3c3d8.jpg?1674420900",
+        "normal": "https://cards.scryfall.io/normal/front/9/4/94117b09-d852-4f2e-be8e-68ee0ee3c3d8.jpg?1674420900"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Mask of the Jadecrafter",
+      "color": "C",
+      "rarity": "Uncommon",
+      "pick_order_rank": 146,
+      "tier_rating": "C",
+      "note": "#7 — dual-mode artifact enhancement.",
+      "id": "5db83275-bfd2-42c2-8d0f-e8a9b4f60e78",
+      "scryfall_uri": "https://scryfall.com/card/bro/201/mask-of-the-jadecrafter",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5db83275-bfd2-42c2-8d0f-e8a9b4f60e78.jpg?1674421704",
+        "normal": "https://cards.scryfall.io/normal/front/5/d/5db83275-bfd2-42c2-8d0f-e8a9b4f60e78.jpg?1674421704"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Gurgling Anointer",
+      "color": "B",
+      "rarity": "Uncommon",
+      "pick_order_rank": 83,
+      "tier_rating": "C",
+      "note": "#8 — card draw synergy enabler.",
+      "id": "9ce0d139-2bea-48df-a007-cee7c8ce07bd",
+      "scryfall_uri": "https://scryfall.com/card/bro/104/gurgling-anointer",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Phyrexian Horror",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9ce0d139-2bea-48df-a007-cee7c8ce07bd.jpg?1674420917",
+        "normal": "https://cards.scryfall.io/normal/front/9/c/9ce0d139-2bea-48df-a007-cee7c8ce07bd.jpg?1674420917"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Horned Stoneseeker",
+      "color": "R",
+      "rarity": "Uncommon",
+      "pick_order_rank": 78,
+      "tier_rating": "B",
+      "note": "#9 — efficient evasive value creature.",
+      "id": "5cd965a9-caa2-42a3-b2f9-e4f57341ac27",
+      "scryfall_uri": "https://scryfall.com/card/bro/138/horned-stoneseeker",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Creature — Lizard",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5cd965a9-caa2-42a3-b2f9-e4f57341ac27.jpg?1674421162",
+        "normal": "https://cards.scryfall.io/normal/front/5/c/5cd965a9-caa2-42a3-b2f9-e4f57341ac27.jpg?1674421162"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Corrupt",
+      "color": "B",
+      "rarity": "Uncommon",
+      "pick_order_rank": 98,
+      "tier_rating": "C",
+      "note": "#10 — best mono-colored payoff.",
+      "id": "c92ea561-80da-4fe1-ad87-ce47d9eb80bc",
+      "scryfall_uri": "https://scryfall.com/card/bro/88/corrupt",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/9/c92ea561-80da-4fe1-ad87-ce47d9eb80bc.jpg?1674420792",
+        "normal": "https://cards.scryfall.io/normal/front/c/9/c92ea561-80da-4fe1-ad87-ce47d9eb80bc.jpg?1674420792"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    }
+  ],
+  "splashing_strategy": {
+    "description": "Color tension is substantially higher than previous sets. Splash only the best cards.",
+    "fixers": [
+      {
+        "name": "Energy Refractor",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 151,
+        "tier_rating": "C",
+        "note": "Cantripping artifact.",
+        "id": "cc2a81fb-5045-4b7b-8cfb-b90c4f4a1f51",
+        "scryfall_uri": "https://scryfall.com/card/bro/234/energy-refractor",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cc2a81fb-5045-4b7b-8cfb-b90c4f4a1f51.jpg?1674421958",
+          "normal": "https://cards.scryfall.io/normal/front/c/c/cc2a81fb-5045-4b7b-8cfb-b90c4f4a1f51.jpg?1674421958"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Chromatic Star",
+        "color": "C",
+        "rarity": "Uncommon",
+        "pick_order_rank": 109,
+        "tier_rating": "C",
+        "note": "Sacrifice synergy.",
+        "id": "669f7205-af98-4e9b-a5d1-2901507c511d",
+        "scryfall_uri": "https://scryfall.com/card/brr/11/chromatic-star",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/669f7205-af98-4e9b-a5d1-2901507c511d.jpg?1674091855",
+          "normal": "https://cards.scryfall.io/normal/front/6/6/669f7205-af98-4e9b-a5d1-2901507c511d.jpg?1674091855"
+        },
+        "set": "brr",
+        "set_name": "The Brothers' War Retro Artifacts"
+      },
+      {
+        "name": "Evolving Wilds",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 150,
+        "tier_rating": "C",
+        "note": "Low opportunity cost.",
+        "id": "238de888-b1bd-4cce-9aa2-d0dd69ae7f0d",
+        "scryfall_uri": "https://scryfall.com/card/bro/261/evolving-wilds",
+        "colors": [],
+        "type_line": "Land",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/3/238de888-b1bd-4cce-9aa2-d0dd69ae7f0d.jpg?1674422191",
+          "normal": "https://cards.scryfall.io/normal/front/2/3/238de888-b1bd-4cce-9aa2-d0dd69ae7f0d.jpg?1674422191"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      },
+      {
+        "name": "Bushwhack",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 85,
+        "tier_rating": "C",
+        "note": "Fixer + removal.",
+        "id": "712a0640-d9c8-46fc-b38b-bf20a40fa902",
+        "scryfall_uri": "https://scryfall.com/card/bro/174/bushwhack",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/712a0640-d9c8-46fc-b38b-bf20a40fa902.jpg?1674421510",
+          "normal": "https://cards.scryfall.io/normal/front/7/1/712a0640-d9c8-46fc-b38b-bf20a40fa902.jpg?1674421510"
+        },
+        "set": "bro",
+        "set_name": "The Brothers' War"
+      }
+    ]
+  },
+  "bomb_rares": [
+    {
+      "name": "Titania's Command",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 6,
+      "tier_rating": "S",
+      "note": null,
+      "id": "753567c7-c484-4c0d-8128-7710e23c428f",
+      "scryfall_uri": "https://scryfall.com/card/bro/194/titanias-command",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/753567c7-c484-4c0d-8128-7710e23c428f.jpg?1674421654",
+        "normal": "https://cards.scryfall.io/normal/front/7/5/753567c7-c484-4c0d-8128-7710e23c428f.jpg?1674421654"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Gix's Command",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 9,
+      "tier_rating": "S",
+      "note": null,
+      "id": "9606de75-c25f-411b-a271-258ac5a60987",
+      "scryfall_uri": "https://scryfall.com/card/bro/97/gixs-command",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/9606de75-c25f-411b-a271-258ac5a60987.jpg?1674420864",
+        "normal": "https://cards.scryfall.io/normal/front/9/6/9606de75-c25f-411b-a271-258ac5a60987.jpg?1674420864"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Steel Seraph",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 8,
+      "tier_rating": "S",
+      "note": null,
+      "id": "1b6ef5f5-4058-4f89-a573-9e2da87a9f2e",
+      "scryfall_uri": "https://scryfall.com/card/bro/38/steel-seraph",
+      "colors": [],
+      "type_line": "Artifact Creature — Angel",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b6ef5f5-4058-4f89-a573-9e2da87a9f2e.jpg?1674420417",
+        "normal": "https://cards.scryfall.io/normal/front/1/b/1b6ef5f5-4058-4f89-a573-9e2da87a9f2e.jpg?1674420417"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Tyrant of Kher Ridges",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 4,
+      "tier_rating": "S",
+      "note": null,
+      "id": "72a271b1-b757-4373-8e6d-e9698ae96bed",
+      "scryfall_uri": "https://scryfall.com/card/bro/154/tyrant-of-kher-ridges",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Creature — Dragon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/2/72a271b1-b757-4373-8e6d-e9698ae96bed.jpg?1674427016",
+        "normal": "https://cards.scryfall.io/normal/front/7/2/72a271b1-b757-4373-8e6d-e9698ae96bed.jpg?1674427016"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Teferi, Temporal Pilgrim",
+      "color": "U",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": null,
+      "id": "23a4f1ec-eadf-4f1e-8821-f22293ad2580",
+      "scryfall_uri": "https://scryfall.com/card/bro/66/teferi-temporal-pilgrim",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Legendary Planeswalker — Teferi",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/3/23a4f1ec-eadf-4f1e-8821-f22293ad2580.jpg?1674420627",
+        "normal": "https://cards.scryfall.io/normal/front/2/3/23a4f1ec-eadf-4f1e-8821-f22293ad2580.jpg?1674420627"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Gix, Yawgmoth Praetor",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 5,
+      "tier_rating": "S",
+      "note": null,
+      "id": "2c76f7e0-37e7-4e87-93a3-a25ba0674645",
+      "scryfall_uri": "https://scryfall.com/card/bro/95/gix-yawgmoth-praetor",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Creature — Phyrexian Praetor",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c76f7e0-37e7-4e87-93a3-a25ba0674645.jpg?1675567458",
+        "normal": "https://cards.scryfall.io/normal/front/2/c/2c76f7e0-37e7-4e87-93a3-a25ba0674645.jpg?1675567458"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Skystrike Officer",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 18,
+      "tier_rating": "A",
+      "note": null,
+      "id": "925fa343-d9c3-4ed9-bd1f-aaa31c0badd7",
+      "scryfall_uri": "https://scryfall.com/card/bro/62/skystrike-officer",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Human Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/925fa343-d9c3-4ed9-bd1f-aaa31c0badd7.jpg?1674420595",
+        "normal": "https://cards.scryfall.io/normal/front/9/2/925fa343-d9c3-4ed9-bd1f-aaa31c0badd7.jpg?1674420595"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Myrel, Shield of Argive",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 16,
+      "tier_rating": "A",
+      "note": null,
+      "id": "e632ed57-bb00-4493-adef-7b4805edd7ea",
+      "scryfall_uri": "https://scryfall.com/card/bro/18/myrel-shield-of-argive",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Creature — Human Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e632ed57-bb00-4493-adef-7b4805edd7ea.jpg?1674420256",
+        "normal": "https://cards.scryfall.io/normal/front/e/6/e632ed57-bb00-4493-adef-7b4805edd7ea.jpg?1674420256"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Precursor Golem",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 44,
+      "tier_rating": "B",
+      "note": null,
+      "id": "182c80d0-3ce2-42cd-8dd7-e28b10e2a9a1",
+      "scryfall_uri": "https://scryfall.com/card/brr/42/precursor-golem",
+      "colors": [],
+      "type_line": "Artifact Creature — Golem",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/182c80d0-3ce2-42cd-8dd7-e28b10e2a9a1.jpg?1674092103",
+        "normal": "https://cards.scryfall.io/normal/front/1/8/182c80d0-3ce2-42cd-8dd7-e28b10e2a9a1.jpg?1674092103"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Saheeli, Filigree Master",
+      "color": "UR",
+      "rarity": "Mythic",
+      "pick_order_rank": 20,
+      "tier_rating": "A",
+      "note": null,
+      "id": "a3657562-323c-40d0-a261-d029ed549695",
+      "scryfall_uri": "https://scryfall.com/card/bro/219/saheeli-filigree-master",
+      "colors": [
+        "R",
+        "U"
+      ],
+      "type_line": "Legendary Planeswalker — Saheeli",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a3657562-323c-40d0-a261-d029ed549695.jpg?1674421836",
+        "normal": "https://cards.scryfall.io/normal/front/a/3/a3657562-323c-40d0-a261-d029ed549695.jpg?1674421836"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Gixian Puppeteer",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 21,
+      "tier_rating": "A",
+      "note": null,
+      "id": "2cc86e18-ffbc-4c5f-a694-922332b146cc",
+      "scryfall_uri": "https://scryfall.com/card/bro/99/gixian-puppeteer",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Phyrexian Warlock",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cc86e18-ffbc-4c5f-a694-922332b146cc.jpg?1674420879",
+        "normal": "https://cards.scryfall.io/normal/front/2/c/2cc86e18-ffbc-4c5f-a694-922332b146cc.jpg?1674420879"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Siege Veteran",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 17,
+      "tier_rating": "A",
+      "note": null,
+      "id": "f57e2a32-6e52-4f6e-96ec-55f5b7ba77e0",
+      "scryfall_uri": "https://scryfall.com/card/bro/25/siege-veteran",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Human Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f57e2a32-6e52-4f6e-96ec-55f5b7ba77e0.jpg?1674420312",
+        "normal": "https://cards.scryfall.io/normal/front/f/5/f57e2a32-6e52-4f6e-96ec-55f5b7ba77e0.jpg?1674420312"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Simian Simulacrum",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 23,
+      "tier_rating": "A",
+      "note": null,
+      "id": "c85e2a35-cb55-434c-bbd7-54c3438345c1",
+      "scryfall_uri": "https://scryfall.com/card/bro/205/simian-simulacrum",
+      "colors": [],
+      "type_line": "Artifact Creature — Ape",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/8/c85e2a35-cb55-434c-bbd7-54c3438345c1.jpg?1674421732",
+        "normal": "https://cards.scryfall.io/normal/front/c/8/c85e2a35-cb55-434c-bbd7-54c3438345c1.jpg?1674421732"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Transmogrant's Crown",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 30,
+      "tier_rating": "B",
+      "note": null,
+      "id": "dc913ed6-3032-4b45-a6c1-6a4208a7e00a",
+      "scryfall_uri": "https://scryfall.com/card/bro/125/transmogrants-crown",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/c/dc913ed6-3032-4b45-a6c1-6a4208a7e00a.jpg?1674421067",
+        "normal": "https://cards.scryfall.io/normal/front/d/c/dc913ed6-3032-4b45-a6c1-6a4208a7e00a.jpg?1674421067"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Cityscape Leveler",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 13,
+      "tier_rating": "A",
+      "note": null,
+      "id": "67a87278-4c82-4056-8354-253d86b0ef3d",
+      "scryfall_uri": "https://scryfall.com/card/bro/233/cityscape-leveler",
+      "colors": [],
+      "type_line": "Artifact Creature — Construct",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/67a87278-4c82-4056-8354-253d86b0ef3d.jpg?1674421950",
+        "normal": "https://cards.scryfall.io/normal/front/6/7/67a87278-4c82-4056-8354-253d86b0ef3d.jpg?1674421950"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    }
+  ],
+  "junk_rares": [
+    {
+      "name": "The Stasis Coffin",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 323,
+      "tier_rating": "F",
+      "note": null,
+      "id": "45537ac3-fc61-4253-a782-7f3e436b2aa6",
+      "scryfall_uri": "https://scryfall.com/card/bro/245/the-stasis-coffin",
+      "colors": [],
+      "type_line": "Legendary Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/5/45537ac3-fc61-4253-a782-7f3e436b2aa6.jpg?1674422040",
+        "normal": "https://cards.scryfall.io/normal/front/4/5/45537ac3-fc61-4253-a782-7f3e436b2aa6.jpg?1674422040"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Semblance Anvil",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 284,
+      "tier_rating": "D",
+      "note": null,
+      "id": "52f4f1fa-43b8-411c-a151-c90b776fe985",
+      "scryfall_uri": "https://scryfall.com/card/brr/52/semblance-anvil",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/52f4f1fa-43b8-411c-a151-c90b776fe985.jpg?1674092180",
+        "normal": "https://cards.scryfall.io/normal/front/5/2/52f4f1fa-43b8-411c-a151-c90b776fe985.jpg?1674092180"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Quicksilver Amulet",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 314,
+      "tier_rating": "D",
+      "note": null,
+      "id": "8ddb3e7b-06ae-4b2e-8342-0bc7a3bfa8e6",
+      "scryfall_uri": "https://scryfall.com/card/brr/45/quicksilver-amulet",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8ddb3e7b-06ae-4b2e-8342-0bc7a3bfa8e6.jpg?1674092126",
+        "normal": "https://cards.scryfall.io/normal/front/8/d/8ddb3e7b-06ae-4b2e-8342-0bc7a3bfa8e6.jpg?1674092126"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Unwinding Clock",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 321,
+      "tier_rating": "D",
+      "note": null,
+      "id": "2cb86d65-15c3-4169-9716-c8394ede4f65",
+      "scryfall_uri": "https://scryfall.com/card/brr/61/unwinding-clock",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cb86d65-15c3-4169-9716-c8394ede4f65.jpg?1674092249",
+        "normal": "https://cards.scryfall.io/normal/front/2/c/2cb86d65-15c3-4169-9716-c8394ede4f65.jpg?1674092249"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Inspiring Statuary",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 280,
+      "tier_rating": "D",
+      "note": null,
+      "id": "fadc49d8-bc17-4ddc-8f94-071437ff8045",
+      "scryfall_uri": "https://scryfall.com/card/brr/22/inspiring-statuary",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/a/fadc49d8-bc17-4ddc-8f94-071437ff8045.jpg?1674091944",
+        "normal": "https://cards.scryfall.io/normal/front/f/a/fadc49d8-bc17-4ddc-8f94-071437ff8045.jpg?1674091944"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Quietus Spike",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 282,
+      "tier_rating": "D",
+      "note": null,
+      "id": "31c776aa-7f7e-4cd7-a188-bbe655f785d2",
+      "scryfall_uri": "https://scryfall.com/card/brr/46/quietus-spike",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/31c776aa-7f7e-4cd7-a188-bbe655f785d2.jpg?1674092133",
+        "normal": "https://cards.scryfall.io/normal/front/3/1/31c776aa-7f7e-4cd7-a188-bbe655f785d2.jpg?1674092133"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Goblin Charbelcher",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 310,
+      "tier_rating": "D",
+      "note": null,
+      "id": "7aa8567a-c7bb-4bb4-a9dc-e0eb898812e4",
+      "scryfall_uri": "https://scryfall.com/card/brr/18/goblin-charbelcher",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7aa8567a-c7bb-4bb4-a9dc-e0eb898812e4.jpg?1674091915",
+        "normal": "https://cards.scryfall.io/normal/front/7/a/7aa8567a-c7bb-4bb4-a9dc-e0eb898812e4.jpg?1674091915"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Cloud Key",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 299,
+      "tier_rating": "D",
+      "note": null,
+      "id": "1b6c0ff0-9dfe-450d-aec4-37b89ecceda8",
+      "scryfall_uri": "https://scryfall.com/card/brr/12/cloud-key",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b6c0ff0-9dfe-450d-aec4-37b89ecceda8.jpg?1674091865",
+        "normal": "https://cards.scryfall.io/normal/front/1/b/1b6c0ff0-9dfe-450d-aec4-37b89ecceda8.jpg?1674091865"
+      },
+      "set": "brr",
+      "set_name": "The Brothers' War Retro Artifacts"
+    },
+    {
+      "name": "Over the Top",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 308,
+      "tier_rating": "D",
+      "note": null,
+      "id": "01eb9702-55c5-41b2-8bef-63d33dafa599",
+      "scryfall_uri": "https://scryfall.com/card/bro/146/over-the-top",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/01eb9702-55c5-41b2-8bef-63d33dafa599.jpg?1674421220",
+        "normal": "https://cards.scryfall.io/normal/front/0/1/01eb9702-55c5-41b2-8bef-63d33dafa599.jpg?1674421220"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    },
+    {
+      "name": "Hurkyl's Final Meditation",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 316,
+      "tier_rating": "D",
+      "note": null,
+      "id": "5577f345-9577-42f8-b244-089b9a7c2e56",
+      "scryfall_uri": "https://scryfall.com/card/bro/52/hurkyls-final-meditation",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/5577f345-9577-42f8-b244-089b9a7c2e56.jpg?1675567442",
+        "normal": "https://cards.scryfall.io/normal/front/5/5/5577f345-9577-42f8-b244-089b9a7c2e56.jpg?1675567442"
+      },
+      "set": "bro",
+      "set_name": "The Brothers' War"
+    }
+  ],
+  "retro_artifacts_bonus_sheet": {
+    "description": "The Brothers' War Retro Artifacts (brr) — 63 reprinted artifacts appearing in a bonus slot. Many are bombs in Limited; quality varies.",
+    "note": "When you see a retro frame, evaluate the artifact carefully — some are first-pick bombs and others are unplayable."
+  },
+  "general_tips": [
+    "Understand archetype context before drafting — read signals carefully for archetype saturation.",
+    "Prioritize interaction (removal/counterspells) alongside threats.",
+    "Be willing to abandon cards to avoid color-locked positions.",
+    "Powerstone utility varies by archetype — evaluate specific uses before prioritizing generation.",
+    "Splash only the best cards; do not splash above-average ones."
+  ]
+}

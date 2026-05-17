@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,8 +37,6 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -54,8 +51,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -81,8 +76,12 @@ import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.StaleWarningBanner
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchViewModel
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -177,31 +176,25 @@ private fun CollectionContent(
     onNavigateToTradeThread:   (String, String) -> Unit = { _, _ -> },
 ) {
     val mc = MaterialTheme.magicColors
-    val snackbarHostState = remember { SnackbarHostState() }
-    val syncSuccessMsg     = stringResource(R.string.collection_sync_success)
+    val toastState = rememberMagicToastState()
     val syncErrorMsg       = stringResource(R.string.collection_sync_error)
     val migrationMsgFmt    = stringResource(R.string.trades_migration_synced_n_cards)
 
-    // Auto-dismiss sync success/error via snackbar
     LaunchedEffect(uiState.syncState, uiState.syncError) {
         when (uiState.syncState) {
-            SyncState.SUCCESS -> {
-              //  snackbarHostState.showSnackbar(message = syncSuccessMsg)
-                onSyncDismissed()
-            }
+            SyncState.SUCCESS -> onSyncDismissed()
             SyncState.ERROR -> {
-                snackbarHostState.showSnackbar(message = uiState.syncError ?: syncErrorMsg)
+                toastState.show(uiState.syncError ?: syncErrorMsg, MagicToastType.ERROR)
                 onSyncDismissed()
             }
             else -> Unit
         }
     }
 
-    // Show trade list migration snackbar when count > 0
     LaunchedEffect(uiState.snackbarMessage) {
         val countStr = uiState.snackbarMessage ?: return@LaunchedEffect
         val count = countStr.toIntOrNull() ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message = migrationMsgFmt.format(count))
+        toastState.show(migrationMsgFmt.format(count), MagicToastType.INFO)
         onSnackbarDismissed()
     }
 
@@ -209,13 +202,10 @@ private fun CollectionContent(
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
         Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0),
             topBar = {
-                CollectionTopBar(
-                    selectedTab       = uiState.selectedTab,
-                )
+                CollectionTopBar()
             },
             floatingActionButton = {
                 if (uiState.selectedTab == CollectionTab.CARDS) {
@@ -308,6 +298,8 @@ private fun CollectionContent(
                 LaunchedEffect(it) { onErrorDismissed() }
             }
         }
+
+        MagicToastHost(state = toastState)
     }
 }
 
@@ -497,7 +489,13 @@ private fun CardsTabContent(
 
         // Empty state
         if (uiState.cards.isEmpty()) {
-            EmptyCollectionState(onAddCardClick = onScannerClick)
+            EmptyState(
+                icon        = Icons.Default.CollectionsBookmark,
+                title       = stringResource(R.string.collection_empty_title),
+                subtitle    = stringResource(R.string.collection_empty_subtitle),
+                actionLabel = stringResource(R.string.collection_empty_action),
+                onAction    = onScannerClick,
+            )
             return@Column
         }
 
@@ -516,9 +514,7 @@ private fun CardsTabContent(
 }
 
 @Composable
-private fun CollectionTopBar(
-    selectedTab:      CollectionTab,
-) {
+private fun CollectionTopBar() {
     val mc = MaterialTheme.magicColors
 
     Surface(
@@ -619,40 +615,6 @@ private fun CardList(
             )
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
         }
-    }
-}
-
-@Composable
-private fun EmptyCollectionState(onAddCardClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    Column(
-        modifier            = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector        = Icons.Default.CollectionsBookmark,
-            contentDescription = null,
-            tint               = mc.textDisabled,
-            modifier           = Modifier.size(64.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.collection_empty_title),
-            style = MaterialTheme.magicTypography.titleMedium,
-            color = mc.textPrimary,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.collection_empty_subtitle),
-            style = MaterialTheme.magicTypography.bodyMedium,
-            color = mc.textSecondary,
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onAddCardClick,
-            colors  = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-        ) { Text(stringResource(R.string.collection_empty_action), color = mc.background) }
     }
 }
 

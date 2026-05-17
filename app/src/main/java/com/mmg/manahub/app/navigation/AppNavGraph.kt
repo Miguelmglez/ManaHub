@@ -58,6 +58,7 @@ import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
+import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
 import com.mmg.manahub.feature.scanner.presentation.ScannerScreen
 import com.mmg.manahub.feature.settings.presentation.SettingsScreen
@@ -245,7 +246,10 @@ fun AppNavGraph(
                     onBack = { navController.popBackStack() },
                     onImproveDeck = { id ->
                         navController.navigate(Screen.DeckImprovement.createRoute(id))
-                    }
+                    },
+                    onReviewSurvey = { sessionId ->
+                        navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
+                    },
                 )
             }
 
@@ -277,12 +281,16 @@ fun AppNavGraph(
                 StatsScreen(
                     onCardClick = { id ->
                         navController.navigate(
-                            Screen.CollectionCardDetail.createRoute(
-                                id
-                            )
+                            Screen.CollectionCardDetail.createRoute(id)
                         )
                     },
                     onBackClick = navController::popBackStack,
+                    onReviewSurvey = { sessionId ->
+                        navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
+                    },
+                    onDeckClick = { deckId ->
+                        navController.navigate(Screen.DeckDetail.createRoute(deckId))
+                    },
                 )
             }
 
@@ -301,11 +309,31 @@ fun AppNavGraph(
 
             // ── News ──────────────────────────────────────────────────────────
             composable(Screen.News.route) {
-                NewsScreen()
+                NewsScreen(
+                    onVideoClick = { videoId, title ->
+                        navController.navigate(Screen.NewsVideoPlayer.createRoute(videoId, title))
+                    },
+                )
             }
 
             composable(Screen.NewsSourcesSettings.route) {
                 NewsSourcesSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.NewsVideoPlayer.route,
+                arguments = listOf(
+                    navArgument("videoId") { type = NavType.StringType },
+                    navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { backStackEntry ->
+                val videoId = android.net.Uri.decode(backStackEntry.arguments?.getString("videoId") ?: return@composable)
+                val title = android.net.Uri.decode(backStackEntry.arguments?.getString("title") ?: "")
+                VideoPlayerScreen(
+                    videoId = videoId,
+                    title = title,
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -620,23 +648,24 @@ fun AppNavGraph(
             // ── Post-game survey ──────────────────────────────────────────────
             composable(
                 route = Screen.GameSurvey.route,
-                arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),
+                arguments = listOf(
+                    navArgument("sessionId") { type = NavType.LongType },
+                    navArgument("mode") { type = NavType.StringType; defaultValue = "COMPLETE" },
+                ),
             ) { backStack ->
-                val sessionId = backStack.arguments?.getLong("sessionId") ?: 0L
-                val gameResult = gameUiState.gameResult
-
-                if (gameResult != null) {
-                    SurveyScreen(
-                        sessionId = sessionId,
-                        gameResult = gameResult,
-                        onComplete = {
+                val mode = backStack.arguments?.getString("mode") ?: "COMPLETE"
+                SurveyScreen(
+                    onComplete = {
+                        if (mode == "REVIEW") {
+                            navController.popBackStack()
+                        } else {
                             gameVm.finishGame()
                             navController.navigate(Screen.GameSetup.route) {
                                 popUpTo(Screen.Collection.route) { inclusive = false }
                             }
-                        },
-                    )
-                }
+                        }
+                    },
+                )
             }
         }
         // Global toast for invite results — overlays all screens without interfering with

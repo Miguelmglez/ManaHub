@@ -211,17 +211,6 @@ class FriendsViewModel @Inject constructor(
         }
     }
 
-    fun removeFriend(friendshipId: String, errorMsg: String) {
-        viewModelScope.launch {
-            val result = friendRepo.removeFriend(friendshipId)
-            analyticsHelper.logEvent("remove_friend")
-            if (result.isFailure) _uiState.update {
-                analyticsHelper.logEvent("error_remove_friend", mapOf("error" to errorMsg))
-                it.copy(toastMessage = errorMsg, toastType = MagicToastType.ERROR)
-            }
-        }
-    }
-
     fun clearToast() = _uiState.update { it.copy(toastMessage = null, toastType = MagicToastType.ERROR) }
 
     private fun refreshOutgoingIfLoggedIn() {

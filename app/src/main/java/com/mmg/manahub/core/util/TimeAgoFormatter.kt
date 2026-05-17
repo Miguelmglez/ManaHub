@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.news.presentation
+package com.mmg.manahub.core.util
 
 import java.util.Locale
 

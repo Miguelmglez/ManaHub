@@ -7,7 +7,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 
-// ── Font families cargadas desde res/font/ ────────────────────────────────────
+// ── Font families loaded from res/font/ ──────────────────────────────────────
 
 val MarcellusFontFamily = FontFamily(
     Font(R.font.marcellus_regular, FontWeight.Normal),
@@ -29,7 +29,7 @@ val ManaFontFamily = FontFamily(
     Font(R.font.mana, FontWeight.Normal)
 )
 
-// ── Escala tipográfica ────────────────────────────────────────────────────────
+// ── Typography scale ─────────────────────────────────────────────────────────
 
 /**
  * Typography scale for the ManaHub design system.

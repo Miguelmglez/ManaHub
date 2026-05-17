@@ -1,147 +1,1718 @@
 {
-  "set_code": "dsk",
-  "set_name": "Duskmourn: House of Horror",
-  "last_updated": "2024-10-01",
-  "overview": "Duskmourn is a horror-themed set that emphasizes survival mechanics and eerie synergies. The format is medium-speed with strong incentives to be aggressive in certain color pairs while controlling archetypes reward patience. Delirium and room mechanics are central to many strategies, and enchantments matter more than usual due to the Room subtype.",
+  "metadata": {
+    "set_name": "Duskmourn: House of Horror",
+    "set_code": "DSK",
+    "source_url": "https://draftsim.com/mtg-dsk-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "October 11, 2024"
+  },
+  "set_overview": {
+    "summary": "Duskmourn: House of Horror features balanced color and archetype distribution with average gameplay pace that varies by archetype. The format emphasizes 2-drops and synergistic interactions rather than early stomps.",
+    "color_ranking": [
+      "{W} White",
+      "{R} Red",
+      "{G} Green",
+      "{U} Blue",
+      "{B} Black"
+    ],
+    "color_notes": {
+      "{W} White": "Best color. Two excellent common removals (Trapped in the Screen, Seized from Slumber) and strong creatures (Fear of Surveillance, Unsettling Twins).",
+      "{R} Red": "Proactive color with good removal (Scorching Dragonfire, Glassworks // Shattered Yard). Creatures support aggressive strategies.",
+      "{G} Green": "Most flexible color. Essential for delirium decks and provides mana fixing for splashes.",
+      "{U} Blue": "Solid removal and control pieces (Glimmerburst, Unable to Scream) but creatures are mediocre.",
+      "{B} Black": "Weakest creatures; valuable primarily for removal (Murder, Winter's Intervention, Final Vengeance)."
+    },
+    "key_gameplay_notes": [
+      "Format rewards 2-drops and synergies over big early plays.",
+      "Manifest information is deducible — what was binned reveals manifested card quality.",
+      "Splashing requires 3+ sources; green enables most splashes via mana fixing.",
+      "Rooms provide essential mana sinks that prevent mana flood.",
+      "Delirium enablers (Say Its Name, Commune with Evil) act as near-guarantees.",
+      "Eerie is easily triggered with high enchantment density.",
+      "Early 2-drop trades prevent late-game surprises from manifests."
+    ]
+  },
   "mechanics": [
     {
       "name": "Rooms",
-      "description": "Room enchantments are double-faced enchantments. You can unlock the second room by paying its cost later. Each side has a different effect.",
-      "draft_tip": "Rooms provide excellent value in longer games. Prioritize rooms that have strong first halves since you may not always unlock the second side. They count as enchantments for synergies."
-    },
-    {
-      "name": "Delirium",
-      "description": "Cards with Delirium get a bonus if you have four or more card types in your graveyard.",
-      "draft_tip": "Build your deck with diverse card types to enable Delirium. Artifact creatures, enchantment creatures, and instant/sorcery splits help reach the threshold quickly."
-    },
-    {
-      "name": "Survival",
-      "description": "Survival triggers the first time a creature you control attacks while you have less life than your starting total.",
-      "draft_tip": "Survival is naturally enabled in aggressive strategies. Don't be afraid to take some early damage — your survival payoffs will reward it."
+      "summary": "Dual-faced enchantments providing Eerie triggers and mana sinks. Excellent flexibility — you unlock one half at a time.",
+      "performance": "Format-defining. Rooms are mana sinks that smooth long games.",
+      "key_examples": [
+        {
+          "name": "Glassworks Shattered Yard",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 69,
+          "tier_rating": "B",
+          "note": null,
+          "id": "fe32f667-8d9f-4414-913e-256cbc2fbc45",
+          "scryfall_uri": "https://scryfall.com/card/dsk/137/glassworks-shattered-yard",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment — Room // Enchantment — Room",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe32f667-8d9f-4414-913e-256cbc2fbc45.jpg?1726780646",
+            "normal": "https://cards.scryfall.io/normal/front/f/e/fe32f667-8d9f-4414-913e-256cbc2fbc45.jpg?1726780646"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        },
+        {
+          "name": "Meat Locker Drowned Diner",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 110,
+          "tier_rating": "C",
+          "note": null,
+          "id": "b3c773f0-9e65-48de-a362-a9a943198693",
+          "scryfall_uri": "https://scryfall.com/card/dsk/65/meat-locker-drowned-diner",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment — Room // Enchantment — Room",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3c773f0-9e65-48de-a362-a9a943198693.jpg?1726780679",
+            "normal": "https://cards.scryfall.io/normal/front/b/3/b3c773f0-9e65-48de-a362-a9a943198693.jpg?1726780679"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        },
+        {
+          "name": "Derelict Attic Widow's Walk",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 219,
+          "tier_rating": "D",
+          "note": null,
+          "id": "2cae24c1-53f1-4f3f-8795-b634c46a17c4",
+          "scryfall_uri": "https://scryfall.com/card/dsk/93/derelict-attic-widows-walk",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment — Room // Enchantment — Room",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cae24c1-53f1-4f3f-8795-b634c46a17c4.jpg?1726780598",
+            "normal": "https://cards.scryfall.io/normal/front/2/c/2cae24c1-53f1-4f3f-8795-b634c46a17c4.jpg?1726780598"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        }
+      ]
     },
     {
       "name": "Eerie",
-      "description": "Eerie triggers whenever an enchantment enters the battlefield under your control or you unlock a Room.",
-      "draft_tip": "Eerie rewards enchantment-heavy builds. Rooms trigger Eerie twice — once when cast and again when unlocked. This makes rooms premium in Eerie decks."
+      "summary": "Easy-to-trigger payoff whenever a Room or aura enters. WU version is stronger than black's.",
+      "performance": "WU Eerie is tier 1; BU lags behind.",
+      "key_examples": [
+        {
+          "name": "Optimistic Scavenger",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 20,
+          "tier_rating": "S",
+          "note": null,
+          "id": "9c72fc6f-6a96-420d-812d-b5cf0f57cc7f",
+          "scryfall_uri": "https://scryfall.com/card/dsk/21/optimistic-scavenger",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9c72fc6f-6a96-420d-812d-b5cf0f57cc7f.jpg?1726285934",
+            "normal": "https://cards.scryfall.io/normal/front/9/c/9c72fc6f-6a96-420d-812d-b5cf0f57cc7f.jpg?1726285934"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        },
+        {
+          "name": "Gremlin Tamer",
+          "color": "WB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 31,
+          "tier_rating": "A",
+          "note": null,
+          "id": "3593a222-21c5-4f91-bde1-763ea08071da",
+          "scryfall_uri": "https://scryfall.com/card/dsk/215/gremlin-tamer",
+          "colors": [
+            "U",
+            "W"
+          ],
+          "type_line": "Creature — Human Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/3593a222-21c5-4f91-bde1-763ea08071da.jpg?1726286668",
+            "normal": "https://cards.scryfall.io/normal/front/3/5/3593a222-21c5-4f91-bde1-763ea08071da.jpg?1726286668"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        },
+        {
+          "name": "Balemurk Leech",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 251,
+          "tier_rating": "F",
+          "note": null,
+          "id": "f0621b32-95c5-4f70-96cf-d46d20efc85d",
+          "scryfall_uri": "https://scryfall.com/card/dsk/84/balemurk-leech",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Leech",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0621b32-95c5-4f70-96cf-d46d20efc85d.jpg?1726286164",
+            "normal": "https://cards.scryfall.io/normal/front/f/0/f0621b32-95c5-4f70-96cf-d46d20efc85d.jpg?1726286164"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        }
+      ]
+    },
+    {
+      "name": "Survival",
+      "summary": "Disappointing mechanic; works better as a subtheme. Some Survivors are still worth playing on rate.",
+      "performance": "Weak primary theme; some standout Survivors exist.",
+      "key_examples": [
+        {
+          "name": "Defiant Survivor",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 130,
+          "tier_rating": "C",
+          "note": null,
+          "id": "327772f3-5a87-47af-9308-c1119ad2711d",
+          "scryfall_uri": "https://scryfall.com/card/dsk/175/defiant-survivor",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Survivor",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/327772f3-5a87-47af-9308-c1119ad2711d.jpg?1726286512",
+            "normal": "https://cards.scryfall.io/normal/front/3/2/327772f3-5a87-47af-9308-c1119ad2711d.jpg?1726286512"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        },
+        {
+          "name": "Rootwise Survivor",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 136,
+          "tier_rating": "C",
+          "note": null,
+          "id": "d843c242-088f-4131-9e52-7ee2d0db5e20",
+          "scryfall_uri": "https://scryfall.com/card/dsk/196/rootwise-survivor",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Survivor",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d843c242-088f-4131-9e52-7ee2d0db5e20.jpg?1726286598",
+            "normal": "https://cards.scryfall.io/normal/front/d/8/d843c242-088f-4131-9e52-7ee2d0db5e20.jpg?1726286598"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        }
+      ]
+    },
+    {
+      "name": "Delirium",
+      "summary": "Both RG and BG versions are solid. Enablers like Say Its Name and Commune with Evil nearly guarantee activation.",
+      "performance": "Reliable archetype payoff; build with enablers.",
+      "key_examples": [
+        {
+          "name": "Say Its Name",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 95,
+          "tier_rating": "B",
+          "note": null,
+          "id": "94c58683-b5f2-4863-9562-6f6be1ec21fe",
+          "scryfall_uri": "https://scryfall.com/card/dsk/197/say-its-name",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/94c58683-b5f2-4863-9562-6f6be1ec21fe.jpg?1726286600",
+            "normal": "https://cards.scryfall.io/normal/front/9/4/94c58683-b5f2-4863-9562-6f6be1ec21fe.jpg?1726286600"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        },
+        {
+          "name": "Commune with Evil",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 89,
+          "tier_rating": "B",
+          "note": null,
+          "id": "9ab94ebe-b51b-4c6f-af43-0ed80e2808a3",
+          "scryfall_uri": "https://scryfall.com/card/dsk/87/commune-with-evil",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/a/9ab94ebe-b51b-4c6f-af43-0ed80e2808a3.jpg?1726286174",
+            "normal": "https://cards.scryfall.io/normal/front/9/a/9ab94ebe-b51b-4c6f-af43-0ed80e2808a3.jpg?1726286174"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        }
+      ]
     },
     {
       "name": "Manifest Dread",
-      "description": "Look at the top two cards of your library, put one face down as a 2/2 creature, and the other into your graveyard.",
-      "draft_tip": "Manifest Dread fuels Delirium by milling cards and creates board presence. The face-down creatures can be turned face up if they're creature cards."
+      "summary": "Slows games down and is core to GU. Requires careful information deduction since both faces are hidden.",
+      "performance": "Engine for GU Manifest decks; rewards card-counting.",
+      "key_examples": [
+        {
+          "name": "Growing Dread",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 52,
+          "tier_rating": "B",
+          "note": null,
+          "id": "5479ac50-8335-4c6a-be99-750a44e24f25",
+          "scryfall_uri": "https://scryfall.com/card/dsk/216/growing-dread",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/5479ac50-8335-4c6a-be99-750a44e24f25.jpg?1726286675",
+            "normal": "https://cards.scryfall.io/normal/front/5/4/5479ac50-8335-4c6a-be99-750a44e24f25.jpg?1726286675"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        },
+        {
+          "name": "Oblivious Bookworm",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 25,
+          "tier_rating": "A",
+          "note": null,
+          "id": "c7b4c50b-fe76-430d-8f96-208f15ca4cd7",
+          "scryfall_uri": "https://scryfall.com/card/dsk/225/oblivious-bookworm",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Creature — Human Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7b4c50b-fe76-430d-8f96-208f15ca4cd7.jpg?1726286707",
+            "normal": "https://cards.scryfall.io/normal/front/c/7/c7b4c50b-fe76-430d-8f96-208f15ca4cd7.jpg?1726286707"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        }
+      ]
+    },
+    {
+      "name": "Impending",
+      "summary": "Rare mechanic. All Overlords are bombs; Overlord of the Mistmoors is called \"the most broken rare\" in the set.",
+      "performance": "Top-tier rares; first-pick when seen.",
+      "key_examples": [
+        {
+          "name": "Overlord of the Mistmoors",
+          "color": "W",
+          "rarity": "Mythic",
+          "pick_order_rank": 1,
+          "tier_rating": "S",
+          "note": null,
+          "id": "6bcafc2e-cef6-412d-8c5d-1658c3337292",
+          "scryfall_uri": "https://scryfall.com/card/dsk/23/overlord-of-the-mistmoors",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment Creature — Avatar Horror",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6bcafc2e-cef6-412d-8c5d-1658c3337292.jpg?1726285942",
+            "normal": "https://cards.scryfall.io/normal/front/6/b/6bcafc2e-cef6-412d-8c5d-1658c3337292.jpg?1726285942"
+          },
+          "set": "dsk",
+          "set_name": "Duskmourn: House of Horror"
+        }
+      ]
     }
   ],
-  "archetypes": [
-    {
-      "colors": "WU",
-      "name": "Eerie Control",
-      "tier": "A",
-      "description": "White-Blue focuses on Eerie triggers from enchantments and rooms to generate incremental value and control the board.",
-      "key_commons": ["Unwilling Vessel", "Seized from Slumber", "Paranormal Analyst"],
-      "key_uncommons": ["Patched Plaything", "Ghostly Dancers"],
-      "strategy": "Draft rooms and enchantments highly. Use Eerie payoffs to generate card advantage and tempo. Win by outvaluing the opponent with repeated triggers."
-    },
-    {
-      "colors": "UB",
-      "name": "Eerie Tempo",
-      "tier": "S",
-      "description": "Blue-Black combines Eerie triggers with tempo plays and removal to dominate the mid-game.",
-      "key_commons": ["Paranormal Analyst", "Spectral Snatcher", "Grabbed by the Throat"],
-      "key_uncommons": ["Fear of Impostors", "Twist Reality"],
-      "strategy": "Focus on efficient creatures with Eerie payoffs. Use removal to clear blockers and enchantments to trigger Eerie repeatedly."
-    },
-    {
-      "colors": "BR",
-      "name": "Sacrifice Aggro",
-      "tier": "A",
-      "description": "Black-Red uses sacrifice synergies and aggressive creatures to pressure opponents.",
-      "key_commons": ["Torch the Tower", "Cult Ceremony", "Scorching Dragonfire"],
-      "key_uncommons": ["Sawblade Skinripper", "Screaming Nemesis"],
-      "strategy": "Draft cheap aggressive creatures and sacrifice outlets. Use burn spells to clear the way and close out games quickly."
-    },
-    {
-      "colors": "RG",
-      "name": "Delirium Midrange",
-      "tier": "B",
-      "description": "Red-Green focuses on reaching Delirium quickly to power up creatures and spells.",
-      "key_commons": ["Flesh Burrower", "Wildfire Wickerfolk", "Piggy Bank"],
-      "key_uncommons": ["Grasping Longneck", "Peer Past the Veil"],
-      "strategy": "Diversify card types to enable Delirium fast. Play efficient midrange threats that become powerful once Delirium is active."
-    },
-    {
-      "colors": "GW",
-      "name": "Survival Aggro",
-      "tier": "B",
-      "description": "Green-White uses Survival triggers and go-wide strategies to overwhelm opponents.",
-      "key_commons": ["Sheltered by Ghosts", "Acrobatic Cheerleader", "Commune with Nature"],
-      "key_uncommons": ["Enduring Innocence", "Coordinated Clobbering"],
-      "strategy": "Build a curve of efficient creatures. Enable Survival by attacking early and use combat tricks to win races."
-    },
-    {
-      "colors": "WB",
-      "name": "Enchantments Value",
-      "tier": "A",
-      "description": "White-Black uses enchantment synergies for removal and value generation.",
-      "key_commons": ["Sheltered by Ghosts", "Seized from Slumber", "Final Vengeance"],
-      "key_uncommons": ["Resurrected Cultist", "Broodspinner"],
-      "strategy": "Prioritize enchantment-based removal. Use enchantment payoffs to generate card advantage while controlling the board."
-    },
-    {
-      "colors": "UR",
-      "name": "Rooms Tempo",
-      "tier": "B",
-      "description": "Blue-Red combines rooms with tempo plays and direct damage.",
-      "key_commons": ["Pyroclasm", "Paranormal Analyst", "Torch the Tower"],
-      "key_uncommons": ["Glassworks", "Impossible Inferno"],
-      "strategy": "Draft rooms with strong immediate effects. Use burn to clear the path while rooms provide ongoing value."
-    },
-    {
-      "colors": "BG",
-      "name": "Delirium Graveyard",
-      "tier": "A",
-      "description": "Black-Green maximizes Delirium with self-mill and graveyard recursion.",
-      "key_commons": ["Flesh Burrower", "Grabbed by the Throat", "Commune with Nature"],
-      "key_uncommons": ["Drag to the Roots", "Cathartic Parting"],
-      "strategy": "Self-mill aggressively to fuel Delirium. Use recursion to grind out opponents and powerful Delirium payoffs as finishers."
-    },
-    {
-      "colors": "RW",
-      "name": "Survival Aggro",
-      "tier": "C",
-      "description": "Red-White goes aggressive with Survival triggers and efficient beaters.",
-      "key_commons": ["Acrobatic Cheerleader", "Torch the Tower", "Scorching Dragonfire"],
-      "key_uncommons": ["Screaming Nemesis", "Enduring Innocence"],
-      "strategy": "Curve out aggressively. Use combat tricks and burn to push through damage and trigger Survival."
-    },
-    {
-      "colors": "GU",
-      "name": "Manifest Value",
-      "tier": "C",
-      "description": "Green-Blue uses Manifest Dread to generate card advantage and board presence.",
-      "key_commons": ["Commune with Nature", "Paranormal Analyst", "Wildfire Wickerfolk"],
-      "key_uncommons": ["Threats Around Every Corner", "Peer Past the Veil"],
-      "strategy": "Use Manifest Dread to fill the board while milling for value. Turn creatures face up for tempo and use green's size advantage."
-    }
-  ],
-  "top_commons": {
-    "W": ["Sheltered by Ghosts", "Seized from Slumber", "Acrobatic Cheerleader"],
-    "U": ["Paranormal Analyst", "Fear of Surveillance", "Spectral Snatcher"],
-    "B": ["Grabbed by the Throat", "Final Vengeance", "Cult Ceremony"],
-    "R": ["Torch the Tower", "Scorching Dragonfire", "Flesh Burrower"],
-    "G": ["Commune with Nature", "Wildfire Wickerfolk", "Piggy Bank"]
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{W}{U}",
+        "name": "WU Eerie",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Tempo / tempo-control with enchantment synergies. Optimistic Scavenger and Gremlin Tamer are the signposts; chain Rooms and auras for repeated Eerie triggers.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Optimistic Scavenger",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 20,
+            "tier_rating": "S",
+            "note": null,
+            "id": "9c72fc6f-6a96-420d-812d-b5cf0f57cc7f",
+            "scryfall_uri": "https://scryfall.com/card/dsk/21/optimistic-scavenger",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9c72fc6f-6a96-420d-812d-b5cf0f57cc7f.jpg?1726285934",
+              "normal": "https://cards.scryfall.io/normal/front/9/c/9c72fc6f-6a96-420d-812d-b5cf0f57cc7f.jpg?1726285934"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Gremlin Tamer",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 31,
+            "tier_rating": "A",
+            "note": null,
+            "id": "3593a222-21c5-4f91-bde1-763ea08071da",
+            "scryfall_uri": "https://scryfall.com/card/dsk/215/gremlin-tamer",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Human Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/3593a222-21c5-4f91-bde1-763ea08071da.jpg?1726286668",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/3593a222-21c5-4f91-bde1-763ea08071da.jpg?1726286668"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Aggro",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Fast damage with tempo creatures. Ragged Playmate and Vicious Clown anchor the curve.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Ragged Playmate",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 144,
+            "tier_rating": "C",
+            "note": null,
+            "id": "000499a4-3f39-4d25-a2a2-b2f014e30754",
+            "scryfall_uri": "https://scryfall.com/card/dsk/150/ragged-playmate",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Artifact Creature — Toy",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/000499a4-3f39-4d25-a2a2-b2f014e30754.jpg?1726286406",
+              "normal": "https://cards.scryfall.io/normal/front/0/0/000499a4-3f39-4d25-a2a2-b2f014e30754.jpg?1726286406"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Vicious Clown",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 161,
+            "tier_rating": "C",
+            "note": null,
+            "id": "12649f73-9d29-4eed-bc89-cc0d1a8969e3",
+            "scryfall_uri": "https://scryfall.com/card/dsk/163/vicious-clown",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Clown",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/12649f73-9d29-4eed-bc89-cc0d1a8969e3.jpg?1726286464",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/12649f73-9d29-4eed-bc89-cc0d1a8969e3.jpg?1726286464"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{R}{G}",
+        "name": "RG Delirium",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Graveyard setup enabling delirium payoffs. Fear of Burning Alive and Spineseeker Centipede are key.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Fear of Burning Alive",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 64,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b282f8e3-8b79-47e9-8c18-62284211442b",
+            "scryfall_uri": "https://scryfall.com/card/dsk/135/fear-of-burning-alive",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Enchantment Creature — Nightmare",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b282f8e3-8b79-47e9-8c18-62284211442b.jpg?1726286352",
+              "normal": "https://cards.scryfall.io/normal/front/b/2/b282f8e3-8b79-47e9-8c18-62284211442b.jpg?1726286352"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Spineseeker Centipede",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 71,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b50d697c-8358-429b-8f79-7ad9d01a5edd",
+            "scryfall_uri": "https://scryfall.com/card/dsk/199/spineseeker-centipede",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Insect",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b50d697c-8358-429b-8f79-7ad9d01a5edd.jpg?1726286608",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b50d697c-8358-429b-8f79-7ad9d01a5edd.jpg?1726286608"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "GU Manifest",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Manifest dread creatures repeatedly and turn the top of the deck into card advantage. Growing Dread and Oblivious Bookworm are signposts.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Growing Dread",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 52,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5479ac50-8335-4c6a-be99-750a44e24f25",
+            "scryfall_uri": "https://scryfall.com/card/dsk/216/growing-dread",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/5479ac50-8335-4c6a-be99-750a44e24f25.jpg?1726286675",
+              "normal": "https://cards.scryfall.io/normal/front/5/4/5479ac50-8335-4c6a-be99-750a44e24f25.jpg?1726286675"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Oblivious Bookworm",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 25,
+            "tier_rating": "A",
+            "note": null,
+            "id": "c7b4c50b-fe76-430d-8f96-208f15ca4cd7",
+            "scryfall_uri": "https://scryfall.com/card/dsk/225/oblivious-bookworm",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7b4c50b-fe76-430d-8f96-208f15ca4cd7.jpg?1726286707",
+              "normal": "https://cards.scryfall.io/normal/front/c/7/c7b4c50b-fe76-430d-8f96-208f15ca4cd7.jpg?1726286707"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "BR Sacrifice",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Fodder generation with sacrifice payoffs. Boilerbilges Ripper and Glassworks // Shattered Yard reward repeated sacrifice triggers.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Boilerbilges Ripper",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 209,
+            "tier_rating": "D",
+            "note": null,
+            "id": "1a68009c-83cd-455f-81e9-bdd720d23a43",
+            "scryfall_uri": "https://scryfall.com/card/dsk/127/boilerbilges-ripper",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Assassin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1a68009c-83cd-455f-81e9-bdd720d23a43.jpg?1726286321",
+              "normal": "https://cards.scryfall.io/normal/front/1/a/1a68009c-83cd-455f-81e9-bdd720d23a43.jpg?1726286321"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Glassworks Shattered Yard",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fe32f667-8d9f-4414-913e-256cbc2fbc45",
+            "scryfall_uri": "https://scryfall.com/card/dsk/137/glassworks-shattered-yard",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Enchantment — Room // Enchantment — Room",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe32f667-8d9f-4414-913e-256cbc2fbc45.jpg?1726780646",
+              "normal": "https://cards.scryfall.io/normal/front/f/e/fe32f667-8d9f-4414-913e-256cbc2fbc45.jpg?1726780646"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "BG Delirium",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Graveyard synergies. Broodspinner is the payoff; Say Its Name turns delirium on near-automatically.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Broodspinner",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 29,
+            "tier_rating": "A",
+            "note": null,
+            "id": "dcdd2622-ab7a-4990-b026-3667cac42894",
+            "scryfall_uri": "https://scryfall.com/card/dsk/211/broodspinner",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Spider",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/c/dcdd2622-ab7a-4990-b026-3667cac42894.jpg?1726286653",
+              "normal": "https://cards.scryfall.io/normal/front/d/c/dcdd2622-ab7a-4990-b026-3667cac42894.jpg?1726286653"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Say Its Name",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 95,
+            "tier_rating": "B",
+            "note": null,
+            "id": "94c58683-b5f2-4863-9562-6f6be1ec21fe",
+            "scryfall_uri": "https://scryfall.com/card/dsk/197/say-its-name",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/94c58683-b5f2-4863-9562-6f6be1ec21fe.jpg?1726286600",
+              "normal": "https://cards.scryfall.io/normal/front/9/4/94c58683-b5f2-4863-9562-6f6be1ec21fe.jpg?1726286600"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{G}{W}",
+        "name": "GW Survival",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Trigger Survival from creature damage. Defiant Survivor and Glimmer Seeker are the signposts.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Defiant Survivor",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 130,
+            "tier_rating": "C",
+            "note": null,
+            "id": "327772f3-5a87-47af-9308-c1119ad2711d",
+            "scryfall_uri": "https://scryfall.com/card/dsk/175/defiant-survivor",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Survivor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/327772f3-5a87-47af-9308-c1119ad2711d.jpg?1726286512",
+              "normal": "https://cards.scryfall.io/normal/front/3/2/327772f3-5a87-47af-9308-c1119ad2711d.jpg?1726286512"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Glimmer Seeker",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 79,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7f06bbb1-0c7d-4803-9b35-8a2206803eed",
+            "scryfall_uri": "https://scryfall.com/card/dsk/14/glimmer-seeker",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Survivor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f06bbb1-0c7d-4803-9b35-8a2206803eed.jpg?1726285911",
+              "normal": "https://cards.scryfall.io/normal/front/7/f/7f06bbb1-0c7d-4803-9b35-8a2206803eed.jpg?1726285911"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "UR Rooms",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Dual-faced Room activation with Rampaging Soulrager. Rewards drafting many Rooms.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Rampaging Soulrager",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 255,
+            "tier_rating": "F",
+            "note": null,
+            "id": "569c914b-95af-428f-a142-6f20e418bc59",
+            "scryfall_uri": "https://scryfall.com/card/dsk/151/rampaging-soulrager",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/6/569c914b-95af-428f-a142-6f20e418bc59.jpg?1726286414",
+              "normal": "https://cards.scryfall.io/normal/front/5/6/569c914b-95af-428f-a142-6f20e418bc59.jpg?1726286414"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "WB Reanimator",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Graveyard recursion archetype. Emerge from the Cocoon and Shroudstomper are the targets.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Emerge from the Cocoon",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 176,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3ba16fbf-2d44-4337-87cb-6ff6b84a258a",
+            "scryfall_uri": "https://scryfall.com/card/dsk/5/emerge-from-the-cocoon",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/b/3ba16fbf-2d44-4337-87cb-6ff6b84a258a.jpg?1726285873",
+              "normal": "https://cards.scryfall.io/normal/front/3/b/3ba16fbf-2d44-4337-87cb-6ff6b84a258a.jpg?1726285873"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Shroudstomper",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 150,
+            "tier_rating": "C",
+            "note": null,
+            "id": "53f746bf-0642-48db-835e-27a7fe369fef",
+            "scryfall_uri": "https://scryfall.com/card/dsk/233/shroudstomper",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Elemental",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/3/53f746bf-0642-48db-835e-27a7fe369fef.jpg?1726286739",
+              "normal": "https://cards.scryfall.io/normal/front/5/3/53f746bf-0642-48db-835e-27a7fe369fef.jpg?1726286739"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Eerie / Control",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Control-focused Eerie deck. Nowhere to Run and Final Vengeance provide removal.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Nowhere to Run",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 80,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fee60e9d-9ee7-444a-88f3-c1929e1888fb",
+            "scryfall_uri": "https://scryfall.com/card/dsk/111/nowhere-to-run",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fee60e9d-9ee7-444a-88f3-c1929e1888fb.jpg?1726286262",
+              "normal": "https://cards.scryfall.io/normal/front/f/e/fee60e9d-9ee7-444a-88f3-c1929e1888fb.jpg?1726286262"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          },
+          {
+            "name": "Final Vengeance",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "648da934-71f6-4945-a08f-09698414417b",
+            "scryfall_uri": "https://scryfall.com/card/dsk/99/final-vengeance",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/648da934-71f6-4945-a08f-09698414417b.jpg?1726286218",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/648da934-71f6-4945-a08f-09698414417b.jpg?1726286218"
+            },
+            "set": "dsk",
+            "set_name": "Duskmourn: House of Horror"
+          }
+        ]
+      }
+    ]
   },
-  "top_uncommons": {
-    "W": ["Enduring Innocence", "Coordinated Clobbering"],
-    "U": ["Fear of Impostors", "Twist Reality"],
-    "B": ["Sawblade Skinripper", "Drag to the Roots"],
-    "R": ["Screaming Nemesis", "Impossible Inferno"],
-    "G": ["Grasping Longneck", "Peer Past the Veil"]
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Trapped in the Screen",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1fe95bfb-8ca7-434f-a2e7-a6b2e699584e",
+        "scryfall_uri": "https://scryfall.com/card/dsk/36/trapped-in-the-screen",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/f/1fe95bfb-8ca7-434f-a2e7-a6b2e699584e.jpg?1726285993",
+          "normal": "https://cards.scryfall.io/normal/front/1/f/1fe95bfb-8ca7-434f-a2e7-a6b2e699584e.jpg?1726285993"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Unsettling Twins",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 86,
+        "tier_rating": "B",
+        "note": null,
+        "id": "85da2e65-4e22-48b6-98ad-6969684d69e1",
+        "scryfall_uri": "https://scryfall.com/card/dsk/38/unsettling-twins",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85da2e65-4e22-48b6-98ad-6969684d69e1.jpg?1726286000",
+          "normal": "https://cards.scryfall.io/normal/front/8/5/85da2e65-4e22-48b6-98ad-6969684d69e1.jpg?1726286000"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Seized from Slumber",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 96,
+        "tier_rating": "B",
+        "note": null,
+        "id": "24456083-0c76-46c5-9b18-8d468702df69",
+        "scryfall_uri": "https://scryfall.com/card/dsk/28/seized-from-slumber",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24456083-0c76-46c5-9b18-8d468702df69.jpg?1726285963",
+          "normal": "https://cards.scryfall.io/normal/front/2/4/24456083-0c76-46c5-9b18-8d468702df69.jpg?1726285963"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Fear of Surveillance",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 105,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6e98559d-d9fd-4bdf-8df9-389eee756a3a",
+        "scryfall_uri": "https://scryfall.com/card/dsk/11/fear-of-surveillance",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment Creature — Nightmare",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e98559d-d9fd-4bdf-8df9-389eee756a3a.jpg?1726285897",
+          "normal": "https://cards.scryfall.io/normal/front/6/e/6e98559d-d9fd-4bdf-8df9-389eee756a3a.jpg?1726285897"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Glimmerburst",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 55,
+        "tier_rating": "B",
+        "note": null,
+        "id": "fe1ab8db-3994-4b6d-9eaf-75243a78b715",
+        "scryfall_uri": "https://scryfall.com/card/dsk/62/glimmerburst",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe1ab8db-3994-4b6d-9eaf-75243a78b715.jpg?1726286087",
+          "normal": "https://cards.scryfall.io/normal/front/f/e/fe1ab8db-3994-4b6d-9eaf-75243a78b715.jpg?1726286087"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Unable to Scream",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 73,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7c59e0cd-10a8-4a32-9c0a-a2c6ef1ed9a6",
+        "scryfall_uri": "https://scryfall.com/card/dsk/78/unable-to-scream",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/c/7c59e0cd-10a8-4a32-9c0a-a2c6ef1ed9a6.jpg?1726286143",
+          "normal": "https://cards.scryfall.io/normal/front/7/c/7c59e0cd-10a8-4a32-9c0a-a2c6ef1ed9a6.jpg?1726286143"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Tunnel Surveyor",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 107,
+        "tier_rating": "C",
+        "note": null,
+        "id": "12ee2690-f464-4a38-81e1-6dd2053a3327",
+        "scryfall_uri": "https://scryfall.com/card/dsk/76/tunnel-surveyor",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Detective",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/12ee2690-f464-4a38-81e1-6dd2053a3327.jpg?1726286136",
+          "normal": "https://cards.scryfall.io/normal/front/1/2/12ee2690-f464-4a38-81e1-6dd2053a3327.jpg?1726286136"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Meat Locker Drowned Diner",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 110,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b3c773f0-9e65-48de-a362-a9a943198693",
+        "scryfall_uri": "https://scryfall.com/card/dsk/65/meat-locker-drowned-diner",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Room // Enchantment — Room",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3c773f0-9e65-48de-a362-a9a943198693.jpg?1726780679",
+          "normal": "https://cards.scryfall.io/normal/front/b/3/b3c773f0-9e65-48de-a362-a9a943198693.jpg?1726780679"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Murder",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 121,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2c249609-9cf7-46f1-b94c-9329add966bb",
+        "scryfall_uri": "https://scryfall.com/card/dsk/110/murder",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c249609-9cf7-46f1-b94c-9329add966bb.jpg?1726286259",
+          "normal": "https://cards.scryfall.io/normal/front/2/c/2c249609-9cf7-46f1-b94c-9329add966bb.jpg?1726286259"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Winter's Intervention",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 145,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b33d38fa-bbcf-4bcc-93a8-adbfd9c93faa",
+        "scryfall_uri": "https://scryfall.com/card/dsk/123/winters-intervention",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b33d38fa-bbcf-4bcc-93a8-adbfd9c93faa.jpg?1726286306",
+          "normal": "https://cards.scryfall.io/normal/front/b/3/b33d38fa-bbcf-4bcc-93a8-adbfd9c93faa.jpg?1726286306"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Final Vengeance",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 84,
+        "tier_rating": "B",
+        "note": null,
+        "id": "648da934-71f6-4945-a08f-09698414417b",
+        "scryfall_uri": "https://scryfall.com/card/dsk/99/final-vengeance",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/648da934-71f6-4945-a08f-09698414417b.jpg?1726286218",
+          "normal": "https://cards.scryfall.io/normal/front/6/4/648da934-71f6-4945-a08f-09698414417b.jpg?1726286218"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Innocuous Rat",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 120,
+        "tier_rating": "C",
+        "note": null,
+        "id": "94edbbc5-5673-4753-bfad-4432c4b7dca4",
+        "scryfall_uri": "https://scryfall.com/card/dsk/103/innocuous-rat",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Rat",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/94edbbc5-5673-4753-bfad-4432c4b7dca4.jpg?1726286232",
+          "normal": "https://cards.scryfall.io/normal/front/9/4/94edbbc5-5673-4753-bfad-4432c4b7dca4.jpg?1726286232"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Scorching Dragonfire",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 56,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a55f4f37-796a-4b18-a5ee-1d4f711f19b8",
+        "scryfall_uri": "https://scryfall.com/card/dsk/156/scorching-dragonfire",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a55f4f37-796a-4b18-a5ee-1d4f711f19b8.jpg?1726286431",
+          "normal": "https://cards.scryfall.io/normal/front/a/5/a55f4f37-796a-4b18-a5ee-1d4f711f19b8.jpg?1726286431"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Glassworks Shattered Yard",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 69,
+        "tier_rating": "B",
+        "note": null,
+        "id": "fe32f667-8d9f-4414-913e-256cbc2fbc45",
+        "scryfall_uri": "https://scryfall.com/card/dsk/137/glassworks-shattered-yard",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Enchantment — Room // Enchantment — Room",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe32f667-8d9f-4414-913e-256cbc2fbc45.jpg?1726780646",
+          "normal": "https://cards.scryfall.io/normal/front/f/e/fe32f667-8d9f-4414-913e-256cbc2fbc45.jpg?1726780646"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Clockwork Percussionist",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 54,
+        "tier_rating": "B",
+        "note": null,
+        "id": "10986e5a-9fc6-41e2-8352-289328245171",
+        "scryfall_uri": "https://scryfall.com/card/dsk/130/clockwork-percussionist",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Artifact Creature — Monkey Toy",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/10986e5a-9fc6-41e2-8352-289328245171.jpg?1726286332",
+          "normal": "https://cards.scryfall.io/normal/front/1/0/10986e5a-9fc6-41e2-8352-289328245171.jpg?1726286332"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Turn Inside Out",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 72,
+        "tier_rating": "B",
+        "note": null,
+        "id": "57e2a92c-06d3-4cb5-883d-cba428a7e98e",
+        "scryfall_uri": "https://scryfall.com/card/dsk/160/turn-inside-out",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/57e2a92c-06d3-4cb5-883d-cba428a7e98e.jpg?1726286448",
+          "normal": "https://cards.scryfall.io/normal/front/5/7/57e2a92c-06d3-4cb5-883d-cba428a7e98e.jpg?1726286448"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Monstrous Emergence",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 94,
+        "tier_rating": "B",
+        "note": null,
+        "id": "b999eb47-b842-47f1-be91-c79fc46e1896",
+        "scryfall_uri": "https://scryfall.com/card/dsk/191/monstrous-emergence",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/9/b999eb47-b842-47f1-be91-c79fc46e1896.jpg?1726328518",
+          "normal": "https://cards.scryfall.io/normal/front/b/9/b999eb47-b842-47f1-be91-c79fc46e1896.jpg?1726328518"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Spineseeker Centipede",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 71,
+        "tier_rating": "B",
+        "note": null,
+        "id": "b50d697c-8358-429b-8f79-7ad9d01a5edd",
+        "scryfall_uri": "https://scryfall.com/card/dsk/199/spineseeker-centipede",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Insect",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b50d697c-8358-429b-8f79-7ad9d01a5edd.jpg?1726286608",
+          "normal": "https://cards.scryfall.io/normal/front/b/5/b50d697c-8358-429b-8f79-7ad9d01a5edd.jpg?1726286608"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Manifest Dread",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 85,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a649265b-6c32-49e7-b6cb-6086c40d26e8",
+        "scryfall_uri": "https://scryfall.com/card/dsk/189/manifest-dread",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a649265b-6c32-49e7-b6cb-6086c40d26e8.jpg?1726286570",
+          "normal": "https://cards.scryfall.io/normal/front/a/6/a649265b-6c32-49e7-b6cb-6086c40d26e8.jpg?1726286570"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Say Its Name",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 95,
+        "tier_rating": "B",
+        "note": null,
+        "id": "94c58683-b5f2-4863-9562-6f6be1ec21fe",
+        "scryfall_uri": "https://scryfall.com/card/dsk/197/say-its-name",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/94c58683-b5f2-4863-9562-6f6be1ec21fe.jpg?1726286600",
+          "normal": "https://cards.scryfall.io/normal/front/9/4/94c58683-b5f2-4863-9562-6f6be1ec21fe.jpg?1726286600"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ]
+  },
+  "bomb_picks": {
+    "premium_splashes": [
+      {
+        "name": "Valgavoth's Onslaught",
+        "color": "G",
+        "rarity": "Rare",
+        "pick_order_rank": 2,
+        "tier_rating": "S",
+        "note": null,
+        "id": "7d4ba274-3c6f-4e12-ba2c-a81c3da3f7e2",
+        "scryfall_uri": "https://scryfall.com/card/dsk/204/valgavoths-onslaught",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d4ba274-3c6f-4e12-ba2c-a81c3da3f7e2.jpg?1726286630",
+          "normal": "https://cards.scryfall.io/normal/front/7/d/7d4ba274-3c6f-4e12-ba2c-a81c3da3f7e2.jpg?1726286630"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "The Swarmweaver",
+        "color": "BG",
+        "rarity": "Rare",
+        "pick_order_rank": 5,
+        "tier_rating": "S",
+        "note": null,
+        "id": "dcf3b17b-f2f6-4702-864d-8c96100b0563",
+        "scryfall_uri": "https://scryfall.com/card/dsk/236/the-swarmweaver",
+        "colors": [
+          "B",
+          "G"
+        ],
+        "type_line": "Legendary Artifact Creature — Scarecrow",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/c/dcf3b17b-f2f6-4702-864d-8c96100b0563.jpg?1726286750",
+          "normal": "https://cards.scryfall.io/normal/front/d/c/dcf3b17b-f2f6-4702-864d-8c96100b0563.jpg?1726286750"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Zimone, All-Questioning",
+        "color": "UG",
+        "rarity": "Rare",
+        "pick_order_rank": 16,
+        "tier_rating": "S",
+        "note": null,
+        "id": "7722f4f7-fe38-4107-a715-7b27b6a4e341",
+        "scryfall_uri": "https://scryfall.com/card/dsk/241/zimone-all-questioning",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Legendary Creature — Human Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/7722f4f7-fe38-4107-a715-7b27b6a4e341.jpg?1726597486",
+          "normal": "https://cards.scryfall.io/normal/front/7/7/7722f4f7-fe38-4107-a715-7b27b6a4e341.jpg?1726597486"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Unstoppable Slasher",
+        "color": "B",
+        "rarity": "Rare",
+        "pick_order_rank": 12,
+        "tier_rating": "S",
+        "note": null,
+        "id": "c78da035-6b5b-4136-9ab6-f622b64fdc54",
+        "scryfall_uri": "https://scryfall.com/card/dsk/119/unstoppable-slasher",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Zombie Assassin",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c78da035-6b5b-4136-9ab6-f622b64fdc54.jpg?1726286292",
+          "normal": "https://cards.scryfall.io/normal/front/c/7/c78da035-6b5b-4136-9ab6-f622b64fdc54.jpg?1726286292"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Entity Tracker",
+        "color": "U",
+        "rarity": "Rare",
+        "pick_order_rank": 14,
+        "tier_rating": "S",
+        "note": null,
+        "id": "ae54d697-6d06-4af1-a617-8a47a6ab9c01",
+        "scryfall_uri": "https://scryfall.com/card/dsk/53/entity-tracker",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/ae54d697-6d06-4af1-a617-8a47a6ab9c01.jpg?1726286051",
+          "normal": "https://cards.scryfall.io/normal/front/a/e/ae54d697-6d06-4af1-a617-8a47a6ab9c01.jpg?1726286051"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Roaring Furnace Steaming Sauna",
+        "color": "R",
+        "rarity": "Rare",
+        "pick_order_rank": 35,
+        "tier_rating": "A",
+        "note": null,
+        "id": "94352ffb-d716-484d-b018-4e1c033ef2f3",
+        "scryfall_uri": "https://scryfall.com/card/dsk/230/roaring-furnace-steaming-sauna",
+        "colors": [
+          "R",
+          "U"
+        ],
+        "type_line": "Enchantment — Room // Enchantment — Room",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/94352ffb-d716-484d-b018-4e1c033ef2f3.jpg?1726867698",
+          "normal": "https://cards.scryfall.io/normal/front/9/4/94352ffb-d716-484d-b018-4e1c033ef2f3.jpg?1726867698"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Sheltered by Ghosts",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 18,
+        "tier_rating": "S",
+        "note": "Strongest uncommon in the set.",
+        "id": "389f3f7b-be40-4a2d-b5cc-28471a577981",
+        "scryfall_uri": "https://scryfall.com/card/dsk/30/sheltered-by-ghosts",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/389f3f7b-be40-4a2d-b5cc-28471a577981.jpg?1726285971",
+          "normal": "https://cards.scryfall.io/normal/front/3/8/389f3f7b-be40-4a2d-b5cc-28471a577981.jpg?1726285971"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Dissection Tools",
+        "color": "C",
+        "rarity": "Rare",
+        "pick_order_rank": 11,
+        "tier_rating": "S",
+        "note": "Best P1P1.",
+        "id": "048bb2c6-91bd-4d6a-a070-c73d8277c264",
+        "scryfall_uri": "https://scryfall.com/card/dsk/245/dissection-tools",
+        "colors": [],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/048bb2c6-91bd-4d6a-a070-c73d8277c264.jpg?1726301876",
+          "normal": "https://cards.scryfall.io/normal/front/0/4/048bb2c6-91bd-4d6a-a070-c73d8277c264.jpg?1726301876"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ],
+    "archetype_specific": [
+      {
+        "name": "Unholy Annex Ritual Chamber",
+        "color": "B",
+        "rarity": "Rare",
+        "pick_order_rank": 6,
+        "tier_rating": "S",
+        "note": "Top-5 rare.",
+        "id": "0fb4c734-c698-46f2-bc78-5f036f472e5b",
+        "scryfall_uri": "https://scryfall.com/card/dsk/118/unholy-annex-ritual-chamber",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment — Room // Enchantment — Room",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/f/0fb4c734-c698-46f2-bc78-5f036f472e5b.jpg?1726867681",
+          "normal": "https://cards.scryfall.io/normal/front/0/f/0fb4c734-c698-46f2-bc78-5f036f472e5b.jpg?1726867681"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Tyvar, the Pummeler",
+        "color": "G",
+        "rarity": "Mythic",
+        "pick_order_rank": 9,
+        "tier_rating": "S",
+        "note": null,
+        "id": "5f7687b1-630a-4e95-89c7-eaf456d8cb68",
+        "scryfall_uri": "https://scryfall.com/card/dsk/202/tyvar-the-pummeler",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Legendary Creature — Elf Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/f/5f7687b1-630a-4e95-89c7-eaf456d8cb68.jpg?1726286622",
+          "normal": "https://cards.scryfall.io/normal/front/5/f/5f7687b1-630a-4e95-89c7-eaf456d8cb68.jpg?1726286622"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Dollmaker's Shop Porcelain Gallery",
+        "color": "W",
+        "rarity": "Mythic",
+        "pick_order_rank": 7,
+        "tier_rating": "S",
+        "note": null,
+        "id": "c5ee6651-9946-4bae-b21e-6cf28fa77b13",
+        "scryfall_uri": "https://scryfall.com/card/dsk/4/dollmakers-shop-porcelain-gallery",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Room // Enchantment — Room",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c5ee6651-9946-4bae-b21e-6cf28fa77b13.jpg?1726867800",
+          "normal": "https://cards.scryfall.io/normal/front/c/5/c5ee6651-9946-4bae-b21e-6cf28fa77b13.jpg?1726867800"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Abhorrent Oculus",
+        "color": "U",
+        "rarity": "Mythic",
+        "pick_order_rank": 33,
+        "tier_rating": "A",
+        "note": "Exceptional when manifested.",
+        "id": "d2705b43-a94a-44c0-8740-82e0b296820c",
+        "scryfall_uri": "https://scryfall.com/card/dsk/42/abhorrent-oculus",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Eye",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/2/d2705b43-a94a-44c0-8740-82e0b296820c.jpg?1726286015",
+          "normal": "https://cards.scryfall.io/normal/front/d/2/d2705b43-a94a-44c0-8740-82e0b296820c.jpg?1726286015"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "The Rollercrusher Ride",
+        "color": "R",
+        "rarity": "Mythic",
+        "pick_order_rank": 22,
+        "tier_rating": "A",
+        "note": null,
+        "id": "70019956-fca1-4090-b3b6-6a963528e05b",
+        "scryfall_uri": "https://scryfall.com/card/dsk/155/the-rollercrusher-ride",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Legendary Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70019956-fca1-4090-b3b6-6a963528e05b.jpg?1726286431",
+          "normal": "https://cards.scryfall.io/normal/front/7/0/70019956-fca1-4090-b3b6-6a963528e05b.jpg?1726286431"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ]
+  },
+  "removal_priority": {
+    "strong": [
+      {
+        "name": "Trapped in the Screen",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1fe95bfb-8ca7-434f-a2e7-a6b2e699584e",
+        "scryfall_uri": "https://scryfall.com/card/dsk/36/trapped-in-the-screen",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/f/1fe95bfb-8ca7-434f-a2e7-a6b2e699584e.jpg?1726285993",
+          "normal": "https://cards.scryfall.io/normal/front/1/f/1fe95bfb-8ca7-434f-a2e7-a6b2e699584e.jpg?1726285993"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Unable to Scream",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 73,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7c59e0cd-10a8-4a32-9c0a-a2c6ef1ed9a6",
+        "scryfall_uri": "https://scryfall.com/card/dsk/78/unable-to-scream",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/c/7c59e0cd-10a8-4a32-9c0a-a2c6ef1ed9a6.jpg?1726286143",
+          "normal": "https://cards.scryfall.io/normal/front/7/c/7c59e0cd-10a8-4a32-9c0a-a2c6ef1ed9a6.jpg?1726286143"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Murder",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 121,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2c249609-9cf7-46f1-b94c-9329add966bb",
+        "scryfall_uri": "https://scryfall.com/card/dsk/110/murder",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2c249609-9cf7-46f1-b94c-9329add966bb.jpg?1726286259",
+          "normal": "https://cards.scryfall.io/normal/front/2/c/2c249609-9cf7-46f1-b94c-9329add966bb.jpg?1726286259"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Final Vengeance",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 84,
+        "tier_rating": "B",
+        "note": null,
+        "id": "648da934-71f6-4945-a08f-09698414417b",
+        "scryfall_uri": "https://scryfall.com/card/dsk/99/final-vengeance",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/648da934-71f6-4945-a08f-09698414417b.jpg?1726286218",
+          "normal": "https://cards.scryfall.io/normal/front/6/4/648da934-71f6-4945-a08f-09698414417b.jpg?1726286218"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Scorching Dragonfire",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 56,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a55f4f37-796a-4b18-a5ee-1d4f711f19b8",
+        "scryfall_uri": "https://scryfall.com/card/dsk/156/scorching-dragonfire",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a55f4f37-796a-4b18-a5ee-1d4f711f19b8.jpg?1726286431",
+          "normal": "https://cards.scryfall.io/normal/front/a/5/a55f4f37-796a-4b18-a5ee-1d4f711f19b8.jpg?1726286431"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ],
+    "situational": [
+      {
+        "name": "Seized from Slumber",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 96,
+        "tier_rating": "B",
+        "note": "Limited vigilance in format.",
+        "id": "24456083-0c76-46c5-9b18-8d468702df69",
+        "scryfall_uri": "https://scryfall.com/card/dsk/28/seized-from-slumber",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24456083-0c76-46c5-9b18-8d468702df69.jpg?1726285963",
+          "normal": "https://cards.scryfall.io/normal/front/2/4/24456083-0c76-46c5-9b18-8d468702df69.jpg?1726285963"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Vanish from Sight",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 74,
+        "tier_rating": "B",
+        "note": null,
+        "id": "5254988b-3113-42f7-b751-517ffb3b40f0",
+        "scryfall_uri": "https://scryfall.com/card/dsk/82/vanish-from-sight",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/5254988b-3113-42f7-b751-517ffb3b40f0.jpg?1727205055",
+          "normal": "https://cards.scryfall.io/normal/front/5/2/5254988b-3113-42f7-b751-517ffb3b40f0.jpg?1727205055"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Winter's Intervention",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 145,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b33d38fa-bbcf-4bcc-93a8-adbfd9c93faa",
+        "scryfall_uri": "https://scryfall.com/card/dsk/123/winters-intervention",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b33d38fa-bbcf-4bcc-93a8-adbfd9c93faa.jpg?1726286306",
+          "normal": "https://cards.scryfall.io/normal/front/b/3/b33d38fa-bbcf-4bcc-93a8-adbfd9c93faa.jpg?1726286306"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Bear Trap",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 236,
+        "tier_rating": "D",
+        "note": "Delirium enabler.",
+        "id": "e27c27d6-dc3a-4420-bb35-d97dc216e002",
+        "scryfall_uri": "https://scryfall.com/card/dsk/243/bear-trap",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e27c27d6-dc3a-4420-bb35-d97dc216e002.jpg?1726286782",
+          "normal": "https://cards.scryfall.io/normal/front/e/2/e27c27d6-dc3a-4420-bb35-d97dc216e002.jpg?1726286782"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      },
+      {
+        "name": "Impossible Inferno",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 156,
+        "tier_rating": "C",
+        "note": "Archetype-specific.",
+        "id": "a35248f9-9a4e-4758-a4c1-0e0c83e3fd75",
+        "scryfall_uri": "https://scryfall.com/card/dsk/140/impossible-inferno",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a35248f9-9a4e-4758-a4c1-0e0c83e3fd75.jpg?1726286368",
+          "normal": "https://cards.scryfall.io/normal/front/a/3/a35248f9-9a4e-4758-a4c1-0e0c83e3fd75.jpg?1726286368"
+        },
+        "set": "dsk",
+        "set_name": "Duskmourn: House of Horror"
+      }
+    ]
   },
   "general_tips": [
-    "Rooms are premium picks — they provide two-for-one value and trigger Eerie twice.",
-    "Delirium is easier to enable than it looks. Prioritize artifact creatures and enchantment creatures for type diversity.",
-    "The format rewards proactive strategies. Pure control without a win condition struggles.",
-    "Enchantment-based removal (like Sheltered by Ghosts) is premium because it enables Eerie.",
-    "Survival decks want to trade life for tempo early — don't be afraid to take damage.",
-    "Manifest Dread is excellent because it develops your board while fueling your graveyard."
+    "Take 2-drops early — the format rewards establishing a board on turn 2.",
+    "Manifest information is deducible: which cards have left zones reveal what manifest faces hide.",
+    "Splashing requires 3+ sources; green is the splash enabler via fixing.",
+    "Rooms are the main mana sink — every deck wants at least a couple.",
+    "Delirium activates almost for free with Say Its Name or Commune with Evil.",
+    "High enchantment density makes Eerie trivially good — prioritize enchantments in WU/UB.",
+    "Trade 2-drops liberally to keep manifests from snowballing."
   ]
 }

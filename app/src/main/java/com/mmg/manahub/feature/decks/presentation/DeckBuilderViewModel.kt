@@ -17,9 +17,11 @@ import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
@@ -29,14 +31,19 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -102,16 +109,44 @@ class DeckMagicDetailViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val suggestTagsUseCase: SuggestTagsUseCase,
     private val userPreferencesRepo: UserPreferencesRepository,
+    private val userPrefsStore: UserPreferencesDataStore,
     private val syncManager: SyncManager,
     private val workManager: WorkManager,
     @ApplicationScope private val applicationScope: CoroutineScope,
     savedStateHandle: SavedStateHandle,
+    private val getDeckGameStatsUseCase: GetDeckGameStatsUseCase,
 ) : ViewModel() {
 
     val deckId: String = checkNotNull(savedStateHandle["deckId"])
 
     private val _uiState = MutableStateFlow(DeckMagicDetailUiState())
     val uiState: StateFlow<DeckMagicDetailUiState> = _uiState.asStateFlow()
+
+    /**
+     * Per-deck game statistics, kept independent of [uiState] to avoid invalidating
+     * the existing deck editor state machine on each stats update.
+     *
+     * Emits null until the deck ID is available and the first Room query fires.
+     */
+    val deckStatsFlow: StateFlow<GetDeckGameStatsUseCase.Result?> =
+        _uiState
+            .map { it.deck?.id }
+            .distinctUntilChanged()
+            .filterNotNull()
+            .flatMapLatest { id -> getDeckGameStatsUseCase(id) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = null,
+            )
+
+    /** The app user's player name, used to compute win/loss in [DeckStatsCard]. */
+    val playerNameFlow: StateFlow<String> = userPrefsStore.playerNameFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = "",
+        )
 
     // ── Persisted snapshot (last state written to Room) ───────────────────────
     private var persistedCardsMap: Map<Pair<String, Boolean>, Int> = emptyMap()

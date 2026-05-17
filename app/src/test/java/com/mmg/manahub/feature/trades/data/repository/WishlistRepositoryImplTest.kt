@@ -76,10 +76,10 @@ class WishlistRepositoryImplTest {
         cardId: String = "scryfall-card-001",
         quantity: Int = 1,
         matchAnyVariant: Boolean = true,
-        isFoil: Boolean? = null,
+        isFoil: Boolean = false,
         condition: String? = null,
         language: String? = null,
-        isAltArt: Boolean? = null,
+        isAltArt: Boolean = false,
         createdAt: Long = 1_000L,
     ) = WishlistEntry(
         id = id,

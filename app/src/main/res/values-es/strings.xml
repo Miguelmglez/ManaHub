@@ -141,12 +141,59 @@
     <string name="stats_refresh_success">Actualizados %1$d precios</string>
     <string name="stats_refresh_error">Error al actualizar precios</string>
     <string name="stats_empty_collection">Añade cartas para ver tus estadísticas</string>
+
+    <!-- Tabs de estadísticas -->
+    <string name="stats_tab_collection">Colección</string>
+    <string name="stats_tab_games">Partidas</string>
+
+    <!-- KPIs de la pestaña Partidas -->
+    <string name="stats_kpi_total_games">Total partidas</string>
+    <string name="stats_kpi_winrate">% victorias</string>
+    <string name="stats_kpi_avg_duration">Duración media</string>
+    <string name="stats_kpi_favorite_mode">Modo favorito</string>
+    <string name="stats_pending_surveys">%d encuesta(s) pendiente(s)</string>
+
+    <!-- Secciones de la pestaña Partidas -->
+    <string name="stats_section_deck_performance">Rendimiento por mazo</string>
+    <string name="stats_section_history">Historial</string>
+    <string name="stats_empty_decks_subtitle">Asocia partidas con mazos en la encuesta post-partida para ver estadísticas</string>
+    <string name="stats_empty_history_subtitle">Las partidas registradas aparecerán aquí</string>
+
+    <!-- Estado de la encuesta -->
+    <string name="survey_pending">Encuesta pendiente</string>
+    <string name="survey_partial">Encuesta incompleta</string>
+    <string name="survey_completed">Encuesta completada</string>
+    <string name="survey_skipped">Encuesta omitida</string>
+
+    <!-- Diálogos de eliminación de partida -->
+    <string name="delete_game_title">¿Eliminar partida?</string>
+    <string name="delete_game_message_1">¿Eliminar esta partida? También se eliminará la encuesta vinculada.</string>
+    <string name="delete_game_final_title">¿Estás completamente seguro?</string>
+    <string name="delete_game_final_message">Esta acción no se puede deshacer.</string>
+    <string name="delete_game_toast">Partida eliminada</string>
+
+    <!-- Acciones de partida -->
+    <string name="action_review_survey">Revisar encuesta</string>
+    <string name="action_delete_game">Eliminar partida</string>
+
     <string name="stats_currency_usd">USD</string>
     <string name="stats_currency_eur">EUR</string>
     <string name="stats_rarity_common">Común</string>
     <string name="stats_rarity_uncommon">Infrecuente</string>
     <string name="stats_rarity_rare">Rara</string>
     <string name="stats_rarity_mythic">Mítica</string>
+
+    <!-- Deck stats card (DeckStatsCard) -->
+    <string name="deck_stats_title">Rendimiento del mazo</string>
+    <string name="deck_stats_winrate">%1$d%% de victorias</string>
+    <string name="deck_stats_games_count">%1$d partidas</string>
+    <string name="deck_stats_avg_duration">Media %1$s</string>
+    <string name="deck_stats_top_cards">Cartas más impactantes</string>
+    <string name="deck_stats_weakest_cards">Considera reemplazar</string>
+    <string name="deck_stats_recent_games">Partidas recientes</string>
+    <string name="deck_stats_replace_button">Reemplazar</string>
+    <string name="deck_stats_no_data">Todavía no hay datos de partidas para este mazo</string>
+    <string name="deck_stats_card_appearances">%1$dx</string>
 
     <!-- DECK LIST SCREEN -->
     <string name="decklist_title">Mazos</string>
@@ -396,6 +443,51 @@
     <string name="survey_hand_3">Mano jugable</string>
     <string name="survey_hand_4">Buena mano</string>
     <string name="survey_hand_5">Mano perfecta</string>
+
+    <!-- Survey v2 — paneles y nuevas claves de preguntas/respuestas -->
+    <string name="survey_panel_mood">Estado de ánimo</string>
+    <string name="survey_panel_fundamentals">Fundamentos</string>
+    <string name="survey_panel_cards">Impacto de cartas</string>
+    <string name="survey_panel_summary">Resumen</string>
+
+    <string name="survey_q_decisive_moment">¿Cuál fue el momento decisivo?</string>
+    <string name="survey_a_key_turn">Turno clave</string>
+    <string name="survey_a_top_deck">Top-deck</string>
+    <string name="survey_a_rival_error">Error del rival</string>
+    <string name="survey_a_unclear">Poco claro</string>
+
+    <string name="survey_q_matchup_difficulty">¿Qué tan difícil fue el enfrentamiento?</string>
+
+    <string name="survey_q_result_context_win">¿Cómo se sintió la victoria?</string>
+    <string name="survey_q_result_context_loss">¿Qué te costó la partida?</string>
+
+    <string name="survey_q_card_impact">¿Alguna carta marcó la diferencia?</string>
+    <string name="survey_a_card_key">Carta clave</string>
+    <string name="survey_a_card_average">Normal</string>
+    <string name="survey_a_card_weak">Débil</string>
+
+    <string name="survey_action_later">Más tarde</string>
+    <string name="survey_action_save_finish">Guardar y terminar</string>
+    <string name="survey_action_save_changes">Guardar cambios</string>
+    <string name="survey_action_add_card">Añadir carta</string>
+
+    <string name="survey_recap_win">Victoria</string>
+    <string name="survey_recap_loss">Derrota</string>
+    <string name="survey_recap_turns">%1$d turnos</string>
+    <string name="survey_recap_vs">vs %1$s</string>
+    <string name="survey_recap_commander_kill">Victoria por daño de comandante</string>
+
+    <string name="survey_deck_picker_title">¿Con qué mazo jugaste?</string>
+    <string name="survey_deck_picker_none">Sin mazo</string>
+    <string name="survey_deck_associated">Mazo: %1$s</string>
+
+    <string name="survey_reviewing_title">Revisando partida</string>
+
+    <string name="survey_skipped_count">%1$d omitidas — está bien</string>
+    <string name="survey_saved_toast">Revisión de la partida guardada</string>
+    <string name="survey_no_deck_prompt">Asocia esta partida con uno de tus mazos</string>
+    <string name="survey_no_deck_notice">Sin mazo asociado — seguimiento de impacto no disponible</string>
+    <string name="survey_duration_min">%1$d min</string>
 
     <!-- TOURNAMENT SCREEN -->
     <string name="tournament_setup_title">Nuevo torneo</string>

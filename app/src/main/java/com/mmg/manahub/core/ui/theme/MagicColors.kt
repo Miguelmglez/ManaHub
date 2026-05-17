@@ -50,7 +50,7 @@ data class MagicColors(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  NeonVoid — "Pink Nebula" (Rosa Neón + Cian)
+//  NeonVoid — "Pink Nebula" (Neon Pink + Cyan)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 internal val NeonVoidColors = MagicColors(
@@ -89,7 +89,7 @@ internal val NeonVoidColors = MagicColors(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  MedievalGrimoire — "Blood Rite" (Rojo Carmesí + Oro)
+//  MedievalGrimoire — "Blood Rite" (Crimson Red + Gold)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 internal val MedievalGrimoireColors = MagicColors(
@@ -128,7 +128,7 @@ internal val MedievalGrimoireColors = MagicColors(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  ArcaneCosmos — "Bio-Luminescence" (Turquesa Neón + Coral)
+//  ArcaneCosmos — "Bio-Luminescence" (Neon Teal + Coral)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 internal val ArcaneCosmosColors = MagicColors(

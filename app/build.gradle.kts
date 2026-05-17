@@ -17,6 +17,11 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
+fun requiredProperty(name: String): String =
+    localProperties.getProperty(name)
+        ?: System.getenv(name)
+        ?: error("Missing required build property: $name. Add it to local.properties or set as environment variable in CI.")
+
 android {
     namespace = "com.mmg.manahub"
     compileSdk = 36
@@ -36,17 +41,22 @@ android {
         buildConfigField(
             "String",
             "SUPABASE_URL",
-            "\"${localProperties.getProperty("SUPABASE_URL", "")}\""
+            "\"${requiredProperty("SUPABASE_URL")}\""
         )
         buildConfigField(
             "String",
             "SUPABASE_ANON_KEY",
-            "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\""
+            "\"${requiredProperty("SUPABASE_ANON_KEY")}\""
         )
         buildConfigField(
             "String",
             "GOOGLE_CLIENT_ID",
-            "\"${localProperties.getProperty("GOOGLE_CLIENT_ID", "")}\""
+            "\"${requiredProperty("GOOGLE_CLIENT_ID")}\""
+        )
+        buildConfigField(
+            "String",
+            "CLOUDFLARE_WORKER_URL",
+            "\"${localProperties.getProperty("CLOUDFLARE_WORKER_URL", "https://manahub-draft-api.miguel-mglez.workers.dev/")}\""
         )
     }
 

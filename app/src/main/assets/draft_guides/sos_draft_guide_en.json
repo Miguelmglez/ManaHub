@@ -1,0 +1,728 @@
+{
+  "metadata": {
+    "set_name": "Secrets of Strixhaven",
+    "set_code": "SOS",
+    "source_url": "https://draftsim.com/mtg-sos-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "May 2026"
+  },
+  "set_overview": {
+    "summary": "Secrets of Strixhaven features an environment where white aggro goes under Prismari and Quandrix decks, while Witherbloom plays an awkward middle ground. Converge and splashes can easily be accommodated in non-white strategies, leading to 'Converge soups' full of removal, card draw, and bombs. Removal is highly effective, and games are often defined by the tension between aggressive decks and value-oriented control builds.",
+    "color_ranking": [
+      "{W} White",
+      "{B} Black",
+      "{R} Red",
+      "{U} Blue",
+      "{G} Green"
+    ],
+    "color_notes": {
+      "{W} White": "Strong aggro color. Cards like Elite Interceptor, Ajani's Response, and Stone Docent form the backbone of assertive decks.",
+      "{U} Blue": "Supports control and value. Essence Scatter, Run Behind, and Quick Study provide solid answers and card advantage.",
+      "{B} Black": "Offers premium removal like Last Gasp and Cost of Brilliance. Often anchors Witherbloom midrange or Silverquill aggro.",
+      "{R} Red": "Solid removal like Unsubtle Mockery and Rubble Rouser. Pairs well in aggressive strategies or as removal splash.",
+      "{G} Green": "The weakest and most narrow color. Requires specific synergies or multicolor strategies to shine. Studious First-Year and Burrog Barrage are key."
+    },
+    "key_gameplay_notes": [
+      "White aggro vs 'Converge soup' is the defining dynamic of the format.",
+      "Removal is essential and highly efficient across most colors.",
+      "Card draw is critical to out-scale aggro decks and win 'soup' mirrors.",
+      "Splashing is very viable, especially in non-white 'Converge' decks.",
+      "Many decks can go under the radar, like pump spell combo, flicker, or artifact synergies."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Prepare",
+      "summary": "Varies in quality. You evaluate each prepared creature individually. It provides a valuable way to get spells and creatures into the same slot.",
+      "performance": "Less impactful than expected. Average instant/sorcery tends to be better than average creature.",
+      "key_examples": {
+        "overperformers": [
+          {
+            "name": "Elite Interceptor // Rejoinder",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 32,
+            "tier_rating": "A",
+            "note": "Tier A Limited card.",
+            "id": "2970683e-e69c-42cb-a067-34abd56fb42b",
+            "scryfall_uri": "https://scryfall.com/card/sos/12/elite-interceptor-rejoinder?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Wizard // Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/2970683e-e69c-42cb-a067-34abd56fb42b.jpg?1775936992",
+              "normal": "https://cards.scryfall.io/normal/front/2/9/2970683e-e69c-42cb-a067-34abd56fb42b.jpg?1775936992"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven"
+          },
+          {
+            "name": "Studious First-Year // Rampant Growth",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 111,
+            "tier_rating": "B",
+            "note": "Tier B Limited card.",
+            "id": "24f888dd-785c-4089-a89c-03f9080130ed",
+            "scryfall_uri": "https://scryfall.com/card/sos/162/studious-first-year-rampant-growth?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Bear Wizard // Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24f888dd-785c-4089-a89c-03f9080130ed.jpg?1778165149",
+              "normal": "https://cards.scryfall.io/normal/front/2/4/24f888dd-785c-4089-a89c-03f9080130ed.jpg?1778165149"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven"
+          }
+        ],
+        "underperformers": [
+          {
+            "name": "Honorbound Page // Forum's Favor",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 238,
+            "tier_rating": "C",
+            "note": "Tier C Limited card.",
+            "id": "79a70863-860f-4a7b-9cb2-d3546b689d44",
+            "scryfall_uri": "https://scryfall.com/card/sos/19/honorbound-page-forums-favor?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Cat Cleric // Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/9/79a70863-860f-4a7b-9cb2-d3546b689d44.jpg?1775937039",
+              "normal": "https://cards.scryfall.io/normal/front/7/9/79a70863-860f-4a7b-9cb2-d3546b689d44.jpg?1775937039"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven"
+          },
+          {
+            "name": "Strife Scholar // Awaken the Ages",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 284,
+            "tier_rating": "C",
+            "note": "Tier C Limited card.",
+            "id": "8de79312-2046-425e-9919-49afe19be81b",
+            "scryfall_uri": "https://scryfall.com/card/sos/131/strife-scholar-awaken-the-ages?utm_source=api",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Orc Sorcerer // Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8de79312-2046-425e-9919-49afe19be81b.jpg?1775937883",
+              "normal": "https://cards.scryfall.io/normal/front/8/d/8de79312-2046-425e-9919-49afe19be81b.jpg?1775937883"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Repartee",
+      "summary": "Plays like a hybrid heroic/crime mechanic. Rewards removal spells and repeatable buffs. Difficult to draft a coherent WB deck without caring about it.",
+      "performance": "Worked as advertised. Essential for WB (Silverquill) and some RW decks.",
+      "key_examples": [
+        {
+          "name": "Dig Site Inventory",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 157,
+          "tier_rating": "B",
+          "note": "Tier B Limited card.",
+          "id": "e52464ee-df8b-41ec-af93-4b0eb004383e",
+          "scryfall_uri": "https://scryfall.com/card/sos/10/dig-site-inventory?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/5/e52464ee-df8b-41ec-af93-4b0eb004383e.jpg?1775936980",
+            "normal": "https://cards.scryfall.io/normal/front/e/5/e52464ee-df8b-41ec-af93-4b0eb004383e.jpg?1775936980"
+          },
+          "set": "sos",
+          "set_name": "Secrets of Strixhaven"
+        },
+        {
+          "name": "Killian's Confidence",
+          "color": "BW",
+          "rarity": "Uncommon",
+          "pick_order_rank": 122,
+          "tier_rating": "B",
+          "note": "Tier B Limited card.",
+          "id": "55ff776a-fc3b-4338-8864-d57a85b3f123",
+          "scryfall_uri": "https://scryfall.com/card/sos/197/killians-confidence?utm_source=api",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/55ff776a-fc3b-4338-8864-d57a85b3f123.jpg?1775938369",
+            "normal": "https://cards.scryfall.io/normal/front/5/5/55ff776a-fc3b-4338-8864-d57a85b3f123.jpg?1775938369"
+          },
+          "set": "sos",
+          "set_name": "Secrets of Strixhaven"
+        },
+        {
+          "name": "Ancestral Anger",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 235,
+          "tier_rating": "C",
+          "note": "Tier C Limited card.",
+          "id": "6c5a93d6-d4ab-4062-bb3c-1b5330bf15ad",
+          "scryfall_uri": "https://scryfall.com/card/sos/106/ancestral-anger?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c5a93d6-d4ab-4062-bb3c-1b5330bf15ad.jpg?1775937666",
+            "normal": "https://cards.scryfall.io/normal/front/6/c/6c5a93d6-d4ab-4062-bb3c-1b5330bf15ad.jpg?1775937666"
+          },
+          "set": "sos",
+          "set_name": "Secrets of Strixhaven"
+        }
+      ]
+    },
+    {
+      "name": "Opus",
+      "summary": "UR decks lean into this. Some decks play it like prowess with cards like Expressive Firedancer.",
+      "performance": "Requires critical mass. Mediocre 5-drops become playable if you have enough enablers."
+    },
+    {
+      "name": "Infusion",
+      "summary": "Witherbloom mechanic. Set is generally short on great lifegain payoffs.",
+      "performance": "Bummer mechanic. Common payoffs are overwhelming and it's one of the weakest archetypes."
+    },
+    {
+      "name": "Flashback",
+      "summary": "Allows you to recast spells from the graveyard.",
+      "performance": "Excellent in Lorehold decks and in general. Cards like Pursue the Past are highly impactful."
+    },
+    {
+      "name": "Increment",
+      "summary": "Quandrix +1/+1 counters mechanic. Scales with rarity.",
+      "performance": "Useful but varies. Don't trick yourself into playing +1/+1 counter synergy cards heavily as it is barely supported.",
+      "key_examples": [
+        {
+          "name": "Ambitious Augmenter",
+          "color": "G",
+          "rarity": "Rare",
+          "pick_order_rank": 25,
+          "tier_rating": "A",
+          "note": "Tier A Limited card.",
+          "id": "85629088-2007-4db5-9397-bac12a3d7498",
+          "scryfall_uri": "https://scryfall.com/card/sos/140/ambitious-augmenter?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Turtle Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85629088-2007-4db5-9397-bac12a3d7498.jpg?1775937950",
+            "normal": "https://cards.scryfall.io/normal/front/8/5/85629088-2007-4db5-9397-bac12a3d7498.jpg?1775937950"
+          },
+          "set": "sos",
+          "set_name": "Secrets of Strixhaven"
+        },
+        {
+          "name": "Pensive Professor",
+          "color": "U",
+          "rarity": "Rare",
+          "pick_order_rank": 62,
+          "tier_rating": "B",
+          "note": "Tier B Limited card.",
+          "id": "66d47940-84f9-4479-8562-45e5148435d4",
+          "scryfall_uri": "https://scryfall.com/card/sos/63/pensive-professor?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Human Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66d47940-84f9-4479-8562-45e5148435d4.jpg?1775937349",
+            "normal": "https://cards.scryfall.io/normal/front/6/6/66d47940-84f9-4479-8562-45e5148435d4.jpg?1775937349"
+          },
+          "set": "sos",
+          "set_name": "Secrets of Strixhaven"
+        }
+      ]
+    },
+    {
+      "name": "Paradigm",
+      "summary": "Cycle of powerful mythic/rare spells.",
+      "performance": "Ranges from great to 'banned in Limited'. Every member is P1P1 worthy.",
+      "key_examples": [
+        {
+          "name": "Decorum Dissertation",
+          "color": "B",
+          "rarity": "Mythic",
+          "pick_order_rank": 137,
+          "tier_rating": "B",
+          "note": "Tier B Limited card.",
+          "id": "f4ab2d9b-c73d-478d-aac7-4d3bb24296d2",
+          "scryfall_uri": "https://scryfall.com/card/sos/78/decorum-dissertation?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Sorcery — Lesson",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/4/f4ab2d9b-c73d-478d-aac7-4d3bb24296d2.jpg?1775937454",
+            "normal": "https://cards.scryfall.io/normal/front/f/4/f4ab2d9b-c73d-478d-aac7-4d3bb24296d2.jpg?1775937454"
+          },
+          "set": "sos",
+          "set_name": "Secrets of Strixhaven"
+        }
+      ]
+    },
+    {
+      "name": "Converge",
+      "summary": "Rewards playing multiple colors.",
+      "performance": "Exceptional. 4- to 5-color piles are highly effective. Snarl Song and Arcane Omens feel like cheating."
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{W}{B}",
+        "name": "Silverquill Aggro",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Go under slower 'soup' decks using efficient cheap threats and premium removal. Leverage the Repartee mechanic with repeatable buffs and removal spells.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Cost of Brilliance",
+            "id": "3a46816b-9f75-4c72-9ec6-cded6a4a0d01",
+            "scryfall_uri": "https://scryfall.com/card/sos/77/cost-of-brilliance?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a46816b-9f75-4c72-9ec6-cded6a4a0d01.jpg?1775937447",
+              "normal": "https://cards.scryfall.io/normal/front/3/a/3a46816b-9f75-4c72-9ec6-cded6a4a0d01.jpg?1775937447"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "B"
+          },
+          {
+            "name": "Last Gasp",
+            "id": "da5f3729-6ec7-4482-90cb-83b973edeae4",
+            "scryfall_uri": "https://scryfall.com/card/sos/86/last-gasp?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/da5f3729-6ec7-4482-90cb-83b973edeae4.jpg?1775937510",
+              "normal": "https://cards.scryfall.io/normal/front/d/a/da5f3729-6ec7-4482-90cb-83b973edeae4.jpg?1775937510"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "B"
+          },
+          {
+            "name": "Scolding Administrator",
+            "id": "69757177-aefa-44a6-81db-5ae9b5d2f117",
+            "scryfall_uri": "https://scryfall.com/card/sos/224/scolding-administrator?utm_source=api",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Dwarf Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/69757177-aefa-44a6-81db-5ae9b5d2f117.jpg?1775938562",
+              "normal": "https://cards.scryfall.io/normal/front/6/9/69757177-aefa-44a6-81db-5ae9b5d2f117.jpg?1775938562"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "uncommon",
+            "color": "BW"
+          },
+          {
+            "name": "Snooping Page",
+            "id": "73d06987-8686-461b-b260-9a4fee6a3b32",
+            "scryfall_uri": "https://scryfall.com/card/sos/227/snooping-page?utm_source=api",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Human Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73d06987-8686-461b-b260-9a4fee6a3b32.jpg?1775938584",
+              "normal": "https://cards.scryfall.io/normal/front/7/3/73d06987-8686-461b-b260-9a4fee6a3b32.jpg?1775938584"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "uncommon",
+            "color": "BW"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{R}",
+        "name": "Lorehold Aggro/Midrange",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Aggressive strategy relying on strong uncommons to get ahead of the curve. Flashback provides late-game reach.",
+        "difficulty": "Low",
+        "key_cards": [
+          {
+            "name": "Pursue the Past",
+            "id": "4584d5f7-b1f1-4c8e-80c5-ad35e44a968e",
+            "scryfall_uri": "https://scryfall.com/card/sos/216/pursue-the-past?utm_source=api",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/5/4584d5f7-b1f1-4c8e-80c5-ad35e44a968e.jpg?1775938502",
+              "normal": "https://cards.scryfall.io/normal/front/4/5/4584d5f7-b1f1-4c8e-80c5-ad35e44a968e.jpg?1775938502"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "RW"
+          },
+          {
+            "name": "Tome Blast",
+            "id": "72a3b17d-1e00-48e9-8402-c81bacd595a7",
+            "scryfall_uri": "https://scryfall.com/card/sos/135/tome-blast?utm_source=api",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/2/72a3b17d-1e00-48e9-8402-c81bacd595a7.jpg?1775937914",
+              "normal": "https://cards.scryfall.io/normal/front/7/2/72a3b17d-1e00-48e9-8402-c81bacd595a7.jpg?1775937914"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "R"
+          },
+          {
+            "name": "Stone Docent",
+            "id": "c2abfffb-bf36-44af-9a27-6e109e4d77dd",
+            "scryfall_uri": "https://scryfall.com/card/sos/36/stone-docent?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Spirit Chimera",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2abfffb-bf36-44af-9a27-6e109e4d77dd.jpg?1775937164",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c2abfffb-bf36-44af-9a27-6e109e4d77dd.jpg?1775937164"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "W"
+          },
+          {
+            "name": "Elite Interceptor // Rejoinder",
+            "id": "2970683e-e69c-42cb-a067-34abd56fb42b",
+            "scryfall_uri": "https://scryfall.com/card/sos/12/elite-interceptor-rejoinder?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Wizard // Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/9/2970683e-e69c-42cb-a067-34abd56fb42b.jpg?1775936992",
+              "normal": "https://cards.scryfall.io/normal/front/2/9/2970683e-e69c-42cb-a067-34abd56fb42b.jpg?1775936992"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "W"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{U}{B}{R}{G}",
+        "name": "Converge Soup",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Play 4-5 colors utilizing heavy removal and card draw to stall aggressive decks, and powerful bombs/converge payoffs to win the late game.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Snarl Song",
+            "id": "fc4c7fa2-aebb-4636-9afd-f1010c923316",
+            "scryfall_uri": "https://scryfall.com/card/sos/161/snarl-song?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/c/fc4c7fa2-aebb-4636-9afd-f1010c923316.jpg?1775938101",
+              "normal": "https://cards.scryfall.io/normal/front/f/c/fc4c7fa2-aebb-4636-9afd-f1010c923316.jpg?1775938101"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "uncommon",
+            "color": "G"
+          },
+          {
+            "name": "Arcane Omens",
+            "id": "d357d997-9d4e-4ade-81f2-37629853f13a",
+            "scryfall_uri": "https://scryfall.com/card/sos/73/arcane-omens?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d357d997-9d4e-4ade-81f2-37629853f13a.jpg?1775937419",
+              "normal": "https://cards.scryfall.io/normal/front/d/3/d357d997-9d4e-4ade-81f2-37629853f13a.jpg?1775937419"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "uncommon",
+            "color": "B"
+          },
+          {
+            "name": "Together as One",
+            "id": "ac2a8a66-e38c-42ab-83e1-d2d99ee48861",
+            "scryfall_uri": "https://scryfall.com/card/sos/4/together-as-one?utm_source=api",
+            "colors": [],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/ac2a8a66-e38c-42ab-83e1-d2d99ee48861.jpg?1775936940",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/ac2a8a66-e38c-42ab-83e1-d2d99ee48861.jpg?1775936940"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "rare",
+            "color": "C"
+          },
+          {
+            "name": "Visionary's Dance",
+            "id": "846a0e79-a530-429e-8f7f-4b87f1b0156e",
+            "scryfall_uri": "https://scryfall.com/card/sos/242/visionarys-dance?utm_source=api",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/846a0e79-a530-429e-8f7f-4b87f1b0156e.jpg?1776000377",
+              "normal": "https://cards.scryfall.io/normal/front/8/4/846a0e79-a530-429e-8f7f-4b87f1b0156e.jpg?1776000377"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "RU"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{U}{R}",
+        "name": "Prismari Control / Opus",
+        "tier": "Tier 2 — Great",
+        "strategy": "Control the game with instants and sorceries while extracting value from Opus triggers.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Run Behind",
+            "id": "40ecc34b-4cd0-4998-bbf4-7faa6fd3d7e0",
+            "scryfall_uri": "https://scryfall.com/card/sos/66/run-behind?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/0/40ecc34b-4cd0-4998-bbf4-7faa6fd3d7e0.jpg?1775937369",
+              "normal": "https://cards.scryfall.io/normal/front/4/0/40ecc34b-4cd0-4998-bbf4-7faa6fd3d7e0.jpg?1775937369"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "U"
+          },
+          {
+            "name": "Essence Scatter",
+            "id": "32840097-0531-4c43-b6a8-e76c17420b04",
+            "scryfall_uri": "https://scryfall.com/card/sos/47/essence-scatter?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32840097-0531-4c43-b6a8-e76c17420b04.jpg?1775937236",
+              "normal": "https://cards.scryfall.io/normal/front/3/2/32840097-0531-4c43-b6a8-e76c17420b04.jpg?1775937236"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "U"
+          },
+          {
+            "name": "Unsubtle Mockery",
+            "id": "2b7cb1a3-761e-470e-a164-6e29dd9448cd",
+            "scryfall_uri": "https://scryfall.com/card/sos/136/unsubtle-mockery?utm_source=api",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/b/2b7cb1a3-761e-470e-a164-6e29dd9448cd.jpg?1775937921",
+              "normal": "https://cards.scryfall.io/normal/front/2/b/2b7cb1a3-761e-470e-a164-6e29dd9448cd.jpg?1775937921"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "R"
+          },
+          {
+            "name": "Colorstorm Stallion",
+            "id": "f5b54d46-2caf-4d1b-8be1-dbd9e9dce058",
+            "scryfall_uri": "https://scryfall.com/card/sos/180/colorstorm-stallion?utm_source=api",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Elemental Horse",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f5b54d46-2caf-4d1b-8be1-dbd9e9dce058.jpg?1775938240",
+              "normal": "https://cards.scryfall.io/normal/front/f/5/f5b54d46-2caf-4d1b-8be1-dbd9e9dce058.jpg?1775938240"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "rare",
+            "color": "RU"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Quandrix Ramp / Increment",
+        "tier": "Tier 2 — Great",
+        "strategy": "Ramp and +1/+1 counters, though the counter theme is weakly supported at common.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Ambitious Augmenter",
+            "id": "85629088-2007-4db5-9397-bac12a3d7498",
+            "scryfall_uri": "https://scryfall.com/card/sos/140/ambitious-augmenter?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Turtle Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85629088-2007-4db5-9397-bac12a3d7498.jpg?1775937950",
+              "normal": "https://cards.scryfall.io/normal/front/8/5/85629088-2007-4db5-9397-bac12a3d7498.jpg?1775937950"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "rare",
+            "color": "G"
+          },
+          {
+            "name": "Pensive Professor",
+            "id": "66d47940-84f9-4479-8562-45e5148435d4",
+            "scryfall_uri": "https://scryfall.com/card/sos/63/pensive-professor?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66d47940-84f9-4479-8562-45e5148435d4.jpg?1775937349",
+              "normal": "https://cards.scryfall.io/normal/front/6/6/66d47940-84f9-4479-8562-45e5148435d4.jpg?1775937349"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "rare",
+            "color": "U"
+          },
+          {
+            "name": "Studious First-Year // Rampant Growth",
+            "id": "24f888dd-785c-4089-a89c-03f9080130ed",
+            "scryfall_uri": "https://scryfall.com/card/sos/162/studious-first-year-rampant-growth?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Bear Wizard // Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24f888dd-785c-4089-a89c-03f9080130ed.jpg?1778165149",
+              "normal": "https://cards.scryfall.io/normal/front/2/4/24f888dd-785c-4089-a89c-03f9080130ed.jpg?1778165149"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "G"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{B}{G}",
+        "name": "Witherbloom Midrange / Infusion",
+        "tier": "Tier 3 — Playable",
+        "strategy": "Awkward middle ground utilizing lifegain synergies. Generally considered the weakest archetype due to underwhelming payoffs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Noxious Newt",
+            "id": "3a028306-c5d7-4f8f-b6f4-0d103fd47000",
+            "scryfall_uri": "https://scryfall.com/card/sos/155/noxious-newt?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Salamander",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a028306-c5d7-4f8f-b6f4-0d103fd47000.jpg?1775938060",
+              "normal": "https://cards.scryfall.io/normal/front/3/a/3a028306-c5d7-4f8f-b6f4-0d103fd47000.jpg?1775938060"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "G"
+          },
+          {
+            "name": "Burrog Barrage",
+            "id": "95d5b0a8-2b66-418e-9e5e-ecf7b304c31e",
+            "scryfall_uri": "https://scryfall.com/card/sos/141/burrog-barrage?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95d5b0a8-2b66-418e-9e5e-ecf7b304c31e.jpg?1775937957",
+              "normal": "https://cards.scryfall.io/normal/front/9/5/95d5b0a8-2b66-418e-9e5e-ecf7b304c31e.jpg?1775937957"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "G"
+          },
+          {
+            "name": "Ulna Alley Shopkeep",
+            "id": "c25e1ae5-f17c-4eee-98f1-5681981af31c",
+            "scryfall_uri": "https://scryfall.com/card/sos/103/ulna-alley-shopkeep?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Goblin Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c25e1ae5-f17c-4eee-98f1-5681981af31c.jpg?1775937633",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c25e1ae5-f17c-4eee-98f1-5681981af31c.jpg?1775937633"
+            },
+            "set": "sos",
+            "set_name": "Secrets of Strixhaven",
+            "rarity": "common",
+            "color": "B"
+          }
+        ]
+      }
+    ]
+  }
+}

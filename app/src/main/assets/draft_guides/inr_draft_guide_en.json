@@ -1,0 +1,3012 @@
+{
+  "metadata": {
+    "set_name": "Innistrad Remastered",
+    "set_code": "INR",
+    "source_url": "https://draftsim.com/mtg-inr-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "January 24, 2025"
+  },
+  "set_overview": {
+    "summary": "Innistrad Remastered is a \"greatest hits\" collection from Magic's seven Innistrad sets. The curated draft format combines mechanics and cards from across Innistrad's history, available for paper MTG and Magic Online but not MTG Arena.",
+    "color_ranking": [
+      "{B}{R} Vampires/Madness — strongest pair",
+      "{W}{B} Attrition — well-supported",
+      "{U}{B} Zombies — strong removal + good stuff",
+      "{U}{G} Self-Mill — well-supported",
+      "{R}{G} Werewolves — weakest pair"
+    ],
+    "color_notes": {
+      "Note": "INR is heavily archetype-driven; rank pairs rather than colors. BR appears strongest; RG appears weakest. Draft mana fixing (Evolving Wilds, Traveler's Amulet, Wild-Field Scarecrow) for 3-color decks."
+    },
+    "key_gameplay_notes": [
+      "Self-mill, madness, sacrifice, and token strategies have strong support.",
+      "Prioritize card quality and synergy balance — avoid forcing weak synergies.",
+      "Recognize your draft lane early and commit to it.",
+      "Value creatures like Tower Geist and efficient removal are universally strong.",
+      "Madness enablers (Faithless Looting, Olivia's Dragoon, Furyblade Vampire, Lightning Axe) feed BR."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Transforming DFCs",
+      "summary": "Double-faced cards that flip when conditions are met (e.g., Delver of Secrets / Insectile Aberration). Spread across all colors and archetypes.",
+      "performance": "Individually strong; the flip side often represents free value.",
+      "key_examples": [
+        {
+          "name": "Delver of Secrets",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 251,
+          "tier_rating": "D",
+          "note": null,
+          "id": "6904ea20-e504-47da-95a0-08739fdde260",
+          "scryfall_uri": "https://scryfall.com/card/inr/60/delver-of-secrets-insectile-aberration",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Human Wizard // Creature — Human Insect",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/6904ea20-e504-47da-95a0-08739fdde260.jpg?1736467707",
+            "normal": "https://cards.scryfall.io/normal/front/6/9/6904ea20-e504-47da-95a0-08739fdde260.jpg?1736467707"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        },
+        {
+          "name": "Scorned Villager",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 200,
+          "tier_rating": "D",
+          "note": null,
+          "id": "ee539a5e-2d10-4666-9b52-5064562dd233",
+          "scryfall_uri": "https://scryfall.com/card/inr/212/scorned-villager-moonscarred-werewolf",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee539a5e-2d10-4666-9b52-5064562dd233.jpg?1736468401",
+            "normal": "https://cards.scryfall.io/normal/front/e/e/ee539a5e-2d10-4666-9b52-5064562dd233.jpg?1736468401"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Disturb",
+      "summary": "Returns creatures as spirits or auras from the graveyard for a specific cost. Appears on 4 cards; supports WU Spirits.",
+      "performance": "Recurring value mechanic — every Disturb card is essentially two cards.",
+      "key_examples": []
+    },
+    {
+      "name": "Meld",
+      "summary": "Two specific cards fuse into one during combat. 3 pairs total; rare mechanic.",
+      "performance": "Build-around bomb when both halves are drafted; otherwise role-players.",
+      "key_examples": []
+    },
+    {
+      "name": "Emerge",
+      "summary": "Cast colorless creatures by sacrificing creatures, reducing cost. 3 commons + 3 rares.",
+      "performance": "Solid tempo play; Wretched Gryff is a top blue common.",
+      "key_examples": [
+        {
+          "name": "Wretched Gryff",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 133,
+          "tier_rating": "C",
+          "note": null,
+          "id": "722b519a-715d-4393-9d3c-97f329896ef4",
+          "scryfall_uri": "https://scryfall.com/card/inr/7/wretched-gryff",
+          "colors": [],
+          "type_line": "Creature — Eldrazi Hippogriff",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/2/722b519a-715d-4393-9d3c-97f329896ef4.jpg?1736467441",
+            "normal": "https://cards.scryfall.io/normal/front/7/2/722b519a-715d-4393-9d3c-97f329896ef4.jpg?1736467441"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Madness",
+      "summary": "Cast from graveyard when discarded instead of going to the graveyard. Black/red cards form the core BR mechanic.",
+      "performance": "Anchors the top-tier BR Vampires/Madness archetype.",
+      "key_examples": [
+        {
+          "name": "Fiery Temper",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 54,
+          "tier_rating": "A",
+          "note": null,
+          "id": "1d3a3a1d-c393-4a57-8a0e-5907d1722331",
+          "scryfall_uri": "https://scryfall.com/card/inr/154/fiery-temper",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1d3a3a1d-c393-4a57-8a0e-5907d1722331.jpg?1736468138",
+            "normal": "https://cards.scryfall.io/normal/front/1/d/1d3a3a1d-c393-4a57-8a0e-5907d1722331.jpg?1736468138"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        },
+        {
+          "name": "Lightning Axe",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 61,
+          "tier_rating": "A",
+          "note": null,
+          "id": "90911c79-24c3-4566-b72c-02ccde083f1b",
+          "scryfall_uri": "https://scryfall.com/card/inr/162/lightning-axe",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/90911c79-24c3-4566-b72c-02ccde083f1b.jpg?1736473361",
+            "normal": "https://cards.scryfall.io/normal/front/9/0/90911c79-24c3-4566-b72c-02ccde083f1b.jpg?1736473361"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        },
+        {
+          "name": "Asylum Visitor",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 143,
+          "tier_rating": "C",
+          "note": null,
+          "id": "02046824-6c48-40bb-9f0b-4fd280c6ed85",
+          "scryfall_uri": "https://scryfall.com/card/inr/96/asylum-visitor",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Vampire Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02046824-6c48-40bb-9f0b-4fd280c6ed85.jpg?1736473224",
+            "normal": "https://cards.scryfall.io/normal/front/0/2/02046824-6c48-40bb-9f0b-4fd280c6ed85.jpg?1736473224"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Escalate",
+      "summary": "Pay more for additional effects. Appears on 4 cards, mostly red.",
+      "performance": "Niche; situational value.",
+      "key_examples": []
+    },
+    {
+      "name": "Flashback",
+      "summary": "Recast spells from graveyard by paying flashback cost. Instants/sorceries in all colors.",
+      "performance": "Strong card advantage; pairs with self-mill in UG.",
+      "key_examples": [
+        {
+          "name": "Lingering Souls",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 41,
+          "tier_rating": "A",
+          "note": null,
+          "id": "09cd56b2-1987-40c2-a436-5f3cbc564f1c",
+          "scryfall_uri": "https://scryfall.com/card/inr/30/lingering-souls",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09cd56b2-1987-40c2-a436-5f3cbc564f1c.jpg?1736467529",
+            "normal": "https://cards.scryfall.io/normal/front/0/9/09cd56b2-1987-40c2-a436-5f3cbc564f1c.jpg?1736467529"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        },
+        {
+          "name": "Think Twice",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 152,
+          "tier_rating": "C",
+          "note": null,
+          "id": "35471afe-e14c-48f4-b901-297111be9c23",
+          "scryfall_uri": "https://scryfall.com/card/inr/92/think-twice",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35471afe-e14c-48f4-b901-297111be9c23.jpg?1736467855",
+            "normal": "https://cards.scryfall.io/normal/front/3/5/35471afe-e14c-48f4-b901-297111be9c23.jpg?1736467855"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        },
+        {
+          "name": "Silent Departure",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 175,
+          "tier_rating": "C",
+          "note": null,
+          "id": "4d1552e7-20b2-42b0-af47-6618ab163115",
+          "scryfall_uri": "https://scryfall.com/card/inr/84/silent-departure",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4d1552e7-20b2-42b0-af47-6618ab163115.jpg?1736467818",
+            "normal": "https://cards.scryfall.io/normal/front/4/d/4d1552e7-20b2-42b0-af47-6618ab163115.jpg?1736467818"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Investigate",
+      "summary": "Create Clue tokens that draw cards when sacrificed. Minor theme; 4 cards.",
+      "performance": "Universal value; light support.",
+      "key_examples": [
+        {
+          "name": "Thraben Inspector",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 134,
+          "tier_rating": "C",
+          "note": null,
+          "id": "08a5007f-06a0-40fa-a252-c38baa6b5c6f",
+          "scryfall_uri": "https://scryfall.com/card/inr/45/thraben-inspector",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608",
+            "normal": "https://cards.scryfall.io/normal/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Blood Tokens",
+      "summary": "Sacrifice to discard and draw (rummage effect). Synergy with madness.",
+      "performance": "Feeds the BR Madness archetype.",
+      "key_examples": []
+    },
+    {
+      "name": "Undying",
+      "summary": "Returns from death with +1/+1 counter. 2 commons: Young Wolf, Butcher Ghoul.",
+      "performance": "Solid value creatures; play extra copies of these.",
+      "key_examples": [
+        {
+          "name": "Young Wolf",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 155,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ed2ca825-b029-495f-83fc-54366229d417",
+          "scryfall_uri": "https://scryfall.com/card/inr/227/young-wolf",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Wolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/ed2ca825-b029-495f-83fc-54366229d417.jpg?1736468463",
+            "normal": "https://cards.scryfall.io/normal/front/e/d/ed2ca825-b029-495f-83fc-54366229d417.jpg?1736468463"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        },
+        {
+          "name": "Butcher Ghoul",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 232,
+          "tier_rating": "D",
+          "note": null,
+          "id": "c4ef03c8-2047-4170-9ac4-f26cc14ebf96",
+          "scryfall_uri": "https://scryfall.com/card/inr/99/butcher-ghoul",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Zombie",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c4ef03c8-2047-4170-9ac4-f26cc14ebf96.jpg?1736467900",
+            "normal": "https://cards.scryfall.io/normal/front/c/4/c4ef03c8-2047-4170-9ac4-f26cc14ebf96.jpg?1736467900"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Miracle",
+      "summary": "Cast for reduced cost if drawn as top card of library. 2 cards; rarely impactful.",
+      "performance": "Largely a curiosity — luck-dependent.",
+      "key_examples": []
+    },
+    {
+      "name": "Soulbond",
+      "summary": "Pair creatures together for a benefit. 2 cards: Lightning Mauler, Deadeye Navigator.",
+      "performance": "Rare interaction with high upside when drafted.",
+      "key_examples": [
+        {
+          "name": "Lightning Mauler",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 180,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ea45c4fe-6e39-4c5f-b7f0-233dee1eff90",
+          "scryfall_uri": "https://scryfall.com/card/inr/163/lightning-mauler",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Human Berserker",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/ea45c4fe-6e39-4c5f-b7f0-233dee1eff90.jpg?1736468186",
+            "normal": "https://cards.scryfall.io/normal/front/e/a/ea45c4fe-6e39-4c5f-b7f0-233dee1eff90.jpg?1736468186"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        },
+        {
+          "name": "Deadeye Navigator",
+          "color": "U",
+          "rarity": "Rare",
+          "pick_order_rank": 73,
+          "tier_rating": "B",
+          "note": null,
+          "id": "4f0791b5-fdb4-4378-8fd3-7e7367ffc05c",
+          "scryfall_uri": "https://scryfall.com/card/inr/59/deadeye-navigator",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Spirit",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f0791b5-fdb4-4378-8fd3-7e7367ffc05c.jpg?1736467700",
+            "normal": "https://cards.scryfall.io/normal/front/4/f/4f0791b5-fdb4-4378-8fd3-7e7367ffc05c.jpg?1736467700"
+          },
+          "set": "inr",
+          "set_name": "Innistrad Remastered"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{B}{R}",
+        "name": "BR Vampires / Madness",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Combine vampire payoffs with madness enablers. Bloodtithe Harvester is the signpost. Madness chains (Faithless Looting → Fiery Temper) snowball games quickly.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Bloodtithe Harvester",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 75,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ae4aec0d-c853-44e6-9f51-cbecf413ea14",
+            "scryfall_uri": "https://scryfall.com/card/inr/233/bloodtithe-harvester",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/ae4aec0d-c853-44e6-9f51-cbecf413ea14.jpg?1736468492",
+              "normal": "https://cards.scryfall.io/normal/front/a/e/ae4aec0d-c853-44e6-9f51-cbecf413ea14.jpg?1736468492"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Neonate's Rush",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 181,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1d623e71-05bd-46d6-b831-2c8dcff7ab45",
+            "scryfall_uri": "https://scryfall.com/card/inr/166/neonates-rush",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1d623e71-05bd-46d6-b831-2c8dcff7ab45.jpg?1736468198",
+              "normal": "https://cards.scryfall.io/normal/front/1/d/1d623e71-05bd-46d6-b831-2c8dcff7ab45.jpg?1736468198"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Indulgent Aristocrat",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 275,
+            "tier_rating": "F",
+            "note": null,
+            "id": "07015524-874f-4856-a5c1-3148bd126886",
+            "scryfall_uri": "https://scryfall.com/card/inr/118/indulgent-aristocrat",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/7/07015524-874f-4856-a5c1-3148bd126886.jpg?1736467987",
+              "normal": "https://cards.scryfall.io/normal/front/0/7/07015524-874f-4856-a5c1-3148bd126886.jpg?1736467987"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Stensia Masquerade",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 276,
+            "tier_rating": "F",
+            "note": null,
+            "id": "faaf031f-2c77-4248-8a29-f47e64773cfd",
+            "scryfall_uri": "https://scryfall.com/card/inr/172/stensia-masquerade",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/a/faaf031f-2c77-4248-8a29-f47e64773cfd.jpg?1736468223",
+              "normal": "https://cards.scryfall.io/normal/front/f/a/faaf031f-2c77-4248-8a29-f47e64773cfd.jpg?1736468223"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Captivating Vampire",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 74,
+            "tier_rating": "B",
+            "note": null,
+            "id": "0f87aadf-7638-4691-b5a5-86f928e98462",
+            "scryfall_uri": "https://scryfall.com/card/inr/100/captivating-vampire",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/f/0f87aadf-7638-4691-b5a5-86f928e98462.jpg?1736467903",
+              "normal": "https://cards.scryfall.io/normal/front/0/f/0f87aadf-7638-4691-b5a5-86f928e98462.jpg?1736467903"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Sorin, Imperious Bloodlord",
+            "color": "B",
+            "rarity": "Mythic",
+            "pick_order_rank": 63,
+            "tier_rating": "B",
+            "note": null,
+            "id": "219d3e48-e0b1-472d-ac45-11c14b292c9e",
+            "scryfall_uri": "https://scryfall.com/card/inr/133/sorin-imperious-bloodlord",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Legendary Planeswalker — Sorin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/219d3e48-e0b1-472d-ac45-11c14b292c9e.jpg?1736468052",
+              "normal": "https://cards.scryfall.io/normal/front/2/1/219d3e48-e0b1-472d-ac45-11c14b292c9e.jpg?1736468052"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Olivia's Dragoon",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 136,
+            "tier_rating": "C",
+            "note": null,
+            "id": "571a9e92-6f34-4bf4-b7f4-15d12560efb6",
+            "scryfall_uri": "https://scryfall.com/card/inr/127/olivias-dragoon",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire Berserker",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/571a9e92-6f34-4bf4-b7f4-15d12560efb6.jpg?1736468024",
+              "normal": "https://cards.scryfall.io/normal/front/5/7/571a9e92-6f34-4bf4-b7f4-15d12560efb6.jpg?1736468024"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Faithless Looting",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 221,
+            "tier_rating": "D",
+            "note": null,
+            "id": "52e47757-0aa9-48b0-8b43-e2483d7eed67",
+            "scryfall_uri": "https://scryfall.com/card/inr/151/faithless-looting",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/52e47757-0aa9-48b0-8b43-e2483d7eed67.jpg?1736468128",
+              "normal": "https://cards.scryfall.io/normal/front/5/2/52e47757-0aa9-48b0-8b43-e2483d7eed67.jpg?1736468128"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Furyblade Vampire",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 145,
+            "tier_rating": "C",
+            "note": null,
+            "id": "95a38a53-d83a-4df7-8caa-40995b0c4235",
+            "scryfall_uri": "https://scryfall.com/card/inr/155/furyblade-vampire",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Vampire Berserker",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95a38a53-d83a-4df7-8caa-40995b0c4235.jpg?1736468144",
+              "normal": "https://cards.scryfall.io/normal/front/9/5/95a38a53-d83a-4df7-8caa-40995b0c4235.jpg?1736468144"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Lightning Axe",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 61,
+            "tier_rating": "A",
+            "note": null,
+            "id": "90911c79-24c3-4566-b72c-02ccde083f1b",
+            "scryfall_uri": "https://scryfall.com/card/inr/162/lightning-axe",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/90911c79-24c3-4566-b72c-02ccde083f1b.jpg?1736473361",
+              "normal": "https://cards.scryfall.io/normal/front/9/0/90911c79-24c3-4566-b72c-02ccde083f1b.jpg?1736473361"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{W}{B}",
+        "name": "WB Attrition / Aristocrats",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Grind opponents out with token generation and sacrifice synergies. Fleshtaker is the signpost. Lingering Souls, Thraben Inspector, and Butcher Ghoul form the core.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Fleshtaker",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 101,
+            "tier_rating": "B",
+            "note": null,
+            "id": "4b9bf7a7-28f8-410e-86d3-5637e473a5a1",
+            "scryfall_uri": "https://scryfall.com/card/inr/235/fleshtaker",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Human Assassin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4b9bf7a7-28f8-410e-86d3-5637e473a5a1.jpg?1736468499",
+              "normal": "https://cards.scryfall.io/normal/front/4/b/4b9bf7a7-28f8-410e-86d3-5637e473a5a1.jpg?1736468499"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Lingering Souls",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 41,
+            "tier_rating": "A",
+            "note": null,
+            "id": "09cd56b2-1987-40c2-a436-5f3cbc564f1c",
+            "scryfall_uri": "https://scryfall.com/card/inr/30/lingering-souls",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09cd56b2-1987-40c2-a436-5f3cbc564f1c.jpg?1736467529",
+              "normal": "https://cards.scryfall.io/normal/front/0/9/09cd56b2-1987-40c2-a436-5f3cbc564f1c.jpg?1736467529"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Thraben Inspector",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 134,
+            "tier_rating": "C",
+            "note": null,
+            "id": "08a5007f-06a0-40fa-a252-c38baa6b5c6f",
+            "scryfall_uri": "https://scryfall.com/card/inr/45/thraben-inspector",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608",
+              "normal": "https://cards.scryfall.io/normal/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Butcher Ghoul",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 232,
+            "tier_rating": "D",
+            "note": null,
+            "id": "c4ef03c8-2047-4170-9ac4-f26cc14ebf96",
+            "scryfall_uri": "https://scryfall.com/card/inr/99/butcher-ghoul",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c4ef03c8-2047-4170-9ac4-f26cc14ebf96.jpg?1736467900",
+              "normal": "https://cards.scryfall.io/normal/front/c/4/c4ef03c8-2047-4170-9ac4-f26cc14ebf96.jpg?1736467900"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Angelic Purge",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 76,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ed2fe361-2885-4fc9-a10f-960cc1ac0fbf",
+            "scryfall_uri": "https://scryfall.com/card/inr/9/angelic-purge",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/ed2fe361-2885-4fc9-a10f-960cc1ac0fbf.jpg?1736467455",
+              "normal": "https://cards.scryfall.io/normal/front/e/d/ed2fe361-2885-4fc9-a10f-960cc1ac0fbf.jpg?1736467455"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Village Rites",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 209,
+            "tier_rating": "D",
+            "note": null,
+            "id": "42ed35e9-51cd-468a-86a9-9412553cf50d",
+            "scryfall_uri": "https://scryfall.com/card/inr/137/village-rites",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/42ed35e9-51cd-468a-86a9-9412553cf50d.jpg?1736468066",
+              "normal": "https://cards.scryfall.io/normal/front/4/2/42ed35e9-51cd-468a-86a9-9412553cf50d.jpg?1736468066"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Zombies / Good Stuff",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Midrange/control with efficient removal and zombie payoffs. Bladestitched Skaab is the signpost.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Bladestitched Skaab",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 67,
+            "tier_rating": "B",
+            "note": null,
+            "id": "af14d311-0fd5-4979-bc46-1421472c3b0a",
+            "scryfall_uri": "https://scryfall.com/card/inr/231/bladestitched-skaab",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Zombie Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/f/af14d311-0fd5-4979-bc46-1421472c3b0a.jpg?1736468485",
+              "normal": "https://cards.scryfall.io/normal/front/a/f/af14d311-0fd5-4979-bc46-1421472c3b0a.jpg?1736468485"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Compelling Deterrence",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 115,
+            "tier_rating": "C",
+            "note": null,
+            "id": "62ffc952-b763-4b9e-acdf-164253bdfe72",
+            "scryfall_uri": "https://scryfall.com/card/inr/57/compelling-deterrence",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/62ffc952-b763-4b9e-acdf-164253bdfe72.jpg?1736467685",
+              "normal": "https://cards.scryfall.io/normal/front/6/2/62ffc952-b763-4b9e-acdf-164253bdfe72.jpg?1736467685"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Drunau Corpse Trawler",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 87,
+            "tier_rating": "B",
+            "note": null,
+            "id": "11b29a06-c1e1-4d81-ac50-906c94617abe",
+            "scryfall_uri": "https://scryfall.com/card/inr/63/drunau-corpse-trawler",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11b29a06-c1e1-4d81-ac50-906c94617abe.jpg?1736467727",
+              "normal": "https://cards.scryfall.io/normal/front/1/1/11b29a06-c1e1-4d81-ac50-906c94617abe.jpg?1736467727"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Archghoul of Thraben",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 142,
+            "tier_rating": "C",
+            "note": null,
+            "id": "687b8e00-80f4-474b-927f-d208a2e8c205",
+            "scryfall_uri": "https://scryfall.com/card/inr/95/archghoul-of-thraben",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/687b8e00-80f4-474b-927f-d208a2e8c205.jpg?1736467871",
+              "normal": "https://cards.scryfall.io/normal/front/6/8/687b8e00-80f4-474b-927f-d208a2e8c205.jpg?1736467871"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Gisa and Geralf",
+            "color": "UB",
+            "rarity": "Rare",
+            "pick_order_rank": 19,
+            "tier_rating": "S",
+            "note": null,
+            "id": "bce9bf8d-4d22-4967-bd9e-27fe444ef3f6",
+            "scryfall_uri": "https://scryfall.com/card/inr/237/gisa-and-geralf",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/c/bce9bf8d-4d22-4967-bd9e-27fe444ef3f6.jpg?1736468506",
+              "normal": "https://cards.scryfall.io/normal/front/b/c/bce9bf8d-4d22-4967-bd9e-27fe444ef3f6.jpg?1736468506"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Necroduality",
+            "color": "U",
+            "rarity": "Mythic",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6385509a-6814-4039-83fb-1fa5a7439696",
+            "scryfall_uri": "https://scryfall.com/card/inr/79/necroduality",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/6385509a-6814-4039-83fb-1fa5a7439696.jpg?1736467797",
+              "normal": "https://cards.scryfall.io/normal/front/6/3/6385509a-6814-4039-83fb-1fa5a7439696.jpg?1736467797"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{G}",
+        "name": "UG Self-Mill",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Mill yourself and turn the graveyard into a resource. Vilespawn Spider is the signpost. Often splashes into GW or BG for additional payoffs.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Vilespawn Spider",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 156,
+            "tier_rating": "C",
+            "note": null,
+            "id": "58901777-f8bf-450b-acf8-d60a73c3322f",
+            "scryfall_uri": "https://scryfall.com/card/inr/251/vilespawn-spider",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Spider",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/8/58901777-f8bf-450b-acf8-d60a73c3322f.jpg?1736468562",
+              "normal": "https://cards.scryfall.io/normal/front/5/8/58901777-f8bf-450b-acf8-d60a73c3322f.jpg?1736468562"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Eccentric Farmer",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 92,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fe2a1718-eae1-4330-b494-c3088b992aae",
+            "scryfall_uri": "https://scryfall.com/card/inr/194/eccentric-farmer",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Peasant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe2a1718-eae1-4330-b494-c3088b992aae.jpg?1736468317",
+              "normal": "https://cards.scryfall.io/normal/front/f/e/fe2a1718-eae1-4330-b494-c3088b992aae.jpg?1736468317"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Bramble Wurm",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 146,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7ed00113-a0d7-4825-b066-f911a1ffb900",
+            "scryfall_uri": "https://scryfall.com/card/inr/187/bramble-wurm",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Wurm",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7ed00113-a0d7-4825-b066-f911a1ffb900.jpg?1737775521",
+              "normal": "https://cards.scryfall.io/normal/front/7/e/7ed00113-a0d7-4825-b066-f911a1ffb900.jpg?1737775521"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Grapple with the Past",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 249,
+            "tier_rating": "D",
+            "note": null,
+            "id": "06e0c180-2275-461a-86e7-8ccdc5f47938",
+            "scryfall_uri": "https://scryfall.com/card/inr/199/grapple-with-the-past",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/06e0c180-2275-461a-86e7-8ccdc5f47938.jpg?1736468339",
+              "normal": "https://cards.scryfall.io/normal/front/0/6/06e0c180-2275-461a-86e7-8ccdc5f47938.jpg?1736468339"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Moldgraf Millipede",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 238,
+            "tier_rating": "D",
+            "note": null,
+            "id": "3a163ec7-4c9a-4d45-965c-e5ddeb07a3e0",
+            "scryfall_uri": "https://scryfall.com/card/inr/208/moldgraf-millipede",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Insect Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a163ec7-4c9a-4d45-965c-e5ddeb07a3e0.jpg?1736468379",
+              "normal": "https://cards.scryfall.io/normal/front/3/a/3a163ec7-4c9a-4d45-965c-e5ddeb07a3e0.jpg?1736468379"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Ghoultree",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 288,
+            "tier_rating": "F",
+            "note": null,
+            "id": "9c99fe73-5fe1-4fcb-8099-73c4a6fd0d35",
+            "scryfall_uri": "https://scryfall.com/card/inr/198/ghoultree",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Zombie Treefolk",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/c/9c99fe73-5fe1-4fcb-8099-73c4a6fd0d35.jpg?1736468334",
+              "normal": "https://cards.scryfall.io/normal/front/9/c/9c99fe73-5fe1-4fcb-8099-73c4a6fd0d35.jpg?1736468334"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Spider Spawning",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 43,
+            "tier_rating": "A",
+            "note": null,
+            "id": "c229cbde-f370-4fef-8765-9773d516324a",
+            "scryfall_uri": "https://scryfall.com/card/inr/216/spider-spawning",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c229cbde-f370-4fef-8765-9773d516324a.jpg?1736468419",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c229cbde-f370-4fef-8765-9773d516324a.jpg?1736468419"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Splinterfright",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 171,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d4d5aafc-b1a6-4387-b9bf-59fca23fff94",
+            "scryfall_uri": "https://scryfall.com/card/inr/217/splinterfright",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elemental",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/4/d4d5aafc-b1a6-4387-b9bf-59fca23fff94.jpg?1736468424",
+              "normal": "https://cards.scryfall.io/normal/front/d/4/d4d5aafc-b1a6-4387-b9bf-59fca23fff94.jpg?1736468424"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Groundskeeper",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 168,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7bbc04ba-8814-4f6f-ab83-488aa5eb30c9",
+            "scryfall_uri": "https://scryfall.com/card/inr/200/groundskeeper",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7bbc04ba-8814-4f6f-ab83-488aa5eb30c9.jpg?1736473342",
+              "normal": "https://cards.scryfall.io/normal/front/7/b/7bbc04ba-8814-4f6f-ab83-488aa5eb30c9.jpg?1736473342"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{U}",
+        "name": "WU Spirits",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "No signpost uncommon; cheap fliers and tempo. Lean on Disturb and Apothecary Geist for value.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Apothecary Geist",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 157,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a79df1a1-6d60-4e5f-b4d8-668155836bb6",
+            "scryfall_uri": "https://scryfall.com/card/inr/10/apothecary-geist",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/7/a79df1a1-6d60-4e5f-b4d8-668155836bb6.jpg?1736467457",
+              "normal": "https://cards.scryfall.io/normal/front/a/7/a79df1a1-6d60-4e5f-b4d8-668155836bb6.jpg?1736467457"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Battleground Geist",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 161,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3507e285-fabb-45e3-af4c-52032558cf03",
+            "scryfall_uri": "https://scryfall.com/card/inr/53/battleground-geist",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/3507e285-fabb-45e3-af4c-52032558cf03.jpg?1737936143",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/3507e285-fabb-45e3-af4c-52032558cf03.jpg?1737936143"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Nebelgast Herald",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 68,
+            "tier_rating": "B",
+            "note": null,
+            "id": "51173564-cd0e-410f-82fc-3d071e6f4d17",
+            "scryfall_uri": "https://scryfall.com/card/inr/78/nebelgast-herald",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/1/51173564-cd0e-410f-82fc-3d071e6f4d17.jpg?1736467790",
+              "normal": "https://cards.scryfall.io/normal/front/5/1/51173564-cd0e-410f-82fc-3d071e6f4d17.jpg?1736467790"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Mausoleum Wanderer",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 220,
+            "tier_rating": "D",
+            "note": null,
+            "id": "f47bda42-8eb7-49c5-8f3b-e988e377a7f5",
+            "scryfall_uri": "https://scryfall.com/card/inr/74/mausoleum-wanderer",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/4/f47bda42-8eb7-49c5-8f3b-e988e377a7f5.jpg?1736467770",
+              "normal": "https://cards.scryfall.io/normal/front/f/4/f47bda42-8eb7-49c5-8f3b-e988e377a7f5.jpg?1736467770"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Tower Geist",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 231,
+            "tier_rating": "D",
+            "note": null,
+            "id": "88523d44-4469-4685-8f59-dbcf255e7fe0",
+            "scryfall_uri": "https://scryfall.com/card/inr/93/tower-geist",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88523d44-4469-4685-8f59-dbcf255e7fe0.jpg?1737775516",
+              "normal": "https://cards.scryfall.io/normal/front/8/8/88523d44-4469-4685-8f59-dbcf255e7fe0.jpg?1737775516"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Bound by Moonsilver",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 55,
+            "tier_rating": "A",
+            "note": null,
+            "id": "647f5c2f-3ced-4397-a366-6f0e57582566",
+            "scryfall_uri": "https://scryfall.com/card/inr/13/bound-by-moonsilver",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/647f5c2f-3ced-4397-a366-6f0e57582566.jpg?1737936147",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/647f5c2f-3ced-4397-a366-6f0e57582566.jpg?1737936147"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{G}{W}",
+        "name": "GW Humans / Tokens",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Join the Dance is the signpost. Limited human payoffs; rely on efficient creatures with removal.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Join the Dance",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 113,
+            "tier_rating": "C",
+            "note": null,
+            "id": "4a2d360c-1fad-4425-a1ab-5f713c45c7b3",
+            "scryfall_uri": "https://scryfall.com/card/inr/242/join-the-dance",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/a/4a2d360c-1fad-4425-a1ab-5f713c45c7b3.jpg?1736468526",
+              "normal": "https://cards.scryfall.io/normal/front/4/a/4a2d360c-1fad-4425-a1ab-5f713c45c7b3.jpg?1736468526"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Mayor of Avabruck",
+            "color": "G",
+            "rarity": "Rare",
+            "pick_order_rank": 23,
+            "tier_rating": "S",
+            "note": null,
+            "id": "ef84540b-a132-4169-b3c0-b0edeb395c9b",
+            "scryfall_uri": "https://scryfall.com/card/inr/207/mayor-of-avabruck-howlpack-alpha",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Advisor Werewolf // Creature — Werewolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef84540b-a132-4169-b3c0-b0edeb395c9b.jpg?1736468379",
+              "normal": "https://cards.scryfall.io/normal/front/e/f/ef84540b-a132-4169-b3c0-b0edeb395c9b.jpg?1736468379"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Hamlet Captain",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 169,
+            "tier_rating": "C",
+            "note": null,
+            "id": "06e5d76a-0cec-40e0-b694-2b5c8484f6c0",
+            "scryfall_uri": "https://scryfall.com/card/inr/201/hamlet-captain",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/06e5d76a-0cec-40e0-b694-2b5c8484f6c0.jpg?1736468348",
+              "normal": "https://cards.scryfall.io/normal/front/0/6/06e5d76a-0cec-40e0-b694-2b5c8484f6c0.jpg?1736468348"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Bound by Moonsilver",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 55,
+            "tier_rating": "A",
+            "note": null,
+            "id": "647f5c2f-3ced-4397-a366-6f0e57582566",
+            "scryfall_uri": "https://scryfall.com/card/inr/13/bound-by-moonsilver",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/647f5c2f-3ced-4397-a366-6f0e57582566.jpg?1737936147",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/647f5c2f-3ced-4397-a366-6f0e57582566.jpg?1737936147"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Clear Shot",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 70,
+            "tier_rating": "B",
+            "note": null,
+            "id": "88b8905b-68d3-491b-b7fe-eed74841e9a0",
+            "scryfall_uri": "https://scryfall.com/card/inr/188/clear-shot",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88b8905b-68d3-491b-b7fe-eed74841e9a0.jpg?1736468291",
+              "normal": "https://cards.scryfall.io/normal/front/8/8/88b8905b-68d3-491b-b7fe-eed74841e9a0.jpg?1736468291"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Travel Preparations",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 154,
+            "tier_rating": "C",
+            "note": null,
+            "id": "41190fb8-f5d5-4a8b-bdc8-a4516e7075b5",
+            "scryfall_uri": "https://scryfall.com/card/inr/220/travel-preparations",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/1/41190fb8-f5d5-4a8b-bdc8-a4516e7075b5.jpg?1736468435",
+              "normal": "https://cards.scryfall.io/normal/front/4/1/41190fb8-f5d5-4a8b-bdc8-a4516e7075b5.jpg?1736468435"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "UR Spells",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Wandering Mind is the signpost. Two builds: Prowess aggro (Delver of Secrets, Lantern Bearer, Silent Departure, Festival Crasher, Ancestral Anger) or Control (Seize the Storm, Think Twice, Syncopate, Tower Geist + removal).",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Wandering Mind",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 104,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b57491d9-ac52-4598-ac36-bed842f141a1",
+            "scryfall_uri": "https://scryfall.com/card/inr/252/wandering-mind",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b57491d9-ac52-4598-ac36-bed842f141a1.jpg?1736468562",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b57491d9-ac52-4598-ac36-bed842f141a1.jpg?1736468562"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Delver of Secrets",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 251,
+            "tier_rating": "D",
+            "note": null,
+            "id": "6904ea20-e504-47da-95a0-08739fdde260",
+            "scryfall_uri": "https://scryfall.com/card/inr/60/delver-of-secrets-insectile-aberration",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Wizard // Creature — Human Insect",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/6904ea20-e504-47da-95a0-08739fdde260.jpg?1736467707",
+              "normal": "https://cards.scryfall.io/normal/front/6/9/6904ea20-e504-47da-95a0-08739fdde260.jpg?1736467707"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Lantern Bearer",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 151,
+            "tier_rating": "C",
+            "note": null,
+            "id": "0e568af8-9ddf-4efd-92ec-74a54b811c03",
+            "scryfall_uri": "https://scryfall.com/card/inr/72/lantern-bearer-lanterns-lift",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit // Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/e/0e568af8-9ddf-4efd-92ec-74a54b811c03.jpg?1736467763",
+              "normal": "https://cards.scryfall.io/normal/front/0/e/0e568af8-9ddf-4efd-92ec-74a54b811c03.jpg?1736467763"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Silent Departure",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 175,
+            "tier_rating": "C",
+            "note": null,
+            "id": "4d1552e7-20b2-42b0-af47-6618ab163115",
+            "scryfall_uri": "https://scryfall.com/card/inr/84/silent-departure",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4d1552e7-20b2-42b0-af47-6618ab163115.jpg?1736467818",
+              "normal": "https://cards.scryfall.io/normal/front/4/d/4d1552e7-20b2-42b0-af47-6618ab163115.jpg?1736467818"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Festival Crasher",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 119,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d8d050c1-ae0c-46c1-8aa7-7cde4606105b",
+            "scryfall_uri": "https://scryfall.com/card/inr/153/festival-crasher",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Devil",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d8d050c1-ae0c-46c1-8aa7-7cde4606105b.jpg?1736468136",
+              "normal": "https://cards.scryfall.io/normal/front/d/8/d8d050c1-ae0c-46c1-8aa7-7cde4606105b.jpg?1736468136"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Ancestral Anger",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 236,
+            "tier_rating": "D",
+            "note": null,
+            "id": "eeaca66d-23bd-4e8f-8d4a-c5864dd447be",
+            "scryfall_uri": "https://scryfall.com/card/inr/141/ancestral-anger",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/eeaca66d-23bd-4e8f-8d4a-c5864dd447be.jpg?1736468086",
+              "normal": "https://cards.scryfall.io/normal/front/e/e/eeaca66d-23bd-4e8f-8d4a-c5864dd447be.jpg?1736468086"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Seize the Storm",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 91,
+            "tier_rating": "B",
+            "note": null,
+            "id": "45ec2af6-8397-429f-900f-846a5056f8e0",
+            "scryfall_uri": "https://scryfall.com/card/inr/170/seize-the-storm",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/5/45ec2af6-8397-429f-900f-846a5056f8e0.jpg?1737775512",
+              "normal": "https://cards.scryfall.io/normal/front/4/5/45ec2af6-8397-429f-900f-846a5056f8e0.jpg?1737775512"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Think Twice",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 152,
+            "tier_rating": "C",
+            "note": null,
+            "id": "35471afe-e14c-48f4-b901-297111be9c23",
+            "scryfall_uri": "https://scryfall.com/card/inr/92/think-twice",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35471afe-e14c-48f4-b901-297111be9c23.jpg?1736467855",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/35471afe-e14c-48f4-b901-297111be9c23.jpg?1736467855"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Syncopate",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 177,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9aebd769-7ae3-4dac-81ea-458061762cce",
+            "scryfall_uri": "https://scryfall.com/card/inr/89/syncopate",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/a/9aebd769-7ae3-4dac-81ea-458061762cce.jpg?1736467840",
+              "normal": "https://cards.scryfall.io/normal/front/9/a/9aebd769-7ae3-4dac-81ea-458061762cce.jpg?1736467840"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Aggro / Tokens",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Markov Waltzer is the signpost. Focus on efficient curve and combat tricks.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Markov Waltzer",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 103,
+            "tier_rating": "B",
+            "note": null,
+            "id": "231f4da2-8756-4f99-a46f-b8afe9adb80d",
+            "scryfall_uri": "https://scryfall.com/card/inr/245/markov-waltzer",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/3/231f4da2-8756-4f99-a46f-b8afe9adb80d.jpg?1736468539",
+              "normal": "https://cards.scryfall.io/normal/front/2/3/231f4da2-8756-4f99-a46f-b8afe9adb80d.jpg?1736468539"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Thraben Inspector",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 134,
+            "tier_rating": "C",
+            "note": null,
+            "id": "08a5007f-06a0-40fa-a252-c38baa6b5c6f",
+            "scryfall_uri": "https://scryfall.com/card/inr/45/thraben-inspector",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608",
+              "normal": "https://cards.scryfall.io/normal/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Avacynian Priest",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 202,
+            "tier_rating": "D",
+            "note": null,
+            "id": "c119b314-c563-4b6b-8bac-a680e69c6b37",
+            "scryfall_uri": "https://scryfall.com/card/inr/12/avacynian-priest",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c119b314-c563-4b6b-8bac-a680e69c6b37.jpg?1736467469",
+              "normal": "https://cards.scryfall.io/normal/front/c/1/c119b314-c563-4b6b-8bac-a680e69c6b37.jpg?1736467469"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Guardian of Pilgrims",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 172,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f87b5e18-d1a9-424b-bec5-6a80f7699600",
+            "scryfall_uri": "https://scryfall.com/card/inr/26/guardian-of-pilgrims",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Spirit Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f87b5e18-d1a9-424b-bec5-6a80f7699600.jpg?1736467516",
+              "normal": "https://cards.scryfall.io/normal/front/f/8/f87b5e18-d1a9-424b-bec5-6a80f7699600.jpg?1736467516"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Dauntless Cathar",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 114,
+            "tier_rating": "C",
+            "note": null,
+            "id": "b680d42c-8198-43b0-b934-2add08a02bbc",
+            "scryfall_uri": "https://scryfall.com/card/inr/19/dauntless-cathar",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b680d42c-8198-43b0-b934-2add08a02bbc.jpg?1736467496",
+              "normal": "https://cards.scryfall.io/normal/front/b/6/b680d42c-8198-43b0-b934-2add08a02bbc.jpg?1736467496"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Inspiring Captain",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 281,
+            "tier_rating": "F",
+            "note": null,
+            "id": "fb56d6ab-50bf-4407-9f30-595ef7ae9492",
+            "scryfall_uri": "https://scryfall.com/card/inr/28/inspiring-captain",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/b/fb56d6ab-50bf-4407-9f30-595ef7ae9492.jpg?1736467523",
+              "normal": "https://cards.scryfall.io/normal/front/f/b/fb56d6ab-50bf-4407-9f30-595ef7ae9492.jpg?1736467523"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Blood Petal Celebrant",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 165,
+            "tier_rating": "C",
+            "note": null,
+            "id": "96db3d95-c0b8-42ff-956c-837f5f9cd40d",
+            "scryfall_uri": "https://scryfall.com/card/inr/144/blood-petal-celebrant",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/96db3d95-c0b8-42ff-956c-837f5f9cd40d.jpg?1736468095",
+              "normal": "https://cards.scryfall.io/normal/front/9/6/96db3d95-c0b8-42ff-956c-837f5f9cd40d.jpg?1736468095"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Village Messenger",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 199,
+            "tier_rating": "D",
+            "note": null,
+            "id": "8bdc98cd-d03a-4c24-8642-b9ffb1f144c6",
+            "scryfall_uri": "https://scryfall.com/card/inr/179/village-messenger-moonrise-intruder",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/b/8bdc98cd-d03a-4c24-8642-b9ffb1f144c6.jpg?1737775526",
+              "normal": "https://cards.scryfall.io/normal/front/8/b/8bdc98cd-d03a-4c24-8642-b9ffb1f144c6.jpg?1737775526"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Voldaren Duelist",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 127,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7e2df669-a996-4692-9c04-7ba236595076",
+            "scryfall_uri": "https://scryfall.com/card/inr/181/voldaren-duelist",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Vampire Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7e2df669-a996-4692-9c04-7ba236595076.jpg?1736468262",
+              "normal": "https://cards.scryfall.io/normal/front/7/e/7e2df669-a996-4692-9c04-7ba236595076.jpg?1736468262"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_4": [
+      {
+        "colors": "{B}{G}",
+        "name": "BG Morbid",
+        "tier": "Tier 4 — Weak Archetype",
+        "strategy": "Only 4 morbid cards (Tragic Slip, Festerhide Boar, Morkrut Banshee, Skirsdag High Priest). Alternative: graveyard strategy with Spider Spawning, Splinterfright.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Tragic Slip",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 252,
+            "tier_rating": "D",
+            "note": null,
+            "id": "132ccc20-cb42-4474-b747-7e41a661060e",
+            "scryfall_uri": "https://scryfall.com/card/inr/134/tragic-slip",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/132ccc20-cb42-4474-b747-7e41a661060e.jpg?1736468053",
+              "normal": "https://cards.scryfall.io/normal/front/1/3/132ccc20-cb42-4474-b747-7e41a661060e.jpg?1736468053"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Festerhide Boar",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 213,
+            "tier_rating": "D",
+            "note": null,
+            "id": "b401dba6-c26e-45c1-b10a-12116fb1cb4e",
+            "scryfall_uri": "https://scryfall.com/card/inr/196/festerhide-boar",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Boar",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b401dba6-c26e-45c1-b10a-12116fb1cb4e.jpg?1736468325",
+              "normal": "https://cards.scryfall.io/normal/front/b/4/b401dba6-c26e-45c1-b10a-12116fb1cb4e.jpg?1736468325"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Morkrut Banshee",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 90,
+            "tier_rating": "B",
+            "note": null,
+            "id": "14ab7063-1704-4c56-a58d-4f4287299bd7",
+            "scryfall_uri": "https://scryfall.com/card/inr/125/morkrut-banshee",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/14ab7063-1704-4c56-a58d-4f4287299bd7.jpg?1736473391",
+              "normal": "https://cards.scryfall.io/normal/front/1/4/14ab7063-1704-4c56-a58d-4f4287299bd7.jpg?1736473391"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Skirsdag High Priest",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 65,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7a329b20-4e6e-45c9-aee0-51fe81dce543",
+            "scryfall_uri": "https://scryfall.com/card/inr/132/skirsdag-high-priest",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a329b20-4e6e-45c9-aee0-51fe81dce543.jpg?1736468045",
+              "normal": "https://cards.scryfall.io/normal/front/7/a/7a329b20-4e6e-45c9-aee0-51fe81dce543.jpg?1736468045"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Spider Spawning",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 43,
+            "tier_rating": "A",
+            "note": null,
+            "id": "c229cbde-f370-4fef-8765-9773d516324a",
+            "scryfall_uri": "https://scryfall.com/card/inr/216/spider-spawning",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c229cbde-f370-4fef-8765-9773d516324a.jpg?1736468419",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c229cbde-f370-4fef-8765-9773d516324a.jpg?1736468419"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Splinterfright",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 171,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d4d5aafc-b1a6-4387-b9bf-59fca23fff94",
+            "scryfall_uri": "https://scryfall.com/card/inr/217/splinterfright",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elemental",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/4/d4d5aafc-b1a6-4387-b9bf-59fca23fff94.jpg?1736468424",
+              "normal": "https://cards.scryfall.io/normal/front/d/4/d4d5aafc-b1a6-4387-b9bf-59fca23fff94.jpg?1736468424"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "RG Werewolves",
+        "tier": "Tier 4 — Weakest Pair",
+        "strategy": "No signpost uncommon; weaker archetype with limited payoffs. Focus on a generic stompy plan.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Runebound Wolf",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 126,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8e220cc1-e13f-48da-b59b-91a556829ea5",
+            "scryfall_uri": "https://scryfall.com/card/inr/168/runebound-wolf",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Wolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8e220cc1-e13f-48da-b59b-91a556829ea5.jpg?1736468206",
+              "normal": "https://cards.scryfall.io/normal/front/8/e/8e220cc1-e13f-48da-b59b-91a556829ea5.jpg?1736468206"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Ulrich's Kindred",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 80,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a461ca76-ce52-4f6a-bbc0-601c683eaaa0",
+            "scryfall_uri": "https://scryfall.com/card/inr/176/ulrichs-kindred",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Wolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a461ca76-ce52-4f6a-bbc0-601c683eaaa0.jpg?1736468238",
+              "normal": "https://cards.scryfall.io/normal/front/a/4/a461ca76-ce52-4f6a-bbc0-601c683eaaa0.jpg?1736468238"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Howlpack Resurgence",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 273,
+            "tier_rating": "F",
+            "note": null,
+            "id": "c0dc4c08-ed18-454b-b061-8901c253005c",
+            "scryfall_uri": "https://scryfall.com/card/inr/204/howlpack-resurgence",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0dc4c08-ed18-454b-b061-8901c253005c.jpg?1736468363",
+              "normal": "https://cards.scryfall.io/normal/front/c/0/c0dc4c08-ed18-454b-b061-8901c253005c.jpg?1736468363"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          },
+          {
+            "name": "Moonlight Hunt",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 250,
+            "tier_rating": "D",
+            "note": null,
+            "id": "6d36aecd-4bd8-4350-9161-e6feecc09bb9",
+            "scryfall_uri": "https://scryfall.com/card/inr/209/moonlight-hunt",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d36aecd-4bd8-4350-9161-e6feecc09bb9.jpg?1736468386",
+              "normal": "https://cards.scryfall.io/normal/front/6/d/6d36aecd-4bd8-4350-9161-e6feecc09bb9.jpg?1736468386"
+            },
+            "set": "inr",
+            "set_name": "Innistrad Remastered"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Bound by Moonsilver",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 55,
+        "tier_rating": "A",
+        "note": "Flexible removal with sacrifice synergies.",
+        "id": "647f5c2f-3ced-4397-a366-6f0e57582566",
+        "scryfall_uri": "https://scryfall.com/card/inr/13/bound-by-moonsilver",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/647f5c2f-3ced-4397-a366-6f0e57582566.jpg?1737936147",
+          "normal": "https://cards.scryfall.io/normal/front/6/4/647f5c2f-3ced-4397-a366-6f0e57582566.jpg?1737936147"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Thraben Inspector",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 134,
+        "tier_rating": "C",
+        "note": "Cantripping creature.",
+        "id": "08a5007f-06a0-40fa-a252-c38baa6b5c6f",
+        "scryfall_uri": "https://scryfall.com/card/inr/45/thraben-inspector",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608",
+          "normal": "https://cards.scryfall.io/normal/front/0/8/08a5007f-06a0-40fa-a252-c38baa6b5c6f.jpg?1736467608"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Avacynian Priest",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 202,
+        "tier_rating": "D",
+        "note": "Efficient tapper.",
+        "id": "c119b314-c563-4b6b-8bac-a680e69c6b37",
+        "scryfall_uri": "https://scryfall.com/card/inr/12/avacynian-priest",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c119b314-c563-4b6b-8bac-a680e69c6b37.jpg?1736467469",
+          "normal": "https://cards.scryfall.io/normal/front/c/1/c119b314-c563-4b6b-8bac-a680e69c6b37.jpg?1736467469"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Dauntless Cathar",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 114,
+        "tier_rating": "C",
+        "note": "Trades well, graveyard synergy.",
+        "id": "b680d42c-8198-43b0-b934-2add08a02bbc",
+        "scryfall_uri": "https://scryfall.com/card/inr/19/dauntless-cathar",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b680d42c-8198-43b0-b934-2add08a02bbc.jpg?1736467496",
+          "normal": "https://cards.scryfall.io/normal/front/b/6/b680d42c-8198-43b0-b934-2add08a02bbc.jpg?1736467496"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Tower Geist",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 231,
+        "tier_rating": "D",
+        "note": "Spirit 2-for-1.",
+        "id": "88523d44-4469-4685-8f59-dbcf255e7fe0",
+        "scryfall_uri": "https://scryfall.com/card/inr/93/tower-geist",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Spirit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88523d44-4469-4685-8f59-dbcf255e7fe0.jpg?1737775516",
+          "normal": "https://cards.scryfall.io/normal/front/8/8/88523d44-4469-4685-8f59-dbcf255e7fe0.jpg?1737775516"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Wretched Gryff",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 133,
+        "tier_rating": "C",
+        "note": "Fat flier via emerge.",
+        "id": "722b519a-715d-4393-9d3c-97f329896ef4",
+        "scryfall_uri": "https://scryfall.com/card/inr/7/wretched-gryff",
+        "colors": [],
+        "type_line": "Creature — Eldrazi Hippogriff",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/2/722b519a-715d-4393-9d3c-97f329896ef4.jpg?1736467441",
+          "normal": "https://cards.scryfall.io/normal/front/7/2/722b519a-715d-4393-9d3c-97f329896ef4.jpg?1736467441"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Stitched Mangler",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 176,
+        "tier_rating": "C",
+        "note": "Freeze creature.",
+        "id": "e90cb0f1-d6fa-4a73-83bb-8870e59b1d7d",
+        "scryfall_uri": "https://scryfall.com/card/inr/87/stitched-mangler",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Zombie Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e90cb0f1-d6fa-4a73-83bb-8870e59b1d7d.jpg?1736467832",
+          "normal": "https://cards.scryfall.io/normal/front/e/9/e90cb0f1-d6fa-4a73-83bb-8870e59b1d7d.jpg?1736467832"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Think Twice",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 152,
+        "tier_rating": "C",
+        "note": "Card draw / mana efficiency.",
+        "id": "35471afe-e14c-48f4-b901-297111be9c23",
+        "scryfall_uri": "https://scryfall.com/card/inr/92/think-twice",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35471afe-e14c-48f4-b901-297111be9c23.jpg?1736467855",
+          "normal": "https://cards.scryfall.io/normal/front/3/5/35471afe-e14c-48f4-b901-297111be9c23.jpg?1736467855"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Murderous Compulsion",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 178,
+        "tier_rating": "C",
+        "note": "Madness removal with 2-for-1 potential.",
+        "id": "5fca1faf-bd47-45cd-a2d9-b2efbc75cbb5",
+        "scryfall_uri": "https://scryfall.com/card/inr/126/murderous-compulsion",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/f/5fca1faf-bd47-45cd-a2d9-b2efbc75cbb5.jpg?1736468021",
+          "normal": "https://cards.scryfall.io/normal/front/5/f/5fca1faf-bd47-45cd-a2d9-b2efbc75cbb5.jpg?1736468021"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Gisa's Bidding",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 89,
+        "tier_rating": "B",
+        "note": "Tokens with upside.",
+        "id": "5ad2fdbf-4a68-42e8-9c4f-7a075261ddf8",
+        "scryfall_uri": "https://scryfall.com/card/inr/111/gisas-bidding",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5ad2fdbf-4a68-42e8-9c4f-7a075261ddf8.jpg?1737936164",
+          "normal": "https://cards.scryfall.io/normal/front/5/a/5ad2fdbf-4a68-42e8-9c4f-7a075261ddf8.jpg?1737936164"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Eaten Alive",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 118,
+        "tier_rating": "C",
+        "note": "Flexible removal.",
+        "id": "143d278d-d99b-42da-9fbd-9ab70526d53a",
+        "scryfall_uri": "https://scryfall.com/card/inr/106/eaten-alive",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/143d278d-d99b-42da-9fbd-9ab70526d53a.jpg?1736467937",
+          "normal": "https://cards.scryfall.io/normal/front/1/4/143d278d-d99b-42da-9fbd-9ab70526d53a.jpg?1736467937"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Village Rites",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 209,
+        "tier_rating": "D",
+        "note": "Sacrifice outlet / draw.",
+        "id": "42ed35e9-51cd-468a-86a9-9412553cf50d",
+        "scryfall_uri": "https://scryfall.com/card/inr/137/village-rites",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/42ed35e9-51cd-468a-86a9-9412553cf50d.jpg?1736468066",
+          "normal": "https://cards.scryfall.io/normal/front/4/2/42ed35e9-51cd-468a-86a9-9412553cf50d.jpg?1736468066"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Abrade",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 85,
+        "tier_rating": "B",
+        "note": "Versatile removal (creature or artifact).",
+        "id": "fee393c7-1868-4d11-93c3-3d143e0c8dd9",
+        "scryfall_uri": "https://scryfall.com/card/inr/139/abrade",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fee393c7-1868-4d11-93c3-3d143e0c8dd9.jpg?1736468077",
+          "normal": "https://cards.scryfall.io/normal/front/f/e/fee393c7-1868-4d11-93c3-3d143e0c8dd9.jpg?1736468077"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Alchemist's Greeting",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 78,
+        "tier_rating": "B",
+        "note": "Madness burn.",
+        "id": "f36e2146-b6a9-4b61-9ccf-969a2c79b747",
+        "scryfall_uri": "https://scryfall.com/card/inr/140/alchemists-greeting",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f36e2146-b6a9-4b61-9ccf-969a2c79b747.jpg?1736468080",
+          "normal": "https://cards.scryfall.io/normal/front/f/3/f36e2146-b6a9-4b61-9ccf-969a2c79b747.jpg?1736468080"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Faithless Looting",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 221,
+        "tier_rating": "D",
+        "note": "Madness enabler.",
+        "id": "52e47757-0aa9-48b0-8b43-e2483d7eed67",
+        "scryfall_uri": "https://scryfall.com/card/inr/151/faithless-looting",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/52e47757-0aa9-48b0-8b43-e2483d7eed67.jpg?1736468128",
+          "normal": "https://cards.scryfall.io/normal/front/5/2/52e47757-0aa9-48b0-8b43-e2483d7eed67.jpg?1736468128"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Conduit of Storms",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 98,
+        "tier_rating": "B",
+        "note": "Transform DFC.",
+        "id": "a60c3aa0-9c6b-4fb2-8ece-b9a02c64c1cf",
+        "scryfall_uri": "https://scryfall.com/card/inr/150/conduit-of-storms-conduit-of-emrakul",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Werewolf Horror // Creature — Eldrazi Werewolf",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a60c3aa0-9c6b-4fb2-8ece-b9a02c64c1cf.jpg?1737936178",
+          "normal": "https://cards.scryfall.io/normal/front/a/6/a60c3aa0-9c6b-4fb2-8ece-b9a02c64c1cf.jpg?1737936178"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Eccentric Farmer",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": "Self-mill enabler.",
+        "id": "fe2a1718-eae1-4330-b494-c3088b992aae",
+        "scryfall_uri": "https://scryfall.com/card/inr/194/eccentric-farmer",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Peasant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe2a1718-eae1-4330-b494-c3088b992aae.jpg?1736468317",
+          "normal": "https://cards.scryfall.io/normal/front/f/e/fe2a1718-eae1-4330-b494-c3088b992aae.jpg?1736468317"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Bramble Wurm",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 146,
+        "tier_rating": "C",
+        "note": "Fat creature for milling.",
+        "id": "7ed00113-a0d7-4825-b066-f911a1ffb900",
+        "scryfall_uri": "https://scryfall.com/card/inr/187/bramble-wurm",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Wurm",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7ed00113-a0d7-4825-b066-f911a1ffb900.jpg?1737775521",
+          "normal": "https://cards.scryfall.io/normal/front/7/e/7ed00113-a0d7-4825-b066-f911a1ffb900.jpg?1737775521"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Spore Crawler",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 148,
+        "tier_rating": "C",
+        "note": "Utility creature.",
+        "id": "a2a37c40-6d33-4e32-ab7b-4a7c2d10b757",
+        "scryfall_uri": "https://scryfall.com/card/inr/218/spore-crawler",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Fungus",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a2a37c40-6d33-4e32-ab7b-4a7c2d10b757.jpg?1736468427",
+          "normal": "https://cards.scryfall.io/normal/front/a/2/a2a37c40-6d33-4e32-ab7b-4a7c2d10b757.jpg?1736468427"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Scorned Villager",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 200,
+        "tier_rating": "D",
+        "note": "Transform DFC ramp.",
+        "id": "ee539a5e-2d10-4666-9b52-5064562dd233",
+        "scryfall_uri": "https://scryfall.com/card/inr/212/scorned-villager-moonscarred-werewolf",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee539a5e-2d10-4666-9b52-5064562dd233.jpg?1736468401",
+          "normal": "https://cards.scryfall.io/normal/front/e/e/ee539a5e-2d10-4666-9b52-5064562dd233.jpg?1736468401"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ]
+  },
+  "top_uncommons_by_color": {
+    "{W} White": [
+      {
+        "name": "Lingering Souls",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 41,
+        "tier_rating": "A",
+        "note": "2-for-1 spirits.",
+        "id": "09cd56b2-1987-40c2-a436-5f3cbc564f1c",
+        "scryfall_uri": "https://scryfall.com/card/inr/30/lingering-souls",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09cd56b2-1987-40c2-a436-5f3cbc564f1c.jpg?1736467529",
+          "normal": "https://cards.scryfall.io/normal/front/0/9/09cd56b2-1987-40c2-a436-5f3cbc564f1c.jpg?1736467529"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Ambitious Farmhand",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 72,
+        "tier_rating": "B",
+        "note": "Transform.",
+        "id": "36cb9b12-98a3-4770-9ae0-a3b02f057c2e",
+        "scryfall_uri": "https://scryfall.com/card/inr/8/ambitious-farmhand-seasoned-cathar",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Peasant // Creature — Human Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/6/36cb9b12-98a3-4770-9ae0-a3b02f057c2e.jpg?1736467448",
+          "normal": "https://cards.scryfall.io/normal/front/3/6/36cb9b12-98a3-4770-9ae0-a3b02f057c2e.jpg?1736467448"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Fiend Hunter",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 56,
+        "tier_rating": "A",
+        "note": "ETB removal.",
+        "id": "f606cf4d-e29b-415a-956c-b148045c44e9",
+        "scryfall_uri": "https://scryfall.com/card/inr/22/fiend-hunter",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/6/f606cf4d-e29b-415a-956c-b148045c44e9.jpg?1736467504",
+          "normal": "https://cards.scryfall.io/normal/front/f/6/f606cf4d-e29b-415a-956c-b148045c44e9.jpg?1736467504"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Subjugator Angel",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 123,
+        "tier_rating": "C",
+        "note": "Flying with utility.",
+        "id": "bb89585f-0c68-42e6-8115-07d5752f6c1c",
+        "scryfall_uri": "https://scryfall.com/card/inr/43/subjugator-angel",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Angel",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bb89585f-0c68-42e6-8115-07d5752f6c1c.jpg?1736467595",
+          "normal": "https://cards.scryfall.io/normal/front/b/b/bb89585f-0c68-42e6-8115-07d5752f6c1c.jpg?1736467595"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Mist Raven",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 117,
+        "tier_rating": "C",
+        "note": "Bounce.",
+        "id": "557b7e56-36f7-489c-a0fe-039c463f8bc5",
+        "scryfall_uri": "https://scryfall.com/card/inr/76/mist-raven",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Bird",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/557b7e56-36f7-489c-a0fe-039c463f8bc5.jpg?1736467778",
+          "normal": "https://cards.scryfall.io/normal/front/5/5/557b7e56-36f7-489c-a0fe-039c463f8bc5.jpg?1736467778"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Compelling Deterrence",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 115,
+        "tier_rating": "C",
+        "note": "Conditional bounce.",
+        "id": "62ffc952-b763-4b9e-acdf-164253bdfe72",
+        "scryfall_uri": "https://scryfall.com/card/inr/57/compelling-deterrence",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/62ffc952-b763-4b9e-acdf-164253bdfe72.jpg?1736467685",
+          "normal": "https://cards.scryfall.io/normal/front/6/2/62ffc952-b763-4b9e-acdf-164253bdfe72.jpg?1736467685"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Biolume Egg",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 173,
+        "tier_rating": "C",
+        "note": "Self-mill.",
+        "id": "009c8a91-8c73-4e3f-9955-45344ae07832",
+        "scryfall_uri": "https://scryfall.com/card/inr/54/biolume-egg-biolume-serpent",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Serpent Egg // Creature — Serpent",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/009c8a91-8c73-4e3f-9955-45344ae07832.jpg?1736467665",
+          "normal": "https://cards.scryfall.io/normal/front/0/0/009c8a91-8c73-4e3f-9955-45344ae07832.jpg?1736467665"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Cackling Counterpart",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 83,
+        "tier_rating": "B",
+        "note": "Creature duplication.",
+        "id": "a865fdc5-955a-4c4a-90c0-342c15fd7bbc",
+        "scryfall_uri": "https://scryfall.com/card/inr/55/cackling-counterpart",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/8/a865fdc5-955a-4c4a-90c0-342c15fd7bbc.jpg?1736467672",
+          "normal": "https://cards.scryfall.io/normal/front/a/8/a865fdc5-955a-4c4a-90c0-342c15fd7bbc.jpg?1736467672"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Sever the Bloodline",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 47,
+        "tier_rating": "A",
+        "note": "Recurring removal.",
+        "id": "a2d4152d-c128-453c-86f5-f2ebcfd48b98",
+        "scryfall_uri": "https://scryfall.com/card/inr/130/sever-the-bloodline",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a2d4152d-c128-453c-86f5-f2ebcfd48b98.jpg?1736473279",
+          "normal": "https://cards.scryfall.io/normal/front/a/2/a2d4152d-c128-453c-86f5-f2ebcfd48b98.jpg?1736473279"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Infernal Grasp",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 57,
+        "tier_rating": "A",
+        "note": "Efficient kill.",
+        "id": "e2b74630-1768-4b02-b7ca-37cd35ede6cf",
+        "scryfall_uri": "https://scryfall.com/card/inr/119/infernal-grasp",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e2b74630-1768-4b02-b7ca-37cd35ede6cf.jpg?1736467989",
+          "normal": "https://cards.scryfall.io/normal/front/e/2/e2b74630-1768-4b02-b7ca-37cd35ede6cf.jpg?1736467989"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Morbid Opportunist",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 77,
+        "tier_rating": "B",
+        "note": "Sacrifice synergy.",
+        "id": "1bfd3be4-2cea-4a88-a55f-e6ebeecd4c96",
+        "scryfall_uri": "https://scryfall.com/card/inr/124/morbid-opportunist",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1bfd3be4-2cea-4a88-a55f-e6ebeecd4c96.jpg?1736468013",
+          "normal": "https://cards.scryfall.io/normal/front/1/b/1bfd3be4-2cea-4a88-a55f-e6ebeecd4c96.jpg?1736468013"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Asylum Visitor",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 143,
+        "tier_rating": "C",
+        "note": "Madness payoff.",
+        "id": "02046824-6c48-40bb-9f0b-4fd280c6ed85",
+        "scryfall_uri": "https://scryfall.com/card/inr/96/asylum-visitor",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Vampire Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02046824-6c48-40bb-9f0b-4fd280c6ed85.jpg?1736473224",
+          "normal": "https://cards.scryfall.io/normal/front/0/2/02046824-6c48-40bb-9f0b-4fd280c6ed85.jpg?1736473224"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Fiery Temper",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 54,
+        "tier_rating": "A",
+        "note": "Madness burn.",
+        "id": "1d3a3a1d-c393-4a57-8a0e-5907d1722331",
+        "scryfall_uri": "https://scryfall.com/card/inr/154/fiery-temper",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1d3a3a1d-c393-4a57-8a0e-5907d1722331.jpg?1736468138",
+          "normal": "https://cards.scryfall.io/normal/front/1/d/1d3a3a1d-c393-4a57-8a0e-5907d1722331.jpg?1736468138"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Lightning Axe",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 61,
+        "tier_rating": "A",
+        "note": "Madness removal.",
+        "id": "90911c79-24c3-4566-b72c-02ccde083f1b",
+        "scryfall_uri": "https://scryfall.com/card/inr/162/lightning-axe",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/90911c79-24c3-4566-b72c-02ccde083f1b.jpg?1736473361",
+          "normal": "https://cards.scryfall.io/normal/front/9/0/90911c79-24c3-4566-b72c-02ccde083f1b.jpg?1736473361"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Savage Alliance",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 35,
+        "tier_rating": "A",
+        "note": "Flexible removal.",
+        "id": "54bebcf4-7697-4b2d-9160-243cd447c1d4",
+        "scryfall_uri": "https://scryfall.com/card/inr/169/savage-alliance",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54bebcf4-7697-4b2d-9160-243cd447c1d4.jpg?1736468208",
+          "normal": "https://cards.scryfall.io/normal/front/5/4/54bebcf4-7697-4b2d-9160-243cd447c1d4.jpg?1736468208"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Stromkirk Occultist",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 62,
+        "tier_rating": "A",
+        "note": "Madness creature.",
+        "id": "b11fa9f0-82d1-4dd6-8f2d-45d73f908277",
+        "scryfall_uri": "https://scryfall.com/card/inr/173/stromkirk-occultist",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Vampire Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/1/b11fa9f0-82d1-4dd6-8f2d-45d73f908277.jpg?1736473327",
+          "normal": "https://cards.scryfall.io/normal/front/b/1/b11fa9f0-82d1-4dd6-8f2d-45d73f908277.jpg?1736473327"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Clear Shot",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 70,
+        "tier_rating": "B",
+        "note": "Combat trick removal.",
+        "id": "88b8905b-68d3-491b-b7fe-eed74841e9a0",
+        "scryfall_uri": "https://scryfall.com/card/inr/188/clear-shot",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88b8905b-68d3-491b-b7fe-eed74841e9a0.jpg?1736468291",
+          "normal": "https://cards.scryfall.io/normal/front/8/8/88b8905b-68d3-491b-b7fe-eed74841e9a0.jpg?1736468291"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Pack Guardian",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 71,
+        "tier_rating": "B",
+        "note": "Efficient creature.",
+        "id": "6265e9fa-3fc3-41c5-9950-cbeaae2e6187",
+        "scryfall_uri": "https://scryfall.com/card/inr/211/pack-guardian",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Wolf Spirit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/6265e9fa-3fc3-41c5-9950-cbeaae2e6187.jpg?1736468394",
+          "normal": "https://cards.scryfall.io/normal/front/6/2/6265e9fa-3fc3-41c5-9950-cbeaae2e6187.jpg?1736468394"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Duskwatch Recruiter",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 49,
+        "tier_rating": "A",
+        "note": "Transform value engine.",
+        "id": "4ef68479-ab2e-4a60-886c-ad007b64f185",
+        "scryfall_uri": "https://scryfall.com/card/inr/193/duskwatch-recruiter-krallenhorde-howler",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Warrior Werewolf // Creature — Werewolf",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4ef68479-ab2e-4a60-886c-ad007b64f185.jpg?1739519198",
+          "normal": "https://cards.scryfall.io/normal/front/4/e/4ef68479-ab2e-4a60-886c-ad007b64f185.jpg?1739519198"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      },
+      {
+        "name": "Noose Constrictor",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 111,
+        "tier_rating": "C",
+        "note": "Discard outlet.",
+        "id": "b432cccb-4291-46f3-a171-919adf8b95eb",
+        "scryfall_uri": "https://scryfall.com/card/inr/210/noose-constrictor",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Snake",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b432cccb-4291-46f3-a171-919adf8b95eb.jpg?1736468386",
+          "normal": "https://cards.scryfall.io/normal/front/b/4/b432cccb-4291-46f3-a171-919adf8b95eb.jpg?1736468386"
+        },
+        "set": "inr",
+        "set_name": "Innistrad Remastered"
+      }
+    ]
+  },
+  "notable_rares": [
+    {
+      "name": "Archangel Avacyn",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": null,
+      "id": "fe675f03-cbb5-4177-b7d7-64a30260ee2a",
+      "scryfall_uri": "https://scryfall.com/card/inr/11/archangel-avacyn-avacyn-the-purifier",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Creature — Angel // Legendary Creature — Angel",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe675f03-cbb5-4177-b7d7-64a30260ee2a.jpg?1736467464",
+        "normal": "https://cards.scryfall.io/normal/front/f/e/fe675f03-cbb5-4177-b7d7-64a30260ee2a.jpg?1736467464"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Gisela, the Broken Blade",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 7,
+      "tier_rating": "S",
+      "note": null,
+      "id": "04506bad-3856-4184-8dda-941ded60f41a",
+      "scryfall_uri": "https://scryfall.com/card/inr/24/gisela-the-broken-blade",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Creature — Angel Horror",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04506bad-3856-4184-8dda-941ded60f41a.jpg?1738701214",
+        "normal": "https://cards.scryfall.io/normal/front/0/4/04506bad-3856-4184-8dda-941ded60f41a.jpg?1738701214"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Jace, Unraveler of Secrets",
+      "color": "U",
+      "rarity": "Mythic",
+      "pick_order_rank": 2,
+      "tier_rating": "S",
+      "note": null,
+      "id": "3d9c8217-013d-4e75-bdd1-9c46c8467edb",
+      "scryfall_uri": "https://scryfall.com/card/inr/70/jace-unraveler-of-secrets",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Legendary Planeswalker — Jace",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d9c8217-013d-4e75-bdd1-9c46c8467edb.jpg?1736467756",
+        "normal": "https://cards.scryfall.io/normal/front/3/d/3d9c8217-013d-4e75-bdd1-9c46c8467edb.jpg?1736467756"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Snapcaster Mage",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 82,
+      "tier_rating": "B",
+      "note": null,
+      "id": "22b36ad5-bf4d-436a-9c3c-fa4acd0052fe",
+      "scryfall_uri": "https://scryfall.com/card/inr/478/snapcaster-mage",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Human Wizard",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/2/22b36ad5-bf4d-436a-9c3c-fa4acd0052fe.jpg?1736551138",
+        "normal": "https://cards.scryfall.io/normal/front/2/2/22b36ad5-bf4d-436a-9c3c-fa4acd0052fe.jpg?1736551138"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Bloodline Keeper",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 11,
+      "tier_rating": "S",
+      "note": null,
+      "id": "60658907-dd63-478d-a66a-123e4e9d2a00",
+      "scryfall_uri": "https://scryfall.com/card/inr/98/bloodline-keeper-lord-of-lineage",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Vampire // Creature — Vampire",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/0/60658907-dd63-478d-a66a-123e4e9d2a00.jpg?1738800571",
+        "normal": "https://cards.scryfall.io/normal/front/6/0/60658907-dd63-478d-a66a-123e4e9d2a00.jpg?1738800571"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Liliana of the Veil",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 30,
+      "tier_rating": "S",
+      "note": null,
+      "id": "efbb7256-9337-4183-8bda-a419f3f2c501",
+      "scryfall_uri": "https://scryfall.com/card/inr/475/liliana-of-the-veil",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Planeswalker — Liliana",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/efbb7256-9337-4183-8bda-a419f3f2c501.jpg?1736551720",
+        "normal": "https://cards.scryfall.io/normal/front/e/f/efbb7256-9337-4183-8bda-a419f3f2c501.jpg?1736551720"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Sorin, Imperious Bloodlord",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 63,
+      "tier_rating": "B",
+      "note": null,
+      "id": "219d3e48-e0b1-472d-ac45-11c14b292c9e",
+      "scryfall_uri": "https://scryfall.com/card/inr/133/sorin-imperious-bloodlord",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Planeswalker — Sorin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/219d3e48-e0b1-472d-ac45-11c14b292c9e.jpg?1736468052",
+        "normal": "https://cards.scryfall.io/normal/front/2/1/219d3e48-e0b1-472d-ac45-11c14b292c9e.jpg?1736468052"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "The Meathook Massacre",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 4,
+      "tier_rating": "S",
+      "note": null,
+      "id": "70d0540f-93c6-4af5-ab2d-65e6c03001c7",
+      "scryfall_uri": "https://scryfall.com/card/inr/122/the-meathook-massacre",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70d0540f-93c6-4af5-ab2d-65e6c03001c7.jpg?1762704818",
+        "normal": "https://cards.scryfall.io/normal/front/7/0/70d0540f-93c6-4af5-ab2d-65e6c03001c7.jpg?1762704818"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Craterhoof Behemoth",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 20,
+      "tier_rating": "S",
+      "note": null,
+      "id": "777bb4ba-a821-4a83-a9e2-8827e7eff98f",
+      "scryfall_uri": "https://scryfall.com/card/inr/480/craterhoof-behemoth",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Beast",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/777bb4ba-a821-4a83-a9e2-8827e7eff98f.jpg?1736551389",
+        "normal": "https://cards.scryfall.io/normal/front/7/7/777bb4ba-a821-4a83-a9e2-8827e7eff98f.jpg?1736551389"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Grimgrin, Corpse-Born",
+      "color": "UB",
+      "rarity": "Mythic",
+      "pick_order_rank": 37,
+      "tier_rating": "A",
+      "note": null,
+      "id": "3c257fe6-1038-4167-ae78-90309974b925",
+      "scryfall_uri": "https://scryfall.com/card/inr/239/grimgrin-corpse-born",
+      "colors": [
+        "B",
+        "U"
+      ],
+      "type_line": "Legendary Creature — Zombie Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3c257fe6-1038-4167-ae78-90309974b925.jpg?1736468513",
+        "normal": "https://cards.scryfall.io/normal/front/3/c/3c257fe6-1038-4167-ae78-90309974b925.jpg?1736468513"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Olivia Voldaren",
+      "color": "BR",
+      "rarity": "Mythic",
+      "pick_order_rank": 10,
+      "tier_rating": "S",
+      "note": null,
+      "id": "561d616c-df11-4144-acec-f9fe47efa5c7",
+      "scryfall_uri": "https://scryfall.com/card/inr/246/olivia-voldaren",
+      "colors": [
+        "B",
+        "R"
+      ],
+      "type_line": "Legendary Creature — Vampire",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/6/561d616c-df11-4144-acec-f9fe47efa5c7.jpg?1736468539",
+        "normal": "https://cards.scryfall.io/normal/front/5/6/561d616c-df11-4144-acec-f9fe47efa5c7.jpg?1736468539"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Arlinn Kord",
+      "color": "RG",
+      "rarity": "Mythic",
+      "pick_order_rank": 51,
+      "tier_rating": "A",
+      "note": null,
+      "id": "e72d7c11-2165-4c72-80f3-3c1a7b4b5572",
+      "scryfall_uri": "https://scryfall.com/card/inr/230/arlinn-kord-arlinn-embraced-by-the-moon",
+      "colors": [
+        "G",
+        "R"
+      ],
+      "type_line": "Legendary Planeswalker — Arlinn // Legendary Planeswalker — Arlinn",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e72d7c11-2165-4c72-80f3-3c1a7b4b5572.jpg?1736468478",
+        "normal": "https://cards.scryfall.io/normal/front/e/7/e72d7c11-2165-4c72-80f3-3c1a7b4b5572.jpg?1736468478"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    },
+    {
+      "name": "Wrenn and Seven",
+      "color": "G",
+      "rarity": "Mythic",
+      "pick_order_rank": 5,
+      "tier_rating": "S",
+      "note": null,
+      "id": "302f0dc1-88ab-4961-b78c-fbe7980dca18",
+      "scryfall_uri": "https://scryfall.com/card/inr/226/wrenn-and-seven",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Legendary Planeswalker — Wrenn",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/0/302f0dc1-88ab-4961-b78c-fbe7980dca18.jpg?1736468462",
+        "normal": "https://cards.scryfall.io/normal/front/3/0/302f0dc1-88ab-4961-b78c-fbe7980dca18.jpg?1736468462"
+      },
+      "set": "inr",
+      "set_name": "Innistrad Remastered"
+    }
+  ],
+  "general_tips": [
+    "BR Vampires/Madness is the strongest archetype — pivot into it if open.",
+    "Self-mill, madness, sacrifice, and token strategies all have real support; pure goodstuff piles are weaker.",
+    "Recognize your draft lane early and commit; INR rewards coherence.",
+    "Mana fixing exists (Evolving Wilds, Traveler's Amulet, Wild-Field Scarecrow) for 3-color builds.",
+    "Avoid forcing RG Werewolves or BG Morbid without strong signals — both lanes are thin.",
+    "Tower Geist and equivalent value creatures play in every blue deck."
+  ]
+}

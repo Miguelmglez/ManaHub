@@ -10,7 +10,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
@@ -36,7 +36,7 @@ class CollectionStatsSyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val authRepo: AuthRepository,
-    private val userPrefsDataStore: UserPreferencesDataStore,
+    private val syncPrefs: SyncPreferencesStore,
     private val statsDao: StatsDao,
     private val friendRepo: FriendRepository,
 ) : CoroutineWorker(appContext, workerParams) {
@@ -71,7 +71,7 @@ class CollectionStatsSyncWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val userId = authRepo.getCurrentUser()?.id ?: return Result.success()
 
-        val lastSync = userPrefsDataStore.getLastStatsSyncMillis(userId)
+        val lastSync = syncPrefs.getLastStatsSyncMillis(userId)
         if (System.currentTimeMillis() - lastSync < TWENTY_THREE_HOURS_MS) return Result.success()
 
         return try {
@@ -94,7 +94,7 @@ class CollectionStatsSyncWorker @AssistedInject constructor(
                 // guarding against a sign-out + sign-in that happened during the network call.
                 val currentUserId = authRepo.getCurrentUser()?.id
                 if (currentUserId == userId) {
-                    userPrefsDataStore.saveLastStatsSyncMillis(userId, System.currentTimeMillis())
+                    syncPrefs.saveLastStatsSyncMillis(userId, System.currentTimeMillis())
                 }
                 Result.success()
             } else {

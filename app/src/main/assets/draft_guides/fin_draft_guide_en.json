@@ -1,0 +1,2168 @@
+{
+  "metadata": {
+    "set_name": "Final Fantasy",
+    "set_code": "FIN",
+    "source_url": "https://draftsim.com/mtg-fin-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Draftsim",
+    "last_updated": "2026-05-16"
+  },
+  "set_overview": {
+    "summary": "Final Fantasy is a high-synergy set with well-balanced archetypes. Success requires drafting coherent, synergistic decks rather than relying on bombs or 5-color piles. The format mostly plays as a 2-color synergy environment, with GUx (Towns/Ramp) being the main splash-friendly archetype.",
+    "color_ranking": [
+      "{U} Blue",
+      "{G} Green",
+      "{B} Black",
+      "{W} White",
+      "{R} Red"
+    ],
+    "color_notes": {
+      "{U} Blue": "Strong tempo and noncreature-spell synergies. Anchors UR Big Spells (tier 1) and contributes to WU Artifacts/Skies and UB Control. Deep removal/tempo tools (Ice Magic, Thunder Magic, Syncopate).",
+      "{G} Green": "Ramp, fatties, and the Towns/Ramp engine. Best fixing access via Travel the Overworld. Anchors BG Graveyard (tier 1).",
+      "{B} Black": "Deep removal pool plus graveyard/sacrifice synergies. Cloud of Darkness is the single best signpost uncommon in the set.",
+      "{W} White": "Solid creatures and equipment, especially in RW and WU. Job Select equipment plays a starring role.",
+      "{R} Red": "The worst color in the set. Limited wizard support for BR, and RG Landfall is weakly supported. Still has efficient burn and Choco-Comet/Thunder Magic for spell decks."
+    },
+    "key_gameplay_notes": [
+      "Format is mostly 2-color; only GUx splashes more thanks to dual-land synergies.",
+      "Synergy beats bombs — pure goodstuff piles underperform coherent archetypes.",
+      "Unconditional removal (Sephiroth's Intervention, Fate of the Sun-Cryst) is worth splashing.",
+      "Job Select equipment is generally solid and fits most decks.",
+      "Tiered spells (Thunder Magic, Ice Magic, Fire Magic) reward casting at the highest tier; pair with UR Big Spells payoffs."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Legendaries",
+      "summary": "The set has many legendary creatures but limited \"legends matter\" payoffs. Venat, Heart of Hydaelyn is an excellent rate due to how easy it is to trigger.",
+      "performance": "Legendaries are pushed individually rather than as a tribal theme.",
+      "key_examples": [
+        {
+          "name": "Venat, Heart of Hydaelyn",
+          "color": "W",
+          "rarity": "Rare",
+          "pick_order_rank": 103,
+          "tier_rating": "B",
+          "note": null,
+          "id": "2625c00d-0a51-4481-bf36-cf13a2546242",
+          "scryfall_uri": "https://scryfall.com/card/fin/39/venat-heart-of-hydaelyn-hydaelyn-the-mothercrystal",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Legendary Creature — Elder Wizard // Legendary Creature — God",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/6/2625c00d-0a51-4481-bf36-cf13a2546242.jpg?1748707803",
+            "normal": "https://cards.scryfall.io/normal/front/2/6/2625c00d-0a51-4481-bf36-cf13a2546242.jpg?1748707803"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    },
+    {
+      "name": "Job Select",
+      "summary": "Equipment-style cards offering dual functionality: enter as an equipment or use the alternate mode. Job Select cards are generally pretty solid and slot into most decks.",
+      "performance": "Reliable role-players across all archetypes; standouts in RW and WU.",
+      "key_examples": [
+        {
+          "name": "Samurai's Katana",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 28,
+          "tier_rating": "A",
+          "note": null,
+          "id": "11f1d378-c78c-402a-ac46-2d32598c23e7",
+          "scryfall_uri": "https://scryfall.com/card/fin/154/samurais-katana",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Artifact — Equipment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11f1d378-c78c-402a-ac46-2d32598c23e7.jpg?1748706334",
+            "normal": "https://cards.scryfall.io/normal/front/1/1/11f1d378-c78c-402a-ac46-2d32598c23e7.jpg?1748706334"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Dragoon's Lance",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 20,
+          "tier_rating": "S",
+          "note": null,
+          "id": "96630531-8eb7-4e3e-8d63-60c562a5571b",
+          "scryfall_uri": "https://scryfall.com/card/fin/17/dragoons-lance",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Artifact — Equipment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/96630531-8eb7-4e3e-8d63-60c562a5571b.jpg?1748705819",
+            "normal": "https://cards.scryfall.io/normal/front/9/6/96630531-8eb7-4e3e-8d63-60c562a5571b.jpg?1748705819"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    },
+    {
+      "name": "Tiered Spells",
+      "summary": "Three-stage spells that trigger multiple payoffs depending on the cost paid. Thunder Magic enables 4+ payoffs in UR Big Spells.",
+      "performance": "Format-defining for UR; secondary in BR (Fire Magic) and UR/UB (Ice Magic).",
+      "key_examples": [
+        {
+          "name": "Thunder Magic",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 72,
+          "tier_rating": "B",
+          "note": null,
+          "id": "9f2b202c-91da-40ec-8324-6b6be7cb3bc8",
+          "scryfall_uri": "https://scryfall.com/card/fin/165/thunder-magic",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380",
+            "normal": "https://cards.scryfall.io/normal/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Ice Magic",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 66,
+          "tier_rating": "B",
+          "note": null,
+          "id": "9dabd626-7ec3-4913-babb-d5d3fd5e32d5",
+          "scryfall_uri": "https://scryfall.com/card/fin/56/ice-magic",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9dabd626-7ec3-4913-babb-d5d3fd5e32d5.jpg?1748705962",
+            "normal": "https://cards.scryfall.io/normal/front/9/d/9dabd626-7ec3-4913-babb-d5d3fd5e32d5.jpg?1748705962"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Fire Magic",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 122,
+          "tier_rating": "B",
+          "note": null,
+          "id": "415ff6a5-61ef-4b37-ae08-e44476300d4a",
+          "scryfall_uri": "https://scryfall.com/card/fin/136/fire-magic",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/1/415ff6a5-61ef-4b37-ae08-e44476300d4a.jpg?1748706272",
+            "normal": "https://cards.scryfall.io/normal/front/4/1/415ff6a5-61ef-4b37-ae08-e44476300d4a.jpg?1748706272"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    },
+    {
+      "name": "Saga Creatures (Summons)",
+      "summary": "Multi-chapter saga creatures representing iconic Final Fantasy summons. Four-chapter examples include G.F. Ifrit and Fat Chocobo; three-chapter examples include Primal Garuda.",
+      "performance": "Top uncommons (Summon: Fenrir, Summon: Shiva) are format-defining. Several commons are playable.",
+      "key_examples": [
+        {
+          "name": "Summon: Fenrir",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 23,
+          "tier_rating": "A",
+          "note": "The best uncommon in the set.",
+          "id": "93feb9d5-d004-4598-a448-b3488c869c05",
+          "scryfall_uri": "https://scryfall.com/card/fin/203/summon:-fenrir",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment Creature — Saga Wolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/3/93feb9d5-d004-4598-a448-b3488c869c05.jpg?1748706522",
+            "normal": "https://cards.scryfall.io/normal/front/9/3/93feb9d5-d004-4598-a448-b3488c869c05.jpg?1748706522"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Summon: Shiva",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 119,
+          "tier_rating": "B",
+          "note": null,
+          "id": "a80511f8-7cb1-4974-afde-8a5cebe13ad7",
+          "scryfall_uri": "https://scryfall.com/card/fin/78/summon:-shiva",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment Creature — Saga Elemental",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/8/a80511f8-7cb1-4974-afde-8a5cebe13ad7.jpg?1748706054",
+            "normal": "https://cards.scryfall.io/normal/front/a/8/a80511f8-7cb1-4974-afde-8a5cebe13ad7.jpg?1748706054"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Summon: Fat Chocobo",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 111,
+          "tier_rating": "B",
+          "note": null,
+          "id": "32eb192b-de6b-4814-8077-628d343d014e",
+          "scryfall_uri": "https://scryfall.com/card/fin/202/summon:-fat-chocobo",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment Creature — Saga Bird",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32eb192b-de6b-4814-8077-628d343d014e.jpg?1748706518",
+            "normal": "https://cards.scryfall.io/normal/front/3/2/32eb192b-de6b-4814-8077-628d343d014e.jpg?1748706518"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Summon: G.F. Ifrit",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 305,
+          "tier_rating": "F",
+          "note": null,
+          "id": "c6c73092-5195-4bdc-b039-a699f6e297b2",
+          "scryfall_uri": "https://scryfall.com/card/fin/163/summon:-gf-ifrit",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment Creature — Saga Demon",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/6/c6c73092-5195-4bdc-b039-a699f6e297b2.jpg?1749639154",
+            "normal": "https://cards.scryfall.io/normal/front/c/6/c6c73092-5195-4bdc-b039-a699f6e297b2.jpg?1749639154"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Summon: Primal Garuda",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 146,
+          "tier_rating": "C",
+          "note": null,
+          "id": "e44497a8-067e-454e-a9c0-684f03df55ff",
+          "scryfall_uri": "https://scryfall.com/card/fin/37/summon:-primal-garuda",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment Creature — Saga Harpy",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e44497a8-067e-454e-a9c0-684f03df55ff.jpg?1748705892",
+            "normal": "https://cards.scryfall.io/normal/front/e/4/e44497a8-067e-454e-a9c0-684f03df55ff.jpg?1748705892"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    },
+    {
+      "name": "Transforming DFCs",
+      "summary": "Double-faced cards that transform under specific conditions. Mostly on rares; Crystal Fragments is a representative example.",
+      "performance": "Individually powerful but rare; not a draftable theme.",
+      "key_examples": [
+        {
+          "name": "Crystal Fragments",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 267,
+          "tier_rating": "D",
+          "note": null,
+          "id": "5f51c853-949d-44e9-a3a2-02e1ce69a147",
+          "scryfall_uri": "https://scryfall.com/card/fin/13/crystal-fragments-summon:-alexander",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Artifact — Equipment // Enchantment Creature — Saga Construct",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/f/5f51c853-949d-44e9-a3a2-02e1ce69a147.jpg?1748707800",
+            "normal": "https://cards.scryfall.io/normal/front/5/f/5f51c853-949d-44e9-a3a2-02e1ce69a147.jpg?1748707800"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    },
+    {
+      "name": "Cycling",
+      "summary": "The common cycle shows wide quality variance. Malboro overperformed; Balamb T-Rexaur is pretty good; Ice Flan and Hill Gigas are mediocre but playable; Cloudbound Moogle is probably playable but not good.",
+      "performance": "Useful filler that smooths draws; quality varies card-by-card.",
+      "key_examples": [
+        {
+          "name": "Malboro",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 134,
+          "tier_rating": "B",
+          "note": "Overperformed.",
+          "id": "e46d8048-03ce-4e07-ba24-f41ba6140a4e",
+          "scryfall_uri": "https://scryfall.com/card/fin/106/malboro",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Plant Horror",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e46d8048-03ce-4e07-ba24-f41ba6140a4e.jpg?1748706158",
+            "normal": "https://cards.scryfall.io/normal/front/e/4/e46d8048-03ce-4e07-ba24-f41ba6140a4e.jpg?1748706158"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Balamb T-Rexaur",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 154,
+          "tier_rating": "C",
+          "note": "Pretty good.",
+          "id": "e5857b1b-73bc-458e-b26b-7ed8bef785f3",
+          "scryfall_uri": "https://scryfall.com/card/fin/173/balamb-t-rexaur",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Dinosaur",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/5/e5857b1b-73bc-458e-b26b-7ed8bef785f3.jpg?1748706407",
+            "normal": "https://cards.scryfall.io/normal/front/e/5/e5857b1b-73bc-458e-b26b-7ed8bef785f3.jpg?1748706407"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Ice Flan",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 232,
+          "tier_rating": "D",
+          "note": "Mediocre but playable.",
+          "id": "ad304c9c-943f-442f-bb82-ff378ad7d7ba",
+          "scryfall_uri": "https://scryfall.com/card/fin/55/ice-flan",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Elemental Ooze",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/d/ad304c9c-943f-442f-bb82-ff378ad7d7ba.jpg?1748705958",
+            "normal": "https://cards.scryfall.io/normal/front/a/d/ad304c9c-943f-442f-bb82-ff378ad7d7ba.jpg?1748705958"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Hill Gigas",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 301,
+          "tier_rating": "F",
+          "note": "Mediocre but playable.",
+          "id": "2a8b3e1e-5c10-4360-ac1c-83b2e026278c",
+          "scryfall_uri": "https://scryfall.com/card/fin/141/hill-gigas",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Giant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/a/2a8b3e1e-5c10-4360-ac1c-83b2e026278c.jpg?1748706292",
+            "normal": "https://cards.scryfall.io/normal/front/2/a/2a8b3e1e-5c10-4360-ac1c-83b2e026278c.jpg?1748706292"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Cloudbound Moogle",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 277,
+          "tier_rating": "D",
+          "note": "Probably playable but not good.",
+          "id": "7387bca7-f496-45da-a0ac-6be049303a8f",
+          "scryfall_uri": "https://scryfall.com/card/fin/11/cloudbound-moogle",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Moogle",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/7387bca7-f496-45da-a0ac-6be049303a8f.jpg?1748705792",
+            "normal": "https://cards.scryfall.io/normal/front/7/3/7387bca7-f496-45da-a0ac-6be049303a8f.jpg?1748705792"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    },
+    {
+      "name": "Adventure Lands",
+      "summary": "Lands with adventure-style flexible modes. Zanarkand, Ancient Metropolis is the only good adventure town.",
+      "performance": "Mostly low-impact; one standout.",
+      "key_examples": [
+        {
+          "name": "Zanarkand, Ancient Metropolis",
+          "color": "C",
+          "rarity": "Rare",
+          "pick_order_rank": 158,
+          "tier_rating": "C",
+          "note": "The only good adventure town.",
+          "id": "881e4c00-3b9a-47a1-bf66-1badda994c88",
+          "scryfall_uri": "https://scryfall.com/card/fin/293/zanarkand-ancient-metropolis-lasting-fayth",
+          "colors": [],
+          "type_line": "Land — Town // Sorcery — Adventure",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/881e4c00-3b9a-47a1-bf66-1badda994c88.jpg?1748706876",
+            "normal": "https://cards.scryfall.io/normal/front/8/8/881e4c00-3b9a-47a1-bf66-1badda994c88.jpg?1748706876"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    },
+    {
+      "name": "Towns",
+      "summary": "Land-based ramp/fixing engine that powers GUx. Travel the Overworld is the truth — the engine of GUx decks. Prishe's Wanderings and Reach the Horizon tutor towns.",
+      "performance": "Defines the GUx archetype; weaker without dedicated tutors.",
+      "key_examples": [
+        {
+          "name": "Travel the Overworld",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 120,
+          "tier_rating": "B",
+          "note": "The truth — engine of GUx decks.",
+          "id": "aa5086e0-e2f2-498f-9035-1b31e1d21e0a",
+          "scryfall_uri": "https://scryfall.com/card/fin/82/travel-the-overworld",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aa5086e0-e2f2-498f-9035-1b31e1d21e0a.jpg?1748901899",
+            "normal": "https://cards.scryfall.io/normal/front/a/a/aa5086e0-e2f2-498f-9035-1b31e1d21e0a.jpg?1748901899"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Prishe's Wanderings",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 203,
+          "tier_rating": "C",
+          "note": null,
+          "id": "d6e1dee0-e2cd-4899-a3ea-7d0df717c9ab",
+          "scryfall_uri": "https://scryfall.com/card/fin/193/prishes-wanderings",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/6/d6e1dee0-e2cd-4899-a3ea-7d0df717c9ab.jpg?1748706482",
+            "normal": "https://cards.scryfall.io/normal/front/d/6/d6e1dee0-e2cd-4899-a3ea-7d0df717c9ab.jpg?1748706482"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        },
+        {
+          "name": "Reach the Horizon",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 235,
+          "tier_rating": "D",
+          "note": null,
+          "id": "c25960e0-5779-4e20-89f3-03950ad9d91c",
+          "scryfall_uri": "https://scryfall.com/card/fin/195/reach-the-horizon",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c25960e0-5779-4e20-89f3-03950ad9d91c.jpg?1748706490",
+            "normal": "https://cards.scryfall.io/normal/front/c/2/c25960e0-5779-4e20-89f3-03950ad9d91c.jpg?1748706490"
+          },
+          "set": "fin",
+          "set_name": "Final Fantasy"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{U}{R}",
+        "name": "UR Big Spells",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Reward casting noncreature spells (especially 4+ mana). Tiered spells like Thunder Magic and Ice Magic enable multiple payoffs in one cast. Combine cheap interaction with payoff creatures that snowball off your spell count.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Ultros, Obnoxious Octopus",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 68,
+            "tier_rating": "B",
+            "note": null,
+            "id": "14379198-9a0a-4853-9d51-fb074a24b1c0",
+            "scryfall_uri": "https://scryfall.com/card/fin/83/ultros-obnoxious-octopus",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Legendary Creature — Octopus",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/14379198-9a0a-4853-9d51-fb074a24b1c0.jpg?1748706073",
+              "normal": "https://cards.scryfall.io/normal/front/1/4/14379198-9a0a-4853-9d51-fb074a24b1c0.jpg?1748706073"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Prompto Argentum",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 136,
+            "tier_rating": "B",
+            "note": null,
+            "id": "4c617bcd-05f8-40c2-bb38-489bc863ce6b",
+            "scryfall_uri": "https://scryfall.com/card/fin/148/prompto-argentum",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c617bcd-05f8-40c2-bb38-489bc863ce6b.jpg?1748706313",
+              "normal": "https://cards.scryfall.io/normal/front/4/c/4c617bcd-05f8-40c2-bb38-489bc863ce6b.jpg?1748706313"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Thunder Magic",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 72,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9f2b202c-91da-40ec-8324-6b6be7cb3bc8",
+            "scryfall_uri": "https://scryfall.com/card/fin/165/thunder-magic",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380",
+              "normal": "https://cards.scryfall.io/normal/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Ice Magic",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 66,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9dabd626-7ec3-4913-babb-d5d3fd5e32d5",
+            "scryfall_uri": "https://scryfall.com/card/fin/56/ice-magic",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9dabd626-7ec3-4913-babb-d5d3fd5e32d5.jpg?1748705962",
+              "normal": "https://cards.scryfall.io/normal/front/9/d/9dabd626-7ec3-4913-babb-d5d3fd5e32d5.jpg?1748705962"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Dreams of Laguna",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 87,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ba752243-2727-4b8a-8e21-e70becfd4ff3",
+            "scryfall_uri": "https://scryfall.com/card/fin/50/dreams-of-laguna",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/a/ba752243-2727-4b8a-8e21-e70becfd4ff3.jpg?1748705940",
+              "normal": "https://cards.scryfall.io/normal/front/b/a/ba752243-2727-4b8a-8e21-e70becfd4ff3.jpg?1748705940"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Eject",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 53,
+            "tier_rating": "A",
+            "note": null,
+            "id": "aec83c9a-8ec4-4a5a-b27f-0e74a2b3d21e",
+            "scryfall_uri": "https://scryfall.com/card/fin/52/eject",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/aec83c9a-8ec4-4a5a-b27f-0e74a2b3d21e.jpg?1748705947",
+              "normal": "https://cards.scryfall.io/normal/front/a/e/aec83c9a-8ec4-4a5a-b27f-0e74a2b3d21e.jpg?1748705947"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Sorceress's Schemes",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 94,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7efd7627-0754-4685-9d04-8f5f82f45632",
+            "scryfall_uri": "https://scryfall.com/card/fin/159/sorceresss-schemes",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7efd7627-0754-4685-9d04-8f5f82f45632.jpg?1748706360",
+              "normal": "https://cards.scryfall.io/normal/front/7/e/7efd7627-0754-4685-9d04-8f5f82f45632.jpg?1748706360"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Choco-Comet",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 21,
+            "tier_rating": "S",
+            "note": null,
+            "id": "8d8d3903-a7f4-4cd8-8d29-b4a173e4fbb2",
+            "scryfall_uri": "https://scryfall.com/card/fin/132/choco-comet",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d8d3903-a7f4-4cd8-8d29-b4a173e4fbb2.jpg?1748706258",
+              "normal": "https://cards.scryfall.io/normal/front/8/d/8d8d3903-a7f4-4cd8-8d29-b4a173e4fbb2.jpg?1748706258"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "BG Graveyard / Midrange",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Cloud of Darkness is the single best signpost uncommon in the set. Lean on backbone commons and the deep BG removal + creature pool to grind out games.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Cloud of Darkness",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 29,
+            "tier_rating": "A",
+            "note": "The single best signpost uncommon in the set.",
+            "id": "a292094a-674a-401f-8776-ba5ebe57c946",
+            "scryfall_uri": "https://scryfall.com/card/fin/217/cloud-of-darkness",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Legendary Creature — Avatar",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a292094a-674a-401f-8776-ba5ebe57c946.jpg?1748706571",
+              "normal": "https://cards.scryfall.io/normal/front/a/2/a292094a-674a-401f-8776-ba5ebe57c946.jpg?1748706571"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Town Greeter",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 76,
+            "tier_rating": "B",
+            "note": null,
+            "id": "49cd4efa-4df4-4257-9a42-60330f7781e2",
+            "scryfall_uri": "https://scryfall.com/card/fin/209/town-greeter",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Citizen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/49cd4efa-4df4-4257-9a42-60330f7781e2.jpg?1748706545",
+              "normal": "https://cards.scryfall.io/normal/front/4/9/49cd4efa-4df4-4257-9a42-60330f7781e2.jpg?1748706545"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Shinra Reinforcements",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 108,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7367b257-1a8c-4593-a307-7116e36e0342",
+            "scryfall_uri": "https://scryfall.com/card/fin/118/shinra-reinforcements",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/7367b257-1a8c-4593-a307-7116e36e0342.jpg?1748706203",
+              "normal": "https://cards.scryfall.io/normal/front/7/3/7367b257-1a8c-4593-a307-7116e36e0342.jpg?1748706203"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Resentful Revelation",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 92,
+            "tier_rating": "B",
+            "note": null,
+            "id": "945006ea-c6a1-4ee5-abb2-387c2b6d3123",
+            "scryfall_uri": "https://scryfall.com/card/fin/114/resentful-revelation",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/945006ea-c6a1-4ee5-abb2-387c2b6d3123.jpg?1748706186",
+              "normal": "https://cards.scryfall.io/normal/front/9/4/945006ea-c6a1-4ee5-abb2-387c2b6d3123.jpg?1748706186"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{W}{B}",
+        "name": "WB Sacrifice / Midrange",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Three-tier theme: payoffs (Judge Magister Gabranth, Al Bhed Salvagers), sacrifice outlets (Phantom Train, Namazu Trader, Ahriman), and fodder creatures. Uses Job Select equipment extensively to add value to the sacrifice loop.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Judge Magister Gabranth",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 157,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f9e64cb6-48f7-41d3-99e7-4b0bc3b33fd7",
+            "scryfall_uri": "https://scryfall.com/card/fin/230/judge-magister-gabranth",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Advisor Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/9/f9e64cb6-48f7-41d3-99e7-4b0bc3b33fd7.jpg?1748706634",
+              "normal": "https://cards.scryfall.io/normal/front/f/9/f9e64cb6-48f7-41d3-99e7-4b0bc3b33fd7.jpg?1748706634"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Al Bhed Salvagers",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 130,
+            "tier_rating": "B",
+            "note": null,
+            "id": "58ccdcfc-a669-480f-bded-4273cfaf2045",
+            "scryfall_uri": "https://scryfall.com/card/fin/88/al-bhed-salvagers",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Human Artificer Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/8/58ccdcfc-a669-480f-bded-4273cfaf2045.jpg?1748706093",
+              "normal": "https://cards.scryfall.io/normal/front/5/8/58ccdcfc-a669-480f-bded-4273cfaf2045.jpg?1748706093"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Phantom Train",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 184,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7a50d2ac-101d-41e1-b400-18fa7d2d7125",
+            "scryfall_uri": "https://scryfall.com/card/fin/110/phantom-train",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Artifact — Vehicle",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a50d2ac-101d-41e1-b400-18fa7d2d7125.jpg?1748706172",
+              "normal": "https://cards.scryfall.io/normal/front/7/a/7a50d2ac-101d-41e1-b400-18fa7d2d7125.jpg?1748706172"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Namazu Trader",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 183,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f9d25b34-990d-416c-aef7-1b5a73f19dd4",
+            "scryfall_uri": "https://scryfall.com/card/fin/107/namazu-trader",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Fish Citizen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/9/f9d25b34-990d-416c-aef7-1b5a73f19dd4.jpg?1748962390",
+              "normal": "https://cards.scryfall.io/normal/front/f/9/f9d25b34-990d-416c-aef7-1b5a73f19dd4.jpg?1748962390"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Ahriman",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 181,
+            "tier_rating": "C",
+            "note": null,
+            "id": "162a415c-5465-497e-8f4e-c6f09681641d",
+            "scryfall_uri": "https://scryfall.com/card/fin/87/ahriman",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Eye Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/6/162a415c-5465-497e-8f4e-c6f09681641d.jpg?1748706087",
+              "normal": "https://cards.scryfall.io/normal/front/1/6/162a415c-5465-497e-8f4e-c6f09681641d.jpg?1748706087"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Aggro / Equipment",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Slower than typical RW, emphasizing incremental advantages via equipment. Voltron potential through Adelbert Steiner. Star lineup of legendary creatures stacks Job Select gear for big swings.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Adelbert Steiner",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 63,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1a67a991-1e52-4676-a2e3-2bc7aa943ab3",
+            "scryfall_uri": "https://scryfall.com/card/fin/3/adelbert-steiner",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1a67a991-1e52-4676-a2e3-2bc7aa943ab3.jpg?1748705765",
+              "normal": "https://cards.scryfall.io/normal/front/1/a/1a67a991-1e52-4676-a2e3-2bc7aa943ab3.jpg?1748705765"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Cloud, Midgar Mercenary",
+            "color": "W",
+            "rarity": "Mythic",
+            "pick_order_rank": 65,
+            "tier_rating": "B",
+            "note": null,
+            "id": "2cf7e8a3-fad7-413d-b17c-7519a9cf5fb5",
+            "scryfall_uri": "https://scryfall.com/card/fin/10/cloud-midgar-mercenary",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Soldier Mercenary",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cf7e8a3-fad7-413d-b17c-7519a9cf5fb5.jpg?1748705791",
+              "normal": "https://cards.scryfall.io/normal/front/2/c/2cf7e8a3-fad7-413d-b17c-7519a9cf5fb5.jpg?1748705791"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Gilgamesh, Master-at-Arms",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 71,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1eb81329-fb7a-4347-b96c-9960a5c48e87",
+            "scryfall_uri": "https://scryfall.com/card/fin/139/gilgamesh-master-at-arms",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Samurai",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1eb81329-fb7a-4347-b96c-9960a5c48e87.jpg?1748706285",
+              "normal": "https://cards.scryfall.io/normal/front/1/e/1eb81329-fb7a-4347-b96c-9960a5c48e87.jpg?1748706285"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Firion, Wild Rose Warrior",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 135,
+            "tier_rating": "B",
+            "note": null,
+            "id": "98366937-d15b-4a66-b9f6-878d50b63871",
+            "scryfall_uri": "https://scryfall.com/card/fin/137/firion-wild-rose-warrior",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Rebel Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/98366937-d15b-4a66-b9f6-878d50b63871.jpg?1748706279",
+              "normal": "https://cards.scryfall.io/normal/front/9/8/98366937-d15b-4a66-b9f6-878d50b63871.jpg?1748706279"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Freya Crescent",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 202,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9921f646-e893-44db-ac89-0633c1009788",
+            "scryfall_uri": "https://scryfall.com/card/fin/138/freya-crescent",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature — Rat Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/9921f646-e893-44db-ac89-0633c1009788.jpg?1748706279",
+              "normal": "https://cards.scryfall.io/normal/front/9/9/9921f646-e893-44db-ac89-0633c1009788.jpg?1748706279"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Giott, King of the Dwarves",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 156,
+            "tier_rating": "C",
+            "note": null,
+            "id": "6a7784de-a10d-4ce6-98a5-aaf3e85773b6",
+            "scryfall_uri": "https://scryfall.com/card/fin/223/giott-king-of-the-dwarves",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Dwarf Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/a/6a7784de-a10d-4ce6-98a5-aaf3e85773b6.jpg?1748706604",
+              "normal": "https://cards.scryfall.io/normal/front/6/a/6a7784de-a10d-4ce6-98a5-aaf3e85773b6.jpg?1748706604"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Zidane, Tantalus Thief",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 98,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e42c7d9d-8685-415b-8c5d-6ab2165863b9",
+            "scryfall_uri": "https://scryfall.com/card/fin/251/zidane-tantalus-thief",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Mutant Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e42c7d9d-8685-415b-8c5d-6ab2165863b9.jpg?1748706732",
+              "normal": "https://cards.scryfall.io/normal/front/e/4/e42c7d9d-8685-415b-8c5d-6ab2165863b9.jpg?1748706732"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{U}",
+        "name": "WU Artifacts / Skies",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Tempo-focused deck with fliers and Job Select equipment. Cid, Timeless Artificer is the strong signpost; Tidus, Blitzball Star is the worst multicolor uncommon in the set.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Cid, Timeless Artificer",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 188,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7fb99393-d2b6-40a6-8de7-317efdc4c50b",
+            "scryfall_uri": "https://scryfall.com/card/fin/216/cid-timeless-artificer",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Artificer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7fb99393-d2b6-40a6-8de7-317efdc4c50b.jpg?1748706567",
+              "normal": "https://cards.scryfall.io/normal/front/7/f/7fb99393-d2b6-40a6-8de7-317efdc4c50b.jpg?1748706567"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Tidus, Blitzball Star",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 304,
+            "tier_rating": "F",
+            "note": "The worst multicolor uncommon in the set.",
+            "id": "aa851d68-a7a4-48c0-9cd7-d3d2e079f3a1",
+            "scryfall_uri": "https://scryfall.com/card/fin/246/tidus-blitzball-star",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aa851d68-a7a4-48c0-9cd7-d3d2e079f3a1.jpg?1748706706",
+              "normal": "https://cards.scryfall.io/normal/front/a/a/aa851d68-a7a4-48c0-9cd7-d3d2e079f3a1.jpg?1748706706"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "GUx Towns / Ramp",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "5-color good-stuff archetype enabled by Towns and dual lands. Travel the Overworld and Omega, Heartless Evolution are the primary payoffs. Ignis Scientia provides value and graveyard hate.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Travel the Overworld",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 120,
+            "tier_rating": "B",
+            "note": null,
+            "id": "aa5086e0-e2f2-498f-9035-1b31e1d21e0a",
+            "scryfall_uri": "https://scryfall.com/card/fin/82/travel-the-overworld",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aa5086e0-e2f2-498f-9035-1b31e1d21e0a.jpg?1748901899",
+              "normal": "https://cards.scryfall.io/normal/front/a/a/aa5086e0-e2f2-498f-9035-1b31e1d21e0a.jpg?1748901899"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Omega, Heartless Evolution",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 96,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9a8eb7e6-0c0b-42d0-aa90-2d3d29bc15aa",
+            "scryfall_uri": "https://scryfall.com/card/fin/236/omega-heartless-evolution",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Artifact Creature — Robot",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/a/9a8eb7e6-0c0b-42d0-aa90-2d3d29bc15aa.jpg?1748706661",
+              "normal": "https://cards.scryfall.io/normal/front/9/a/9a8eb7e6-0c0b-42d0-aa90-2d3d29bc15aa.jpg?1748706661"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Ignis Scientia",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 80,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ab4f9721-5b2c-4371-98a5-3f6714265e57",
+            "scryfall_uri": "https://scryfall.com/card/fin/227/ignis-scientia",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/ab4f9721-5b2c-4371-98a5-3f6714265e57.jpg?1748706619",
+              "normal": "https://cards.scryfall.io/normal/front/a/b/ab4f9721-5b2c-4371-98a5-3f6714265e57.jpg?1748706619"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{U}{B}",
+        "name": "UB Control / Good Stuff",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Lightly themed archetype that emphasizes 2-for-1s and kill spells over hard synergy. Locke Cole and Ultimecia, Time Sorceress provide value. Sidequest: Hunt the Mark pairs well.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Locke Cole",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 113,
+            "tier_rating": "B",
+            "note": null,
+            "id": "572feb8c-6976-40a8-8a34-b4db836cca56",
+            "scryfall_uri": "https://scryfall.com/card/fin/234/locke-cole",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/572feb8c-6976-40a8-8a34-b4db836cca56.jpg?1748706655",
+              "normal": "https://cards.scryfall.io/normal/front/5/7/572feb8c-6976-40a8-8a34-b4db836cca56.jpg?1748706655"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Ultimecia, Time Sorceress",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 190,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2d6a2b68-5407-464e-a335-7866fd969c30",
+            "scryfall_uri": "https://scryfall.com/card/fin/247/ultimecia-time-sorceress-ultimecia-omnipotent",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Warlock // Legendary Creature — Nightmare Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d6a2b68-5407-464e-a335-7866fd969c30.jpg?1748707837",
+              "normal": "https://cards.scryfall.io/normal/front/2/d/2d6a2b68-5407-464e-a335-7866fd969c30.jpg?1748707837"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Sidequest: Hunt the Mark",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 27,
+            "tier_rating": "A",
+            "note": null,
+            "id": "c3eb2ae5-10de-4c3d-91c8-8734befc80b2",
+            "scryfall_uri": "https://scryfall.com/card/fin/119/sidequest:-hunt-the-mark-yiazmat-ultimate-mark",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment // Legendary Creature — Dragon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3eb2ae5-10de-4c3d-91c8-8734befc80b2.jpg?1748707815",
+              "normal": "https://cards.scryfall.io/normal/front/c/3/c3eb2ae5-10de-4c3d-91c8-8734befc80b2.jpg?1748707815"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "GW Go Wide / Midrange",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "The go-wide theme felt kind of like a bust. Works better with summons payoffs Garnet, Princess of Alexandria and Rinoa Heartilly than with pure token strategies.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Garnet, Princess of Alexandria",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 189,
+            "tier_rating": "C",
+            "note": null,
+            "id": "b883df14-8d7b-4f6a-9a6a-2f71f5b6ddda",
+            "scryfall_uri": "https://scryfall.com/card/fin/222/garnet-princess-of-alexandria",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Noble Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b883df14-8d7b-4f6a-9a6a-2f71f5b6ddda.jpg?1748706601",
+              "normal": "https://cards.scryfall.io/normal/front/b/8/b883df14-8d7b-4f6a-9a6a-2f71f5b6ddda.jpg?1748706601"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Rinoa Heartilly",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 124,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ba79d293-bf42-48b6-a868-5249f4beeb76",
+            "scryfall_uri": "https://scryfall.com/card/fin/237/rinoa-heartilly",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Rebel Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/a/ba79d293-bf42-48b6-a868-5249f4beeb76.jpg?1748706666",
+              "normal": "https://cards.scryfall.io/normal/front/b/a/ba79d293-bf42-48b6-a868-5249f4beeb76.jpg?1748706666"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "BR Wizards / Bleeder",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Limited wizard support. Cornered by Black Mages is the key payoff. Plays like mono-removal with cards like Fire Magic, edict effects, and Malboro.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Cornered by Black Mages",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "688fcf8a-0a44-416a-8086-83acf9a6fe69",
+            "scryfall_uri": "https://scryfall.com/card/fin/93/cornered-by-black-mages",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/688fcf8a-0a44-416a-8086-83acf9a6fe69.jpg?1748706113",
+              "normal": "https://cards.scryfall.io/normal/front/6/8/688fcf8a-0a44-416a-8086-83acf9a6fe69.jpg?1748706113"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Fire Magic",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 122,
+            "tier_rating": "B",
+            "note": null,
+            "id": "415ff6a5-61ef-4b37-ae08-e44476300d4a",
+            "scryfall_uri": "https://scryfall.com/card/fin/136/fire-magic",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/1/415ff6a5-61ef-4b37-ae08-e44476300d4a.jpg?1748706272",
+              "normal": "https://cards.scryfall.io/normal/front/4/1/415ff6a5-61ef-4b37-ae08-e44476300d4a.jpg?1748706272"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Malboro",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 134,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e46d8048-03ce-4e07-ba24-f41ba6140a4e",
+            "scryfall_uri": "https://scryfall.com/card/fin/106/malboro",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Plant Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e46d8048-03ce-4e07-ba24-f41ba6140a4e.jpg?1748706158",
+              "normal": "https://cards.scryfall.io/normal/front/e/4/e46d8048-03ce-4e07-ba24-f41ba6140a4e.jpg?1748706158"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "RG Landfall / Stompy",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Weakly supported because red is the worst color in the set. Bird tokens from landfall are capped at 2 toughness. Payoffs include Gladiolus Amicitia, Rydia, Summoner of Mist, and Sabotender.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Gladiolus Amicitia",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 112,
+            "tier_rating": "B",
+            "note": null,
+            "id": "442957fc-045d-4db6-b82a-445f172d23e4",
+            "scryfall_uri": "https://scryfall.com/card/fin/224/gladiolus-amicitia",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/442957fc-045d-4db6-b82a-445f172d23e4.jpg?1748706608",
+              "normal": "https://cards.scryfall.io/normal/front/4/4/442957fc-045d-4db6-b82a-445f172d23e4.jpg?1748706608"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Rydia, Summoner of Mist",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 240,
+            "tier_rating": "D",
+            "note": null,
+            "id": "99450143-6ab5-463d-9e04-e8e6703a8b92",
+            "scryfall_uri": "https://scryfall.com/card/fin/239/rydia-summoner-of-mist",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/99450143-6ab5-463d-9e04-e8e6703a8b92.jpg?1748706673",
+              "normal": "https://cards.scryfall.io/normal/front/9/9/99450143-6ab5-463d-9e04-e8e6703a8b92.jpg?1748706673"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          },
+          {
+            "name": "Sabotender",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 286,
+            "tier_rating": "D",
+            "note": null,
+            "id": "12df1295-8b08-4c8e-bac9-55b4f514c0be",
+            "scryfall_uri": "https://scryfall.com/card/fin/153/sabotender",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Plant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/12df1295-8b08-4c8e-bac9-55b4f514c0be.jpg?1748706333",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/12df1295-8b08-4c8e-bac9-55b4f514c0be.jpg?1748706333"
+            },
+            "set": "fin",
+            "set_name": "Final Fantasy"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Summon: Choco/Mog",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 230,
+        "tier_rating": "D",
+        "note": null,
+        "id": "00546117-018a-4286-bc20-b5446c5be56f",
+        "scryfall_uri": "https://scryfall.com/card/fin/35/summon:-chocomog",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment Creature — Saga Bird Moogle",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/00546117-018a-4286-bc20-b5446c5be56f.jpg?1748705886",
+          "normal": "https://cards.scryfall.io/normal/front/0/0/00546117-018a-4286-bc20-b5446c5be56f.jpg?1748705886"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Call the Mountain Chocobo",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 109,
+        "tier_rating": "B",
+        "note": null,
+        "id": "b2e1986c-2852-4843-bdc4-eddb727ba3d4",
+        "scryfall_uri": "https://scryfall.com/card/fin/131/call-the-mountain-chocobo",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b2e1986c-2852-4843-bdc4-eddb727ba3d4.jpg?1748706252",
+          "normal": "https://cards.scryfall.io/normal/front/b/2/b2e1986c-2852-4843-bdc4-eddb727ba3d4.jpg?1748706252"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Slash of Light",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 128,
+        "tier_rating": "B",
+        "note": null,
+        "id": "da6d9529-3cb0-4adc-8209-b9b02db3bf54",
+        "scryfall_uri": "https://scryfall.com/card/fin/32/slash-of-light",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/da6d9529-3cb0-4adc-8209-b9b02db3bf54.jpg?1748705874",
+          "normal": "https://cards.scryfall.io/normal/front/d/a/da6d9529-3cb0-4adc-8209-b9b02db3bf54.jpg?1748705874"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Aerith Rescue Mission",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 211,
+        "tier_rating": "C",
+        "note": null,
+        "id": "3123d16c-e1e6-4659-a7a3-2ec6efc6bf08",
+        "scryfall_uri": "https://scryfall.com/card/fin/5/aerith-rescue-mission",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/3123d16c-e1e6-4659-a7a3-2ec6efc6bf08.jpg?1748705771",
+          "normal": "https://cards.scryfall.io/normal/front/3/1/3123d16c-e1e6-4659-a7a3-2ec6efc6bf08.jpg?1748705771"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Ice Magic",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 66,
+        "tier_rating": "B",
+        "note": null,
+        "id": "9dabd626-7ec3-4913-babb-d5d3fd5e32d5",
+        "scryfall_uri": "https://scryfall.com/card/fin/56/ice-magic",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9dabd626-7ec3-4913-babb-d5d3fd5e32d5.jpg?1748705962",
+          "normal": "https://cards.scryfall.io/normal/front/9/d/9dabd626-7ec3-4913-babb-d5d3fd5e32d5.jpg?1748705962"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Thunder Magic",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 72,
+        "tier_rating": "B",
+        "note": null,
+        "id": "9f2b202c-91da-40ec-8324-6b6be7cb3bc8",
+        "scryfall_uri": "https://scryfall.com/card/fin/165/thunder-magic",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380",
+          "normal": "https://cards.scryfall.io/normal/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Syncopate",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 106,
+        "tier_rating": "B",
+        "note": null,
+        "id": "83e1cd8d-5b97-427a-be75-2a1947f9c59b",
+        "scryfall_uri": "https://scryfall.com/card/fin/80/syncopate",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/83e1cd8d-5b97-427a-be75-2a1947f9c59b.jpg?1748706062",
+          "normal": "https://cards.scryfall.io/normal/front/8/3/83e1cd8d-5b97-427a-be75-2a1947f9c59b.jpg?1748706062"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Retrieve the Esper",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 161,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ebd733f0-8883-434a-b36c-ef76b091fe8e",
+        "scryfall_uri": "https://scryfall.com/card/fin/68/retrieve-the-esper",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/b/ebd733f0-8883-434a-b36c-ef76b091fe8e.jpg?1748706008",
+          "normal": "https://cards.scryfall.io/normal/front/e/b/ebd733f0-8883-434a-b36c-ef76b091fe8e.jpg?1748706008"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Dreams of Laguna",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 87,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ba752243-2727-4b8a-8e21-e70becfd4ff3",
+        "scryfall_uri": "https://scryfall.com/card/fin/50/dreams-of-laguna",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/a/ba752243-2727-4b8a-8e21-e70becfd4ff3.jpg?1748705940",
+          "normal": "https://cards.scryfall.io/normal/front/b/a/ba752243-2727-4b8a-8e21-e70becfd4ff3.jpg?1748705940"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Sephiroth's Intervention",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "A",
+        "note": null,
+        "id": "cf7df82f-937a-443f-813f-2bcc6944c5c0",
+        "scryfall_uri": "https://scryfall.com/card/fin/116/sephiroths-intervention",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf7df82f-937a-443f-813f-2bcc6944c5c0.jpg?1748706197",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cf7df82f-937a-443f-813f-2bcc6944c5c0.jpg?1748706197"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Resentful Revelation",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "945006ea-c6a1-4ee5-abb2-387c2b6d3123",
+        "scryfall_uri": "https://scryfall.com/card/fin/114/resentful-revelation",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/945006ea-c6a1-4ee5-abb2-387c2b6d3123.jpg?1748706186",
+          "normal": "https://cards.scryfall.io/normal/front/9/4/945006ea-c6a1-4ee5-abb2-387c2b6d3123.jpg?1748706186"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Shinra Reinforcements",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 108,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7367b257-1a8c-4593-a307-7116e36e0342",
+        "scryfall_uri": "https://scryfall.com/card/fin/118/shinra-reinforcements",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/7367b257-1a8c-4593-a307-7116e36e0342.jpg?1748706203",
+          "normal": "https://cards.scryfall.io/normal/front/7/3/7367b257-1a8c-4593-a307-7116e36e0342.jpg?1748706203"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Town Greeter",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 76,
+        "tier_rating": "B",
+        "note": null,
+        "id": "49cd4efa-4df4-4257-9a42-60330f7781e2",
+        "scryfall_uri": "https://scryfall.com/card/fin/209/town-greeter",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Citizen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/49cd4efa-4df4-4257-9a42-60330f7781e2.jpg?1748706545",
+          "normal": "https://cards.scryfall.io/normal/front/4/9/49cd4efa-4df4-4257-9a42-60330f7781e2.jpg?1748706545"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Choco-Comet",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 21,
+        "tier_rating": "S",
+        "note": null,
+        "id": "8d8d3903-a7f4-4cd8-8d29-b4a173e4fbb2",
+        "scryfall_uri": "https://scryfall.com/card/fin/132/choco-comet",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d8d3903-a7f4-4cd8-8d29-b4a173e4fbb2.jpg?1748706258",
+          "normal": "https://cards.scryfall.io/normal/front/8/d/8d8d3903-a7f4-4cd8-8d29-b4a173e4fbb2.jpg?1748706258"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Thunder Magic",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 72,
+        "tier_rating": "B",
+        "note": null,
+        "id": "9f2b202c-91da-40ec-8324-6b6be7cb3bc8",
+        "scryfall_uri": "https://scryfall.com/card/fin/165/thunder-magic",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380",
+          "normal": "https://cards.scryfall.io/normal/front/9/f/9f2b202c-91da-40ec-8324-6b6be7cb3bc8.jpg?1748706380"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Suplex",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 137,
+        "tier_rating": "B",
+        "note": null,
+        "id": "f61693a2-7042-44e0-85ba-9bf12ab94e7e",
+        "scryfall_uri": "https://scryfall.com/card/fin/164/suplex",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/6/f61693a2-7042-44e0-85ba-9bf12ab94e7e.jpg?1748706376",
+          "normal": "https://cards.scryfall.io/normal/front/f/6/f61693a2-7042-44e0-85ba-9bf12ab94e7e.jpg?1748706376"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Samurai's Katana",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 28,
+        "tier_rating": "A",
+        "note": null,
+        "id": "11f1d378-c78c-402a-ac46-2d32598c23e7",
+        "scryfall_uri": "https://scryfall.com/card/fin/154/samurais-katana",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11f1d378-c78c-402a-ac46-2d32598c23e7.jpg?1748706334",
+          "normal": "https://cards.scryfall.io/normal/front/1/1/11f1d378-c78c-402a-ac46-2d32598c23e7.jpg?1748706334"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Blazing Bomb",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 121,
+        "tier_rating": "B",
+        "note": null,
+        "id": "70f47277-ca47-428a-808f-0fb32e820a71",
+        "scryfall_uri": "https://scryfall.com/card/fin/130/blazing-bomb",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Elemental",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70f47277-ca47-428a-808f-0fb32e820a71.jpg?1748706252",
+          "normal": "https://cards.scryfall.io/normal/front/7/0/70f47277-ca47-428a-808f-0fb32e820a71.jpg?1748706252"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Summon: Fat Chocobo",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 111,
+        "tier_rating": "B",
+        "note": null,
+        "id": "32eb192b-de6b-4814-8077-628d343d014e",
+        "scryfall_uri": "https://scryfall.com/card/fin/202/summon:-fat-chocobo",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Enchantment Creature — Saga Bird",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32eb192b-de6b-4814-8077-628d343d014e.jpg?1748706518",
+          "normal": "https://cards.scryfall.io/normal/front/3/2/32eb192b-de6b-4814-8077-628d343d014e.jpg?1748706518"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Chocobo Kick",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 110,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ff8c8be0-8223-499c-8704-cb68e0a42ce2",
+        "scryfall_uri": "https://scryfall.com/card/fin/178/chocobo-kick",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ff8c8be0-8223-499c-8704-cb68e0a42ce2.jpg?1748706427",
+          "normal": "https://cards.scryfall.io/normal/front/f/f/ff8c8be0-8223-499c-8704-cb68e0a42ce2.jpg?1748706427"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Town Greeter",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 76,
+        "tier_rating": "B",
+        "note": null,
+        "id": "49cd4efa-4df4-4257-9a42-60330f7781e2",
+        "scryfall_uri": "https://scryfall.com/card/fin/209/town-greeter",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Citizen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/49cd4efa-4df4-4257-9a42-60330f7781e2.jpg?1748706545",
+          "normal": "https://cards.scryfall.io/normal/front/4/9/49cd4efa-4df4-4257-9a42-60330f7781e2.jpg?1748706545"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Goobbue Gardener",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 169,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b7c3544a-5dd5-423e-8a40-ac4803db8adc",
+        "scryfall_uri": "https://scryfall.com/card/fin/188/goobbue-gardener",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Plant Beast",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b7c3544a-5dd5-423e-8a40-ac4803db8adc.jpg?1748706464",
+          "normal": "https://cards.scryfall.io/normal/front/b/7/b7c3544a-5dd5-423e-8a40-ac4803db8adc.jpg?1748706464"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Scorpion Sentinel",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 150,
+        "tier_rating": "C",
+        "note": null,
+        "id": "08ab5220-e5c1-472e-8217-97fd60e1773c",
+        "scryfall_uri": "https://scryfall.com/card/fin/72/scorpion-sentinel",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Artifact Creature — Robot Scorpion",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08ab5220-e5c1-472e-8217-97fd60e1773c.jpg?1748706024",
+          "normal": "https://cards.scryfall.io/normal/front/0/8/08ab5220-e5c1-472e-8217-97fd60e1773c.jpg?1748706024"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ],
+    "Colorless_Artifacts": [
+      {
+        "name": "Malboro",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 134,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e46d8048-03ce-4e07-ba24-f41ba6140a4e",
+        "scryfall_uri": "https://scryfall.com/card/fin/106/malboro",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Plant Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e46d8048-03ce-4e07-ba24-f41ba6140a4e.jpg?1748706158",
+          "normal": "https://cards.scryfall.io/normal/front/e/4/e46d8048-03ce-4e07-ba24-f41ba6140a4e.jpg?1748706158"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Balamb T-Rexaur",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 154,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e5857b1b-73bc-458e-b26b-7ed8bef785f3",
+        "scryfall_uri": "https://scryfall.com/card/fin/173/balamb-t-rexaur",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/5/e5857b1b-73bc-458e-b26b-7ed8bef785f3.jpg?1748706407",
+          "normal": "https://cards.scryfall.io/normal/front/e/5/e5857b1b-73bc-458e-b26b-7ed8bef785f3.jpg?1748706407"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Paladin's Arms",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 145,
+        "tier_rating": "C",
+        "note": null,
+        "id": "446506c5-5e1d-4b42-aef3-ea247d7881ef",
+        "scryfall_uri": "https://scryfall.com/card/fin/28/paladins-arms",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/446506c5-5e1d-4b42-aef3-ea247d7881ef.jpg?1748705858",
+          "normal": "https://cards.scryfall.io/normal/front/4/4/446506c5-5e1d-4b42-aef3-ea247d7881ef.jpg?1748705858"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "World Map",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 299,
+        "tier_rating": "D",
+        "note": null,
+        "id": "70d9ab99-ec8a-402e-ba1d-ffa6c4c84a3f",
+        "scryfall_uri": "https://scryfall.com/card/fin/270/world-map",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70d9ab99-ec8a-402e-ba1d-ffa6c4c84a3f.jpg?1748706796",
+          "normal": "https://cards.scryfall.io/normal/front/7/0/70d9ab99-ec8a-402e-ba1d-ffa6c4c84a3f.jpg?1748706796"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Blitzball",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 306,
+        "tier_rating": "F",
+        "note": null,
+        "id": "92f4ad73-42bf-45c0-8bb6-0b44043c81ef",
+        "scryfall_uri": "https://scryfall.com/card/fin/254/blitzball",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/92f4ad73-42bf-45c0-8bb6-0b44043c81ef.jpg?1748706744",
+          "normal": "https://cards.scryfall.io/normal/front/9/2/92f4ad73-42bf-45c0-8bb6-0b44043c81ef.jpg?1748706744"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ]
+  },
+  "removal_priority": {
+    "overperformers": [
+      {
+        "name": "Cornered by Black Mages",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 69,
+        "tier_rating": "B",
+        "note": null,
+        "id": "688fcf8a-0a44-416a-8086-83acf9a6fe69",
+        "scryfall_uri": "https://scryfall.com/card/fin/93/cornered-by-black-mages",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/688fcf8a-0a44-416a-8086-83acf9a6fe69.jpg?1748706113",
+          "normal": "https://cards.scryfall.io/normal/front/6/8/688fcf8a-0a44-416a-8086-83acf9a6fe69.jpg?1748706113"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Blazing Bomb",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 121,
+        "tier_rating": "B",
+        "note": null,
+        "id": "70f47277-ca47-428a-808f-0fb32e820a71",
+        "scryfall_uri": "https://scryfall.com/card/fin/130/blazing-bomb",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Elemental",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70f47277-ca47-428a-808f-0fb32e820a71.jpg?1748706252",
+          "normal": "https://cards.scryfall.io/normal/front/7/0/70f47277-ca47-428a-808f-0fb32e820a71.jpg?1748706252"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Chocobo Kick",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 110,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ff8c8be0-8223-499c-8704-cb68e0a42ce2",
+        "scryfall_uri": "https://scryfall.com/card/fin/178/chocobo-kick",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ff8c8be0-8223-499c-8704-cb68e0a42ce2.jpg?1748706427",
+          "normal": "https://cards.scryfall.io/normal/front/f/f/ff8c8be0-8223-499c-8704-cb68e0a42ce2.jpg?1748706427"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ],
+    "underperformers": [
+      {
+        "name": "Light of Judgment",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 250,
+        "tier_rating": "D",
+        "note": null,
+        "id": "98bb716d-ca66-445f-9cb3-0fc656c8ebff",
+        "scryfall_uri": "https://scryfall.com/card/fin/144/light-of-judgment",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/8/98bb716d-ca66-445f-9cb3-0fc656c8ebff.jpg?1748706299",
+          "normal": "https://cards.scryfall.io/normal/front/9/8/98bb716d-ca66-445f-9cb3-0fc656c8ebff.jpg?1748706299"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Airship Crash",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 254,
+        "tier_rating": "D",
+        "note": null,
+        "id": "ec91c4e4-711f-464d-bc83-e6813f4fdcdb",
+        "scryfall_uri": "https://scryfall.com/card/fin/171/airship-crash",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/ec91c4e4-711f-464d-bc83-e6813f4fdcdb.jpg?1750188044",
+          "normal": "https://cards.scryfall.io/normal/front/e/c/ec91c4e4-711f-464d-bc83-e6813f4fdcdb.jpg?1750188044"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Stuck in Summoner's Sanctum",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 162,
+        "tier_rating": "C",
+        "note": "Generally worse than Ice Magic.",
+        "id": "6678501e-6349-4e37-ab4c-a31a3d408d52",
+        "scryfall_uri": "https://scryfall.com/card/fin/76/stuck-in-summoners-sanctum",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/6678501e-6349-4e37-ab4c-a31a3d408d52.jpg?1748706046",
+          "normal": "https://cards.scryfall.io/normal/front/6/6/6678501e-6349-4e37-ab4c-a31a3d408d52.jpg?1748706046"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ],
+    "splash_targets": [
+      {
+        "name": "Sephiroth's Intervention",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "A",
+        "note": null,
+        "id": "cf7df82f-937a-443f-813f-2bcc6944c5c0",
+        "scryfall_uri": "https://scryfall.com/card/fin/116/sephiroths-intervention",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf7df82f-937a-443f-813f-2bcc6944c5c0.jpg?1748706197",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cf7df82f-937a-443f-813f-2bcc6944c5c0.jpg?1748706197"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      },
+      {
+        "name": "Fate of the Sun-Cryst",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 213,
+        "tier_rating": "C",
+        "note": null,
+        "id": "900cdf11-b42e-4dcc-97c3-2e4d8e406a70",
+        "scryfall_uri": "https://scryfall.com/card/fin/19/fate-of-the-sun-cryst",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/900cdf11-b42e-4dcc-97c3-2e4d8e406a70.jpg?1748705825",
+          "normal": "https://cards.scryfall.io/normal/front/9/0/900cdf11-b42e-4dcc-97c3-2e4d8e406a70.jpg?1748705825"
+        },
+        "set": "fin",
+        "set_name": "Final Fantasy"
+      }
+    ]
+  },
+  "general_tips": [
+    "Stay 2-color unless you are drafting GUx Towns — dual lands and Travel the Overworld are what enable splashing.",
+    "Prioritize coherent synergies over loose bombs; the set rewards drafters who commit to an archetype.",
+    "Cloud of Darkness is the single best signpost — take it over almost anything if you are open in BG.",
+    "Summon: Fenrir is the best uncommon in the set; first-pick over most rares.",
+    "Avoid red unless you are in UR Big Spells; RG and BR are the weakest pairings.",
+    "Thunder Magic and Ice Magic enable multiple payoffs in UR Big Spells — pick them highly when in that lane."
+  ]
+}

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,13 +16,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -51,6 +53,7 @@ import com.mmg.manahub.feature.friends.domain.model.FriendCard
  * @param viewModel      ViewModel used to dispatch user actions.
  * @param friendNickname Friend's nickname, used in empty-state messages.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendFolderTab(
     uiState: FriendDetailViewModel.UiState,
@@ -63,6 +66,42 @@ fun FriendFolderTab(
     Column(
         modifier = Modifier.fillMaxSize(),
     ) {
+        // ── Sub-navigation chips ──────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            subTabs.forEach { subTab ->
+                FilterChip(
+                    modifier = Modifier.weight(1f),
+                    selected = uiState.folderSubTab == subTab,
+                    onClick = { viewModel.selectFolderSubTab(subTab) },
+                    label = {
+                        Text(
+                            text = subTabLabel(subTab),
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
+                        selectedLabelColor = mc.primaryAccent,
+                        containerColor = mc.surface,
+                        labelColor = mc.textSecondary,
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = uiState.folderSubTab == subTab,
+                        borderColor = mc.surfaceVariant,
+                        selectedBorderColor = mc.primaryAccent
+                    )
+                )
+            }
+        }
+
         // ── Search bar ────────────────────────────────────────────────────────
         OutlinedTextField(
             value = uiState.searchQuery,
@@ -87,29 +126,8 @@ fun FriendFolderTab(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         )
-
-        // ── Sub-tab row ───────────────────────────────────────────────────────
-        ScrollableTabRow(
-            selectedTabIndex = uiState.folderSubTab.ordinal,
-            containerColor = mc.backgroundSecondary,
-            contentColor = mc.primaryAccent,
-            edgePadding = 16.dp,
-        ) {
-            subTabs.forEachIndexed { index, subTab ->
-                Tab(
-                    selected = uiState.folderSubTab.ordinal == index,
-                    onClick = { viewModel.selectFolderSubTab(subTabs[index]) },
-                    text = {
-                        Text(
-                            text = subTabLabel(subTab),
-                            style = MaterialTheme.magicTypography.labelLarge,
-                        )
-                    },
-                )
-            }
-        }
 
         // ── Loading indicator (overlay, not replacing content) ────────────────
         if (uiState.isLoadingCards) {
@@ -157,10 +175,7 @@ fun FriendFolderTab(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 16.dp,
-                            vertical = 8.dp,
-                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     ) {
                         items(
                             items = uiState.cards,

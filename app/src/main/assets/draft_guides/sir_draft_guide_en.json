@@ -1,0 +1,2060 @@
+{
+  "metadata": {
+    "set_name": "Shadows over Innistrad Remastered",
+    "set_code": "SIR",
+    "source_url": "https://draftsim.com/mtg-sir-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "October 4, 2024"
+  },
+  "set_overview": {
+    "summary": "Shadows over Innistrad Remastered is an Arena-exclusive set combining cards from Shadows over Innistrad, Eldritch Moon, and older Innistrad block sets (Innistrad, Dark Ascension, Avacyn Restored). The \"Shadows of the Past\" slot rotates thematic card pools weekly over the month-long availability.",
+    "color_ranking": [
+      "{U} Blue — S-tier",
+      "{G} Green — A-tier",
+      "{W} White — A-tier",
+      "{R} Red — B-tier",
+      "{B} Black — C-tier"
+    ],
+    "color_notes": {
+      "{U} Blue": "Great support cards and archetypes.",
+      "{G} Green": "Strong commons and delirium payoffs.",
+      "{W} White": "Solid removal and creature support.",
+      "{R} Red": "Madness and spellslinger presence.",
+      "{B} Black": "Worst commons with lots of duds (Merciless Resolve)."
+    },
+    "key_gameplay_notes": [
+      "Set is softer on archetypes than most sets — six of the signposts are monocolor with off-color costs.",
+      "Bombs > strong general playables > speculative archetype payoffs > archetype filler > general filler.",
+      "Splashing is possible but not prominent; Simic Clues and Golgari Delirium are best splash candidates.",
+      "Commons matter — the gulf between commons and uncommons feels small.",
+      "Don't force decks based on the weekly Shadows of the Past theme; solid fundamentals beat theme exploitation."
+    ],
+    "shadows_of_the_past_themes": {
+      "week_1": "Creature Type Terror (tribal effects)",
+      "week_2": "Fatal Flashback (flashback spells)",
+      "week_3": "Morbid and Macabre (morbid / \"dies\" triggers)",
+      "week_4": "Abominable All Stars (mythics / iconic spells)"
+    }
+  },
+  "mechanics": [
+    {
+      "name": "Madness",
+      "summary": "Cast discarded cards from exile, often at a reduced cost. Primarily Rakdos.",
+      "performance": "Anchors RB Madness (A-tier).",
+      "key_examples": [
+        {
+          "name": "Alchemist's Greeting",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 110,
+          "tier_rating": "B",
+          "note": null,
+          "id": "893fc565-5baf-482a-8eb5-a57c3d7c8c3a",
+          "scryfall_uri": "https://scryfall.com/card/sir/140/alchemists-greeting",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/893fc565-5baf-482a-8eb5-a57c3d7c8c3a.jpg?1678945088",
+            "normal": "https://cards.scryfall.io/normal/front/8/9/893fc565-5baf-482a-8eb5-a57c3d7c8c3a.jpg?1678945088"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Fiery Temper",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 84,
+          "tier_rating": "A",
+          "note": null,
+          "id": "8226467d-45bb-4351-af38-28e79089c30f",
+          "scryfall_uri": "https://scryfall.com/card/sir/154/fiery-temper",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/8226467d-45bb-4351-af38-28e79089c30f.jpg?1678945111",
+            "normal": "https://cards.scryfall.io/normal/front/8/2/8226467d-45bb-4351-af38-28e79089c30f.jpg?1678945111"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Olivia's Dragoon",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 187,
+          "tier_rating": "C",
+          "note": null,
+          "id": "657feaae-e4bf-4f8c-b908-b99aa1d5adda",
+          "scryfall_uri": "https://scryfall.com/card/sir/128/olivias-dragoon",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Vampire Berserker",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/657feaae-e4bf-4f8c-b908-b99aa1d5adda.jpg?1678945071",
+            "normal": "https://cards.scryfall.io/normal/front/6/5/657feaae-e4bf-4f8c-b908-b99aa1d5adda.jpg?1678945071"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Tormenting Voice",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 264,
+          "tier_rating": "D",
+          "note": null,
+          "id": "01f0e847-0fa6-4c7e-a240-91d333f0bb7e",
+          "scryfall_uri": "https://scryfall.com/card/sir/181/tormenting-voice",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/01f0e847-0fa6-4c7e-a240-91d333f0bb7e.jpg?1678945155",
+            "normal": "https://cards.scryfall.io/normal/front/0/1/01f0e847-0fa6-4c7e-a240-91d333f0bb7e.jpg?1678945155"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Delirium",
+      "summary": "Cards trigger powerful effects when 4+ card types are in your graveyard. Primarily Golgari.",
+      "performance": "Anchors BG Delirium (A-tier).",
+      "key_examples": [
+        {
+          "name": "Gnarlwood Dryad",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 136,
+          "tier_rating": "B",
+          "note": null,
+          "id": "ef465aae-66ac-4963-ae3f-a58b378f6006",
+          "scryfall_uri": "https://scryfall.com/card/sir/196/gnarlwood-dryad",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Dryad Horror",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef465aae-66ac-4963-ae3f-a58b378f6006.jpg?1678945178",
+            "normal": "https://cards.scryfall.io/normal/front/e/f/ef465aae-66ac-4963-ae3f-a58b378f6006.jpg?1678945178"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Obsessive Skinner",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 125,
+          "tier_rating": "B",
+          "note": null,
+          "id": "75f08d3f-7ee1-4a02-ab11-86a4a9aa924f",
+          "scryfall_uri": "https://scryfall.com/card/sir/207/obsessive-skinner",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/75f08d3f-7ee1-4a02-ab11-86a4a9aa924f.jpg?1678945196",
+            "normal": "https://cards.scryfall.io/normal/front/7/5/75f08d3f-7ee1-4a02-ab11-86a4a9aa924f.jpg?1678945196"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Dead Weight",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 101,
+          "tier_rating": "B",
+          "note": null,
+          "id": "c352ac9e-b640-4da3-9cfa-a1fe742638a6",
+          "scryfall_uri": "https://scryfall.com/card/sir/106/dead-weight",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039",
+            "normal": "https://cards.scryfall.io/normal/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Grapple with the Past",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 276,
+          "tier_rating": "D",
+          "note": null,
+          "id": "ff751882-a362-45fc-b69d-4cb27949536b",
+          "scryfall_uri": "https://scryfall.com/card/sir/198/grapple-with-the-past",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ff751882-a362-45fc-b69d-4cb27949536b.jpg?1678945180",
+            "normal": "https://cards.scryfall.io/normal/front/f/f/ff751882-a362-45fc-b69d-4cb27949536b.jpg?1678945180"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Vessel of Nascency",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 248,
+          "tier_rating": "D",
+          "note": null,
+          "id": "ff1b8d52-23f2-4c4f-9dab-2ca1f62b4e9d",
+          "scryfall_uri": "https://scryfall.com/card/sir/224/vessel-of-nascency",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ff1b8d52-23f2-4c4f-9dab-2ca1f62b4e9d.jpg?1678945221",
+            "normal": "https://cards.scryfall.io/normal/front/f/f/ff1b8d52-23f2-4c4f-9dab-2ca1f62b4e9d.jpg?1678945221"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Terrarion",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 317,
+          "tier_rating": "F",
+          "note": null,
+          "id": "78a78281-f908-436a-b86d-5d39ea8dc99b",
+          "scryfall_uri": "https://scryfall.com/card/sir/261/terrarion",
+          "colors": [],
+          "type_line": "Artifact",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/8/78a78281-f908-436a-b86d-5d39ea8dc99b.jpg?1678945279",
+            "normal": "https://cards.scryfall.io/normal/front/7/8/78a78281-f908-436a-b86d-5d39ea8dc99b.jpg?1678945279"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Emerge",
+      "summary": "Sacrifice a creature to reduce the casting cost of a spell by the creature's mana value. Multicolor with Simic emphasis.",
+      "performance": "Strong modal play — cheap with setup or hard cast late.",
+      "key_examples": [
+        {
+          "name": "Wretched Gryff",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 195,
+          "tier_rating": "C",
+          "note": null,
+          "id": "9e1914cc-0d51-43a6-b4a3-16de696d1d5a",
+          "scryfall_uri": "https://scryfall.com/card/sir/9/wretched-gryff",
+          "colors": [],
+          "type_line": "Creature — Eldrazi Hippogriff",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/e/9e1914cc-0d51-43a6-b4a3-16de696d1d5a.jpg?1678945273",
+            "normal": "https://cards.scryfall.io/normal/front/9/e/9e1914cc-0d51-43a6-b4a3-16de696d1d5a.jpg?1678945273"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Exultant Cultist",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 239,
+          "tier_rating": "D",
+          "note": null,
+          "id": "91c7e3c3-37de-4f6a-a719-284a8c8d32e3",
+          "scryfall_uri": "https://scryfall.com/card/sir/68/exultant-cultist",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Human Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/91c7e3c3-37de-4f6a-a719-284a8c8d32e3.jpg?1678944974",
+            "normal": "https://cards.scryfall.io/normal/front/9/1/91c7e3c3-37de-4f6a-a719-284a8c8d32e3.jpg?1678944974"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Clues / Investigate",
+      "summary": "Create Clue tokens you can sacrifice for two mana to draw a card. Blue/green primarily.",
+      "performance": "Anchors UG Clues/Emerge (A-tier).",
+      "key_examples": [
+        {
+          "name": "Ongoing Investigation",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 94,
+          "tier_rating": "B",
+          "note": null,
+          "id": "c464b2f5-54e0-45a7-a58c-750f587ca339",
+          "scryfall_uri": "https://scryfall.com/card/sir/84/ongoing-investigation",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c464b2f5-54e0-45a7-a58c-750f587ca339.jpg?1678945004",
+            "normal": "https://cards.scryfall.io/normal/front/c/4/c464b2f5-54e0-45a7-a58c-750f587ca339.jpg?1678945004"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Fleeting Memories",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 313,
+          "tier_rating": "F",
+          "note": null,
+          "id": "14ee271d-f545-4fde-a859-f8a1bb92d512",
+          "scryfall_uri": "https://scryfall.com/card/sir/69/fleeting-memories",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/14ee271d-f545-4fde-a859-f8a1bb92d512.jpg?1678944976",
+            "normal": "https://cards.scryfall.io/normal/front/1/4/14ee271d-f545-4fde-a859-f8a1bb92d512.jpg?1678944976"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Confront the Unknown",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 302,
+          "tier_rating": "D",
+          "note": null,
+          "id": "856c3be0-afe1-40c3-b84f-b50235246216",
+          "scryfall_uri": "https://scryfall.com/card/sir/190/confront-the-unknown",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/856c3be0-afe1-40c3-b84f-b50235246216.jpg?1678945169",
+            "normal": "https://cards.scryfall.io/normal/front/8/5/856c3be0-afe1-40c3-b84f-b50235246216.jpg?1678945169"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Graf Mole",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 137,
+          "tier_rating": "B",
+          "note": null,
+          "id": "74d7b5f1-09fc-4c84-aed1-3c92623449cc",
+          "scryfall_uri": "https://scryfall.com/card/sir/197/graf-mole",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Mole Beast",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74d7b5f1-09fc-4c84-aed1-3c92623449cc.jpg?1678945179",
+            "normal": "https://cards.scryfall.io/normal/front/7/4/74d7b5f1-09fc-4c84-aed1-3c92623449cc.jpg?1678945179"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Ulvenwald Mysteries",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 127,
+          "tier_rating": "B",
+          "note": null,
+          "id": "c6079979-8613-4613-a5bd-6b1fab382767",
+          "scryfall_uri": "https://scryfall.com/card/sir/223/ulvenwald-mysteries",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/6/c6079979-8613-4613-a5bd-6b1fab382767.jpg?1679728432",
+            "normal": "https://cards.scryfall.io/normal/front/c/6/c6079979-8613-4613-a5bd-6b1fab382767.jpg?1679728432"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Transform",
+      "summary": "Double-faced cards flip based on spell-cast conditions or mana payments.",
+      "performance": "Universal — every color has examples; emphasis Red/Green.",
+      "key_examples": [
+        {
+          "name": "Hinterland Logger",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 185,
+          "tier_rating": "C",
+          "note": null,
+          "id": "a190f230-f069-4086-9027-c1d9ded8cb6b",
+          "scryfall_uri": "https://scryfall.com/card/sir/201/hinterland-logger-timber-shredder",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a190f230-f069-4086-9027-c1d9ded8cb6b.jpg?1678945778",
+            "normal": "https://cards.scryfall.io/normal/front/a/1/a190f230-f069-4086-9027-c1d9ded8cb6b.jpg?1678945778"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Ulvenwald Captive",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 97,
+          "tier_rating": "B",
+          "note": null,
+          "id": "1cde776b-da69-44e8-8c09-d6f118835ec2",
+          "scryfall_uri": "https://scryfall.com/card/sir/221/ulvenwald-captive-ulvenwald-abomination",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Werewolf Horror // Creature — Eldrazi Werewolf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1cde776b-da69-44e8-8c09-d6f118835ec2.jpg?1678945760",
+            "normal": "https://cards.scryfall.io/normal/front/1/c/1cde776b-da69-44e8-8c09-d6f118835ec2.jpg?1678945760"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Meld",
+      "summary": "Specific card pairs combine into a single powerful card under conditions. Rare; high payoff when assembled.",
+      "performance": "Niche; hard to set up.",
+      "key_examples": [
+        {
+          "name": "Graf Rats",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 223,
+          "tier_rating": "C",
+          "note": null,
+          "id": "966822eb-17fe-474b-86ee-78a7b23f3f03",
+          "scryfall_uri": "https://scryfall.com/card/sir/115/graf-rats",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Rat",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/966822eb-17fe-474b-86ee-78a7b23f3f03.jpg?1756757796",
+            "normal": "https://cards.scryfall.io/normal/front/9/6/966822eb-17fe-474b-86ee-78a7b23f3f03.jpg?1756757796"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Midnight Scavengers",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 206,
+          "tier_rating": "C",
+          "note": null,
+          "id": "b483a253-c76d-42e3-97fc-f283e61117d6",
+          "scryfall_uri": "https://scryfall.com/card/sir/123/midnight-scavengers",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Human Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b483a253-c76d-42e3-97fc-f283e61117d6.jpg?1678945326",
+            "normal": "https://cards.scryfall.io/normal/front/b/4/b483a253-c76d-42e3-97fc-f283e61117d6.jpg?1678945326"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Hanweir Battlements",
+          "color": "C",
+          "rarity": "Rare",
+          "pick_order_rank": 225,
+          "tier_rating": "C",
+          "note": null,
+          "id": "77e843e3-edbe-4950-afe0-8430a9eb893e",
+          "scryfall_uri": "https://scryfall.com/card/sir/271/hanweir-battlements",
+          "colors": [],
+          "type_line": "Land",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/77e843e3-edbe-4950-afe0-8430a9eb893e.jpg?1678945321",
+            "normal": "https://cards.scryfall.io/normal/front/7/7/77e843e3-edbe-4950-afe0-8430a9eb893e.jpg?1678945321"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Hanweir Garrison",
+          "color": "R",
+          "rarity": "Rare",
+          "pick_order_rank": 56,
+          "tier_rating": "A",
+          "note": null,
+          "id": "85822129-ee39-4239-ba88-807435170f94",
+          "scryfall_uri": "https://scryfall.com/card/sir/161/hanweir-garrison",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85822129-ee39-4239-ba88-807435170f94.jpg?1756757833",
+            "normal": "https://cards.scryfall.io/normal/front/8/5/85822129-ee39-4239-ba88-807435170f94.jpg?1756757833"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Gisela, the Broken Blade",
+          "color": "W",
+          "rarity": "Mythic",
+          "pick_order_rank": 10,
+          "tier_rating": "S",
+          "note": null,
+          "id": "bcaad0d2-4f73-4d09-80f2-5975a498ea19",
+          "scryfall_uri": "https://scryfall.com/card/sir/30/gisela-the-broken-blade",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Legendary Creature — Angel Horror",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/c/bcaad0d2-4f73-4d09-80f2-5975a498ea19.jpg?1679517836",
+            "normal": "https://cards.scryfall.io/normal/front/b/c/bcaad0d2-4f73-4d09-80f2-5975a498ea19.jpg?1679517836"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        },
+        {
+          "name": "Bruna, the Fading Light",
+          "color": "W",
+          "rarity": "Rare",
+          "pick_order_rank": 40,
+          "tier_rating": "S",
+          "note": null,
+          "id": "25fe1de0-431e-4a33-a6e2-c68dad7c17fe",
+          "scryfall_uri": "https://scryfall.com/card/sir/17/bruna-the-fading-light",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Legendary Creature — Angel Horror",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25fe1de0-431e-4a33-a6e2-c68dad7c17fe.jpg?1756757855",
+            "normal": "https://cards.scryfall.io/normal/front/2/5/25fe1de0-431e-4a33-a6e2-c68dad7c17fe.jpg?1756757855"
+          },
+          "set": "sir",
+          "set_name": "Shadows over Innistrad Remastered"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_a": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Spirits (Tempo)",
+        "tier": "A-tier",
+        "strategy": "Tempo deck built around spirits with fliers. Uses Nebelgast Herald and Essence Flux for disruption.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Spectral Shepherd",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 165,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ab6c47be-9b83-46c7-a55f-1b1ee7f4049e",
+            "scryfall_uri": "https://scryfall.com/card/sir/45/spectral-shepherd",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/ab6c47be-9b83-46c7-a55f-1b1ee7f4049e.jpg?1678944940",
+              "normal": "https://cards.scryfall.io/normal/front/a/b/ab6c47be-9b83-46c7-a55f-1b1ee7f4049e.jpg?1678944940"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Nebelgast Herald",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 104,
+            "tier_rating": "B",
+            "note": null,
+            "id": "09379023-478a-4ef2-a557-edb93a439501",
+            "scryfall_uri": "https://scryfall.com/card/sir/83/nebelgast-herald",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09379023-478a-4ef2-a557-edb93a439501.jpg?1678945003",
+              "normal": "https://cards.scryfall.io/normal/front/0/9/09379023-478a-4ef2-a557-edb93a439501.jpg?1678945003"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Essence Flux",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 345,
+            "tier_rating": "F",
+            "note": null,
+            "id": "c431a7df-1db1-4525-bcb3-a9a5c0da72ad",
+            "scryfall_uri": "https://scryfall.com/card/sir/67/essence-flux",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c431a7df-1db1-4525-bcb3-a9a5c0da72ad.jpg?1678944972",
+              "normal": "https://cards.scryfall.io/normal/front/c/4/c431a7df-1db1-4525-bcb3-a9a5c0da72ad.jpg?1678944972"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Clues / Emerge (Midrange-Control)",
+        "tier": "A-tier",
+        "strategy": "Grind value through Clue tokens and emerge synergies.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Ongoing Investigation",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 94,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c464b2f5-54e0-45a7-a58c-750f587ca339",
+            "scryfall_uri": "https://scryfall.com/card/sir/84/ongoing-investigation",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c464b2f5-54e0-45a7-a58c-750f587ca339.jpg?1678945004",
+              "normal": "https://cards.scryfall.io/normal/front/c/4/c464b2f5-54e0-45a7-a58c-750f587ca339.jpg?1678945004"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Graf Mole",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 137,
+            "tier_rating": "B",
+            "note": null,
+            "id": "74d7b5f1-09fc-4c84-aed1-3c92623449cc",
+            "scryfall_uri": "https://scryfall.com/card/sir/197/graf-mole",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Mole Beast",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74d7b5f1-09fc-4c84-aed1-3c92623449cc.jpg?1678945179",
+              "normal": "https://cards.scryfall.io/normal/front/7/4/74d7b5f1-09fc-4c84-aed1-3c92623449cc.jpg?1678945179"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Wretched Gryff",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 195,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9e1914cc-0d51-43a6-b4a3-16de696d1d5a",
+            "scryfall_uri": "https://scryfall.com/card/sir/9/wretched-gryff",
+            "colors": [],
+            "type_line": "Creature — Eldrazi Hippogriff",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/e/9e1914cc-0d51-43a6-b4a3-16de696d1d5a.jpg?1678945273",
+              "normal": "https://cards.scryfall.io/normal/front/9/e/9e1914cc-0d51-43a6-b4a3-16de696d1d5a.jpg?1678945273"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Exultant Cultist",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 239,
+            "tier_rating": "D",
+            "note": null,
+            "id": "91c7e3c3-37de-4f6a-a719-284a8c8d32e3",
+            "scryfall_uri": "https://scryfall.com/card/sir/68/exultant-cultist",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/91c7e3c3-37de-4f6a-a719-284a8c8d32e3.jpg?1678944974",
+              "normal": "https://cards.scryfall.io/normal/front/9/1/91c7e3c3-37de-4f6a-a719-284a8c8d32e3.jpg?1678944974"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Madness (Tempo-Aggro)",
+        "tier": "A-tier",
+        "strategy": "Discard-madness synergy with a vampire tribal element.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Alchemist's Greeting",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 110,
+            "tier_rating": "B",
+            "note": null,
+            "id": "893fc565-5baf-482a-8eb5-a57c3d7c8c3a",
+            "scryfall_uri": "https://scryfall.com/card/sir/140/alchemists-greeting",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/893fc565-5baf-482a-8eb5-a57c3d7c8c3a.jpg?1678945088",
+              "normal": "https://cards.scryfall.io/normal/front/8/9/893fc565-5baf-482a-8eb5-a57c3d7c8c3a.jpg?1678945088"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Fiery Temper",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 84,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8226467d-45bb-4351-af38-28e79089c30f",
+            "scryfall_uri": "https://scryfall.com/card/sir/154/fiery-temper",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/8226467d-45bb-4351-af38-28e79089c30f.jpg?1678945111",
+              "normal": "https://cards.scryfall.io/normal/front/8/2/8226467d-45bb-4351-af38-28e79089c30f.jpg?1678945111"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Ravenous Bloodseeker",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 227,
+            "tier_rating": "C",
+            "note": null,
+            "id": "126e8d21-dbe7-43f5-9b3d-81bcbe306d2f",
+            "scryfall_uri": "https://scryfall.com/card/sir/173/ravenous-bloodseeker",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Vampire Berserker",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/126e8d21-dbe7-43f5-9b3d-81bcbe306d2f.jpg?1678945139",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/126e8d21-dbe7-43f5-9b3d-81bcbe306d2f.jpg?1678945139"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Olivia's Dragoon",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 187,
+            "tier_rating": "C",
+            "note": null,
+            "id": "657feaae-e4bf-4f8c-b908-b99aa1d5adda",
+            "scryfall_uri": "https://scryfall.com/card/sir/128/olivias-dragoon",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire Berserker",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/657feaae-e4bf-4f8c-b908-b99aa1d5adda.jpg?1678945071",
+              "normal": "https://cards.scryfall.io/normal/front/6/5/657feaae-e4bf-4f8c-b908-b99aa1d5adda.jpg?1678945071"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Tormenting Voice",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 264,
+            "tier_rating": "D",
+            "note": null,
+            "id": "01f0e847-0fa6-4c7e-a240-91d333f0bb7e",
+            "scryfall_uri": "https://scryfall.com/card/sir/181/tormenting-voice",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/01f0e847-0fa6-4c7e-a240-91d333f0bb7e.jpg?1678945155",
+              "normal": "https://cards.scryfall.io/normal/front/0/1/01f0e847-0fa6-4c7e-a240-91d333f0bb7e.jpg?1678945155"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Olivia's Bloodsworn",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 138,
+            "tier_rating": "B",
+            "note": null,
+            "id": "2e5fbfc5-62dd-41dc-8acb-97978eea0c3f",
+            "scryfall_uri": "https://scryfall.com/card/sir/127/olivias-bloodsworn",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/e/2e5fbfc5-62dd-41dc-8acb-97978eea0c3f.jpg?1678945069",
+              "normal": "https://cards.scryfall.io/normal/front/2/e/2e5fbfc5-62dd-41dc-8acb-97978eea0c3f.jpg?1678945069"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Indulgent Aristocrat",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 337,
+            "tier_rating": "F",
+            "note": null,
+            "id": "84a20b23-e34d-47aa-8695-c2baf87f8032",
+            "scryfall_uri": "https://scryfall.com/card/sir/118/indulgent-aristocrat",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/84a20b23-e34d-47aa-8695-c2baf87f8032.jpg?1678945055",
+              "normal": "https://cards.scryfall.io/normal/front/8/4/84a20b23-e34d-47aa-8695-c2baf87f8032.jpg?1678945055"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Stensia Masquerade",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 338,
+            "tier_rating": "F",
+            "note": null,
+            "id": "3a47864a-ad4a-4088-a024-b4eb585bd457",
+            "scryfall_uri": "https://scryfall.com/card/sir/178/stensia-masquerade",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a47864a-ad4a-4088-a024-b4eb585bd457.jpg?1678945147",
+              "normal": "https://cards.scryfall.io/normal/front/3/a/3a47864a-ad4a-4088-a024-b4eb585bd457.jpg?1678945147"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Stromkirk Condemned",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 58,
+            "tier_rating": "A",
+            "note": null,
+            "id": "b4a1fb4b-e696-47b5-841e-bd9836410b36",
+            "scryfall_uri": "https://scryfall.com/card/sir/134/stromkirk-condemned",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Vampire Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4a1fb4b-e696-47b5-841e-bd9836410b36.jpg?1678945079",
+              "normal": "https://cards.scryfall.io/normal/front/b/4/b4a1fb4b-e696-47b5-841e-bd9836410b36.jpg?1678945079"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Delirium (Midrange)",
+        "tier": "A-tier",
+        "strategy": "Enable delirium through the 4+ card type graveyard threshold. Sample card-type balance: 11 creatures, 3 artifacts, 3 enchantments, 3 instants, 3 sorceries, 17 lands.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Gnarlwood Dryad",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 136,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ef465aae-66ac-4963-ae3f-a58b378f6006",
+            "scryfall_uri": "https://scryfall.com/card/sir/196/gnarlwood-dryad",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Dryad Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef465aae-66ac-4963-ae3f-a58b378f6006.jpg?1678945178",
+              "normal": "https://cards.scryfall.io/normal/front/e/f/ef465aae-66ac-4963-ae3f-a58b378f6006.jpg?1678945178"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Obsessive Skinner",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 125,
+            "tier_rating": "B",
+            "note": null,
+            "id": "75f08d3f-7ee1-4a02-ab11-86a4a9aa924f",
+            "scryfall_uri": "https://scryfall.com/card/sir/207/obsessive-skinner",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/75f08d3f-7ee1-4a02-ab11-86a4a9aa924f.jpg?1678945196",
+              "normal": "https://cards.scryfall.io/normal/front/7/5/75f08d3f-7ee1-4a02-ab11-86a4a9aa924f.jpg?1678945196"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Dead Weight",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 101,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c352ac9e-b640-4da3-9cfa-a1fe742638a6",
+            "scryfall_uri": "https://scryfall.com/card/sir/106/dead-weight",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039",
+              "normal": "https://cards.scryfall.io/normal/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Grapple with the Past",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 276,
+            "tier_rating": "D",
+            "note": null,
+            "id": "ff751882-a362-45fc-b69d-4cb27949536b",
+            "scryfall_uri": "https://scryfall.com/card/sir/198/grapple-with-the-past",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ff751882-a362-45fc-b69d-4cb27949536b.jpg?1678945180",
+              "normal": "https://cards.scryfall.io/normal/front/f/f/ff751882-a362-45fc-b69d-4cb27949536b.jpg?1678945180"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_b": [
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Zombies (Tribal Midrange)",
+        "tier": "B-tier",
+        "strategy": "Tribal zombie payoffs; heavily dependent on rare cards.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Drunau Corpse Trawler",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 120,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b06a3112-a27e-44ba-872a-c7fb5e0b29ad",
+            "scryfall_uri": "https://scryfall.com/card/sir/64/drunau-corpse-trawler",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Zombie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b06a3112-a27e-44ba-872a-c7fb5e0b29ad.jpg?1678944966",
+              "normal": "https://cards.scryfall.io/normal/front/b/0/b06a3112-a27e-44ba-872a-c7fb5e0b29ad.jpg?1678944966"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Diregraf Colossus",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 79,
+            "tier_rating": "A",
+            "note": null,
+            "id": "d0f7808b-fc76-4108-a8d5-43b38b18f8a1",
+            "scryfall_uri": "https://scryfall.com/card/sir/108/diregraf-colossus",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie Giant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/0/d0f7808b-fc76-4108-a8d5-43b38b18f8a1.jpg?1678945039",
+              "normal": "https://cards.scryfall.io/normal/front/d/0/d0f7808b-fc76-4108-a8d5-43b38b18f8a1.jpg?1678945039"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Gisa and Geralf",
+            "color": "UB",
+            "rarity": "Mythic",
+            "pick_order_rank": 34,
+            "tier_rating": "S",
+            "note": null,
+            "id": "b23a6f7e-c0b8-4e85-9270-254bfb221ae0",
+            "scryfall_uri": "https://scryfall.com/card/sir/233/gisa-and-geralf",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b23a6f7e-c0b8-4e85-9270-254bfb221ae0.jpg?1678945235",
+              "normal": "https://cards.scryfall.io/normal/front/b/2/b23a6f7e-c0b8-4e85-9270-254bfb221ae0.jpg?1678945235"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Dark Salvation",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 16,
+            "tier_rating": "S",
+            "note": null,
+            "id": "d38bf566-d2f6-4f86-9e16-f39c85f8b947",
+            "scryfall_uri": "https://scryfall.com/card/sir/105/dark-salvation",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d38bf566-d2f6-4f86-9e16-f39c85f8b947.jpg?1678945038",
+              "normal": "https://cards.scryfall.io/normal/front/d/3/d38bf566-d2f6-4f86-9e16-f39c85f8b947.jpg?1678945038"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Spells (Tempo-Control)",
+        "tier": "B-tier",
+        "strategy": "Two distinct builds. Slow: Rise from the Tides + removal/draw. Fast: Mercurial Geists with pump spells and untap synergies.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Rise from the Tides",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 295,
+            "tier_rating": "D",
+            "note": null,
+            "id": "84646b55-a986-4781-8c40-319ba4c94f3a",
+            "scryfall_uri": "https://scryfall.com/card/sir/88/rise-from-the-tides",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/84646b55-a986-4781-8c40-319ba4c94f3a.jpg?1678945012",
+              "normal": "https://cards.scryfall.io/normal/front/8/4/84646b55-a986-4781-8c40-319ba4c94f3a.jpg?1678945012"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Mercurial Geists",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 186,
+            "tier_rating": "C",
+            "note": null,
+            "id": "478673f0-e146-496f-bcf0-7fccc6566947",
+            "scryfall_uri": "https://scryfall.com/card/sir/236/mercurial-geists",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/7/478673f0-e146-496f-bcf0-7fccc6566947.jpg?1678945243",
+              "normal": "https://cards.scryfall.io/normal/front/4/7/478673f0-e146-496f-bcf0-7fccc6566947.jpg?1678945243"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Take Inventory",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 336,
+            "tier_rating": "F",
+            "note": null,
+            "id": "b4f414aa-b170-4883-9c8c-2e4b45507493",
+            "scryfall_uri": "https://scryfall.com/card/sir/93/take-inventory",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4f414aa-b170-4883-9c8c-2e4b45507493.jpg?1678945021",
+              "normal": "https://cards.scryfall.io/normal/front/b/4/b4f414aa-b170-4883-9c8c-2e4b45507493.jpg?1678945021"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Galvanic Bombardment",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 92,
+            "tier_rating": "B",
+            "note": null,
+            "id": "0b356415-b7a9-40b1-b7df-b36be8718a0c",
+            "scryfall_uri": "https://scryfall.com/card/sir/157/galvanic-bombardment",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116",
+              "normal": "https://cards.scryfall.io/normal/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Wolves (Midrange-Aggro)",
+        "tier": "B-tier",
+        "strategy": "Tribal wolves with midrange/aggro positioning. Payoffs are variable; high trap potential.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Ulrich's Kindred",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 117,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1030ef5a-79d5-4479-be1b-9f13709abbaf",
+            "scryfall_uri": "https://scryfall.com/card/sir/182/ulrichs-kindred",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Wolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/1030ef5a-79d5-4479-be1b-9f13709abbaf.jpg?1678945155",
+              "normal": "https://cards.scryfall.io/normal/front/1/0/1030ef5a-79d5-4479-be1b-9f13709abbaf.jpg?1678945155"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Geier Reach Bandit",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 85,
+            "tier_rating": "A",
+            "note": null,
+            "id": "5a9d4c81-455b-468b-bda1-58768255ebd0",
+            "scryfall_uri": "https://scryfall.com/card/sir/159/geier-reach-bandit-vildin-pack-alpha",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Rogue Werewolf // Creature — Werewolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a9d4c81-455b-468b-bda1-58768255ebd0.jpg?1678945659",
+              "normal": "https://cards.scryfall.io/normal/front/5/a/5a9d4c81-455b-468b-bda1-58768255ebd0.jpg?1678945659"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Duskwatch Recruiter",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 71,
+            "tier_rating": "A",
+            "note": null,
+            "id": "1031eeaa-6c21-4192-b185-85708819344d",
+            "scryfall_uri": "https://scryfall.com/card/sir/194/duskwatch-recruiter-krallenhorde-howler",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Warrior Werewolf // Creature — Werewolf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/1031eeaa-6c21-4192-b185-85708819344d.jpg?1678945742",
+              "normal": "https://cards.scryfall.io/normal/front/1/0/1031eeaa-6c21-4192-b185-85708819344d.jpg?1678945742"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Pack Guardian",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 105,
+            "tier_rating": "B",
+            "note": null,
+            "id": "8d1e8eb8-115e-41c4-bf49-7aa7ebd1c4e2",
+            "scryfall_uri": "https://scryfall.com/card/sir/208/pack-guardian",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Wolf Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d1e8eb8-115e-41c4-bf49-7aa7ebd1c4e2.jpg?1678945197",
+              "normal": "https://cards.scryfall.io/normal/front/8/d/8d1e8eb8-115e-41c4-bf49-7aa7ebd1c4e2.jpg?1678945197"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Moonlight Hunt",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 279,
+            "tier_rating": "D",
+            "note": null,
+            "id": "768ee736-9d47-4085-a0b6-a80ca150b499",
+            "scryfall_uri": "https://scryfall.com/card/sir/205/moonlight-hunt",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/6/768ee736-9d47-4085-a0b6-a80ca150b499.jpg?1678945191",
+              "normal": "https://cards.scryfall.io/normal/front/7/6/768ee736-9d47-4085-a0b6-a80ca150b499.jpg?1678945191"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Howlpack Resurgence",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 329,
+            "tier_rating": "F",
+            "note": null,
+            "id": "3e2438c0-8ea8-41e5-bdab-4b38ace45be0",
+            "scryfall_uri": "https://scryfall.com/card/sir/202/howlpack-resurgence",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/e/3e2438c0-8ea8-41e5-bdab-4b38ace45be0.jpg?1678945187",
+              "normal": "https://cards.scryfall.io/normal/front/3/e/3e2438c0-8ea8-41e5-bdab-4b38ace45be0.jpg?1678945187"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Humans (Aggro-Tribal)",
+        "tier": "B-tier",
+        "strategy": "Aggro with human tribal payoffs.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Veteran Cathar",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 109,
+            "tier_rating": "B",
+            "note": null,
+            "id": "3c6224d0-b4b6-4f75-b63d-c27a5833e053",
+            "scryfall_uri": "https://scryfall.com/card/sir/225/veteran-cathar",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3c6224d0-b4b6-4f75-b63d-c27a5833e053.jpg?1678945223",
+              "normal": "https://cards.scryfall.io/normal/front/3/c/3c6224d0-b4b6-4f75-b63d-c27a5833e053.jpg?1678945223"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Courageous Outrider",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 135,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5c71ec66-64c7-4e1d-9c07-51cbe5217619",
+            "scryfall_uri": "https://scryfall.com/card/sir/20/courageous-outrider",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c71ec66-64c7-4e1d-9c07-51cbe5217619.jpg?1678944894",
+              "normal": "https://cards.scryfall.io/normal/front/5/c/5c71ec66-64c7-4e1d-9c07-51cbe5217619.jpg?1678944894"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Heron's Grace Champion",
+            "color": "WG",
+            "rarity": "Rare",
+            "pick_order_rank": 26,
+            "tier_rating": "S",
+            "note": null,
+            "id": "b395f172-d839-4c48-a852-d9458f64e619",
+            "scryfall_uri": "https://scryfall.com/card/sir/235/herons-grace-champion",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b395f172-d839-4c48-a852-d9458f64e619.jpg?1678945240",
+              "normal": "https://cards.scryfall.io/normal/front/b/3/b395f172-d839-4c48-a852-d9458f64e619.jpg?1678945240"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "True-Faith Censer",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 318,
+            "tier_rating": "F",
+            "note": null,
+            "id": "02a27a84-1fff-4764-9a8b-2c7a6485975f",
+            "scryfall_uri": "https://scryfall.com/card/sir/262/true-faith-censer",
+            "colors": [],
+            "type_line": "Artifact — Equipment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02a27a84-1fff-4764-9a8b-2c7a6485975f.jpg?1678945283",
+              "normal": "https://cards.scryfall.io/normal/front/0/2/02a27a84-1fff-4764-9a8b-2c7a6485975f.jpg?1678945283"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_c": [
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Aggro",
+        "tier": "C-tier",
+        "strategy": "Attack-focused aggro; no compelling synergies beyond creature quality. \"Play them, curve out, and hope to draft a more fun deck next time.\"",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Ride Down",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 190,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1255e40a-8162-4f51-9cb8-6d823d890c42",
+            "scryfall_uri": "https://scryfall.com/card/sir/241/ride-down",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/1255e40a-8162-4f51-9cb8-6d823d890c42.jpg?1678945252",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/1255e40a-8162-4f51-9cb8-6d823d890c42.jpg?1678945252"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Midrange",
+        "tier": "C-tier",
+        "strategy": "Good-rate creatures and removal with a balanced curve; a slower Boros. Card advantage is hard to come by.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Anguished Unmaking",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 68,
+            "tier_rating": "A",
+            "note": null,
+            "id": "64f79d81-f3f1-4cf1-9159-007eb5d07d87",
+            "scryfall_uri": "https://scryfall.com/card/sir/229/anguished-unmaking",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/64f79d81-f3f1-4cf1-9159-007eb5d07d87.jpg?1678945232",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/64f79d81-f3f1-4cf1-9159-007eb5d07d87.jpg?1678945232"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          },
+          {
+            "name": "Sorin, Grim Nemesis",
+            "color": "WB",
+            "rarity": "Mythic",
+            "pick_order_rank": 2,
+            "tier_rating": "S",
+            "note": null,
+            "id": "829fba64-6708-40a9-b134-3cdfbf2c648f",
+            "scryfall_uri": "https://scryfall.com/card/sir/243/sorin-grim-nemesis",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Planeswalker — Sorin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/829fba64-6708-40a9-b134-3cdfbf2c648f.jpg?1678945253",
+              "normal": "https://cards.scryfall.io/normal/front/8/2/829fba64-6708-40a9-b134-3cdfbf2c648f.jpg?1678945253"
+            },
+            "set": "sir",
+            "set_name": "Shadows over Innistrad Remastered"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Thraben Inspector",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 167,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6c727d20-51a0-443a-9d40-6efe7b91193a",
+        "scryfall_uri": "https://scryfall.com/card/sir/51/thraben-inspector",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c727d20-51a0-443a-9d40-6efe7b91193a.jpg?1678944953",
+          "normal": "https://cards.scryfall.io/normal/front/6/c/6c727d20-51a0-443a-9d40-6efe7b91193a.jpg?1678944953"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      },
+      {
+        "name": "Bound by Moonsilver",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 82,
+        "tier_rating": "A",
+        "note": null,
+        "id": "160464c0-0d30-4332-bcab-521e51f6b347",
+        "scryfall_uri": "https://scryfall.com/card/sir/16/bound-by-moonsilver",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/6/160464c0-0d30-4332-bcab-521e51f6b347.jpg?1678944869",
+          "normal": "https://cards.scryfall.io/normal/front/1/6/160464c0-0d30-4332-bcab-521e51f6b347.jpg?1678944869"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Take Inventory",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 336,
+        "tier_rating": "F",
+        "note": null,
+        "id": "b4f414aa-b170-4883-9c8c-2e4b45507493",
+        "scryfall_uri": "https://scryfall.com/card/sir/93/take-inventory",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4f414aa-b170-4883-9c8c-2e4b45507493.jpg?1678945021",
+          "normal": "https://cards.scryfall.io/normal/front/b/4/b4f414aa-b170-4883-9c8c-2e4b45507493.jpg?1678945021"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      },
+      {
+        "name": "Drag Under",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 162,
+        "tier_rating": "C",
+        "note": null,
+        "id": "713e3d79-e364-4323-ba19-ed46f63f6c46",
+        "scryfall_uri": "https://scryfall.com/card/sir/62/drag-under",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/713e3d79-e364-4323-ba19-ed46f63f6c46.jpg?1678944963",
+          "normal": "https://cards.scryfall.io/normal/front/7/1/713e3d79-e364-4323-ba19-ed46f63f6c46.jpg?1678944963"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Dead Weight",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 101,
+        "tier_rating": "B",
+        "note": null,
+        "id": "c352ac9e-b640-4da3-9cfa-a1fe742638a6",
+        "scryfall_uri": "https://scryfall.com/card/sir/106/dead-weight",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039",
+          "normal": "https://cards.scryfall.io/normal/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      },
+      {
+        "name": "Gisa's Bidding",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 121,
+        "tier_rating": "B",
+        "note": null,
+        "id": "6a6619b7-429d-4855-9d8a-0a4a1486f18e",
+        "scryfall_uri": "https://scryfall.com/card/sir/113/gisas-bidding",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/a/6a6619b7-429d-4855-9d8a-0a4a1486f18e.jpg?1678945047",
+          "normal": "https://cards.scryfall.io/normal/front/6/a/6a6619b7-429d-4855-9d8a-0a4a1486f18e.jpg?1678945047"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Incendiary Flow",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 93,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e14b5e9d-1581-4dc6-ab7a-0cf02957166f",
+        "scryfall_uri": "https://scryfall.com/card/sir/163/incendiary-flow",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e14b5e9d-1581-4dc6-ab7a-0cf02957166f.jpg?1678945122",
+          "normal": "https://cards.scryfall.io/normal/front/e/1/e14b5e9d-1581-4dc6-ab7a-0cf02957166f.jpg?1678945122"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      },
+      {
+        "name": "Galvanic Bombardment",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "0b356415-b7a9-40b1-b7df-b36be8718a0c",
+        "scryfall_uri": "https://scryfall.com/card/sir/157/galvanic-bombardment",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116",
+          "normal": "https://cards.scryfall.io/normal/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Gnarlwood Dryad",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 136,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ef465aae-66ac-4963-ae3f-a58b378f6006",
+        "scryfall_uri": "https://scryfall.com/card/sir/196/gnarlwood-dryad",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dryad Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef465aae-66ac-4963-ae3f-a58b378f6006.jpg?1678945178",
+          "normal": "https://cards.scryfall.io/normal/front/e/f/ef465aae-66ac-4963-ae3f-a58b378f6006.jpg?1678945178"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      },
+      {
+        "name": "Obsessive Skinner",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 125,
+        "tier_rating": "B",
+        "note": null,
+        "id": "75f08d3f-7ee1-4a02-ab11-86a4a9aa924f",
+        "scryfall_uri": "https://scryfall.com/card/sir/207/obsessive-skinner",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/75f08d3f-7ee1-4a02-ab11-86a4a9aa924f.jpg?1678945196",
+          "normal": "https://cards.scryfall.io/normal/front/7/5/75f08d3f-7ee1-4a02-ab11-86a4a9aa924f.jpg?1678945196"
+        },
+        "set": "sir",
+        "set_name": "Shadows over Innistrad Remastered"
+      }
+    ]
+  },
+  "removal_priority": [
+    {
+      "name": "Take Inventory",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 336,
+      "tier_rating": "F",
+      "note": null,
+      "id": "b4f414aa-b170-4883-9c8c-2e4b45507493",
+      "scryfall_uri": "https://scryfall.com/card/sir/93/take-inventory",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4f414aa-b170-4883-9c8c-2e4b45507493.jpg?1678945021",
+        "normal": "https://cards.scryfall.io/normal/front/b/4/b4f414aa-b170-4883-9c8c-2e4b45507493.jpg?1678945021"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Galvanic Bombardment",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 92,
+      "tier_rating": "B",
+      "note": null,
+      "id": "0b356415-b7a9-40b1-b7df-b36be8718a0c",
+      "scryfall_uri": "https://scryfall.com/card/sir/157/galvanic-bombardment",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116",
+        "normal": "https://cards.scryfall.io/normal/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Thraben Inspector",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 167,
+      "tier_rating": "C",
+      "note": null,
+      "id": "6c727d20-51a0-443a-9d40-6efe7b91193a",
+      "scryfall_uri": "https://scryfall.com/card/sir/51/thraben-inspector",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Human Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c727d20-51a0-443a-9d40-6efe7b91193a.jpg?1678944953",
+        "normal": "https://cards.scryfall.io/normal/front/6/c/6c727d20-51a0-443a-9d40-6efe7b91193a.jpg?1678944953"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Bound by Moonsilver",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 82,
+      "tier_rating": "A",
+      "note": null,
+      "id": "160464c0-0d30-4332-bcab-521e51f6b347",
+      "scryfall_uri": "https://scryfall.com/card/sir/16/bound-by-moonsilver",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/6/160464c0-0d30-4332-bcab-521e51f6b347.jpg?1678944869",
+        "normal": "https://cards.scryfall.io/normal/front/1/6/160464c0-0d30-4332-bcab-521e51f6b347.jpg?1678944869"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Dead Weight",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 101,
+      "tier_rating": "B",
+      "note": null,
+      "id": "c352ac9e-b640-4da3-9cfa-a1fe742638a6",
+      "scryfall_uri": "https://scryfall.com/card/sir/106/dead-weight",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039",
+        "normal": "https://cards.scryfall.io/normal/front/c/3/c352ac9e-b640-4da3-9cfa-a1fe742638a6.jpg?1678945039"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Incendiary Flow",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 93,
+      "tier_rating": "B",
+      "note": null,
+      "id": "e14b5e9d-1581-4dc6-ab7a-0cf02957166f",
+      "scryfall_uri": "https://scryfall.com/card/sir/163/incendiary-flow",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e14b5e9d-1581-4dc6-ab7a-0cf02957166f.jpg?1678945122",
+        "normal": "https://cards.scryfall.io/normal/front/e/1/e14b5e9d-1581-4dc6-ab7a-0cf02957166f.jpg?1678945122"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Galvanic Bombardment",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 92,
+      "tier_rating": "B",
+      "note": null,
+      "id": "0b356415-b7a9-40b1-b7df-b36be8718a0c",
+      "scryfall_uri": "https://scryfall.com/card/sir/157/galvanic-bombardment",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116",
+        "normal": "https://cards.scryfall.io/normal/front/0/b/0b356415-b7a9-40b1-b7df-b36be8718a0c.jpg?1678945116"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    }
+  ],
+  "flash_creatures_to_watch": [
+    {
+      "name": "Drogskol Shieldmate",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 253,
+      "tier_rating": "D",
+      "note": null,
+      "id": "d52114f0-a55a-4d0c-afa1-70395d669ffe",
+      "scryfall_uri": "https://scryfall.com/card/sir/26/drogskol-shieldmate",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Spirit Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/5/d52114f0-a55a-4d0c-afa1-70395d669ffe.jpg?1678944911",
+        "normal": "https://cards.scryfall.io/normal/front/d/5/d52114f0-a55a-4d0c-afa1-70395d669ffe.jpg?1678944911"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    }
+  ],
+  "mana_fixing": [
+    {
+      "name": "Terrarion",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 317,
+      "tier_rating": "F",
+      "note": null,
+      "id": "78a78281-f908-436a-b86d-5d39ea8dc99b",
+      "scryfall_uri": "https://scryfall.com/card/sir/261/terrarion",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/8/78a78281-f908-436a-b86d-5d39ea8dc99b.jpg?1678945279",
+        "normal": "https://cards.scryfall.io/normal/front/7/8/78a78281-f908-436a-b86d-5d39ea8dc99b.jpg?1678945279"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Wild-Field Scarecrow",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 320,
+      "tier_rating": "F",
+      "note": null,
+      "id": "b1525786-3eb2-4684-a5f3-3cf9d4fa1497",
+      "scryfall_uri": "https://scryfall.com/card/sir/263/wild-field-scarecrow",
+      "colors": [],
+      "type_line": "Artifact Creature — Scarecrow",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/1/b1525786-3eb2-4684-a5f3-3cf9d4fa1497.jpg?1678945283",
+        "normal": "https://cards.scryfall.io/normal/front/b/1/b1525786-3eb2-4684-a5f3-3cf9d4fa1497.jpg?1678945283"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Weirding Wood",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 282,
+      "tier_rating": "D",
+      "note": null,
+      "id": "65b73086-30f0-44c6-bf83-a0faeb91e885",
+      "scryfall_uri": "https://scryfall.com/card/sir/226/weirding-wood",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/65b73086-30f0-44c6-bf83-a0faeb91e885.jpg?1678945225",
+        "normal": "https://cards.scryfall.io/normal/front/6/5/65b73086-30f0-44c6-bf83-a0faeb91e885.jpg?1678945225"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    }
+  ],
+  "bomb_rares": [
+    {
+      "name": "Archangel Avacyn",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": null,
+      "id": "71cece3e-0c43-48e3-8272-34c8d04b7909",
+      "scryfall_uri": "https://scryfall.com/card/sir/13/archangel-avacyn-avacyn-the-purifier",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Creature — Angel // Legendary Creature — Angel",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/71cece3e-0c43-48e3-8272-34c8d04b7909.jpg?1678945451",
+        "normal": "https://cards.scryfall.io/normal/front/7/1/71cece3e-0c43-48e3-8272-34c8d04b7909.jpg?1678945451"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Tireless Tracker",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 17,
+      "tier_rating": "S",
+      "note": null,
+      "id": "5015b027-de1c-4e1e-8cf3-d946b8a3a4a3",
+      "scryfall_uri": "https://scryfall.com/card/sir/219/tireless-tracker",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Human Scout",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/5015b027-de1c-4e1e-8cf3-d946b8a3a4a3.jpg?1678945215",
+        "normal": "https://cards.scryfall.io/normal/front/5/0/5015b027-de1c-4e1e-8cf3-d946b8a3a4a3.jpg?1678945215"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Ishkanah, Grafwidow",
+      "color": "G",
+      "rarity": "Mythic",
+      "pick_order_rank": 11,
+      "tier_rating": "S",
+      "note": null,
+      "id": "045b6009-6215-4d2b-acce-5d90f2d4e391",
+      "scryfall_uri": "https://scryfall.com/card/sir/204/ishkanah-grafwidow",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Legendary Creature — Spider",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/045b6009-6215-4d2b-acce-5d90f2d4e391.jpg?1678945188",
+        "normal": "https://cards.scryfall.io/normal/front/0/4/045b6009-6215-4d2b-acce-5d90f2d4e391.jpg?1678945188"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Diregraf Colossus",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 79,
+      "tier_rating": "A",
+      "note": null,
+      "id": "d0f7808b-fc76-4108-a8d5-43b38b18f8a1",
+      "scryfall_uri": "https://scryfall.com/card/sir/108/diregraf-colossus",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature — Zombie Giant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/0/d0f7808b-fc76-4108-a8d5-43b38b18f8a1.jpg?1678945039",
+        "normal": "https://cards.scryfall.io/normal/front/d/0/d0f7808b-fc76-4108-a8d5-43b38b18f8a1.jpg?1678945039"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Sorin, Grim Nemesis",
+      "color": "WB",
+      "rarity": "Mythic",
+      "pick_order_rank": 2,
+      "tier_rating": "S",
+      "note": null,
+      "id": "829fba64-6708-40a9-b134-3cdfbf2c648f",
+      "scryfall_uri": "https://scryfall.com/card/sir/243/sorin-grim-nemesis",
+      "colors": [
+        "B",
+        "W"
+      ],
+      "type_line": "Legendary Planeswalker — Sorin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/829fba64-6708-40a9-b134-3cdfbf2c648f.jpg?1678945253",
+        "normal": "https://cards.scryfall.io/normal/front/8/2/829fba64-6708-40a9-b134-3cdfbf2c648f.jpg?1678945253"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    },
+    {
+      "name": "Emrakul, the Promised End",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 29,
+      "tier_rating": "S",
+      "note": null,
+      "id": "aef9212c-9a66-4621-842d-c8b64f3937b2",
+      "scryfall_uri": "https://scryfall.com/card/sir/6/emrakul-the-promised-end",
+      "colors": [],
+      "type_line": "Legendary Creature — Eldrazi",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/aef9212c-9a66-4621-842d-c8b64f3937b2.jpg?1678945269",
+        "normal": "https://cards.scryfall.io/normal/front/a/e/aef9212c-9a66-4621-842d-c8b64f3937b2.jpg?1678945269"
+      },
+      "set": "sir",
+      "set_name": "Shadows over Innistrad Remastered"
+    }
+  ],
+  "general_tips": [
+    "Follow fundamentals — commons matter and the gulf to uncommons is small.",
+    "Don't force based on the weekly Shadows of the Past theme; respect signals.",
+    "Simic Clues and Golgari Delirium are the best splash candidates.",
+    "Bomb rares (Avacyn, Tireless Tracker, Ishkanah, Diregraf Colossus, Sorin) are too good to pass.",
+    "Use mana fixing (Terrarion, Wild-Field Scarecrow, Weirding Wood) for flexibility."
+  ]
+}
