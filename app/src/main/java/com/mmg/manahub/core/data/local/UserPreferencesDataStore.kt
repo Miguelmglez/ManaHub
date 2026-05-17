@@ -53,12 +53,6 @@ private val KEY_COLLECTION_PUBLIC  = booleanPreferencesKey("collection_public")
 private val KEY_WISHLIST_PUBLIC    = booleanPreferencesKey("wishlist_public")
 private val KEY_TRADE_LIST_PUBLIC  = booleanPreferencesKey("trade_list_public")
 
-// ── Per-user sync keys (keyed by userId to handle multi-account scenarios) ───
-private fun syncTimestampKey(userId: String) = stringPreferencesKey("sync_ts_$userId")
-private fun syncTimestampMillisKey(userId: String) = longPreferencesKey("sync_ts_ms_$userId")
-private fun syncDateKey(userId: String)      = stringPreferencesKey("sync_date_$userId")
-private fun pendingDeletesKey(userId: String) = stringSetPreferencesKey("sync_del_$userId")
-
 private data class UdtRecord(val k: String, val l: String, val c: String)
 private val udtListType = object : TypeToken<List<UdtRecord>>() {}.type
 private val gson = Gson()
@@ -79,9 +73,7 @@ class UserPreferencesDataStore @Inject constructor(
 
             UserPreferences(
                 appLanguage = AppLanguage.fromCode(
-                    prefs[KEY_APP_LANGUAGE]
-                        ?: "en"
-                        //?: if (deviceLang in listOf("en", "es", "de")) deviceLang else "en"
+                    prefs[KEY_APP_LANGUAGE] ?: "en"
                 ),
                 cardLanguage = CardLanguage.fromCode(
                     prefs[KEY_CARD_LANGUAGE] ?: "en"
@@ -125,10 +117,6 @@ class UserPreferencesDataStore @Inject constructor(
 
     override val preferredCurrencyFlow: Flow<PreferredCurrency> = preferencesFlow
         .map { it.preferredCurrency }
-
-    suspend fun savePreferredCurrency(currency: PreferredCurrency) {
-        setPreferredCurrency(currency)
-    }
 
     private fun defaultPreferences() = UserPreferences(
         appLanguage = AppLanguage.ENGLISH,
@@ -256,54 +244,6 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_COLLECTION_VIEW_MODE] = mode.name }
     }
 
-    // ── Sync metadata ─────────────────────────────────────────────────────────
-
-    // ── Delta-sync epoch millis watermark (new system — Last Write Wins) ────────
-
-    suspend fun getLastSyncTimestampMillis(userId: String): Long =
-        context.userPrefsDataStore.data.map { it[syncTimestampMillisKey(userId)] ?: 0L }.first()
-
-    suspend fun saveLastSyncTimestampMillis(userId: String, millis: Long) {
-        context.userPrefsDataStore.edit { it[syncTimestampMillisKey(userId)] = millis }
-    }
-
-    suspend fun clearLastSyncTimestampMillis(userId: String) {
-        context.userPrefsDataStore.edit { it.remove(syncTimestampMillisKey(userId)) }
-    }
-
-    // ── Legacy ISO-string sync keys (kept for backward-compat, not used by SyncManager) ─
-
-    suspend fun getLastSyncTimestamp(userId: String): String? {
-        return context.userPrefsDataStore.data.map { it[syncTimestampKey(userId)] }.first()
-    }
-
-    suspend fun saveLastSyncTimestamp(userId: String, isoTimestamp: String) {
-        context.userPrefsDataStore.edit { it[syncTimestampKey(userId)] = isoTimestamp }
-    }
-
-    suspend fun getLastSyncDate(userId: String): String? {
-        return context.userPrefsDataStore.data.map { it[syncDateKey(userId)] }.first()
-    }
-
-    suspend fun saveLastSyncDate(userId: String, isoDate: String) {
-        context.userPrefsDataStore.edit { it[syncDateKey(userId)] = isoDate }
-    }
-
-    suspend fun getPendingDeleteRemoteIds(userId: String): Set<String> {
-        return context.userPrefsDataStore.data.map { it[pendingDeletesKey(userId)] ?: emptySet() }.first()
-    }
-
-    suspend fun addPendingDeleteRemoteId(userId: String, remoteId: String) {
-        context.userPrefsDataStore.edit { prefs ->
-            val current = prefs[pendingDeletesKey(userId)] ?: emptySet()
-            prefs[pendingDeletesKey(userId)] = current + remoteId
-        }
-    }
-
-    suspend fun clearPendingDeleteRemoteIds(userId: String) {
-        context.userPrefsDataStore.edit { it.remove(pendingDeletesKey(userId)) }
-    }
-
     // ── Embedding database version ────────────────────────────────────────────
 
     /** Emits the locally stored version of the downloaded embedding DB (0 = bundled asset only). */
@@ -352,16 +292,6 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun saveTradeListPublic(value: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_TRADE_LIST_PUBLIC] = value }
-    }
-
-    // ── Stats sync watermark ──────────────────────────────────────────────────
-    // Used by CollectionStatsSyncWorker to avoid re-uploading stats more than once per 23h.
-
-    suspend fun getLastStatsSyncMillis(userId: String): Long =
-        context.userPrefsDataStore.data.map { it[longPreferencesKey("stats_sync_ms_$userId")] ?: 0L }.first()
-
-    suspend fun saveLastStatsSyncMillis(userId: String, millis: Long) {
-        context.userPrefsDataStore.edit { it[longPreferencesKey("stats_sync_ms_$userId")] = millis }
     }
 
     suspend fun saveTheme(theme: AppTheme) {

@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.decks.presentation.improvement
 
-
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,8 +27,6 @@ class DeckImprovementViewModel @Inject constructor(
     private val magicEngine: DeckMagicEngine,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
-
-    //private val deckId: Long = checkNotNull(savedStateHandle["deckId"])
 
     private val deckId: String = checkNotNull(savedStateHandle["deckId"])
     private val _uiState = MutableStateFlow(DeckImprovementUiState())
@@ -65,41 +62,16 @@ class DeckImprovementViewModel @Inject constructor(
 
             val collection = userCardRepository.observeCollection().first()
             val deckFormat = com.mmg.manahub.core.domain.model.DeckFormat.valueOf(deckWithCards.deck.format.uppercase())
-            
             val report = magicEngine.analyzeDeck(deckEntries, collection, deckFormat)
-            
-            val mainboardEntries = deckEntries.filter { !it.isSideboard }
-            val totalCards = mainboardEntries.sumOf { it.quantity }
-            val targetCount = deckFormat.targetDeckSize
-            val manaCurve = calculateManaCurve(mainboardEntries)
-            val maxInCurve = manaCurve.values.maxOrNull() ?: 0
-            val deckCards = mainboardEntries.filter { it.card != null && !com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator.isLand(it.card!!) }.map {
-                com.mmg.manahub.core.domain.model.DeckCard(it.card!!, it.quantity, true)
-            }
 
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     deckName = deckWithCards.deck.name,
                     report = report,
                     isLoading = false,
-                    cards = deckCards,
-                    totalCards = totalCards,
-                    targetCount = targetCount,
-                    manaCurve = manaCurve,
-                    maxInCurve = maxInCurve
                 )
             }
         }
-    }
-
-    private fun calculateManaCurve(cards: List<DeckSlotEntry>): Map<Int, Int> {
-        val curve = mutableMapOf<Int, Int>()
-        cards.filter { it.card != null && !com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator.isLand(it.card!!) }
-            .forEach { entry ->
-                val cmc = entry.card!!.cmc.toInt().coerceIn(0, 7)
-                curve[cmc] = (curve[cmc] ?: 0) + entry.quantity
-            }
-        return curve
     }
 
     fun applySuggestion(suggestion: ImprovementSuggestion) {
@@ -122,19 +94,10 @@ class DeckImprovementViewModel @Inject constructor(
                 }
             }
             _uiState.update { it.copy(appliedSuggestions = it.appliedSuggestions + scryfallId) }
-            // Re-analyze after change
             loadAnalysis()
         }
     }
 }
-
-
-
-
-
-
-
-
 
 
 

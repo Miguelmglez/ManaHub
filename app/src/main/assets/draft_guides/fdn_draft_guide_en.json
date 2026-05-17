@@ -1,0 +1,1786 @@
+{
+  "metadata": {
+    "set_name": "Foundations",
+    "set_code": "FDN",
+    "source_url": "https://draftsim.com/mtg-fdn-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "December 27, 2024"
+  },
+  "set_overview": {
+    "summary": "Foundations is a Core Set designed as an MTG introduction featuring half new cards and half reprints, legal for five years in Standard. The set emphasizes straightforward synergies and core MTG concepts with \"softer\" archetypes than previous sets.",
+    "color_ranking": [
+      "{W} White",
+      "{R} Red",
+      "{U} Blue",
+      "{B} Black",
+      "{G} Green"
+    ],
+    "color_notes": {
+      "{W} White": "Excellent removal, three quality fliers at common, strong ground creatures.",
+      "{R} Red": "Best common in the set (Burst Lightning), good high-end options, flat quality distribution.",
+      "{U} Blue": "Big hits available but lacks a solid all-around cast; removal is weak.",
+      "{B} Black": "Strong removal spells and creatures (Infestation Sage, Burglar Rat); weak expensive plays.",
+      "{G} Green": "Worst color relatively. Relies heavily on Llanowar Elves and uncommons."
+    },
+    "key_gameplay_notes": [
+      "Synergy cards like Inspiring Call can function as traps even in their intended archetypes.",
+      "Draft card quality in a vacuum — mana curve often matters more than synergy.",
+      "Adjust based on actual draft progression, not rigid archetype adherence.",
+      "Removal density is crucial given the prevalence of large threats.",
+      "Two-card combos (treason + sacrifice, lifegain payoffs) drive most synergy value."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Lifegain",
+      "summary": "Pairs gain-life triggers with payoffs like Ajani's Pridemate and Exemplar of Light. Core to WB.",
+      "performance": "Reliable when supported; weak as a one-off splash.",
+      "key_examples": [
+        {
+          "name": "Ajani's Pridemate",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 95,
+          "tier_rating": "C",
+          "note": null,
+          "id": "222c1a68-e34c-4103-b1be-17d4ceaef6ce",
+          "scryfall_uri": "https://scryfall.com/card/fdn/135/ajanis-pridemate",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Cat Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/2/222c1a68-e34c-4103-b1be-17d4ceaef6ce.jpg?1730489107",
+            "normal": "https://cards.scryfall.io/normal/front/2/2/222c1a68-e34c-4103-b1be-17d4ceaef6ce.jpg?1730489107"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        },
+        {
+          "name": "Exemplar of Light",
+          "color": "W",
+          "rarity": "Rare",
+          "pick_order_rank": 24,
+          "tier_rating": "A",
+          "note": null,
+          "id": "b7393efb-da40-4b55-a6ff-ce774f0815f9",
+          "scryfall_uri": "https://scryfall.com/card/fdn/733/exemplar-of-light",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Angel",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b7393efb-da40-4b55-a6ff-ce774f0815f9.jpg?1775599652",
+            "normal": "https://cards.scryfall.io/normal/front/b/7/b7393efb-da40-4b55-a6ff-ce774f0815f9.jpg?1775599652"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        },
+        {
+          "name": "Fiendish Panda",
+          "color": "WB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 99,
+          "tier_rating": "C",
+          "note": null,
+          "id": "4e434d74-cad0-45f5-bc8d-f34aa5e1d879",
+          "scryfall_uri": "https://scryfall.com/card/fdn/120/fiendish-panda",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Creature — Bear Demon",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4e434d74-cad0-45f5-bc8d-f34aa5e1d879.jpg?1730489045",
+            "normal": "https://cards.scryfall.io/normal/front/4/e/4e434d74-cad0-45f5-bc8d-f34aa5e1d879.jpg?1730489045"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        }
+      ]
+    },
+    {
+      "name": "Threshold (Graveyard)",
+      "summary": "UB graveyard-fill payoffs anchored by Dreadwing Scavenger. Cards reward seven-card graveyards.",
+      "performance": "Strong when committed; Dreadwing is a signpost worth building around.",
+      "key_examples": [
+        {
+          "name": "Dreadwing Scavenger",
+          "color": "UB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 10,
+          "tier_rating": "S",
+          "note": null,
+          "id": "e24d838b-ab48-410a-9a50-dbfea5da089b",
+          "scryfall_uri": "https://scryfall.com/card/fdn/118/dreadwing-scavenger",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Creature — Nightmare Bird",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e24d838b-ab48-410a-9a50-dbfea5da089b.jpg?1730489038",
+            "normal": "https://cards.scryfall.io/normal/front/e/2/e24d838b-ab48-410a-9a50-dbfea5da089b.jpg?1730489038"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        }
+      ]
+    },
+    {
+      "name": "Raid",
+      "summary": "BR mechanic: bonus effect if you attacked this turn. Pairs with Involuntary Employment for free creatures.",
+      "performance": "Solid aggressive theme.",
+      "key_examples": [
+        {
+          "name": "Involuntary Employment",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 107,
+          "tier_rating": "C",
+          "note": null,
+          "id": "f3ad3d62-2f24-4562-b3fa-809213dbc4a4",
+          "scryfall_uri": "https://scryfall.com/card/fdn/203/involuntary-employment",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206",
+            "normal": "https://cards.scryfall.io/normal/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        }
+      ]
+    },
+    {
+      "name": "Spells Matter",
+      "summary": "UR instant/sorcery synergies. Crackling Cyclops and Involuntary Employment support the lane.",
+      "performance": "Mid-tier; relies on uncommon density.",
+      "key_examples": [
+        {
+          "name": "Crackling Cyclops",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 275,
+          "tier_rating": "F",
+          "note": null,
+          "id": "6e5b899a-52f7-471b-ad50-4fa6566758fd",
+          "scryfall_uri": "https://scryfall.com/card/fdn/83/crackling-cyclops",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Cyclops Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e5b899a-52f7-471b-ad50-4fa6566758fd.jpg?1730488898",
+            "normal": "https://cards.scryfall.io/normal/front/6/e/6e5b899a-52f7-471b-ad50-4fa6566758fd.jpg?1730488898"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        },
+        {
+          "name": "Involuntary Employment",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 107,
+          "tier_rating": "C",
+          "note": null,
+          "id": "f3ad3d62-2f24-4562-b3fa-809213dbc4a4",
+          "scryfall_uri": "https://scryfall.com/card/fdn/203/involuntary-employment",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206",
+            "normal": "https://cards.scryfall.io/normal/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        }
+      ]
+    },
+    {
+      "name": "Morbid",
+      "summary": "BG mechanic requiring a creature to die this turn. Requires consistent creature sacrifice outlets and is inconsistent without them.",
+      "performance": "Weakest archetype mechanic; only viable with high density.",
+      "key_examples": []
+    },
+    {
+      "name": "Ramp",
+      "summary": "GU ramp built around Tatyova, Benthic Druid and Evolving Wilds synergy. Enables greedy mana bases.",
+      "performance": "Strong with the signpost; otherwise generic.",
+      "key_examples": [
+        {
+          "name": "Tatyova, Benthic Druid",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 188,
+          "tier_rating": "D",
+          "note": null,
+          "id": "eabc978a-0666-472d-bdc6-d4b29d29eca4",
+          "scryfall_uri": "https://scryfall.com/card/fdn/247/tatyova-benthic-druid",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Legendary Creature — Merfolk Druid",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/eabc978a-0666-472d-bdc6-d4b29d29eca4.jpg?1730489527",
+            "normal": "https://cards.scryfall.io/normal/front/e/a/eabc978a-0666-472d-bdc6-d4b29d29eca4.jpg?1730489527"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        },
+        {
+          "name": "Evolving Wilds",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 148,
+          "tier_rating": "C",
+          "note": null,
+          "id": "3a0b9356-5b91-4542-8802-f0f7275238e1",
+          "scryfall_uri": "https://scryfall.com/card/fdn/262/evolving-wilds",
+          "colors": [],
+          "type_line": "Land",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a0b9356-5b91-4542-8802-f0f7275238e1.jpg?1730489581",
+            "normal": "https://cards.scryfall.io/normal/front/3/a/3a0b9356-5b91-4542-8802-f0f7275238e1.jpg?1730489581"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        },
+        {
+          "name": "Llanowar Elves",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 81,
+          "tier_rating": "B",
+          "note": null,
+          "id": "6a0b230b-d391-4998-a3f7-7b158a0ec2cd",
+          "scryfall_uri": "https://scryfall.com/card/fdn/227/llanowar-elves",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Elf Druid",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/a/6a0b230b-d391-4998-a3f7-7b158a0ec2cd.jpg?1731652605",
+            "normal": "https://cards.scryfall.io/normal/front/6/a/6a0b230b-d391-4998-a3f7-7b158a0ec2cd.jpg?1731652605"
+          },
+          "set": "fdn",
+          "set_name": "Foundations"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{W}{U}",
+        "name": "WU Fliers",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Efficient creatures plus removal; curve out with fliers, ideally boosted by Empyrean Eagle.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Empyrean Eagle",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 29,
+            "tier_rating": "A",
+            "note": null,
+            "id": "577e99a7-4a55-4314-8f08-2ae0c33b85c7",
+            "scryfall_uri": "https://scryfall.com/card/fdn/239/empyrean-eagle",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Bird Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/577e99a7-4a55-4314-8f08-2ae0c33b85c7.jpg?1730489495",
+              "normal": "https://cards.scryfall.io/normal/front/5/7/577e99a7-4a55-4314-8f08-2ae0c33b85c7.jpg?1730489495"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Dazzling Angel",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 49,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a0bdf4d1-576f-41b6-a077-8725be608331",
+            "scryfall_uri": "https://scryfall.com/card/fdn/732/dazzling-angel",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Angel",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a0bdf4d1-576f-41b6-a077-8725be608331.jpg?1775599645",
+              "normal": "https://cards.scryfall.io/normal/front/a/0/a0bdf4d1-576f-41b6-a077-8725be608331.jpg?1775599645"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Banishing Light",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 55,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e38dc3b3-1629-491b-8afd-0e7a9a857713",
+            "scryfall_uri": "https://scryfall.com/card/fdn/138/banishing-light",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e38dc3b3-1629-491b-8afd-0e7a9a857713.jpg?1732131144",
+              "normal": "https://cards.scryfall.io/normal/front/e/3/e38dc3b3-1629-491b-8afd-0e7a9a857713.jpg?1732131144"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "RG Stompy",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Big creatures with Giant Growth effects. Accelerate with Llanowar Elves into oversized threats.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Llanowar Elves",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 81,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6a0b230b-d391-4998-a3f7-7b158a0ec2cd",
+            "scryfall_uri": "https://scryfall.com/card/fdn/227/llanowar-elves",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Elf Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/a/6a0b230b-d391-4998-a3f7-7b158a0ec2cd.jpg?1731652605",
+              "normal": "https://cards.scryfall.io/normal/front/6/a/6a0b230b-d391-4998-a3f7-7b158a0ec2cd.jpg?1731652605"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Burst Lightning",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 54,
+            "tier_rating": "B",
+            "note": null,
+            "id": "aec5d380-d354-4750-931a-6c91853e2edc",
+            "scryfall_uri": "https://scryfall.com/card/fdn/192/burst-lightning",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/aec5d380-d354-4750-931a-6c91853e2edc.jpg?1730489309",
+              "normal": "https://cards.scryfall.io/normal/front/a/e/aec5d380-d354-4750-931a-6c91853e2edc.jpg?1730489309"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Gorehorn Raider",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 91,
+            "tier_rating": "B",
+            "note": null,
+            "id": "78ce6c40-3452-4aa0-a45b-dbfd70f8d220",
+            "scryfall_uri": "https://scryfall.com/card/fdn/89/gorehorn-raider",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Minotaur Pirate",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/8/78ce6c40-3452-4aa0-a45b-dbfd70f8d220.jpg?1730488923",
+              "normal": "https://cards.scryfall.io/normal/front/7/8/78ce6c40-3452-4aa0-a45b-dbfd70f8d220.jpg?1730488923"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Threshold",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Control archetype with Dreadwing Scavenger as signpost. Graveyard-focused threshold payoffs.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Dreadwing Scavenger",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 10,
+            "tier_rating": "S",
+            "note": null,
+            "id": "e24d838b-ab48-410a-9a50-dbfea5da089b",
+            "scryfall_uri": "https://scryfall.com/card/fdn/118/dreadwing-scavenger",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Nightmare Bird",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e24d838b-ab48-410a-9a50-dbfea5da089b.jpg?1730489038",
+              "normal": "https://cards.scryfall.io/normal/front/e/2/e24d838b-ab48-410a-9a50-dbfea5da089b.jpg?1730489038"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{W}{B}",
+        "name": "WB Lifegain",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Lifegain payoffs: Fiendish Panda, Exemplar of Light, Ajani's Pridemate. Builds critical mass with small lifegain triggers.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Fiendish Panda",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 99,
+            "tier_rating": "C",
+            "note": null,
+            "id": "4e434d74-cad0-45f5-bc8d-f34aa5e1d879",
+            "scryfall_uri": "https://scryfall.com/card/fdn/120/fiendish-panda",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Bear Demon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4e434d74-cad0-45f5-bc8d-f34aa5e1d879.jpg?1730489045",
+              "normal": "https://cards.scryfall.io/normal/front/4/e/4e434d74-cad0-45f5-bc8d-f34aa5e1d879.jpg?1730489045"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Exemplar of Light",
+            "color": "W",
+            "rarity": "Rare",
+            "pick_order_rank": 24,
+            "tier_rating": "A",
+            "note": null,
+            "id": "b7393efb-da40-4b55-a6ff-ce774f0815f9",
+            "scryfall_uri": "https://scryfall.com/card/fdn/733/exemplar-of-light",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Angel",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b7393efb-da40-4b55-a6ff-ce774f0815f9.jpg?1775599652",
+              "normal": "https://cards.scryfall.io/normal/front/b/7/b7393efb-da40-4b55-a6ff-ce774f0815f9.jpg?1775599652"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Ajani's Pridemate",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 95,
+            "tier_rating": "C",
+            "note": null,
+            "id": "222c1a68-e34c-4103-b1be-17d4ceaef6ce",
+            "scryfall_uri": "https://scryfall.com/card/fdn/135/ajanis-pridemate",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Cat Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/2/222c1a68-e34c-4103-b1be-17d4ceaef6ce.jpg?1730489107",
+              "normal": "https://cards.scryfall.io/normal/front/2/2/222c1a68-e34c-4103-b1be-17d4ceaef6ce.jpg?1730489107"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "BR Raid",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Involuntary Employment synergies — creatures attacking provides fodder value. Cheap aggressive creatures plus removal.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Involuntary Employment",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 107,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f3ad3d62-2f24-4562-b3fa-809213dbc4a4",
+            "scryfall_uri": "https://scryfall.com/card/fdn/203/involuntary-employment",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206",
+              "normal": "https://cards.scryfall.io/normal/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Aggro",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Fast starts with combat tricks; pressure-focused strategy.",
+        "difficulty": "Easy",
+        "key_cards": []
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "GW Midrange",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Softer archetype; focuses on card quality over tight synergies.",
+        "difficulty": "Easy",
+        "key_cards": []
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{G}{U}",
+        "name": "GU Ramp",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Tatyova, Benthic Druid + Evolving Wilds synergy. Greedy mana base into bombs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Tatyova, Benthic Druid",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 188,
+            "tier_rating": "D",
+            "note": null,
+            "id": "eabc978a-0666-472d-bdc6-d4b29d29eca4",
+            "scryfall_uri": "https://scryfall.com/card/fdn/247/tatyova-benthic-druid",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Merfolk Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/eabc978a-0666-472d-bdc6-d4b29d29eca4.jpg?1730489527",
+              "normal": "https://cards.scryfall.io/normal/front/e/a/eabc978a-0666-472d-bdc6-d4b29d29eca4.jpg?1730489527"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Evolving Wilds",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 148,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3a0b9356-5b91-4542-8802-f0f7275238e1",
+            "scryfall_uri": "https://scryfall.com/card/fdn/262/evolving-wilds",
+            "colors": [],
+            "type_line": "Land",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a0b9356-5b91-4542-8802-f0f7275238e1.jpg?1730489581",
+              "normal": "https://cards.scryfall.io/normal/front/3/a/3a0b9356-5b91-4542-8802-f0f7275238e1.jpg?1730489581"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "UR Spells",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Instant/sorcery synergies. Crackling Cyclops and Involuntary Employment support.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Crackling Cyclops",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 275,
+            "tier_rating": "F",
+            "note": null,
+            "id": "6e5b899a-52f7-471b-ad50-4fa6566758fd",
+            "scryfall_uri": "https://scryfall.com/card/fdn/83/crackling-cyclops",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Cyclops Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e5b899a-52f7-471b-ad50-4fa6566758fd.jpg?1730488898",
+              "normal": "https://cards.scryfall.io/normal/front/6/e/6e5b899a-52f7-471b-ad50-4fa6566758fd.jpg?1730488898"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          },
+          {
+            "name": "Involuntary Employment",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 107,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f3ad3d62-2f24-4562-b3fa-809213dbc4a4",
+            "scryfall_uri": "https://scryfall.com/card/fdn/203/involuntary-employment",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206",
+              "normal": "https://cards.scryfall.io/normal/front/f/3/f3ad3d62-2f24-4562-b3fa-809213dbc4a4.jpg?1730492206"
+            },
+            "set": "fdn",
+            "set_name": "Foundations"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "BG Morbid",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Requires consistent creature sacrifice outlets. Inconsistent mechanic at common.",
+        "difficulty": "Hard",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Banishing Light",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 55,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e38dc3b3-1629-491b-8afd-0e7a9a857713",
+        "scryfall_uri": "https://scryfall.com/card/fdn/138/banishing-light",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e38dc3b3-1629-491b-8afd-0e7a9a857713.jpg?1732131144",
+          "normal": "https://cards.scryfall.io/normal/front/e/3/e38dc3b3-1629-491b-8afd-0e7a9a857713.jpg?1732131144"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Dazzling Angel",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 49,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a0bdf4d1-576f-41b6-a077-8725be608331",
+        "scryfall_uri": "https://scryfall.com/card/fdn/732/dazzling-angel",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Angel",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a0bdf4d1-576f-41b6-a077-8725be608331.jpg?1775599645",
+          "normal": "https://cards.scryfall.io/normal/front/a/0/a0bdf4d1-576f-41b6-a077-8725be608331.jpg?1775599645"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Helpful Hunter",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 51,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1b9a0e91-80b5-428f-8f08-931d0631be14",
+        "scryfall_uri": "https://scryfall.com/card/fdn/16/helpful-hunter",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Cat",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b9a0e91-80b5-428f-8f08-931d0631be14.jpg?1731652632",
+          "normal": "https://cards.scryfall.io/normal/front/1/b/1b9a0e91-80b5-428f-8f08-931d0631be14.jpg?1731652632"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Luminous Rebuke",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "B",
+        "note": null,
+        "id": "621839e1-2756-4cdc-a25c-5f76ea98dd87",
+        "scryfall_uri": "https://scryfall.com/card/fdn/20/luminous-rebuke",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/621839e1-2756-4cdc-a25c-5f76ea98dd87.jpg?1730488660",
+          "normal": "https://cards.scryfall.io/normal/front/6/2/621839e1-2756-4cdc-a25c-5f76ea98dd87.jpg?1730488660"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Bigfin Bouncer",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 66,
+        "tier_rating": "B",
+        "note": null,
+        "id": "9b1d5b76-b07e-45c6-800d-4cfce085164f",
+        "scryfall_uri": "https://scryfall.com/card/fdn/31/bigfin-bouncer",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Shark Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9b1d5b76-b07e-45c6-800d-4cfce085164f.jpg?1730488703",
+          "normal": "https://cards.scryfall.io/normal/front/9/b/9b1d5b76-b07e-45c6-800d-4cfce085164f.jpg?1730488703"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Refute",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 52,
+        "tier_rating": "B",
+        "note": null,
+        "id": "38806934-dd9c-4ad4-a59c-a16dce03a14a",
+        "scryfall_uri": "https://scryfall.com/card/fdn/48/refute",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/38806934-dd9c-4ad4-a59c-a16dce03a14a.jpg?1730488762",
+          "normal": "https://cards.scryfall.io/normal/front/3/8/38806934-dd9c-4ad4-a59c-a16dce03a14a.jpg?1730488762"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Think Twice",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 73,
+        "tier_rating": "B",
+        "note": null,
+        "id": "d88faaa1-eb41-40f7-991c-5c06e1138f3d",
+        "scryfall_uri": "https://scryfall.com/card/fdn/165/think-twice",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d88faaa1-eb41-40f7-991c-5c06e1138f3d.jpg?1730489218",
+          "normal": "https://cards.scryfall.io/normal/front/d/8/d88faaa1-eb41-40f7-991c-5c06e1138f3d.jpg?1730489218"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Uncharted Voyage",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e0846820-e595-4743-8a28-29c57d728677",
+        "scryfall_uri": "https://scryfall.com/card/fdn/53/uncharted-voyage",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/0/e0846820-e595-4743-8a28-29c57d728677.jpg?1730488782",
+          "normal": "https://cards.scryfall.io/normal/front/e/0/e0846820-e595-4743-8a28-29c57d728677.jpg?1730488782"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Bake into a Pie",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 48,
+        "tier_rating": "B",
+        "note": null,
+        "id": "2ab0e660-86a3-4b92-82fa-77dcb5db947d",
+        "scryfall_uri": "https://scryfall.com/card/fdn/169/bake-into-a-pie",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/a/2ab0e660-86a3-4b92-82fa-77dcb5db947d.jpg?1730489233",
+          "normal": "https://cards.scryfall.io/normal/front/2/a/2ab0e660-86a3-4b92-82fa-77dcb5db947d.jpg?1730489233"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Stab",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 46,
+        "tier_rating": "B",
+        "note": null,
+        "id": "6859a5ba-1c1c-4631-bba8-f9900b827178",
+        "scryfall_uri": "https://scryfall.com/card/fdn/71/stab",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/6859a5ba-1c1c-4631-bba8-f9900b827178.jpg?1730488851",
+          "normal": "https://cards.scryfall.io/normal/front/6/8/6859a5ba-1c1c-4631-bba8-f9900b827178.jpg?1730488851"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Eaten Alive",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 89,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1c4f7b20-b2a8-498c-8c36-dc296863b0b9",
+        "scryfall_uri": "https://scryfall.com/card/fdn/172/eaten-alive",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c4f7b20-b2a8-498c-8c36-dc296863b0b9.jpg?1730489240",
+          "normal": "https://cards.scryfall.io/normal/front/1/c/1c4f7b20-b2a8-498c-8c36-dc296863b0b9.jpg?1730489240"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Infestation Sage",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 79,
+        "tier_rating": "B",
+        "note": null,
+        "id": "d40c73de-7a5f-46f2-a70b-449bc8ecfe24",
+        "scryfall_uri": "https://scryfall.com/card/fdn/64/infestation-sage",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Elf Warlock",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/4/d40c73de-7a5f-46f2-a70b-449bc8ecfe24.jpg?1730492338",
+          "normal": "https://cards.scryfall.io/normal/front/d/4/d40c73de-7a5f-46f2-a70b-449bc8ecfe24.jpg?1730492338"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Burst Lightning",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 54,
+        "tier_rating": "B",
+        "note": "Best common in the set.",
+        "id": "aec5d380-d354-4750-931a-6c91853e2edc",
+        "scryfall_uri": "https://scryfall.com/card/fdn/192/burst-lightning",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/aec5d380-d354-4750-931a-6c91853e2edc.jpg?1730489309",
+          "normal": "https://cards.scryfall.io/normal/front/a/e/aec5d380-d354-4750-931a-6c91853e2edc.jpg?1730489309"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Gorehorn Raider",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 91,
+        "tier_rating": "B",
+        "note": null,
+        "id": "78ce6c40-3452-4aa0-a45b-dbfd70f8d220",
+        "scryfall_uri": "https://scryfall.com/card/fdn/89/gorehorn-raider",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Minotaur Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/8/78ce6c40-3452-4aa0-a45b-dbfd70f8d220.jpg?1730488923",
+          "normal": "https://cards.scryfall.io/normal/front/7/8/78ce6c40-3452-4aa0-a45b-dbfd70f8d220.jpg?1730488923"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Courageous Goblin",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 175,
+        "tier_rating": "D",
+        "note": null,
+        "id": "8db6819c-666a-409d-85a5-b9ac34d8dd2f",
+        "scryfall_uri": "https://scryfall.com/card/fdn/82/courageous-goblin",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Goblin",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8db6819c-666a-409d-85a5-b9ac34d8dd2f.jpg?1730488896",
+          "normal": "https://cards.scryfall.io/normal/front/8/d/8db6819c-666a-409d-85a5-b9ac34d8dd2f.jpg?1730488896"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Sower of Chaos",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 162,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7ff50606-491c-4946-8d03-719b01cfad77",
+        "scryfall_uri": "https://scryfall.com/card/fdn/95/sower-of-chaos",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Devil",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7ff50606-491c-4946-8d03-719b01cfad77.jpg?1730506530",
+          "normal": "https://cards.scryfall.io/normal/front/7/f/7ff50606-491c-4946-8d03-719b01cfad77.jpg?1730506530"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Llanowar Elves",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 81,
+        "tier_rating": "B",
+        "note": null,
+        "id": "6a0b230b-d391-4998-a3f7-7b158a0ec2cd",
+        "scryfall_uri": "https://scryfall.com/card/fdn/227/llanowar-elves",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elf Druid",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/a/6a0b230b-d391-4998-a3f7-7b158a0ec2cd.jpg?1731652605",
+          "normal": "https://cards.scryfall.io/normal/front/6/a/6a0b230b-d391-4998-a3f7-7b158a0ec2cd.jpg?1731652605"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Bite Down",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 132,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f8d70b3b-f6f9-4b3c-ad70-0ce369e812b5",
+        "scryfall_uri": "https://scryfall.com/card/fdn/212/bite-down",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f8d70b3b-f6f9-4b3c-ad70-0ce369e812b5.jpg?1730489385",
+          "normal": "https://cards.scryfall.io/normal/front/f/8/f8d70b3b-f6f9-4b3c-ad70-0ce369e812b5.jpg?1730489385"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Beast-Kin Ranger",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 123,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0102e0be-5783-4825-9489-713b1b1df0b2",
+        "scryfall_uri": "https://scryfall.com/card/fdn/100/beast-kin-ranger",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elf Ranger",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/0102e0be-5783-4825-9489-713b1b1df0b2.jpg?1730488967",
+          "normal": "https://cards.scryfall.io/normal/front/0/1/0102e0be-5783-4825-9489-713b1b1df0b2.jpg?1730488967"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Bushwhack",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 178,
+        "tier_rating": "D",
+        "note": null,
+        "id": "03ebdb36-55e0-49dd-a514-785fbeb4ae19",
+        "scryfall_uri": "https://scryfall.com/card/fdn/215/bushwhack",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/3/03ebdb36-55e0-49dd-a514-785fbeb4ae19.jpg?1730489398",
+          "normal": "https://cards.scryfall.io/normal/front/0/3/03ebdb36-55e0-49dd-a514-785fbeb4ae19.jpg?1730489398"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ]
+  },
+  "uncommon_reassessment": {
+    "overrated": [
+      {
+        "name": "Elvish Regrower",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 80,
+        "tier_rating": "B",
+        "note": null,
+        "id": "2694e3cd-26ed-4a10-ae55-fb84d7800253",
+        "scryfall_uri": "https://scryfall.com/card/fdn/104/elvish-regrower",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elf Druid",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/6/2694e3cd-26ed-4a10-ae55-fb84d7800253.jpg?1730488983",
+          "normal": "https://cards.scryfall.io/normal/front/2/6/2694e3cd-26ed-4a10-ae55-fb84d7800253.jpg?1730488983"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Affectionate Indrik",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 125,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2da8347d-06a4-46e0-a55e-cc2da4660263",
+        "scryfall_uri": "https://scryfall.com/card/fdn/211/affectionate-indrik",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Beast",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2da8347d-06a4-46e0-a55e-cc2da4660263.jpg?1731255612",
+          "normal": "https://cards.scryfall.io/normal/front/2/d/2da8347d-06a4-46e0-a55e-cc2da4660263.jpg?1731255612"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Overrun",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 139,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1d8e9cbb-8bf4-4a48-a58e-79deb3abdf7f",
+        "scryfall_uri": "https://scryfall.com/card/fdn/230/overrun",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1d8e9cbb-8bf4-4a48-a58e-79deb3abdf7f.jpg?1730489456",
+          "normal": "https://cards.scryfall.io/normal/front/1/d/1d8e9cbb-8bf4-4a48-a58e-79deb3abdf7f.jpg?1730489456"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Tragic Banshee",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 40,
+        "tier_rating": "B",
+        "note": null,
+        "id": "30df3e33-2f17-4067-99f1-5db6b0f41fd4",
+        "scryfall_uri": "https://scryfall.com/card/fdn/73/tragic-banshee",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Spirit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/0/30df3e33-2f17-4067-99f1-5db6b0f41fd4.jpg?1730488859",
+          "normal": "https://cards.scryfall.io/normal/front/3/0/30df3e33-2f17-4067-99f1-5db6b0f41fd4.jpg?1730488859"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Arcane Epiphany",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 93,
+        "tier_rating": "C",
+        "note": null,
+        "id": "06431793-5dfe-4cbf-990b-4bcc960d1f31",
+        "scryfall_uri": "https://scryfall.com/card/fdn/29/arcane-epiphany",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/06431793-5dfe-4cbf-990b-4bcc960d1f31.jpg?1730488696",
+          "normal": "https://cards.scryfall.io/normal/front/0/6/06431793-5dfe-4cbf-990b-4bcc960d1f31.jpg?1730488696"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Needletooth Pack",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 184,
+        "tier_rating": "D",
+        "note": null,
+        "id": "993c1679-e02b-44f2-b34e-12fd6b5142e9",
+        "scryfall_uri": "https://scryfall.com/card/fdn/108/needletooth-pack",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/993c1679-e02b-44f2-b34e-12fd6b5142e9.jpg?1730488999",
+          "normal": "https://cards.scryfall.io/normal/front/9/9/993c1679-e02b-44f2-b34e-12fd6b5142e9.jpg?1730488999"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Strongbox Raider",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 122,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b2223eb8-59f9-489b-a3f3-b6496218cb79",
+        "scryfall_uri": "https://scryfall.com/card/fdn/96/strongbox-raider",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Orc Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b2223eb8-59f9-489b-a3f3-b6496218cb79.jpg?1730488952",
+          "normal": "https://cards.scryfall.io/normal/front/b/2/b2223eb8-59f9-489b-a3f3-b6496218cb79.jpg?1730488952"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ],
+    "underrated": [
+      {
+        "name": "Mischievous Mystic",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 22,
+        "tier_rating": "A",
+        "note": null,
+        "id": "20d89cec-528b-4b2a-87db-e11ce0000622",
+        "scryfall_uri": "https://scryfall.com/card/fdn/47/mischievous-mystic",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/20d89cec-528b-4b2a-87db-e11ce0000622.jpg?1730670691",
+          "normal": "https://cards.scryfall.io/normal/front/2/0/20d89cec-528b-4b2a-87db-e11ce0000622.jpg?1730670691"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Battlesong Berserker",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 60,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a1f8b199-5d62-485f-b1c3-b30aa550595b",
+        "scryfall_uri": "https://scryfall.com/card/fdn/78/battlesong-berserker",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Berserker",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1f8b199-5d62-485f-b1c3-b30aa550595b.jpg?1730488878",
+          "normal": "https://cards.scryfall.io/normal/front/a/1/a1f8b199-5d62-485f-b1c3-b30aa550595b.jpg?1730488878"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Hero's Downfall",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 64,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ad2c01d9-8f54-46c0-9dc9-d4d4764ce1c9",
+        "scryfall_uri": "https://scryfall.com/card/fdn/175/heros-downfall",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/d/ad2c01d9-8f54-46c0-9dc9-d4d4764ce1c9.jpg?1731652610",
+          "normal": "https://cards.scryfall.io/normal/front/a/d/ad2c01d9-8f54-46c0-9dc9-d4d4764ce1c9.jpg?1731652610"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Vampire Gourmand",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 34,
+        "tier_rating": "A",
+        "note": null,
+        "id": "917514c0-9cd5-4b97-85b9-c4f753560ad4",
+        "scryfall_uri": "https://scryfall.com/card/fdn/74/vampire-gourmand",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Vampire",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/917514c0-9cd5-4b97-85b9-c4f753560ad4.jpg?1730488861",
+          "normal": "https://cards.scryfall.io/normal/front/9/1/917514c0-9cd5-4b97-85b9-c4f753560ad4.jpg?1730488861"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Micromancer",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 28,
+        "tier_rating": "A",
+        "note": null,
+        "id": "e6af54ea-b57a-4e50-8e46-1747cca14430",
+        "scryfall_uri": "https://scryfall.com/card/fdn/158/micromancer",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e6af54ea-b57a-4e50-8e46-1747cca14430.jpg?1730489192",
+          "normal": "https://cards.scryfall.io/normal/front/e/6/e6af54ea-b57a-4e50-8e46-1747cca14430.jpg?1730489192"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Cat Collector",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 23,
+        "tier_rating": "A",
+        "note": null,
+        "id": "526fe356-bff1-4211-9e88-bf913ac76b1d",
+        "scryfall_uri": "https://scryfall.com/card/fdn/4/cat-collector",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Citizen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/526fe356-bff1-4211-9e88-bf913ac76b1d.jpg?1730488601",
+          "normal": "https://cards.scryfall.io/normal/front/5/2/526fe356-bff1-4211-9e88-bf913ac76b1d.jpg?1730488601"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Faebloom Trick",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 26,
+        "tier_rating": "A",
+        "note": null,
+        "id": "0c3bee8f-f5be-4404-a696-c902637799c3",
+        "scryfall_uri": "https://scryfall.com/card/fdn/38/faebloom-trick",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0c3bee8f-f5be-4404-a696-c902637799c3.jpg?1730488727",
+          "normal": "https://cards.scryfall.io/normal/front/0/c/0c3bee8f-f5be-4404-a696-c902637799c3.jpg?1730488727"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Sun-Blessed Healer",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 25,
+        "tier_rating": "A",
+        "note": null,
+        "id": "323d029e-9a88-4188-b3a4-38ef32cffc9f",
+        "scryfall_uri": "https://scryfall.com/card/fdn/25/sun-blessed-healer",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/323d029e-9a88-4188-b3a4-38ef32cffc9f.jpg?1730488681",
+          "normal": "https://cards.scryfall.io/normal/front/3/2/323d029e-9a88-4188-b3a4-38ef32cffc9f.jpg?1730488681"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Infernal Vessel",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 47,
+        "tier_rating": "B",
+        "note": null,
+        "id": "877b6330-2d0b-4f2f-a848-f10b06fb4ef5",
+        "scryfall_uri": "https://scryfall.com/card/fdn/63/infernal-vessel",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/877b6330-2d0b-4f2f-a848-f10b06fb4ef5.jpg?1730488820",
+          "normal": "https://cards.scryfall.io/normal/front/8/7/877b6330-2d0b-4f2f-a848-f10b06fb4ef5.jpg?1730488820"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Spectral Sailor",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 36,
+        "tier_rating": "A",
+        "note": null,
+        "id": "5ef30b6c-0806-4bf6-9a84-c2aea8d84cf1",
+        "scryfall_uri": "https://scryfall.com/card/fdn/746/spectral-sailor",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Spirit Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/e/5ef30b6c-0806-4bf6-9a84-c2aea8d84cf1.jpg?1775599795",
+          "normal": "https://cards.scryfall.io/normal/front/5/e/5ef30b6c-0806-4bf6-9a84-c2aea8d84cf1.jpg?1775599795"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Felling Blow",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 44,
+        "tier_rating": "B",
+        "note": null,
+        "id": "96948ae3-b15d-4d6d-aa73-9f52084cd903",
+        "scryfall_uri": "https://scryfall.com/card/fdn/105/felling-blow",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/96948ae3-b15d-4d6d-aa73-9f52084cd903.jpg?1730488984",
+          "normal": "https://cards.scryfall.io/normal/front/9/6/96948ae3-b15d-4d6d-aa73-9f52084cd903.jpg?1730488984"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ]
+  },
+  "bomb_reassessment": {
+    "overrated": [
+      {
+        "name": "Ajani, Caller of the Pride",
+        "color": "W",
+        "rarity": "Mythic",
+        "pick_order_rank": 63,
+        "tier_rating": "B",
+        "note": null,
+        "id": "59793f1c-8c7e-433e-9c09-40aa3ce931a1",
+        "scryfall_uri": "https://scryfall.com/card/fdn/134/ajani-caller-of-the-pride",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Legendary Planeswalker — Ajani",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/59793f1c-8c7e-433e-9c09-40aa3ce931a1.jpg?1730489103",
+          "normal": "https://cards.scryfall.io/normal/front/5/9/59793f1c-8c7e-433e-9c09-40aa3ce931a1.jpg?1730489103"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Archmage of Runes",
+        "color": "U",
+        "rarity": "Rare",
+        "pick_order_rank": 110,
+        "tier_rating": "C",
+        "note": null,
+        "id": "334b5018-2da9-49f1-9d09-83d312ecfb02",
+        "scryfall_uri": "https://scryfall.com/card/fdn/30/archmage-of-runes",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Giant Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/3/334b5018-2da9-49f1-9d09-83d312ecfb02.jpg?1730488698",
+          "normal": "https://cards.scryfall.io/normal/front/3/3/334b5018-2da9-49f1-9d09-83d312ecfb02.jpg?1730488698"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Rune-Scarred Demon",
+        "color": "B",
+        "rarity": "Rare",
+        "pick_order_rank": 65,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1eae3165-554d-4759-8f18-794e2a7d8464",
+        "scryfall_uri": "https://scryfall.com/card/fdn/184/rune-scarred-demon",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Demon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1eae3165-554d-4759-8f18-794e2a7d8464.jpg?1730489283",
+          "normal": "https://cards.scryfall.io/normal/front/1/e/1eae3165-554d-4759-8f18-794e2a7d8464.jpg?1730489283"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Etali, Primal Storm",
+        "color": "R",
+        "rarity": "Rare",
+        "pick_order_rank": 187,
+        "tier_rating": "D",
+        "note": null,
+        "id": "b6af9894-95b5-4c8e-902f-a9ba70f02e4a",
+        "scryfall_uri": "https://scryfall.com/card/fdn/194/etali-primal-storm",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Legendary Creature — Elder Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b6af9894-95b5-4c8e-902f-a9ba70f02e4a.jpg?1730489317",
+          "normal": "https://cards.scryfall.io/normal/front/b/6/b6af9894-95b5-4c8e-902f-a9ba70f02e4a.jpg?1730489317"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Loot, Exuberant Explorer",
+        "color": "G",
+        "rarity": "Rare",
+        "pick_order_rank": 104,
+        "tier_rating": "C",
+        "note": null,
+        "id": "09980ce6-425b-4e03-94d0-0f02043cb361",
+        "scryfall_uri": "https://scryfall.com/card/fdn/106/loot-exuberant-explorer",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Legendary Creature — Beast Noble",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09980ce6-425b-4e03-94d0-0f02043cb361.jpg?1730488991",
+          "normal": "https://cards.scryfall.io/normal/front/0/9/09980ce6-425b-4e03-94d0-0f02043cb361.jpg?1730488991"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Mossborn Hydra",
+        "color": "G",
+        "rarity": "Rare",
+        "pick_order_rank": 137,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7054a0d7-396f-40b4-ab24-db591c3b08f0",
+        "scryfall_uri": "https://scryfall.com/card/fdn/107/mossborn-hydra",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elemental Hydra",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/7054a0d7-396f-40b4-ab24-db591c3b08f0.jpg?1730488992",
+          "normal": "https://cards.scryfall.io/normal/front/7/0/7054a0d7-396f-40b4-ab24-db591c3b08f0.jpg?1730488992"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Quilled Greatwurm",
+        "color": "G",
+        "rarity": "Mythic",
+        "pick_order_rank": 124,
+        "tier_rating": "C",
+        "note": null,
+        "id": "31b60531-3d33-4e66-923a-29008716b15c",
+        "scryfall_uri": "https://scryfall.com/card/fdn/111/quilled-greatwurm",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Wurm",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/31b60531-3d33-4e66-923a-29008716b15c.jpg?1730489009",
+          "normal": "https://cards.scryfall.io/normal/front/3/1/31b60531-3d33-4e66-923a-29008716b15c.jpg?1730489009"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ],
+    "underrated": [
+      {
+        "name": "Sire of Seven Deaths",
+        "color": "C",
+        "rarity": "Mythic",
+        "pick_order_rank": 15,
+        "tier_rating": "A",
+        "note": null,
+        "id": "8d8432a7-1c8a-4cfb-947c-ecf9791063eb",
+        "scryfall_uri": "https://scryfall.com/card/fdn/1/sire-of-seven-deaths",
+        "colors": [],
+        "type_line": "Creature — Eldrazi",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d8432a7-1c8a-4cfb-947c-ecf9791063eb.jpg?1730657490",
+          "normal": "https://cards.scryfall.io/normal/front/8/d/8d8432a7-1c8a-4cfb-947c-ecf9791063eb.jpg?1730657490"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Celestial Armor",
+        "color": "W",
+        "rarity": "Rare",
+        "pick_order_rank": 6,
+        "tier_rating": "S",
+        "note": null,
+        "id": "809ee8ad-1573-49e5-9e84-b7cdd29efcae",
+        "scryfall_uri": "https://scryfall.com/card/fdn/5/celestial-armor",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/809ee8ad-1573-49e5-9e84-b7cdd29efcae.jpg?1730488607",
+          "normal": "https://cards.scryfall.io/normal/front/8/0/809ee8ad-1573-49e5-9e84-b7cdd29efcae.jpg?1730488607"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "High-Society Hunter",
+        "color": "B",
+        "rarity": "Rare",
+        "pick_order_rank": 33,
+        "tier_rating": "A",
+        "note": null,
+        "id": "51da4a4b-ea12-4169-a7cf-eb4427f13e84",
+        "scryfall_uri": "https://scryfall.com/card/fdn/61/high-society-hunter",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Vampire Noble",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/1/51da4a4b-ea12-4169-a7cf-eb4427f13e84.jpg?1730488812",
+          "normal": "https://cards.scryfall.io/normal/front/5/1/51da4a4b-ea12-4169-a7cf-eb4427f13e84.jpg?1730488812"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Chandra, Flameshaper",
+        "color": "R",
+        "rarity": "Mythic",
+        "pick_order_rank": 12,
+        "tier_rating": "S",
+        "note": null,
+        "id": "a22d21ec-0fb3-4574-a803-6442ec13167e",
+        "scryfall_uri": "https://scryfall.com/card/fdn/81/chandra-flameshaper",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Legendary Planeswalker — Chandra",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a22d21ec-0fb3-4574-a803-6442ec13167e.jpg?1730488891",
+          "normal": "https://cards.scryfall.io/normal/front/a/2/a22d21ec-0fb3-4574-a803-6442ec13167e.jpg?1730488891"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Koma, World-Eater",
+        "color": "UG",
+        "rarity": "Rare",
+        "pick_order_rank": 71,
+        "tier_rating": "B",
+        "note": null,
+        "id": "c3b92caa-3401-4b11-9515-152f3e057c05",
+        "scryfall_uri": "https://scryfall.com/card/fdn/121/koma-world-eater",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Legendary Creature — Serpent",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3b92caa-3401-4b11-9515-152f3e057c05.jpg?1730489050",
+          "normal": "https://cards.scryfall.io/normal/front/c/3/c3b92caa-3401-4b11-9515-152f3e057c05.jpg?1730489050"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Scavenging Ooze",
+        "color": "G",
+        "rarity": "Rare",
+        "pick_order_rank": 8,
+        "tier_rating": "S",
+        "note": null,
+        "id": "8c504c23-1e9a-411b-9cfe-4180d0c744f6",
+        "scryfall_uri": "https://scryfall.com/card/fdn/232/scavenging-ooze",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Ooze",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/c/8c504c23-1e9a-411b-9cfe-4180d0c744f6.jpg?1730489464",
+          "normal": "https://cards.scryfall.io/normal/front/8/c/8c504c23-1e9a-411b-9cfe-4180d0c744f6.jpg?1730489464"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Spinner of Souls",
+        "color": "G",
+        "rarity": "Rare",
+        "pick_order_rank": 7,
+        "tier_rating": "S",
+        "note": null,
+        "id": "f50a8dec-b079-4192-9098-6cdc1026c693",
+        "scryfall_uri": "https://scryfall.com/card/fdn/112/spinner-of-souls",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Spider Spirit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f50a8dec-b079-4192-9098-6cdc1026c693.jpg?1730489015",
+          "normal": "https://cards.scryfall.io/normal/front/f/5/f50a8dec-b079-4192-9098-6cdc1026c693.jpg?1730489015"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Alesha, Who Laughs at Fate",
+        "color": "BR",
+        "rarity": "Rare",
+        "pick_order_rank": 5,
+        "tier_rating": "S",
+        "note": null,
+        "id": "a93e3406-4e29-4bc0-ae52-cbd2ac1f99a4",
+        "scryfall_uri": "https://scryfall.com/card/fdn/115/alesha-who-laughs-at-fate",
+        "colors": [
+          "B",
+          "R"
+        ],
+        "type_line": "Legendary Creature — Human Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a93e3406-4e29-4bc0-ae52-cbd2ac1f99a4.jpg?1730489026",
+          "normal": "https://cards.scryfall.io/normal/front/a/9/a93e3406-4e29-4bc0-ae52-cbd2ac1f99a4.jpg?1730489026"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      },
+      {
+        "name": "Raise the Past",
+        "color": "W",
+        "rarity": "Rare",
+        "pick_order_rank": 224,
+        "tier_rating": "D",
+        "note": null,
+        "id": "6c6be129-56da-4fe7-a6bd-6a1d402c09e1",
+        "scryfall_uri": "https://scryfall.com/card/fdn/22/raise-the-past",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c6be129-56da-4fe7-a6bd-6a1d402c09e1.jpg?1730488667",
+          "normal": "https://cards.scryfall.io/normal/front/6/c/6c6be129-56da-4fe7-a6bd-6a1d402c09e1.jpg?1730488667"
+        },
+        "set": "fdn",
+        "set_name": "Foundations"
+      }
+    ]
+  },
+  "general_tips": [
+    "Draft card quality and mana curve before synergy — Foundations rewards solid cards more than gimmicks.",
+    "Adjust to draft signals; do not commit to an archetype too early.",
+    "Removal density is crucial — large threats appear at every rarity.",
+    "Two-card combos (treason + sacrifice, lifegain payoffs) drive most of the synergy value in the set.",
+    "Avoid \"trap\" synergy cards like Inspiring Call unless you have built around them deeply."
+  ]
+}

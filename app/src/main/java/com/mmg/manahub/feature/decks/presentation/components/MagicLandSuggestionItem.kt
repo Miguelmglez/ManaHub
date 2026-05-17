@@ -70,8 +70,6 @@ fun MagicLandSuggestionStatic(
     }
 }
 
-
-
 @Composable
 private fun DeltaList(
     deltas: List<LandDelta>,
@@ -92,10 +90,6 @@ private fun DeltaList(
         }
     }
 }
-
-
-
-
 
 
 

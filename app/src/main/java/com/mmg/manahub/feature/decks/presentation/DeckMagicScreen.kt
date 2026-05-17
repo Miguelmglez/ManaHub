@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.decks.presentation.engine.MagicCard
 import com.mmg.manahub.feature.decks.presentation.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.presentation.engine.MagicSuggestion
@@ -51,16 +53,19 @@ fun DeckMagicScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val mc = MaterialTheme.magicColors
+
     Scaffold(
         contentWindowInsets = WindowInsets.statusBars,
+        containerColor = mc.background,
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { 
+                title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent)
                         Spacer(Modifier.width(8.dp))
-                        Text("Deck Magic Creator") 
+                        Text("Deck Magic Creator", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
                     }
                 }
             )
@@ -94,28 +99,31 @@ private fun DashboardContent(
     onDiscoveryClick: (MagicDiscovery) -> Unit,
     onStartEmpty: () -> Unit
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
+
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onStartEmpty,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = CardDefaults.cardColors(containerColor = mc.surface)
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Start from scratch", style = MaterialTheme.typography.titleMedium)
-                    Text("Choose your colors and strategy manually", style = MaterialTheme.typography.bodySmall)
+                    Text("Start from scratch", style = ty.titleMedium, color = mc.textPrimary)
+                    Text("Choose your colors and strategy manually", style = ty.bodySmall, color = mc.textSecondary)
                 }
             }
         }
 
         if (uiState.discoveries.isNotEmpty()) {
             item {
-                Text("Magic Discoveries", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Based on your collection's strongest synergies", style = MaterialTheme.typography.bodyMedium)
+                Text("Magic Discoveries", style = ty.titleLarge, fontWeight = FontWeight.Bold, color = mc.textPrimary)
+                Text("Based on your collection's strongest synergies", style = ty.bodyMedium, color = mc.textSecondary)
             }
 
             items(uiState.discoveries) { discovery ->
@@ -127,13 +135,16 @@ private fun DashboardContent(
 
 @Composable
 private fun DiscoveryCard(discovery: MagicDiscovery, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Card(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = mc.surface)
     ) {
         Column(Modifier.padding(12.dp)) {
-            Text(discovery.label, style = MaterialTheme.typography.titleMedium)
-            Text(discovery.description, style = MaterialTheme.typography.bodySmall)
+            Text(discovery.label, style = ty.titleMedium, color = mc.textPrimary)
+            Text(discovery.description, style = ty.bodySmall, color = mc.textSecondary)
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(discovery.cards.take(6)) { magicCard ->
@@ -163,13 +174,15 @@ private fun BuildingContent(
     uiState: DeckMagicUiState,
     onCardClick: (String) -> Unit
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Building your deck", style = MaterialTheme.typography.titleMedium)
-        Text("${uiState.mainboard.size} cards added", style = MaterialTheme.typography.bodySmall)
-        
+        Text("Building your deck", style = ty.titleMedium, color = mc.textPrimary)
+        Text("${uiState.mainboard.size} cards added", style = ty.bodySmall, color = mc.textSecondary)
+
         Spacer(Modifier.height(16.dp))
-        
-        Text("Suggestions", style = MaterialTheme.typography.titleSmall)
+
+        Text("Suggestions", style = ty.labelMedium, color = mc.textPrimary)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(uiState.currentSuggestions) { suggestion ->
                 SuggestionItem(
@@ -186,9 +199,12 @@ private fun SuggestionItem(
     suggestion: MagicSuggestion,
     onClick: () -> Unit
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Card(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = mc.surface)
     ) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
@@ -199,10 +215,10 @@ private fun SuggestionItem(
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(suggestion.magicCard.card.name, style = MaterialTheme.typography.bodyMedium)
-                Text(suggestion.reasons.take(2).joinToString(", "), style = MaterialTheme.typography.labelSmall)
+                Text(suggestion.magicCard.card.name, style = ty.bodyMedium, color = mc.textPrimary)
+                Text(suggestion.reasons.take(2).joinToString(", "), style = ty.labelSmall, color = mc.textSecondary)
             }
-            Text("${(suggestion.score * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text("${(suggestion.score * 100).toInt()}%", style = ty.titleMedium, color = mc.primaryAccent)
         }
     }
 }
@@ -265,7 +281,7 @@ private fun DeckMagicScreenPreview() {
         )
     )
 
-    MaterialTheme {
+    com.mmg.manahub.core.ui.theme.MagicTheme {
         DashboardContent(
             uiState = uiState,
             onDiscoveryClick = {},
@@ -273,10 +289,6 @@ private fun DeckMagicScreenPreview() {
         )
     }
 }
-
-
-
-
 
 
 

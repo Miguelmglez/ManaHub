@@ -5,16 +5,16 @@ import com.mmg.manahub.core.domain.model.PreferredCurrency
 object PriceFormatter {
 
     /**
-     * Determina si el dispositivo usa formato europeo (utilizado para el valor inicial por defecto).
-     * Delega la lógica a LocaleLanguageProvider.
+     * Returns true when the device locale uses European number formatting.
+     * Delegates to [LocaleLanguageProvider.isEuropeanLocale].
      */
     fun isEuropeanLocale(): Boolean = LocaleLanguageProvider.isEuropeanLocale()
 
     /**
-     * Formatea un precio dado su valor y divisa preferida.
-     * @param amount El valor numérico.
-     * @param currency La divisa a utilizar (USD o EUR).
-     * @param showSymbol Si se debe incluir el símbolo de la moneda.
+     * Formats a price for the given [currency].
+     * @param amount Numeric price value.
+     * @param currency The currency to use (USD or EUR).
+     * @param showSymbol Whether to include the currency symbol.
      */
     fun format(
         amount: Double?,
@@ -30,7 +30,7 @@ object PriceFormatter {
     }
 
     /**
-     * Sobrecarga para String? (formato habitual de APIs).
+     * Overload for [String?] values as returned by Scryfall API fields.
      */
     fun format(
         amount: String?,
@@ -41,20 +41,18 @@ object PriceFormatter {
     }
 
     private fun formatEur(amount: Double, showSymbol: Boolean): String {
-        // Formato europeo: separador de miles = punto, separador decimal = coma, símbolo al final
+        // European format: thousands separator = dot, decimal separator = comma, symbol at the end.
         val formatted = String.format(java.util.Locale.GERMAN, "%,.2f", amount)
         return if (showSymbol) "$formatted €" else formatted
     }
 
     private fun formatUsd(amount: Double, showSymbol: Boolean): String {
-        // Formato americano: separador de miles = coma, separador decimal = punto, símbolo al inicio
+        // US format: thousands separator = comma, decimal separator = dot, symbol at the front.
         val formatted = String.format(java.util.Locale.US, "%,.2f", amount)
         return if (showSymbol) "\$$formatted" else formatted
     }
 
-    /**
-     * Selecciona el precio correcto (USD o EUR) de un par de valores según la preferencia.
-     */
+    /** Picks the correct price (USD or EUR) from a pair of values based on the preferred currency. */
     fun selectPrice(
         priceUsd: String?,
         priceEur: String?,
@@ -67,9 +65,7 @@ object PriceFormatter {
         }
     }
 
-    /**
-     * Selecciona el precio correcto (USD o EUR) de un par de valores según la preferencia.
-     */
+    /** Picks the correct price (USD or EUR) from a pair of [Double?] values based on the preferred currency. */
     fun selectPrice(
         priceUsd: Double?,
         priceEur: Double?,
@@ -82,9 +78,7 @@ object PriceFormatter {
         }
     }
 
-    /**
-     * Formatea directamente desde los dos campos de Scryfall (String?).
-     */
+    /** Formats a price directly from the two Scryfall [String?] fields. */
     fun formatFromScryfall(
         priceUsd: String?,
         priceEur: String?,
@@ -95,9 +89,7 @@ object PriceFormatter {
         return format(amount, currency, showSymbol)
     }
 
-    /**
-     * Formatea directamente desde Double? (campos del modelo Card).
-     */
+    /** Formats a price directly from the [Double?] fields on the [Card] domain model. */
     fun formatFromScryfall(
         priceUsd: Double?,
         priceEur: Double?,

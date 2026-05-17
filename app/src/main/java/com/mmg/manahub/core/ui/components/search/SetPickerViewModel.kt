@@ -75,11 +75,8 @@ class SetPickerViewModel @Inject constructor(
     }
 
     fun clearFilters() {
-        _uiState.update { it.copy(
-            searchQuery = "",
-            selectedTypes = emptySet(),
-            filteredSets = _uiState.value.allSets,
-        )}
+        _uiState.update { it.copy(searchQuery = "", selectedTypes = emptySet()) }
+        applyFilters()
     }
 
     private fun applyFilters() {

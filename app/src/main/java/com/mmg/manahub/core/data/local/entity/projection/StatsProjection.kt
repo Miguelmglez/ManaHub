@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.data.local.entity.projection
 
-
 data class TotalsProjection(val totalCards: Int, val uniqueCards: Int)
 data class CardValueProjection(
     val scryfallId:    String,

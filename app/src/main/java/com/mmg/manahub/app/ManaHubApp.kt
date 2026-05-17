@@ -21,7 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import java.io.IOException
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -41,25 +40,9 @@ class ManaHubApp : Application() {
 
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
 
-        val allowedImageHosts = setOf(
-            "cards.scryfall.io",
-            "svgs.scryfall.io",
-            "c1.scryfall.com",
-            "i.ytimg.com",
-        )
         Coil.setImageLoader(
             ImageLoader.Builder(this)
-                .okHttpClient(
-                    okHttpClient.newBuilder()
-                        .addInterceptor { chain ->
-                            val host = chain.request().url.host
-                            if (host !in allowedImageHosts) {
-                                throw IOException("Image host not in allowlist: $host")
-                            }
-                            chain.proceed(chain.request())
-                        }
-                        .build()
-                )
+                .okHttpClient(okHttpClient)
                 .components { add(SvgDecoder.Factory()) }
                 .build()
         )

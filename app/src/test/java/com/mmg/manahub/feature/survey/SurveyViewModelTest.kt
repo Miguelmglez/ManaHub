@@ -1,23 +1,34 @@
 package com.mmg.manahub.feature.survey
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
+import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.entity.GameSessionEntity
+import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
+import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
+import com.mmg.manahub.core.data.local.entity.SurveyStatus
+import com.mmg.manahub.core.domain.model.AppLanguage
+import com.mmg.manahub.core.domain.model.CardLanguage
+import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.domain.model.NewsLanguage
+import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.model.UserPreferences
+import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.ui.theme.PlayerTheme
-import com.mmg.manahub.feature.game.model.EliminationReason
-import com.mmg.manahub.feature.game.model.GameMode
-import com.mmg.manahub.feature.game.model.GameResult
-import com.mmg.manahub.feature.game.model.Player
-import com.mmg.manahub.feature.game.model.PlayerResult
+import com.mmg.manahub.feature.survey.presentation.CardImpactRating
+import com.mmg.manahub.feature.survey.presentation.SurveyMode
+import com.mmg.manahub.feature.survey.presentation.SurveyViewModel
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -28,98 +39,53 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for [SurveyViewModel].
- *
- * REGRESSION GROUP: "persistAnswers race condition fix"
- * Before the fix, persistAnswers() could be called twice:
- *   1. answerAndAdvance() on the last question sets isComplete=true → calls persistAnswers()
- *   2. skipAll() also calls persistAnswers() without checking if already called
- * This could result in duplicate rows in survey_answers for the same session.
- * Fix: persistCalled boolean guard — once persistAnswers() is entered, it immediately sets
- * persistCalled=true and subsequent invocations return early without calling the DAO.
- *
- * Note: SurveyViewModel uses Context only for SurveyQuestionEngine.buildQuestions() (string
- * resources). Tests that need questions use a pre-built SurveyQuestion list injected via
- * initWithResult() with a mocked Context — or bypass initWithResult() entirely and call
- * the ViewModel methods directly on a pre-seeded state via reflection.
- * To keep tests framework-free, we use the two-question approach: the survey state is set
- * by calling initWithResult() with a fake GameResult. Since SurveyQuestionEngine calls
- * context.getString(), we use an android.content.Context mock for those calls.
+ * Uses [UnconfinedTestDispatcher] so coroutines launched from the VM run eagerly,
+ * making state observable synchronously after each call. The DAO mocks use
+ * `coEvery { ... } returns ...` which complete immediately, so we never need to
+ * coordinate with the real Dispatchers.IO that `persistAnswers` switches to.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SurveyViewModelTest {
 
-    // ── Dispatcher ────────────────────────────────────────────────────────────
+    private val sessionId = 42L
 
-    private val testDispatcher = StandardTestDispatcher()
+    private lateinit var surveyAnswerDao: SurveyAnswerDao
+    private lateinit var gameSessionDao: GameSessionDao
+    private lateinit var deckRepository: DeckRepository
+    private lateinit var cardDao: CardDao
+    private lateinit var prefsRepository: UserPreferencesRepository
+    private lateinit var context: Context
 
-    // ── Mocks ─────────────────────────────────────────────────────────────────
-
-    private val surveyAnswerDao     = mockk<SurveyAnswerDao>(relaxed = true)
-    private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
-    private val savedStateHandle    = SavedStateHandle(mapOf("sessionId" to 10L))
-    private val context             = mockk<android.content.Context>(relaxed = true)
-
-    private lateinit var viewModel: SurveyViewModel
-
-    // ── Fixture helpers ───────────────────────────────────────────────────────
-
-    private val defaultTheme = PlayerTheme.ALL[0]
-
-    private fun buildPlayer(id: Int = 0, name: String = "Player ${id+1}") = Player(
-        id        = id,
-        name      = name,
-        life      = 20,
-        theme     = defaultTheme,
-        isAppUser = id == 0,
-    )
-
-    private fun buildGameResult(
-        winner:     Player              = buildPlayer(0),
-        allPlayers: List<Player>        = listOf(buildPlayer(0), buildPlayer(1)),
-        playerResults: List<PlayerResult> = listOf(
-            PlayerResult(buildPlayer(0), 20, 0, 0, 0, null),
-            PlayerResult(buildPlayer(1), 0, 0, 0, 0, EliminationReason.LIFE),
-        ),
-    ) = GameResult(
-        winner           = winner,
-        allPlayers       = allPlayers,
-        gameMode         = GameMode.STANDARD,
-        totalTurns       = 5,
-        durationMs       = 60_000L,
-        playerResults    = playerResults,
-        appUserWon       = true,
-        appUserFinalLife = 20,
-        appUserName      = "Wizard",
-    )
-
-    /**
-     * Injects a fixed set of questions directly into the ViewModel's state by
-     * using the ViewModel's own public initWithResult() path with a mocked Context
-     * that returns empty strings (avoids android resources).
-     * The actual question content doesn't matter for persistence tests.
-     */
-    private fun seedQuestions(vm: SurveyViewModel, questions: List<SurveyQuestion>) {
-        // Directly update _uiState via the public state by exploiting the fact that
-        // initWithResult() only runs if questions list is empty. We call it first
-        // with a mock context; the engine will build questions from string resources.
-        // For tests where we need precise question count, we use a helper ViewModel subclass.
-        // Since we can't easily control SurveyQuestionEngine without Android resources,
-        // we verify persistAnswers behavior via the persistCalled guard directly.
-        // Tests that need specific question counts manipulate state through answerAndAdvance().
-    }
-
-    // ── Setup / Teardown ──────────────────────────────────────────────────────
+    private val dispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(testDispatcher)
-        viewModel = SurveyViewModel(
-            surveyAnswerDao = surveyAnswerDao,
-            userPreferencesRepository = userPreferencesRepository,
-            savedStateHandle = savedStateHandle,
-            context = context,
+        Dispatchers.setMain(dispatcher)
+
+        surveyAnswerDao = mockk(relaxUnitFun = true)
+        gameSessionDao = mockk(relaxUnitFun = true)
+        deckRepository = mockk()
+        cardDao = mockk()
+        prefsRepository = mockk()
+        context = mockk(relaxed = true)
+
+        every { context.getString(any()) } returns "stub"
+        every { context.getString(any(), *anyVararg()) } returns "stub"
+        every { context.createConfigurationContext(any()) } returns context
+
+        every { prefsRepository.preferencesFlow } returns flowOf(
+            UserPreferences(
+                appLanguage = AppLanguage.ENGLISH,
+                cardLanguage = CardLanguage.ENGLISH,
+                newsLanguages = setOf(NewsLanguage.ENGLISH),
+                preferredCurrency = PreferredCurrency.USD,
+                collectionViewMode = CollectionViewMode.GRID,
+            )
         )
+
+        coEvery { gameSessionDao.getSessionById(sessionId) } returns fakeSessionWithPlayers()
+        coEvery { surveyAnswerDao.getAnswersForSession(sessionId) } returns emptyList()
+        every { deckRepository.observeAllDecks() } returns flowOf(emptyList())
     }
 
     @After
@@ -127,321 +93,193 @@ class SurveyViewModelTest {
         Dispatchers.resetMain()
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — REGRESSION: persistAnswers race condition guard
-    //  The key invariant: surveyAnswerDao.insertAnswers() must be called AT MOST
-    //  once per ViewModel instance regardless of how many times persistAnswers()
-    //  is triggered.
-    // ══════════════════════════════════════════════════════════════════════════
+    @Test
+    fun `init hydrates GameRecap from loaded session`() = runTest(dispatcher) {
+        val vm = buildVm()
+        val state = vm.uiState.value
+        assertEquals(sessionId, state.recap?.sessionId)
+        assertEquals(true, state.recap?.won)
+        assertEquals("COMMANDER", state.recap?.mode)
+    }
 
     @Test
-    fun `given skipAll when called twice then insertAnswers is called at most once`() = runTest {
-        // Arrange — add a question and answer so entities list is not empty
-        val fakeQuestion = SurveyQuestion(
-            id           = "q1",
-            type         = "RESULT_FEEL",
-            text         = "How did it feel?",
-            answerOption = AnswerOption.SingleChoice(
-                listOf(SurveyChoice("WIN", "Win"), SurveyChoice("LOSS", "Loss")),
-            ),
+    fun `init restores existing answers including CARD_IMPACT and FREE_TEXT`() = runTest(dispatcher) {
+        coEvery { surveyAnswerDao.getAnswersForSession(sessionId) } returns listOf(
+            SurveyAnswerEntity(sessionId = sessionId, questionId = "decisive_moment", questionType = "DECISIVE_MOMENT", answer = "KEY_TURN"),
+            SurveyAnswerEntity(sessionId = sessionId, questionId = "card_impact", questionType = "CARD_IMPACT", answer = "KEY_CARD", cardReference = "card-a"),
+            SurveyAnswerEntity(sessionId = sessionId, questionId = "free_notes", questionType = "FREE_TEXT", answer = "felt slow"),
         )
-        // Manually seed state via reflection (clean alternative: test-only constructor param)
-        // Since SurveyViewModel does not expose a test seeding API we directly invoke
-        // skipAll() twice on a freshly created VM. With no questions loaded, the answers
-        // map is empty and insertAnswers won't be called — this validates the guard still
-        // doesn't throw on double-invocation.
-        viewModel.skipAll()
-        viewModel.skipAll()   // second call must be no-op due to persistCalled guard
-        advanceUntilIdle()
-
-        // Assert: DAO called 0 times (answers map empty), but more importantly: no exception,
-        // and the second call returned early due to the guard.
-        coVerify(atMost = 1) { surveyAnswerDao.insertAnswers(any()) }
+        val vm = buildVm()
+        val state = vm.uiState.value
+        assertEquals("KEY_TURN", state.answers["decisive_moment"])
+        assertEquals(CardImpactRating.KEY_CARD, state.cardImpactSelections["card-a"])
+        assertEquals("felt slow", state.freeNotes)
     }
 
     @Test
-    fun `given skipAll called once when called then isComplete is set to true`() = runTest {
-        // Arrange
-        // Act
-        viewModel.skipAll()
-        advanceUntilIdle()
+    fun `complete writes COMPLETED status with completedAt`() = runTest(dispatcher) {
+        val vm = buildVm()
+        vm.setAnswer("decisive_moment", "KEY_TURN")
+        vm.complete()
 
-        // Assert
-        assertTrue(viewModel.uiState.value.isComplete)
+        coVerify(timeout = 2_000L) {
+            gameSessionDao.updateSurveyStatus(
+                sessionId = sessionId,
+                status = SurveyStatus.COMPLETED.name,
+                completedAt = match { it != null },
+            )
+        }
     }
 
     @Test
-    fun `given persistCalled guard when skipAll then second skipAll does not increment insertAnswers calls`() = runTest {
-        // Arrange — add answers via answerAndAdvance to a pre-seeded question
-        // We test the guard in isolation: call skipAll (1), then skipAll (2)
-        viewModel.skipAll()
-        viewModel.skipAll()
-        advanceUntilIdle()
+    fun `postpone writes PARTIAL status with null completedAt`() = runTest(dispatcher) {
+        val vm = buildVm()
+        vm.setAnswer("hand_quality", "4")
+        vm.postpone()
 
-        // Assert: at most 1 call total — the guard prevents a second insert
-        coVerify(atMost = 1) { surveyAnswerDao.insertAnswers(any()) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 2 — answerAndAdvance state transitions
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given question answered when answerAndAdvance then answer is stored in state`() = runTest {
-        // Arrange — we need questions in state; use the SurveyQuestionEngine via initWithResult()
-        // context.getString() returns empty strings (mockk relaxed), so questions are created
-        // but with empty text — still valid for state tests
-        viewModel.initWithResult(buildGameResult())
-        val questionId = viewModel.uiState.value.questions.firstOrNull()?.id ?: return@runTest
-
-        // Act
-        viewModel.answerAndAdvance(questionId, "DOMINANT")
-
-        // Assert
-        assertTrue(viewModel.uiState.value.answers.containsKey(questionId))
-        assertEquals("DOMINANT", viewModel.uiState.value.answers[questionId])
+        coVerify(timeout = 2_000L) {
+            gameSessionDao.updateSurveyStatus(
+                sessionId = sessionId,
+                status = SurveyStatus.PARTIAL.name,
+                completedAt = null,
+            )
+        }
     }
 
     @Test
-    fun `given question answered when answerAndAdvance then currentIndex increments`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        val initialIndex = viewModel.uiState.value.currentIndex
+    fun `skipAll marks SKIPPED only when current status is PENDING`() = runTest(dispatcher) {
+        coEvery { gameSessionDao.getSessionById(sessionId) } returns fakeSessionWithPlayers(surveyStatus = "PENDING")
+        val vm = buildVm()
+        vm.skipAll()
 
-        val questionId = viewModel.uiState.value.questions.firstOrNull()?.id ?: return@runTest
-
-        // Act
-        viewModel.answerAndAdvance(questionId, "CLOSE")
-
-        // Assert
-        assertEquals(initialIndex + 1, viewModel.uiState.value.currentIndex)
+        coVerify(timeout = 2_000L) {
+            gameSessionDao.updateSurveyStatus(
+                sessionId = sessionId,
+                status = SurveyStatus.SKIPPED.name,
+                completedAt = null,
+            )
+        }
     }
 
     @Test
-    fun `given survey initialized when answerAndAdvance past last question then isComplete is true`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        val questions = viewModel.uiState.value.questions
-        if (questions.isEmpty()) return@runTest   // engine returned no questions in test environment
+    fun `skipAll does not overwrite PARTIAL status`() = runTest(dispatcher) {
+        coEvery { gameSessionDao.getSessionById(sessionId) } returns fakeSessionWithPlayers(surveyStatus = "PARTIAL")
+        val vm = buildVm()
+        vm.skipAll()
 
-        // Act — answer all questions
-        questions.forEach { q -> viewModel.answerAndAdvance(q.id, "DOMINANT") }
-        advanceUntilIdle()
-
-        // Assert
-        assertTrue(viewModel.uiState.value.isComplete)
+        coVerify(exactly = 0, timeout = 2_000L) {
+            gameSessionDao.updateSurveyStatus(
+                sessionId = sessionId,
+                status = SurveyStatus.SKIPPED.name,
+                completedAt = null,
+            )
+        }
     }
 
     @Test
-    fun `given all questions answered when answerAndAdvance then insertAnswers is called exactly once`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        val questions = viewModel.uiState.value.questions
-        if (questions.isEmpty()) return@runTest
-
-        // Act
-        questions.forEach { q -> viewModel.answerAndAdvance(q.id, "CLOSE") }
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 1) { surveyAnswerDao.insertAnswers(any()) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — REGRESSION: answerAndAdvance + skipAll → single persist
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given all questions answered then skipAll called when combined then insertAnswers called at most once`() = runTest {
-        // Arrange — answer all questions to trigger persist via answerAndAdvance path
-        viewModel.initWithResult(buildGameResult())
-        val questions = viewModel.uiState.value.questions
-
-        // Act
-        questions.forEach { q -> viewModel.answerAndAdvance(q.id, "DOMINANT") }
-        // Then skipAll fires (race condition scenario)
-        viewModel.skipAll()
-        advanceUntilIdle()
-
-        // Assert: persistCalled guard prevents double insert
-        coVerify(atMost = 1) { surveyAnswerDao.insertAnswers(any()) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — persistAnswers skips insert when answers map is empty
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given no answers recorded when skipAll then insertAnswers is NOT called`() = runTest {
-        // Arrange — no questions answered → answers map is empty
-
-        // Act
-        viewModel.skipAll()
-        advanceUntilIdle()
-
-        // Assert: empty entity list → insertAnswers is not called
-        coVerify(exactly = 0) { surveyAnswerDao.insertAnswers(any()) }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — insertAnswers entities are correct
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given answered question when persistAnswers then entity has correct sessionId`() = runTest {
-        // Arrange — sessionId=10L from SavedStateHandle
-        viewModel.initWithResult(buildGameResult())
-        val questions = viewModel.uiState.value.questions
-        if (questions.isEmpty()) return@runTest
-
-        val capturedEntities = slot<List<SurveyAnswerEntity>>()
-        // We need to capture the entities; re-init with capture mock
-        val newDao   = mockk<SurveyAnswerDao>(relaxed = true)
-        val newVm    = SurveyViewModel(
-            surveyAnswerDao = newDao,
-            userPreferencesRepository = userPreferencesRepository,
-            savedStateHandle = SavedStateHandle(mapOf("sessionId" to 99L)),
-            context = context
+    fun `REVIEW mode propagates to state`() = runTest(dispatcher) {
+        val vm = SurveyViewModel(
+            surveyAnswerDao = surveyAnswerDao,
+            gameSessionDao = gameSessionDao,
+            deckRepository = deckRepository,
+            cardDao = cardDao,
+            userPreferencesRepository = prefsRepository,
+            context = context,
+            ioDispatcher = dispatcher,
+            savedStateHandle = SavedStateHandle(mapOf("sessionId" to sessionId, "mode" to "REVIEW")),
         )
-        newVm.initWithResult(buildGameResult())
-        val qs = newVm.uiState.value.questions
-        if (qs.isEmpty()) return@runTest
-
-        coEvery { newDao.insertAnswers(capture(capturedEntities)) } returns Unit
-
-        // Act
-        qs.forEach { q -> newVm.answerAndAdvance(q.id, "DOMINANT") }
-        advanceUntilIdle()
-
-        // Assert
-        assertTrue(capturedEntities.captured.all { it.sessionId == 99L })
+        assertEquals(SurveyMode.REVIEW, vm.uiState.value.surveyMode)
     }
 
     @Test
-    fun `given answered question when persistAnswers then entity has correct questionId and answer`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        val questions = viewModel.uiState.value.questions
-        if (questions.isEmpty()) return@runTest
+    fun `addExtraImpactCard dedupes by scryfallId`() = runTest(dispatcher) {
+        val vm = buildVm()
+        val card = fakeCard("card-a")
+        vm.addExtraImpactCard(card)
+        vm.addExtraImpactCard(card)
+        assertEquals(1, vm.uiState.value.extraImpactCards.size)
+    }
 
-        val capturedEntities = slot<List<SurveyAnswerEntity>>()
-        val newDao = mockk<SurveyAnswerDao>(relaxed = true)
-        val newVm  = SurveyViewModel(
-            surveyAnswerDao = newDao,
-            userPreferencesRepository = userPreferencesRepository,
-            savedStateHandle = SavedStateHandle(mapOf("sessionId" to 1L)),
-            context = context
+    @Test
+    fun `removeImpactCard clears both selection and extra entry`() = runTest(dispatcher) {
+        val vm = buildVm()
+        val card = fakeCard("card-x")
+        vm.addExtraImpactCard(card)
+        vm.setCardImpact("card-x", CardImpactRating.WEAK)
+        vm.removeImpactCard("card-x")
+        assertTrue(vm.uiState.value.extraImpactCards.isEmpty())
+        assertTrue(vm.uiState.value.cardImpactSelections.isEmpty())
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private fun buildVm() = SurveyViewModel(
+        surveyAnswerDao = surveyAnswerDao,
+        gameSessionDao = gameSessionDao,
+        deckRepository = deckRepository,
+        cardDao = cardDao,
+        userPreferencesRepository = prefsRepository,
+        context = context,
+        ioDispatcher = dispatcher,
+        savedStateHandle = SavedStateHandle(mapOf("sessionId" to sessionId, "mode" to "COMPLETE")),
+    )
+
+    private fun fakeSessionWithPlayers(surveyStatus: String = "PENDING"): GameSessionWithPlayers {
+        val session = GameSessionEntity(
+            id = sessionId,
+            playedAt = 1_700_000_000_000L,
+            durationMs = 1_320_000L,
+            mode = "COMMANDER",
+            totalTurns = 14,
+            playerCount = 2,
+            winnerId = 1,
+            winnerName = "Me",
+            surveyStatus = surveyStatus,
         )
-        newVm.initWithResult(buildGameResult())
-        val qs = newVm.uiState.value.questions
-        if (qs.isEmpty()) return@runTest
-
-        val firstQuestion = qs.first()
-        coEvery { newDao.insertAnswers(capture(capturedEntities)) } returns Unit
-
-        // Act
-        newVm.answerAndAdvance(firstQuestion.id, "LUCKY")
-        // Answer remaining questions to trigger persist
-        qs.drop(1).forEach { q -> newVm.answerAndAdvance(q.id, "DOMINANT") }
-        advanceUntilIdle()
-
-        // Assert: the first question answer is present with correct values
-        val firstEntity = capturedEntities.captured.find { it.questionId == firstQuestion.id }
-        assertEquals("LUCKY", firstEntity?.answer)
+        val players = listOf(
+            PlayerSessionEntity(sessionId = sessionId, playerId = 1, playerName = "Me", finalLife = 30, finalPoison = 0, eliminationReason = null, isWinner = true),
+            PlayerSessionEntity(sessionId = sessionId, playerId = 2, playerName = "Rival", finalLife = -3, finalPoison = 0, eliminationReason = "LIFE", isWinner = false),
+        )
+        return GameSessionWithPlayers(session, players)
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — initWithResult idempotency
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given initWithResult called when called again then questions list is not reset`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        val questionsAfterFirst = viewModel.uiState.value.questions
-
-        // Act — second call should be ignored (guard: questions.isNotEmpty())
-        viewModel.initWithResult(buildGameResult())
-        val questionsAfterSecond = viewModel.uiState.value.questions
-
-        // Assert: identical reference — no rebuild happened
-        assertEquals(questionsAfterFirst, questionsAfterSecond)
-    }
-
-    @Test
-    fun `given answerAndAdvance called then initWithResult called again when then currentIndex is not reset`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        val qs = viewModel.uiState.value.questions
-        if (qs.isEmpty()) return@runTest
-
-        viewModel.answerAndAdvance(qs[0].id, "DOMINANT")
-        val indexAfterAnswer = viewModel.uiState.value.currentIndex
-
-        // Act — second init must be idempotent
-        viewModel.initWithResult(buildGameResult())
-
-        // Assert: index was not reset
-        assertEquals(indexAfterAnswer, viewModel.uiState.value.currentIndex)
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 7 — skipQuestion
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given question not answered when skipQuestion then currentIndex increments`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        if (viewModel.uiState.value.questions.isEmpty()) return@runTest
-        val initialIndex = viewModel.uiState.value.currentIndex
-
-        // Act
-        viewModel.skipQuestion()
-
-        // Assert
-        assertEquals(initialIndex + 1, viewModel.uiState.value.currentIndex)
-    }
-
-    @Test
-    fun `given question skipped when skipQuestion then answer is NOT added to answers map`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        if (viewModel.uiState.value.questions.isEmpty()) return@runTest
-
-        // Act
-        viewModel.skipQuestion()
-
-        // Assert: no answer was added
-        assertTrue(viewModel.uiState.value.answers.isEmpty())
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 8 — progress computation
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given no questions when progress then returns 0f`() = runTest {
-        // Arrange — fresh ViewModel, no questions loaded
-
-        // Act
-        val progress = viewModel.progress
-
-        // Assert
-        assertEquals(0f, progress, 0.001f)
-    }
-
-    @Test
-    fun `given questions loaded and first answered when progress then is greater than 0`() = runTest {
-        // Arrange
-        viewModel.initWithResult(buildGameResult())
-        val qs = viewModel.uiState.value.questions
-        if (qs.isEmpty()) return@runTest
-
-        // Act
-        viewModel.answerAndAdvance(qs[0].id, "CLOSE")
-
-        // Assert
-        assertTrue(viewModel.progress > 0f)
-    }
+    private fun fakeCard(id: String) = com.mmg.manahub.core.domain.model.Card(
+        scryfallId = id,
+        name = "Stub $id",
+        printedName = null,
+        manaCost = null,
+        cmc = 3.0,
+        colors = emptyList(),
+        colorIdentity = emptyList(),
+        typeLine = "Creature",
+        printedTypeLine = null,
+        oracleText = null,
+        printedText = null,
+        keywords = emptyList(),
+        power = null,
+        toughness = null,
+        loyalty = null,
+        setCode = "",
+        setName = "",
+        collectorNumber = "",
+        rarity = "",
+        releasedAt = "",
+        frameEffects = emptyList(),
+        promoTypes = emptyList(),
+        lang = "",
+        imageNormal = null,
+        imageArtCrop = null,
+        imageBackNormal = null,
+        priceUsd = null,
+        priceUsdFoil = null,
+        priceEur = null,
+        priceEurFoil = null,
+        legalityStandard = "",
+        legalityPioneer = "",
+        legalityModern = "",
+        legalityCommander = "",
+        flavorText = null,
+        artist = null,
+        scryfallUri = "",
+    )
 }

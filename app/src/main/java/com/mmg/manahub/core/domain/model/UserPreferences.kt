@@ -10,8 +10,6 @@ data class UserPreferences(
 
 enum class AppLanguage(val code: String, val displayName: String) {
     ENGLISH("en-GB", "English");
-    //SPANISH("es", "Español")
-    //GERMAN("de", "Deutsch");
 
     companion object {
         fun fromCode(code: String) = entries.find { it.code == code } ?: ENGLISH

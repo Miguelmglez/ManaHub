@@ -1,0 +1,1851 @@
+{
+  "metadata": {
+    "set_name": "Outlaws of Thunder Junction",
+    "set_code": "OTJ",
+    "source_url": "https://draftsim.com/mtg-otj-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "September 26, 2024"
+  },
+  "set_overview": {
+    "summary": "Outlaws of Thunder Junction emphasizes value, removal, and fatties with a slower format than its predecessor. It avoids the unbeatable bomb rares and noninteractive races that plagued Murders at Karlov Manor, offering more time for synergy assembly and color-splashing opportunities.",
+    "color_ranking": [
+      "{G} Green",
+      "{W} White",
+      "{B} Black",
+      "{R} Red",
+      "{U} Blue"
+    ],
+    "color_notes": {
+      "{G} Green": "Best color. Exceptional mana-fixing through ramp, premium fatties (Spinewoods Paladin, Cactarantula, Giant Beaver), strong removal (Throw from the Saddle), and splashing utility (Snakeskin Veil). Often overdrafted.",
+      "{W} White": "Efficient early creatures (Trained Arynx, Sterling Keykeeper, Holy Cow), premium removal (Mystical Tether), and excellent tricks (Take Up the Shield). Creature sizing trails green.",
+      "{B} Black": "Best common removal (Consuming Ashes, Desert's Due), efficient early plays (Vault Plunderer, Desperate Bloodseeker), and strong value cards (Mourner's Surprise, Ambush Gigapede). Limited creature sizing.",
+      "{R} Red": "Best common is Explosive Derailment. Secondary removal (Prickly Pair) and go-wide payoff (Outlaws' Fury). Often outmatched by value decks.",
+      "{U} Blue": "Weakest. Playable counterspell (Phantom Interference) and Loan Shark value, but the lowest-quality common creatures in the format."
+    },
+    "key_gameplay_notes": [
+      "Green's strength can lead to scarcity mid-draft — be ready to pivot.",
+      "Splashing is encouraged through desert mana-fixing.",
+      "Graveyard synergies reward patient play.",
+      "Board-wipes are uncommon; most removal is targeted.",
+      "No significant graveyard hate available.",
+      "Deserts outperform expectations thanks to mana-fixing and crime synergy."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Crime",
+      "summary": "Flexible mechanic rewarding both dedicated and incidental synergies. Targeting opponents' permanents and players counts as committing a crime.",
+      "performance": "Easy to enable; payoffs scale with density.",
+      "key_examples": [
+        {
+          "name": "Freestrider Lookout",
+          "color": "G",
+          "rarity": "Rare",
+          "pick_order_rank": 114,
+          "tier_rating": "B",
+          "note": null,
+          "id": "32370f05-52a2-405f-b2bb-1b8a9b0b69f8",
+          "scryfall_uri": "https://scryfall.com/card/otj/163/freestrider-lookout",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32370f05-52a2-405f-b2bb-1b8a9b0b69f8.jpg?1712355921",
+            "normal": "https://cards.scryfall.io/normal/front/3/2/32370f05-52a2-405f-b2bb-1b8a9b0b69f8.jpg?1712355921"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        },
+        {
+          "name": "Blood Hustler",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 113,
+          "tier_rating": "B",
+          "note": null,
+          "id": "1016a750-2a18-4443-a600-957eb4026d3a",
+          "scryfall_uri": "https://scryfall.com/card/otj/80/blood-hustler",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Vampire Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/1016a750-2a18-4443-a600-957eb4026d3a.jpg?1712355556",
+            "normal": "https://cards.scryfall.io/normal/front/1/0/1016a750-2a18-4443-a600-957eb4026d3a.jpg?1712355556"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        },
+        {
+          "name": "Nimble Brigand",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 205,
+          "tier_rating": "C",
+          "note": null,
+          "id": "73c74d48-362d-4c3b-9ff7-39bdd19657a6",
+          "scryfall_uri": "https://scryfall.com/card/otj/58/nimble-brigand",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Human Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73c74d48-362d-4c3b-9ff7-39bdd19657a6.jpg?1712355461",
+            "normal": "https://cards.scryfall.io/normal/front/7/3/73c74d48-362d-4c3b-9ff7-39bdd19657a6.jpg?1712355461"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        }
+      ]
+    },
+    {
+      "name": "Plot",
+      "summary": "Cast plotted spells at a discount on a later turn. Interesting decision-making; strong both as a standalone payoff and as a synergy engine.",
+      "performance": "Format-defining — enables tempo and value plays.",
+      "key_examples": [
+        {
+          "name": "Spinewoods Paladin",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 83,
+          "tier_rating": "B",
+          "note": null,
+          "id": "1b2b432d-9e73-4ab2-a098-546d406df6c0",
+          "scryfall_uri": "https://scryfall.com/card/otj/183/spinewoods-paladin",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Knight",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b2b432d-9e73-4ab2-a098-546d406df6c0.jpg?1712356003",
+            "normal": "https://cards.scryfall.io/normal/front/1/b/1b2b432d-9e73-4ab2-a098-546d406df6c0.jpg?1712356003"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        }
+      ]
+    },
+    {
+      "name": "Saddle",
+      "summary": "Less binary than vehicle mechanics — saddling grants powerful but temporary bonuses. Core to GW Mounts.",
+      "performance": "Top-tier when paired with mount creatures.",
+      "key_examples": []
+    },
+    {
+      "name": "Spree",
+      "summary": "Standard modular spell design with selectable add-on modes. Limited impact on format shape.",
+      "performance": "Solid but not transformative.",
+      "key_examples": []
+    },
+    {
+      "name": "Outlaws / Mercenaries / Deserts",
+      "summary": "Outlaws are slightly underpowered; mercenaries are useful across RW/BR/WB; deserts outperform expectations due to mana-fixing and crime synergy.",
+      "performance": "Deserts are the most impactful subtype.",
+      "key_examples": [
+        {
+          "name": "Conduit Pylons",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 132,
+          "tier_rating": "C",
+          "note": null,
+          "id": "5ffa48cc-b991-4d47-b7ec-cf678915c758",
+          "scryfall_uri": "https://scryfall.com/card/otj/254/conduit-pylons",
+          "colors": [],
+          "type_line": "Land — Desert",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/f/5ffa48cc-b991-4d47-b7ec-cf678915c758.jpg?1712356314",
+            "normal": "https://cards.scryfall.io/normal/front/5/f/5ffa48cc-b991-4d47-b7ec-cf678915c758.jpg?1712356314"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        },
+        {
+          "name": "Mirage Mesa",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 195,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c3d2e816-c06d-4c5d-98fe-c350d8cfab27",
+          "scryfall_uri": "https://scryfall.com/card/otj/262/mirage-mesa",
+          "colors": [],
+          "type_line": "Land — Desert",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3d2e816-c06d-4c5d-98fe-c350d8cfab27.jpg?1712356348",
+            "normal": "https://cards.scryfall.io/normal/front/c/3/c3d2e816-c06d-4c5d-98fe-c350d8cfab27.jpg?1712356348"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        },
+        {
+          "name": "Cactarantula",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 99,
+          "tier_rating": "B",
+          "note": null,
+          "id": "2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3",
+          "scryfall_uri": "https://scryfall.com/card/otj/158/cactarantula",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Plant Spider",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/e/2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3.jpg?1712355900",
+            "normal": "https://cards.scryfall.io/normal/front/2/e/2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3.jpg?1712355900"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        },
+        {
+          "name": "Desert's Due",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 80,
+          "tier_rating": "B",
+          "note": null,
+          "id": "35e899e4-e2de-44cf-b6f4-cace8d3770cb",
+          "scryfall_uri": "https://scryfall.com/card/otj/85/deserts-due",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575",
+            "normal": "https://cards.scryfall.io/normal/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575"
+          },
+          "set": "otj",
+          "set_name": "Outlaws of Thunder Junction"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{G}{W}",
+        "name": "GW Mounts (Midrange/Aggro)",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Every mount creature performs above average. Synergy with removal creates an efficiency advantage.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Seraphic Steed",
+            "color": "WG",
+            "rarity": "Rare",
+            "pick_order_rank": 8,
+            "tier_rating": "S",
+            "note": null,
+            "id": "7ada7ab4-0dee-4ff3-9817-1e61ca3f2ccf",
+            "scryfall_uri": "https://scryfall.com/card/otj/232/seraphic-steed",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Unicorn Mount",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7ada7ab4-0dee-4ff3-9817-1e61ca3f2ccf.jpg?1712356210",
+              "normal": "https://cards.scryfall.io/normal/front/7/a/7ada7ab4-0dee-4ff3-9817-1e61ca3f2ccf.jpg?1712356210"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Congregation Gryff",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 55,
+            "tier_rating": "B",
+            "note": null,
+            "id": "0ef4907a-2fc1-42c5-bffc-3b3f93601fb9",
+            "scryfall_uri": "https://scryfall.com/card/otj/200/congregation-gryff",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Hippogriff Mount",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/e/0ef4907a-2fc1-42c5-bffc-3b3f93601fb9.jpg?1712356078",
+              "normal": "https://cards.scryfall.io/normal/front/0/e/0ef4907a-2fc1-42c5-bffc-3b3f93601fb9.jpg?1712356078"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Wylie Duke, Atiin Hero",
+            "color": "WG",
+            "rarity": "Rare",
+            "pick_order_rank": 33,
+            "tier_rating": "A",
+            "note": null,
+            "id": "bc97ffcf-4f51-44cd-8daa-a7dae4592ee5",
+            "scryfall_uri": "https://scryfall.com/card/otj/239/wylie-duke-atiin-hero",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Ranger",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/c/bc97ffcf-4f51-44cd-8daa-a7dae4592ee5.jpg?1712356248",
+              "normal": "https://cards.scryfall.io/normal/front/b/c/bc97ffcf-4f51-44cd-8daa-a7dae4592ee5.jpg?1712356248"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Miriam, Herd Whisperer",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 39,
+            "tier_rating": "A",
+            "note": null,
+            "id": "bfa7750a-7c32-4413-b762-62e24d992c6b",
+            "scryfall_uri": "https://scryfall.com/card/otj/221/miriam-herd-whisperer",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/f/bfa7750a-7c32-4413-b762-62e24d992c6b.jpg?1712356167",
+              "normal": "https://cards.scryfall.io/normal/front/b/f/bfa7750a-7c32-4413-b762-62e24d992c6b.jpg?1712356167"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Selvala, Eager Trailblazer",
+            "color": "WG",
+            "rarity": "Mythic",
+            "pick_order_rank": 17,
+            "tier_rating": "S",
+            "note": null,
+            "id": "7d2e167f-7cb2-4f15-a1db-7ee56b7ba523",
+            "scryfall_uri": "https://scryfall.com/card/otj/231/selvala-eager-trailblazer",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Elf Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d2e167f-7cb2-4f15-a1db-7ee56b7ba523.jpg?1712356210",
+              "normal": "https://cards.scryfall.io/normal/front/7/d/7d2e167f-7cb2-4f15-a1db-7ee56b7ba523.jpg?1712356210"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Bucolic Ranch",
+            "color": "C",
+            "rarity": "Uncommon",
+            "pick_order_rank": 103,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6c4f6b81-53d0-49fb-b404-c2ad67de7493",
+            "scryfall_uri": "https://scryfall.com/card/otj/265/bucolic-ranch",
+            "colors": [],
+            "type_line": "Land — Desert",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c4f6b81-53d0-49fb-b404-c2ad67de7493.jpg?1712356362",
+              "normal": "https://cards.scryfall.io/normal/front/6/c/6c4f6b81-53d0-49fb-b404-c2ad67de7493.jpg?1712356362"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Throw from the Saddle",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 40,
+            "tier_rating": "A",
+            "note": null,
+            "id": "775874cc-4b78-4904-9c97-431c2e400c64",
+            "scryfall_uri": "https://scryfall.com/card/otj/185/throw-from-the-saddle",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/775874cc-4b78-4904-9c97-431c2e400c64.jpg?1712356011",
+              "normal": "https://cards.scryfall.io/normal/front/7/7/775874cc-4b78-4904-9c97-431c2e400c64.jpg?1712356011"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Trained Arynx",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 75,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ef32a5f8-f69d-47dc-a800-4f0ddf4eada5",
+            "scryfall_uri": "https://scryfall.com/card/otj/36/trained-arynx",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Cat Beast Mount",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef32a5f8-f69d-47dc-a800-4f0ddf4eada5.jpg?1712355371",
+              "normal": "https://cards.scryfall.io/normal/front/e/f/ef32a5f8-f69d-47dc-a800-4f0ddf4eada5.jpg?1712355371"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Giant Beaver",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 131,
+            "tier_rating": "C",
+            "note": null,
+            "id": "919826a9-c427-42c6-8885-a87f0b6d2192",
+            "scryfall_uri": "https://scryfall.com/card/otj/165/giant-beaver",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Beaver Mount",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/919826a9-c427-42c6-8885-a87f0b6d2192.jpg?1712355929",
+              "normal": "https://cards.scryfall.io/normal/front/9/1/919826a9-c427-42c6-8885-a87f0b6d2192.jpg?1712355929"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "BG Recursion (Midrange/Control)",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Best removal suite plus mana-fixing enables greedy splashing. Graveyard payoffs reward creature-heavy decks.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Honest Rutstein",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 48,
+            "tier_rating": "A",
+            "note": null,
+            "id": "259ddf66-76af-4857-83c3-c812327a6e23",
+            "scryfall_uri": "https://scryfall.com/card/otj/207/honest-rutstein",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Legendary Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/259ddf66-76af-4857-83c3-c812327a6e23.jpg?1712356107",
+              "normal": "https://cards.scryfall.io/normal/front/2/5/259ddf66-76af-4857-83c3-c812327a6e23.jpg?1712356107"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Rise of the Varmints",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 189,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f4e879d8-a058-48e8-9733-f58b1e0da4b9",
+            "scryfall_uri": "https://scryfall.com/card/otj/179/rise-of-the-varmints",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/4/f4e879d8-a058-48e8-9733-f58b1e0da4b9.jpg?1712355986",
+              "normal": "https://cards.scryfall.io/normal/front/f/4/f4e879d8-a058-48e8-9733-f58b1e0da4b9.jpg?1712355986"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Stubborn Burrowfiend",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 64,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6d963eb4-d20b-4d3f-bf5d-c75f7bcb9670",
+            "scryfall_uri": "https://scryfall.com/card/otj/184/stubborn-burrowfiend",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Badger Beast Mount",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d963eb4-d20b-4d3f-bf5d-c75f7bcb9670.jpg?1712356009",
+              "normal": "https://cards.scryfall.io/normal/front/6/d/6d963eb4-d20b-4d3f-bf5d-c75f7bcb9670.jpg?1712356009"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Patient Naturalist",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 101,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1dd17cea-9e8c-4dba-b6ab-a6b9de87a306",
+            "scryfall_uri": "https://scryfall.com/card/otj/174/patient-naturalist",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1dd17cea-9e8c-4dba-b6ab-a6b9de87a306.jpg?1712355965",
+              "normal": "https://cards.scryfall.io/normal/front/1/d/1dd17cea-9e8c-4dba-b6ab-a6b9de87a306.jpg?1712355965"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Badlands Revival",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 102,
+            "tier_rating": "B",
+            "note": null,
+            "id": "8d3ef971-cdd4-410c-97c3-df98e4f02ab2",
+            "scryfall_uri": "https://scryfall.com/card/otj/194/badlands-revival",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d3ef971-cdd4-410c-97c3-df98e4f02ab2.jpg?1712356053",
+              "normal": "https://cards.scryfall.io/normal/front/8/d/8d3ef971-cdd4-410c-97c3-df98e4f02ab2.jpg?1712356053"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Cactarantula",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 99,
+            "tier_rating": "B",
+            "note": null,
+            "id": "2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3",
+            "scryfall_uri": "https://scryfall.com/card/otj/158/cactarantula",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Plant Spider",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/e/2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3.jpg?1712355900",
+              "normal": "https://cards.scryfall.io/normal/front/2/e/2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3.jpg?1712355900"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Desert's Due",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 80,
+            "tier_rating": "B",
+            "note": null,
+            "id": "35e899e4-e2de-44cf-b6f4-cace8d3770cb",
+            "scryfall_uri": "https://scryfall.com/card/otj/85/deserts-due",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "WB Attrition (Midrange)",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Premium removal pairs with efficient creatures; sacrifice outlets enable value generation.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Baron Bertram Graywater",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 215,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e9da18b4-1efc-44b7-8001-a2cfd44c69bf",
+            "scryfall_uri": "https://scryfall.com/card/otj/195/baron-bertram-graywater",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Vampire Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e9da18b4-1efc-44b7-8001-a2cfd44c69bf.jpg?1712356055",
+              "normal": "https://cards.scryfall.io/normal/front/e/9/e9da18b4-1efc-44b7-8001-a2cfd44c69bf.jpg?1712356055"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Ruthless Lawbringer",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 56,
+            "tier_rating": "B",
+            "note": null,
+            "id": "927b5498-23f1-47c0-b441-7daaeb54f9b8",
+            "scryfall_uri": "https://scryfall.com/card/otj/229/ruthless-lawbringer",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Vampire Assassin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/927b5498-23f1-47c0-b441-7daaeb54f9b8.jpg?1712356201",
+              "normal": "https://cards.scryfall.io/normal/front/9/2/927b5498-23f1-47c0-b441-7daaeb54f9b8.jpg?1712356201"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Prosperity Tycoon",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f87824f3-aa9f-4d3d-99f7-0fbca43d8a51",
+            "scryfall_uri": "https://scryfall.com/card/otj/25/prosperity-tycoon",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/8/f87824f3-aa9f-4d3d-99f7-0fbca43d8a51.jpg?1712355328",
+              "normal": "https://cards.scryfall.io/normal/front/f/8/f87824f3-aa9f-4d3d-99f7-0fbca43d8a51.jpg?1712355328"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Lassoed by the Law",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 21,
+            "tier_rating": "A",
+            "note": null,
+            "id": "ea96eeac-c316-4247-a81f-0ddf52675ebf",
+            "scryfall_uri": "https://scryfall.com/card/otj/18/lassoed-by-the-law",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/ea96eeac-c316-4247-a81f-0ddf52675ebf.jpg?1712355295",
+              "normal": "https://cards.scryfall.io/normal/front/e/a/ea96eeac-c316-4247-a81f-0ddf52675ebf.jpg?1712355295"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Unfortunate Accident",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 96,
+            "tier_rating": "B",
+            "note": null,
+            "id": "0c5a25d9-926e-4004-8830-2b2bf7bc0775",
+            "scryfall_uri": "https://scryfall.com/card/otj/111/unfortunate-accident",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0c5a25d9-926e-4004-8830-2b2bf7bc0775.jpg?1712860615",
+              "normal": "https://cards.scryfall.io/normal/front/0/c/0c5a25d9-926e-4004-8830-2b2bf7bc0775.jpg?1712860615"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Outlaw Medic",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 175,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2feaa51e-47fb-4849-b420-ee7278f3489a",
+            "scryfall_uri": "https://scryfall.com/card/otj/23/outlaw-medic",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2feaa51e-47fb-4849-b420-ee7278f3489a.jpg?1712355319",
+              "normal": "https://cards.scryfall.io/normal/front/2/f/2feaa51e-47fb-4849-b420-ee7278f3489a.jpg?1712355319"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Nezumi Linkbreaker",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 176,
+            "tier_rating": "C",
+            "note": null,
+            "id": "6dd0095b-6136-4368-94cb-4c82621aaf37",
+            "scryfall_uri": "https://scryfall.com/card/otj/96/nezumi-linkbreaker",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Rat Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6dd0095b-6136-4368-94cb-4c82621aaf37.jpg?1712355626",
+              "normal": "https://cards.scryfall.io/normal/front/6/d/6dd0095b-6136-4368-94cb-4c82621aaf37.jpg?1712355626"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Corrupted Conviction",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 275,
+            "tier_rating": "D",
+            "note": null,
+            "id": "8046f892-3317-4ef7-9cf7-97b9060540c8",
+            "scryfall_uri": "https://scryfall.com/card/otj/84/corrupted-conviction",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/8046f892-3317-4ef7-9cf7-97b9060540c8.jpg?1712355575",
+              "normal": "https://cards.scryfall.io/normal/front/8/0/8046f892-3317-4ef7-9cf7-97b9060540c8.jpg?1712355575"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Fake Your Own Death",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 141,
+            "tier_rating": "C",
+            "note": null,
+            "id": "79a17ab9-13c9-41d4-a143-82d8caacfd8b",
+            "scryfall_uri": "https://scryfall.com/card/otj/87/fake-your-own-death",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/9/79a17ab9-13c9-41d4-a143-82d8caacfd8b.jpg?1712355584",
+              "normal": "https://cards.scryfall.io/normal/front/7/9/79a17ab9-13c9-41d4-a143-82d8caacfd8b.jpg?1712355584"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Vengeful Townsfolk",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 183,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2df404af-571a-4867-83f5-bb4163b433ff",
+            "scryfall_uri": "https://scryfall.com/card/otj/37/vengeful-townsfolk",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Citizen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2df404af-571a-4867-83f5-bb4163b433ff.jpg?1712355378",
+              "normal": "https://cards.scryfall.io/normal/front/2/d/2df404af-571a-4867-83f5-bb4163b433ff.jpg?1712355378"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{R}{G}",
+        "name": "RG Ferocious (Midrange/Aggro)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Rewards 4+ power creatures with powerful payoffs. Green dominates creature quality.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Jolene, Plundering Pugilist",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 116,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fe30b5c8-4889-4350-bb1d-3e2a67d9dfb2",
+            "scryfall_uri": "https://scryfall.com/card/otj/210/jolene-plundering-pugilist",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Human Mercenary",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe30b5c8-4889-4350-bb1d-3e2a67d9dfb2.jpg?1712356118",
+              "normal": "https://cards.scryfall.io/normal/front/f/e/fe30b5c8-4889-4350-bb1d-3e2a67d9dfb2.jpg?1712356118"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Cactusfolk Sureshot",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 66,
+            "tier_rating": "B",
+            "note": null,
+            "id": "318b8c5d-9fb0-488f-9b32-c2e29d1f1dbb",
+            "scryfall_uri": "https://scryfall.com/card/otj/199/cactusfolk-sureshot",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Creature — Plant Mercenary",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/318b8c5d-9fb0-488f-9b32-c2e29d1f1dbb.jpg?1712356071",
+              "normal": "https://cards.scryfall.io/normal/front/3/1/318b8c5d-9fb0-488f-9b32-c2e29d1f1dbb.jpg?1712356071"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Scalestorm Summoner",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 145,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d603c00f-048a-4a05-9df9-52844819d523",
+            "scryfall_uri": "https://scryfall.com/card/otj/144/scalestorm-summoner",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/6/d603c00f-048a-4a05-9df9-52844819d523.jpg?1712355842",
+              "normal": "https://cards.scryfall.io/normal/front/d/6/d603c00f-048a-4a05-9df9-52844819d523.jpg?1712355842"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Beastbond Outcaster",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 46,
+            "tier_rating": "A",
+            "note": null,
+            "id": "073b9ae8-8ac3-4824-aec4-84a80531aa23",
+            "scryfall_uri": "https://scryfall.com/card/otj/154/beastbond-outcaster",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/7/073b9ae8-8ac3-4824-aec4-84a80531aa23.jpg?1712355883",
+              "normal": "https://cards.scryfall.io/normal/front/0/7/073b9ae8-8ac3-4824-aec4-84a80531aa23.jpg?1712355883"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Drover Grizzly",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 155,
+            "tier_rating": "C",
+            "note": null,
+            "id": "560062cd-34f8-4d30-9e25-099b03961724",
+            "scryfall_uri": "https://scryfall.com/card/otj/161/drover-grizzly",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Bear Mount",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/6/560062cd-34f8-4d30-9e25-099b03961724.jpg?1712355911",
+              "normal": "https://cards.scryfall.io/normal/front/5/6/560062cd-34f8-4d30-9e25-099b03961724.jpg?1712355911"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Mercenaries (Aggro)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Go-wide token strategy leveraging mercenary generation and board-based payoffs.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Ertha Jo, Frontier Mentor",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 115,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a4e81be6-6447-4f1e-be00-6fcdb2ab35af",
+            "scryfall_uri": "https://scryfall.com/card/otj/203/ertha-jo-frontier-mentor",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Kor Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4e81be6-6447-4f1e-be00-6fcdb2ab35af.jpg?1712356089",
+              "normal": "https://cards.scryfall.io/normal/front/a/4/a4e81be6-6447-4f1e-be00-6fcdb2ab35af.jpg?1712356089"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Form a Posse",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 190,
+            "tier_rating": "C",
+            "note": null,
+            "id": "39ee1387-c24e-4a66-8ad6-9afa9c0abcbb",
+            "scryfall_uri": "https://scryfall.com/card/otj/204/form-a-posse",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/9/39ee1387-c24e-4a66-8ad6-9afa9c0abcbb.jpg?1712356094",
+              "normal": "https://cards.scryfall.io/normal/front/3/9/39ee1387-c24e-4a66-8ad6-9afa9c0abcbb.jpg?1712356094"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Bruse Tarl, Roving Rancher",
+            "color": "WR",
+            "rarity": "Rare",
+            "pick_order_rank": 24,
+            "tier_rating": "A",
+            "note": null,
+            "id": "286c55c2-dcc1-4e87-a83f-9981d28ab62d",
+            "scryfall_uri": "https://scryfall.com/card/otj/198/bruse-tarl-roving-rancher",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/8/286c55c2-dcc1-4e87-a83f-9981d28ab62d.jpg?1712356070",
+              "normal": "https://cards.scryfall.io/normal/front/2/8/286c55c2-dcc1-4e87-a83f-9981d28ab62d.jpg?1712356070"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Prickly Pair",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 224,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e70f2278-8857-46e4-aa2b-fff5589b750f",
+            "scryfall_uri": "https://scryfall.com/card/otj/137/prickly-pair",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Plant Mercenary",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e70f2278-8857-46e4-aa2b-fff5589b750f.jpg?1712355809",
+              "normal": "https://cards.scryfall.io/normal/front/e/7/e70f2278-8857-46e4-aa2b-fff5589b750f.jpg?1712355809"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Outlaws' Fury",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 284,
+            "tier_rating": "D",
+            "note": null,
+            "id": "f7502b9c-b759-499a-8e94-22f87f5eb142",
+            "scryfall_uri": "https://scryfall.com/card/otj/136/outlaws-fury",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7502b9c-b759-499a-8e94-22f87f5eb142.jpg?1712355807",
+              "normal": "https://cards.scryfall.io/normal/front/f/7/f7502b9c-b759-499a-8e94-22f87f5eb142.jpg?1712355807"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "GU Ramp Plot (Midrange/Control)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Plotting creatures at a discount sets up powerful future turns. Splashing-friendly.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Bonny Pall, Clearcutter",
+            "color": "UG",
+            "rarity": "Rare",
+            "pick_order_rank": 1,
+            "tier_rating": "S",
+            "note": null,
+            "id": "4383ae7c-58ea-4354-93e4-677ad185c3bb",
+            "scryfall_uri": "https://scryfall.com/card/otj/196/bonny-pall-clearcutter",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Giant Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/4383ae7c-58ea-4354-93e4-677ad185c3bb.jpg?1712356061",
+              "normal": "https://cards.scryfall.io/normal/front/4/3/4383ae7c-58ea-4354-93e4-677ad185c3bb.jpg?1712356061"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Oko, the Ringleader",
+            "color": "UG",
+            "rarity": "Mythic",
+            "pick_order_rank": 50,
+            "tier_rating": "A",
+            "note": null,
+            "id": "396df8d6-e85d-4486-8116-68841b7e1e2e",
+            "scryfall_uri": "https://scryfall.com/card/otj/223/oko-the-ringleader",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Planeswalker — Oko",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/9/396df8d6-e85d-4486-8116-68841b7e1e2e.jpg?1712356176",
+              "normal": "https://cards.scryfall.io/normal/front/3/9/396df8d6-e85d-4486-8116-68841b7e1e2e.jpg?1712356176"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          },
+          {
+            "name": "Make Your Own Luck",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 150,
+            "tier_rating": "C",
+            "note": null,
+            "id": "0557b0a3-2b48-408f-a508-9f4da2ab1cd1",
+            "scryfall_uri": "https://scryfall.com/card/otj/218/make-your-own-luck",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/5/0557b0a3-2b48-408f-a508-9f4da2ab1cd1.jpg?1712356151",
+              "normal": "https://cards.scryfall.io/normal/front/0/5/0557b0a3-2b48-408f-a508-9f4da2ab1cd1.jpg?1712356151"
+            },
+            "set": "otj",
+            "set_name": "Outlaws of Thunder Junction"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Crime (Control)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Removal-focused with crime payoffs; tempo-oriented crime suite.",
+        "difficulty": "Medium",
+        "key_cards": []
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "BR Outlaws (Aggro/Midrange)",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Outlaw synergies with creature-based removal and token generation.",
+        "difficulty": "Medium",
+        "key_cards": []
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{W}{U}",
+        "name": "WU Flash Plot (Tempo/Midrange)",
+        "tier": "Tier 3 — Mediocre Deck",
+        "strategy": "Flash creatures with plot synergy provide tempo advantage but lack density of premium payoffs.",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "UR Two-Spells Plot (Control)",
+        "tier": "Tier 3 — Mediocre Deck",
+        "strategy": "\"No spells cast\" and \"two spells cast\" payoffs create inconsistent deck building pressures.",
+        "difficulty": "Hard",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Mystical Tether",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "18344498-952e-489c-8b03-bd1bef4c26ca",
+        "scryfall_uri": "https://scryfall.com/card/otj/19/mystical-tether",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/18344498-952e-489c-8b03-bd1bef4c26ca.jpg?1712355302",
+          "normal": "https://cards.scryfall.io/normal/front/1/8/18344498-952e-489c-8b03-bd1bef4c26ca.jpg?1712355302"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Trained Arynx",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 75,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ef32a5f8-f69d-47dc-a800-4f0ddf4eada5",
+        "scryfall_uri": "https://scryfall.com/card/otj/36/trained-arynx",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Cat Beast Mount",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef32a5f8-f69d-47dc-a800-4f0ddf4eada5.jpg?1712355371",
+          "normal": "https://cards.scryfall.io/normal/front/e/f/ef32a5f8-f69d-47dc-a800-4f0ddf4eada5.jpg?1712355371"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Sterling Supplier",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 104,
+        "tier_rating": "B",
+        "note": null,
+        "id": "b6000be7-67db-440e-87ba-276df20b803e",
+        "scryfall_uri": "https://scryfall.com/card/otj/33/sterling-supplier",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Bird Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b6000be7-67db-440e-87ba-276df20b803e.jpg?1712355360",
+          "normal": "https://cards.scryfall.io/normal/front/b/6/b6000be7-67db-440e-87ba-276df20b803e.jpg?1712355360"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Take Up the Shield",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 67,
+        "tier_rating": "B",
+        "note": null,
+        "id": "76a31968-ba6d-4c01-838f-4cb8c64e73fb",
+        "scryfall_uri": "https://scryfall.com/card/otj/34/take-up-the-shield",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/6/76a31968-ba6d-4c01-838f-4cb8c64e73fb.jpg?1712355363",
+          "normal": "https://cards.scryfall.io/normal/front/7/6/76a31968-ba6d-4c01-838f-4cb8c64e73fb.jpg?1712355363"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Take the Fall",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 154,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9fea80c4-923c-40a1-9363-bfa4c267a024",
+        "scryfall_uri": "https://scryfall.com/card/otj/73/take-the-fall",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9fea80c4-923c-40a1-9363-bfa4c267a024.jpg?1712355525",
+          "normal": "https://cards.scryfall.io/normal/front/9/f/9fea80c4-923c-40a1-9363-bfa4c267a024.jpg?1712355525"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Loan Shark",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 204,
+        "tier_rating": "C",
+        "note": null,
+        "id": "49f12760-ff07-4c9f-a7a9-1e64bd3a9adf",
+        "scryfall_uri": "https://scryfall.com/card/otj/55/loan-shark",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Shark Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/49f12760-ff07-4c9f-a7a9-1e64bd3a9adf.jpg?1712355452",
+          "normal": "https://cards.scryfall.io/normal/front/4/9/49f12760-ff07-4c9f-a7a9-1e64bd3a9adf.jpg?1712355452"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Phantom Interference",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 130,
+        "tier_rating": "C",
+        "note": null,
+        "id": "00bf4dd1-5468-4594-9c7b-0737610f19d4",
+        "scryfall_uri": "https://scryfall.com/card/otj/61/phantom-interference",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/00bf4dd1-5468-4594-9c7b-0737610f19d4.jpg?1712860598",
+          "normal": "https://cards.scryfall.io/normal/front/0/0/00bf4dd1-5468-4594-9c7b-0737610f19d4.jpg?1712860598"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Jailbreak Scheme",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 153,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a4be8e47-9006-4770-8d99-68a684064a43",
+        "scryfall_uri": "https://scryfall.com/card/otj/53/jailbreak-scheme",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4be8e47-9006-4770-8d99-68a684064a43.jpg?1712860592",
+          "normal": "https://cards.scryfall.io/normal/front/a/4/a4be8e47-9006-4770-8d99-68a684064a43.jpg?1712860592"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Consuming Ashes",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 68,
+        "tier_rating": "B",
+        "note": null,
+        "id": "54f96be9-60fc-4e2f-9172-4cc53c9a095a",
+        "scryfall_uri": "https://scryfall.com/card/otj/83/consuming-ashes",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54f96be9-60fc-4e2f-9172-4cc53c9a095a.jpg?1712355566",
+          "normal": "https://cards.scryfall.io/normal/front/5/4/54f96be9-60fc-4e2f-9172-4cc53c9a095a.jpg?1712355566"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Desert's Due",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 80,
+        "tier_rating": "B",
+        "note": null,
+        "id": "35e899e4-e2de-44cf-b6f4-cace8d3770cb",
+        "scryfall_uri": "https://scryfall.com/card/otj/85/deserts-due",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575",
+          "normal": "https://cards.scryfall.io/normal/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Vault Plunderer",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 81,
+        "tier_rating": "B",
+        "note": null,
+        "id": "2e6bf35c-8763-47cc-ab2d-5dbabeb28072",
+        "scryfall_uri": "https://scryfall.com/card/otj/114/vault-plunderer",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/e/2e6bf35c-8763-47cc-ab2d-5dbabeb28072.jpg?1712355713",
+          "normal": "https://cards.scryfall.io/normal/front/2/e/2e6bf35c-8763-47cc-ab2d-5dbabeb28072.jpg?1712355713"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Desperate Bloodseeker",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 94,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a59da027-b5dd-4920-b3a1-9da05fcb1977",
+        "scryfall_uri": "https://scryfall.com/card/otj/86/desperate-bloodseeker",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Vampire",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a59da027-b5dd-4920-b3a1-9da05fcb1977.jpg?1712355583",
+          "normal": "https://cards.scryfall.io/normal/front/a/5/a59da027-b5dd-4920-b3a1-9da05fcb1977.jpg?1712355583"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Explosive Derailment",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 187,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f0e3df9c-0a86-4e6f-a3c7-84a883328a3d",
+        "scryfall_uri": "https://scryfall.com/card/otj/122/explosive-derailment",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0e3df9c-0a86-4e6f-a3c7-84a883328a3d.jpg?1712860585",
+          "normal": "https://cards.scryfall.io/normal/front/f/0/f0e3df9c-0a86-4e6f-a3c7-84a883328a3d.jpg?1712860585"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Prickly Pair",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 224,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e70f2278-8857-46e4-aa2b-fff5589b750f",
+        "scryfall_uri": "https://scryfall.com/card/otj/137/prickly-pair",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Plant Mercenary",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e70f2278-8857-46e4-aa2b-fff5589b750f.jpg?1712355809",
+          "normal": "https://cards.scryfall.io/normal/front/e/7/e70f2278-8857-46e4-aa2b-fff5589b750f.jpg?1712355809"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Thunder Salvo",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 266,
+        "tier_rating": "D",
+        "note": null,
+        "id": "a0bf0ea9-0929-4d33-815a-6df29c399e7e",
+        "scryfall_uri": "https://scryfall.com/card/otj/150/thunder-salvo",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a0bf0ea9-0929-4d33-815a-6df29c399e7e.jpg?1712355867",
+          "normal": "https://cards.scryfall.io/normal/front/a/0/a0bf0ea9-0929-4d33-815a-6df29c399e7e.jpg?1712355867"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Discerning Peddler",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 238,
+        "tier_rating": "D",
+        "note": null,
+        "id": "73b359bf-afd8-439d-a4d2-985db1ad368c",
+        "scryfall_uri": "https://scryfall.com/card/otj/121/discerning-peddler",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73b359bf-afd8-439d-a4d2-985db1ad368c.jpg?1712355741",
+          "normal": "https://cards.scryfall.io/normal/front/7/3/73b359bf-afd8-439d-a4d2-985db1ad368c.jpg?1712355741"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Spinewoods Paladin",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 83,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1b2b432d-9e73-4ab2-a098-546d406df6c0",
+        "scryfall_uri": "https://scryfall.com/card/otj/183/spinewoods-paladin",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b2b432d-9e73-4ab2-a098-546d406df6c0.jpg?1712356003",
+          "normal": "https://cards.scryfall.io/normal/front/1/b/1b2b432d-9e73-4ab2-a098-546d406df6c0.jpg?1712356003"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Patient Naturalist",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 101,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1dd17cea-9e8c-4dba-b6ab-a6b9de87a306",
+        "scryfall_uri": "https://scryfall.com/card/otj/174/patient-naturalist",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1dd17cea-9e8c-4dba-b6ab-a6b9de87a306.jpg?1712355965",
+          "normal": "https://cards.scryfall.io/normal/front/1/d/1dd17cea-9e8c-4dba-b6ab-a6b9de87a306.jpg?1712355965"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Throw from the Saddle",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 40,
+        "tier_rating": "A",
+        "note": null,
+        "id": "775874cc-4b78-4904-9c97-431c2e400c64",
+        "scryfall_uri": "https://scryfall.com/card/otj/185/throw-from-the-saddle",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/775874cc-4b78-4904-9c97-431c2e400c64.jpg?1712356011",
+          "normal": "https://cards.scryfall.io/normal/front/7/7/775874cc-4b78-4904-9c97-431c2e400c64.jpg?1712356011"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Cactarantula",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "B",
+        "note": null,
+        "id": "2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3",
+        "scryfall_uri": "https://scryfall.com/card/otj/158/cactarantula",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Plant Spider",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/e/2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3.jpg?1712355900",
+          "normal": "https://cards.scryfall.io/normal/front/2/e/2e0e27f9-dc2c-4366-b810-3e8d0bdff8c3.jpg?1712355900"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ]
+  },
+  "commons_to_avoid": {
+    "{W} White": [
+      {
+        "name": "Inventive Wingsmith",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 302,
+        "tier_rating": "F",
+        "note": "Outclassed by Holy Cow and Vengeful Townsfolk.",
+        "id": "b6b36bb3-dacc-44f6-adcd-2c2d65513d8c",
+        "scryfall_uri": "https://scryfall.com/card/otj/17/inventive-wingsmith",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Dwarf Artificer",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b6b36bb3-dacc-44f6-adcd-2c2d65513d8c.jpg?1712355293",
+          "normal": "https://cards.scryfall.io/normal/front/b/6/b6b36bb3-dacc-44f6-adcd-2c2d65513d8c.jpg?1712355293"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Djinn of Fool's Fall",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 321,
+        "tier_rating": "F",
+        "note": null,
+        "id": "48bfc6af-c651-485e-a1cc-f9d00aeaf812",
+        "scryfall_uri": "https://scryfall.com/card/otj/43/djinn-of-fools-fall",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Djinn",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/48bfc6af-c651-485e-a1cc-f9d00aeaf812.jpg?1712355401",
+          "normal": "https://cards.scryfall.io/normal/front/4/8/48bfc6af-c651-485e-a1cc-f9d00aeaf812.jpg?1712355401"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Slickshot Vault-Buster",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 327,
+        "tier_rating": "F",
+        "note": null,
+        "id": "592ccc36-3d10-4a12-8743-9b300b80cb4d",
+        "scryfall_uri": "https://scryfall.com/card/otj/68/slickshot-vault-buster",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/592ccc36-3d10-4a12-8743-9b300b80cb4d.jpg?1712355501",
+          "normal": "https://cards.scryfall.io/normal/front/5/9/592ccc36-3d10-4a12-8743-9b300b80cb4d.jpg?1712355501"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Spring Splasher",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 328,
+        "tier_rating": "F",
+        "note": null,
+        "id": "b6822d12-1a25-42e7-94cc-71bd29daed93",
+        "scryfall_uri": "https://scryfall.com/card/otj/69/spring-splasher",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Frog Beast",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b6822d12-1a25-42e7-94cc-71bd29daed93.jpg?1712355509",
+          "normal": "https://cards.scryfall.io/normal/front/b/6/b6822d12-1a25-42e7-94cc-71bd29daed93.jpg?1712355509"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Overzealous Muscle",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 344,
+        "tier_rating": "F",
+        "note": null,
+        "id": "ce57d977-e9c5-4ed1-915f-cdc90a54f8f8",
+        "scryfall_uri": "https://scryfall.com/card/otj/97/overzealous-muscle",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Ogre Mercenary",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/ce57d977-e9c5-4ed1-915f-cdc90a54f8f8.jpg?1712355627",
+          "normal": "https://cards.scryfall.io/normal/front/c/e/ce57d977-e9c5-4ed1-915f-cdc90a54f8f8.jpg?1712355627"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Boneyard Desecrator",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 290,
+        "tier_rating": "D",
+        "note": null,
+        "id": "d43981b1-60c8-4896-8885-b07e73b99b30",
+        "scryfall_uri": "https://scryfall.com/card/otj/81/boneyard-desecrator",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Zombie Mercenary",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/4/d43981b1-60c8-4896-8885-b07e73b99b30.jpg?1712355558",
+          "normal": "https://cards.scryfall.io/normal/front/d/4/d43981b1-60c8-4896-8885-b07e73b99b30.jpg?1712355558"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Quick Draw",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 345,
+        "tier_rating": "F",
+        "note": null,
+        "id": "56399cd0-1214-42b6-be38-f2cbd770915f",
+        "scryfall_uri": "https://scryfall.com/card/otj/138/quick-draw",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/6/56399cd0-1214-42b6-be38-f2cbd770915f.jpg?1712355816",
+          "normal": "https://cards.scryfall.io/normal/front/5/6/56399cd0-1214-42b6-be38-f2cbd770915f.jpg?1712355816"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Rodeo Pyromancers",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 337,
+        "tier_rating": "F",
+        "note": null,
+        "id": "df877a29-06e1-474d-8600-410bbec674ae",
+        "scryfall_uri": "https://scryfall.com/card/otj/143/rodeo-pyromancers",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Mercenary",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/f/df877a29-06e1-474d-8600-410bbec674ae.jpg?1712355836",
+          "normal": "https://cards.scryfall.io/normal/front/d/f/df877a29-06e1-474d-8600-410bbec674ae.jpg?1712355836"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "{G} Green": []
+  },
+  "removal_priority": {
+    "must_play": [
+      {
+        "name": "Consuming Ashes",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 68,
+        "tier_rating": "B",
+        "note": null,
+        "id": "54f96be9-60fc-4e2f-9172-4cc53c9a095a",
+        "scryfall_uri": "https://scryfall.com/card/otj/83/consuming-ashes",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54f96be9-60fc-4e2f-9172-4cc53c9a095a.jpg?1712355566",
+          "normal": "https://cards.scryfall.io/normal/front/5/4/54f96be9-60fc-4e2f-9172-4cc53c9a095a.jpg?1712355566"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Desert's Due",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 80,
+        "tier_rating": "B",
+        "note": null,
+        "id": "35e899e4-e2de-44cf-b6f4-cace8d3770cb",
+        "scryfall_uri": "https://scryfall.com/card/otj/85/deserts-due",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575",
+          "normal": "https://cards.scryfall.io/normal/front/3/5/35e899e4-e2de-44cf-b6f4-cace8d3770cb.jpg?1712355575"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Mystical Tether",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "18344498-952e-489c-8b03-bd1bef4c26ca",
+        "scryfall_uri": "https://scryfall.com/card/otj/19/mystical-tether",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/18344498-952e-489c-8b03-bd1bef4c26ca.jpg?1712355302",
+          "normal": "https://cards.scryfall.io/normal/front/1/8/18344498-952e-489c-8b03-bd1bef4c26ca.jpg?1712355302"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      },
+      {
+        "name": "Throw from the Saddle",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 40,
+        "tier_rating": "A",
+        "note": null,
+        "id": "775874cc-4b78-4904-9c97-431c2e400c64",
+        "scryfall_uri": "https://scryfall.com/card/otj/185/throw-from-the-saddle",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/7/775874cc-4b78-4904-9c97-431c2e400c64.jpg?1712356011",
+          "normal": "https://cards.scryfall.io/normal/front/7/7/775874cc-4b78-4904-9c97-431c2e400c64.jpg?1712356011"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ],
+    "premium_splashable": [
+      {
+        "name": "Journey to Nowhere",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 57,
+        "tier_rating": "B",
+        "note": null,
+        "id": "442bb671-8b23-4e3b-bf39-18152a68887e",
+        "scryfall_uri": "https://scryfall.com/card/otp/3/journey-to-nowhere",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/442bb671-8b23-4e3b-bf39-18152a68887e.jpg?1712353397",
+          "normal": "https://cards.scryfall.io/normal/front/4/4/442bb671-8b23-4e3b-bf39-18152a68887e.jpg?1712353397"
+        },
+        "set": "otp",
+        "set_name": "Breaking News"
+      },
+      {
+        "name": "Repulse",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 108,
+        "tier_rating": "B",
+        "note": null,
+        "id": "88941ed3-1cae-47ce-8ccb-938c5d0e767f",
+        "scryfall_uri": "https://scryfall.com/card/otp/13/repulse",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88941ed3-1cae-47ce-8ccb-938c5d0e767f.jpg?1712353439",
+          "normal": "https://cards.scryfall.io/normal/front/8/8/88941ed3-1cae-47ce-8ccb-938c5d0e767f.jpg?1712353439"
+        },
+        "set": "otp",
+        "set_name": "Breaking News"
+      },
+      {
+        "name": "Explosive Derailment",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 187,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f0e3df9c-0a86-4e6f-a3c7-84a883328a3d",
+        "scryfall_uri": "https://scryfall.com/card/otj/122/explosive-derailment",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/0/f0e3df9c-0a86-4e6f-a3c7-84a883328a3d.jpg?1712860585",
+          "normal": "https://cards.scryfall.io/normal/front/f/0/f0e3df9c-0a86-4e6f-a3c7-84a883328a3d.jpg?1712860585"
+        },
+        "set": "otj",
+        "set_name": "Outlaws of Thunder Junction"
+      }
+    ]
+  },
+  "general_tips": [
+    "Splash via desert mana-fixing — the set rewards greedy mana bases.",
+    "Graveyard synergies reward patient play; let trades happen.",
+    "No graveyard hate is available — feel free to commit to recursion strategies.",
+    "Pivot away from green if it gets cut early; the rest of the format has playable decks.",
+    "Avoid forcing WU Flash Plot or UR Two-Spells Plot without strong signals — both are inconsistent."
+  ]
+}

@@ -7,7 +7,9 @@ import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
-import com.mmg.manahub.feature.game.model.GameMode
+import com.mmg.manahub.feature.game.domain.model.GameMode
+import com.mmg.manahub.feature.game.presentation.PlayerConfig
+import com.mmg.manahub.feature.tournament.presentation.TournamentViewModel
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

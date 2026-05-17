@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.trades.data.repository
 
 import app.cash.turbine.test
+import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.feature.trades.data.remote.TradesRemoteDataSource
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemDto
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeProposalDto
@@ -36,6 +37,7 @@ class TradesRepositoryImplTest {
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val remote = mockk<TradesRemoteDataSource>(relaxed = true)
+    private val cardDao = mockk<CardDao>(relaxed = true)
 
     private lateinit var repository: TradesRepositoryImpl
 
@@ -78,7 +80,7 @@ class TradesRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = TradesRepositoryImpl(remote)
+        repository = TradesRepositoryImpl(remote, cardDao)
 
         // Default: fetchProposalItems returns empty list for any proposal id
         coEvery { remote.fetchProposalItems(any()) } returns Result.success(emptyList<TradeItemDto>())

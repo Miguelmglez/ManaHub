@@ -6,6 +6,7 @@ import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
+import com.mmg.manahub.core.data.local.mapper.toDomainDeck
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckSlot
@@ -45,7 +46,7 @@ class DeckRepositoryImpl @Inject constructor(
 
     override fun observeAllDecks(): Flow<List<Deck>> =
         deckDao.observeAllDecks(null).map { entities ->
-            entities.filter { !it.isDeleted }.map { it.toDomain() }
+            entities.filter { !it.isDeleted }.map { it.toDomainDeck() }
         }
 
     override fun observeAllDeckSummaries(): Flow<List<DeckSummary>> =
@@ -53,21 +54,19 @@ class DeckRepositoryImpl @Inject constructor(
             rows.groupBy { it.deckId }
                 .values
                 .sortedByDescending { it.first().updatedAt }
-                .map { deckRows ->
-                    buildDeckSummary(deckRows)
-                }
+                .map { buildDeckSummary(it) }
         }
 
     override fun observeDecksContainingCard(scryfallId: String): Flow<List<Deck>> =
         deckDao.observeDecksContainingCard(scryfallId).map { entities ->
-            entities.filter { !it.isDeleted }.map { it.toDomain() }
+            entities.filter { !it.isDeleted }.map { it.toDomainDeck() }
         }
 
     override fun observeDeckWithCards(deckId: String): Flow<DeckWithCards?> =
         deckDao.observeDeckWithCards(deckId).map { entity ->
             entity?.let {
                 DeckWithCards(
-                    deck = it.deck.toDomain(),
+                    deck = it.deck.toDomainDeck(),
                     mainboard = it.cards.filter { c -> !c.isSideboard }
                         .map { c -> DeckSlot(c.scryfallId, c.quantity) },
                     sideboard = it.cards.filter { c -> c.isSideboard }
@@ -104,17 +103,15 @@ class DeckRepositoryImpl @Inject constructor(
 
     override suspend fun updateDeck(deck: Deck) = withContext(ioDispatcher) {
         val existing = deckDao.getDeckByIdForSync(deck.id) ?: return@withContext
-        deckDao.upsertDeck(
-            existing.copy(
-                name = deck.name,
-                description = deck.description,
-                format = deck.format,
-                coverCardId = deck.coverCardId,
-                commanderCardId = deck.commanderCardId,
-                isDeleted = false,
-                updatedAt = System.currentTimeMillis(),
-            )
-        )
+        deckDao.upsertDeck(existing.copy(
+            name = deck.name,
+            description = deck.description,
+            format = deck.format,
+            coverCardId = deck.coverCardId,
+            commanderCardId = deck.commanderCardId,
+            isDeleted = false,
+            updatedAt = System.currentTimeMillis(),
+        ))
     }
 
     override suspend fun deleteDeck(deckId: String) = withContext(ioDispatcher) {
@@ -178,17 +175,6 @@ class DeckRepositoryImpl @Inject constructor(
     }
 
     // ── Mapping helpers ───────────────────────────────────────────────────────
-
-    private fun DeckEntity.toDomain(): Deck = Deck(
-        id = id,
-        name = name,
-        description = description,
-        format = format,
-        coverCardId = coverCardId,
-        commanderCardId = commanderCardId,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-    )
 
     private fun buildDeckSummary(deckRows: List<DeckSummaryRow>): DeckSummary {
         val first = deckRows.first()

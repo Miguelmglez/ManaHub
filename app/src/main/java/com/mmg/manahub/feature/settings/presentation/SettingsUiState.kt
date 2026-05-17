@@ -17,8 +17,6 @@ data class SettingsUiState(
     val wishlistPublic: Boolean = true,
     /** Mirrors the `trade_list_public` column in `user_profiles`. Default: true (public). */
     val tradeListPublic: Boolean = true,
-    /** True while a PATCH request is in-flight to Supabase. */
-    val isUpdatingPrivacy: Boolean = false,
     /** Non-null while a privacy-update toast should be shown; cleared by [SettingsViewModel.clearPrivacyToast]. */
     val privacyToastMessage: String? = null,
     /** True when [privacyToastMessage] represents an error; false for a success message. */

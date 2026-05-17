@@ -308,3 +308,11 @@ $RECYCLE.BIN/
 
 # GitHub Pages site (separate git repo, not part of the app)
 /github-pages/
+/AGENTS.md
+/scripts/draftsim/CONTENT_GENERATION.md
+/scripts/draftsim/build_draft_guide.mjs
+/scripts/draftsim/build_sets_index.mjs
+/scripts/draftsim/templates/_example.mjs
+/scripts/draftsim/fetch_tier_list.mjs
+/scripts/draftsim/upload_to_r2.mjs
+/SURVEY_OVERHAUL_STATUS.md

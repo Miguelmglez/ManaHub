@@ -52,7 +52,7 @@ data class LayoutTemplate(
 object LayoutTemplates {
 
     // ─── 2 players ───────────────────────────────────────────────────────────
-    var slots = listOf(
+    val slots = listOf(
         PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
         PlayerSlot(1, GridSlotPosition.FULL_WIDTH_BOTTOM),
     )
@@ -62,9 +62,9 @@ object LayoutTemplates {
         gridRows = mapOf(ScreenedGridSlotPosition.TOP to listOf(slots[0]),ScreenedGridSlotPosition.BOTTOM to listOf(this.slots[1])),
     )
 
-     var slots2 = listOf(
-         PlayerSlot(0, GridSlotPosition.LEFT),
-         PlayerSlot(1, GridSlotPosition.RIGHT),
+    val slots2 = listOf(
+        PlayerSlot(0, GridSlotPosition.LEFT),
+        PlayerSlot(1, GridSlotPosition.RIGHT),
     )
     val TWO_SIDE_BY_SIDE = LayoutTemplate(
         id = "2_side", name = "Side by Side", playerCount = 2,
@@ -76,7 +76,7 @@ object LayoutTemplates {
 
     // ─── 3 players ───────────────────────────────────────────────────────────
 
-    var slots3 = listOf(
+    val slots3 = listOf(
         PlayerSlot(0, GridSlotPosition.LEFT),
         PlayerSlot(1, GridSlotPosition.RIGHT),
         PlayerSlot(2, GridSlotPosition.FULL_WIDTH_BOTTOM),
@@ -86,7 +86,7 @@ object LayoutTemplates {
         slots = slots3,
         gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots3[0],slots3[1]),ScreenedGridSlotPosition.BOTTOM to listOf(slots3[2]))
     )
-    var slots5 = listOf(
+    val slots5 = listOf(
         PlayerSlot(0, GridSlotPosition.LEFT),
         PlayerSlot(1, GridSlotPosition.LEFT),
         PlayerSlot(2, GridSlotPosition.RIGHT)
@@ -100,7 +100,7 @@ object LayoutTemplates {
     val layoutsFor3 = listOf(THREE_U_SHAPE, THREE_TRIANGLE)
 
     // ─── 4 players ───────────────────────────────────────────────────────────
-    var slots7 = listOf(
+    val slots7 = listOf(
         PlayerSlot(0, GridSlotPosition.LEFT),
         PlayerSlot(1, GridSlotPosition.LEFT),
         PlayerSlot(2, GridSlotPosition.RIGHT),
@@ -112,7 +112,7 @@ object LayoutTemplates {
         gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots7[0],slots7[1],slots7[2],slots7[3])),
     )
 
-    var slots8 = listOf(
+    val slots8 = listOf(
         PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
         PlayerSlot(1, GridSlotPosition.FULL_WIDTH_BOTTOM),
         PlayerSlot(2, GridSlotPosition.LEFT),
@@ -129,7 +129,7 @@ object LayoutTemplates {
 
     // ─── 5 players ───────────────────────────────────────────────────────────
 
-    var slots9 = listOf(
+    val slots9 = listOf(
         PlayerSlot(0, GridSlotPosition.LEFT),
         PlayerSlot(1, GridSlotPosition.LEFT),
         PlayerSlot(2, GridSlotPosition.LEFT),
@@ -141,7 +141,7 @@ object LayoutTemplates {
         slots = slots9,
         gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots9[0],slots9[1],slots9[2],slots9[3],slots9[4])))
 
-    var slots10 =listOf(
+    val slots10 = listOf(
         PlayerSlot(0, GridSlotPosition.LEFT),
         PlayerSlot(1, GridSlotPosition.LEFT),
         PlayerSlot(2, GridSlotPosition.RIGHT),
@@ -154,7 +154,7 @@ object LayoutTemplates {
         gridRows = mapOf(ScreenedGridSlotPosition.MID to listOf(slots10[0],slots10[1],slots10[2],slots10[3],slots10[4]))
         )
 
-    var slots11 =listOf(
+    val slots11 = listOf(
         PlayerSlot(0, GridSlotPosition.LEFT),
         PlayerSlot(1, GridSlotPosition.LEFT),
         PlayerSlot(2, GridSlotPosition.RIGHT),
@@ -173,7 +173,7 @@ object LayoutTemplates {
 
     // ─── 6 players ───────────────────────────────────────────────────────────
 
-    var slots13 = listOf(
+    val slots13 = listOf(
         PlayerSlot(0, GridSlotPosition.LEFT),
         PlayerSlot(1, GridSlotPosition.LEFT),
         PlayerSlot(2, GridSlotPosition.LEFT),
@@ -188,7 +188,7 @@ object LayoutTemplates {
         )
     )
 
-    var slots14 = listOf(
+    val slots14 = listOf(
         PlayerSlot(0, GridSlotPosition.FULL_WIDTH_TOP),
         PlayerSlot(1, GridSlotPosition.LEFT),
         PlayerSlot(2, GridSlotPosition.LEFT),

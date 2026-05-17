@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -108,14 +110,14 @@ fun MagicBottomBar(
                 modifier = Modifier.weight(1f),
             )
 
-            /*// Slot 2 — Draft
+            // Slot 2 — Draft
             BottomBarTab(
                 label    = "DRAFT",
                 icon     = Icons.Default.Style,
                 selected = currentRoute == Screen.Draft.route,
                 onClick  = onDraftClick,
                 modifier = Modifier.weight(1f),
-            )*/
+            )
 
             // Slot 3 — Play FAB (overflows upward by 8 dp)
             Box(
@@ -130,7 +132,7 @@ fun MagicBottomBar(
                 )
             }
 
-            /*// Slot 4 — News
+            // Slot 4 — News
 
             BottomBarTab(
                 label    = "NEWS",
@@ -138,7 +140,7 @@ fun MagicBottomBar(
                 selected = currentRoute == Screen.News.route,
                 onClick  = onNewsClick,
                 modifier = Modifier.weight(1f),
-            )*/
+            )
             // Slot 5 — Profile
             BottomBarTab(
                 label    = "PROFILE",

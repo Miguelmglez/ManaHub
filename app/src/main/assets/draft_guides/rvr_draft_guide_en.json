@@ -1,0 +1,3194 @@
+{
+  "metadata": {
+    "set_name": "Ravnica Remastered",
+    "set_code": "RVR",
+    "source_url": "https://draftsim.com/mtg-rvr-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "December 26, 2024"
+  },
+  "set_overview": {
+    "summary": "Ravnica Remastered draws from nearly two decades of Ravnica cards across three blocks. Power level is moderate with notable rarity downshifts (Boros Elite, Thrill-Kill Assassin, Call of the Conclave, Glowspore Shaman). Most decks will be two-color with minimal splashing. Guild signets at uncommon enable more ambitious multicolor decks than typical, but the set does not encourage 5-color greed piles.",
+    "color_ranking": [
+      "Best guilds: Boros, Izzet, Selesnya",
+      "Strong guilds: Azorius, Dimir, Rakdos, Gruul, Orzhov",
+      "Weaker guilds: Golgari, Simic"
+    ],
+    "color_notes": {
+      "Note": "RVR is guild-driven. Stay 2-color unless a clear signal opens a multicolor splash. Track multicolor cards passed to read which guilds are open."
+    },
+    "key_gameplay_notes": [
+      "All 10 guild signets exist as fixing — multicolor is comfortable.",
+      "P1P1 rares/uncommons or top monocolor commons; stay open.",
+      "In 8-mans there are more guilds than players — read signals carefully.",
+      "Draft sideboard cards once you are full on playables.",
+      "5-color Gates lacks payoffs (only Gate Colossus); do not force it."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Convoke",
+      "summary": "Tap creatures toward mana costs.",
+      "performance": "Solid in token decks.",
+      "key_examples": [
+        {
+          "name": "Gather Courage",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 137,
+          "tier_rating": "C",
+          "note": null,
+          "id": "bf059c8d-6e61-41ca-ac79-3bf82fa2d4b3",
+          "scryfall_uri": "https://scryfall.com/card/rvr/143/gather-courage",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/f/bf059c8d-6e61-41ca-ac79-3bf82fa2d4b3.jpg?1702429561",
+            "normal": "https://cards.scryfall.io/normal/front/b/f/bf059c8d-6e61-41ca-ac79-3bf82fa2d4b3.jpg?1702429561"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Populate",
+      "summary": "Create a token copy of a creature token you control. Core to GW Tokens.",
+      "performance": "Engine of Selesnya.",
+      "key_examples": [
+        {
+          "name": "Call of the Conclave",
+          "color": "WG",
+          "rarity": "Common",
+          "pick_order_rank": 92,
+          "tier_rating": "C",
+          "note": null,
+          "id": "88cacc67-5b0e-4cd5-a552-f64934578930",
+          "scryfall_uri": "https://scryfall.com/card/rvr/169/call-of-the-conclave",
+          "colors": [
+            "G",
+            "W"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88cacc67-5b0e-4cd5-a552-f64934578930.jpg?1702550888",
+            "normal": "https://cards.scryfall.io/normal/front/8/8/88cacc67-5b0e-4cd5-a552-f64934578930.jpg?1702550888"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Evolve",
+      "summary": "Put a +1/+1 counter on this creature when a larger creature enters.",
+      "performance": "Builds the GU counters strategy.",
+      "key_examples": [
+        {
+          "name": "Cloudfin Raptor",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 158,
+          "tier_rating": "D",
+          "note": null,
+          "id": "54bb0672-adb4-4aad-a4c0-77a0e7373bac",
+          "scryfall_uri": "https://scryfall.com/card/rvr/37/cloudfin-raptor",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Bird Mutant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317",
+            "normal": "https://cards.scryfall.io/normal/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        },
+        {
+          "name": "Crocanura",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 135,
+          "tier_rating": "C",
+          "note": null,
+          "id": "9de9515a-8845-4eba-922f-438dea46a22a",
+          "scryfall_uri": "https://scryfall.com/card/rvr/135/crocanura",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Crocodile Frog",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9de9515a-8845-4eba-922f-438dea46a22a.jpg?1702429548",
+            "normal": "https://cards.scryfall.io/normal/front/9/d/9de9515a-8845-4eba-922f-438dea46a22a.jpg?1702429548"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Extort",
+      "summary": "Whenever you cast a spell, opponents lose 1 and you gain 1.",
+      "performance": "Anchors WB Orzhov drain plans.",
+      "key_examples": [
+        {
+          "name": "Blind Hunter",
+          "color": "WB",
+          "rarity": "Common",
+          "pick_order_rank": 140,
+          "tier_rating": "C",
+          "note": null,
+          "id": "814a5348-988d-480f-806d-9c958f1a10b9",
+          "scryfall_uri": "https://scryfall.com/card/rvr/166/blind-hunter",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Creature — Bat",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/1/814a5348-988d-480f-806d-9c958f1a10b9.jpg?1702429604",
+            "normal": "https://cards.scryfall.io/normal/front/8/1/814a5348-988d-480f-806d-9c958f1a10b9.jpg?1702429604"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        },
+        {
+          "name": "Basilica Guards",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 228,
+          "tier_rating": "D",
+          "note": null,
+          "id": "5ba068ef-7f08-474f-beea-575568dd6963",
+          "scryfall_uri": "https://scryfall.com/card/rvr/7/basilica-guards",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5ba068ef-7f08-474f-beea-575568dd6963.jpg?1702429258",
+            "normal": "https://cards.scryfall.io/normal/front/5/b/5ba068ef-7f08-474f-beea-575568dd6963.jpg?1702429258"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Afterlife",
+      "summary": "Creates 1/1 flying spirit tokens when the creature dies.",
+      "performance": "Slots into Orzhov sacrifice.",
+      "key_examples": []
+    },
+    {
+      "name": "Battalion",
+      "summary": "Triggers when three or more creatures attack together.",
+      "performance": "Rewards Boros go-wide.",
+      "key_examples": [
+        {
+          "name": "Boros Elite",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 126,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c39f6916-e89d-4185-84b9-c6c02e348ad8",
+          "scryfall_uri": "https://scryfall.com/card/rvr/10/boros-elite",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c39f6916-e89d-4185-84b9-c6c02e348ad8.jpg?1702717409",
+            "normal": "https://cards.scryfall.io/normal/front/c/3/c39f6916-e89d-4185-84b9-c6c02e348ad8.jpg?1702717409"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        },
+        {
+          "name": "Makeshift Battalion",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 241,
+          "tier_rating": "D",
+          "note": null,
+          "id": "1ef55c3a-bba0-4379-b744-79eb91bcafe7",
+          "scryfall_uri": "https://scryfall.com/card/rvr/22/makeshift-battalion",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1ef55c3a-bba0-4379-b744-79eb91bcafe7.jpg?1704049469",
+            "normal": "https://cards.scryfall.io/normal/front/1/e/1ef55c3a-bba0-4379-b744-79eb91bcafe7.jpg?1704049469"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Unleash",
+      "summary": "Creature enters with +1/+1 counter and can't block.",
+      "performance": "Rakdos aggressive accelerant.",
+      "key_examples": [
+        {
+          "name": "Thrill-Kill Assassin",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 196,
+          "tier_rating": "D",
+          "note": null,
+          "id": "d1ca07c8-28f2-4f59-a370-e5c11712fc40",
+          "scryfall_uri": "https://scryfall.com/card/rvr/94/thrill-kill-assassin",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Human Assassin",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1ca07c8-28f2-4f59-a370-e5c11712fc40.jpg?1702429476",
+            "normal": "https://cards.scryfall.io/normal/front/d/1/d1ca07c8-28f2-4f59-a370-e5c11712fc40.jpg?1702429476"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Mentor",
+      "summary": "Put a +1/+1 counter on target creature with lesser power.",
+      "performance": "Boros tempo enabler.",
+      "key_examples": [
+        {
+          "name": "Wojek Bodyguard",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 152,
+          "tier_rating": "C",
+          "note": null,
+          "id": "104605de-65fb-4a17-b26d-8c11c4d604c8",
+          "scryfall_uri": "https://scryfall.com/card/rvr/130/wojek-bodyguard",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/104605de-65fb-4a17-b26d-8c11c4d604c8.jpg?1702429539",
+            "normal": "https://cards.scryfall.io/normal/front/1/0/104605de-65fb-4a17-b26d-8c11c4d604c8.jpg?1702429539"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Dredge",
+      "summary": "Discard to mill cards from your library to graveyard.",
+      "performance": "Niche in Golgari graveyard builds.",
+      "key_examples": []
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Aggro",
+        "tier": "Tier 1 — Best Guild",
+        "strategy": "Aggressive shell with the best multicolor cards in the set. Haste creatures and battalion payoffs.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Assemble the Legion",
+            "color": "WR",
+            "rarity": "Rare",
+            "pick_order_rank": 19,
+            "tier_rating": "A",
+            "note": null,
+            "id": "10ce686a-eecd-4b32-a882-9a6ca3274ae6",
+            "scryfall_uri": "https://scryfall.com/card/rvr/163/assemble-the-legion",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/10ce686a-eecd-4b32-a882-9a6ca3274ae6.jpg?1702429596",
+              "normal": "https://cards.scryfall.io/normal/front/1/0/10ce686a-eecd-4b32-a882-9a6ca3274ae6.jpg?1702429596"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Aurelia, Exemplar of Justice",
+            "color": "WR",
+            "rarity": "Mythic",
+            "pick_order_rank": 2,
+            "tier_rating": "S",
+            "note": null,
+            "id": "f129569e-b14e-435f-bdb6-138ca67eb922",
+            "scryfall_uri": "https://scryfall.com/card/rvr/164/aurelia-exemplar-of-justice",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Angel",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f129569e-b14e-435f-bdb6-138ca67eb922.jpg?1702429598",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f129569e-b14e-435f-bdb6-138ca67eb922.jpg?1702429598"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Tajic, Legion's Edge",
+            "color": "WR",
+            "rarity": "Rare",
+            "pick_order_rank": 14,
+            "tier_rating": "S",
+            "note": null,
+            "id": "45c4c3b3-be18-4d74-99d8-f137498673d7",
+            "scryfall_uri": "https://scryfall.com/card/rvr/231/tajic-legions-edge",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/5/45c4c3b3-be18-4d74-99d8-f137498673d7.jpg?1702429724",
+              "normal": "https://cards.scryfall.io/normal/front/4/5/45c4c3b3-be18-4d74-99d8-f137498673d7.jpg?1702429724"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Lightning Helix",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 36,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e99aead9-caa8-40ff-b8bd-2885004a2fd1",
+            "scryfall_uri": "https://scryfall.com/card/rvr/197/lightning-helix",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e99aead9-caa8-40ff-b8bd-2885004a2fd1.jpg?1702429663",
+              "normal": "https://cards.scryfall.io/normal/front/e/9/e99aead9-caa8-40ff-b8bd-2885004a2fd1.jpg?1702429663"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Makeshift Battalion",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 241,
+            "tier_rating": "D",
+            "note": null,
+            "id": "1ef55c3a-bba0-4379-b744-79eb91bcafe7",
+            "scryfall_uri": "https://scryfall.com/card/rvr/22/makeshift-battalion",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1ef55c3a-bba0-4379-b744-79eb91bcafe7.jpg?1704049469",
+              "normal": "https://cards.scryfall.io/normal/front/1/e/1ef55c3a-bba0-4379-b744-79eb91bcafe7.jpg?1704049469"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Boros Elite",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 126,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c39f6916-e89d-4185-84b9-c6c02e348ad8",
+            "scryfall_uri": "https://scryfall.com/card/rvr/10/boros-elite",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c39f6916-e89d-4185-84b9-c6c02e348ad8.jpg?1702717409",
+              "normal": "https://cards.scryfall.io/normal/front/c/3/c39f6916-e89d-4185-84b9-c6c02e348ad8.jpg?1702717409"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Spells",
+        "tier": "Tier 1 — Best Guild",
+        "strategy": "Pair creature payoffs with instants/sorceries. Curve out and finish with reach.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Murmuring Mystic",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 22,
+            "tier_rating": "A",
+            "note": null,
+            "id": "57cd7b12-c944-43e3-846f-ffea4a664a1f",
+            "scryfall_uri": "https://scryfall.com/card/rvr/51/murmuring-mystic",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/57cd7b12-c944-43e3-846f-ffea4a664a1f.jpg?1702429400",
+              "normal": "https://cards.scryfall.io/normal/front/5/7/57cd7b12-c944-43e3-846f-ffea4a664a1f.jpg?1702429400"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Crackling Drake",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 35,
+            "tier_rating": "B",
+            "note": null,
+            "id": "73957e3b-504d-4ac7-a69c-0b81cb9af402",
+            "scryfall_uri": "https://scryfall.com/card/rvr/174/crackling-drake",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Drake",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73957e3b-504d-4ac7-a69c-0b81cb9af402.jpg?1702429614",
+              "normal": "https://cards.scryfall.io/normal/front/7/3/73957e3b-504d-4ac7-a69c-0b81cb9af402.jpg?1702429614"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Burning Prophet",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 132,
+            "tier_rating": "C",
+            "note": null,
+            "id": "fdc5436b-9655-4fd4-bb1e-9d6a30dfeb81",
+            "scryfall_uri": "https://scryfall.com/card/rvr/104/burning-prophet",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/fdc5436b-9655-4fd4-bb1e-9d6a30dfeb81.jpg?1702429492",
+              "normal": "https://cards.scryfall.io/normal/front/f/d/fdc5436b-9655-4fd4-bb1e-9d6a30dfeb81.jpg?1702429492"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Compulsive Research",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 128,
+            "tier_rating": "C",
+            "note": null,
+            "id": "fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2",
+            "scryfall_uri": "https://scryfall.com/card/rvr/38/compulsive-research",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732",
+              "normal": "https://cards.scryfall.io/normal/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Demonfire",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 10,
+            "tier_rating": "S",
+            "note": null,
+            "id": "f39020e2-86cf-4b7c-bcb8-23207291f9ee",
+            "scryfall_uri": "https://scryfall.com/card/rvr/107/demonfire",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f39020e2-86cf-4b7c-bcb8-23207291f9ee.jpg?1702550901",
+              "normal": "https://cards.scryfall.io/normal/front/f/3/f39020e2-86cf-4b7c-bcb8-23207291f9ee.jpg?1702550901"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Homing Lightning",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 73,
+            "tier_rating": "B",
+            "note": null,
+            "id": "00bca3e9-43c9-4647-8259-00580c0457ea",
+            "scryfall_uri": "https://scryfall.com/card/rvr/112/homing-lightning",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/00bca3e9-43c9-4647-8259-00580c0457ea.jpg?1702429509",
+              "normal": "https://cards.scryfall.io/normal/front/0/0/00bca3e9-43c9-4647-8259-00580c0457ea.jpg?1702429509"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Skewer the Critics",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 74,
+            "tier_rating": "B",
+            "note": null,
+            "id": "43ca8f80-e9ed-483f-a8a7-ad6149811df9",
+            "scryfall_uri": "https://scryfall.com/card/rvr/124/skewer-the-critics",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/43ca8f80-e9ed-483f-a8a7-ad6149811df9.jpg?1702429529",
+              "normal": "https://cards.scryfall.io/normal/front/4/3/43ca8f80-e9ed-483f-a8a7-ad6149811df9.jpg?1702429529"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Tokens",
+        "tier": "Tier 1 — Best Guild",
+        "strategy": "Synergistic plan using tokens for convoke and populate. Otherwise marginal commons like Siege Wurm and Conclave Equenaut shine here.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Call of the Conclave",
+            "color": "WG",
+            "rarity": "Common",
+            "pick_order_rank": 92,
+            "tier_rating": "C",
+            "note": null,
+            "id": "88cacc67-5b0e-4cd5-a552-f64934578930",
+            "scryfall_uri": "https://scryfall.com/card/rvr/169/call-of-the-conclave",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88cacc67-5b0e-4cd5-a552-f64934578930.jpg?1702550888",
+              "normal": "https://cards.scryfall.io/normal/front/8/8/88cacc67-5b0e-4cd5-a552-f64934578930.jpg?1702550888"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Conclave Cavalier",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 45,
+            "tier_rating": "B",
+            "note": null,
+            "id": "084d80d4-c675-4f2a-97ce-ec0b401ecadf",
+            "scryfall_uri": "https://scryfall.com/card/rvr/173/conclave-cavalier",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Centaur Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/084d80d4-c675-4f2a-97ce-ec0b401ecadf.jpg?1702429613",
+              "normal": "https://cards.scryfall.io/normal/front/0/8/084d80d4-c675-4f2a-97ce-ec0b401ecadf.jpg?1702429613"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Selesnya Evangel",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 51,
+            "tier_rating": "B",
+            "note": null,
+            "id": "2d929bda-150c-484a-910e-eee19297c77e",
+            "scryfall_uri": "https://scryfall.com/card/rvr/220/selesnya-evangel",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Elf Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d929bda-150c-484a-910e-eee19297c77e.jpg?1702429706",
+              "normal": "https://cards.scryfall.io/normal/front/2/d/2d929bda-150c-484a-910e-eee19297c77e.jpg?1702429706"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Selesnya Guildmage",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 81,
+            "tier_rating": "B",
+            "note": null,
+            "id": "87ca163e-fedd-4dd7-bfbe-2273835579da",
+            "scryfall_uri": "https://scryfall.com/card/rvr/221/selesnya-guildmage",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Elf Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/87ca163e-fedd-4dd7-bfbe-2273835579da.jpg?1702429707",
+              "normal": "https://cards.scryfall.io/normal/front/8/7/87ca163e-fedd-4dd7-bfbe-2273835579da.jpg?1702429707"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Tempo",
+        "tier": "Tier 2 — Strong Guild",
+        "strategy": "Fliers and tempo plays with value generation. Hold the ground with fat blockers.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Sky Hussar",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 59,
+            "tier_rating": "B",
+            "note": null,
+            "id": "cccfd565-99db-4c24-a16d-665b0823a159",
+            "scryfall_uri": "https://scryfall.com/card/rvr/224/sky-hussar",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cccfd565-99db-4c24-a16d-665b0823a159.jpg?1702429714",
+              "normal": "https://cards.scryfall.io/normal/front/c/c/cccfd565-99db-4c24-a16d-665b0823a159.jpg?1702429714"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Compulsive Research",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 128,
+            "tier_rating": "C",
+            "note": null,
+            "id": "fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2",
+            "scryfall_uri": "https://scryfall.com/card/rvr/38/compulsive-research",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732",
+              "normal": "https://cards.scryfall.io/normal/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Cloudfin Raptor",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 158,
+            "tier_rating": "D",
+            "note": null,
+            "id": "54bb0672-adb4-4aad-a4c0-77a0e7373bac",
+            "scryfall_uri": "https://scryfall.com/card/rvr/37/cloudfin-raptor",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Bird Mutant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317",
+              "normal": "https://cards.scryfall.io/normal/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Judge's Familiar",
+            "color": "WU",
+            "rarity": "Common",
+            "pick_order_rank": 205,
+            "tier_rating": "D",
+            "note": null,
+            "id": "ed363208-cf66-4205-8512-b999b67227d3",
+            "scryfall_uri": "https://scryfall.com/card/rvr/192/judges-familiar",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Bird",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/ed363208-cf66-4205-8512-b999b67227d3.jpg?1702717429",
+              "normal": "https://cards.scryfall.io/normal/front/e/d/ed363208-cf66-4205-8512-b999b67227d3.jpg?1702717429"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Faith's Fetters",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 87,
+            "tier_rating": "C",
+            "note": null,
+            "id": "08b62f4c-cc20-40b6-a504-407d53bdf2aa",
+            "scryfall_uri": "https://scryfall.com/card/rvr/18/faiths-fetters",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08b62f4c-cc20-40b6-a504-407d53bdf2aa.jpg?1702429279",
+              "normal": "https://cards.scryfall.io/normal/front/0/8/08b62f4c-cc20-40b6-a504-407d53bdf2aa.jpg?1702429279"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Summary Judgment",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 97,
+            "tier_rating": "C",
+            "note": null,
+            "id": "84628a1e-17d4-4037-9b53-6ac123746ed7",
+            "scryfall_uri": "https://scryfall.com/card/rvr/27/summary-judgment",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/84628a1e-17d4-4037-9b53-6ac123746ed7.jpg?1702429297",
+              "normal": "https://cards.scryfall.io/normal/front/8/4/84628a1e-17d4-4037-9b53-6ac123746ed7.jpg?1702429297"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Syndicate Messenger",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 192,
+            "tier_rating": "D",
+            "note": null,
+            "id": "9d964b6d-1ad5-4e06-be67-1eca0fa7e389",
+            "scryfall_uri": "https://scryfall.com/card/rvr/29/syndicate-messenger",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Bird",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9d964b6d-1ad5-4e06-be67-1eca0fa7e389.jpg?1702429300",
+              "normal": "https://cards.scryfall.io/normal/front/9/d/9d964b6d-1ad5-4e06-be67-1eca0fa7e389.jpg?1702429300"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Armory Guard",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 189,
+            "tier_rating": "D",
+            "note": null,
+            "id": "322fdd11-7874-46f6-adc5-051119a6c978",
+            "scryfall_uri": "https://scryfall.com/card/rvr/3/armory-guard",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Giant Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/322fdd11-7874-46f6-adc5-051119a6c978.jpg?1702429250",
+              "normal": "https://cards.scryfall.io/normal/front/3/2/322fdd11-7874-46f6-adc5-051119a6c978.jpg?1702429250"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Bulwark Giant",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 248,
+            "tier_rating": "D",
+            "note": null,
+            "id": "ebf3a622-6aad-4d74-8098-ffbf21555956",
+            "scryfall_uri": "https://scryfall.com/card/rvr/11/bulwark-giant",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Giant Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/b/ebf3a622-6aad-4d74-8098-ffbf21555956.jpg?1702429267",
+              "normal": "https://cards.scryfall.io/normal/front/e/b/ebf3a622-6aad-4d74-8098-ffbf21555956.jpg?1702429267"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Control",
+        "tier": "Tier 2 — Strong Guild",
+        "strategy": "Straightforward control combining blue card advantage with black removal. Bombs + removal + card advantage.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Compulsive Research",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 128,
+            "tier_rating": "C",
+            "note": null,
+            "id": "fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2",
+            "scryfall_uri": "https://scryfall.com/card/rvr/38/compulsive-research",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732",
+              "normal": "https://cards.scryfall.io/normal/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Last Gasp",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9ed723ed-4312-4535-b9c2-81fd8e252282",
+            "scryfall_uri": "https://scryfall.com/card/rvr/79/last-gasp",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/e/9ed723ed-4312-4535-b9c2-81fd8e252282.jpg?1702429449",
+              "normal": "https://cards.scryfall.io/normal/front/9/e/9ed723ed-4312-4535-b9c2-81fd8e252282.jpg?1702429449"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Nightveil Predator",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 29,
+            "tier_rating": "A",
+            "note": null,
+            "id": "72efc1ee-3583-4814-beaa-bbee709275e6",
+            "scryfall_uri": "https://scryfall.com/card/rvr/206/nightveil-predator",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/2/72efc1ee-3583-4814-beaa-bbee709275e6.jpg?1702429680",
+              "normal": "https://cards.scryfall.io/normal/front/7/2/72efc1ee-3583-4814-beaa-bbee709275e6.jpg?1702429680"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Moroii",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 143,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3f01c66d-042a-497c-bc86-cad414fa4d60",
+            "scryfall_uri": "https://scryfall.com/card/rvr/202/moroii",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Vampire",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/f/3f01c66d-042a-497c-bc86-cad414fa4d60.jpg?1702429672",
+              "normal": "https://cards.scryfall.io/normal/front/3/f/3f01c66d-042a-497c-bc86-cad414fa4d60.jpg?1702429672"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Aggro",
+        "tier": "Tier 2 — Strong Guild",
+        "strategy": "Aggressive with a sacrifice subtheme. Pair fodder (Scorched Rusalka, Dreadmalkin) with payoffs (Mayhem Devil). Reach via burn.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Scorched Rusalka",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 267,
+            "tier_rating": "F",
+            "note": null,
+            "id": "15fecad6-5f0f-4d40-98ba-7849cda9ec4d",
+            "scryfall_uri": "https://scryfall.com/card/rvr/122/scorched-rusalka",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/5/15fecad6-5f0f-4d40-98ba-7849cda9ec4d.jpg?1702429526",
+              "normal": "https://cards.scryfall.io/normal/front/1/5/15fecad6-5f0f-4d40-98ba-7849cda9ec4d.jpg?1702429526"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Dreadmalkin",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 149,
+            "tier_rating": "C",
+            "note": null,
+            "id": "9dc48d40-630b-4699-9cc9-5035313f538b",
+            "scryfall_uri": "https://scryfall.com/card/rvr/75/dreadmalkin",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie Cat",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9dc48d40-630b-4699-9cc9-5035313f538b.jpg?1702429444",
+              "normal": "https://cards.scryfall.io/normal/front/9/d/9dc48d40-630b-4699-9cc9-5035313f538b.jpg?1702429444"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Dimir House Guard",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 165,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a1974bac-4763-4f95-ae60-061e34d0283d",
+            "scryfall_uri": "https://scryfall.com/card/rvr/73/dimir-house-guard",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Skeleton",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1974bac-4763-4f95-ae60-061e34d0283d.jpg?1702429439",
+              "normal": "https://cards.scryfall.io/normal/front/a/1/a1974bac-4763-4f95-ae60-061e34d0283d.jpg?1702429439"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Act of Treason",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 250,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a1a9d323-fb40-411b-a0e7-64024bc6ba58",
+            "scryfall_uri": "https://scryfall.com/card/rvr/99/act-of-treason",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1a9d323-fb40-411b-a0e7-64024bc6ba58.jpg?1702429484",
+              "normal": "https://cards.scryfall.io/normal/front/a/1/a1a9d323-fb40-411b-a0e7-64024bc6ba58.jpg?1702429484"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Mayhem Devil",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 95,
+            "tier_rating": "C",
+            "note": null,
+            "id": "345ea65e-3dbb-4cb4-ae65-7797a65eafce",
+            "scryfall_uri": "https://scryfall.com/card/rvr/199/mayhem-devil",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Creature — Devil",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/4/345ea65e-3dbb-4cb4-ae65-7797a65eafce.jpg?1702550843",
+              "normal": "https://cards.scryfall.io/normal/front/3/4/345ea65e-3dbb-4cb4-ae65-7797a65eafce.jpg?1702550843"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Skewer the Critics",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 74,
+            "tier_rating": "B",
+            "note": null,
+            "id": "43ca8f80-e9ed-483f-a8a7-ad6149811df9",
+            "scryfall_uri": "https://scryfall.com/card/rvr/124/skewer-the-critics",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/43ca8f80-e9ed-483f-a8a7-ad6149811df9.jpg?1702429529",
+              "normal": "https://cards.scryfall.io/normal/front/4/3/43ca8f80-e9ed-483f-a8a7-ad6149811df9.jpg?1702429529"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Ill-Gotten Inheritance",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 166,
+            "tier_rating": "D",
+            "note": null,
+            "id": "abf2a55e-3112-452c-ac6a-6a3b9986ca99",
+            "scryfall_uri": "https://scryfall.com/card/rvr/77/ill-gotten-inheritance",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/abf2a55e-3112-452c-ac6a-6a3b9986ca99.jpg?1702429447",
+              "normal": "https://cards.scryfall.io/normal/front/a/b/abf2a55e-3112-452c-ac6a-6a3b9986ca99.jpg?1702429447"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Demonfire",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 10,
+            "tier_rating": "S",
+            "note": null,
+            "id": "f39020e2-86cf-4b7c-bcb8-23207291f9ee",
+            "scryfall_uri": "https://scryfall.com/card/rvr/107/demonfire",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f39020e2-86cf-4b7c-bcb8-23207291f9ee.jpg?1702550901",
+              "normal": "https://cards.scryfall.io/normal/front/f/3/f39020e2-86cf-4b7c-bcb8-23207291f9ee.jpg?1702550901"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Stompy/Ramp",
+        "tier": "Tier 2 — Strong Guild",
+        "strategy": "Lean aggro or bigger ramp approach. Aggressive builds are preferred over pure ramp.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Rhythm of the Wild",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 58,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c2a6453e-a373-44ec-807a-15c0c8b1af57",
+            "scryfall_uri": "https://scryfall.com/card/rvr/217/rhythm-of-the-wild",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2a6453e-a373-44ec-807a-15c0c8b1af57.jpg?1702429702",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c2a6453e-a373-44ec-807a-15c0c8b1af57.jpg?1702429702"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Sunder Shaman",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 64,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5baeb29b-5462-4692-ba26-844d2952f77f",
+            "scryfall_uri": "https://scryfall.com/card/rvr/230/sunder-shaman",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Creature — Giant Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5baeb29b-5462-4692-ba26-844d2952f77f.jpg?1702429723",
+              "normal": "https://cards.scryfall.io/normal/front/5/b/5baeb29b-5462-4692-ba26-844d2952f77f.jpg?1702429723"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Domri Rade",
+            "color": "RG",
+            "rarity": "Mythic",
+            "pick_order_rank": 20,
+            "tier_rating": "A",
+            "note": null,
+            "id": "9a7a5bbc-9d5a-461b-a5d7-a3f2e9b383be",
+            "scryfall_uri": "https://scryfall.com/card/rvr/179/domri-rade",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Planeswalker — Domri",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/a/9a7a5bbc-9d5a-461b-a5d7-a3f2e9b383be.jpg?1702429623",
+              "normal": "https://cards.scryfall.io/normal/front/9/a/9a7a5bbc-9d5a-461b-a5d7-a3f2e9b383be.jpg?1702429623"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Extort / Grind",
+        "tier": "Tier 2 — Strong Guild",
+        "strategy": "Grindy deck dealing incremental damage through extort. Alternative sacrifice approach with afterlife and Cartel Aristocrat.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Blind Hunter",
+            "color": "WB",
+            "rarity": "Common",
+            "pick_order_rank": 140,
+            "tier_rating": "C",
+            "note": null,
+            "id": "814a5348-988d-480f-806d-9c958f1a10b9",
+            "scryfall_uri": "https://scryfall.com/card/rvr/166/blind-hunter",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Bat",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/1/814a5348-988d-480f-806d-9c958f1a10b9.jpg?1702429604",
+              "normal": "https://cards.scryfall.io/normal/front/8/1/814a5348-988d-480f-806d-9c958f1a10b9.jpg?1702429604"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Basilica Guards",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 228,
+            "tier_rating": "D",
+            "note": null,
+            "id": "5ba068ef-7f08-474f-beea-575568dd6963",
+            "scryfall_uri": "https://scryfall.com/card/rvr/7/basilica-guards",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5ba068ef-7f08-474f-beea-575568dd6963.jpg?1702429258",
+              "normal": "https://cards.scryfall.io/normal/front/5/b/5ba068ef-7f08-474f-beea-575568dd6963.jpg?1702429258"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Syndicate Messenger",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 192,
+            "tier_rating": "D",
+            "note": null,
+            "id": "9d964b6d-1ad5-4e06-be67-1eca0fa7e389",
+            "scryfall_uri": "https://scryfall.com/card/rvr/29/syndicate-messenger",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Bird",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9d964b6d-1ad5-4e06-be67-1eca0fa7e389.jpg?1702429300",
+              "normal": "https://cards.scryfall.io/normal/front/9/d/9d964b6d-1ad5-4e06-be67-1eca0fa7e389.jpg?1702429300"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Faith's Fetters",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 87,
+            "tier_rating": "C",
+            "note": null,
+            "id": "08b62f4c-cc20-40b6-a504-407d53bdf2aa",
+            "scryfall_uri": "https://scryfall.com/card/rvr/18/faiths-fetters",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08b62f4c-cc20-40b6-a504-407d53bdf2aa.jpg?1702429279",
+              "normal": "https://cards.scryfall.io/normal/front/0/8/08b62f4c-cc20-40b6-a504-407d53bdf2aa.jpg?1702429279"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Cartel Aristocrat",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 93,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e2dec477-5764-4c0c-bb10-42d64ad2103e",
+            "scryfall_uri": "https://scryfall.com/card/rvr/170/cartel-aristocrat",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Human Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e2dec477-5764-4c0c-bb10-42d64ad2103e.jpg?1702429608",
+              "normal": "https://cards.scryfall.io/normal/front/e/2/e2dec477-5764-4c0c-bb10-42d64ad2103e.jpg?1702429608"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Teysa, Orzhov Scion",
+            "color": "WB",
+            "rarity": "Rare",
+            "pick_order_rank": 52,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b8ca900d-767d-4461-aba3-107dd17d8326",
+            "scryfall_uri": "https://scryfall.com/card/rvr/233/teysa-orzhov-scion",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b8ca900d-767d-4461-aba3-107dd17d8326.jpg?1778645538",
+              "normal": "https://cards.scryfall.io/normal/front/b/8/b8ca900d-767d-4461-aba3-107dd17d8326.jpg?1778645538"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Graveyard",
+        "tier": "Tier 3 — Weaker Guild",
+        "strategy": "Lacking dedicated payoffs despite the theme. Better to rely on individually powerful cards than synergy.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Golgari Findbroker",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 46,
+            "tier_rating": "B",
+            "note": null,
+            "id": "eb6104f6-127f-4ab8-94bb-d98783ecb377",
+            "scryfall_uri": "https://scryfall.com/card/rvr/187/golgari-findbroker",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Elf Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/b/eb6104f6-127f-4ab8-94bb-d98783ecb377.jpg?1702429641",
+              "normal": "https://cards.scryfall.io/normal/front/e/b/eb6104f6-127f-4ab8-94bb-d98783ecb377.jpg?1702429641"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Find Finality",
+            "color": "BG",
+            "rarity": "Rare",
+            "pick_order_rank": 39,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1a359c9d-c7d8-4d57-bf32-f49eac65b8de",
+            "scryfall_uri": "https://scryfall.com/card/rvr/245/find-finality",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Sorcery // Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1a359c9d-c7d8-4d57-bf32-f49eac65b8de.jpg?1702429748",
+              "normal": "https://cards.scryfall.io/normal/front/1/a/1a359c9d-c7d8-4d57-bf32-f49eac65b8de.jpg?1702429748"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Putrefy",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 48,
+            "tier_rating": "B",
+            "note": null,
+            "id": "12277fd6-d010-4f8e-8c58-146a14c9e5b6",
+            "scryfall_uri": "https://scryfall.com/card/rvr/212/putrefy",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/12277fd6-d010-4f8e-8c58-146a14c9e5b6.jpg?1702429693",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/12277fd6-d010-4f8e-8c58-146a14c9e5b6.jpg?1702429693"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Greater Mossdog",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 170,
+            "tier_rating": "D",
+            "note": null,
+            "id": "0e7ed627-6ce3-4629-bcd9-e449642b8d34",
+            "scryfall_uri": "https://scryfall.com/card/rvr/145/greater-mossdog",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Plant Dog",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/e/0e7ed627-6ce3-4629-bcd9-e449642b8d34.jpg?1702429567",
+              "normal": "https://cards.scryfall.io/normal/front/0/e/0e7ed627-6ce3-4629-bcd9-e449642b8d34.jpg?1702429567"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Glowspore Shaman",
+            "color": "BG",
+            "rarity": "Common",
+            "pick_order_rank": 122,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a7978a10-795a-414a-a824-b65f7ba543bc",
+            "scryfall_uri": "https://scryfall.com/card/rvr/184/glowspore-shaman",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Elf Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/7/a7978a10-795a-414a-a824-b65f7ba543bc.jpg?1702429632",
+              "normal": "https://cards.scryfall.io/normal/front/a/7/a7978a10-795a-414a-a824-b65f7ba543bc.jpg?1702429632"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Ramp / +1/+1 Counters",
+        "tier": "Tier 3 — Weaker Guild",
+        "strategy": "Either ramp/control or +1/+1 counter build. Struggles with removal — Band Together provides needed answer. Splash for removal/bombs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Cloudfin Raptor",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 158,
+            "tier_rating": "D",
+            "note": null,
+            "id": "54bb0672-adb4-4aad-a4c0-77a0e7373bac",
+            "scryfall_uri": "https://scryfall.com/card/rvr/37/cloudfin-raptor",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Bird Mutant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317",
+              "normal": "https://cards.scryfall.io/normal/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Simic Guildmage",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 145,
+            "tier_rating": "C",
+            "note": null,
+            "id": "6f0656a7-ec7c-4fc2-983b-efd902752690",
+            "scryfall_uri": "https://scryfall.com/card/rvr/223/simic-guildmage",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Elf Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/f/6f0656a7-ec7c-4fc2-983b-efd902752690.jpg?1702429714",
+              "normal": "https://cards.scryfall.io/normal/front/6/f/6f0656a7-ec7c-4fc2-983b-efd902752690.jpg?1702429714"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Sharktocrab",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 30,
+            "tier_rating": "A",
+            "note": null,
+            "id": "ec7933b5-15de-4ed7-af0c-626f81726338",
+            "scryfall_uri": "https://scryfall.com/card/rvr/222/sharktocrab",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Shark Octopus Crab",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/ec7933b5-15de-4ed7-af0c-626f81726338.jpg?1702429711",
+              "normal": "https://cards.scryfall.io/normal/front/e/c/ec7933b5-15de-4ed7-af0c-626f81726338.jpg?1702429711"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          },
+          {
+            "name": "Band Together",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 103,
+            "tier_rating": "C",
+            "note": null,
+            "id": "42c06c8c-4009-48fd-b5ad-b0397cb5a654",
+            "scryfall_uri": "https://scryfall.com/card/rvr/132/band-together",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/42c06c8c-4009-48fd-b5ad-b0397cb5a654.jpg?1702429545",
+              "normal": "https://cards.scryfall.io/normal/front/4/2/42c06c8c-4009-48fd-b5ad-b0397cb5a654.jpg?1702429545"
+            },
+            "set": "rvr",
+            "set_name": "Ravnica Remastered"
+          }
+        ]
+      }
+    ]
+  },
+  "special_archetypes": {
+    "gruul_bogles": {
+      "description": "Build around Silhana Ledgewalker with auras. Avoid edicts like Plaguecrafter and Undercity's Embrace.",
+      "cards": [
+        {
+          "name": "Silhana Ledgewalker",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 257,
+          "tier_rating": "D",
+          "note": null,
+          "id": "1de113f0-0a81-45d3-9e56-7f11b4b5c76c",
+          "scryfall_uri": "https://scryfall.com/card/rvr/156/silhana-ledgewalker",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Elf Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1de113f0-0a81-45d3-9e56-7f11b4b5c76c.jpg?1702429586",
+            "normal": "https://cards.scryfall.io/normal/front/1/d/1de113f0-0a81-45d3-9e56-7f11b4b5c76c.jpg?1702429586"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        },
+        {
+          "name": "Taste for Mayhem",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 254,
+          "tier_rating": "D",
+          "note": null,
+          "id": "e3426d58-ff4d-482d-bc78-99b67c55c6d1",
+          "scryfall_uri": "https://scryfall.com/card/rvr/127/taste-for-mayhem",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e3426d58-ff4d-482d-bc78-99b67c55c6d1.jpg?1702429535",
+            "normal": "https://cards.scryfall.io/normal/front/e/3/e3426d58-ff4d-482d-bc78-99b67c55c6d1.jpg?1702429535"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        },
+        {
+          "name": "Forced Adaptation",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 256,
+          "tier_rating": "D",
+          "note": null,
+          "id": "246c6f63-59df-41a5-8c28-f43e1e89c25f",
+          "scryfall_uri": "https://scryfall.com/card/rvr/140/forced-adaptation",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/246c6f63-59df-41a5-8c28-f43e1e89c25f.jpg?1702429557",
+            "normal": "https://cards.scryfall.io/normal/front/2/4/246c6f63-59df-41a5-8c28-f43e1e89c25f.jpg?1702429557"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        },
+        {
+          "name": "Moldervine Cloak",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 119,
+          "tier_rating": "C",
+          "note": null,
+          "id": "2250c307-f9b3-4e4e-9e34-84ede712ec99",
+          "scryfall_uri": "https://scryfall.com/card/rvr/150/moldervine-cloak",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/2/2250c307-f9b3-4e4e-9e34-84ede712ec99.jpg?1702429576",
+            "normal": "https://cards.scryfall.io/normal/front/2/2/2250c307-f9b3-4e4e-9e34-84ede712ec99.jpg?1702429576"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        },
+        {
+          "name": "Wurmweaver Coil",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 259,
+          "tier_rating": "D",
+          "note": null,
+          "id": "37a71160-aa29-4662-8d7b-590771b42635",
+          "scryfall_uri": "https://scryfall.com/card/rvr/161/wurmweaver-coil",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37a71160-aa29-4662-8d7b-590771b42635.jpg?1702550942",
+            "normal": "https://cards.scryfall.io/normal/front/3/7/37a71160-aa29-4662-8d7b-590771b42635.jpg?1702550942"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    },
+    "five_color_gates": {
+      "description": "Minimal payoff — only Gate Colossus supports the archetype. Gates Ablaze, Guild Summit, and Gatebreaker Ram are absent. Do not force.",
+      "cards": [
+        {
+          "name": "Gate Colossus",
+          "color": "C",
+          "rarity": "Uncommon",
+          "pick_order_rank": 66,
+          "tier_rating": "B",
+          "note": null,
+          "id": "abcab748-bc0a-4c57-942b-47526016c363",
+          "scryfall_uri": "https://scryfall.com/card/rvr/257/gate-colossus",
+          "colors": [],
+          "type_line": "Artifact Creature — Construct",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/abcab748-bc0a-4c57-942b-47526016c363.jpg?1702429770",
+            "normal": "https://cards.scryfall.io/normal/front/a/b/abcab748-bc0a-4c57-942b-47526016c363.jpg?1702429770"
+          },
+          "set": "rvr",
+          "set_name": "Ravnica Remastered"
+        }
+      ]
+    }
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Faith's Fetters",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 87,
+        "tier_rating": "C",
+        "note": "Premium removal that answers most threats while padding life total.",
+        "id": "08b62f4c-cc20-40b6-a504-407d53bdf2aa",
+        "scryfall_uri": "https://scryfall.com/card/rvr/18/faiths-fetters",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/08b62f4c-cc20-40b6-a504-407d53bdf2aa.jpg?1702429279",
+          "normal": "https://cards.scryfall.io/normal/front/0/8/08b62f4c-cc20-40b6-a504-407d53bdf2aa.jpg?1702429279"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Boros Elite",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 126,
+        "tier_rating": "C",
+        "note": "3/3 for 1 mana; exceptional if supported, avoid otherwise.",
+        "id": "c39f6916-e89d-4185-84b9-c6c02e348ad8",
+        "scryfall_uri": "https://scryfall.com/card/rvr/10/boros-elite",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c39f6916-e89d-4185-84b9-c6c02e348ad8.jpg?1702717409",
+          "normal": "https://cards.scryfall.io/normal/front/c/3/c39f6916-e89d-4185-84b9-c6c02e348ad8.jpg?1702717409"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Azorius Arrester",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 155,
+        "tier_rating": "D",
+        "note": "Solid 2-drop for aggro/tempo.",
+        "id": "ff6ce02a-5e1e-4c7a-8bf6-97d9d2f9db92",
+        "scryfall_uri": "https://scryfall.com/card/rvr/5/azorius-arrester",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ff6ce02a-5e1e-4c7a-8bf6-97d9d2f9db92.jpg?1702429255",
+          "normal": "https://cards.scryfall.io/normal/front/f/f/ff6ce02a-5e1e-4c7a-8bf6-97d9d2f9db92.jpg?1702429255"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Summary Judgment",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 97,
+        "tier_rating": "C",
+        "note": "Efficient removal missing vigilance creatures and some rares.",
+        "id": "84628a1e-17d4-4037-9b53-6ac123746ed7",
+        "scryfall_uri": "https://scryfall.com/card/rvr/27/summary-judgment",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/84628a1e-17d4-4037-9b53-6ac123746ed7.jpg?1702429297",
+          "normal": "https://cards.scryfall.io/normal/front/8/4/84628a1e-17d4-4037-9b53-6ac123746ed7.jpg?1702429297"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Compulsive Research",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 128,
+        "tier_rating": "C",
+        "note": "Strong card draw rewarding defensive play and 1-for-1 trading.",
+        "id": "fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2",
+        "scryfall_uri": "https://scryfall.com/card/rvr/38/compulsive-research",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732",
+          "normal": "https://cards.scryfall.io/normal/front/f/d/fd162ca2-3f27-4747-8f5c-8e66e9ceb7f2.jpg?1702431732"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Cloudfin Raptor",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 158,
+        "tier_rating": "D",
+        "note": "Efficient 1-drop requiring high creature count (15+).",
+        "id": "54bb0672-adb4-4aad-a4c0-77a0e7373bac",
+        "scryfall_uri": "https://scryfall.com/card/rvr/37/cloudfin-raptor",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Bird Mutant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317",
+          "normal": "https://cards.scryfall.io/normal/front/5/4/54bb0672-adb4-4aad-a4c0-77a0e7373bac.jpg?1702429317"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Repeal",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "C",
+        "note": "Good tempo card, particularly efficient versus tokens.",
+        "id": "80bfcba4-316a-44e5-8ed0-2cf94cbbfe49",
+        "scryfall_uri": "https://scryfall.com/card/rvr/60/repeal",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/80bfcba4-316a-44e5-8ed0-2cf94cbbfe49.jpg?1702429417",
+          "normal": "https://cards.scryfall.io/normal/front/8/0/80bfcba4-316a-44e5-8ed0-2cf94cbbfe49.jpg?1702429417"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Kiora's Dambreaker",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 231,
+        "tier_rating": "D",
+        "note": "Beefy 6-drop outclassing other common 6-drops.",
+        "id": "02754f2f-03f3-4064-9d0f-6d2a3784af95",
+        "scryfall_uri": "https://scryfall.com/card/rvr/48/kioras-dambreaker",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Leviathan",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02754f2f-03f3-4064-9d0f-6d2a3784af95.jpg?1702429398",
+          "normal": "https://cards.scryfall.io/normal/front/0/2/02754f2f-03f3-4064-9d0f-6d2a3784af95.jpg?1702429398"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Last Gasp",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 69,
+        "tier_rating": "B",
+        "note": "Top-notch removal, especially versus aggro.",
+        "id": "9ed723ed-4312-4535-b9c2-81fd8e252282",
+        "scryfall_uri": "https://scryfall.com/card/rvr/79/last-gasp",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/e/9ed723ed-4312-4535-b9c2-81fd8e252282.jpg?1702429449",
+          "normal": "https://cards.scryfall.io/normal/front/9/e/9ed723ed-4312-4535-b9c2-81fd8e252282.jpg?1702429449"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Blade Juggler",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 61,
+        "tier_rating": "B",
+        "note": "One of Ravnica Allegiance's best commons.",
+        "id": "2fad1e43-7ca9-481a-b297-9ac96b932950",
+        "scryfall_uri": "https://scryfall.com/card/rvr/67/blade-juggler",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2fad1e43-7ca9-481a-b297-9ac96b932950.jpg?1702429428",
+          "normal": "https://cards.scryfall.io/normal/front/2/f/2fad1e43-7ca9-481a-b297-9ac96b932950.jpg?1702429428"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Thrill-Kill Assassin",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 196,
+        "tier_rating": "D",
+        "note": "Split card flexibility; decide whether to unleash.",
+        "id": "d1ca07c8-28f2-4f59-a370-e5c11712fc40",
+        "scryfall_uri": "https://scryfall.com/card/rvr/94/thrill-kill-assassin",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Assassin",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1ca07c8-28f2-4f59-a370-e5c11712fc40.jpg?1702429476",
+          "normal": "https://cards.scryfall.io/normal/front/d/1/d1ca07c8-28f2-4f59-a370-e5c11712fc40.jpg?1702429476"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Ill-Gotten Inheritance",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 166,
+        "tier_rating": "D",
+        "note": "Provides reach for aggro or slow win-con for control.",
+        "id": "abf2a55e-3112-452c-ac6a-6a3b9986ca99",
+        "scryfall_uri": "https://scryfall.com/card/rvr/77/ill-gotten-inheritance",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/b/abf2a55e-3112-452c-ac6a-6a3b9986ca99.jpg?1702429447",
+          "normal": "https://cards.scryfall.io/normal/front/a/b/abf2a55e-3112-452c-ac6a-6a3b9986ca99.jpg?1702429447"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Skewer the Critics",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 74,
+        "tier_rating": "B",
+        "note": "Mediocre when cast fairly, immense potential in aggro.",
+        "id": "43ca8f80-e9ed-483f-a8a7-ad6149811df9",
+        "scryfall_uri": "https://scryfall.com/card/rvr/124/skewer-the-critics",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/43ca8f80-e9ed-483f-a8a7-ad6149811df9.jpg?1702429529",
+          "normal": "https://cards.scryfall.io/normal/front/4/3/43ca8f80-e9ed-483f-a8a7-ad6149811df9.jpg?1702429529"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Burning-Tree Vandal",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 199,
+        "tier_rating": "D",
+        "note": "Great rate with rummaging flexibility.",
+        "id": "f61d0a8a-8c2b-4870-83d3-8286a63637b8",
+        "scryfall_uri": "https://scryfall.com/card/rvr/105/burning-tree-vandal",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/6/f61d0a8a-8c2b-4870-83d3-8286a63637b8.jpg?1702429498",
+          "normal": "https://cards.scryfall.io/normal/front/f/6/f61d0a8a-8c2b-4870-83d3-8286a63637b8.jpg?1702429498"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Rubblebelt Maaka",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 151,
+        "tier_rating": "C",
+        "note": "Combat trick option plus Hill Giant body.",
+        "id": "8ead6cd6-12d9-4977-a36a-fab0cc42d0cf",
+        "scryfall_uri": "https://scryfall.com/card/rvr/121/rubblebelt-maaka",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Cat",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8ead6cd6-12d9-4977-a36a-fab0cc42d0cf.jpg?1702429526",
+          "normal": "https://cards.scryfall.io/normal/front/8/e/8ead6cd6-12d9-4977-a36a-fab0cc42d0cf.jpg?1702429526"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Wojek Bodyguard",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 152,
+        "tier_rating": "C",
+        "note": "3/3 for 3 plus mentor; pairs with Tin Street Dodger and Krenko's Command.",
+        "id": "104605de-65fb-4a17-b26d-8c11c4d604c8",
+        "scryfall_uri": "https://scryfall.com/card/rvr/130/wojek-bodyguard",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/104605de-65fb-4a17-b26d-8c11c4d604c8.jpg?1702429539",
+          "normal": "https://cards.scryfall.io/normal/front/1/0/104605de-65fb-4a17-b26d-8c11c4d604c8.jpg?1702429539"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Band Together",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 103,
+        "tier_rating": "C",
+        "note": "Rare green removal using two creatures as instant answer.",
+        "id": "42c06c8c-4009-48fd-b5ad-b0397cb5a654",
+        "scryfall_uri": "https://scryfall.com/card/rvr/132/band-together",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/2/42c06c8c-4009-48fd-b5ad-b0397cb5a654.jpg?1702429545",
+          "normal": "https://cards.scryfall.io/normal/front/4/2/42c06c8c-4009-48fd-b5ad-b0397cb5a654.jpg?1702429545"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Rampaging Rendhorn",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 172,
+        "tier_rating": "D",
+        "note": "Efficient fat common.",
+        "id": "c74cb111-0034-43a9-8e3e-79be929b418f",
+        "scryfall_uri": "https://scryfall.com/card/rvr/154/rampaging-rendhorn",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Beast",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c74cb111-0034-43a9-8e3e-79be929b418f.jpg?1702429581",
+          "normal": "https://cards.scryfall.io/normal/front/c/7/c74cb111-0034-43a9-8e3e-79be929b418f.jpg?1702429581"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Gather Courage",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 137,
+        "tier_rating": "C",
+        "note": "Free convoke trick with +2/+2 reach potential.",
+        "id": "bf059c8d-6e61-41ca-ac79-3bf82fa2d4b3",
+        "scryfall_uri": "https://scryfall.com/card/rvr/143/gather-courage",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/f/bf059c8d-6e61-41ca-ac79-3bf82fa2d4b3.jpg?1702429561",
+          "normal": "https://cards.scryfall.io/normal/front/b/f/bf059c8d-6e61-41ca-ac79-3bf82fa2d4b3.jpg?1702429561"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Crocanura",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 135,
+        "tier_rating": "C",
+        "note": "Defensive evolution creature; blocks all common fliers after evolution.",
+        "id": "9de9515a-8845-4eba-922f-438dea46a22a",
+        "scryfall_uri": "https://scryfall.com/card/rvr/135/crocanura",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Crocodile Frog",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9de9515a-8845-4eba-922f-438dea46a22a.jpg?1702429548",
+          "normal": "https://cards.scryfall.io/normal/front/9/d/9de9515a-8845-4eba-922f-438dea46a22a.jpg?1702429548"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ],
+    "Multicolor": [
+      {
+        "name": "Blind Hunter",
+        "color": "WB",
+        "rarity": "Common",
+        "pick_order_rank": 140,
+        "tier_rating": "C",
+        "note": "Exceptional rate for Orzhov at common.",
+        "id": "814a5348-988d-480f-806d-9c958f1a10b9",
+        "scryfall_uri": "https://scryfall.com/card/rvr/166/blind-hunter",
+        "colors": [
+          "B",
+          "W"
+        ],
+        "type_line": "Creature — Bat",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/1/814a5348-988d-480f-806d-9c958f1a10b9.jpg?1702429604",
+          "normal": "https://cards.scryfall.io/normal/front/8/1/814a5348-988d-480f-806d-9c958f1a10b9.jpg?1702429604"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Coiling Oracle",
+        "color": "UG",
+        "rarity": "Common",
+        "pick_order_rank": 76,
+        "tier_rating": "B",
+        "note": "Simple value goodness; better with Keymaster Rogue.",
+        "id": "559ff1b1-018c-4e08-9531-8af20af47d05",
+        "scryfall_uri": "https://scryfall.com/card/rvr/172/coiling-oracle",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Creature — Snake Elf Druid",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/559ff1b1-018c-4e08-9531-8af20af47d05.jpg?1702429613",
+          "normal": "https://cards.scryfall.io/normal/front/5/5/559ff1b1-018c-4e08-9531-8af20af47d05.jpg?1702429613"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Call of the Conclave",
+        "color": "WG",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "C",
+        "note": "3/3 token for two mana; synergizes with Rootborn Defenses and Eyes in the Skies.",
+        "id": "88cacc67-5b0e-4cd5-a552-f64934578930",
+        "scryfall_uri": "https://scryfall.com/card/rvr/169/call-of-the-conclave",
+        "colors": [
+          "G",
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88cacc67-5b0e-4cd5-a552-f64934578930.jpg?1702550888",
+          "normal": "https://cards.scryfall.io/normal/front/8/8/88cacc67-5b0e-4cd5-a552-f64934578930.jpg?1702550888"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Skyknight Legionnaire",
+        "color": "WR",
+        "rarity": "Common",
+        "pick_order_rank": 123,
+        "tier_rating": "C",
+        "note": "Good aggressive flier with battalion synergy.",
+        "id": "e22b3239-0f4f-4628-b8fb-0bdeb9b744b1",
+        "scryfall_uri": "https://scryfall.com/card/rvr/225/skyknight-legionnaire",
+        "colors": [
+          "R",
+          "W"
+        ],
+        "type_line": "Creature — Human Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e22b3239-0f4f-4628-b8fb-0bdeb9b744b1.jpg?1702550924",
+          "normal": "https://cards.scryfall.io/normal/front/e/2/e22b3239-0f4f-4628-b8fb-0bdeb9b744b1.jpg?1702550924"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ]
+  },
+  "top_uncommons": [
+    {
+      "name": "Murmuring Mystic",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 22,
+      "tier_rating": "A",
+      "note": "Best uncommon — better than many rares.",
+      "id": "57cd7b12-c944-43e3-846f-ffea4a664a1f",
+      "scryfall_uri": "https://scryfall.com/card/rvr/51/murmuring-mystic",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Human Wizard",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/57cd7b12-c944-43e3-846f-ffea4a664a1f.jpg?1702429400",
+        "normal": "https://cards.scryfall.io/normal/front/5/7/57cd7b12-c944-43e3-846f-ffea4a664a1f.jpg?1702429400"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Lightning Helix",
+      "color": "WR",
+      "rarity": "Uncommon",
+      "pick_order_rank": 36,
+      "tier_rating": "B",
+      "note": "Lightning Bolt plus life gain.",
+      "id": "e99aead9-caa8-40ff-b8bd-2885004a2fd1",
+      "scryfall_uri": "https://scryfall.com/card/rvr/197/lightning-helix",
+      "colors": [
+        "R",
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e99aead9-caa8-40ff-b8bd-2885004a2fd1.jpg?1702429663",
+        "normal": "https://cards.scryfall.io/normal/front/e/9/e99aead9-caa8-40ff-b8bd-2885004a2fd1.jpg?1702429663"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Demonfire",
+      "color": "R",
+      "rarity": "Uncommon",
+      "pick_order_rank": 10,
+      "tier_rating": "S",
+      "note": "Fireball with hellbent bonus.",
+      "id": "f39020e2-86cf-4b7c-bcb8-23207291f9ee",
+      "scryfall_uri": "https://scryfall.com/card/rvr/107/demonfire",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f39020e2-86cf-4b7c-bcb8-23207291f9ee.jpg?1702550901",
+        "normal": "https://cards.scryfall.io/normal/front/f/3/f39020e2-86cf-4b7c-bcb8-23207291f9ee.jpg?1702550901"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Azorius Signet",
+      "color": "C",
+      "rarity": "Uncommon",
+      "pick_order_rank": 208,
+      "tier_rating": "D",
+      "note": "Signet cycle — excellent mana fixing.",
+      "id": "63e1d70c-7b19-4679-9ddc-33496e26c539",
+      "scryfall_uri": "https://scryfall.com/card/rvr/250/azorius-signet",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/63e1d70c-7b19-4679-9ddc-33496e26c539.jpg?1702429756",
+        "normal": "https://cards.scryfall.io/normal/front/6/3/63e1d70c-7b19-4679-9ddc-33496e26c539.jpg?1702429756"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Conclave Cavalier",
+      "color": "WG",
+      "rarity": "Uncommon",
+      "pick_order_rank": 45,
+      "tier_rating": "B",
+      "note": "Guild signpost uncommon (with restrictive mana).",
+      "id": "084d80d4-c675-4f2a-97ce-ec0b401ecadf",
+      "scryfall_uri": "https://scryfall.com/card/rvr/173/conclave-cavalier",
+      "colors": [
+        "G",
+        "W"
+      ],
+      "type_line": "Creature — Centaur Knight",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/8/084d80d4-c675-4f2a-97ce-ec0b401ecadf.jpg?1702429613",
+        "normal": "https://cards.scryfall.io/normal/front/0/8/084d80d4-c675-4f2a-97ce-ec0b401ecadf.jpg?1702429613"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    }
+  ],
+  "bomb_rares": {
+    "planeswalkers": [
+      {
+        "name": "Gideon Blackblade",
+        "color": "W",
+        "rarity": "Mythic",
+        "pick_order_rank": 16,
+        "tier_rating": "A",
+        "note": null,
+        "id": "41326ca6-f815-4af7-b022-67db127bc125",
+        "scryfall_uri": "https://scryfall.com/card/rvr/20/gideon-blackblade",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Legendary Planeswalker — Gideon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/1/41326ca6-f815-4af7-b022-67db127bc125.jpg?1702429284",
+          "normal": "https://cards.scryfall.io/normal/front/4/1/41326ca6-f815-4af7-b022-67db127bc125.jpg?1702429284"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Liliana, Dreadhorde General",
+        "color": "B",
+        "rarity": "Mythic",
+        "pick_order_rank": 1,
+        "tier_rating": "S",
+        "note": null,
+        "id": "4b3c833d-b03e-4aee-8f62-1828081511ff",
+        "scryfall_uri": "https://scryfall.com/card/rvr/80/liliana-dreadhorde-general",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Legendary Planeswalker — Liliana",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4b3c833d-b03e-4aee-8f62-1828081511ff.jpg?1702429454",
+          "normal": "https://cards.scryfall.io/normal/front/4/b/4b3c833d-b03e-4aee-8f62-1828081511ff.jpg?1702429454"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Nicol Bolas, Dragon-God",
+        "color": "UBR",
+        "rarity": "Mythic",
+        "pick_order_rank": 5,
+        "tier_rating": "S",
+        "note": "Requires 3-color splash.",
+        "id": "c5408607-af8f-48fe-bc40-32828d1976de",
+        "scryfall_uri": "https://scryfall.com/card/rvr/205/nicol-bolas-dragon-god",
+        "colors": [
+          "B",
+          "R",
+          "U"
+        ],
+        "type_line": "Legendary Planeswalker — Bolas",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c5408607-af8f-48fe-bc40-32828d1976de.jpg?1702429680",
+          "normal": "https://cards.scryfall.io/normal/front/c/5/c5408607-af8f-48fe-bc40-32828d1976de.jpg?1702429680"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Teferi, Time Raveler",
+        "color": "WU",
+        "rarity": "Mythic",
+        "pick_order_rank": 109,
+        "tier_rating": "C",
+        "note": null,
+        "id": "662fe50f-d75c-422c-8c6c-1f9b5c4ba21f",
+        "scryfall_uri": "https://scryfall.com/card/rvr/232/teferi-time-raveler",
+        "colors": [
+          "U",
+          "W"
+        ],
+        "type_line": "Legendary Planeswalker — Teferi",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/662fe50f-d75c-422c-8c6c-1f9b5c4ba21f.jpg?1702429729",
+          "normal": "https://cards.scryfall.io/normal/front/6/6/662fe50f-d75c-422c-8c6c-1f9b5c4ba21f.jpg?1702429729"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ],
+    "creatures": [
+      {
+        "name": "Ilharg, the Raze-Boar",
+        "color": "R",
+        "rarity": "Mythic",
+        "pick_order_rank": 4,
+        "tier_rating": "S",
+        "note": null,
+        "id": "3d397fc3-fd4e-45ad-ad40-0f8a585c15fd",
+        "scryfall_uri": "https://scryfall.com/card/rvr/113/ilharg-the-raze-boar",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Legendary Creature — Boar God",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d397fc3-fd4e-45ad-ad40-0f8a585c15fd.jpg?1702550832",
+          "normal": "https://cards.scryfall.io/normal/front/3/d/3d397fc3-fd4e-45ad-ad40-0f8a585c15fd.jpg?1702550832"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Aurelia, Exemplar of Justice",
+        "color": "WR",
+        "rarity": "Mythic",
+        "pick_order_rank": 2,
+        "tier_rating": "S",
+        "note": null,
+        "id": "f129569e-b14e-435f-bdb6-138ca67eb922",
+        "scryfall_uri": "https://scryfall.com/card/rvr/164/aurelia-exemplar-of-justice",
+        "colors": [
+          "R",
+          "W"
+        ],
+        "type_line": "Legendary Creature — Angel",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f129569e-b14e-435f-bdb6-138ca67eb922.jpg?1702429598",
+          "normal": "https://cards.scryfall.io/normal/front/f/1/f129569e-b14e-435f-bdb6-138ca67eb922.jpg?1702429598"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Karlov of the Ghost Council",
+        "color": "WB",
+        "rarity": "Mythic",
+        "pick_order_rank": 142,
+        "tier_rating": "C",
+        "note": "Pairs with Ill-Gotten Inheritance and Mourning Thrull.",
+        "id": "f7c41011-a9eb-451c-a76d-67d2dcf47c52",
+        "scryfall_uri": "https://scryfall.com/card/rvr/193/karlov-of-the-ghost-council",
+        "colors": [
+          "B",
+          "W"
+        ],
+        "type_line": "Legendary Creature — Spirit Advisor",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7c41011-a9eb-451c-a76d-67d2dcf47c52.jpg?1703964236",
+          "normal": "https://cards.scryfall.io/normal/front/f/7/f7c41011-a9eb-451c-a76d-67d2dcf47c52.jpg?1703964236"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Krenko, Mob Boss",
+        "color": "R",
+        "rarity": "Rare",
+        "pick_order_rank": 133,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7d00007d-6878-44e9-ab0d-396c25655e56",
+        "scryfall_uri": "https://scryfall.com/card/rvr/114/krenko-mob-boss",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Legendary Creature — Goblin Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d00007d-6878-44e9-ab0d-396c25655e56.jpg?1702429511",
+          "normal": "https://cards.scryfall.io/normal/front/7/d/7d00007d-6878-44e9-ab0d-396c25655e56.jpg?1702429511"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Legion Warboss",
+        "color": "R",
+        "rarity": "Rare",
+        "pick_order_rank": 27,
+        "tier_rating": "A",
+        "note": null,
+        "id": "26ca4014-11fb-4c62-a7c6-ab2880393531",
+        "scryfall_uri": "https://scryfall.com/card/rvr/116/legion-warboss",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Goblin Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/6/26ca4014-11fb-4c62-a7c6-ab2880393531.jpg?1702429518",
+          "normal": "https://cards.scryfall.io/normal/front/2/6/26ca4014-11fb-4c62-a7c6-ab2880393531.jpg?1702429518"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Niv-Mizzet, Parun",
+        "color": "UR",
+        "rarity": "Rare",
+        "pick_order_rank": 6,
+        "tier_rating": "S",
+        "note": "Possibly the most broken rare; requires UR.",
+        "id": "7be6bedd-8d38-4bd9-aa93-29f88a7f0126",
+        "scryfall_uri": "https://scryfall.com/card/rvr/207/niv-mizzet-parun",
+        "colors": [
+          "R",
+          "U"
+        ],
+        "type_line": "Legendary Creature — Dragon Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7be6bedd-8d38-4bd9-aa93-29f88a7f0126.jpg?1702429680",
+          "normal": "https://cards.scryfall.io/normal/front/7/b/7be6bedd-8d38-4bd9-aa93-29f88a7f0126.jpg?1702429680"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Prime Speaker Zegana",
+        "color": "UG",
+        "rarity": "Rare",
+        "pick_order_rank": 37,
+        "tier_rating": "B",
+        "note": null,
+        "id": "51d29fb4-72e3-4400-a57b-7e18acfb2909",
+        "scryfall_uri": "https://scryfall.com/card/rvr/211/prime-speaker-zegana",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Legendary Creature — Merfolk Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/1/51d29fb4-72e3-4400-a57b-7e18acfb2909.jpg?1702429689",
+          "normal": "https://cards.scryfall.io/normal/front/5/1/51d29fb4-72e3-4400-a57b-7e18acfb2909.jpg?1702429689"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Tajic, Legion's Edge",
+        "color": "WR",
+        "rarity": "Rare",
+        "pick_order_rank": 14,
+        "tier_rating": "S",
+        "note": null,
+        "id": "45c4c3b3-be18-4d74-99d8-f137498673d7",
+        "scryfall_uri": "https://scryfall.com/card/rvr/231/tajic-legions-edge",
+        "colors": [
+          "R",
+          "W"
+        ],
+        "type_line": "Legendary Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/5/45c4c3b3-be18-4d74-99d8-f137498673d7.jpg?1702429724",
+          "normal": "https://cards.scryfall.io/normal/front/4/5/45c4c3b3-be18-4d74-99d8-f137498673d7.jpg?1702429724"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ],
+    "other": [
+      {
+        "name": "Assemble the Legion",
+        "color": "WR",
+        "rarity": "Rare",
+        "pick_order_rank": 19,
+        "tier_rating": "A",
+        "note": null,
+        "id": "10ce686a-eecd-4b32-a882-9a6ca3274ae6",
+        "scryfall_uri": "https://scryfall.com/card/rvr/163/assemble-the-legion",
+        "colors": [
+          "R",
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/10ce686a-eecd-4b32-a882-9a6ca3274ae6.jpg?1702429596",
+          "normal": "https://cards.scryfall.io/normal/front/1/0/10ce686a-eecd-4b32-a882-9a6ca3274ae6.jpg?1702429596"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Unbreakable Formation",
+        "color": "W",
+        "rarity": "Rare",
+        "pick_order_rank": 60,
+        "tier_rating": "B",
+        "note": null,
+        "id": "06e1cc7b-9319-4f6f-88ee-2e6b6d2efbc6",
+        "scryfall_uri": "https://scryfall.com/card/rvr/32/unbreakable-formation",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/06e1cc7b-9319-4f6f-88ee-2e6b6d2efbc6.jpg?1702429305",
+          "normal": "https://cards.scryfall.io/normal/front/0/6/06e1cc7b-9319-4f6f-88ee-2e6b6d2efbc6.jpg?1702429305"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Massacre Girl",
+        "color": "B",
+        "rarity": "Rare",
+        "pick_order_rank": 9,
+        "tier_rating": "S",
+        "note": null,
+        "id": "17919445-5b72-4014-9a05-8df4f8d5e80e",
+        "scryfall_uri": "https://scryfall.com/card/rvr/83/massacre-girl",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Legendary Creature — Human Assassin",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/7/17919445-5b72-4014-9a05-8df4f8d5e80e.jpg?1702429456",
+          "normal": "https://cards.scryfall.io/normal/front/1/7/17919445-5b72-4014-9a05-8df4f8d5e80e.jpg?1702429456"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Midnight Reaper",
+        "color": "B",
+        "rarity": "Rare",
+        "pick_order_rank": 15,
+        "tier_rating": "A",
+        "note": null,
+        "id": "5cf16f33-21d8-4763-9c94-54df22905486",
+        "scryfall_uri": "https://scryfall.com/card/rvr/86/midnight-reaper",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Zombie Knight",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5cf16f33-21d8-4763-9c94-54df22905486.jpg?1702429464",
+          "normal": "https://cards.scryfall.io/normal/front/5/c/5cf16f33-21d8-4763-9c94-54df22905486.jpg?1702429464"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Warrant Warden",
+        "color": "WU",
+        "rarity": "Rare",
+        "pick_order_rank": 65,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7e565adc-32ec-4ba8-9220-1239c373f84f",
+        "scryfall_uri": "https://scryfall.com/card/rvr/240/warrant-warden",
+        "colors": [
+          "U",
+          "W"
+        ],
+        "type_line": "Instant // Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7e565adc-32ec-4ba8-9220-1239c373f84f.jpg?1744102818",
+          "normal": "https://cards.scryfall.io/normal/front/7/e/7e565adc-32ec-4ba8-9220-1239c373f84f.jpg?1744102818"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Expansion Explosion",
+        "color": "UR",
+        "rarity": "Rare",
+        "pick_order_rank": 111,
+        "tier_rating": "C",
+        "note": null,
+        "id": "be082a49-1a90-48fd-ba61-c26c90f1f64e",
+        "scryfall_uri": "https://scryfall.com/card/rvr/243/expansion-explosion",
+        "colors": [
+          "R",
+          "U"
+        ],
+        "type_line": "Instant // Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/e/be082a49-1a90-48fd-ba61-c26c90f1f64e.jpg?1744102791",
+          "normal": "https://cards.scryfall.io/normal/front/b/e/be082a49-1a90-48fd-ba61-c26c90f1f64e.jpg?1744102791"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Find Finality",
+        "color": "BG",
+        "rarity": "Rare",
+        "pick_order_rank": 39,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1a359c9d-c7d8-4d57-bf32-f49eac65b8de",
+        "scryfall_uri": "https://scryfall.com/card/rvr/245/find-finality",
+        "colors": [
+          "B",
+          "G"
+        ],
+        "type_line": "Sorcery // Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1a359c9d-c7d8-4d57-bf32-f49eac65b8de.jpg?1702429748",
+          "normal": "https://cards.scryfall.io/normal/front/1/a/1a359c9d-c7d8-4d57-bf32-f49eac65b8de.jpg?1702429748"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      },
+      {
+        "name": "Sphinx's Revelation",
+        "color": "WU",
+        "rarity": "Rare",
+        "pick_order_rank": 13,
+        "tier_rating": "S",
+        "note": null,
+        "id": "5579d2d6-b34b-44a2-8b72-9f18938a18a0",
+        "scryfall_uri": "https://scryfall.com/card/rvr/228/sphinxs-revelation",
+        "colors": [
+          "U",
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/5579d2d6-b34b-44a2-8b72-9f18938a18a0.jpg?1702429723",
+          "normal": "https://cards.scryfall.io/normal/front/5/5/5579d2d6-b34b-44a2-8b72-9f18938a18a0.jpg?1702429723"
+        },
+        "set": "rvr",
+        "set_name": "Ravnica Remastered"
+      }
+    ]
+  },
+  "junk_rares": [
+    {
+      "name": "Karn, the Great Creator",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 247,
+      "tier_rating": "D",
+      "note": "No wishboard available.",
+      "id": "deb3721d-fba1-444f-8b31-1cd10c94c4a0",
+      "scryfall_uri": "https://scryfall.com/card/rvr/1/karn-the-great-creator",
+      "colors": [],
+      "type_line": "Legendary Planeswalker — Karn",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/deb3721d-fba1-444f-8b31-1cd10c94c4a0.jpg?1702429246",
+        "normal": "https://cards.scryfall.io/normal/front/d/e/deb3721d-fba1-444f-8b31-1cd10c94c4a0.jpg?1702429246"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Cloudstone Curio",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 288,
+      "tier_rating": "F",
+      "note": null,
+      "id": "6146bf98-3cab-4044-a1a2-cf2203f617aa",
+      "scryfall_uri": "https://scryfall.com/card/rvr/255/cloudstone-curio",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/6146bf98-3cab-4044-a1a2-cf2203f617aa.jpg?1702431663",
+        "normal": "https://cards.scryfall.io/normal/front/6/1/6146bf98-3cab-4044-a1a2-cf2203f617aa.jpg?1702431663"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Blazing Archon",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 229,
+      "tier_rating": "D",
+      "note": null,
+      "id": "f5e43875-ab5e-4233-892d-fc2c5687fae8",
+      "scryfall_uri": "https://scryfall.com/card/rvr/8/blazing-archon",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Archon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f5e43875-ab5e-4233-892d-fc2c5687fae8.jpg?1758104163",
+        "normal": "https://cards.scryfall.io/normal/front/f/5/f5e43875-ab5e-4233-892d-fc2c5687fae8.jpg?1758104163"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Copy Enchantment",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 283,
+      "tier_rating": "F",
+      "note": null,
+      "id": "ce82b316-8982-41bf-a990-6b776a9e83ac",
+      "scryfall_uri": "https://scryfall.com/card/rvr/39/copy-enchantment",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/ce82b316-8982-41bf-a990-6b776a9e83ac.jpg?1702429365",
+        "normal": "https://cards.scryfall.io/normal/front/c/e/ce82b316-8982-41bf-a990-6b776a9e83ac.jpg?1702429365"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Infernal Tutor",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 286,
+      "tier_rating": "F",
+      "note": null,
+      "id": "4b868126-f5f4-4541-8f02-9ac0f196d18c",
+      "scryfall_uri": "https://scryfall.com/card/rvr/78/infernal-tutor",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4b868126-f5f4-4541-8f02-9ac0f196d18c.jpg?1702429448",
+        "normal": "https://cards.scryfall.io/normal/front/4/b/4b868126-f5f4-4541-8f02-9ac0f196d18c.jpg?1702429448"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Life from the Loam",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 138,
+      "tier_rating": "C",
+      "note": null,
+      "id": "59927e3b-65bc-4ab6-ad7b-6f558ccca6a8",
+      "scryfall_uri": "https://scryfall.com/card/rvr/148/life-from-the-loam",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/59927e3b-65bc-4ab6-ad7b-6f558ccca6a8.jpg?1702429570",
+        "normal": "https://cards.scryfall.io/normal/front/5/9/59927e3b-65bc-4ab6-ad7b-6f558ccca6a8.jpg?1702429570"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Kaya, Orzhov Usurper",
+      "color": "WB",
+      "rarity": "Rare",
+      "pick_order_rank": 271,
+      "tier_rating": "F",
+      "note": null,
+      "id": "307efe3d-291c-4c9f-8ce6-4bd2ba1452ad",
+      "scryfall_uri": "https://scryfall.com/card/rvr/194/kaya-orzhov-usurper",
+      "colors": [
+        "B",
+        "W"
+      ],
+      "type_line": "Legendary Planeswalker — Kaya",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/0/307efe3d-291c-4c9f-8ce6-4bd2ba1452ad.jpg?1702429656",
+        "normal": "https://cards.scryfall.io/normal/front/3/0/307efe3d-291c-4c9f-8ce6-4bd2ba1452ad.jpg?1702429656"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Mindleech Mass",
+      "color": "UB",
+      "rarity": "Rare",
+      "pick_order_rank": 262,
+      "tier_rating": "D",
+      "note": null,
+      "id": "88df246f-708b-4fbb-94e4-6df9471e626e",
+      "scryfall_uri": "https://scryfall.com/card/rvr/201/mindleech-mass",
+      "colors": [
+        "B",
+        "U"
+      ],
+      "type_line": "Creature — Horror",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/8/88df246f-708b-4fbb-94e4-6df9471e626e.jpg?1702429672",
+        "normal": "https://cards.scryfall.io/normal/front/8/8/88df246f-708b-4fbb-94e4-6df9471e626e.jpg?1702429672"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Savra, Queen of the Golgari",
+      "color": "BG",
+      "rarity": "Rare",
+      "pick_order_rank": 80,
+      "tier_rating": "B",
+      "note": null,
+      "id": "e189f09e-d637-4631-bae3-a5a583ada429",
+      "scryfall_uri": "https://scryfall.com/card/rvr/218/savra-queen-of-the-golgari",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Legendary Creature — Elf Shaman",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e189f09e-d637-4631-bae3-a5a583ada429.jpg?1778645566",
+        "normal": "https://cards.scryfall.io/normal/front/e/1/e189f09e-d637-4631-bae3-a5a583ada429.jpg?1778645566"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Stitch in Time",
+      "color": "UR",
+      "rarity": "Rare",
+      "pick_order_rank": 287,
+      "tier_rating": "F",
+      "note": null,
+      "id": "da3a311a-d2c2-4bd1-aa39-9e6f4eb51960",
+      "scryfall_uri": "https://scryfall.com/card/rvr/229/stitch-in-time",
+      "colors": [
+        "R",
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/da3a311a-d2c2-4bd1-aa39-9e6f4eb51960.jpg?1702429723",
+        "normal": "https://cards.scryfall.io/normal/front/d/a/da3a311a-d2c2-4bd1-aa39-9e6f4eb51960.jpg?1702429723"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Bottled Cloister",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 239,
+      "tier_rating": "D",
+      "note": null,
+      "id": "432254fb-1024-4d22-8396-10e6fff8b4d8",
+      "scryfall_uri": "https://scryfall.com/card/rvr/252/bottled-cloister",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/432254fb-1024-4d22-8396-10e6fff8b4d8.jpg?1702429761",
+        "normal": "https://cards.scryfall.io/normal/front/4/3/432254fb-1024-4d22-8396-10e6fff8b4d8.jpg?1702429761"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Illusionist's Bracers",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 291,
+      "tier_rating": "F",
+      "note": null,
+      "id": "9dd8d940-a973-4469-bf78-90318d98f3ab",
+      "scryfall_uri": "https://scryfall.com/card/rvr/260/illusionists-bracers",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9dd8d940-a973-4469-bf78-90318d98f3ab.jpg?1702429773",
+        "normal": "https://cards.scryfall.io/normal/front/9/d/9dd8d940-a973-4469-bf78-90318d98f3ab.jpg?1702429773"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Pariah's Shield",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 289,
+      "tier_rating": "F",
+      "note": null,
+      "id": "d794e94e-5ba4-4caa-bd3d-737301056da1",
+      "scryfall_uri": "https://scryfall.com/card/rvr/264/pariahs-shield",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/7/d794e94e-5ba4-4caa-bd3d-737301056da1.jpg?1702429781",
+        "normal": "https://cards.scryfall.io/normal/front/d/7/d794e94e-5ba4-4caa-bd3d-737301056da1.jpg?1702429781"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Seal of the Guildpact",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 274,
+      "tier_rating": "F",
+      "note": null,
+      "id": "2707d84f-5ab1-46c6-8932-ec51cae14111",
+      "scryfall_uri": "https://scryfall.com/card/rvr/266/seal-of-the-guildpact",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/2707d84f-5ab1-46c6-8932-ec51cae14111.jpg?1702429786",
+        "normal": "https://cards.scryfall.io/normal/front/2/7/2707d84f-5ab1-46c6-8932-ec51cae14111.jpg?1702429786"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Sword of the Paruns",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 273,
+      "tier_rating": "F",
+      "note": null,
+      "id": "3e0fd1d6-c57e-47c7-a87f-0487cf5b2786",
+      "scryfall_uri": "https://scryfall.com/card/rvr/270/sword-of-the-paruns",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/e/3e0fd1d6-c57e-47c7-a87f-0487cf5b2786.jpg?1702429791",
+        "normal": "https://cards.scryfall.io/normal/front/3/e/3e0fd1d6-c57e-47c7-a87f-0487cf5b2786.jpg?1702429791"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    }
+  ],
+  "commons_to_avoid": [
+    {
+      "name": "Persistent Petitioners",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 269,
+      "tier_rating": "F",
+      "note": null,
+      "id": "27be522d-bdef-4a95-a405-98247c58b71a",
+      "scryfall_uri": "https://scryfall.com/card/rvr/53/persistent-petitioners",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Human Advisor",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/27be522d-bdef-4a95-a405-98247c58b71a.jpg?1702429407",
+        "normal": "https://cards.scryfall.io/normal/front/2/7/27be522d-bdef-4a95-a405-98247c58b71a.jpg?1702429407"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Demolish",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 281,
+      "tier_rating": "F",
+      "note": null,
+      "id": "3abaf8fe-5fab-442c-b219-45137f9ae112",
+      "scryfall_uri": "https://scryfall.com/card/rvr/106/demolish",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3abaf8fe-5fab-442c-b219-45137f9ae112.jpg?1702429498",
+        "normal": "https://cards.scryfall.io/normal/front/3/a/3abaf8fe-5fab-442c-b219-45137f9ae112.jpg?1702429498"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Dogpile",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 200,
+      "tier_rating": "D",
+      "note": null,
+      "id": "9624ed7b-9f45-483c-a2cc-6089605f988f",
+      "scryfall_uri": "https://scryfall.com/card/rvr/108/dogpile",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/6/9624ed7b-9f45-483c-a2cc-6089605f988f.jpg?1702505414",
+        "normal": "https://cards.scryfall.io/normal/front/9/6/9624ed7b-9f45-483c-a2cc-6089605f988f.jpg?1702505414"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Greater Forgeling",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 236,
+      "tier_rating": "D",
+      "note": null,
+      "id": "8e4bd21c-f7f1-4a18-894a-80d7b498b57c",
+      "scryfall_uri": "https://scryfall.com/card/rvr/109/greater-forgeling",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Creature — Elemental",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8e4bd21c-f7f1-4a18-894a-80d7b498b57c.jpg?1702717423",
+        "normal": "https://cards.scryfall.io/normal/front/8/e/8e4bd21c-f7f1-4a18-894a-80d7b498b57c.jpg?1702717423"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Arboreal Grazer",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 275,
+      "tier_rating": "F",
+      "note": null,
+      "id": "6d00ced6-7ba3-4d78-a680-9d3211704ca2",
+      "scryfall_uri": "https://scryfall.com/card/rvr/131/arboreal-grazer",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Sloth Beast",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d00ced6-7ba3-4d78-a680-9d3211704ca2.jpg?1709877030",
+        "normal": "https://cards.scryfall.io/normal/front/6/d/6d00ced6-7ba3-4d78-a680-9d3211704ca2.jpg?1709877030"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Forced Adaptation",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 256,
+      "tier_rating": "D",
+      "note": null,
+      "id": "246c6f63-59df-41a5-8c28-f43e1e89c25f",
+      "scryfall_uri": "https://scryfall.com/card/rvr/140/forced-adaptation",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/246c6f63-59df-41a5-8c28-f43e1e89c25f.jpg?1702429557",
+        "normal": "https://cards.scryfall.io/normal/front/2/4/246c6f63-59df-41a5-8c28-f43e1e89c25f.jpg?1702429557"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Forced Landing",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 268,
+      "tier_rating": "F",
+      "note": null,
+      "id": "619b97c7-f297-4c25-be94-27dfae4d39b3",
+      "scryfall_uri": "https://scryfall.com/card/rvr/141/forced-landing",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/619b97c7-f297-4c25-be94-27dfae4d39b3.jpg?1702429559",
+        "normal": "https://cards.scryfall.io/normal/front/6/1/619b97c7-f297-4c25-be94-27dfae4d39b3.jpg?1702429559"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Wild Cantor",
+      "color": "RG",
+      "rarity": "Common",
+      "pick_order_rank": 264,
+      "tier_rating": "D",
+      "note": null,
+      "id": "e6b56946-a368-4cd7-9d35-be14afca935b",
+      "scryfall_uri": "https://scryfall.com/card/rvr/239/wild-cantor",
+      "colors": [
+        "G",
+        "R"
+      ],
+      "type_line": "Creature — Human Druid",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e6b56946-a368-4cd7-9d35-be14afca935b.jpg?1702429739",
+        "normal": "https://cards.scryfall.io/normal/front/e/6/e6b56946-a368-4cd7-9d35-be14afca935b.jpg?1702429739"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Slitherhead",
+      "color": "BG",
+      "rarity": "Common",
+      "pick_order_rank": 207,
+      "tier_rating": "D",
+      "note": null,
+      "id": "4703f1d0-088e-4036-b50c-ce9f7c053ec7",
+      "scryfall_uri": "https://scryfall.com/card/rvr/226/slitherhead",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Creature — Plant Zombie",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/7/4703f1d0-088e-4036-b50c-ce9f7c053ec7.jpg?1702717434",
+        "normal": "https://cards.scryfall.io/normal/front/4/7/4703f1d0-088e-4036-b50c-ce9f7c053ec7.jpg?1702717434"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    },
+    {
+      "name": "Merfolk of the Depths",
+      "color": "UG",
+      "rarity": "Common",
+      "pick_order_rank": 206,
+      "tier_rating": "D",
+      "note": null,
+      "id": "387e51db-89b7-44a9-9fc8-4e59479c75d2",
+      "scryfall_uri": "https://scryfall.com/card/rvr/200/merfolk-of-the-depths",
+      "colors": [
+        "G",
+        "U"
+      ],
+      "type_line": "Creature — Merfolk Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/387e51db-89b7-44a9-9fc8-4e59479c75d2.jpg?1702717432",
+        "normal": "https://cards.scryfall.io/normal/front/3/8/387e51db-89b7-44a9-9fc8-4e59479c75d2.jpg?1702717432"
+      },
+      "set": "rvr",
+      "set_name": "Ravnica Remastered"
+    }
+  ],
+  "general_tips": [
+    "P1P1 rares/uncommons or top monocolor commons to stay open.",
+    "Track multicolor cards passed — they reveal which guilds are open.",
+    "Don't lock into a guild early unless a rare strongly demands it.",
+    "Prioritize monocolor staples for maximum flexibility.",
+    "Read the signal wheel to find underdrafted guilds.",
+    "In 8-mans there are more guilds than players; carefully evaluate signals.",
+    "Draft sideboard cards (Sprouting Renewal, Forced Landing, Crocanura, Mephitic Vapors) once full on playables."
+  ]
+}

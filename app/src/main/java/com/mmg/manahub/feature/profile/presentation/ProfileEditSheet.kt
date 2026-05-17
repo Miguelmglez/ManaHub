@@ -31,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -180,9 +179,9 @@ fun ProfileEditSheet(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     textStyle = MaterialTheme.magicTypography.bodyMedium,
-                    isError = !uiState.isNameValid,
+                    isError = uiState.pendingName != uiState.currentName && !uiState.isNameValid,
                     supportingText = {
-                        if (!uiState.isNameValid) {
+                        if (uiState.pendingName != uiState.currentName && !uiState.isNameValid) {
                             Text(
                                 stringResource(R.string.auth_error_name_too_short), // Reusing error or creating new one
                                 style = MaterialTheme.magicTypography.labelSmall,
@@ -359,7 +358,7 @@ fun ProfileEditSheet(
                             viewModel.confirmChanges(onNicknameUpdate)
                             onDismiss()
                         },
-                        enabled = uiState.isNameValid,
+                        enabled = uiState.pendingName == uiState.currentName || uiState.isNameValid,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(

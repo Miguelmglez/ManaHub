@@ -154,8 +154,9 @@ fun CardDetailScreen(
         Scaffold(
             contentWindowInsets = WindowInsets(0),
             topBar = {
+                val mc = MaterialTheme.magicColors
                 Surface(
-                    color = MaterialTheme.colorScheme.surface,
+                    color = mc.backgroundSecondary,
                     tonalElevation = 3.dp
                 ) {
                     Row(
@@ -168,12 +169,13 @@ fun CardDetailScreen(
                         IconButton(onClick = onBack) {
                             Icon(
                                 Icons.Default.ArrowBack,
-                                contentDescription = stringResource(R.string.action_back)
+                                contentDescription = stringResource(R.string.action_back),
+                                tint = mc.textPrimary,
                             )
                         }
                         CardName(
                             name = uiState.card?.name ?: "",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.magicTypography.titleLarge,
                             modifier = Modifier
                                 .weight(1f),
                             maxLines = 1,
@@ -293,7 +295,7 @@ fun CardDetailScreen(
                 TextButton(onClick = { viewModel.onDeleteCard(uc.id) }) {
                     Text(
                         stringResource(R.string.action_remove),
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.magicColors.lifeNegative
                     )
                 }
             },
@@ -419,8 +421,8 @@ private fun CardDetailContent(
                         stringResource(R.string.carddetail_flip_see_front)
                     else
                         stringResource(R.string.carddetail_flip_see_back),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.magicTypography.labelMedium,
+                    color = MaterialTheme.magicColors.primaryAccent,
                 )
             }
         }
@@ -435,7 +437,7 @@ private fun CardDetailContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CardName(name, style = MaterialTheme.typography.headlineSmall)
+                CardName(name, style = MaterialTheme.magicTypography.titleLarge)
                 if (isStale) StaleBadge()
             }
         }
@@ -453,8 +455,8 @@ private fun CardDetailContent(
                 }
                 Text(
                     text = typeText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.magicTypography.bodyMedium,
+                    color = MaterialTheme.magicColors.textSecondary,
                 )
             }
         }
@@ -471,8 +473,8 @@ private fun CardDetailContent(
             )
             Text(
                 text = card.setName,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.magicTypography.bodySmall,
+                color = MaterialTheme.magicColors.textSecondary,
             )
         }
 
@@ -486,13 +488,13 @@ private fun CardDetailContent(
             if (!oracleDisplayText.isNullOrEmpty()) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        containerColor = MaterialTheme.magicColors.surfaceVariant,
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OracleText(
                         text = oracleDisplayText,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.magicTypography.bodyMedium,
                         modifier = Modifier.padding(12.dp),
                     )
                 }
@@ -505,9 +507,9 @@ private fun CardDetailContent(
             flavorText?.let {
                 Text(
                     text = "\"$it\"",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.magicTypography.bodySmall,
                     fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.magicColors.textSecondary,
                 )
             }
         }
@@ -537,7 +539,7 @@ private fun CardDetailContent(
                 ) {
                     Text(
                         text = ptOrLoyalty,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.magicTypography.titleMedium,
                         color = mc.secondaryAccent,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )
@@ -642,7 +644,7 @@ private fun FoundInDecksSection(
                         R.string.carddetail_decks
                     )
                 ),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.magicTypography.labelMedium,
                 color = mc.textPrimary,
             )
         }
@@ -731,7 +733,7 @@ private fun CollectionSection(
 
         Text(
             stringResource(R.string.carddetail_in_collection),
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.magicTypography.labelMedium,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -750,7 +752,7 @@ private fun CollectionSection(
                 Spacer(Modifier.width(4.dp))
                 Text(
                     stringResource(R.string.carddetail_add_to_wishlist),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.magicTypography.labelSmall,
                     color = MaterialTheme.magicColors.goldMtg
                 )
             }
@@ -768,7 +770,7 @@ private fun CollectionSection(
                 Spacer(Modifier.width(4.dp))
                 Text(
                     stringResource(R.string.carddetail_add_copy),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.magicTypography.labelSmall,
                     color = MaterialTheme.magicColors.primaryAccent
                 )
             }
@@ -779,8 +781,8 @@ private fun CollectionSection(
     if (userCards.isEmpty()) {
         Text(
             text = stringResource(R.string.carddetail_no_copies),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.magicTypography.bodySmall,
+            color = MaterialTheme.magicColors.textSecondary,
         )
     } else {
         userCards.forEach { uc ->
@@ -807,7 +809,7 @@ private fun CollectionSection(
             Spacer(Modifier.width(4.dp))
             Text(
                 stringResource(R.string.carddetail_offer_for_trade),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.magicTypography.labelSmall,
                 color = MaterialTheme.magicColors.secondaryAccent
             )
         }
@@ -822,8 +824,9 @@ private fun CollectionCopyRow(
     onUpdateQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = mc.surface,
         shape = MaterialTheme.shapes.small,
     ) {
         Column(
@@ -845,13 +848,13 @@ private fun CollectionCopyRow(
                 }
                 if (tradeQuantity > 0) {
                     Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        color = mc.secondaryAccent.copy(alpha = 0.15f),
                         shape = MaterialTheme.shapes.extraSmall,
                     ) {
                         Text(
                             text = stringResource(R.string.carddetail_for_trade_badge),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.secondaryAccent,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
@@ -865,8 +868,8 @@ private fun CollectionCopyRow(
             ) {
                 Text(
                     stringResource(R.string.carddetail_quantity_label),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(
@@ -881,7 +884,7 @@ private fun CollectionCopyRow(
                 }
                 Text(
                     text = "${userCard.quantity}",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.magicTypography.titleMedium,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
                 IconButton(
@@ -902,7 +905,7 @@ private fun CollectionCopyRow(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = stringResource(R.string.action_delete),
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = mc.lifeNegative,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -918,7 +921,7 @@ private fun PriceSection(card: Card) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             stringResource(R.string.carddetail_market_prices),
-            style = MaterialTheme.typography.titleSmall
+            style = MaterialTheme.magicTypography.labelMedium
         )
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             PricePill(
@@ -937,15 +940,16 @@ private fun PriceSection(card: Card) {
 
 @Composable
 private fun PricePill(label: String, price: Double?, currency: PreferredCurrency) {
+    val mc = MaterialTheme.magicColors
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            label, style = MaterialTheme.magicTypography.labelSmall,
+            color = mc.textSecondary
         )
         Text(
             text = PriceFormatter.format(price, currency),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.tertiary,
+            style = MaterialTheme.magicTypography.bodyLarge,
+            color = mc.goldMtg,
         )
     }
 }
@@ -956,7 +960,7 @@ private fun LegalitySection(card: Card) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             stringResource(R.string.carddetail_legality),
-            style = MaterialTheme.typography.titleSmall
+            style = MaterialTheme.magicTypography.labelMedium
         )
         val formats = listOf(
             stringResource(R.string.format_standard) to card.legalityStandard,
@@ -978,10 +982,10 @@ private fun LegalitySection(card: Card) {
 
 @Composable
 private fun LegalityChip(format: String, legality: String) {
+    val mc = MaterialTheme.magicColors
     val isLegal = legality == "legal"
     Surface(
-        color = if (isLegal) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceVariant,
+        color = if (isLegal) mc.lifePositive.copy(alpha = 0.15f) else mc.surfaceVariant,
         shape = MaterialTheme.shapes.small,
     ) {
         Column(
@@ -990,16 +994,15 @@ private fun LegalityChip(format: String, legality: String) {
         ) {
             Text(
                 text = format,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textPrimary,
                 maxLines = 1
             )
             Text(
-                text = if (isLegal) stringResource(R.string.carddetail_legality_legal) else stringResource(
-                    R.string.carddetail_legality_not_legal
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isLegal) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                text = if (isLegal) stringResource(R.string.carddetail_legality_legal)
+                       else stringResource(R.string.carddetail_legality_not_legal),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = if (isLegal) mc.lifePositive else mc.textSecondary,
                 maxLines = 1
             )
         }
@@ -1032,7 +1035,7 @@ private fun TagsSection(
         ) {
             Text(
                 text = stringResource(R.string.carddetail_tags_section),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.magicTypography.labelMedium,
                 modifier = Modifier.weight(1f),
             )
             Icon(
@@ -1041,13 +1044,14 @@ private fun TagsSection(
             )
         }
 
+        val mc = MaterialTheme.magicColors
         if (expanded) {
             // ── Auto-generated tags ──────────────────────────────────────────
             if (autoTags.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.carddetail_tags_auto_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1061,7 +1065,7 @@ private fun TagsSection(
                                 label = {
                                     Text(
                                         tag.label,
-                                        style = MaterialTheme.typography.labelSmall
+                                        style = MaterialTheme.magicTypography.labelSmall
                                     )
                                 }
                             )
@@ -1071,7 +1075,7 @@ private fun TagsSection(
                                 label = {
                                     Text(
                                         tag.label,
-                                        style = MaterialTheme.typography.labelSmall
+                                        style = MaterialTheme.magicTypography.labelSmall
                                     )
                                 },
                             )
@@ -1087,8 +1091,8 @@ private fun TagsSection(
                 }
                 Text(
                     text = stringResource(R.string.carddetail_tags_user_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
                 )
                 if (userTags.isNotEmpty()) {
                     FlowRow(
@@ -1102,7 +1106,7 @@ private fun TagsSection(
                                 label = {
                                     Text(
                                         tag.label,
-                                        style = MaterialTheme.typography.labelSmall
+                                        style = MaterialTheme.magicTypography.labelSmall
                                     )
                                 },
                                 trailingIcon = {
@@ -1121,8 +1125,8 @@ private fun TagsSection(
                 } else {
                     Text(
                         text = stringResource(R.string.carddetail_tags_user_empty),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
                     )
                 }
 
@@ -1139,14 +1143,14 @@ private fun TagsSection(
                     Spacer(Modifier.width(4.dp))
                     Text(
                         stringResource(R.string.carddetail_tags_add_button),
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.magicTypography.labelSmall
                     )
                 }
             } else if (!hasAnyTag) {
                 Text(
                     text = stringResource(R.string.carddetail_tags_auto_empty),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
                 )
             }
         }
@@ -1184,7 +1188,7 @@ private fun SuggestedTagsSection(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.carddetail_tags_suggested_label),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.magicTypography.labelMedium,
                 color = mc.textPrimary,
                 modifier = Modifier.weight(1f),
             )
@@ -1371,7 +1375,7 @@ private fun TagPickerSheet(
             item {
                 Text(
                     stringResource(R.string.carddetail_tags_picker_title),
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.magicTypography.titleMedium
                 )
             }
 
@@ -1555,8 +1559,9 @@ private fun CustomTagCreatorSection(
 ) {
     val allCategories: List<String> = builtInCategories.map { it.name } + userCustomCategoryKeys
 
+    val mc = MaterialTheme.magicColors
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        color = mc.surfaceVariant.copy(alpha = 0.4f),
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(
@@ -1565,8 +1570,8 @@ private fun CustomTagCreatorSection(
         ) {
             Text(
                 stringResource(R.string.carddetail_new_custom_tag),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.magicTypography.labelLarge,
+                color = mc.textSecondary,
             )
 
             OutlinedTextField(
@@ -1581,8 +1586,8 @@ private fun CustomTagCreatorSection(
 
             Text(
                 stringResource(R.string.carddetail_tag_type_label),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.textSecondary,
             )
 
             // Horizontally scrollable category chips
@@ -1593,7 +1598,7 @@ private fun CustomTagCreatorSection(
                     FilterChip(
                         selected = cat == selectedCategoryKey,
                         onClick = { onCategorySelected(cat) },
-                        label = { Text(cat, style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(cat, style = MaterialTheme.magicTypography.labelSmall) },
                     )
                 }
                 item {
@@ -1602,7 +1607,7 @@ private fun CustomTagCreatorSection(
                         label = {
                             Text(
                                 stringResource(R.string.carddetail_new_tag_button),
-                                style = MaterialTheme.typography.labelSmall
+                                style = MaterialTheme.magicTypography.labelSmall
                             )
                         },
                     )
@@ -1791,7 +1796,7 @@ private fun ExternalLinksSection(card: Card) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = stringResource(R.string.carddetail_links_title),
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.magicTypography.labelMedium,
         )
 
         if (referenceLinks.isNotEmpty()) {
