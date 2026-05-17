@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -43,8 +42,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,8 +71,12 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardSearchSheet
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -84,7 +85,6 @@ import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.friends.domain.model.Friend
-import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,26 +97,26 @@ fun CreateTradeProposalScreen(
     authViewModel: AuthViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val toastState = rememberMagicToastState()
     val mc = MaterialTheme.magicColors
     val focusManager = LocalFocusManager.current
     val preferredCurrency = LocalPreferredCurrency.current
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
+        toastState.show(msg, MagicToastType.SUCCESS)
         viewModel.onSnackbarDismissed()
     }
 
     LaunchedEffect(uiState.errorMessage) {
         val err = uiState.errorMessage ?: return@LaunchedEffect
         val message = when (err) {
-            "NO_RECEIVER"             -> "Please select a friend to trade with"
-            "INITIAL_ASYMMETRY"       -> "Both sides must have at least one item"
+            "NO_RECEIVER"               -> "Please select a friend to trade with"
+            "INITIAL_ASYMMETRY"         -> "Both sides must have at least one item"
             "PROPOSAL_VERSION_MISMATCH" -> "Proposal was modified; please refresh"
-            else                      -> err ?: "Unknown error"
+            else                        -> err
         }
-        snackbarHostState.showSnackbar(message)
+        toastState.show(message, MagicToastType.ERROR)
         viewModel.onErrorDismissed()
     }
 
@@ -142,7 +142,6 @@ fun CreateTradeProposalScreen(
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
 
         Scaffold(
-            snackbarHost        = { SnackbarHost(snackbarHostState) },
             containerColor      = Color.Transparent,
             contentWindowInsets = WindowInsets(0),
             topBar = {
@@ -338,6 +337,8 @@ fun CreateTradeProposalScreen(
                 item(key = "bottom_spacer") { Spacer(Modifier.height(16.dp)) }
             }
         }
+
+        MagicToastHost(state = toastState)
     }
 
     showAddItemSheet?.let { side ->
@@ -527,23 +528,25 @@ private fun FriendSelector(
 
                 when {
                     sessionState is SessionState.Unauthenticated -> {
-                        EmptyStateCTA(
-                            text = "Log in to trade with your friends and sync your collection across devices.",
-                            buttonText = "Log In",
-                            onClick = {
+                        EmptyState(
+                            title = "Log in to trade with your friends and sync your collection across devices.",
+                            actionLabel = "Log In",
+                            onAction = {
                                 showSheet = false
                                 onNavigateToLogin()
-                            }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     friends.isEmpty() -> {
-                        EmptyStateCTA(
-                            text = "You don't have any friends yet. Add friends to start trading!",
-                            buttonText = "Add Friends",
-                            onClick = {
+                        EmptyState(
+                            title = "You don't have any friends yet. Add friends to start trading!",
+                            actionLabel = "Add Friends",
+                            onAction = {
                                 showSheet = false
                                 onNavigateToAddFriends()
-                            }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     else -> {
@@ -610,35 +613,6 @@ private fun FriendSelector(
                 }
                 Spacer(Modifier.height(24.dp))
             }
-        }
-    }
-}
-
-@Composable
-private fun EmptyStateCTA(
-    text: String,
-    buttonText: String,
-    onClick: () -> Unit
-) {
-    val mc = MaterialTheme.magicColors
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.magicTypography.bodyMedium,
-            color = mc.textSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-        Button(
-            onClick = onClick,
-            colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(buttonText, color = mc.background)
         }
     }
 }
@@ -788,53 +762,6 @@ private fun TradeItemDraftRow(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun TradeBalanceIndicator(
-    proposerValue: Double,
-    receiverValue: Double,
-    currency: PreferredCurrency
-) {
-    val balance = proposerValue - receiverValue
-    val mc = MaterialTheme.magicColors
-    val color = when {
-        abs(balance) < 0.1 -> mc.textPrimary
-        balance > 0 -> mc.lifePositive
-        else -> mc.lifeNegative
-    }
-    
-    val balanceText = PriceFormatter.format(abs(balance), currency)
-    val indicatorText = when {
-        abs(balance) < 0.1 -> "Balanced"
-        balance > 0 -> "+$balanceText"
-        else -> "-$balanceText"
-    }
-
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = CircleShape,
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.2f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.CompareArrows,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = indicatorText,
-                style = MaterialTheme.magicTypography.labelMedium,
-                color = color,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }

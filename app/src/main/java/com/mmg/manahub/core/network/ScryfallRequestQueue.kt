@@ -19,18 +19,21 @@ import javax.inject.Singleton
 class ScryfallRequestQueue @Inject constructor() {
 
     private val lastRequestTime = AtomicLong(0L)
-    private val minDelayMs = 100L
     private val mutex = Mutex()
 
     suspend fun <T> execute(block: suspend () -> T): T {
         mutex.withLock {
             val now = System.currentTimeMillis()
             val elapsed = now - lastRequestTime.get()
-            if (elapsed < minDelayMs) {
-                delay(minDelayMs - elapsed)
+            if (elapsed < MIN_DELAY_MS) {
+                delay(MIN_DELAY_MS - elapsed)
             }
             lastRequestTime.set(System.currentTimeMillis())
         }
         return block()
+    }
+
+    companion object {
+        private const val MIN_DELAY_MS = 100L
     }
 }

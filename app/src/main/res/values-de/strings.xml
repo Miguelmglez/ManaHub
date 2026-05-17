@@ -141,12 +141,59 @@
     <string name="stats_refresh_success">%1$d Preise aktualisiert</string>
     <string name="stats_refresh_error">Fehler beim Preis-Update</string>
     <string name="stats_empty_collection">Füge Karten hinzu, um Statistiken zu sehen</string>
+
+    <!-- Statistiken-Tabs -->
+    <string name="stats_tab_collection">Sammlung</string>
+    <string name="stats_tab_games">Spiele</string>
+
+    <!-- KPIs des Spiele-Tabs -->
+    <string name="stats_kpi_total_games">Spiele gesamt</string>
+    <string name="stats_kpi_winrate">Siegquote</string>
+    <string name="stats_kpi_avg_duration">Ø Dauer</string>
+    <string name="stats_kpi_favorite_mode">Lieblingsmodus</string>
+    <string name="stats_pending_surveys">%d ausstehende Umfrage(n)</string>
+
+    <!-- Abschnitte des Spiele-Tabs -->
+    <string name="stats_section_deck_performance">Deck-Performance</string>
+    <string name="stats_section_history">Verlauf</string>
+    <string name="stats_empty_decks_subtitle">Verknüpfe Spiele mit Decks in der Nachspiel-Umfrage, um Deck-Statistiken zu sehen</string>
+    <string name="stats_empty_history_subtitle">Aufgezeichnete Spielsitzungen erscheinen hier</string>
+
+    <!-- Umfrage-Status -->
+    <string name="survey_pending">Umfrage ausstehend</string>
+    <string name="survey_partial">Umfrage unvollständig</string>
+    <string name="survey_completed">Umfrage abgeschlossen</string>
+    <string name="survey_skipped">Umfrage übersprungen</string>
+
+    <!-- Spiel löschen -->
+    <string name="delete_game_title">Spiel löschen?</string>
+    <string name="delete_game_message_1">Dieses Spiel löschen? Die verknüpfte Umfrage wird ebenfalls entfernt.</string>
+    <string name="delete_game_final_title">Bist du absolut sicher?</string>
+    <string name="delete_game_final_message">Diese Aktion kann nicht rückgängig gemacht werden.</string>
+    <string name="delete_game_toast">Spiel gelöscht</string>
+
+    <!-- Spielaktionen -->
+    <string name="action_review_survey">Umfrage überprüfen</string>
+    <string name="action_delete_game">Spiel löschen</string>
+
     <string name="stats_currency_usd">USD</string>
     <string name="stats_currency_eur">EUR</string>
     <string name="stats_rarity_common">Common</string>
     <string name="stats_rarity_uncommon">Uncommon</string>
     <string name="stats_rarity_rare">Rare</string>
     <string name="stats_rarity_mythic">Mythic</string>
+
+    <!-- Deck stats card (DeckStatsCard) -->
+    <string name="deck_stats_title">Deck-Leistung</string>
+    <string name="deck_stats_winrate">%1$d%% Siegrate</string>
+    <string name="deck_stats_games_count">%1$d Spiele</string>
+    <string name="deck_stats_avg_duration">Avg %1$s</string>
+    <string name="deck_stats_top_cards">Wirkungsstärkste Karten</string>
+    <string name="deck_stats_weakest_cards">Austausch empfohlen</string>
+    <string name="deck_stats_recent_games">Letzte Spiele</string>
+    <string name="deck_stats_replace_button">Ersetzen</string>
+    <string name="deck_stats_no_data">Noch keine Spieldaten für dieses Deck</string>
+    <string name="deck_stats_card_appearances">%1$dx</string>
 
     <!-- DECK LIST SCREEN -->
     <string name="decklist_title">Decks</string>
@@ -396,6 +443,51 @@
     <string name="survey_hand_3">Spielbare Hand</string>
     <string name="survey_hand_4">Gute Hand</string>
     <string name="survey_hand_5">Perfekte Hand</string>
+
+    <!-- Survey v2 — Panels und neue Frage-/Antwort-Keys -->
+    <string name="survey_panel_mood">Stimmung</string>
+    <string name="survey_panel_fundamentals">Grundlagen</string>
+    <string name="survey_panel_cards">Karteneinfluss</string>
+    <string name="survey_panel_summary">Zusammenfassung</string>
+
+    <string name="survey_q_decisive_moment">Was war der entscheidende Moment?</string>
+    <string name="survey_a_key_turn">Schlüsselzug</string>
+    <string name="survey_a_top_deck">Top-Deck</string>
+    <string name="survey_a_rival_error">Fehler des Gegners</string>
+    <string name="survey_a_unclear">Unklar</string>
+
+    <string name="survey_q_matchup_difficulty">Wie schwer war das Matchup?</string>
+
+    <string name="survey_q_result_context_win">Wie hat sich der Sieg angefühlt?</string>
+    <string name="survey_q_result_context_loss">Was hat dich das Spiel gekostet?</string>
+
+    <string name="survey_q_card_impact">Hat eine Karte den Unterschied gemacht?</string>
+    <string name="survey_a_card_key">Schlüsselkarte</string>
+    <string name="survey_a_card_average">Durchschnittlich</string>
+    <string name="survey_a_card_weak">Schwach</string>
+
+    <string name="survey_action_later">Später</string>
+    <string name="survey_action_save_finish">Speichern &amp; abschließen</string>
+    <string name="survey_action_save_changes">Änderungen speichern</string>
+    <string name="survey_action_add_card">Karte hinzufügen</string>
+
+    <string name="survey_recap_win">Sieg</string>
+    <string name="survey_recap_loss">Niederlage</string>
+    <string name="survey_recap_turns">%1$d Züge</string>
+    <string name="survey_recap_vs">vs %1$s</string>
+    <string name="survey_recap_commander_kill">Sieg durch Commander-Schaden</string>
+
+    <string name="survey_deck_picker_title">Mit welchem Deck hast du gespielt?</string>
+    <string name="survey_deck_picker_none">Kein Deck</string>
+    <string name="survey_deck_associated">Deck: %1$s</string>
+
+    <string name="survey_reviewing_title">Spiel wird überprüft</string>
+
+    <string name="survey_skipped_count">%1$d übersprungen — das ist in Ordnung</string>
+    <string name="survey_saved_toast">Spielbewertung gespeichert</string>
+    <string name="survey_no_deck_prompt">Verknüpfe dieses Spiel mit einem deiner Decks</string>
+    <string name="survey_no_deck_notice">Kein Deck verknüpft — Karteneinfluss-Tracking nicht verfügbar</string>
+    <string name="survey_duration_min">%1$d Min.</string>
 
     <!-- TOURNAMENT SCREEN -->
     <string name="tournament_setup_title">Neues Turnier</string>

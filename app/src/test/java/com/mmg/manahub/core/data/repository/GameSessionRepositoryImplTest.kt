@@ -4,11 +4,11 @@ import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.ui.theme.PlayerTheme
-import com.mmg.manahub.feature.game.model.EliminationReason
-import com.mmg.manahub.feature.game.model.GameMode
-import com.mmg.manahub.feature.game.model.GameResult
-import com.mmg.manahub.feature.game.model.Player
-import com.mmg.manahub.feature.game.model.PlayerResult
+import com.mmg.manahub.feature.game.domain.model.EliminationReason
+import com.mmg.manahub.feature.game.domain.model.GameMode
+import com.mmg.manahub.feature.game.domain.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.Player
+import com.mmg.manahub.feature.game.domain.model.PlayerResult
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

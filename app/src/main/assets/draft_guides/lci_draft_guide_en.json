@@ -1,0 +1,2078 @@
+{
+  "metadata": {
+    "set_name": "The Lost Caverns of Ixalan",
+    "set_code": "LCI",
+    "source_url": "https://draftsim.com/mtg-lci-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "October 3, 2024"
+  },
+  "set_overview": {
+    "summary": "The Lost Caverns of Ixalan emphasizes tempo-driven gameplay. This is a rough format to fall behind in due to efficient creatures and evasive threats. The format values early board control and punishes slow starts.",
+    "color_ranking": [
+      "{W} White",
+      "{U} Blue",
+      "{R} Red",
+      "{G} Green",
+      "{B} Black"
+    ],
+    "color_notes": {
+      "{W} White": "Best color. Efficient cheap creatures and strong common removal.",
+      "{U} Blue": "Close second — Waterwind Scout is the format's top common.",
+      "{R} Red": "Strong efficient creatures and flexible removal like Abrade.",
+      "{G} Green": "Good value creatures but slower early game.",
+      "{B} Black": "Weakest color with lackluster creatures despite decent removal."
+    },
+    "key_gameplay_notes": [
+      "Format prioritizes efficient tempo plays and punishes stumbles.",
+      "Most decks want 16-17 lands; 17-18 with taplands, higher curve, draw spells, or mana sinks.",
+      "Even controlling decks need plenty of cheap 1-3 drops.",
+      "Aim for one of the top-four archetypes (Azorius Artifacts, Izzet Pirates, Gruul Dinos, Boros Midrange)."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Descend",
+      "summary": "Threshold mechanic that triggers when 4 or more cards are in your graveyard.",
+      "performance": "Featured prominently in Dimir, Golgari, and Rakdos strategies — strongest in Dimir.",
+      "key_examples": [
+        {
+          "name": "Deathcap Marionette",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 126,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ccc9d22c-dfce-4136-aed8-a5fe9bb852f2",
+          "scryfall_uri": "https://scryfall.com/card/lci/100/deathcap-marionette",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Fungus",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113",
+            "normal": "https://cards.scryfall.io/normal/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113"
+          },
+          "set": "lci",
+          "set_name": "The Lost Caverns of Ixalan"
+        },
+        {
+          "name": "Another Chance",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 128,
+          "tier_rating": "C",
+          "note": null,
+          "id": "20d9eb9f-2fcc-49f0-99c1-bad748239466",
+          "scryfall_uri": "https://scryfall.com/card/lci/90/another-chance",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/20d9eb9f-2fcc-49f0-99c1-bad748239466.jpg?1699044076",
+            "normal": "https://cards.scryfall.io/normal/front/2/0/20d9eb9f-2fcc-49f0-99c1-bad748239466.jpg?1699044076"
+          },
+          "set": "lci",
+          "set_name": "The Lost Caverns of Ixalan"
+        }
+      ]
+    },
+    {
+      "name": "Explore",
+      "summary": "Reveal the top card; if it's a land, put it in hand, otherwise put a +1/+1 counter on the creature and choose whether to keep the card on top or in the graveyard.",
+      "performance": "Card-draw engine used in Simic decks.",
+      "key_examples": [
+        {
+          "name": "Pathfinding Axejaw",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 60,
+          "tier_rating": "B",
+          "note": null,
+          "id": "9f619075-ca5d-4e09-bd84-31e6b61eaa7e",
+          "scryfall_uri": "https://scryfall.com/card/lci/206/pathfinding-axejaw",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Dinosaur",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470",
+            "normal": "https://cards.scryfall.io/normal/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470"
+          },
+          "set": "lci",
+          "set_name": "The Lost Caverns of Ixalan"
+        },
+        {
+          "name": "Merfolk Cave-Diver",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 201,
+          "tier_rating": "D",
+          "note": null,
+          "id": "6e0fe81c-b8ef-49ff-8743-f03d0220cb9e",
+          "scryfall_uri": "https://scryfall.com/card/lci/65/merfolk-cave-diver",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Merfolk Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e0fe81c-b8ef-49ff-8743-f03d0220cb9e.jpg?1699043829",
+            "normal": "https://cards.scryfall.io/normal/front/6/e/6e0fe81c-b8ef-49ff-8743-f03d0220cb9e.jpg?1699043829"
+          },
+          "set": "lci",
+          "set_name": "The Lost Caverns of Ixalan"
+        }
+      ]
+    },
+    {
+      "name": "Craft",
+      "summary": "Artifact-assembly mechanic that rewards artifact synergy. Anchors Azorius Artifacts.",
+      "performance": "Engine of Azorius Artifacts/Fliers.",
+      "key_examples": []
+    },
+    {
+      "name": "Discover",
+      "summary": "Fixed cascade mechanic — cast a 2-3 mana spell for free. Featured on Etali's Favor and others.",
+      "performance": "Strong tempo with modest setup.",
+      "key_examples": [
+        {
+          "name": "Etali's Favor",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 65,
+          "tier_rating": "B",
+          "note": null,
+          "id": "6d4075a8-c15d-4078-bf4b-0f85c03fecec",
+          "scryfall_uri": "https://scryfall.com/card/lci/149/etalis-favor",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d4075a8-c15d-4078-bf4b-0f85c03fecec.jpg?1699044282",
+            "normal": "https://cards.scryfall.io/normal/front/6/d/6d4075a8-c15d-4078-bf4b-0f85c03fecec.jpg?1699044282"
+          },
+          "set": "lci",
+          "set_name": "The Lost Caverns of Ixalan"
+        }
+      ]
+    },
+    {
+      "name": "Cycling",
+      "summary": "Utility mechanic enabling card cycling and self-mill strategies.",
+      "performance": "Smooths draws and feeds Descend.",
+      "key_examples": []
+    },
+    {
+      "name": "Sacrifice",
+      "summary": "Central to Orzhov's incremental value plan.",
+      "performance": "Anchors WB Sacrifice.",
+      "key_examples": []
+    },
+    {
+      "name": "Caves",
+      "summary": "Subtheme — dedicating to caves requires 7+ to enable payoffs. Sinuous Benthisaur is splashable with just 3 caves.",
+      "performance": "Niche build-around.",
+      "key_examples": [
+        {
+          "name": "Sinuous Benthisaur",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 152,
+          "tier_rating": "C",
+          "note": null,
+          "id": "7a58639c-001f-4cb1-89fd-0a0967b86977",
+          "scryfall_uri": "https://scryfall.com/card/lci/76/sinuous-benthisaur",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Dinosaur",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a58639c-001f-4cb1-89fd-0a0967b86977.jpg?1699043930",
+            "normal": "https://cards.scryfall.io/normal/front/7/a/7a58639c-001f-4cb1-89fd-0a0967b86977.jpg?1699043930"
+          },
+          "set": "lci",
+          "set_name": "The Lost Caverns of Ixalan"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Artifacts / Fliers",
+        "tier": "Tier 1 — Top 4 Archetype",
+        "strategy": "Cheap flying creatures paired with artifact synergies.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Oltec Cloud Guard",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 42,
+            "tier_rating": "A",
+            "note": null,
+            "id": "02d68a38-2e0b-401b-b67d-a55e2af5b18d",
+            "scryfall_uri": "https://scryfall.com/card/lci/28/oltec-cloud-guard",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02d68a38-2e0b-401b-b67d-a55e2af5b18d.jpg?1699043317",
+              "normal": "https://cards.scryfall.io/normal/front/0/2/02d68a38-2e0b-401b-b67d-a55e2af5b18d.jpg?1699043317"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Clay-Fired Bricks",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 33,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8aece300-656b-4e0d-a45f-aa7feaff0a4e",
+            "scryfall_uri": "https://scryfall.com/card/lci/6/clay-fired-bricks-cosmium-kiln",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Artifact // Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8aece300-656b-4e0d-a45f-aa7feaff0a4e.jpg?1699125724",
+              "normal": "https://cards.scryfall.io/normal/front/8/a/8aece300-656b-4e0d-a45f-aa7feaff0a4e.jpg?1699125724"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Spring-Loaded Sawblades",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 35,
+            "tier_rating": "A",
+            "note": null,
+            "id": "24417388-f2bb-4783-bdce-264774531838",
+            "scryfall_uri": "https://scryfall.com/card/lci/36/spring-loaded-sawblades-bladewheel-chariot",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Artifact // Artifact — Vehicle",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24417388-f2bb-4783-bdce-264774531838.jpg?1699043409",
+              "normal": "https://cards.scryfall.io/normal/front/2/4/24417388-f2bb-4783-bdce-264774531838.jpg?1699043409"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Lodestone Needle",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 55,
+            "tier_rating": "B",
+            "note": null,
+            "id": "dedd7a22-92e2-41fd-aa80-944c69653a5e",
+            "scryfall_uri": "https://scryfall.com/card/lci/62/lodestone-needle-guidestone-compass",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Artifact // Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/dedd7a22-92e2-41fd-aa80-944c69653a5e.jpg?1699043804",
+              "normal": "https://cards.scryfall.io/normal/front/d/e/dedd7a22-92e2-41fd-aa80-944c69653a5e.jpg?1699043804"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Braided Net",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 105,
+            "tier_rating": "B",
+            "note": null,
+            "id": "68a6ede0-6d57-4e29-9e3b-3569ab7f0bcd",
+            "scryfall_uri": "https://scryfall.com/card/lci/47/braided-net-braided-quipu",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Artifact // Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/68a6ede0-6d57-4e29-9e3b-3569ab7f0bcd.jpg?1699120209",
+              "normal": "https://cards.scryfall.io/normal/front/6/8/68a6ede0-6d57-4e29-9e3b-3569ab7f0bcd.jpg?1699120209"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Unstable Glyphbridge",
+            "color": "W",
+            "rarity": "Rare",
+            "pick_order_rank": 7,
+            "tier_rating": "S",
+            "note": null,
+            "id": "d70f48e7-582c-4dd2-a64e-6fd03fa6b77e",
+            "scryfall_uri": "https://scryfall.com/card/lci/41/unstable-glyphbridge-sandswirl-wanderglyph",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Artifact // Artifact Creature — Golem",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/7/d70f48e7-582c-4dd2-a64e-6fd03fa6b77e.jpg?1699043483",
+              "normal": "https://cards.scryfall.io/normal/front/d/7/d70f48e7-582c-4dd2-a64e-6fd03fa6b77e.jpg?1699043483"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Pirates",
+        "tier": "Tier 1 — Top 4 Archetype",
+        "strategy": "Aggressive tempo deck with cheap creatures, evasion, and haste.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Waterwind Scout",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 43,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8a7738fb-0a1b-4010-b8c0-e1129739c765",
+            "scryfall_uri": "https://scryfall.com/card/lci/84/waterwind-scout",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Merfolk Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8a7738fb-0a1b-4010-b8c0-e1129739c765.jpg?1699044008",
+              "normal": "https://cards.scryfall.io/normal/front/8/a/8a7738fb-0a1b-4010-b8c0-e1129739c765.jpg?1699044008"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Goblin Tomb Raider",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 80,
+            "tier_rating": "B",
+            "note": null,
+            "id": "018160fe-f602-43f5-8495-241a08eaa69c",
+            "scryfall_uri": "https://scryfall.com/card/lci/151/goblin-tomb-raider",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin Pirate",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/018160fe-f602-43f5-8495-241a08eaa69c.jpg?1699044289",
+              "normal": "https://cards.scryfall.io/normal/front/0/1/018160fe-f602-43f5-8495-241a08eaa69c.jpg?1699044289"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Plundering Pirate",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 113,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5bb2552f-8370-4931-83e1-93706d51413a",
+            "scryfall_uri": "https://scryfall.com/card/lci/160/plundering-pirate",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Orc Pirate",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5bb2552f-8370-4931-83e1-93706d51413a.jpg?1699044322",
+              "normal": "https://cards.scryfall.io/normal/front/5/b/5bb2552f-8370-4931-83e1-93706d51413a.jpg?1699044322"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Captain Storm, Cosmium Raider",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 38,
+            "tier_rating": "A",
+            "note": null,
+            "id": "14c65f5a-10bd-4f9b-b816-46c2240b11ff",
+            "scryfall_uri": "https://scryfall.com/card/lci/227/captain-storm-cosmium-raider",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Pirate",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/14c65f5a-10bd-4f9b-b816-46c2240b11ff.jpg?1699044532",
+              "normal": "https://cards.scryfall.io/normal/front/1/4/14c65f5a-10bd-4f9b-b816-46c2240b11ff.jpg?1699044532"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Zoetic Glyph",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 13,
+            "tier_rating": "S",
+            "note": null,
+            "id": "a2f498ac-179e-4055-9b83-97bcc5ab1bb9",
+            "scryfall_uri": "https://scryfall.com/card/lci/86/zoetic-glyph",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a2f498ac-179e-4055-9b83-97bcc5ab1bb9.jpg?1699044026",
+              "normal": "https://cards.scryfall.io/normal/front/a/2/a2f498ac-179e-4055-9b83-97bcc5ab1bb9.jpg?1699044026"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Staunch Crewmate",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 32,
+            "tier_rating": "A",
+            "note": null,
+            "id": "143e9845-8a11-4fc4-b116-29a929985146",
+            "scryfall_uri": "https://scryfall.com/card/lci/79/staunch-crewmate",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Pirate",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/143e9845-8a11-4fc4-b116-29a929985146.jpg?1699043955",
+              "normal": "https://cards.scryfall.io/normal/front/1/4/143e9845-8a11-4fc4-b116-29a929985146.jpg?1699043955"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Dowsing Device",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 213,
+            "tier_rating": "D",
+            "note": null,
+            "id": "3d715e9f-223d-462e-8ce3-eebbaf1cd021",
+            "scryfall_uri": "https://scryfall.com/card/lci/146/dowsing-device-geode-grotto",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Artifact // Land — Cave",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d715e9f-223d-462e-8ce3-eebbaf1cd021.jpg?1699044274",
+              "normal": "https://cards.scryfall.io/normal/front/3/d/3d715e9f-223d-462e-8ce3-eebbaf1cd021.jpg?1699044274"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Dinosaurs",
+        "tier": "Tier 1 — Top 4 Archetype",
+        "strategy": "Ramp and trade early, then deploy large threats.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Pathfinding Axejaw",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9f619075-ca5d-4e09-bd84-31e6b61eaa7e",
+            "scryfall_uri": "https://scryfall.com/card/lci/206/pathfinding-axejaw",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Dinosaur",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470",
+              "normal": "https://cards.scryfall.io/normal/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Burning Sun Cavalry",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 161,
+            "tier_rating": "C",
+            "note": null,
+            "id": "0c491ac0-4752-47a7-967e-456b6e4245de",
+            "scryfall_uri": "https://scryfall.com/card/lci/138/burning-sun-cavalry",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0c491ac0-4752-47a7-967e-456b6e4245de.jpg?1699044244",
+              "normal": "https://cards.scryfall.io/normal/front/0/c/0c491ac0-4752-47a7-967e-456b6e4245de.jpg?1699044244"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Armored Kincaller",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 97,
+            "tier_rating": "B",
+            "note": null,
+            "id": "b76a46a1-a63e-460a-98c5-699dd1c827aa",
+            "scryfall_uri": "https://scryfall.com/card/lci/174/armored-kincaller",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Dinosaur",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b76a46a1-a63e-460a-98c5-699dd1c827aa.jpg?1699044365",
+              "normal": "https://cards.scryfall.io/normal/front/b/7/b76a46a1-a63e-460a-98c5-699dd1c827aa.jpg?1699044365"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Itzquinth, Firstborn of Gishath",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 29,
+            "tier_rating": "S",
+            "note": "Single best signpost uncommon.",
+            "id": "7112c366-b36a-4bc8-aa64-6bad16bebc39",
+            "scryfall_uri": "https://scryfall.com/card/lci/230/itzquinth-firstborn-of-gishath",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Dinosaur",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/7112c366-b36a-4bc8-aa64-6bad16bebc39.jpg?1699044540",
+              "normal": "https://cards.scryfall.io/normal/front/7/1/7112c366-b36a-4bc8-aa64-6bad16bebc39.jpg?1699044540"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Midrange",
+        "tier": "Tier 1 — Top 4 Archetype",
+        "strategy": "Build around \"tap untapped permanents\" effects.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Sunshot Militia",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 122,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d3114f5c-21e9-43c3-abe3-3cf1da20916f",
+            "scryfall_uri": "https://scryfall.com/card/lci/168/sunshot-militia",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d3114f5c-21e9-43c3-abe3-3cf1da20916f.jpg?1699044348",
+              "normal": "https://cards.scryfall.io/normal/front/d/3/d3114f5c-21e9-43c3-abe3-3cf1da20916f.jpg?1699044348"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Tinker's Tote",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "8321857e-7977-46dd-8357-d732312e5261",
+            "scryfall_uri": "https://scryfall.com/card/lci/40/tinkers-tote",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/8321857e-7977-46dd-8357-d732312e5261.jpg?1699043462",
+              "normal": "https://cards.scryfall.io/normal/front/8/3/8321857e-7977-46dd-8357-d732312e5261.jpg?1699043462"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Adaptive Gemguard",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 179,
+            "tier_rating": "C",
+            "note": null,
+            "id": "83c91e24-b7e8-4040-80cb-d1b375002c10",
+            "scryfall_uri": "https://scryfall.com/card/lci/3/adaptive-gemguard",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Artifact Creature — Gnome",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/83c91e24-b7e8-4040-80cb-d1b375002c10.jpg?1766123403",
+              "normal": "https://cards.scryfall.io/normal/front/8/3/83c91e24-b7e8-4040-80cb-d1b375002c10.jpg?1766123403"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Warden of the Inner Sky",
+            "color": "W",
+            "rarity": "Rare",
+            "pick_order_rank": 15,
+            "tier_rating": "S",
+            "note": null,
+            "id": "549fd992-ed37-431d-97cb-9ca017db1d47",
+            "scryfall_uri": "https://scryfall.com/card/lci/43/warden-of-the-inner-sky",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/549fd992-ed37-431d-97cb-9ca017db1d47.jpg?1699043501",
+              "normal": "https://cards.scryfall.io/normal/front/5/4/549fd992-ed37-431d-97cb-9ca017db1d47.jpg?1699043501"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Thousand Moons Smithy",
+            "color": "W",
+            "rarity": "Rare",
+            "pick_order_rank": 19,
+            "tier_rating": "S",
+            "note": null,
+            "id": "4a6bec46-1acd-4726-b8d9-3045ac6a2ea2",
+            "scryfall_uri": "https://scryfall.com/card/lci/39/thousand-moons-smithy-barracks-of-the-thousand",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Legendary Artifact // Legendary Artifact Land",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/a/4a6bec46-1acd-4726-b8d9-3045ac6a2ea2.jpg?1739655142",
+              "normal": "https://cards.scryfall.io/normal/front/4/a/4a6bec46-1acd-4726-b8d9-3045ac6a2ea2.jpg?1739655142"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Caparocti Sunborn",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 109,
+            "tier_rating": "B",
+            "note": null,
+            "id": "8ea82964-fd9c-48e3-962f-94954476b31f",
+            "scryfall_uri": "https://scryfall.com/card/lci/226/caparocti-sunborn",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8ea82964-fd9c-48e3-962f-94954476b31f.jpg?1699044531",
+              "normal": "https://cards.scryfall.io/normal/front/8/e/8ea82964-fd9c-48e3-962f-94954476b31f.jpg?1699044531"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Aggro",
+        "tier": "Tier 2 — Viable",
+        "strategy": "Straightforward creature-focused beatdown.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Ironpaw Aspirant",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 129,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f70689a0-ac69-4052-84fc-9055e9e1c54b",
+            "scryfall_uri": "https://scryfall.com/card/lci/18/ironpaw-aspirant",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Cat Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f70689a0-ac69-4052-84fc-9055e9e1c54b.jpg?1699043222",
+              "normal": "https://cards.scryfall.io/normal/front/f/7/f70689a0-ac69-4052-84fc-9055e9e1c54b.jpg?1699043222"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Staggering Size",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 78,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e34c4946-6c21-4ae1-9595-35933d38da52",
+            "scryfall_uri": "https://scryfall.com/card/lci/214/staggering-size",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e34c4946-6c21-4ae1-9595-35933d38da52.jpg?1699044491",
+              "normal": "https://cards.scryfall.io/normal/front/e/3/e34c4946-6c21-4ae1-9595-35933d38da52.jpg?1699044491"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Huatli's Final Strike",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 77,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56",
+            "scryfall_uri": "https://scryfall.com/card/lci/190/huatlis-final-strike",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56.jpg?1699044417",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56.jpg?1699044417"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Kutzil, Malamet Exemplar",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 110,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c9f88a40-a6ed-4c1f-a309-011aca1acddd",
+            "scryfall_uri": "https://scryfall.com/card/lci/232/kutzil-malamet-exemplar",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Cat Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/9/c9f88a40-a6ed-4c1f-a309-011aca1acddd.jpg?1699044549",
+              "normal": "https://cards.scryfall.io/normal/front/c/9/c9f88a40-a6ed-4c1f-a309-011aca1acddd.jpg?1699044549"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Sovereign Okinec Ahau",
+            "color": "WG",
+            "rarity": "Mythic",
+            "pick_order_rank": 154,
+            "tier_rating": "C",
+            "note": null,
+            "id": "70c75aa7-e2f9-4a69-8086-c982019ca714",
+            "scryfall_uri": "https://scryfall.com/card/lci/240/sovereign-okinec-ahau",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Cat Noble",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70c75aa7-e2f9-4a69-8086-c982019ca714.jpg?1699044573",
+              "normal": "https://cards.scryfall.io/normal/front/7/0/70c75aa7-e2f9-4a69-8086-c982019ca714.jpg?1699044573"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Explore",
+        "tier": "Tier 2 — Viable",
+        "strategy": "Midrange with card advantage through the explore mechanic.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Pathfinding Axejaw",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9f619075-ca5d-4e09-bd84-31e6b61eaa7e",
+            "scryfall_uri": "https://scryfall.com/card/lci/206/pathfinding-axejaw",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Dinosaur",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470",
+              "normal": "https://cards.scryfall.io/normal/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Huatli's Final Strike",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 77,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56",
+            "scryfall_uri": "https://scryfall.com/card/lci/190/huatlis-final-strike",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56.jpg?1699044417",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56.jpg?1699044417"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Merfolk Cave-Diver",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 201,
+            "tier_rating": "D",
+            "note": null,
+            "id": "6e0fe81c-b8ef-49ff-8743-f03d0220cb9e",
+            "scryfall_uri": "https://scryfall.com/card/lci/65/merfolk-cave-diver",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Merfolk Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e0fe81c-b8ef-49ff-8743-f03d0220cb9e.jpg?1699043829",
+              "normal": "https://cards.scryfall.io/normal/front/6/e/6e0fe81c-b8ef-49ff-8743-f03d0220cb9e.jpg?1699043829"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Nicanzil, Current Conductor",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 214,
+            "tier_rating": "D",
+            "note": null,
+            "id": "5e6f4aba-3500-4fb7-ab78-02f63c03778a",
+            "scryfall_uri": "https://scryfall.com/card/lci/236/nicanzil-current-conductor",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Merfolk Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/e/5e6f4aba-3500-4fb7-ab78-02f63c03778a.jpg?1699044562",
+              "normal": "https://cards.scryfall.io/normal/front/5/e/5e6f4aba-3500-4fb7-ab78-02f63c03778a.jpg?1699044562"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Descend",
+        "tier": "Tier 2 — Viable",
+        "strategy": "Self-mill strategy around Descend. Best payoffs are rares (Wail of the Forgotten, The Ancient One, The Everflowing Well).",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Waterwind Scout",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 43,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8a7738fb-0a1b-4010-b8c0-e1129739c765",
+            "scryfall_uri": "https://scryfall.com/card/lci/84/waterwind-scout",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Merfolk Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8a7738fb-0a1b-4010-b8c0-e1129739c765.jpg?1699044008",
+              "normal": "https://cards.scryfall.io/normal/front/8/a/8a7738fb-0a1b-4010-b8c0-e1129739c765.jpg?1699044008"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Join the Dead",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 125,
+            "tier_rating": "C",
+            "note": null,
+            "id": "b5bf6c25-a7d7-40b6-aa19-f852d348967f",
+            "scryfall_uri": "https://scryfall.com/card/lci/110/join-the-dead",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5bf6c25-a7d7-40b6-aa19-f852d348967f.jpg?1699044147",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b5bf6c25-a7d7-40b6-aa19-f852d348967f.jpg?1699044147"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Deathcap Marionette",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 126,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ccc9d22c-dfce-4136-aed8-a5fe9bb852f2",
+            "scryfall_uri": "https://scryfall.com/card/lci/100/deathcap-marionette",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Fungus",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113",
+              "normal": "https://cards.scryfall.io/normal/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Another Chance",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 128,
+            "tier_rating": "C",
+            "note": null,
+            "id": "20d9eb9f-2fcc-49f0-99c1-bad748239466",
+            "scryfall_uri": "https://scryfall.com/card/lci/90/another-chance",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/20d9eb9f-2fcc-49f0-99c1-bad748239466.jpg?1699044076",
+              "normal": "https://cards.scryfall.io/normal/front/2/0/20d9eb9f-2fcc-49f0-99c1-bad748239466.jpg?1699044076"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Uchbenbak, the Great Mistake",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 181,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a062202c-f9fb-4dd6-989a-c3083644f1c0",
+            "scryfall_uri": "https://scryfall.com/card/lci/242/uchbenbak-the-great-mistake",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Skeleton Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/0/a062202c-f9fb-4dd6-989a-c3083644f1c0.jpg?1699044578",
+              "normal": "https://cards.scryfall.io/normal/front/a/0/a062202c-f9fb-4dd6-989a-c3083644f1c0.jpg?1699044578"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Wail of the Forgotten",
+            "color": "UB",
+            "rarity": "Rare",
+            "pick_order_rank": 112,
+            "tier_rating": "B",
+            "note": null,
+            "id": "67108256-b7da-44bd-9639-4264931d348f",
+            "scryfall_uri": "https://scryfall.com/card/lci/244/wail-of-the-forgotten",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/67108256-b7da-44bd-9639-4264931d348f.jpg?1699044584",
+              "normal": "https://cards.scryfall.io/normal/front/6/7/67108256-b7da-44bd-9639-4264931d348f.jpg?1699044584"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "The Ancient One",
+            "color": "UB",
+            "rarity": "Mythic",
+            "pick_order_rank": 75,
+            "tier_rating": "B",
+            "note": null,
+            "id": "66dd43d7-76a7-46ea-b431-097fcea417af",
+            "scryfall_uri": "https://scryfall.com/card/lci/222/the-ancient-one",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Spirit God",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66dd43d7-76a7-46ea-b431-097fcea417af.jpg?1699044521",
+              "normal": "https://cards.scryfall.io/normal/front/6/6/66dd43d7-76a7-46ea-b431-097fcea417af.jpg?1699044521"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "The Everflowing Well",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 48,
+            "tier_rating": "A",
+            "note": null,
+            "id": "bf573fb7-fa6c-4df7-8e5e-1e071585361e",
+            "scryfall_uri": "https://scryfall.com/card/lci/56/the-everflowing-well-the-myriad-pools",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Legendary Artifact // Legendary Artifact Land",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/f/bf573fb7-fa6c-4df7-8e5e-1e071585361e.jpg?1699043648",
+              "normal": "https://cards.scryfall.io/normal/front/b/f/bf573fb7-fa6c-4df7-8e5e-1e071585361e.jpg?1699043648"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Descend",
+        "tier": "Tier 2 — Viable",
+        "strategy": "Descend-focused with green's limited payoffs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Another Chance",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 128,
+            "tier_rating": "C",
+            "note": null,
+            "id": "20d9eb9f-2fcc-49f0-99c1-bad748239466",
+            "scryfall_uri": "https://scryfall.com/card/lci/90/another-chance",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/20d9eb9f-2fcc-49f0-99c1-bad748239466.jpg?1699044076",
+              "normal": "https://cards.scryfall.io/normal/front/2/0/20d9eb9f-2fcc-49f0-99c1-bad748239466.jpg?1699044076"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Deathcap Marionette",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 126,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ccc9d22c-dfce-4136-aed8-a5fe9bb852f2",
+            "scryfall_uri": "https://scryfall.com/card/lci/100/deathcap-marionette",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Fungus",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113",
+              "normal": "https://cards.scryfall.io/normal/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "In the Presence of Ages",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 174,
+            "tier_rating": "C",
+            "note": null,
+            "id": "97b1be22-3177-49af-bb06-42497d717c21",
+            "scryfall_uri": "https://scryfall.com/card/lci/192/in-the-presence-of-ages",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97b1be22-3177-49af-bb06-42497d717c21.jpg?1699044424",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/97b1be22-3177-49af-bb06-42497d717c21.jpg?1699044424"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Akawalli, the Seething Tower",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 158,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3ee62dd1-97d0-4e5d-8937-26c9e51e9414",
+            "scryfall_uri": "https://scryfall.com/card/lci/220/akawalli-the-seething-tower",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Legendary Creature — Fungus",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/e/3ee62dd1-97d0-4e5d-8937-26c9e51e9414.jpg?1699044515",
+              "normal": "https://cards.scryfall.io/normal/front/3/e/3ee62dd1-97d0-4e5d-8937-26c9e51e9414.jpg?1699044515"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Sacrifice",
+        "tier": "Tier 2 — Viable",
+        "strategy": "Build incremental advantage through sacrifice outlets.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Tithing Blade",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 99,
+            "tier_rating": "B",
+            "note": null,
+            "id": "dbaa9a2d-e9fd-4746-a26c-f99ae731f024",
+            "scryfall_uri": "https://scryfall.com/card/lci/128/tithing-blade-consuming-sepulcher",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Artifact // Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1699049915",
+              "normal": "https://cards.scryfall.io/normal/front/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1699049915"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Skullcap Snail",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 155,
+            "tier_rating": "C",
+            "note": null,
+            "id": "0d96d019-5d80-468a-b891-e3e99346372a",
+            "scryfall_uri": "https://scryfall.com/card/lci/119/skullcap-snail",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Fungus Snail",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d96d019-5d80-468a-b891-e3e99346372a.jpg?1699044176",
+              "normal": "https://cards.scryfall.io/normal/front/0/d/0d96d019-5d80-468a-b891-e3e99346372a.jpg?1699044176"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Tinker's Tote",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "8321857e-7977-46dd-8357-d732312e5261",
+            "scryfall_uri": "https://scryfall.com/card/lci/40/tinkers-tote",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/8321857e-7977-46dd-8357-d732312e5261.jpg?1699043462",
+              "normal": "https://cards.scryfall.io/normal/front/8/3/8321857e-7977-46dd-8357-d732312e5261.jpg?1699043462"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Mephitic Draught",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 228,
+            "tier_rating": "D",
+            "note": null,
+            "id": "adcae196-dbcc-44d5-b700-c57b0b646483",
+            "scryfall_uri": "https://scryfall.com/card/lci/112/mephitic-draught",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/d/adcae196-dbcc-44d5-b700-c57b0b646483.jpg?1699044154",
+              "normal": "https://cards.scryfall.io/normal/front/a/d/adcae196-dbcc-44d5-b700-c57b0b646483.jpg?1699044154"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Bartolome del Presidio",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 223,
+            "tier_rating": "D",
+            "note": null,
+            "id": "690ccdc7-6c43-4902-9d11-2f07b7a36b11",
+            "scryfall_uri": "https://scryfall.com/card/lci/224/bartolom%C3%A9-del-presidio",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Vampire Knight",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/690ccdc7-6c43-4902-9d11-2f07b7a36b11.jpg?1699044523",
+              "normal": "https://cards.scryfall.io/normal/front/6/9/690ccdc7-6c43-4902-9d11-2f07b7a36b11.jpg?1699044523"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Vito, Fanatic of Aclazotz",
+            "color": "WB",
+            "rarity": "Mythic",
+            "pick_order_rank": 70,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c4fd9047-df91-4d82-be00-c623acae0f01",
+            "scryfall_uri": "https://scryfall.com/card/lci/243/vito-fanatic-of-aclazotz",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Vampire Demon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c4fd9047-df91-4d82-be00-c623acae0f01.jpg?1699044580",
+              "normal": "https://cards.scryfall.io/normal/front/c/4/c4fd9047-df91-4d82-be00-c623acae0f01.jpg?1699044580"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Tarrian's Journal",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 193,
+            "tier_rating": "D",
+            "note": null,
+            "id": "99255a66-b868-45fc-a2a9-0c89bd851b69",
+            "scryfall_uri": "https://scryfall.com/card/lci/126/tarrians-journal-the-tomb-of-aclazotz",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Legendary Artifact — Book // Legendary Land — Cave",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/9/99255a66-b868-45fc-a2a9-0c89bd851b69.jpg?1776203223",
+              "normal": "https://cards.scryfall.io/normal/front/9/9/99255a66-b868-45fc-a2a9-0c89bd851b69.jpg?1776203223"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Descend",
+        "tier": "Tier 3 — Weakest Archetype",
+        "strategy": "Triggers from descending actions, but lacks quality payoffs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Dead Weight",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 127,
+            "tier_rating": "C",
+            "note": null,
+            "id": "82e6b971-3f5b-47e7-8209-98d72ee781fc",
+            "scryfall_uri": "https://scryfall.com/card/lci/99/dead-weight",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/82e6b971-3f5b-47e7-8209-98d72ee781fc.jpg?1699044112",
+              "normal": "https://cards.scryfall.io/normal/front/8/2/82e6b971-3f5b-47e7-8209-98d72ee781fc.jpg?1699044112"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Fanatical Offering",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 143,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d896dd52-b134-4b55-ab91-ccb05ecc50f4",
+            "scryfall_uri": "https://scryfall.com/card/lci/105/fanatical-offering",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d896dd52-b134-4b55-ab91-ccb05ecc50f4.jpg?1699044130",
+              "normal": "https://cards.scryfall.io/normal/front/d/8/d896dd52-b134-4b55-ab91-ccb05ecc50f4.jpg?1699044130"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          },
+          {
+            "name": "Zoyowa Lava-Tongue",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 188,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c06f0ff2-d42f-4854-bbe5-4b022fb26d7d",
+            "scryfall_uri": "https://scryfall.com/card/lci/245/zoyowa-lava-tongue",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Goblin Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c06f0ff2-d42f-4854-bbe5-4b022fb26d7d.jpg?1699044586",
+              "normal": "https://cards.scryfall.io/normal/front/c/0/c06f0ff2-d42f-4854-bbe5-4b022fb26d7d.jpg?1699044586"
+            },
+            "set": "lci",
+            "set_name": "The Lost Caverns of Ixalan"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Oltec Cloud Guard",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 42,
+        "tier_rating": "A",
+        "note": null,
+        "id": "02d68a38-2e0b-401b-b67d-a55e2af5b18d",
+        "scryfall_uri": "https://scryfall.com/card/lci/28/oltec-cloud-guard",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02d68a38-2e0b-401b-b67d-a55e2af5b18d.jpg?1699043317",
+          "normal": "https://cards.scryfall.io/normal/front/0/2/02d68a38-2e0b-401b-b67d-a55e2af5b18d.jpg?1699043317"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Miner's Guidewing",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 41,
+        "tier_rating": "A",
+        "note": null,
+        "id": "9048cd9d-df3f-4705-a5f4-e5b09760c631",
+        "scryfall_uri": "https://scryfall.com/card/lci/24/miners-guidewing",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Bird",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/9048cd9d-df3f-4705-a5f4-e5b09760c631.jpg?1699043273",
+          "normal": "https://cards.scryfall.io/normal/front/9/0/9048cd9d-df3f-4705-a5f4-e5b09760c631.jpg?1699043273"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Petrify",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 61,
+        "tier_rating": "B",
+        "note": null,
+        "id": "bbc5f28f-6361-455f-ac82-260a70e59316",
+        "scryfall_uri": "https://scryfall.com/card/lci/30/petrify",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbc5f28f-6361-455f-ac82-260a70e59316.jpg?1699043345",
+          "normal": "https://cards.scryfall.io/normal/front/b/b/bbc5f28f-6361-455f-ac82-260a70e59316.jpg?1699043345"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Tinker's Tote",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 84,
+        "tier_rating": "B",
+        "note": null,
+        "id": "8321857e-7977-46dd-8357-d732312e5261",
+        "scryfall_uri": "https://scryfall.com/card/lci/40/tinkers-tote",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/8321857e-7977-46dd-8357-d732312e5261.jpg?1699043462",
+          "normal": "https://cards.scryfall.io/normal/front/8/3/8321857e-7977-46dd-8357-d732312e5261.jpg?1699043462"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Waterwind Scout",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 43,
+        "tier_rating": "A",
+        "note": "Best common in the format.",
+        "id": "8a7738fb-0a1b-4010-b8c0-e1129739c765",
+        "scryfall_uri": "https://scryfall.com/card/lci/84/waterwind-scout",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Merfolk Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8a7738fb-0a1b-4010-b8c0-e1129739c765.jpg?1699044008",
+          "normal": "https://cards.scryfall.io/normal/front/8/a/8a7738fb-0a1b-4010-b8c0-e1129739c765.jpg?1699044008"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Cogwork Wrestler",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 62,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a9d329ad-6b19-4aa7-a53f-38c7b76c4c96",
+        "scryfall_uri": "https://scryfall.com/card/lci/49/cogwork-wrestler",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Artifact Creature — Gnome",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9d329ad-6b19-4aa7-a53f-38c7b76c4c96.jpg?1699043571",
+          "normal": "https://cards.scryfall.io/normal/front/a/9/a9d329ad-6b19-4aa7-a53f-38c7b76c4c96.jpg?1699043571"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Oaken Siren",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 56,
+        "tier_rating": "B",
+        "note": null,
+        "id": "d7731ef5-da74-4436-8ee7-01c065cbefae",
+        "scryfall_uri": "https://scryfall.com/card/lci/66/oaken-siren",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Artifact Creature — Siren Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/7/d7731ef5-da74-4436-8ee7-01c065cbefae.jpg?1699043837",
+          "normal": "https://cards.scryfall.io/normal/front/d/7/d7731ef5-da74-4436-8ee7-01c065cbefae.jpg?1699043837"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Inverted Iceberg",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 63,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ac5e9a53-cc4f-4ced-8088-5a73d619eae3",
+        "scryfall_uri": "https://scryfall.com/card/lci/60/inverted-iceberg-iceberg-titan",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Artifact // Artifact Creature — Golem",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/ac5e9a53-cc4f-4ced-8088-5a73d619eae3.jpg?1699045157",
+          "normal": "https://cards.scryfall.io/normal/front/a/c/ac5e9a53-cc4f-4ced-8088-5a73d619eae3.jpg?1699045157"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Tithing Blade",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "B",
+        "note": null,
+        "id": "dbaa9a2d-e9fd-4746-a26c-f99ae731f024",
+        "scryfall_uri": "https://scryfall.com/card/lci/128/tithing-blade-consuming-sepulcher",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Artifact // Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1699049915",
+          "normal": "https://cards.scryfall.io/normal/front/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1699049915"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Fanatical Offering",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 143,
+        "tier_rating": "C",
+        "note": null,
+        "id": "d896dd52-b134-4b55-ab91-ccb05ecc50f4",
+        "scryfall_uri": "https://scryfall.com/card/lci/105/fanatical-offering",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d896dd52-b134-4b55-ab91-ccb05ecc50f4.jpg?1699044130",
+          "normal": "https://cards.scryfall.io/normal/front/d/8/d896dd52-b134-4b55-ab91-ccb05ecc50f4.jpg?1699044130"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Join the Dead",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 125,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b5bf6c25-a7d7-40b6-aa19-f852d348967f",
+        "scryfall_uri": "https://scryfall.com/card/lci/110/join-the-dead",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5bf6c25-a7d7-40b6-aa19-f852d348967f.jpg?1699044147",
+          "normal": "https://cards.scryfall.io/normal/front/b/5/b5bf6c25-a7d7-40b6-aa19-f852d348967f.jpg?1699044147"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Deathcap Marionette",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 126,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ccc9d22c-dfce-4136-aed8-a5fe9bb852f2",
+        "scryfall_uri": "https://scryfall.com/card/lci/100/deathcap-marionette",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Fungus",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113",
+          "normal": "https://cards.scryfall.io/normal/front/c/c/ccc9d22c-dfce-4136-aed8-a5fe9bb852f2.jpg?1699044113"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Etali's Favor",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 65,
+        "tier_rating": "B",
+        "note": null,
+        "id": "6d4075a8-c15d-4078-bf4b-0f85c03fecec",
+        "scryfall_uri": "https://scryfall.com/card/lci/149/etalis-favor",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d4075a8-c15d-4078-bf4b-0f85c03fecec.jpg?1699044282",
+          "normal": "https://cards.scryfall.io/normal/front/6/d/6d4075a8-c15d-4078-bf4b-0f85c03fecec.jpg?1699044282"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Goblin Tomb Raider",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 80,
+        "tier_rating": "B",
+        "note": null,
+        "id": "018160fe-f602-43f5-8495-241a08eaa69c",
+        "scryfall_uri": "https://scryfall.com/card/lci/151/goblin-tomb-raider",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Goblin Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/018160fe-f602-43f5-8495-241a08eaa69c.jpg?1699044289",
+          "normal": "https://cards.scryfall.io/normal/front/0/1/018160fe-f602-43f5-8495-241a08eaa69c.jpg?1699044289"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Abrade",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 94,
+        "tier_rating": "B",
+        "note": null,
+        "id": "47f39b5e-2e85-4f31-bbab-0b0bf58f701d",
+        "scryfall_uri": "https://scryfall.com/card/lci/131/abrade",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/7/47f39b5e-2e85-4f31-bbab-0b0bf58f701d.jpg?1699044218",
+          "normal": "https://cards.scryfall.io/normal/front/4/7/47f39b5e-2e85-4f31-bbab-0b0bf58f701d.jpg?1699044218"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Plundering Pirate",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 113,
+        "tier_rating": "B",
+        "note": null,
+        "id": "5bb2552f-8370-4931-83e1-93706d51413a",
+        "scryfall_uri": "https://scryfall.com/card/lci/160/plundering-pirate",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Orc Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5bb2552f-8370-4931-83e1-93706d51413a.jpg?1699044322",
+          "normal": "https://cards.scryfall.io/normal/front/5/b/5bb2552f-8370-4931-83e1-93706d51413a.jpg?1699044322"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Pathfinding Axejaw",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 60,
+        "tier_rating": "B",
+        "note": null,
+        "id": "9f619075-ca5d-4e09-bd84-31e6b61eaa7e",
+        "scryfall_uri": "https://scryfall.com/card/lci/206/pathfinding-axejaw",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470",
+          "normal": "https://cards.scryfall.io/normal/front/9/f/9f619075-ca5d-4e09-bd84-31e6b61eaa7e.jpg?1699044470"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Staggering Size",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 78,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e34c4946-6c21-4ae1-9595-35933d38da52",
+        "scryfall_uri": "https://scryfall.com/card/lci/214/staggering-size",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e34c4946-6c21-4ae1-9595-35933d38da52.jpg?1699044491",
+          "normal": "https://cards.scryfall.io/normal/front/e/3/e34c4946-6c21-4ae1-9595-35933d38da52.jpg?1699044491"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Huatli's Final Strike",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 77,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56",
+        "scryfall_uri": "https://scryfall.com/card/lci/190/huatlis-final-strike",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56.jpg?1699044417",
+          "normal": "https://cards.scryfall.io/normal/front/1/2/1247a5fa-b50a-4ab1-96ca-dbeb45bd0b56.jpg?1699044417"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Poison Dart Frog",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 68,
+        "tier_rating": "B",
+        "note": null,
+        "id": "62c1f09a-9d17-415c-8afa-cd0b62abe48d",
+        "scryfall_uri": "https://scryfall.com/card/lci/207/poison-dart-frog",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Frog",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/62c1f09a-9d17-415c-8afa-cd0b62abe48d.jpg?1699044475",
+          "normal": "https://cards.scryfall.io/normal/front/6/2/62c1f09a-9d17-415c-8afa-cd0b62abe48d.jpg?1699044475"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      }
+    ]
+  },
+  "commons_to_avoid": [
+    {
+      "name": "Relic's Roar",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 246,
+      "tier_rating": "F",
+      "note": null,
+      "id": "35096eb3-ad7b-4b6e-b799-cb4cc447883e",
+      "scryfall_uri": "https://scryfall.com/card/lci/71/relics-roar",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35096eb3-ad7b-4b6e-b799-cb4cc447883e.jpg?1699043888",
+        "normal": "https://cards.scryfall.io/normal/front/3/5/35096eb3-ad7b-4b6e-b799-cb4cc447883e.jpg?1699043888"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Tectonic Hazard",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 280,
+      "tier_rating": "F",
+      "note": null,
+      "id": "5204c781-f568-4c7f-b3f7-ce4dd678689b",
+      "scryfall_uri": "https://scryfall.com/card/lci/169/tectonic-hazard",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/5204c781-f568-4c7f-b3f7-ce4dd678689b.jpg?1699044348",
+        "normal": "https://cards.scryfall.io/normal/front/5/2/5204c781-f568-4c7f-b3f7-ce4dd678689b.jpg?1699044348"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Disturbed Slumber",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 279,
+      "tier_rating": "F",
+      "note": null,
+      "id": "4404b8d6-3673-4d82-b9ed-d28e9b54e1f6",
+      "scryfall_uri": "https://scryfall.com/card/lci/182/disturbed-slumber",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/4/4404b8d6-3673-4d82-b9ed-d28e9b54e1f6.jpg?1699044387",
+        "normal": "https://cards.scryfall.io/normal/front/4/4/4404b8d6-3673-4d82-b9ed-d28e9b54e1f6.jpg?1699044387"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Hunter's Blowgun",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 250,
+      "tier_rating": "F",
+      "note": null,
+      "id": "3348abe7-6aa3-47f7-8203-a15f75007e33",
+      "scryfall_uri": "https://scryfall.com/card/lci/255/hunters-blowgun",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/3/3348abe7-6aa3-47f7-8203-a15f75007e33.jpg?1699044614",
+        "normal": "https://cards.scryfall.io/normal/front/3/3/3348abe7-6aa3-47f7-8203-a15f75007e33.jpg?1699044614"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Cartographer's Companion",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 227,
+      "tier_rating": "D",
+      "note": null,
+      "id": "dbd8115e-4cb3-49b6-b74f-8fcfa28c6404",
+      "scryfall_uri": "https://scryfall.com/card/lci/248/cartographers-companion",
+      "colors": [],
+      "type_line": "Artifact Creature — Gnome",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/b/dbd8115e-4cb3-49b6-b74f-8fcfa28c6404.jpg?1699044595",
+        "normal": "https://cards.scryfall.io/normal/front/d/b/dbd8115e-4cb3-49b6-b74f-8fcfa28c6404.jpg?1699044595"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Family Reunion",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 230,
+      "tier_rating": "D",
+      "note": null,
+      "id": "5c2cfbdc-8d40-4abb-afca-6c6d8e36185b",
+      "scryfall_uri": "https://scryfall.com/card/lci/13/family-reunion",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c2cfbdc-8d40-4abb-afca-6c6d8e36185b.jpg?1699043178",
+        "normal": "https://cards.scryfall.io/normal/front/5/c/5c2cfbdc-8d40-4abb-afca-6c6d8e36185b.jpg?1699043178"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Frilled Cave-Wurm",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 256,
+      "tier_rating": "F",
+      "note": null,
+      "id": "6f65e1bc-fade-4fdf-a1fd-de068bff9e4c",
+      "scryfall_uri": "https://scryfall.com/card/lci/57/frilled-cave-wurm",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Salamander Wurm",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/f/6f65e1bc-fade-4fdf-a1fd-de068bff9e4c.jpg?1699043658",
+        "normal": "https://cards.scryfall.io/normal/front/6/f/6f65e1bc-fade-4fdf-a1fd-de068bff9e4c.jpg?1699043658"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Child of the Volcano",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 281,
+      "tier_rating": "F",
+      "note": null,
+      "id": "e964f026-9cbf-4fa2-acdc-60d19b88f183",
+      "scryfall_uri": "https://scryfall.com/card/lci/140/child-of-the-volcano",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Creature — Elemental",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e964f026-9cbf-4fa2-acdc-60d19b88f183.jpg?1699044247",
+        "normal": "https://cards.scryfall.io/normal/front/e/9/e964f026-9cbf-4fa2-acdc-60d19b88f183.jpg?1699044247"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "name": "Seeker of Sunlight",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 244,
+      "tier_rating": "D",
+      "note": null,
+      "id": "ffcdb10f-4bad-4f89-8e7c-daa5c0c69230",
+      "scryfall_uri": "https://scryfall.com/card/lci/210/seeker-of-sunlight",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Merfolk Scout",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/f/ffcdb10f-4bad-4f89-8e7c-daa5c0c69230.jpg?1699044483",
+        "normal": "https://cards.scryfall.io/normal/front/f/f/ffcdb10f-4bad-4f89-8e7c-daa5c0c69230.jpg?1699044483"
+      },
+      "set": "lci",
+      "set_name": "The Lost Caverns of Ixalan"
+    }
+  ],
+  "caves_archetype": {
+    "description": "Dedicate to caves with 7+ to enable major payoffs. Sinuous Benthisaur is splashable at just 3 caves.",
+    "payoffs": [
+      {
+        "name": "Bat Colony",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 169,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1c02134c-ec9f-4090-820e-8ba7ae4a8c2b",
+        "scryfall_uri": "https://scryfall.com/card/lci/5/bat-colony",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c02134c-ec9f-4090-820e-8ba7ae4a8c2b.jpg?1699043091",
+          "normal": "https://cards.scryfall.io/normal/front/1/c/1c02134c-ec9f-4090-820e-8ba7ae4a8c2b.jpg?1699043091"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Gargantuan Leech",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 212,
+        "tier_rating": "D",
+        "note": null,
+        "id": "94724efb-4785-4751-9fe1-07f243dd6008",
+        "scryfall_uri": "https://scryfall.com/card/lci/107/gargantuan-leech",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Leech",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/4/94724efb-4785-4751-9fe1-07f243dd6008.jpg?1699044138",
+          "normal": "https://cards.scryfall.io/normal/front/9/4/94724efb-4785-4751-9fe1-07f243dd6008.jpg?1699044138"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Calamitous Cave-In",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 215,
+        "tier_rating": "D",
+        "note": null,
+        "id": "8341ddd9-aac1-4773-b8ce-51e35f696263",
+        "scryfall_uri": "https://scryfall.com/card/lci/139/calamitous-cave-in",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/8341ddd9-aac1-4773-b8ce-51e35f696263.jpg?1699044244",
+          "normal": "https://cards.scryfall.io/normal/front/8/3/8341ddd9-aac1-4773-b8ce-51e35f696263.jpg?1699044244"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      },
+      {
+        "name": "Sinuous Benthisaur",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 152,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7a58639c-001f-4cb1-89fd-0a0967b86977",
+        "scryfall_uri": "https://scryfall.com/card/lci/76/sinuous-benthisaur",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a58639c-001f-4cb1-89fd-0a0967b86977.jpg?1699043930",
+          "normal": "https://cards.scryfall.io/normal/front/7/a/7a58639c-001f-4cb1-89fd-0a0967b86977.jpg?1699043930"
+        },
+        "set": "lci",
+        "set_name": "The Lost Caverns of Ixalan"
+      }
+    ]
+  },
+  "sideboard_tips": [
+    "Include graveyard hate (Pit of Offerings) versus Descend decks.",
+    "Pack artifact/enchantment removal (Deconstruction Hammer) for craft-heavy decks.",
+    "Add extra removal for bomb-heavy matchups."
+  ],
+  "general_tips": [
+    "Prioritize cards that are good everywhere — efficiency beats archetype-only payoffs.",
+    "Aim to land in one of the top-four archetypes when possible.",
+    "Don't fall behind — the format punishes slow starts brutally.",
+    "Even controlling decks need cheap 1-3 drops to survive early."
+  ]
+}

@@ -31,7 +31,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -152,13 +151,6 @@ private fun GameSetupScreenContent(
                             modifier = Modifier.weight(1f)
                         )
 
-                        /*IconButton(onClick = onNavigateToTournament) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = stringResource(R.string.gamesetup_tournament_link),
-                                tint = mc.primaryAccent
-                            )
-                        }*/
                     }
                 }
             },

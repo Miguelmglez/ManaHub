@@ -9,7 +9,6 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
@@ -22,8 +21,6 @@ import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.SendProposalUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -107,14 +104,11 @@ class TradeProposalViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val createProposal: CreateTradeProposalUseCase,
     private val editProposal: EditProposalUseCase,
-    private val sendProposal: SendProposalUseCase,
     private val counterProposal: CounterProposalUseCase,
-    private val refreshTrades: RefreshTradesUseCase,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
     private val wishlistRepository: WishlistRepository,
     private val friendRepository: FriendRepository,
-    val searchCards: SearchCardsUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -262,10 +256,6 @@ class TradeProposalViewModel @Inject constructor(
         }
     }
 
-    fun showCollectionCards() {
-        updateSearchLists("")
-    }
-
     fun searchScryfallDirect(query: String) {
         _uiState.update { it.copy(addCardsQuery = query) }
         if (query.isBlank()) {
@@ -343,7 +333,7 @@ class TradeProposalViewModel @Inject constructor(
         }
     }
 
-    fun validateInitialProposal(): Boolean {
+    private fun validateInitialProposal(): Boolean {
         val state = _uiState.value
         if (state.isCounterMode) return true
         val proposerCovered = state.proposerItems.isNotEmpty() || state.includesReviewFromProposer

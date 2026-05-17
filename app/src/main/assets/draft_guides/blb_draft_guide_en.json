@@ -1,147 +1,1112 @@
 {
-  "set_code": "blb",
-  "set_name": "Bloomburrow",
-  "last_updated": "2024-08-15",
-  "overview": "Bloomburrow is a charming creature-centric set where all creatures are animals. The format is synergy-driven with strong tribal themes. Each color pair has a distinct animal type identity, and the key mechanic Offspring allows creatures to create token copies. The format is relatively fast with excellent aggro options but rewards well-built synergy decks.",
+  "metadata": {
+    "set_name": "Bloomburrow",
+    "set_code": "BLB",
+    "source_url": "https://draftsim.com/mtg-blb-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "August 9, 2024"
+  },
+  "set_overview": {
+    "summary": "Bloomburrow received mixed reception regarding pacing, color balance, and linearity, though the theming resonates well. The format features ten tribal archetypes with distinct mechanics supporting each color pair.",
+    "color_ranking": [
+      "{G} Green",
+      "{W} White",
+      "{B} Black",
+      "{R} Red",
+      "{U} Blue"
+    ],
+    "color_notes": {
+      "{G} Green": "Best color. Superior creature sizing, removal, and mana-fixing enablement.",
+      "{W} White": "Aggressive payoffs with premium removal (Banishing Light, Repel Calamity).",
+      "{B} Black": "Strong removal suite and solid value creatures.",
+      "{R} Red": "Aggressive color with good removal spells (Take Out the Trash, Agate Assault).",
+      "{U} Blue": "Weakest common quality; best deployed as a support color."
+    },
+    "key_gameplay_notes": [
+      "Carrot Cake addresses low consistency through scry effects and mana smoothing.",
+      "Green depth at common exceeds other colors significantly.",
+      "Token payoffs (Caretaker's Talent, Finneas, Ace Archer) need token generators — Carrot Cake is premium for that.",
+      "The format skews toward aggressive strategies with limited sweeper availability."
+    ]
+  },
   "mechanics": [
     {
       "name": "Offspring",
-      "description": "When you cast a creature with Offspring, you may pay an additional cost to create a 1/1 token copy of it.",
-      "draft_tip": "Offspring is excellent value. The token copy keeps all abilities, making creatures with strong ETB effects or keyword abilities premium Offspring targets."
+      "summary": "Creates token copies of creatures. Uneven power level overall; the standouts are clear (Intrepid Rabbit is the headliner).",
+      "performance": "Variable. Build around the strongest Offspring cards rather than treating it as a primary theme.",
+      "key_examples": [
+        {
+          "name": "Intrepid Rabbit",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 59,
+          "tier_rating": "A",
+          "note": null,
+          "id": "4d70b99d-c8bf-4a56-8957-cf587fe60b81",
+          "scryfall_uri": "https://scryfall.com/card/blb/17/intrepid-rabbit",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Rabbit Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4d70b99d-c8bf-4a56-8957-cf587fe60b81.jpg?1721425856",
+            "normal": "https://cards.scryfall.io/normal/front/4/d/4d70b99d-c8bf-4a56-8957-cf587fe60b81.jpg?1721425856"
+          },
+          "set": "blb",
+          "set_name": "Bloomburrow"
+        }
+      ]
     },
     {
       "name": "Valiant",
-      "description": "Valiant triggers whenever the creature becomes the target of a spell or ability you control for the first time each turn.",
-      "draft_tip": "Valiant rewards combat tricks and targeted effects. Draft cheap targeting spells like equipment and auras to trigger Valiant repeatedly."
+      "summary": "Mouse-specific trigger that activates when the creature is targeted by your own spell. Primarily matters in Boros (RW) Mice.",
+      "performance": "Core to RW; situational elsewhere.",
+      "key_examples": []
     },
     {
       "name": "Forage",
-      "description": "To Forage, you exile three cards from your graveyard or sacrifice a Food token.",
-      "draft_tip": "Forage needs graveyard fuel. Self-mill and card draw help keep your graveyard stocked. Food tokens provide an alternative cost."
+      "summary": "Graveyard-fueled mechanic — exile cards from your graveyard for a payoff. Excellent in Golgari (BG) Squirrels.",
+      "performance": "Engine of tier-1 BG Squirrels.",
+      "key_examples": []
     },
     {
       "name": "Expend",
-      "description": "Expend triggers when you spend a certain total amount of mana during your turn (Expend 4, 6, or 8).",
-      "draft_tip": "Expend rewards ramping and casting multiple spells. Higher Expend thresholds need careful mana planning — don't try to hit Expend 8 without ramp."
+      "summary": "Straightforward mechanic triggered when you spend four or more mana in a turn. Any deck can utilize the four-drop synergies.",
+      "performance": "Flexible. Works in nearly every archetype.",
+      "key_examples": []
     },
     {
       "name": "Gift",
-      "description": "Some spells let you give an opponent a gift (usually a token or card). If you do, the spell has an enhanced effect.",
-      "draft_tip": "The gifted benefit to your opponent is usually minor compared to what you get. Most Gift cards are worth using with the gift option."
+      "summary": "Opponent-choice interaction where you offer a benefit to the opponent in exchange for extra value. Encourages interesting decision-making.",
+      "performance": "Niche. Strong when you can make the gift irrelevant.",
+      "key_examples": []
+    },
+    {
+      "name": "Pawprint / Seasons",
+      "summary": "Modular payoff cards that scale with pawprint counts. Season of the Bold underperforms slightly compared to the rest.",
+      "performance": "Best in dedicated tribal decks that pile pawprints on a single threat.",
+      "key_examples": []
+    },
+    {
+      "name": "Threshold",
+      "summary": "Seven-cards-in-graveyard condition. Creates setup cost for the Rats archetype.",
+      "performance": "Slow to enable; needs heavy mill/discard support.",
+      "key_examples": []
+    },
+    {
+      "name": "Changeling",
+      "summary": "Counts as every creature type. Better in Sealed than Draft due to splash requirements.",
+      "performance": "Sealed staples; weaker in Draft.",
+      "key_examples": []
     }
   ],
-  "archetypes": [
-    {
-      "colors": "WU",
-      "name": "Birds Flyers",
-      "tier": "A",
-      "description": "White-Blue focuses on Bird creatures and flying synergies to dominate the air.",
-      "key_commons": ["Skyward Splash", "Stormchaser's Talent", "Plumecreed Mentor"],
-      "key_uncommons": ["Astral Wingspan", "Dazzling Denial"],
-      "strategy": "Draft flyers aggressively. Use tempo spells to protect your attackers and outrace ground-based strategies."
-    },
-    {
-      "colors": "UB",
-      "name": "Rats Sacrifice",
-      "tier": "B",
-      "description": "Blue-Black uses Rat tribal with sacrifice and recursion themes.",
-      "key_commons": ["Nocturnal Hunger", "Starscape Cleric", "Daggerfang Duo"],
-      "key_uncommons": ["Wick's Patrol", "Brazen Collector"],
-      "strategy": "Generate Rat tokens and sacrifice them for value. Use recursion to grind and removal to control the board."
-    },
-    {
-      "colors": "BR",
-      "name": "Lizards Aggro",
-      "tier": "S",
-      "description": "Black-Red Lizards is the premier aggressive archetype with excellent low-curve creatures and burn.",
-      "key_commons": ["Torch the Tower", "Fireglass Mentor", "Might of the Meek"],
-      "key_uncommons": ["Screaming Nemesis", "Lizard Blades"],
-      "strategy": "Curve out with aggressive Lizard creatures. Use burn and removal to clear blockers and close games by turn 6-7."
-    },
-    {
-      "colors": "RG",
-      "name": "Raccoons Expend",
-      "tier": "A",
-      "description": "Red-Green Raccoons use the Expend mechanic to get value from spending mana on multiple spells.",
-      "key_commons": ["Rockface Village", "Wandertale Mentor", "Territorial Aerie"],
-      "key_uncommons": ["Muerra, Trash Tactician", "Harnesser of Storms"],
-      "strategy": "Ramp early, then chain spells together to hit Expend thresholds. Raccoon payoffs reward you for casting multiple spells per turn."
-    },
-    {
-      "colors": "GW",
-      "name": "Rabbits Go-Wide",
-      "tier": "A",
-      "description": "Green-White Rabbits goes wide with token generation and anthem effects.",
-      "key_commons": ["Carrot Cake", "Valley Questcaller", "Bushy Bodyguard"],
-      "key_uncommons": ["Warren Elder", "Finneas, Ace Archer"],
-      "strategy": "Generate Rabbit tokens through Offspring and token makers. Use anthem effects to pump your team and overwhelm opponents."
-    },
-    {
-      "colors": "WB",
-      "name": "Bats Lifegain",
-      "tier": "B",
-      "description": "White-Black Bats combines flying pressure with lifegain synergies.",
-      "key_commons": ["Nocturnal Hunger", "Starscape Cleric", "Plumecreed Mentor"],
-      "key_uncommons": ["Zoraline, Cosmos Caller", "Bat Colony"],
-      "strategy": "Use Bat tokens and lifegain to stabilize while building aerial pressure. Lifegain payoffs provide extra value."
-    },
-    {
-      "colors": "UR",
-      "name": "Otters Spells",
-      "tier": "B",
-      "description": "Blue-Red Otters rewards casting noncreature spells with prowess-like triggers.",
-      "key_commons": ["Stormchaser's Talent", "Torch the Tower", "Skyward Splash"],
-      "key_uncommons": ["Festival of Embers", "Stormcatch Mentor"],
-      "strategy": "Draft a mix of efficient creatures and cheap spells. Chain spells together for maximum trigger value."
-    },
-    {
-      "colors": "BG",
-      "name": "Squirrels Forage",
-      "tier": "B",
-      "description": "Black-Green Squirrels use Forage to generate value from the graveyard.",
-      "key_commons": ["Nocturnal Hunger", "Carrot Cake", "Bushy Bodyguard"],
-      "key_uncommons": ["Vinereap Mentor", "Calamitous Tide"],
-      "strategy": "Fill your graveyard through trading and self-mill. Use Forage to convert graveyard resources into board advantage."
-    },
-    {
-      "colors": "RW",
-      "name": "Mice Valiant",
-      "tier": "A",
-      "description": "Red-White Mice uses Valiant triggers with combat tricks for explosive turns.",
-      "key_commons": ["Might of the Meek", "Valley Questcaller", "Fireglass Mentor"],
-      "key_uncommons": ["Heartfire Hero", "Mabel, Heir to Cragflame"],
-      "strategy": "Draft cheap Mice with Valiant and plenty of targeting effects. Combat tricks do double duty — triggering Valiant and winning combat."
-    },
-    {
-      "colors": "GU",
-      "name": "Frogs Ramp",
-      "tier": "C",
-      "description": "Green-Blue Frogs ramps into large threats and uses card advantage to outvalue opponents.",
-      "key_commons": ["Carrot Cake", "Stormchaser's Talent", "Wandertale Mentor"],
-      "key_uncommons": ["Tempest Angler", "Shore Up"],
-      "strategy": "Ramp into expensive threats while using card draw to maintain resources. Frogs reward patience and bigger mana."
-    }
-  ],
-  "top_commons": {
-    "W": ["Carrot Cake", "Valley Questcaller", "Plumecreed Mentor"],
-    "U": ["Stormchaser's Talent", "Skyward Splash", "Starscape Cleric"],
-    "B": ["Nocturnal Hunger", "Daggerfang Duo", "Fell"],
-    "R": ["Torch the Tower", "Fireglass Mentor", "Might of the Meek"],
-    "G": ["Bushy Bodyguard", "Wandertale Mentor", "Territorial Aerie"]
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{G}{W}",
+        "name": "GW Rabbits",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Rabbits leverage Offspring tokens and combat tricks. Intrepid Rabbit is the standout; pair with white removal and green sizing.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Intrepid Rabbit",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 59,
+            "tier_rating": "A",
+            "note": null,
+            "id": "4d70b99d-c8bf-4a56-8957-cf587fe60b81",
+            "scryfall_uri": "https://scryfall.com/card/blb/17/intrepid-rabbit",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Rabbit Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4d70b99d-c8bf-4a56-8957-cf587fe60b81.jpg?1721425856",
+              "normal": "https://cards.scryfall.io/normal/front/4/d/4d70b99d-c8bf-4a56-8957-cf587fe60b81.jpg?1721425856"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Banishing Light",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 133,
+            "tier_rating": "C",
+            "note": null,
+            "id": "25a06f82-ebdb-4dd6-bfe8-958018ce557c",
+            "scryfall_uri": "https://scryfall.com/card/blb/1/banishing-light",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25a06f82-ebdb-4dd6-bfe8-958018ce557c.jpg?1721425761",
+              "normal": "https://cards.scryfall.io/normal/front/2/5/25a06f82-ebdb-4dd6-bfe8-958018ce557c.jpg?1721425761"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Bakersbane Duo",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 70,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5309354f-1ff4-4fa9-9141-01ea2f7588ab",
+            "scryfall_uri": "https://scryfall.com/card/blb/163/bakersbane-duo",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Squirrel Raccoon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/3/5309354f-1ff4-4fa9-9141-01ea2f7588ab.jpg?1721426764",
+              "normal": "https://cards.scryfall.io/normal/front/5/3/5309354f-1ff4-4fa9-9141-01ea2f7588ab.jpg?1721426764"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "BG Squirrels",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Forage-fueled value deck. Squirrels generate tokens and feed the graveyard for repeated Forage triggers.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Treeguard Duo",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 80,
+            "tier_rating": "B",
+            "note": null,
+            "id": "89c8456e-c971-42b7-abf3-ff5ae1320abe",
+            "scryfall_uri": "https://scryfall.com/card/blb/200/treeguard-duo",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Frog Rabbit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89c8456e-c971-42b7-abf3-ff5ae1320abe.jpg?1721426977",
+              "normal": "https://cards.scryfall.io/normal/front/8/9/89c8456e-c971-42b7-abf3-ff5ae1320abe.jpg?1721426977"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Corpseberry Cultivator",
+            "color": "BG",
+            "rarity": "Common",
+            "pick_order_rank": 167,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c911a759-ed7b-452b-88a3-663478357610",
+            "scryfall_uri": "https://scryfall.com/card/blb/210/corpseberry-cultivator",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Squirrel Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/9/c911a759-ed7b-452b-88a3-663478357610.jpg?1721427036",
+              "normal": "https://cards.scryfall.io/normal/front/c/9/c911a759-ed7b-452b-88a3-663478357610.jpg?1721427036"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{B}{R}",
+        "name": "BR Lizards",
+        "tier": "Tier 2 — Great Deck",
+        "strategy": "Aggressive Lizards with sacrifice subthemes. Use Take Out the Trash and Nocturnal Hunger as core removal.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Take Out the Trash",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 105,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7a1c6f00-af4c-4d35-b682-6c0e759df9a5",
+            "scryfall_uri": "https://scryfall.com/card/blb/156/take-out-the-trash",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a1c6f00-af4c-4d35-b682-6c0e759df9a5.jpg?1721426722",
+              "normal": "https://cards.scryfall.io/normal/front/7/a/7a1c6f00-af4c-4d35-b682-6c0e759df9a5.jpg?1721426722"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Nocturnal Hunger",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 92,
+            "tier_rating": "B",
+            "note": null,
+            "id": "742c0409-9abd-4559-b52e-932cc90c531a",
+            "scryfall_uri": "https://scryfall.com/card/blb/102/nocturnal-hunger",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/742c0409-9abd-4559-b52e-932cc90c531a.jpg?1721426459",
+              "normal": "https://cards.scryfall.io/normal/front/7/4/742c0409-9abd-4559-b52e-932cc90c531a.jpg?1721426459"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "GU Frogs",
+        "tier": "Tier 2 — Great Deck",
+        "strategy": "Frogs combine green creatures with blue tempo and Pond Prophet value.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Pond Prophet",
+            "color": "UG",
+            "rarity": "Common",
+            "pick_order_rank": 82,
+            "tier_rating": "B",
+            "note": null,
+            "id": "fb959e74-61ea-453d-bb9f-ad0183c0e1b1",
+            "scryfall_uri": "https://scryfall.com/card/blb/229/pond-prophet",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Frog Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/b/fb959e74-61ea-453d-bb9f-ad0183c0e1b1.jpg?1721427169",
+              "normal": "https://cards.scryfall.io/normal/front/f/b/fb959e74-61ea-453d-bb9f-ad0183c0e1b1.jpg?1721427169"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Polliwallop",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 107,
+            "tier_rating": "B",
+            "note": null,
+            "id": "6bc4963c-d90b-4588-bdb7-85956e42a623",
+            "scryfall_uri": "https://scryfall.com/card/blb/189/polliwallop",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6bc4963c-d90b-4588-bdb7-85956e42a623.jpg?1721426903",
+              "normal": "https://cards.scryfall.io/normal/front/6/b/6bc4963c-d90b-4588-bdb7-85956e42a623.jpg?1721426903"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "WB Bats",
+        "tier": "Tier 2 — Great Deck",
+        "strategy": "Lifegain-and-fly. Bats produce evasive damage while drain triggers stabilize.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Moonrise Cleric",
+            "color": "WB",
+            "rarity": "Common",
+            "pick_order_rank": 138,
+            "tier_rating": "C",
+            "note": null,
+            "id": "35f2a71f-31e8-4b51-9dd4-51a5336b3b86",
+            "scryfall_uri": "https://scryfall.com/card/blb/226/moonrise-cleric",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Bat Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35f2a71f-31e8-4b51-9dd4-51a5336b3b86.jpg?1721427155",
+              "normal": "https://cards.scryfall.io/normal/front/3/5/35f2a71f-31e8-4b51-9dd4-51a5336b3b86.jpg?1721427155"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Glidedive Duo",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 89,
+            "tier_rating": "B",
+            "note": null,
+            "id": "4831e7ae-54e3-4bd9-b5af-52dc29f81715",
+            "scryfall_uri": "https://scryfall.com/card/blb/96/glidedive-duo",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Bat Lizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/4831e7ae-54e3-4bd9-b5af-52dc29f81715.jpg?1721426425",
+              "normal": "https://cards.scryfall.io/normal/front/4/8/4831e7ae-54e3-4bd9-b5af-52dc29f81715.jpg?1721426425"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{R}{G}",
+        "name": "RG Raccoons",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Midrange-aggro using Raccoons and Expend payoffs. Wants a high creature count and reach.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Roughshod Duo",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 209,
+            "tier_rating": "D",
+            "note": null,
+            "id": "78cdcfb9-a247-4c2d-a098-5b57570f8cd5",
+            "scryfall_uri": "https://scryfall.com/card/blb/150/roughshod-duo",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Mouse Raccoon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/8/78cdcfb9-a247-4c2d-a098-5b57570f8cd5.jpg?1771346343",
+              "normal": "https://cards.scryfall.io/normal/front/7/8/78cdcfb9-a247-4c2d-a098-5b57570f8cd5.jpg?1771346343"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Alania's Pathmaker",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 193,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d3871fe6-e26e-4ab4-bd81-7e3c7b8135c1",
+            "scryfall_uri": "https://scryfall.com/card/blb/123/alanias-pathmaker",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Otter Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d3871fe6-e26e-4ab4-bd81-7e3c7b8135c1.jpg?1721426565",
+              "normal": "https://cards.scryfall.io/normal/front/d/3/d3871fe6-e26e-4ab4-bd81-7e3c7b8135c1.jpg?1721426565"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Mice",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Mice + Valiant aggro. Cheap mice trigger Valiant when targeted by your own spells (auras and combat tricks).",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Take Out the Trash",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 105,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7a1c6f00-af4c-4d35-b682-6c0e759df9a5",
+            "scryfall_uri": "https://scryfall.com/card/blb/156/take-out-the-trash",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a1c6f00-af4c-4d35-b682-6c0e759df9a5.jpg?1721426722",
+              "normal": "https://cards.scryfall.io/normal/front/7/a/7a1c6f00-af4c-4d35-b682-6c0e759df9a5.jpg?1721426722"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Rats",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Rats with Threshold payoffs. Requires graveyard fill (mill, discard) to come online.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Daggerfang Duo",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 124,
+            "tier_rating": "B",
+            "note": null,
+            "id": "cea2bb34-e328-44fb-918a-72208c9457e4",
+            "scryfall_uri": "https://scryfall.com/card/blb/89/daggerfang-duo",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Rat Squirrel",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/cea2bb34-e328-44fb-918a-72208c9457e4.jpg?1721426379",
+              "normal": "https://cards.scryfall.io/normal/front/c/e/cea2bb34-e328-44fb-918a-72208c9457e4.jpg?1721426379"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Savor",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 51,
+            "tier_rating": "A",
+            "note": null,
+            "id": "1397f689-dca1-4d35-864b-92c5606afb9a",
+            "scryfall_uri": "https://scryfall.com/card/blb/109/savor",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/1397f689-dca1-4d35-864b-92c5606afb9a.jpg?1721426493",
+              "normal": "https://cards.scryfall.io/normal/front/1/3/1397f689-dca1-4d35-864b-92c5606afb9a.jpg?1721426493"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      }
+    ],
+    "tier_4": [
+      {
+        "colors": "{W}{U}",
+        "name": "WU Birds",
+        "tier": "Tier 4 — Weaker Deck",
+        "strategy": "Flying tribal. Limited payoffs and inconsistent commons hold this archetype back.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Dazzling Denial",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 161,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8739f1ac-2e57-4b52-a7ff-cc8df5936aad",
+            "scryfall_uri": "https://scryfall.com/card/blb/45/dazzling-denial",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/8739f1ac-2e57-4b52-a7ff-cc8df5936aad.jpg?1721426047",
+              "normal": "https://cards.scryfall.io/normal/front/8/7/8739f1ac-2e57-4b52-a7ff-cc8df5936aad.jpg?1721426047"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Lightshell Duo",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 157,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2f00c834-b4a9-45b8-bb3f-22c2a42314a0",
+            "scryfall_uri": "https://scryfall.com/card/blb/56/lightshell-duo",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Rat Otter",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2f00c834-b4a9-45b8-bb3f-22c2a42314a0.jpg?1721426129",
+              "normal": "https://cards.scryfall.io/normal/front/2/f/2f00c834-b4a9-45b8-bb3f-22c2a42314a0.jpg?1721426129"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "UR Otters",
+        "tier": "Tier 4 — Weaker Deck",
+        "strategy": "Spells-matter Otters. Thin payoff density; blue's common quality drags the pair down.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Dire Downdraft",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 135,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f1931f22-974c-43ad-911e-684bf3f9995d",
+            "scryfall_uri": "https://scryfall.com/card/blb/46/dire-downdraft",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f1931f22-974c-43ad-911e-684bf3f9995d.jpg?1721426060",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f1931f22-974c-43ad-911e-684bf3f9995d.jpg?1721426060"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          },
+          {
+            "name": "Agate Assault",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 192,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7dd9946b-515e-4e0d-9da2-711e126e9fa6",
+            "scryfall_uri": "https://scryfall.com/card/blb/122/agate-assault",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7dd9946b-515e-4e0d-9da2-711e126e9fa6.jpg?1721426563",
+              "normal": "https://cards.scryfall.io/normal/front/7/d/7dd9946b-515e-4e0d-9da2-711e126e9fa6.jpg?1721426563"
+            },
+            "set": "blb",
+            "set_name": "Bloomburrow"
+          }
+        ]
+      }
+    ]
   },
-  "top_uncommons": {
-    "W": ["Warren Elder", "Finneas, Ace Archer"],
-    "U": ["Dazzling Denial", "Shore Up"],
-    "B": ["Wick's Patrol", "Brazen Collector"],
-    "R": ["Screaming Nemesis", "Harnesser of Storms"],
-    "G": ["Vinereap Mentor", "Tempest Angler"]
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Intrepid Rabbit",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 59,
+        "tier_rating": "A",
+        "note": null,
+        "id": "4d70b99d-c8bf-4a56-8957-cf587fe60b81",
+        "scryfall_uri": "https://scryfall.com/card/blb/17/intrepid-rabbit",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Rabbit Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4d70b99d-c8bf-4a56-8957-cf587fe60b81.jpg?1721425856",
+          "normal": "https://cards.scryfall.io/normal/front/4/d/4d70b99d-c8bf-4a56-8957-cf587fe60b81.jpg?1721425856"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Banishing Light",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 133,
+        "tier_rating": "C",
+        "note": null,
+        "id": "25a06f82-ebdb-4dd6-bfe8-958018ce557c",
+        "scryfall_uri": "https://scryfall.com/card/blb/1/banishing-light",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25a06f82-ebdb-4dd6-bfe8-958018ce557c.jpg?1721425761",
+          "normal": "https://cards.scryfall.io/normal/front/2/5/25a06f82-ebdb-4dd6-bfe8-958018ce557c.jpg?1721425761"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Carrot Cake",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 40,
+        "tier_rating": "A",
+        "note": null,
+        "id": "eb03bb4f-8b4b-417e-bfc6-294cd2186b2e",
+        "scryfall_uri": "https://scryfall.com/card/blb/7/carrot-cake",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Artifact — Food",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/b/eb03bb4f-8b4b-417e-bfc6-294cd2186b2e.jpg?1721425791",
+          "normal": "https://cards.scryfall.io/normal/front/e/b/eb03bb4f-8b4b-417e-bfc6-294cd2186b2e.jpg?1721425791"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Warren Elder",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 103,
+        "tier_rating": "B",
+        "note": null,
+        "id": "4bf20069-5a20-4f95-976b-6af2b69f3ad0",
+        "scryfall_uri": "https://scryfall.com/card/blb/37/warren-elder",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Rabbit Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4bf20069-5a20-4f95-976b-6af2b69f3ad0.jpg?1721425988",
+          "normal": "https://cards.scryfall.io/normal/front/4/b/4bf20069-5a20-4f95-976b-6af2b69f3ad0.jpg?1721425988"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Dire Downdraft",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 135,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f1931f22-974c-43ad-911e-684bf3f9995d",
+        "scryfall_uri": "https://scryfall.com/card/blb/46/dire-downdraft",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f1931f22-974c-43ad-911e-684bf3f9995d.jpg?1721426060",
+          "normal": "https://cards.scryfall.io/normal/front/f/1/f1931f22-974c-43ad-911e-684bf3f9995d.jpg?1721426060"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Dazzling Denial",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 161,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8739f1ac-2e57-4b52-a7ff-cc8df5936aad",
+        "scryfall_uri": "https://scryfall.com/card/blb/45/dazzling-denial",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/8739f1ac-2e57-4b52-a7ff-cc8df5936aad.jpg?1721426047",
+          "normal": "https://cards.scryfall.io/normal/front/8/7/8739f1ac-2e57-4b52-a7ff-cc8df5936aad.jpg?1721426047"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Lightshell Duo",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 157,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2f00c834-b4a9-45b8-bb3f-22c2a42314a0",
+        "scryfall_uri": "https://scryfall.com/card/blb/56/lightshell-duo",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Rat Otter",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2f00c834-b4a9-45b8-bb3f-22c2a42314a0.jpg?1721426129",
+          "normal": "https://cards.scryfall.io/normal/front/2/f/2f00c834-b4a9-45b8-bb3f-22c2a42314a0.jpg?1721426129"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Pearl of Wisdom",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 164,
+        "tier_rating": "C",
+        "note": null,
+        "id": "13cb9575-1138-4f99-8e90-0eaf00bdf4a1",
+        "scryfall_uri": "https://scryfall.com/card/blb/64/pearl-of-wisdom",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/13cb9575-1138-4f99-8e90-0eaf00bdf4a1.jpg?1721426185",
+          "normal": "https://cards.scryfall.io/normal/front/1/3/13cb9575-1138-4f99-8e90-0eaf00bdf4a1.jpg?1721426185"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Nocturnal Hunger",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "742c0409-9abd-4559-b52e-932cc90c531a",
+        "scryfall_uri": "https://scryfall.com/card/blb/102/nocturnal-hunger",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/742c0409-9abd-4559-b52e-932cc90c531a.jpg?1721426459",
+          "normal": "https://cards.scryfall.io/normal/front/7/4/742c0409-9abd-4559-b52e-932cc90c531a.jpg?1721426459"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Savor",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 51,
+        "tier_rating": "A",
+        "note": null,
+        "id": "1397f689-dca1-4d35-864b-92c5606afb9a",
+        "scryfall_uri": "https://scryfall.com/card/blb/109/savor",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/1397f689-dca1-4d35-864b-92c5606afb9a.jpg?1721426493",
+          "normal": "https://cards.scryfall.io/normal/front/1/3/1397f689-dca1-4d35-864b-92c5606afb9a.jpg?1721426493"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Glidedive Duo",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 89,
+        "tier_rating": "B",
+        "note": null,
+        "id": "4831e7ae-54e3-4bd9-b5af-52dc29f81715",
+        "scryfall_uri": "https://scryfall.com/card/blb/96/glidedive-duo",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Bat Lizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/4831e7ae-54e3-4bd9-b5af-52dc29f81715.jpg?1721426425",
+          "normal": "https://cards.scryfall.io/normal/front/4/8/4831e7ae-54e3-4bd9-b5af-52dc29f81715.jpg?1721426425"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Daggerfang Duo",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 124,
+        "tier_rating": "B",
+        "note": null,
+        "id": "cea2bb34-e328-44fb-918a-72208c9457e4",
+        "scryfall_uri": "https://scryfall.com/card/blb/89/daggerfang-duo",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Rat Squirrel",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/e/cea2bb34-e328-44fb-918a-72208c9457e4.jpg?1721426379",
+          "normal": "https://cards.scryfall.io/normal/front/c/e/cea2bb34-e328-44fb-918a-72208c9457e4.jpg?1721426379"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Take Out the Trash",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 105,
+        "tier_rating": "B",
+        "note": null,
+        "id": "7a1c6f00-af4c-4d35-b682-6c0e759df9a5",
+        "scryfall_uri": "https://scryfall.com/card/blb/156/take-out-the-trash",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a1c6f00-af4c-4d35-b682-6c0e759df9a5.jpg?1721426722",
+          "normal": "https://cards.scryfall.io/normal/front/7/a/7a1c6f00-af4c-4d35-b682-6c0e759df9a5.jpg?1721426722"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Agate Assault",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 192,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7dd9946b-515e-4e0d-9da2-711e126e9fa6",
+        "scryfall_uri": "https://scryfall.com/card/blb/122/agate-assault",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7dd9946b-515e-4e0d-9da2-711e126e9fa6.jpg?1721426563",
+          "normal": "https://cards.scryfall.io/normal/front/7/d/7dd9946b-515e-4e0d-9da2-711e126e9fa6.jpg?1721426563"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Alania's Pathmaker",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 193,
+        "tier_rating": "C",
+        "note": null,
+        "id": "d3871fe6-e26e-4ab4-bd81-7e3c7b8135c1",
+        "scryfall_uri": "https://scryfall.com/card/blb/123/alanias-pathmaker",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Otter Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d3871fe6-e26e-4ab4-bd81-7e3c7b8135c1.jpg?1721426565",
+          "normal": "https://cards.scryfall.io/normal/front/d/3/d3871fe6-e26e-4ab4-bd81-7e3c7b8135c1.jpg?1721426565"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Roughshod Duo",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 209,
+        "tier_rating": "D",
+        "note": null,
+        "id": "78cdcfb9-a247-4c2d-a098-5b57570f8cd5",
+        "scryfall_uri": "https://scryfall.com/card/blb/150/roughshod-duo",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Mouse Raccoon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/8/78cdcfb9-a247-4c2d-a098-5b57570f8cd5.jpg?1771346343",
+          "normal": "https://cards.scryfall.io/normal/front/7/8/78cdcfb9-a247-4c2d-a098-5b57570f8cd5.jpg?1771346343"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Bakersbane Duo",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 70,
+        "tier_rating": "B",
+        "note": null,
+        "id": "5309354f-1ff4-4fa9-9141-01ea2f7588ab",
+        "scryfall_uri": "https://scryfall.com/card/blb/163/bakersbane-duo",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Squirrel Raccoon",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/3/5309354f-1ff4-4fa9-9141-01ea2f7588ab.jpg?1721426764",
+          "normal": "https://cards.scryfall.io/normal/front/5/3/5309354f-1ff4-4fa9-9141-01ea2f7588ab.jpg?1721426764"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Treeguard Duo",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 80,
+        "tier_rating": "B",
+        "note": null,
+        "id": "89c8456e-c971-42b7-abf3-ff5ae1320abe",
+        "scryfall_uri": "https://scryfall.com/card/blb/200/treeguard-duo",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Frog Rabbit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89c8456e-c971-42b7-abf3-ff5ae1320abe.jpg?1721426977",
+          "normal": "https://cards.scryfall.io/normal/front/8/9/89c8456e-c971-42b7-abf3-ff5ae1320abe.jpg?1721426977"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Polliwallop",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 107,
+        "tier_rating": "B",
+        "note": null,
+        "id": "6bc4963c-d90b-4588-bdb7-85956e42a623",
+        "scryfall_uri": "https://scryfall.com/card/blb/189/polliwallop",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/b/6bc4963c-d90b-4588-bdb7-85956e42a623.jpg?1721426903",
+          "normal": "https://cards.scryfall.io/normal/front/6/b/6bc4963c-d90b-4588-bdb7-85956e42a623.jpg?1721426903"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Longstalk Brawl",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 115,
+        "tier_rating": "B",
+        "note": null,
+        "id": "c7ef748c-b5e5-4e7d-bf2e-d3e6c08edb42",
+        "scryfall_uri": "https://scryfall.com/card/blb/182/longstalk-brawl",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7ef748c-b5e5-4e7d-bf2e-d3e6c08edb42.jpg?1721426861",
+          "normal": "https://cards.scryfall.io/normal/front/c/7/c7ef748c-b5e5-4e7d-bf2e-d3e6c08edb42.jpg?1721426861"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      }
+    ],
+    "Hybrid": [
+      {
+        "name": "Pond Prophet",
+        "color": "UG",
+        "rarity": "Common",
+        "pick_order_rank": 82,
+        "tier_rating": "B",
+        "note": null,
+        "id": "fb959e74-61ea-453d-bb9f-ad0183c0e1b1",
+        "scryfall_uri": "https://scryfall.com/card/blb/229/pond-prophet",
+        "colors": [
+          "G",
+          "U"
+        ],
+        "type_line": "Creature — Frog Advisor",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/b/fb959e74-61ea-453d-bb9f-ad0183c0e1b1.jpg?1721427169",
+          "normal": "https://cards.scryfall.io/normal/front/f/b/fb959e74-61ea-453d-bb9f-ad0183c0e1b1.jpg?1721427169"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Head of the Homestead",
+        "color": "WG",
+        "rarity": "Common",
+        "pick_order_rank": 81,
+        "tier_rating": "B",
+        "note": null,
+        "id": "2fc20157-edd3-484d-8864-925c071c0551",
+        "scryfall_uri": "https://scryfall.com/card/blb/216/head-of-the-homestead",
+        "colors": [
+          "G",
+          "W"
+        ],
+        "type_line": "Creature — Rabbit Citizen",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2fc20157-edd3-484d-8864-925c071c0551.jpg?1721427071",
+          "normal": "https://cards.scryfall.io/normal/front/2/f/2fc20157-edd3-484d-8864-925c071c0551.jpg?1721427071"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Moonrise Cleric",
+        "color": "WB",
+        "rarity": "Common",
+        "pick_order_rank": 138,
+        "tier_rating": "C",
+        "note": null,
+        "id": "35f2a71f-31e8-4b51-9dd4-51a5336b3b86",
+        "scryfall_uri": "https://scryfall.com/card/blb/226/moonrise-cleric",
+        "colors": [
+          "B",
+          "W"
+        ],
+        "type_line": "Creature — Bat Cleric",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35f2a71f-31e8-4b51-9dd4-51a5336b3b86.jpg?1721427155",
+          "normal": "https://cards.scryfall.io/normal/front/3/5/35f2a71f-31e8-4b51-9dd4-51a5336b3b86.jpg?1721427155"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      },
+      {
+        "name": "Corpseberry Cultivator",
+        "color": "BG",
+        "rarity": "Common",
+        "pick_order_rank": 167,
+        "tier_rating": "C",
+        "note": null,
+        "id": "c911a759-ed7b-452b-88a3-663478357610",
+        "scryfall_uri": "https://scryfall.com/card/blb/210/corpseberry-cultivator",
+        "colors": [
+          "B",
+          "G"
+        ],
+        "type_line": "Creature — Squirrel Warlock",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/9/c911a759-ed7b-452b-88a3-663478357610.jpg?1721427036",
+          "normal": "https://cards.scryfall.io/normal/front/c/9/c911a759-ed7b-452b-88a3-663478357610.jpg?1721427036"
+        },
+        "set": "blb",
+        "set_name": "Bloomburrow"
+      }
+    ]
   },
   "general_tips": [
-    "Offspring is the best mechanic in the set — creatures with strong Offspring abilities should be drafted highly.",
-    "The format is faster than average. Have a plan for the first four turns or you'll fall behind.",
-    "Carrot Cake is one of the best commons in the set — it provides Food, card filtering, and a body.",
-    "Tribal synergies are important but don't force a tribe. Good cards are better than on-tribe mediocre cards.",
-    "Combat tricks are better than usual due to Valiant — they trigger abilities and win combat.",
-    "Food tokens are valuable both for lifegain and as Forage fuel. Don't sacrifice them casually."
+    "Token producers (especially Carrot Cake) are premium picks — they enable every token payoff in the set.",
+    "Green is deepest at common; pivoting into a green deck is almost always an option.",
+    "Format is aggressive with limited sweepers; build to apply pressure or stabilize with removal.",
+    "Avoid forcing WU Birds or UR Otters without strong signals — both archetypes are thin.",
+    "Caretaker's Talent and Finneas, Ace Archer pay off heavily once you have token sources online."
   ]
 }

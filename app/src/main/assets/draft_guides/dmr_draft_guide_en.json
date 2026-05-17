@@ -1,0 +1,2570 @@
+{
+  "metadata": {
+    "set_name": "Dominaria Remastered",
+    "set_code": "DMR",
+    "source_url": "https://draftsim.com/mtg-dmr-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "April 26, 2025"
+  },
+  "set_overview": {
+    "summary": "Dominaria Remastered incorporates cards from 27 different sets, creating an unfocused Limited environment with inconsistent archetypes, some powerful synergies, lots of weak rares, and color imbalances. Blue dominates with above-average commons. Splashing is severely limited due to minimal mana-fixing.",
+    "color_ranking": [
+      "{U} Blue — S-tier",
+      "{R} Red — A-tier",
+      "{B} Black — A-tier",
+      "{G} Green — B-tier",
+      "{W} White — C-tier"
+    ],
+    "color_notes": {
+      "{U} Blue": "Best color in the set. Premium commons (Man-o'-War, Counterspell, Peregrine Drake, Deep Analysis).",
+      "{R} Red": "Strong for aggro or support. Standouts: Chain Lightning, Solar Blast, Coal Stoker, Goblin Matron. Solid burn/creature mix with fatties (Macetail Hystrodon, Avarax).",
+      "{B} Black": "Excellent value color. Terror (best common removal), Phyrexian Rager, Cackling Fiend, Urborg Uprising.",
+      "{G} Green": "Ramp-focused with ZERO removal. Werebear, Wild Growth, Symbiotic Beast, Fa'adiyah Seer.",
+      "{W} White": "Weakest color. Pacifism, Nomad Decoy, Radiant's Judgment, Kjeldoran Gargoyle. Best as support color."
+    },
+    "key_gameplay_notes": [
+      "Expect 99% two-color decks — splashing is severely limited.",
+      "Mana fixing options: Terminal Moraine, Lairs (uncommon, -1 mana efficiency), but Crop Rotation is a trap.",
+      "Fundamentals matter more than synergy in this unfocused set.",
+      "Green has zero removal — don't enter without an interaction plan.",
+      "Cycling enables payoffs from both players — opponents can trigger your Lightning Rift / Invigorating Boon."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Cycling",
+      "summary": "Discard the card to draw a new one. No downside; all cyclers are playable. Enables threshold and payoffs (Lightning Rift, Invigorating Boon).",
+      "performance": "Universal utility. Cycling lands are essential.",
+      "key_examples": [
+        {
+          "name": "Lightning Rift",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 32,
+          "tier_rating": "B",
+          "note": null,
+          "id": "d1b731b2-70cb-4e94-8c9a-d694f617a521",
+          "scryfall_uri": "https://scryfall.com/card/dmr/129/lightning-rift",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1b731b2-70cb-4e94-8c9a-d694f617a521.jpg?1675200077",
+            "normal": "https://cards.scryfall.io/normal/front/d/1/d1b731b2-70cb-4e94-8c9a-d694f617a521.jpg?1675200077"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Invigorating Boon",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 148,
+          "tier_rating": "C",
+          "note": null,
+          "id": "6eb5124d-bcd6-4aa4-8fd2-f49c8dc6765a",
+          "scryfall_uri": "https://scryfall.com/card/dmr/164/invigorating-boon",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6eb5124d-bcd6-4aa4-8fd2-f49c8dc6765a.jpg?1773974316",
+            "normal": "https://cards.scryfall.io/normal/front/6/e/6eb5124d-bcd6-4aa4-8fd2-f49c8dc6765a.jpg?1773974316"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Drifting Meadow",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 83,
+          "tier_rating": "C",
+          "note": null,
+          "id": "8cb024fa-2df1-4414-b0d7-6f700d152c51",
+          "scryfall_uri": "https://scryfall.com/card/dmr/245/drifting-meadow",
+          "colors": [],
+          "type_line": "Land",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/c/8cb024fa-2df1-4414-b0d7-6f700d152c51.jpg?1675201190",
+            "normal": "https://cards.scryfall.io/normal/front/8/c/8cb024fa-2df1-4414-b0d7-6f700d152c51.jpg?1675201190"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Remote Isle",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 87,
+          "tier_rating": "C",
+          "note": null,
+          "id": "a340af37-c0a7-4f26-974b-95397b5c32f7",
+          "scryfall_uri": "https://scryfall.com/card/dmr/254/remote-isle",
+          "colors": [],
+          "type_line": "Land",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a340af37-c0a7-4f26-974b-95397b5c32f7.jpg?1709139228",
+            "normal": "https://cards.scryfall.io/normal/front/a/3/a340af37-c0a7-4f26-974b-95397b5c32f7.jpg?1709139228"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Polluted Mire",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 86,
+          "tier_rating": "C",
+          "note": null,
+          "id": "bb724bec-3509-4f5f-84c0-b1b54063d06f",
+          "scryfall_uri": "https://scryfall.com/card/dmr/253/polluted-mire",
+          "colors": [],
+          "type_line": "Land",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bb724bec-3509-4f5f-84c0-b1b54063d06f.jpg?1675201274",
+            "normal": "https://cards.scryfall.io/normal/front/b/b/bb724bec-3509-4f5f-84c0-b1b54063d06f.jpg?1675201274"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Smoldering Crater",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 122,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ddcfaaed-c139-4787-946f-59800bde71e4",
+          "scryfall_uri": "https://scryfall.com/card/dmr/257/smoldering-crater",
+          "colors": [],
+          "type_line": "Land",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/ddcfaaed-c139-4787-946f-59800bde71e4.jpg?1675201315",
+            "normal": "https://cards.scryfall.io/normal/front/d/d/ddcfaaed-c139-4787-946f-59800bde71e4.jpg?1675201315"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Slippery Karst",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 121,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c41073e8-01cc-4d19-acb5-caaf2861bc6a",
+          "scryfall_uri": "https://scryfall.com/card/dmr/256/slippery-karst",
+          "colors": [],
+          "type_line": "Land",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c41073e8-01cc-4d19-acb5-caaf2861bc6a.jpg?1675201305",
+            "normal": "https://cards.scryfall.io/normal/front/c/4/c41073e8-01cc-4d19-acb5-caaf2861bc6a.jpg?1675201305"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Threshold",
+      "summary": "Creatures improve at 7+ cards in your graveyard. Build via cycling, spellcasting, and combat trades.",
+      "performance": "Anchors GW Threshold.",
+      "key_examples": [
+        {
+          "name": "Mystic Enforcer",
+          "color": "WG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 46,
+          "tier_rating": "C",
+          "note": null,
+          "id": "187ebb67-1bdd-4a9c-aeeb-554e7580ce24",
+          "scryfall_uri": "https://scryfall.com/card/dmr/192/mystic-enforcer",
+          "colors": [
+            "G",
+            "W"
+          ],
+          "type_line": "Creature — Human Nomad Mystic",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/187ebb67-1bdd-4a9c-aeeb-554e7580ce24.jpg?1675200684",
+            "normal": "https://cards.scryfall.io/normal/front/1/8/187ebb67-1bdd-4a9c-aeeb-554e7580ce24.jpg?1675200684"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Werebear",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 116,
+          "tier_rating": "C",
+          "note": null,
+          "id": "973310bb-ab32-46dc-8f59-8a5d3e1c58cc",
+          "scryfall_uri": "https://scryfall.com/card/dmr/182/werebear",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Bear Druid",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/973310bb-ab32-46dc-8f59-8a5d3e1c58cc.jpg?1675200590",
+            "normal": "https://cards.scryfall.io/normal/front/9/7/973310bb-ab32-46dc-8f59-8a5d3e1c58cc.jpg?1675200590"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Mystic Zealot",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 167,
+          "tier_rating": "D",
+          "note": null,
+          "id": "9bc955bd-b998-44b9-918f-84b96cf5e915",
+          "scryfall_uri": "https://scryfall.com/card/dmr/16/mystic-zealot",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Nomad Mystic",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9bc955bd-b998-44b9-918f-84b96cf5e915.jpg?1675198910",
+            "normal": "https://cards.scryfall.io/normal/front/9/b/9bc955bd-b998-44b9-918f-84b96cf5e915.jpg?1675198910"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Flicker / ETB",
+      "summary": "Momentary Blink and Whitemane Lion enable value creatures.",
+      "performance": "Core to Azorius Flicker.",
+      "key_examples": [
+        {
+          "name": "Momentary Blink",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 64,
+          "tier_rating": "C",
+          "note": null,
+          "id": "619c620d-1920-40d1-98d4-df5607f84d26",
+          "scryfall_uri": "https://scryfall.com/card/dmr/15/momentary-blink",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/619c620d-1920-40d1-98d4-df5607f84d26.jpg?1675198898",
+            "normal": "https://cards.scryfall.io/normal/front/6/1/619c620d-1920-40d1-98d4-df5607f84d26.jpg?1675198898"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Whitemane Lion",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 169,
+          "tier_rating": "D",
+          "note": null,
+          "id": "a358def9-65a0-4741-896c-b2a8c8947768",
+          "scryfall_uri": "https://scryfall.com/card/dmr/35/whitemane-lion",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Cat",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a358def9-65a0-4741-896c-b2a8c8947768.jpg?1675199118",
+            "normal": "https://cards.scryfall.io/normal/front/a/3/a358def9-65a0-4741-896c-b2a8c8947768.jpg?1675199118"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Cleric of the Forward Order",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 123,
+          "tier_rating": "C",
+          "note": null,
+          "id": "435b24ae-590f-4a79-8aeb-b006de6545ca",
+          "scryfall_uri": "https://scryfall.com/card/dmr/3/cleric-of-the-forward-order",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/435b24ae-590f-4a79-8aeb-b006de6545ca.jpg?1675198771",
+            "normal": "https://cards.scryfall.io/normal/front/4/3/435b24ae-590f-4a79-8aeb-b006de6545ca.jpg?1675198771"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Man-o'-War",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 23,
+          "tier_rating": "B",
+          "note": null,
+          "id": "a1ef40d5-c287-4229-8059-3505d9f251ca",
+          "scryfall_uri": "https://scryfall.com/card/dmr/58/man-o-war",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Jellyfish",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1ef40d5-c287-4229-8059-3505d9f251ca.jpg?1675199356",
+            "normal": "https://cards.scryfall.io/normal/front/a/1/a1ef40d5-c287-4229-8059-3505d9f251ca.jpg?1675199356"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Peregrine Drake",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 69,
+          "tier_rating": "C",
+          "note": null,
+          "id": "611c8fa2-b53f-483b-9efa-759ac59dc30f",
+          "scryfall_uri": "https://scryfall.com/card/dmr/65/peregrine-drake",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Drake",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/611c8fa2-b53f-483b-9efa-759ac59dc30f.jpg?1675199421",
+            "normal": "https://cards.scryfall.io/normal/front/6/1/611c8fa2-b53f-483b-9efa-759ac59dc30f.jpg?1675199421"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Storm",
+      "summary": "Copy this spell once for each spell cast earlier in the turn. Grapeshot and Empty the Warrens at common.",
+      "performance": "Defines Izzet Storm (top archetype).",
+      "key_examples": [
+        {
+          "name": "Grapeshot",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 180,
+          "tier_rating": "D",
+          "note": null,
+          "id": "923e1291-3999-4f81-ade4-073fb982143f",
+          "scryfall_uri": "https://scryfall.com/card/dmr/125/grapeshot",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/923e1291-3999-4f81-ade4-073fb982143f.jpg?1675200032",
+            "normal": "https://cards.scryfall.io/normal/front/9/2/923e1291-3999-4f81-ade4-073fb982143f.jpg?1675200032"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Empty the Warrens",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 144,
+          "tier_rating": "C",
+          "note": null,
+          "id": "939d765a-aefb-4393-8808-98b1bbd7e803",
+          "scryfall_uri": "https://scryfall.com/card/dmr/118/empty-the-warrens",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/3/939d765a-aefb-4393-8808-98b1bbd7e803.jpg?1675199954",
+            "normal": "https://cards.scryfall.io/normal/front/9/3/939d765a-aefb-4393-8808-98b1bbd7e803.jpg?1675199954"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Impulse",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 96,
+          "tier_rating": "C",
+          "note": null,
+          "id": "3ec50625-5e14-4fd0-9a96-86f195342695",
+          "scryfall_uri": "https://scryfall.com/card/dmr/56/impulse",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/e/3ec50625-5e14-4fd0-9a96-86f195342695.jpg?1675199337",
+            "normal": "https://cards.scryfall.io/normal/front/3/e/3ec50625-5e14-4fd0-9a96-86f195342695.jpg?1675199337"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Obsessive Search",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 97,
+          "tier_rating": "C",
+          "note": null,
+          "id": "1d97436e-329a-49a4-a7c9-671ec9ba90cc",
+          "scryfall_uri": "https://scryfall.com/card/dmr/61/obsessive-search",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1d97436e-329a-49a4-a7c9-671ec9ba90cc.jpg?1675199383",
+            "normal": "https://cards.scryfall.io/normal/front/1/d/1d97436e-329a-49a4-a7c9-671ec9ba90cc.jpg?1675199383"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Deep Analysis",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 67,
+          "tier_rating": "C",
+          "note": null,
+          "id": "d1d675e0-0e79-4f90-b3d7-d4bfaedd4719",
+          "scryfall_uri": "https://scryfall.com/card/dmr/46/deep-analysis",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1d675e0-0e79-4f90-b3d7-d4bfaedd4719.jpg?1675199234",
+            "normal": "https://cards.scryfall.io/normal/front/d/1/d1d675e0-0e79-4f90-b3d7-d4bfaedd4719.jpg?1675199234"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Fact or Fiction",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 9,
+          "tier_rating": "A",
+          "note": null,
+          "id": "f758a8b6-f586-4d27-9379-8f7c4a78d90c",
+          "scryfall_uri": "https://scryfall.com/card/dmr/48/fact-or-fiction",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f758a8b6-f586-4d27-9379-8f7c4a78d90c.jpg?1675199258",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f758a8b6-f586-4d27-9379-8f7c4a78d90c.jpg?1675199258"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Madness",
+      "summary": "Cast from exile when discarded. Niche Dimir subtheme.",
+      "performance": "Light support; not a full archetype.",
+      "key_examples": [
+        {
+          "name": "Aquamoeba",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 94,
+          "tier_rating": "C",
+          "note": null,
+          "id": "62721a55-37c6-4c05-aedf-0aa203045afa",
+          "scryfall_uri": "https://scryfall.com/card/dmr/38/aquamoeba",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Elemental Beast",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/62721a55-37c6-4c05-aedf-0aa203045afa.jpg?1675199147",
+            "normal": "https://cards.scryfall.io/normal/front/6/2/62721a55-37c6-4c05-aedf-0aa203045afa.jpg?1675199147"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Urborg Syphon-Mage",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 103,
+          "tier_rating": "C",
+          "note": null,
+          "id": "cf857d76-f2ca-4323-9611-cb20b9615202",
+          "scryfall_uri": "https://scryfall.com/card/dmr/106/urborg-syphon-mage",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Human Spellshaper",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf857d76-f2ca-4323-9611-cb20b9615202.jpg?1675199840",
+            "normal": "https://cards.scryfall.io/normal/front/c/f/cf857d76-f2ca-4323-9611-cb20b9615202.jpg?1675199840"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Undead Gladiator",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 55,
+          "tier_rating": "C",
+          "note": null,
+          "id": "7f7a3d34-4e4e-4545-8e2e-6977eb754270",
+          "scryfall_uri": "https://scryfall.com/card/dmr/105/undead-gladiator",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Zombie Barbarian",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f7a3d34-4e4e-4545-8e2e-6977eb754270.jpg?1675199831",
+            "normal": "https://cards.scryfall.io/normal/front/7/f/7f7a3d34-4e4e-4545-8e2e-6977eb754270.jpg?1675199831"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        }
+      ]
+    },
+    {
+      "name": "Tribal (Goblin / Zombie)",
+      "summary": "Goblin Matron tutors goblins; zombies enable Dralnu's Crusade + Deadapult.",
+      "performance": "Anchors Rakdos Tribal.",
+      "key_examples": [
+        {
+          "name": "Goblin Matron",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 106,
+          "tier_rating": "C",
+          "note": null,
+          "id": "a521a254-c484-4d59-bb7e-8745e96d4bbf",
+          "scryfall_uri": "https://scryfall.com/card/dmr/123/goblin-matron",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Goblin",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a521a254-c484-4d59-bb7e-8745e96d4bbf.jpg?1675200004",
+            "normal": "https://cards.scryfall.io/normal/front/a/5/a521a254-c484-4d59-bb7e-8745e96d4bbf.jpg?1675200004"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Dralnu's Crusade",
+          "color": "BR",
+          "rarity": "Uncommon",
+          "pick_order_rank": 154,
+          "tier_rating": "C",
+          "note": null,
+          "id": "844976c7-c8f7-435a-9bd4-1fea3c635030",
+          "scryfall_uri": "https://scryfall.com/card/dmr/189/dralnus-crusade",
+          "colors": [
+            "B",
+            "R"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/844976c7-c8f7-435a-9bd4-1fea3c635030.jpg?1698992982",
+            "normal": "https://cards.scryfall.io/normal/front/8/4/844976c7-c8f7-435a-9bd4-1fea3c635030.jpg?1698992982"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        },
+        {
+          "name": "Deadapult",
+          "color": "R",
+          "rarity": "Uncommon",
+          "pick_order_rank": 210,
+          "tier_rating": "D",
+          "note": null,
+          "id": "b8f9cb4d-5ee2-4934-a0ca-43148491ae35",
+          "scryfall_uri": "https://scryfall.com/card/dmr/115/deadapult",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b8f9cb4d-5ee2-4934-a0ca-43148491ae35.jpg?1675199926",
+            "normal": "https://cards.scryfall.io/normal/front/b/8/b8f9cb4d-5ee2-4934-a0ca-43148491ae35.jpg?1675199926"
+          },
+          "set": "dmr",
+          "set_name": "Dominaria Remastered"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_s": [
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Storm",
+        "tier": "S — Best Deck",
+        "strategy": "Cast multiple spells per turn for storm payoff. Mana-refund tools and cantrips enable explosive turns.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Grapeshot",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 180,
+            "tier_rating": "D",
+            "note": null,
+            "id": "923e1291-3999-4f81-ade4-073fb982143f",
+            "scryfall_uri": "https://scryfall.com/card/dmr/125/grapeshot",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/923e1291-3999-4f81-ade4-073fb982143f.jpg?1675200032",
+              "normal": "https://cards.scryfall.io/normal/front/9/2/923e1291-3999-4f81-ade4-073fb982143f.jpg?1675200032"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Empty the Warrens",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 144,
+            "tier_rating": "C",
+            "note": null,
+            "id": "939d765a-aefb-4393-8808-98b1bbd7e803",
+            "scryfall_uri": "https://scryfall.com/card/dmr/118/empty-the-warrens",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/3/939d765a-aefb-4393-8808-98b1bbd7e803.jpg?1675199954",
+              "normal": "https://cards.scryfall.io/normal/front/9/3/939d765a-aefb-4393-8808-98b1bbd7e803.jpg?1675199954"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Cloud of Faeries",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 170,
+            "tier_rating": "D",
+            "note": null,
+            "id": "ed95f539-1d8b-408b-9af2-8c6f93fb98c8",
+            "scryfall_uri": "https://scryfall.com/card/dmr/43/cloud-of-faeries",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Faerie",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/ed95f539-1d8b-408b-9af2-8c6f93fb98c8.jpg?1675199201",
+              "normal": "https://cards.scryfall.io/normal/front/e/d/ed95f539-1d8b-408b-9af2-8c6f93fb98c8.jpg?1675199201"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Frantic Search",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 68,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7cceaa53-5cac-415c-ad52-6299d6934ba0",
+            "scryfall_uri": "https://scryfall.com/card/dmr/51/frantic-search",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/c/7cceaa53-5cac-415c-ad52-6299d6934ba0.jpg?1675199291",
+              "normal": "https://cards.scryfall.io/normal/front/7/c/7cceaa53-5cac-415c-ad52-6299d6934ba0.jpg?1675199291"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Peregrine Drake",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 69,
+            "tier_rating": "C",
+            "note": null,
+            "id": "611c8fa2-b53f-483b-9efa-759ac59dc30f",
+            "scryfall_uri": "https://scryfall.com/card/dmr/65/peregrine-drake",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Drake",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/611c8fa2-b53f-483b-9efa-759ac59dc30f.jpg?1675199421",
+              "normal": "https://cards.scryfall.io/normal/front/6/1/611c8fa2-b53f-483b-9efa-759ac59dc30f.jpg?1675199421"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Snap",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 70,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f13406c6-f208-402a-94d3-a94a24f03563",
+            "scryfall_uri": "https://scryfall.com/card/dmr/66/snap",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f13406c6-f208-402a-94d3-a94a24f03563.jpg?1675199430",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f13406c6-f208-402a-94d3-a94a24f03563.jpg?1675199430"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Coal Stoker",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 105,
+            "tier_rating": "C",
+            "note": null,
+            "id": "67c8578e-052f-4182-9bb1-fb35450d22c0",
+            "scryfall_uri": "https://scryfall.com/card/dmr/114/coal-stoker",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Elemental",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/67c8578e-052f-4182-9bb1-fb35450d22c0.jpg?1675199916",
+              "normal": "https://cards.scryfall.io/normal/front/6/7/67c8578e-052f-4182-9bb1-fb35450d22c0.jpg?1675199916"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_a": [
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Control",
+        "tier": "A — Strong Deck",
+        "strategy": "Card draw + removal-based control. Madness subtheme available.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Recoil",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 22,
+            "tier_rating": "B",
+            "note": null,
+            "id": "9035dda8-5ad3-4169-b281-83d6ca55b71e",
+            "scryfall_uri": "https://scryfall.com/card/dmr/197/recoil",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/9035dda8-5ad3-4169-b281-83d6ca55b71e.jpg?1675200731",
+              "normal": "https://cards.scryfall.io/normal/front/9/0/9035dda8-5ad3-4169-b281-83d6ca55b71e.jpg?1675200731"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Aquamoeba",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 94,
+            "tier_rating": "C",
+            "note": null,
+            "id": "62721a55-37c6-4c05-aedf-0aa203045afa",
+            "scryfall_uri": "https://scryfall.com/card/dmr/38/aquamoeba",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Elemental Beast",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/62721a55-37c6-4c05-aedf-0aa203045afa.jpg?1675199147",
+              "normal": "https://cards.scryfall.io/normal/front/6/2/62721a55-37c6-4c05-aedf-0aa203045afa.jpg?1675199147"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Undead Gladiator",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 55,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7f7a3d34-4e4e-4545-8e2e-6977eb754270",
+            "scryfall_uri": "https://scryfall.com/card/dmr/105/undead-gladiator",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Zombie Barbarian",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f7a3d34-4e4e-4545-8e2e-6977eb754270.jpg?1675199831",
+              "normal": "https://cards.scryfall.io/normal/front/7/f/7f7a3d34-4e4e-4545-8e2e-6977eb754270.jpg?1675199831"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Tribal",
+        "tier": "A — Strong Deck",
+        "strategy": "Goblin/zombie synergies. Goblin Matron tutors; bombs include Pashalik Mons and Siege-Gang Commander.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Dralnu's Crusade",
+            "color": "BR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 154,
+            "tier_rating": "C",
+            "note": null,
+            "id": "844976c7-c8f7-435a-9bd4-1fea3c635030",
+            "scryfall_uri": "https://scryfall.com/card/dmr/189/dralnus-crusade",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/844976c7-c8f7-435a-9bd4-1fea3c635030.jpg?1698992982",
+              "normal": "https://cards.scryfall.io/normal/front/8/4/844976c7-c8f7-435a-9bd4-1fea3c635030.jpg?1698992982"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Goblin Matron",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 106,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a521a254-c484-4d59-bb7e-8745e96d4bbf",
+            "scryfall_uri": "https://scryfall.com/card/dmr/123/goblin-matron",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a521a254-c484-4d59-bb7e-8745e96d4bbf.jpg?1675200004",
+              "normal": "https://cards.scryfall.io/normal/front/a/5/a521a254-c484-4d59-bb7e-8745e96d4bbf.jpg?1675200004"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Pashalik Mons",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 20,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ca20a650-65b0-4714-b7ce-0481af3db377",
+            "scryfall_uri": "https://scryfall.com/card/dmr/133/pashalik-mons",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature — Goblin Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/ca20a650-65b0-4714-b7ce-0481af3db377.jpg?1675200126",
+              "normal": "https://cards.scryfall.io/normal/front/c/a/ca20a650-65b0-4714-b7ce-0481af3db377.jpg?1675200126"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Siege-Gang Commander",
+            "color": "R",
+            "rarity": "Rare",
+            "pick_order_rank": 12,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5dd6a913-88df-4fbc-964e-a8fec3ad989f",
+            "scryfall_uri": "https://scryfall.com/card/dmr/136/siege-gang-commander",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Goblin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5dd6a913-88df-4fbc-964e-a8fec3ad989f.jpg?1675200158",
+              "normal": "https://cards.scryfall.io/normal/front/5/d/5dd6a913-88df-4fbc-964e-a8fec3ad989f.jpg?1675200158"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Midrange",
+        "tier": "A — Strong Deck",
+        "strategy": "Standard good-stuff. Removal (Terror), card draw, and fatties (Spiritmonger, Call of the Herd).",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Phyrexian Rager",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 41,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1db97152-afd5-4190-8bf1-1276b0fcf005",
+            "scryfall_uri": "https://scryfall.com/card/dmr/99/phyrexian-rager",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Phyrexian Horror",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1db97152-afd5-4190-8bf1-1276b0fcf005.jpg?1675199773",
+              "normal": "https://cards.scryfall.io/normal/front/1/d/1db97152-afd5-4190-8bf1-1276b0fcf005.jpg?1675199773"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Terror",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 42,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a3870eba-4e8f-414d-817c-14ec97f6a93c",
+            "scryfall_uri": "https://scryfall.com/card/dmr/103/terror",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a3870eba-4e8f-414d-817c-14ec97f6a93c.jpg?1675199810",
+              "normal": "https://cards.scryfall.io/normal/front/a/3/a3870eba-4e8f-414d-817c-14ec97f6a93c.jpg?1675199810"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Spiritmonger",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 19,
+            "tier_rating": "B",
+            "note": null,
+            "id": "5da7739e-8413-45b6-8539-fde2021b06a7",
+            "scryfall_uri": "https://scryfall.com/card/dmr/202/spiritmonger",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Beast",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5da7739e-8413-45b6-8539-fde2021b06a7.jpg?1675200773",
+              "normal": "https://cards.scryfall.io/normal/front/5/d/5da7739e-8413-45b6-8539-fde2021b06a7.jpg?1675200773"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Call of the Herd",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 21,
+            "tier_rating": "B",
+            "note": null,
+            "id": "680bc22c-a80c-44db-aacd-aa80982202b9",
+            "scryfall_uri": "https://scryfall.com/card/dmr/153/call-of-the-herd",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/680bc22c-a80c-44db-aacd-aa80982202b9.jpg?1675200339",
+              "normal": "https://cards.scryfall.io/normal/front/6/8/680bc22c-a80c-44db-aacd-aa80982202b9.jpg?1675200339"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Ramp",
+        "tier": "A — Strong Deck",
+        "strategy": "Ramp into large creatures. Weak interaction; rely on tempo creatures.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Tatyova, Benthic Druid",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 7,
+            "tier_rating": "A",
+            "note": "Best signpost uncommon.",
+            "id": "a8953672-b1ae-4f0a-8107-e28322fc16b7",
+            "scryfall_uri": "https://scryfall.com/card/dmr/203/tatyova-benthic-druid",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Merfolk Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/8/a8953672-b1ae-4f0a-8107-e28322fc16b7.jpg?1675200784",
+              "normal": "https://cards.scryfall.io/normal/front/a/8/a8953672-b1ae-4f0a-8107-e28322fc16b7.jpg?1675200784"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Man-o'-War",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 23,
+            "tier_rating": "B",
+            "note": null,
+            "id": "a1ef40d5-c287-4229-8059-3505d9f251ca",
+            "scryfall_uri": "https://scryfall.com/card/dmr/58/man-o-war",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Jellyfish",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1ef40d5-c287-4229-8059-3505d9f251ca.jpg?1675199356",
+              "normal": "https://cards.scryfall.io/normal/front/a/1/a1ef40d5-c287-4229-8059-3505d9f251ca.jpg?1675199356"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Snap",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 70,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f13406c6-f208-402a-94d3-a94a24f03563",
+            "scryfall_uri": "https://scryfall.com/card/dmr/66/snap",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f13406c6-f208-402a-94d3-a94a24f03563.jpg?1675199430",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f13406c6-f208-402a-94d3-a94a24f03563.jpg?1675199430"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_b": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Flicker",
+        "tier": "B — Decent Deck",
+        "strategy": "ETB value creatures + flicker effects. Limited redundancy in value creatures.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Sawtooth Loon",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 48,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3f5882a5-ea4c-4b2b-bcf9-7d15087d8bd4",
+            "scryfall_uri": "https://scryfall.com/card/dmr/199/sawtooth-loon",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Bird",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/f/3f5882a5-ea4c-4b2b-bcf9-7d15087d8bd4.jpg?1675200748",
+              "normal": "https://cards.scryfall.io/normal/front/3/f/3f5882a5-ea4c-4b2b-bcf9-7d15087d8bd4.jpg?1675200748"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Momentary Blink",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 64,
+            "tier_rating": "C",
+            "note": null,
+            "id": "619c620d-1920-40d1-98d4-df5607f84d26",
+            "scryfall_uri": "https://scryfall.com/card/dmr/15/momentary-blink",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/619c620d-1920-40d1-98d4-df5607f84d26.jpg?1675198898",
+              "normal": "https://cards.scryfall.io/normal/front/6/1/619c620d-1920-40d1-98d4-df5607f84d26.jpg?1675198898"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Whitemane Lion",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 169,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a358def9-65a0-4741-896c-b2a8c8947768",
+            "scryfall_uri": "https://scryfall.com/card/dmr/35/whitemane-lion",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Cat",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a358def9-65a0-4741-896c-b2a8c8947768.jpg?1675199118",
+              "normal": "https://cards.scryfall.io/normal/front/a/3/a358def9-65a0-4741-896c-b2a8c8947768.jpg?1675199118"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Cycling",
+        "tier": "B — Decent Deck",
+        "strategy": "Cycling synergy with payoffs (Lightning Rift, Invigorating Boon). Play 15-16 lands; off-color cyclers are acceptable.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Radha, Heir to Keld",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 58,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ecb7c19a-b4af-405d-b016-a546ed12a99d",
+            "scryfall_uri": "https://scryfall.com/card/dmr/196/radha-heir-to-keld",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Legendary Creature — Elf Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/c/ecb7c19a-b4af-405d-b016-a546ed12a99d.jpg?1675200719",
+              "normal": "https://cards.scryfall.io/normal/front/e/c/ecb7c19a-b4af-405d-b016-a546ed12a99d.jpg?1675200719"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Lightning Rift",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 32,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d1b731b2-70cb-4e94-8c9a-d694f617a521",
+            "scryfall_uri": "https://scryfall.com/card/dmr/129/lightning-rift",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1b731b2-70cb-4e94-8c9a-d694f617a521.jpg?1675200077",
+              "normal": "https://cards.scryfall.io/normal/front/d/1/d1b731b2-70cb-4e94-8c9a-d694f617a521.jpg?1675200077"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Invigorating Boon",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 148,
+            "tier_rating": "C",
+            "note": null,
+            "id": "6eb5124d-bcd6-4aa4-8fd2-f49c8dc6765a",
+            "scryfall_uri": "https://scryfall.com/card/dmr/164/invigorating-boon",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6eb5124d-bcd6-4aa4-8fd2-f49c8dc6765a.jpg?1773974316",
+              "normal": "https://cards.scryfall.io/normal/front/6/e/6eb5124d-bcd6-4aa4-8fd2-f49c8dc6765a.jpg?1773974316"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Lifegain",
+        "tier": "B — Decent Deck",
+        "strategy": "2-for-1 value. Offset life costs with creatures (Cleric, Kjeldoran Gargoyle). No major synergies.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Gerrard's Verdict",
+            "color": "WB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 45,
+            "tier_rating": "C",
+            "note": null,
+            "id": "e7d9d3be-0a66-4871-9d60-d253d3a37a13",
+            "scryfall_uri": "https://scryfall.com/card/dmr/190/gerrards-verdict",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7d9d3be-0a66-4871-9d60-d253d3a37a13.jpg?1675200666",
+              "normal": "https://cards.scryfall.io/normal/front/e/7/e7d9d3be-0a66-4871-9d60-d253d3a37a13.jpg?1675200666"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Kjeldoran Gargoyle",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 166,
+            "tier_rating": "D",
+            "note": null,
+            "id": "6c090af7-3f75-4c14-9ab5-1f409dfd6de1",
+            "scryfall_uri": "https://scryfall.com/card/dmr/11/kjeldoran-gargoyle",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Gargoyle",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c090af7-3f75-4c14-9ab5-1f409dfd6de1.jpg?1675198852",
+              "normal": "https://cards.scryfall.io/normal/front/6/c/6c090af7-3f75-4c14-9ab5-1f409dfd6de1.jpg?1675198852"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Crab",
+        "tier": "B — Decent Deck",
+        "strategy": "Horseshoe Crab combo with Quicksilver Dagger / Hermetic Study for repeated value. Secondary to Storm.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Quicksilver Dagger",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 47,
+            "tier_rating": "C",
+            "note": null,
+            "id": "138d2d9d-d5ab-400f-a714-cd38212a0dae",
+            "scryfall_uri": "https://scryfall.com/card/dmr/195/quicksilver-dagger",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Enchantment — Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/138d2d9d-d5ab-400f-a714-cd38212a0dae.jpg?1675200710",
+              "normal": "https://cards.scryfall.io/normal/front/1/3/138d2d9d-d5ab-400f-a714-cd38212a0dae.jpg?1675200710"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Horseshoe Crab",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 131,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7b8ba7cc-2586-497a-8b62-4342a3f19506",
+            "scryfall_uri": "https://scryfall.com/card/dmr/55/horseshoe-crab",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Crab",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7b8ba7cc-2586-497a-8b62-4342a3f19506.jpg?1675199328",
+              "normal": "https://cards.scryfall.io/normal/front/7/b/7b8ba7cc-2586-497a-8b62-4342a3f19506.jpg?1675199328"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      }
+    ],
+    "tier_c": [
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Threshold",
+        "tier": "C — Weak Deck",
+        "strategy": "Fill graveyard (7+ cards) to buff creatures. Limited self-mill; rely on cycling, sorceries, and Fa'adiyah Seer.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Mystic Enforcer",
+            "color": "WG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 46,
+            "tier_rating": "C",
+            "note": null,
+            "id": "187ebb67-1bdd-4a9c-aeeb-554e7580ce24",
+            "scryfall_uri": "https://scryfall.com/card/dmr/192/mystic-enforcer",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Human Nomad Mystic",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/187ebb67-1bdd-4a9c-aeeb-554e7580ce24.jpg?1675200684",
+              "normal": "https://cards.scryfall.io/normal/front/1/8/187ebb67-1bdd-4a9c-aeeb-554e7580ce24.jpg?1675200684"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          },
+          {
+            "name": "Fa'adiyah Seer",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 75,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3d717a50-6409-462e-9643-4427d754c773",
+            "scryfall_uri": "https://scryfall.com/card/dmr/160/faadiyah-seer",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d717a50-6409-462e-9643-4427d754c773.jpg?1675200404",
+              "normal": "https://cards.scryfall.io/normal/front/3/d/3d717a50-6409-462e-9643-4427d754c773.jpg?1675200404"
+            },
+            "set": "dmr",
+            "set_name": "Dominaria Remastered"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Pacifism",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 91,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5242a576-4d35-4f29-8d40-9a7179e51d0c",
+        "scryfall_uri": "https://scryfall.com/card/dmr/19/pacifism",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/5242a576-4d35-4f29-8d40-9a7179e51d0c.jpg?1675198947",
+          "normal": "https://cards.scryfall.io/normal/front/5/2/5242a576-4d35-4f29-8d40-9a7179e51d0c.jpg?1675198947"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Nomad Decoy",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 90,
+        "tier_rating": "C",
+        "note": null,
+        "id": "da039589-f3ee-4aff-b8b0-e5fda13ebe97",
+        "scryfall_uri": "https://scryfall.com/card/dmr/17/nomad-decoy",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Nomad",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/da039589-f3ee-4aff-b8b0-e5fda13ebe97.jpg?1675198921",
+          "normal": "https://cards.scryfall.io/normal/front/d/a/da039589-f3ee-4aff-b8b0-e5fda13ebe97.jpg?1675198921"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Radiant's Judgment",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 65,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5abbdd37-dc24-4bf7-808e-6354af7d7ec6",
+        "scryfall_uri": "https://scryfall.com/card/dmr/21/radiants-judgment",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5abbdd37-dc24-4bf7-808e-6354af7d7ec6.jpg?1675198972",
+          "normal": "https://cards.scryfall.io/normal/front/5/a/5abbdd37-dc24-4bf7-808e-6354af7d7ec6.jpg?1675198972"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Kjeldoran Gargoyle",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 166,
+        "tier_rating": "D",
+        "note": null,
+        "id": "6c090af7-3f75-4c14-9ab5-1f409dfd6de1",
+        "scryfall_uri": "https://scryfall.com/card/dmr/11/kjeldoran-gargoyle",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Gargoyle",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c090af7-3f75-4c14-9ab5-1f409dfd6de1.jpg?1675198852",
+          "normal": "https://cards.scryfall.io/normal/front/6/c/6c090af7-3f75-4c14-9ab5-1f409dfd6de1.jpg?1675198852"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Savannah Lions",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 93,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e770d089-9957-412c-a51f-3f11b6b9692a",
+        "scryfall_uri": "https://scryfall.com/card/dmr/24/savannah-lions",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Cat",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e770d089-9957-412c-a51f-3f11b6b9692a.jpg?1675199003",
+          "normal": "https://cards.scryfall.io/normal/front/e/7/e770d089-9957-412c-a51f-3f11b6b9692a.jpg?1675199003"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Man-o'-War",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 23,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a1ef40d5-c287-4229-8059-3505d9f251ca",
+        "scryfall_uri": "https://scryfall.com/card/dmr/58/man-o-war",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Jellyfish",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1ef40d5-c287-4229-8059-3505d9f251ca.jpg?1675199356",
+          "normal": "https://cards.scryfall.io/normal/front/a/1/a1ef40d5-c287-4229-8059-3505d9f251ca.jpg?1675199356"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Counterspell",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 27,
+        "tier_rating": "B",
+        "note": null,
+        "id": "02da8709-4228-4fed-9d2d-781e686661df",
+        "scryfall_uri": "https://scryfall.com/card/dmr/45/counterspell",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/2/02da8709-4228-4fed-9d2d-781e686661df.jpg?1675199223",
+          "normal": "https://cards.scryfall.io/normal/front/0/2/02da8709-4228-4fed-9d2d-781e686661df.jpg?1675199223"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Peregrine Drake",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 69,
+        "tier_rating": "C",
+        "note": null,
+        "id": "611c8fa2-b53f-483b-9efa-759ac59dc30f",
+        "scryfall_uri": "https://scryfall.com/card/dmr/65/peregrine-drake",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Drake",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/611c8fa2-b53f-483b-9efa-759ac59dc30f.jpg?1675199421",
+          "normal": "https://cards.scryfall.io/normal/front/6/1/611c8fa2-b53f-483b-9efa-759ac59dc30f.jpg?1675199421"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Deep Analysis",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 67,
+        "tier_rating": "C",
+        "note": null,
+        "id": "d1d675e0-0e79-4f90-b3d7-d4bfaedd4719",
+        "scryfall_uri": "https://scryfall.com/card/dmr/46/deep-analysis",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1d675e0-0e79-4f90-b3d7-d4bfaedd4719.jpg?1675199234",
+          "normal": "https://cards.scryfall.io/normal/front/d/1/d1d675e0-0e79-4f90-b3d7-d4bfaedd4719.jpg?1675199234"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Aven Fisher",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 95,
+        "tier_rating": "C",
+        "note": null,
+        "id": "92b8cd57-df68-4f6d-9612-21e66b9f0190",
+        "scryfall_uri": "https://scryfall.com/card/dmr/41/aven-fisher",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Bird Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/92b8cd57-df68-4f6d-9612-21e66b9f0190.jpg?1675199177",
+          "normal": "https://cards.scryfall.io/normal/front/9/2/92b8cd57-df68-4f6d-9612-21e66b9f0190.jpg?1675199177"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Impulse",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 96,
+        "tier_rating": "C",
+        "note": null,
+        "id": "3ec50625-5e14-4fd0-9a96-86f195342695",
+        "scryfall_uri": "https://scryfall.com/card/dmr/56/impulse",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/e/3ec50625-5e14-4fd0-9a96-86f195342695.jpg?1675199337",
+          "normal": "https://cards.scryfall.io/normal/front/3/e/3ec50625-5e14-4fd0-9a96-86f195342695.jpg?1675199337"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Obsessive Search",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 97,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1d97436e-329a-49a4-a7c9-671ec9ba90cc",
+        "scryfall_uri": "https://scryfall.com/card/dmr/61/obsessive-search",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1d97436e-329a-49a4-a7c9-671ec9ba90cc.jpg?1675199383",
+          "normal": "https://cards.scryfall.io/normal/front/1/d/1d97436e-329a-49a4-a7c9-671ec9ba90cc.jpg?1675199383"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Snap",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 70,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f13406c6-f208-402a-94d3-a94a24f03563",
+        "scryfall_uri": "https://scryfall.com/card/dmr/66/snap",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f13406c6-f208-402a-94d3-a94a24f03563.jpg?1675199430",
+          "normal": "https://cards.scryfall.io/normal/front/f/1/f13406c6-f208-402a-94d3-a94a24f03563.jpg?1675199430"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Terror",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 42,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a3870eba-4e8f-414d-817c-14ec97f6a93c",
+        "scryfall_uri": "https://scryfall.com/card/dmr/103/terror",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a3870eba-4e8f-414d-817c-14ec97f6a93c.jpg?1675199810",
+          "normal": "https://cards.scryfall.io/normal/front/a/3/a3870eba-4e8f-414d-817c-14ec97f6a93c.jpg?1675199810"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Phyrexian Rager",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 41,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1db97152-afd5-4190-8bf1-1276b0fcf005",
+        "scryfall_uri": "https://scryfall.com/card/dmr/99/phyrexian-rager",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Phyrexian Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1db97152-afd5-4190-8bf1-1276b0fcf005.jpg?1675199773",
+          "normal": "https://cards.scryfall.io/normal/front/1/d/1db97152-afd5-4190-8bf1-1276b0fcf005.jpg?1675199773"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Cackling Fiend",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 98,
+        "tier_rating": "C",
+        "note": null,
+        "id": "c7e4fa7f-a5d7-46cd-bc46-d3d231235460",
+        "scryfall_uri": "https://scryfall.com/card/dmr/76/cackling-fiend",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Zombie",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7e4fa7f-a5d7-46cd-bc46-d3d231235460.jpg?1675199534",
+          "normal": "https://cards.scryfall.io/normal/front/c/7/c7e4fa7f-a5d7-46cd-bc46-d3d231235460.jpg?1675199534"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Urborg Uprising",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 141,
+        "tier_rating": "C",
+        "note": null,
+        "id": "497dedba-909a-4f1d-8b05-39c512007fbd",
+        "scryfall_uri": "https://scryfall.com/card/dmr/107/urborg-uprising",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/497dedba-909a-4f1d-8b05-39c512007fbd.jpg?1675199850",
+          "normal": "https://cards.scryfall.io/normal/front/4/9/497dedba-909a-4f1d-8b05-39c512007fbd.jpg?1675199850"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Ichor Slick",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 99,
+        "tier_rating": "C",
+        "note": null,
+        "id": "9db67828-5697-45fd-87db-ff27ef9cec5a",
+        "scryfall_uri": "https://scryfall.com/card/dmr/90/ichor-slick",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9db67828-5697-45fd-87db-ff27ef9cec5a.jpg?1675199686",
+          "normal": "https://cards.scryfall.io/normal/front/9/d/9db67828-5697-45fd-87db-ff27ef9cec5a.jpg?1675199686"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Chain Lightning",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 43,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2105a0d9-ea2e-4ffc-be08-424b5617205d",
+        "scryfall_uri": "https://scryfall.com/card/dmr/113/chain-lightning",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/2105a0d9-ea2e-4ffc-be08-424b5617205d.jpg?1758104090",
+          "normal": "https://cards.scryfall.io/normal/front/2/1/2105a0d9-ea2e-4ffc-be08-424b5617205d.jpg?1758104090"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Solar Blast",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 108,
+        "tier_rating": "C",
+        "note": null,
+        "id": "87202a72-72aa-46d3-ba16-10a180276905",
+        "scryfall_uri": "https://scryfall.com/card/dmr/140/solar-blast",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/87202a72-72aa-46d3-ba16-10a180276905.jpg?1675200204",
+          "normal": "https://cards.scryfall.io/normal/front/8/7/87202a72-72aa-46d3-ba16-10a180276905.jpg?1675200204"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Coal Stoker",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 105,
+        "tier_rating": "C",
+        "note": null,
+        "id": "67c8578e-052f-4182-9bb1-fb35450d22c0",
+        "scryfall_uri": "https://scryfall.com/card/dmr/114/coal-stoker",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Elemental",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/67c8578e-052f-4182-9bb1-fb35450d22c0.jpg?1675199916",
+          "normal": "https://cards.scryfall.io/normal/front/6/7/67c8578e-052f-4182-9bb1-fb35450d22c0.jpg?1675199916"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Goblin Matron",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 106,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a521a254-c484-4d59-bb7e-8745e96d4bbf",
+        "scryfall_uri": "https://scryfall.com/card/dmr/123/goblin-matron",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Goblin",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a521a254-c484-4d59-bb7e-8745e96d4bbf.jpg?1675200004",
+          "normal": "https://cards.scryfall.io/normal/front/a/5/a521a254-c484-4d59-bb7e-8745e96d4bbf.jpg?1675200004"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Werebear",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 116,
+        "tier_rating": "C",
+        "note": null,
+        "id": "973310bb-ab32-46dc-8f59-8a5d3e1c58cc",
+        "scryfall_uri": "https://scryfall.com/card/dmr/182/werebear",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Bear Druid",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/973310bb-ab32-46dc-8f59-8a5d3e1c58cc.jpg?1675200590",
+          "normal": "https://cards.scryfall.io/normal/front/9/7/973310bb-ab32-46dc-8f59-8a5d3e1c58cc.jpg?1675200590"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Wild Growth",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 79,
+        "tier_rating": "C",
+        "note": null,
+        "id": "61429340-15fa-4a70-aac3-3e358b23b02c",
+        "scryfall_uri": "https://scryfall.com/card/dmr/184/wild-growth",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/61429340-15fa-4a70-aac3-3e358b23b02c.jpg?1675200609",
+          "normal": "https://cards.scryfall.io/normal/front/6/1/61429340-15fa-4a70-aac3-3e358b23b02c.jpg?1675200609"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Symbiotic Beast",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 78,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cf013aa4-76d6-4378-8916-d10f591f225a",
+        "scryfall_uri": "https://scryfall.com/card/dmr/180/symbiotic-beast",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Insect Beast",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf013aa4-76d6-4378-8916-d10f591f225a.jpg?1687551863",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cf013aa4-76d6-4378-8916-d10f591f225a.jpg?1687551863"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Fa'adiyah Seer",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 75,
+        "tier_rating": "C",
+        "note": null,
+        "id": "3d717a50-6409-462e-9643-4427d754c773",
+        "scryfall_uri": "https://scryfall.com/card/dmr/160/faadiyah-seer",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Shaman",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d717a50-6409-462e-9643-4427d754c773.jpg?1675200404",
+          "normal": "https://cards.scryfall.io/normal/front/3/d/3d717a50-6409-462e-9643-4427d754c773.jpg?1675200404"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Elvish Aberration",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 191,
+        "tier_rating": "D",
+        "note": null,
+        "id": "cfd91d0d-bc6c-41a1-aecf-d31465717182",
+        "scryfall_uri": "https://scryfall.com/card/dmr/156/elvish-aberration",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elf Mutant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cfd91d0d-bc6c-41a1-aecf-d31465717182.jpg?1675200366",
+          "normal": "https://cards.scryfall.io/normal/front/c/f/cfd91d0d-bc6c-41a1-aecf-d31465717182.jpg?1675200366"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ],
+    "Colorless": [
+      {
+        "name": "Mind Stone",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 62,
+        "tier_rating": "C",
+        "note": "Excellent ramp + card draw.",
+        "id": "5cef8f31-a95e-49d0-ba75-7a639fcaa649",
+        "scryfall_uri": "https://scryfall.com/card/dmr/232/mind-stone",
+        "colors": [],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5cef8f31-a95e-49d0-ba75-7a639fcaa649.jpg?1675201073",
+          "normal": "https://cards.scryfall.io/normal/front/5/c/5cef8f31-a95e-49d0-ba75-7a639fcaa649.jpg?1675201073"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ]
+  },
+  "bomb_rares": [
+    {
+      "name": "Lyra Dawnbringer",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 2,
+      "tier_rating": "S",
+      "note": null,
+      "id": "a2e0c8c5-ea0e-4347-b5cb-b7b1801a523b",
+      "scryfall_uri": "https://scryfall.com/card/dmr/13/lyra-dawnbringer",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Creature — Angel",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a2e0c8c5-ea0e-4347-b5cb-b7b1801a523b.jpg?1675198875",
+        "normal": "https://cards.scryfall.io/normal/front/a/2/a2e0c8c5-ea0e-4347-b5cb-b7b1801a523b.jpg?1675198875"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Sylvan Library",
+      "color": "G",
+      "rarity": "Mythic",
+      "pick_order_rank": 13,
+      "tier_rating": "B",
+      "note": null,
+      "id": "6ada256f-2e55-4c1f-b4d3-d7b10b498956",
+      "scryfall_uri": "https://scryfall.com/card/dmr/179/sylvan-library",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/a/6ada256f-2e55-4c1f-b4d3-d7b10b498956.jpg?1675200566",
+        "normal": "https://cards.scryfall.io/normal/front/6/a/6ada256f-2e55-4c1f-b4d3-d7b10b498956.jpg?1675200566"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Urza, Lord High Artificer",
+      "color": "U",
+      "rarity": "Mythic",
+      "pick_order_rank": 17,
+      "tier_rating": "B",
+      "note": null,
+      "id": "18b26e53-1fc2-4d07-a56f-9000ed25580d",
+      "scryfall_uri": "https://scryfall.com/card/dmr/71/urza-lord-high-artificer",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Legendary Creature — Human Artificer",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/8/18b26e53-1fc2-4d07-a56f-9000ed25580d.jpg?1675199484",
+        "normal": "https://cards.scryfall.io/normal/front/1/8/18b26e53-1fc2-4d07-a56f-9000ed25580d.jpg?1675199484"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Yawgmoth, Thran Physician",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": null,
+      "id": "b5a79f5d-d0df-4799-ac3a-84305e3af0c9",
+      "scryfall_uri": "https://scryfall.com/card/dmr/110/yawgmoth-thran-physician",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Creature — Human Cleric",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5a79f5d-d0df-4799-ac3a-84305e3af0c9.jpg?1675199878",
+        "normal": "https://cards.scryfall.io/normal/front/b/5/b5a79f5d-d0df-4799-ac3a-84305e3af0c9.jpg?1675199878"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Arcanis the Omnipotent",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 6,
+      "tier_rating": "A",
+      "note": null,
+      "id": "2074ed36-fbae-4886-b3ad-360fdfbb69cd",
+      "scryfall_uri": "https://scryfall.com/card/dmr/39/arcanis-the-omnipotent",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Legendary Creature — Wizard",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/2074ed36-fbae-4886-b3ad-360fdfbb69cd.jpg?1675199157",
+        "normal": "https://cards.scryfall.io/normal/front/2/0/2074ed36-fbae-4886-b3ad-360fdfbb69cd.jpg?1675199157"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Birds of Paradise",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 35,
+      "tier_rating": "B",
+      "note": null,
+      "id": "496849a5-4b24-4eae-8bfb-d46f645d85ea",
+      "scryfall_uri": "https://scryfall.com/card/dmr/151/birds-of-paradise",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Bird",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/9/496849a5-4b24-4eae-8bfb-d46f645d85ea.jpg?1675200313",
+        "normal": "https://cards.scryfall.io/normal/front/4/9/496849a5-4b24-4eae-8bfb-d46f645d85ea.jpg?1675200313"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Forgotten Ancient",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 44,
+      "tier_rating": "C",
+      "note": null,
+      "id": "6d79e492-993e-4305-bff2-b45f6b2536c8",
+      "scryfall_uri": "https://scryfall.com/card/dmr/161/forgotten-ancient",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Elemental",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/d/6d79e492-993e-4305-bff2-b45f6b2536c8.jpg?1675200413",
+        "normal": "https://cards.scryfall.io/normal/front/6/d/6d79e492-993e-4305-bff2-b45f6b2536c8.jpg?1675200413"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Grim Lavamancer",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 31,
+      "tier_rating": "B",
+      "note": null,
+      "id": "1ab6ffe8-e1ad-4db9-98f7-d6038f271866",
+      "scryfall_uri": "https://scryfall.com/card/dmr/126/grim-lavamancer",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Creature — Human Wizard",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1ab6ffe8-e1ad-4db9-98f7-d6038f271866.jpg?1675200043",
+        "normal": "https://cards.scryfall.io/normal/front/1/a/1ab6ffe8-e1ad-4db9-98f7-d6038f271866.jpg?1675200043"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Opposition",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 39,
+      "tier_rating": "C",
+      "note": null,
+      "id": "ae14acde-8a5c-4f0e-8e68-b799a363b9f7",
+      "scryfall_uri": "https://scryfall.com/card/dmr/62/opposition",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/ae14acde-8a5c-4f0e-8e68-b799a363b9f7.jpg?1675977485",
+        "normal": "https://cards.scryfall.io/normal/front/a/e/ae14acde-8a5c-4f0e-8e68-b799a363b9f7.jpg?1675977485"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Pashalik Mons",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 20,
+      "tier_rating": "B",
+      "note": null,
+      "id": "ca20a650-65b0-4714-b7ce-0481af3db377",
+      "scryfall_uri": "https://scryfall.com/card/dmr/133/pashalik-mons",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Legendary Creature — Goblin Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/ca20a650-65b0-4714-b7ce-0481af3db377.jpg?1675200126",
+        "normal": "https://cards.scryfall.io/normal/front/c/a/ca20a650-65b0-4714-b7ce-0481af3db377.jpg?1675200126"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Siege-Gang Commander",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 12,
+      "tier_rating": "B",
+      "note": null,
+      "id": "5dd6a913-88df-4fbc-964e-a8fec3ad989f",
+      "scryfall_uri": "https://scryfall.com/card/dmr/136/siege-gang-commander",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Creature — Goblin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5dd6a913-88df-4fbc-964e-a8fec3ad989f.jpg?1675200158",
+        "normal": "https://cards.scryfall.io/normal/front/5/d/5dd6a913-88df-4fbc-964e-a8fec3ad989f.jpg?1675200158"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Sulfuric Vortex",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 34,
+      "tier_rating": "B",
+      "note": null,
+      "id": "3253a624-50cc-4a8a-9b0c-9902aa53775f",
+      "scryfall_uri": "https://scryfall.com/card/dmr/144/sulfuric-vortex",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/3253a624-50cc-4a8a-9b0c-9902aa53775f.jpg?1675200242",
+        "normal": "https://cards.scryfall.io/normal/front/3/2/3253a624-50cc-4a8a-9b0c-9902aa53775f.jpg?1675200242"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Triskelion",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 25,
+      "tier_rating": "B",
+      "note": null,
+      "id": "3151a1d7-bf4a-4615-8bf1-37d1e406a708",
+      "scryfall_uri": "https://scryfall.com/card/dmr/236/triskelion",
+      "colors": [],
+      "type_line": "Artifact Creature — Construct",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/1/3151a1d7-bf4a-4615-8bf1-37d1e406a708.jpg?1675201109",
+        "normal": "https://cards.scryfall.io/normal/front/3/1/3151a1d7-bf4a-4615-8bf1-37d1e406a708.jpg?1675201109"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Wrath of God",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 3,
+      "tier_rating": "S",
+      "note": null,
+      "id": "c3700519-b74c-4445-b42e-03690b8d4463",
+      "scryfall_uri": "https://scryfall.com/card/dmr/37/wrath-of-god",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3700519-b74c-4445-b42e-03690b8d4463.jpg?1675199137",
+        "normal": "https://cards.scryfall.io/normal/front/c/3/c3700519-b74c-4445-b42e-03690b8d4463.jpg?1675199137"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    }
+  ],
+  "unplayable_rares": [
+    {
+      "name": "Dark Depths",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 259,
+      "tier_rating": "D",
+      "note": null,
+      "id": "3a8b11ad-d077-40b6-988c-0462e118fe3d",
+      "scryfall_uri": "https://scryfall.com/card/dmr/244/dark-depths",
+      "colors": [],
+      "type_line": "Legendary Snow Land",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/a/3a8b11ad-d077-40b6-988c-0462e118fe3d.jpg?1764119697",
+        "normal": "https://cards.scryfall.io/normal/front/3/a/3a8b11ad-d077-40b6-988c-0462e118fe3d.jpg?1764119697"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Hunting Grounds",
+      "color": "WG",
+      "rarity": "Mythic",
+      "pick_order_rank": 217,
+      "tier_rating": "D",
+      "note": null,
+      "id": "6e544772-5ab8-47dd-8a6e-686d385a6ee7",
+      "scryfall_uri": "https://scryfall.com/card/dmr/191/hunting-grounds",
+      "colors": [
+        "G",
+        "W"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e544772-5ab8-47dd-8a6e-686d385a6ee7.jpg?1675200675",
+        "normal": "https://cards.scryfall.io/normal/front/6/e/6e544772-5ab8-47dd-8a6e-686d385a6ee7.jpg?1675200675"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Last Chance",
+      "color": "R",
+      "rarity": "Mythic",
+      "pick_order_rank": 244,
+      "tier_rating": "D",
+      "note": null,
+      "id": "c0efb595-d407-4389-a99d-d97c4d6bdcd0",
+      "scryfall_uri": "https://scryfall.com/card/dmr/127/last-chance",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/0/c0efb595-d407-4389-a99d-d97c4d6bdcd0.jpg?1675200054",
+        "normal": "https://cards.scryfall.io/normal/front/c/0/c0efb595-d407-4389-a99d-d97c4d6bdcd0.jpg?1675200054"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Legacy Weapon",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 250,
+      "tier_rating": "D",
+      "note": null,
+      "id": "afd35d5c-7f28-4842-85e8-692d6c391c3a",
+      "scryfall_uri": "https://scryfall.com/card/dmr/229/legacy-weapon",
+      "colors": [],
+      "type_line": "Legendary Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/f/afd35d5c-7f28-4842-85e8-692d6c391c3a.jpg?1675201047",
+        "normal": "https://cards.scryfall.io/normal/front/a/f/afd35d5c-7f28-4842-85e8-692d6c391c3a.jpg?1675201047"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Test of Endurance",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 254,
+      "tier_rating": "D",
+      "note": null,
+      "id": "76841945-8ff1-4c2d-895e-d1e2cf468cff",
+      "scryfall_uri": "https://scryfall.com/card/dmr/32/test-of-endurance",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/6/76841945-8ff1-4c2d-895e-d1e2cf468cff.jpg?1675199087",
+        "normal": "https://cards.scryfall.io/normal/front/7/6/76841945-8ff1-4c2d-895e-d1e2cf468cff.jpg?1675199087"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Urza's Incubator",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 237,
+      "tier_rating": "D",
+      "note": null,
+      "id": "d8122161-1608-4af4-9aca-7f22c2f746aa",
+      "scryfall_uri": "https://scryfall.com/card/dmr/239/urzas-incubator",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d8122161-1608-4af4-9aca-7f22c2f746aa.jpg?1675201135",
+        "normal": "https://cards.scryfall.io/normal/front/d/8/d8122161-1608-4af4-9aca-7f22c2f746aa.jpg?1675201135"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Arcades Sabboth",
+      "color": "WUG",
+      "rarity": "Rare",
+      "pick_order_rank": 215,
+      "tier_rating": "D",
+      "note": null,
+      "id": "175695bb-2630-4269-a407-9138c7008e81",
+      "scryfall_uri": "https://scryfall.com/card/dmr/187/arcades-sabboth",
+      "colors": [
+        "G",
+        "U",
+        "W"
+      ],
+      "type_line": "Legendary Creature — Elder Dragon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/7/175695bb-2630-4269-a407-9138c7008e81.jpg?1675200635",
+        "normal": "https://cards.scryfall.io/normal/front/1/7/175695bb-2630-4269-a407-9138c7008e81.jpg?1675200635"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Cryptic Gateway",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 248,
+      "tier_rating": "D",
+      "note": null,
+      "id": "c872e2b4-3ca9-4649-b863-17c0c4065f63",
+      "scryfall_uri": "https://scryfall.com/card/dmr/218/cryptic-gateway",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/8/c872e2b4-3ca9-4649-b863-17c0c4065f63.jpg?1675200934",
+        "normal": "https://cards.scryfall.io/normal/front/c/8/c872e2b4-3ca9-4649-b863-17c0c4065f63.jpg?1675200934"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Gamble",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 243,
+      "tier_rating": "D",
+      "note": null,
+      "id": "8e37fae5-ddd0-4e16-8581-71579f89d9c5",
+      "scryfall_uri": "https://scryfall.com/card/dmr/121/gamble",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8e37fae5-ddd0-4e16-8581-71579f89d9c5.jpg?1745319947",
+        "normal": "https://cards.scryfall.io/normal/front/8/e/8e37fae5-ddd0-4e16-8581-71579f89d9c5.jpg?1745319947"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    },
+    {
+      "name": "Jester's Cap",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 261,
+      "tier_rating": "F",
+      "note": null,
+      "id": "b364e7e7-83e5-474b-9768-8b70a77e5ffa",
+      "scryfall_uri": "https://scryfall.com/card/dmr/227/jesters-cap",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b364e7e7-83e5-474b-9768-8b70a77e5ffa.jpg?1675201025",
+        "normal": "https://cards.scryfall.io/normal/front/b/3/b364e7e7-83e5-474b-9768-8b70a77e5ffa.jpg?1675201025"
+      },
+      "set": "dmr",
+      "set_name": "Dominaria Remastered"
+    }
+  ],
+  "mana_fixing": {
+    "description": "Severely limited. 99% of decks are 2-color.",
+    "options": [
+      {
+        "name": "Terminal Moraine",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 200,
+        "tier_rating": "D",
+        "note": "Warped Landscape predecessor; clunky but functional.",
+        "id": "9029f22b-f153-4f9a-a60f-ba2d0b6e0a1d",
+        "scryfall_uri": "https://scryfall.com/card/dmr/259/terminal-moraine",
+        "colors": [],
+        "type_line": "Land",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/9029f22b-f153-4f9a-a60f-ba2d0b6e0a1d.jpg?1675201334",
+          "normal": "https://cards.scryfall.io/normal/front/9/0/9029f22b-f153-4f9a-a60f-ba2d0b6e0a1d.jpg?1675201334"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Rith's Grove",
+        "color": "C",
+        "rarity": "Uncommon",
+        "pick_order_rank": 225,
+        "tier_rating": "D",
+        "note": "Lair — uncommon, plays at -1 mana efficiency.",
+        "id": "8a605ce4-ede6-44dd-a2ea-e953902be6bd",
+        "scryfall_uri": "https://scryfall.com/card/dmr/255/riths-grove",
+        "colors": [],
+        "type_line": "Land — Lair",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/a/8a605ce4-ede6-44dd-a2ea-e953902be6bd.jpg?1675201294",
+          "normal": "https://cards.scryfall.io/normal/front/8/a/8a605ce4-ede6-44dd-a2ea-e953902be6bd.jpg?1675201294"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Darigaaz's Caldera",
+        "color": "C",
+        "rarity": "Uncommon",
+        "pick_order_rank": 223,
+        "tier_rating": "D",
+        "note": null,
+        "id": "27b1ad2d-f02e-4e6b-a49a-f65d174bb0fc",
+        "scryfall_uri": "https://scryfall.com/card/dmr/243/darigaazs-caldera",
+        "colors": [],
+        "type_line": "Land — Lair",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/27b1ad2d-f02e-4e6b-a49a-f65d174bb0fc.jpg?1675201174",
+          "normal": "https://cards.scryfall.io/normal/front/2/7/27b1ad2d-f02e-4e6b-a49a-f65d174bb0fc.jpg?1675201174"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Crosis's Catacombs",
+        "color": "C",
+        "rarity": "Uncommon",
+        "pick_order_rank": 222,
+        "tier_rating": "D",
+        "note": null,
+        "id": "52ce462b-e4de-4972-9e96-2e3d3a20d1fc",
+        "scryfall_uri": "https://scryfall.com/card/dmr/242/crosiss-catacombs",
+        "colors": [],
+        "type_line": "Land — Lair",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/52ce462b-e4de-4972-9e96-2e3d3a20d1fc.jpg?1675201162",
+          "normal": "https://cards.scryfall.io/normal/front/5/2/52ce462b-e4de-4972-9e96-2e3d3a20d1fc.jpg?1675201162"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Dromar's Cavern",
+        "color": "C",
+        "rarity": "Uncommon",
+        "pick_order_rank": 224,
+        "tier_rating": "D",
+        "note": null,
+        "id": "10380662-88bd-4bc5-b8c3-14af425fc5a5",
+        "scryfall_uri": "https://scryfall.com/card/dmr/246/dromars-cavern",
+        "colors": [],
+        "type_line": "Land — Lair",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/0/10380662-88bd-4bc5-b8c3-14af425fc5a5.jpg?1675201199",
+          "normal": "https://cards.scryfall.io/normal/front/1/0/10380662-88bd-4bc5-b8c3-14af425fc5a5.jpg?1675201199"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      },
+      {
+        "name": "Treva's Ruins",
+        "color": "C",
+        "rarity": "Uncommon",
+        "pick_order_rank": 226,
+        "tier_rating": "D",
+        "note": null,
+        "id": "4f39366c-00df-4528-a324-6a89d0c53f0a",
+        "scryfall_uri": "https://scryfall.com/card/dmr/260/trevas-ruins",
+        "colors": [],
+        "type_line": "Land — Lair",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f39366c-00df-4528-a324-6a89d0c53f0a.jpg?1675201344",
+          "normal": "https://cards.scryfall.io/normal/front/4/f/4f39366c-00df-4528-a324-6a89d0c53f0a.jpg?1675201344"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ],
+    "avoid": [
+      {
+        "name": "Crop Rotation",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 246,
+        "tier_rating": "D",
+        "note": "Avoid — poor Limited card.",
+        "id": "523414cb-f8db-407a-808a-01454e03d8b9",
+        "scryfall_uri": "https://scryfall.com/card/dmr/154/crop-rotation",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/523414cb-f8db-407a-808a-01454e03d8b9.jpg?1770635095",
+          "normal": "https://cards.scryfall.io/normal/front/5/2/523414cb-f8db-407a-808a-01454e03d8b9.jpg?1770635095"
+        },
+        "set": "dmr",
+        "set_name": "Dominaria Remastered"
+      }
+    ]
+  },
+  "general_tips": [
+    "Prioritize blue for premium commons and flexibility.",
+    "Embrace archetype basics — fundamentals matter more than synergy.",
+    "Adjust land counts: Gruul cycling can run 15-16; storm decks can trim lower.",
+    "Draft interaction early — removal is sparse in some colors (green has none).",
+    "Evaluate signposts skeptically: Radha, Tatyova, and Recoil are strong; Dralnu's Crusade and Quicksilver Dagger have narrow synergies.",
+    "Note opponent cycling triggers — Invigorating Boon and Lightning Rift trigger on either player's cycle.",
+    "Avoid splash temptation — limited mana-fixing punishes greedy builds."
+  ]
+}

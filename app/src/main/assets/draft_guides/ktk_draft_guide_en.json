@@ -1,0 +1,2451 @@
+{
+  "metadata": {
+    "set_name": "Khans of Tarkir",
+    "set_code": "KTK",
+    "source_url": "https://draftsim.com/mtg-ktk-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "October 11, 2024"
+  },
+  "set_overview": {
+    "summary": "Khans of Tarkir emphasizes multicolored cards and the morph mechanic. The format supports 4-5 color decks with heavy land drafting. Compared to modern sets the number of outright bad cards is significantly higher, making card quality evaluation crucial. Khans rewards bombs + mana fixing more than typical Limited formats due to the slow environment and abundant land availability.",
+    "color_ranking": [
+      "{W}{B}{G} Abzan — contains the best 3-color cards in the set",
+      "{U}{R}{W} Jeskai — splashy 3-color cards with strong tempo",
+      "{R}{W}{B} Mardu — aggressive with immediate damage potential",
+      "{G}{U}{R} Temur — big creatures well above rate; smooth starts required",
+      "{B}{G}{U} Sultai — grindy graveyard-focused control"
+    ],
+    "color_notes": {
+      "Note": "KTK is clan-driven (3-color wedges). Most decks should start as 5c/good-stuff and migrate into a clan as signals dictate."
+    },
+    "key_gameplay_notes": [
+      "Bombs + mana fixing matter more than in modern formats.",
+      "Slow format — strong cards are dominant; weak cards drag decks down hard.",
+      "Morphs smooth mana requirements and slow game pace.",
+      "Removal is notably weaker than modern standards; instants are often playable without response windows.",
+      "The Rule of 5: most morphs with strong combat stats cost 5+ mana to flip — large threats won't suddenly appear if your opponent lacks 5 mana."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Outlast (Abzan)",
+      "summary": "Pay mana and tap to put a +1/+1 counter on this creature (sorcery speed).",
+      "performance": "Long-game payoff for Abzan; pairs with counter lords.",
+      "key_examples": [
+        {
+          "name": "Abzan Battle Priest",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 89,
+          "tier_rating": "C",
+          "note": null,
+          "id": "8f5427b1-f1c2-4bb3-8736-701667ac2256",
+          "scryfall_uri": "https://scryfall.com/card/ktk/1/abzan-battle-priest",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8f5427b1-f1c2-4bb3-8736-701667ac2256.jpg?1562790236",
+            "normal": "https://cards.scryfall.io/normal/front/8/f/8f5427b1-f1c2-4bb3-8736-701667ac2256.jpg?1562790236"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Abzan Falconer",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 41,
+          "tier_rating": "B",
+          "note": null,
+          "id": "21ee4f3c-dc94-4156-b0ed-60fe6310451a",
+          "scryfall_uri": "https://scryfall.com/card/ktk/2/abzan-falconer",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/21ee4f3c-dc94-4156-b0ed-60fe6310451a.jpg?1562783594",
+            "normal": "https://cards.scryfall.io/normal/front/2/1/21ee4f3c-dc94-4156-b0ed-60fe6310451a.jpg?1562783594"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Tuskguard Captain",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 147,
+          "tier_rating": "D",
+          "note": null,
+          "id": "b341cc65-d316-41bb-95b8-294afa019a71",
+          "scryfall_uri": "https://scryfall.com/card/ktk/156/tuskguard-captain",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b341cc65-d316-41bb-95b8-294afa019a71.jpg?1562792160",
+            "normal": "https://cards.scryfall.io/normal/front/b/3/b341cc65-d316-41bb-95b8-294afa019a71.jpg?1562792160"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    {
+      "name": "Prowess (Jeskai)",
+      "summary": "Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.",
+      "performance": "Pairs cheap creatures with instants/sorceries for tempo.",
+      "key_examples": [
+        {
+          "name": "Mantis Rider",
+          "color": "WUR",
+          "rarity": "Rare",
+          "pick_order_rank": 34,
+          "tier_rating": "A",
+          "note": null,
+          "id": "82d5ce46-7118-4ede-ba1d-c387e7ce16e7",
+          "scryfall_uri": "https://scryfall.com/card/ktk/184/mantis-rider",
+          "colors": [
+            "R",
+            "U",
+            "W"
+          ],
+          "type_line": "Creature — Human Monk",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/82d5ce46-7118-4ede-ba1d-c387e7ce16e7.jpg?1562789458",
+            "normal": "https://cards.scryfall.io/normal/front/8/2/82d5ce46-7118-4ede-ba1d-c387e7ce16e7.jpg?1562789458"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Jeskai Ascendancy",
+          "color": "WUR",
+          "rarity": "Rare",
+          "pick_order_rank": 216,
+          "tier_rating": "F",
+          "note": null,
+          "id": "ca9c2522-5606-4bbd-863d-f0ab0a612b4e",
+          "scryfall_uri": "https://scryfall.com/card/ktk/180/jeskai-ascendancy",
+          "colors": [
+            "R",
+            "U",
+            "W"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/ca9c2522-5606-4bbd-863d-f0ab0a612b4e.jpg?1562793510",
+            "normal": "https://cards.scryfall.io/normal/front/c/a/ca9c2522-5606-4bbd-863d-f0ab0a612b4e.jpg?1562793510"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    {
+      "name": "Delve (Sultai)",
+      "summary": "Exile cards from your graveyard to reduce the cost of this spell.",
+      "performance": "Only play 1-2 delve cards or build specifically around the mechanic.",
+      "key_examples": [
+        {
+          "name": "Treasure Cruise",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 158,
+          "tier_rating": "D",
+          "note": null,
+          "id": "7a59d4b1-6cf4-44ec-8a96-1bb7094fea21",
+          "scryfall_uri": "https://scryfall.com/card/ktk/59/treasure-cruise",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a59d4b1-6cf4-44ec-8a96-1bb7094fea21.jpg?1562788963",
+            "normal": "https://cards.scryfall.io/normal/front/7/a/7a59d4b1-6cf4-44ec-8a96-1bb7094fea21.jpg?1562788963"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Sultai Scavenger",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 83,
+          "tier_rating": "C",
+          "note": null,
+          "id": "2cb8e423-f7e7-4ac3-acc2-2a3722e409e7",
+          "scryfall_uri": "https://scryfall.com/card/ktk/91/sultai-scavenger",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Bird Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cb8e423-f7e7-4ac3-acc2-2a3722e409e7.jpg?1562784280",
+            "normal": "https://cards.scryfall.io/normal/front/2/c/2cb8e423-f7e7-4ac3-acc2-2a3722e409e7.jpg?1562784280"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Hooting Mandrills",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 135,
+          "tier_rating": "C",
+          "note": null,
+          "id": "090d678c-f0e4-4757-8900-93dfe67aefe9",
+          "scryfall_uri": "https://scryfall.com/card/ktk/137/hooting-mandrills",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Ape",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/090d678c-f0e4-4757-8900-93dfe67aefe9.jpg?1562782269",
+            "normal": "https://cards.scryfall.io/normal/front/0/9/090d678c-f0e4-4757-8900-93dfe67aefe9.jpg?1562782269"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    {
+      "name": "Raid (Mardu)",
+      "summary": "Trigger when you have attacked with a creature this turn.",
+      "performance": "Pure aggression payoff.",
+      "key_examples": [
+        {
+          "name": "Mardu Hordechief",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 36,
+          "tier_rating": "B",
+          "note": null,
+          "id": "23426221-30a8-4be2-9c70-f0eb022edad7",
+          "scryfall_uri": "https://scryfall.com/card/ktk/17/mardu-hordechief",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Human Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/3/23426221-30a8-4be2-9c70-f0eb022edad7.jpg?1562783652",
+            "normal": "https://cards.scryfall.io/normal/front/2/3/23426221-30a8-4be2-9c70-f0eb022edad7.jpg?1562783652"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Mardu Warshrieker",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 134,
+          "tier_rating": "C",
+          "note": null,
+          "id": "1381ae25-0d44-4d06-beae-48e4bbb4bb45",
+          "scryfall_uri": "https://scryfall.com/card/ktk/117/mardu-warshrieker",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Orc Shaman",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/1381ae25-0d44-4d06-beae-48e4bbb4bb45.jpg?1562782862",
+            "normal": "https://cards.scryfall.io/normal/front/1/3/1381ae25-0d44-4d06-beae-48e4bbb4bb45.jpg?1562782862"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    {
+      "name": "Ferocious (Temur)",
+      "summary": "Triggers when you control a creature with power 4 or greater.",
+      "performance": "Rewards big creatures; struggles from behind.",
+      "key_examples": [
+        {
+          "name": "Savage Punch",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 100,
+          "tier_rating": "C",
+          "note": null,
+          "id": "6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c",
+          "scryfall_uri": "https://scryfall.com/card/ktk/147/savage-punch",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166",
+            "normal": "https://cards.scryfall.io/normal/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Force Away",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 125,
+          "tier_rating": "C",
+          "note": null,
+          "id": "dda70b3e-4b70-404e-a579-41dd126be084",
+          "scryfall_uri": "https://scryfall.com/card/ktk/40/force-away",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644",
+            "normal": "https://cards.scryfall.io/normal/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    {
+      "name": "Morph",
+      "summary": "Cast any creature with morph face-down as a 2/2 for 3 mana, then pay the morph cost to flip it face-up. Morphing does not use the stack — opponents get no response window.",
+      "performance": "Format-defining. Smooths mana, slows the game, and adds bluffing.",
+      "key_examples": [
+        {
+          "name": "Woolly Loxodon",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 86,
+          "tier_rating": "C",
+          "note": "Strongest common morph.",
+          "id": "a890c55a-8746-4233-b75a-19cc760c1e8e",
+          "scryfall_uri": "https://scryfall.com/card/ktk/158/woolly-loxodon",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Elephant Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/8/a890c55a-8746-4233-b75a-19cc760c1e8e.jpg?1562791638",
+            "normal": "https://cards.scryfall.io/normal/front/a/8/a890c55a-8746-4233-b75a-19cc760c1e8e.jpg?1562791638"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Trail of Mystery",
+          "color": "G",
+          "rarity": "Rare",
+          "pick_order_rank": 54,
+          "tier_rating": "B",
+          "note": null,
+          "id": "6149685f-cb05-4c1f-95a4-3810505d1a95",
+          "scryfall_uri": "https://scryfall.com/card/ktk/154/trail-of-mystery",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/6149685f-cb05-4c1f-95a4-3810505d1a95.jpg?1562787478",
+            "normal": "https://cards.scryfall.io/normal/front/6/1/6149685f-cb05-4c1f-95a4-3810505d1a95.jpg?1562787478"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Secret Plans",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 195,
+          "tier_rating": "F",
+          "note": null,
+          "id": "01589046-a969-400f-b4ac-90cbbb814504",
+          "scryfall_uri": "https://scryfall.com/card/ktk/198/secret-plans",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/01589046-a969-400f-b4ac-90cbbb814504.jpg?1562781791",
+            "normal": "https://cards.scryfall.io/normal/front/0/1/01589046-a969-400f-b4ac-90cbbb814504.jpg?1562781791"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{W}{B}{G}",
+        "name": "Abzan Outlast",
+        "tier": "Tier 1 — Best Clan",
+        "strategy": "Long-game approach with counter payoffs. Stack outlast lords; multicolor cards are essential for premium removal.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Abzan Battle Priest",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 89,
+            "tier_rating": "C",
+            "note": null,
+            "id": "8f5427b1-f1c2-4bb3-8736-701667ac2256",
+            "scryfall_uri": "https://scryfall.com/card/ktk/1/abzan-battle-priest",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8f5427b1-f1c2-4bb3-8736-701667ac2256.jpg?1562790236",
+              "normal": "https://cards.scryfall.io/normal/front/8/f/8f5427b1-f1c2-4bb3-8736-701667ac2256.jpg?1562790236"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Abzan Falconer",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 41,
+            "tier_rating": "B",
+            "note": null,
+            "id": "21ee4f3c-dc94-4156-b0ed-60fe6310451a",
+            "scryfall_uri": "https://scryfall.com/card/ktk/2/abzan-falconer",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/21ee4f3c-dc94-4156-b0ed-60fe6310451a.jpg?1562783594",
+              "normal": "https://cards.scryfall.io/normal/front/2/1/21ee4f3c-dc94-4156-b0ed-60fe6310451a.jpg?1562783594"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Tuskguard Captain",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 147,
+            "tier_rating": "D",
+            "note": null,
+            "id": "b341cc65-d316-41bb-95b8-294afa019a71",
+            "scryfall_uri": "https://scryfall.com/card/ktk/156/tuskguard-captain",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b341cc65-d316-41bb-95b8-294afa019a71.jpg?1562792160",
+              "normal": "https://cards.scryfall.io/normal/front/b/3/b341cc65-d316-41bb-95b8-294afa019a71.jpg?1562792160"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Duneblast",
+            "color": "WBG",
+            "rarity": "Rare",
+            "pick_order_rank": 22,
+            "tier_rating": "A",
+            "note": null,
+            "id": "d076ea5f-630a-4670-9b15-29fd2cececd2",
+            "scryfall_uri": "https://scryfall.com/card/ktk/174/duneblast",
+            "colors": [
+              "B",
+              "G",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/0/d076ea5f-630a-4670-9b15-29fd2cececd2.jpg?1562793871",
+              "normal": "https://cards.scryfall.io/normal/front/d/0/d076ea5f-630a-4670-9b15-29fd2cececd2.jpg?1562793871"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Siege Rhino",
+            "color": "WBG",
+            "rarity": "Rare",
+            "pick_order_rank": 10,
+            "tier_rating": "S",
+            "note": null,
+            "id": "9011126a-20bd-4c86-a63b-1691f79ac247",
+            "scryfall_uri": "https://scryfall.com/card/ktk/200/siege-rhino",
+            "colors": [
+              "B",
+              "G",
+              "W"
+            ],
+            "type_line": "Creature — Rhino",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/9011126a-20bd-4c86-a63b-1691f79ac247.jpg?1562790317",
+              "normal": "https://cards.scryfall.io/normal/front/9/0/9011126a-20bd-4c86-a63b-1691f79ac247.jpg?1562790317"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Abzan Ascendancy",
+            "color": "WBG",
+            "rarity": "Rare",
+            "pick_order_rank": 8,
+            "tier_rating": "S",
+            "note": null,
+            "id": "9af53a53-d30a-4289-a043-953cd81ee241",
+            "scryfall_uri": "https://scryfall.com/card/ktk/160/abzan-ascendancy",
+            "colors": [
+              "B",
+              "G",
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/a/9af53a53-d30a-4289-a043-953cd81ee241.jpg?1562790940",
+              "normal": "https://cards.scryfall.io/normal/front/9/a/9af53a53-d30a-4289-a043-953cd81ee241.jpg?1562790940"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Abzan Charm",
+            "color": "WBG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 18,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8f7b7598-35b0-4bb5-8347-8c868500f846",
+            "scryfall_uri": "https://scryfall.com/card/ktk/161/abzan-charm",
+            "colors": [
+              "B",
+              "G",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8f7b7598-35b0-4bb5-8347-8c868500f846.jpg?1562790259",
+              "normal": "https://cards.scryfall.io/normal/front/8/f/8f7b7598-35b0-4bb5-8347-8c868500f846.jpg?1562790259"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{U}{R}{W}",
+        "name": "Jeskai Prowess",
+        "tier": "Tier 2 — Strong Clan",
+        "strategy": "Tempo decks mixing cheap creatures with instant/sorcery spells. Aggressive with fliers and Arrow Storm; Jeskai Ascendancy is better in a tempo shell.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Flying Crane Technique",
+            "color": "WUR",
+            "rarity": "Rare",
+            "pick_order_rank": 101,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f1ba7efe-ae5a-4d11-b535-1c2e5e6f5982",
+            "scryfall_uri": "https://scryfall.com/card/ktk/176/flying-crane-technique",
+            "colors": [
+              "R",
+              "U",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f1ba7efe-ae5a-4d11-b535-1c2e5e6f5982.jpg?1562795844",
+              "normal": "https://cards.scryfall.io/normal/front/f/1/f1ba7efe-ae5a-4d11-b535-1c2e5e6f5982.jpg?1562795844"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Jeskai Ascendancy",
+            "color": "WUR",
+            "rarity": "Rare",
+            "pick_order_rank": 216,
+            "tier_rating": "F",
+            "note": null,
+            "id": "ca9c2522-5606-4bbd-863d-f0ab0a612b4e",
+            "scryfall_uri": "https://scryfall.com/card/ktk/180/jeskai-ascendancy",
+            "colors": [
+              "R",
+              "U",
+              "W"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/ca9c2522-5606-4bbd-863d-f0ab0a612b4e.jpg?1562793510",
+              "normal": "https://cards.scryfall.io/normal/front/c/a/ca9c2522-5606-4bbd-863d-f0ab0a612b4e.jpg?1562793510"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Mantis Rider",
+            "color": "WUR",
+            "rarity": "Rare",
+            "pick_order_rank": 34,
+            "tier_rating": "A",
+            "note": null,
+            "id": "82d5ce46-7118-4ede-ba1d-c387e7ce16e7",
+            "scryfall_uri": "https://scryfall.com/card/ktk/184/mantis-rider",
+            "colors": [
+              "R",
+              "U",
+              "W"
+            ],
+            "type_line": "Creature — Human Monk",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/82d5ce46-7118-4ede-ba1d-c387e7ce16e7.jpg?1562789458",
+              "normal": "https://cards.scryfall.io/normal/front/8/2/82d5ce46-7118-4ede-ba1d-c387e7ce16e7.jpg?1562789458"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Jeskai Windscout",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 155,
+            "tier_rating": "D",
+            "note": null,
+            "id": "66356e38-38e1-4b09-80c2-be26007ff99c",
+            "scryfall_uri": "https://scryfall.com/card/ktk/44/jeskai-windscout",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Bird Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66356e38-38e1-4b09-80c2-be26007ff99c.jpg?1562787785",
+              "normal": "https://cards.scryfall.io/normal/front/6/6/66356e38-38e1-4b09-80c2-be26007ff99c.jpg?1562787785"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Arrow Storm",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 160,
+            "tier_rating": "D",
+            "note": null,
+            "id": "c57534fb-2591-4003-aeec-6452faa4a759",
+            "scryfall_uri": "https://scryfall.com/card/ktk/98/arrow-storm",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c57534fb-2591-4003-aeec-6452faa4a759.jpg?1562793262",
+              "normal": "https://cards.scryfall.io/normal/front/c/5/c57534fb-2591-4003-aeec-6452faa4a759.jpg?1562793262"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}{B}",
+        "name": "Mardu Raid",
+        "tier": "Tier 2 — Strong Clan",
+        "strategy": "Most aggressive clan; rarely plays slowly. Wide-based aggression with immediate damage potential.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Ankle Shanker",
+            "color": "WBR",
+            "rarity": "Rare",
+            "pick_order_rank": 110,
+            "tier_rating": "C",
+            "note": null,
+            "id": "6c5bb5d2-181a-44ea-9b56-87f8d96bf634",
+            "scryfall_uri": "https://scryfall.com/card/ktk/164/ankle-shanker",
+            "colors": [
+              "B",
+              "R",
+              "W"
+            ],
+            "type_line": "Creature — Goblin Berserker",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c5bb5d2-181a-44ea-9b56-87f8d96bf634.jpg?1562788164",
+              "normal": "https://cards.scryfall.io/normal/front/6/c/6c5bb5d2-181a-44ea-9b56-87f8d96bf634.jpg?1562788164"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Butcher of the Horde",
+            "color": "WBR",
+            "rarity": "Rare",
+            "pick_order_rank": 9,
+            "tier_rating": "S",
+            "note": null,
+            "id": "4c76027b-9c8d-4181-9311-270fed0212e3",
+            "scryfall_uri": "https://scryfall.com/card/ktk/168/butcher-of-the-horde",
+            "colors": [
+              "B",
+              "R",
+              "W"
+            ],
+            "type_line": "Creature — Demon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c76027b-9c8d-4181-9311-270fed0212e3.jpg?1562786278",
+              "normal": "https://cards.scryfall.io/normal/front/4/c/4c76027b-9c8d-4181-9311-270fed0212e3.jpg?1562786278"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Mardu Hordechief",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 36,
+            "tier_rating": "B",
+            "note": null,
+            "id": "23426221-30a8-4be2-9c70-f0eb022edad7",
+            "scryfall_uri": "https://scryfall.com/card/ktk/17/mardu-hordechief",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/3/23426221-30a8-4be2-9c70-f0eb022edad7.jpg?1562783652",
+              "normal": "https://cards.scryfall.io/normal/front/2/3/23426221-30a8-4be2-9c70-f0eb022edad7.jpg?1562783652"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Mardu Warshrieker",
+            "color": "R",
+            "rarity": "Common",
+            "pick_order_rank": 134,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1381ae25-0d44-4d06-beae-48e4bbb4bb45",
+            "scryfall_uri": "https://scryfall.com/card/ktk/117/mardu-warshrieker",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature — Orc Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/1381ae25-0d44-4d06-beae-48e4bbb4bb45.jpg?1562782862",
+              "normal": "https://cards.scryfall.io/normal/front/1/3/1381ae25-0d44-4d06-beae-48e4bbb4bb45.jpg?1562782862"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}{R}",
+        "name": "Temur Ferocious",
+        "tier": "Tier 2 — Strong Clan",
+        "strategy": "Creature-heavy beatdown that maximizes 4/x power triggers. Struggles from behind — needs smooth starts.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Savage Punch",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 100,
+            "tier_rating": "C",
+            "note": null,
+            "id": "6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c",
+            "scryfall_uri": "https://scryfall.com/card/ktk/147/savage-punch",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166",
+              "normal": "https://cards.scryfall.io/normal/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Force Away",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 125,
+            "tier_rating": "C",
+            "note": null,
+            "id": "dda70b3e-4b70-404e-a579-41dd126be084",
+            "scryfall_uri": "https://scryfall.com/card/ktk/40/force-away",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644",
+              "normal": "https://cards.scryfall.io/normal/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Surrak Dragonclaw",
+            "color": "URG",
+            "rarity": "Mythic",
+            "pick_order_rank": 6,
+            "tier_rating": "S",
+            "note": null,
+            "id": "03032d89-caca-43ff-b2ea-028e376c829c",
+            "scryfall_uri": "https://scryfall.com/card/ktk/206/surrak-dragonclaw",
+            "colors": [
+              "G",
+              "R",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Human Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/3/03032d89-caca-43ff-b2ea-028e376c829c.jpg?1562781878",
+              "normal": "https://cards.scryfall.io/normal/front/0/3/03032d89-caca-43ff-b2ea-028e376c829c.jpg?1562781878"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Savage Knuckleblade",
+            "color": "URG",
+            "rarity": "Rare",
+            "pick_order_rank": 23,
+            "tier_rating": "A",
+            "note": null,
+            "id": "4c9dddd3-7c8d-4669-8298-58149b142b8a",
+            "scryfall_uri": "https://scryfall.com/card/ktk/197/savage-knuckleblade",
+            "colors": [
+              "G",
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Ogre Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c9dddd3-7c8d-4669-8298-58149b142b8a.jpg?1562786291",
+              "normal": "https://cards.scryfall.io/normal/front/4/c/4c9dddd3-7c8d-4669-8298-58149b142b8a.jpg?1562786291"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{B}{G}{U}",
+        "name": "Sultai Delve",
+        "tier": "Tier 3 — Slow Clan",
+        "strategy": "Grindy, graveyard-focused control. Watch for decking; fliers (Sultai Scavenger) provide inevitability.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Villainous Wealth",
+            "color": "UBG",
+            "rarity": "Rare",
+            "pick_order_rank": 165,
+            "tier_rating": "D",
+            "note": null,
+            "id": "0610e69b-8b7c-40e4-bb10-28ee4411f861",
+            "scryfall_uri": "https://scryfall.com/card/ktk/211/villainous-wealth",
+            "colors": [
+              "B",
+              "G",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/0610e69b-8b7c-40e4-bb10-28ee4411f861.jpg?1562782076",
+              "normal": "https://cards.scryfall.io/normal/front/0/6/0610e69b-8b7c-40e4-bb10-28ee4411f861.jpg?1562782076"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Sultai Soothsayer",
+            "color": "UBG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 70,
+            "tier_rating": "B",
+            "note": null,
+            "id": "ae0de2c9-957e-41ee-8899-b93e6f1091dc",
+            "scryfall_uri": "https://scryfall.com/card/ktk/205/sultai-soothsayer",
+            "colors": [
+              "B",
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Snake Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/ae0de2c9-957e-41ee-8899-b93e6f1091dc.jpg?1562791937",
+              "normal": "https://cards.scryfall.io/normal/front/a/e/ae0de2c9-957e-41ee-8899-b93e6f1091dc.jpg?1562791937"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Kheru Lich Lord",
+            "color": "UBG",
+            "rarity": "Rare",
+            "pick_order_rank": 217,
+            "tier_rating": "F",
+            "note": null,
+            "id": "e7fbca8d-34a3-4df1-986a-36fca142a758",
+            "scryfall_uri": "https://scryfall.com/card/ktk/182/kheru-lich-lord",
+            "colors": [
+              "B",
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Zombie Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7fbca8d-34a3-4df1-986a-36fca142a758.jpg?1562795282",
+              "normal": "https://cards.scryfall.io/normal/front/e/7/e7fbca8d-34a3-4df1-986a-36fca142a758.jpg?1562795282"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Rakshasa Vizier",
+            "color": "UBG",
+            "rarity": "Rare",
+            "pick_order_rank": 137,
+            "tier_rating": "C",
+            "note": null,
+            "id": "cb39e674-919d-4db6-9ac1-cfa1cca02207",
+            "scryfall_uri": "https://scryfall.com/card/ktk/193/rakshasa-vizier",
+            "colors": [
+              "B",
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Demon",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/b/cb39e674-919d-4db6-9ac1-cfa1cca02207.jpg?1699601238",
+              "normal": "https://cards.scryfall.io/normal/front/c/b/cb39e674-919d-4db6-9ac1-cfa1cca02207.jpg?1699601238"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          },
+          {
+            "name": "Sultai Ascendancy",
+            "color": "UBG",
+            "rarity": "Rare",
+            "pick_order_rank": 240,
+            "tier_rating": "F",
+            "note": null,
+            "id": "3314d77a-039f-43e4-a457-6ceba20c0ffe",
+            "scryfall_uri": "https://scryfall.com/card/ktk/203/sultai-ascendancy",
+            "colors": [
+              "B",
+              "G",
+              "U"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/3/3314d77a-039f-43e4-a457-6ceba20c0ffe.jpg?1665819808",
+              "normal": "https://cards.scryfall.io/normal/front/3/3/3314d77a-039f-43e4-a457-6ceba20c0ffe.jpg?1665819808"
+            },
+            "set": "ktk",
+            "set_name": "Khans of Tarkir"
+          }
+        ]
+      }
+    ]
+  },
+  "special_archetypes": {
+    "bwr_warriors": {
+      "description": "Lean curve punishing 5-color decks. Ponyback Brigade is the primary reason for the third color. Can function as 2-color (WB) or full Mardu.",
+      "cards": [
+        {
+          "name": "Chief of the Edge",
+          "color": "WB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 21,
+          "tier_rating": "A",
+          "note": null,
+          "id": "28822a9a-97fa-4784-ad97-072fcfc7b9ed",
+          "scryfall_uri": "https://scryfall.com/card/ktk/169/chief-of-the-edge",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Creature — Human Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/8/28822a9a-97fa-4784-ad97-072fcfc7b9ed.jpg?1562784003",
+            "normal": "https://cards.scryfall.io/normal/front/2/8/28822a9a-97fa-4784-ad97-072fcfc7b9ed.jpg?1562784003"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Chief of the Scale",
+          "color": "WB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 48,
+          "tier_rating": "B",
+          "note": null,
+          "id": "a227b8cc-cbe5-4955-ad1b-a354704a82e8",
+          "scryfall_uri": "https://scryfall.com/card/ktk/170/chief-of-the-scale",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Creature — Human Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/2/a227b8cc-cbe5-4955-ad1b-a354704a82e8.jpg?1562791315",
+            "normal": "https://cards.scryfall.io/normal/front/a/2/a227b8cc-cbe5-4955-ad1b-a354704a82e8.jpg?1562791315"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Raiders' Spoils",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 49,
+          "tier_rating": "B",
+          "note": null,
+          "id": "cd3e423e-cb62-43e1-9d0c-e702f823c8e1",
+          "scryfall_uri": "https://scryfall.com/card/ktk/83/raiders-spoils",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/d/cd3e423e-cb62-43e1-9d0c-e702f823c8e1.jpg?1562793691",
+            "normal": "https://cards.scryfall.io/normal/front/c/d/cd3e423e-cb62-43e1-9d0c-e702f823c8e1.jpg?1562793691"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Rush of Battle",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 72,
+          "tier_rating": "C",
+          "note": null,
+          "id": "0d47d8aa-59c8-4e2c-bb48-328ae924dbb3",
+          "scryfall_uri": "https://scryfall.com/card/ktk/19/rush-of-battle",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d47d8aa-59c8-4e2c-bb48-328ae924dbb3.jpg?1562782475",
+            "normal": "https://cards.scryfall.io/normal/front/0/d/0d47d8aa-59c8-4e2c-bb48-328ae924dbb3.jpg?1562782475"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Ponyback Brigade",
+          "color": "WBR",
+          "rarity": "Common",
+          "pick_order_rank": 75,
+          "tier_rating": "C",
+          "note": null,
+          "id": "192d77ef-e8b5-44e2-842b-2c1f342c1e69",
+          "scryfall_uri": "https://scryfall.com/card/ktk/191/ponyback-brigade",
+          "colors": [
+            "B",
+            "R",
+            "W"
+          ],
+          "type_line": "Creature — Goblin Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/192d77ef-e8b5-44e2-842b-2c1f342c1e69.jpg?1562783191",
+            "normal": "https://cards.scryfall.io/normal/front/1/9/192d77ef-e8b5-44e2-842b-2c1f342c1e69.jpg?1562783191"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    "ug_bear_punch": {
+      "description": "Savage Punch + Alpine Grizzly for rapid pressure. Punishes greedy mana bases by exploiting fast clocks.",
+      "cards": [
+        {
+          "name": "Savage Punch",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 100,
+          "tier_rating": "C",
+          "note": null,
+          "id": "6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c",
+          "scryfall_uri": "https://scryfall.com/card/ktk/147/savage-punch",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166",
+            "normal": "https://cards.scryfall.io/normal/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Alpine Grizzly",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 109,
+          "tier_rating": "C",
+          "note": null,
+          "id": "38bbf983-df71-4403-86f3-2e86aa8765b8",
+          "scryfall_uri": "https://scryfall.com/card/ktk/127/alpine-grizzly",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Bear",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/38bbf983-df71-4403-86f3-2e86aa8765b8.jpg?1562784926",
+            "normal": "https://cards.scryfall.io/normal/front/3/8/38bbf983-df71-4403-86f3-2e86aa8765b8.jpg?1562784926"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Force Away",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 125,
+          "tier_rating": "C",
+          "note": null,
+          "id": "dda70b3e-4b70-404e-a579-41dd126be084",
+          "scryfall_uri": "https://scryfall.com/card/ktk/40/force-away",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644",
+            "normal": "https://cards.scryfall.io/normal/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Jeskai Windscout",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 155,
+          "tier_rating": "D",
+          "note": null,
+          "id": "66356e38-38e1-4b09-80c2-be26007ff99c",
+          "scryfall_uri": "https://scryfall.com/card/ktk/44/jeskai-windscout",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Bird Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66356e38-38e1-4b09-80c2-be26007ff99c.jpg?1562787785",
+            "normal": "https://cards.scryfall.io/normal/front/6/6/66356e38-38e1-4b09-80c2-be26007ff99c.jpg?1562787785"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Singing Bell Strike",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 204,
+          "tier_rating": "F",
+          "note": null,
+          "id": "670f24e1-dec9-42e6-b762-c447366ed16c",
+          "scryfall_uri": "https://scryfall.com/card/ktk/55/singing-bell-strike",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment — Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/670f24e1-dec9-42e6-b762-c447366ed16c.jpg?1562787818",
+            "normal": "https://cards.scryfall.io/normal/front/6/7/670f24e1-dec9-42e6-b762-c447366ed16c.jpg?1562787818"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Smoke Teller",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 175,
+          "tier_rating": "D",
+          "note": null,
+          "id": "1916a2d9-4747-4118-b1b2-7a5ce492e3fc",
+          "scryfall_uri": "https://scryfall.com/card/ktk/151/smoke-teller",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Human Shaman",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/1916a2d9-4747-4118-b1b2-7a5ce492e3fc.jpg?1562783190",
+            "normal": "https://cards.scryfall.io/normal/front/1/9/1916a2d9-4747-4118-b1b2-7a5ce492e3fc.jpg?1562783190"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Wetland Sambar",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 198,
+          "tier_rating": "F",
+          "note": null,
+          "id": "f71a86e0-d15a-4fba-94f6-bfbaade8d837",
+          "scryfall_uri": "https://scryfall.com/card/ktk/62/wetland-sambar",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Elk",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f71a86e0-d15a-4fba-94f6-bfbaade8d837.jpg?1562796153",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f71a86e0-d15a-4fba-94f6-bfbaade8d837.jpg?1562796153"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    "ugx_morphs": {
+      "description": "Build around Secret Plans and Trail of Mystery. Best uncommon morphs (Dragon's Eye Savants, Temur Charger) reveal-trigger value.",
+      "cards": [
+        {
+          "name": "Secret Plans",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 195,
+          "tier_rating": "F",
+          "note": null,
+          "id": "01589046-a969-400f-b4ac-90cbbb814504",
+          "scryfall_uri": "https://scryfall.com/card/ktk/198/secret-plans",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/01589046-a969-400f-b4ac-90cbbb814504.jpg?1562781791",
+            "normal": "https://cards.scryfall.io/normal/front/0/1/01589046-a969-400f-b4ac-90cbbb814504.jpg?1562781791"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Trail of Mystery",
+          "color": "G",
+          "rarity": "Rare",
+          "pick_order_rank": 54,
+          "tier_rating": "B",
+          "note": null,
+          "id": "6149685f-cb05-4c1f-95a4-3810505d1a95",
+          "scryfall_uri": "https://scryfall.com/card/ktk/154/trail-of-mystery",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/1/6149685f-cb05-4c1f-95a4-3810505d1a95.jpg?1562787478",
+            "normal": "https://cards.scryfall.io/normal/front/6/1/6149685f-cb05-4c1f-95a4-3810505d1a95.jpg?1562787478"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Dragon's Eye Savants",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 105,
+          "tier_rating": "C",
+          "note": null,
+          "id": "9ff29b2c-2156-45fd-a2dd-655b8d208197",
+          "scryfall_uri": "https://scryfall.com/card/ktk/38/dragons-eye-savants",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Human Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/f/9ff29b2c-2156-45fd-a2dd-655b8d208197.jpg?1562791201",
+            "normal": "https://cards.scryfall.io/normal/front/9/f/9ff29b2c-2156-45fd-a2dd-655b8d208197.jpg?1562791201"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Temur Charger",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 65,
+          "tier_rating": "B",
+          "note": null,
+          "id": "f77258fc-8683-4656-84a3-4df4ea2a8435",
+          "scryfall_uri": "https://scryfall.com/card/ktk/153/temur-charger",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Horse",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f77258fc-8683-4656-84a3-4df4ea2a8435.jpg?1562796176",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f77258fc-8683-4656-84a3-4df4ea2a8435.jpg?1562796176"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    },
+    "toughness_matters": {
+      "description": "Limited payoffs; only Kin-Tree Invocation is substantial. Support with Disowned Ancestor.",
+      "cards": [
+        {
+          "name": "Kheru Bloodsucker",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 129,
+          "tier_rating": "C",
+          "note": null,
+          "id": "baf15cd4-13be-48e7-b3f5-a5106eb02c45",
+          "scryfall_uri": "https://scryfall.com/card/ktk/75/kheru-bloodsucker",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Vampire",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/a/baf15cd4-13be-48e7-b3f5-a5106eb02c45.jpg?1562792642",
+            "normal": "https://cards.scryfall.io/normal/front/b/a/baf15cd4-13be-48e7-b3f5-a5106eb02c45.jpg?1562792642"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Sultai Flayer",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 64,
+          "tier_rating": "B",
+          "note": null,
+          "id": "7f3b2ef3-551d-4782-8dce-a923c0e2965e",
+          "scryfall_uri": "https://scryfall.com/card/ktk/152/sultai-flayer",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Snake Shaman",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f3b2ef3-551d-4782-8dce-a923c0e2965e.jpg?1562789217",
+            "normal": "https://cards.scryfall.io/normal/front/7/f/7f3b2ef3-551d-4782-8dce-a923c0e2965e.jpg?1562789217"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Kin-Tree Invocation",
+          "color": "BG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 67,
+          "tier_rating": "B",
+          "note": null,
+          "id": "926b49a1-f220-41ab-8c67-8354a91a15e8",
+          "scryfall_uri": "https://scryfall.com/card/ktk/183/kin-tree-invocation",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/926b49a1-f220-41ab-8c67-8354a91a15e8.jpg?1562790454",
+            "normal": "https://cards.scryfall.io/normal/front/9/2/926b49a1-f220-41ab-8c67-8354a91a15e8.jpg?1562790454"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        },
+        {
+          "name": "Disowned Ancestor",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 159,
+          "tier_rating": "D",
+          "note": null,
+          "id": "2d8bd496-632d-4d6d-a529-f35cf3222de7",
+          "scryfall_uri": "https://scryfall.com/card/ktk/70/disowned-ancestor",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Spirit Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d8bd496-632d-4d6d-a529-f35cf3222de7.jpg?1562784359",
+            "normal": "https://cards.scryfall.io/normal/front/2/d/2d8bd496-632d-4d6d-a529-f35cf3222de7.jpg?1562784359"
+          },
+          "set": "ktk",
+          "set_name": "Khans of Tarkir"
+        }
+      ]
+    }
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Ainok Bond-Kin",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 90,
+        "tier_rating": "C",
+        "note": null,
+        "id": "22d2a844-17fc-4628-9591-684555e98f7b",
+        "scryfall_uri": "https://scryfall.com/card/ktk/3/ainok-bond-kin",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Dog Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/2/22d2a844-17fc-4628-9591-684555e98f7b.jpg?1562783624",
+          "normal": "https://cards.scryfall.io/normal/front/2/2/22d2a844-17fc-4628-9591-684555e98f7b.jpg?1562783624"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Mardu Hordechief",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 36,
+        "tier_rating": "B",
+        "note": null,
+        "id": "23426221-30a8-4be2-9c70-f0eb022edad7",
+        "scryfall_uri": "https://scryfall.com/card/ktk/17/mardu-hordechief",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/3/23426221-30a8-4be2-9c70-f0eb022edad7.jpg?1562783652",
+          "normal": "https://cards.scryfall.io/normal/front/2/3/23426221-30a8-4be2-9c70-f0eb022edad7.jpg?1562783652"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Kill Shot",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 123,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f30d4136-78a3-4760-83af-d365cc97d118",
+        "scryfall_uri": "https://scryfall.com/card/ktk/15/kill-shot",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f30d4136-78a3-4760-83af-d365cc97d118.jpg?1562795914",
+          "normal": "https://cards.scryfall.io/normal/front/f/3/f30d4136-78a3-4760-83af-d365cc97d118.jpg?1562795914"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Feat of Resistance",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 29,
+        "tier_rating": "A",
+        "note": null,
+        "id": "b6173466-30db-4b95-a556-dd69e03b731e",
+        "scryfall_uri": "https://scryfall.com/card/ktk/10/feat-of-resistance",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/6/b6173466-30db-4b95-a556-dd69e03b731e.jpg?1562792351",
+          "normal": "https://cards.scryfall.io/normal/front/b/6/b6173466-30db-4b95-a556-dd69e03b731e.jpg?1562792351"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Jeskai Windscout",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 155,
+        "tier_rating": "D",
+        "note": null,
+        "id": "66356e38-38e1-4b09-80c2-be26007ff99c",
+        "scryfall_uri": "https://scryfall.com/card/ktk/44/jeskai-windscout",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Bird Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/6/66356e38-38e1-4b09-80c2-be26007ff99c.jpg?1562787785",
+          "normal": "https://cards.scryfall.io/normal/front/6/6/66356e38-38e1-4b09-80c2-be26007ff99c.jpg?1562787785"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Singing Bell Strike",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 204,
+        "tier_rating": "F",
+        "note": null,
+        "id": "670f24e1-dec9-42e6-b762-c447366ed16c",
+        "scryfall_uri": "https://scryfall.com/card/ktk/55/singing-bell-strike",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/670f24e1-dec9-42e6-b762-c447366ed16c.jpg?1562787818",
+          "normal": "https://cards.scryfall.io/normal/front/6/7/670f24e1-dec9-42e6-b762-c447366ed16c.jpg?1562787818"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Force Away",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 125,
+        "tier_rating": "C",
+        "note": null,
+        "id": "dda70b3e-4b70-404e-a579-41dd126be084",
+        "scryfall_uri": "https://scryfall.com/card/ktk/40/force-away",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644",
+          "normal": "https://cards.scryfall.io/normal/front/d/d/dda70b3e-4b70-404e-a579-41dd126be084.jpg?1562794644"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Treasure Cruise",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 158,
+        "tier_rating": "D",
+        "note": null,
+        "id": "7a59d4b1-6cf4-44ec-8a96-1bb7094fea21",
+        "scryfall_uri": "https://scryfall.com/card/ktk/59/treasure-cruise",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a59d4b1-6cf4-44ec-8a96-1bb7094fea21.jpg?1562788963",
+          "normal": "https://cards.scryfall.io/normal/front/7/a/7a59d4b1-6cf4-44ec-8a96-1bb7094fea21.jpg?1562788963"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Debilitating Injury",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 52,
+        "tier_rating": "B",
+        "note": null,
+        "id": "09b2b263-34db-4961-bf41-1eaaba3701da",
+        "scryfall_uri": "https://scryfall.com/card/ktk/68/debilitating-injury",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/09b2b263-34db-4961-bf41-1eaaba3701da.jpg?1562782284",
+          "normal": "https://cards.scryfall.io/normal/front/0/9/09b2b263-34db-4961-bf41-1eaaba3701da.jpg?1562782284"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Bitter Revelation",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 94,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e42f5aa9-2a47-47c3-ab87-dc25735b0e54",
+        "scryfall_uri": "https://scryfall.com/card/ktk/65/bitter-revelation",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e42f5aa9-2a47-47c3-ab87-dc25735b0e54.jpg?1562795020",
+          "normal": "https://cards.scryfall.io/normal/front/e/4/e42f5aa9-2a47-47c3-ab87-dc25735b0e54.jpg?1562795020"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Disowned Ancestor",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 159,
+        "tier_rating": "D",
+        "note": null,
+        "id": "2d8bd496-632d-4d6d-a529-f35cf3222de7",
+        "scryfall_uri": "https://scryfall.com/card/ktk/70/disowned-ancestor",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Spirit Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d8bd496-632d-4d6d-a529-f35cf3222de7.jpg?1562784359",
+          "normal": "https://cards.scryfall.io/normal/front/2/d/2d8bd496-632d-4d6d-a529-f35cf3222de7.jpg?1562784359"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Sultai Scavenger",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 83,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2cb8e423-f7e7-4ac3-acc2-2a3722e409e7",
+        "scryfall_uri": "https://scryfall.com/card/ktk/91/sultai-scavenger",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Bird Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/c/2cb8e423-f7e7-4ac3-acc2-2a3722e409e7.jpg?1562784280",
+          "normal": "https://cards.scryfall.io/normal/front/2/c/2cb8e423-f7e7-4ac3-acc2-2a3722e409e7.jpg?1562784280"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Bring Low",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 183,
+        "tier_rating": "D",
+        "note": null,
+        "id": "9ba5e7bf-2ad8-4061-937a-ef1e9b63da3d",
+        "scryfall_uri": "https://scryfall.com/card/ktk/103/bring-low",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/b/9ba5e7bf-2ad8-4061-937a-ef1e9b63da3d.jpg?1562790998",
+          "normal": "https://cards.scryfall.io/normal/front/9/b/9ba5e7bf-2ad8-4061-937a-ef1e9b63da3d.jpg?1562790998"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Arrow Storm",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 160,
+        "tier_rating": "D",
+        "note": null,
+        "id": "c57534fb-2591-4003-aeec-6452faa4a759",
+        "scryfall_uri": "https://scryfall.com/card/ktk/98/arrow-storm",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c57534fb-2591-4003-aeec-6452faa4a759.jpg?1562793262",
+          "normal": "https://cards.scryfall.io/normal/front/c/5/c57534fb-2591-4003-aeec-6452faa4a759.jpg?1562793262"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Mardu Warshrieker",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 134,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1381ae25-0d44-4d06-beae-48e4bbb4bb45",
+        "scryfall_uri": "https://scryfall.com/card/ktk/117/mardu-warshrieker",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Orc Shaman",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/1381ae25-0d44-4d06-beae-48e4bbb4bb45.jpg?1562782862",
+          "normal": "https://cards.scryfall.io/normal/front/1/3/1381ae25-0d44-4d06-beae-48e4bbb4bb45.jpg?1562782862"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Valley Dasher",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 161,
+        "tier_rating": "D",
+        "note": null,
+        "id": "8543adbd-0dd1-47d3-ac41-2ec72d6a5d35",
+        "scryfall_uri": "https://scryfall.com/card/ktk/125/valley-dasher",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Human Berserker",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/8543adbd-0dd1-47d3-ac41-2ec72d6a5d35.jpg?1562789625",
+          "normal": "https://cards.scryfall.io/normal/front/8/5/8543adbd-0dd1-47d3-ac41-2ec72d6a5d35.jpg?1562789625"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Savage Punch",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 100,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c",
+        "scryfall_uri": "https://scryfall.com/card/ktk/147/savage-punch",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166",
+          "normal": "https://cards.scryfall.io/normal/front/6/c/6c6b50dc-244a-4df5-a9a9-5a2b8f30d40c.jpg?1562788166"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Woolly Loxodon",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 86,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a890c55a-8746-4233-b75a-19cc760c1e8e",
+        "scryfall_uri": "https://scryfall.com/card/ktk/158/woolly-loxodon",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Elephant Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/8/a890c55a-8746-4233-b75a-19cc760c1e8e.jpg?1562791638",
+          "normal": "https://cards.scryfall.io/normal/front/a/8/a890c55a-8746-4233-b75a-19cc760c1e8e.jpg?1562791638"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Hooting Mandrills",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 135,
+        "tier_rating": "C",
+        "note": null,
+        "id": "090d678c-f0e4-4757-8900-93dfe67aefe9",
+        "scryfall_uri": "https://scryfall.com/card/ktk/137/hooting-mandrills",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Ape",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/9/090d678c-f0e4-4757-8900-93dfe67aefe9.jpg?1562782269",
+          "normal": "https://cards.scryfall.io/normal/front/0/9/090d678c-f0e4-4757-8900-93dfe67aefe9.jpg?1562782269"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      },
+      {
+        "name": "Longshot Squad",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 164,
+        "tier_rating": "D",
+        "note": null,
+        "id": "dd9edd62-dc18-4887-a020-4464e31b79c2",
+        "scryfall_uri": "https://scryfall.com/card/ktk/140/longshot-squad",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dog Archer",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/d/dd9edd62-dc18-4887-a020-4464e31b79c2.jpg?1562794643",
+          "normal": "https://cards.scryfall.io/normal/front/d/d/dd9edd62-dc18-4887-a020-4464e31b79c2.jpg?1562794643"
+        },
+        "set": "ktk",
+        "set_name": "Khans of Tarkir"
+      }
+    ]
+  },
+  "bomb_rares": [
+    {
+      "name": "Wingmate Roc",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": null,
+      "id": "25f0f6a2-b392-45e6-97c4-4f00016144d3",
+      "scryfall_uri": "https://scryfall.com/card/ktk/31/wingmate-roc",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Bird",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25f0f6a2-b392-45e6-97c4-4f00016144d3.jpg?1562783827",
+        "normal": "https://cards.scryfall.io/normal/front/2/5/25f0f6a2-b392-45e6-97c4-4f00016144d3.jpg?1562783827"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Sarkhan, the Dragonspeaker",
+      "color": "R",
+      "rarity": "Mythic",
+      "pick_order_rank": 7,
+      "tier_rating": "S",
+      "note": null,
+      "id": "c58064fd-4d8b-4f54-812f-0bb1d7e2ddc2",
+      "scryfall_uri": "https://scryfall.com/card/ktk/119/sarkhan-the-dragonspeaker",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Legendary Planeswalker — Sarkhan",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c58064fd-4d8b-4f54-812f-0bb1d7e2ddc2.jpg?1562793263",
+        "normal": "https://cards.scryfall.io/normal/front/c/5/c58064fd-4d8b-4f54-812f-0bb1d7e2ddc2.jpg?1562793263"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Hooded Hydra",
+      "color": "G",
+      "rarity": "Mythic",
+      "pick_order_rank": 46,
+      "tier_rating": "B",
+      "note": null,
+      "id": "9d7e651f-4187-44c5-99bf-34042d6dd9a2",
+      "scryfall_uri": "https://scryfall.com/card/ktk/136/hooded-hydra",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Snake Hydra",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/d/9d7e651f-4187-44c5-99bf-34042d6dd9a2.jpg?1562791088",
+        "normal": "https://cards.scryfall.io/normal/front/9/d/9d7e651f-4187-44c5-99bf-34042d6dd9a2.jpg?1562791088"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Sorin, Solemn Visitor",
+      "color": "WB",
+      "rarity": "Mythic",
+      "pick_order_rank": 19,
+      "tier_rating": "A",
+      "note": null,
+      "id": "da1a9643-34d6-4b4b-b896-2d4626eca40a",
+      "scryfall_uri": "https://scryfall.com/card/ktk/202/sorin-solemn-visitor",
+      "colors": [
+        "B",
+        "W"
+      ],
+      "type_line": "Legendary Planeswalker — Sorin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/a/da1a9643-34d6-4b4b-b896-2d4626eca40a.jpg?1562794474",
+        "normal": "https://cards.scryfall.io/normal/front/d/a/da1a9643-34d6-4b4b-b896-2d4626eca40a.jpg?1562794474"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Zurgo Helmsmasher",
+      "color": "WBR",
+      "rarity": "Mythic",
+      "pick_order_rank": 15,
+      "tier_rating": "S",
+      "note": null,
+      "id": "13f4bafe-0d21-47ba-8f16-0274107d618c",
+      "scryfall_uri": "https://scryfall.com/card/ktk/214/zurgo-helmsmasher",
+      "colors": [
+        "B",
+        "R",
+        "W"
+      ],
+      "type_line": "Legendary Creature — Orc Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/13f4bafe-0d21-47ba-8f16-0274107d618c.jpg?1562782879",
+        "normal": "https://cards.scryfall.io/normal/front/1/3/13f4bafe-0d21-47ba-8f16-0274107d618c.jpg?1562782879"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Surrak Dragonclaw",
+      "color": "URG",
+      "rarity": "Mythic",
+      "pick_order_rank": 6,
+      "tier_rating": "S",
+      "note": null,
+      "id": "03032d89-caca-43ff-b2ea-028e376c829c",
+      "scryfall_uri": "https://scryfall.com/card/ktk/206/surrak-dragonclaw",
+      "colors": [
+        "G",
+        "R",
+        "U"
+      ],
+      "type_line": "Legendary Creature — Human Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/3/03032d89-caca-43ff-b2ea-028e376c829c.jpg?1562781878",
+        "normal": "https://cards.scryfall.io/normal/front/0/3/03032d89-caca-43ff-b2ea-028e376c829c.jpg?1562781878"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Anafenza, the Foremost",
+      "color": "WBG",
+      "rarity": "Mythic",
+      "pick_order_rank": 12,
+      "tier_rating": "S",
+      "note": null,
+      "id": "c8b432a7-53da-4480-b571-e6feb1364a3a",
+      "scryfall_uri": "https://scryfall.com/card/ktk/163/anafenza-the-foremost",
+      "colors": [
+        "B",
+        "G",
+        "W"
+      ],
+      "type_line": "Legendary Creature — Human Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/8/c8b432a7-53da-4480-b571-e6feb1364a3a.jpg?1562793427",
+        "normal": "https://cards.scryfall.io/normal/front/c/8/c8b432a7-53da-4480-b571-e6feb1364a3a.jpg?1562793427"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "End Hostilities",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 51,
+      "tier_rating": "B",
+      "note": null,
+      "id": "80a53ed7-a7b7-40d8-9239-cf6f205dbc59",
+      "scryfall_uri": "https://scryfall.com/card/ktk/8/end-hostilities",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/0/80a53ed7-a7b7-40d8-9239-cf6f205dbc59.jpg?1562789330",
+        "normal": "https://cards.scryfall.io/normal/front/8/0/80a53ed7-a7b7-40d8-9239-cf6f205dbc59.jpg?1562789330"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "High Sentinels of Arashin",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 2,
+      "tier_rating": "S",
+      "note": null,
+      "id": "db5f4bab-f918-4b42-b82c-cfcf5ff0c58a",
+      "scryfall_uri": "https://scryfall.com/card/ktk/13/high-sentinels-of-arashin",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Bird Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/b/db5f4bab-f918-4b42-b82c-cfcf5ff0c58a.jpg?1562794547",
+        "normal": "https://cards.scryfall.io/normal/front/d/b/db5f4bab-f918-4b42-b82c-cfcf5ff0c58a.jpg?1562794547"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Master of Pearls",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 58,
+      "tier_rating": "B",
+      "note": null,
+      "id": "e8455229-6fec-4843-b888-e701c09620af",
+      "scryfall_uri": "https://scryfall.com/card/ktk/18/master-of-pearls",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Human Monk",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/8/e8455229-6fec-4843-b888-e701c09620af.jpg?1562795295",
+        "normal": "https://cards.scryfall.io/normal/front/e/8/e8455229-6fec-4843-b888-e701c09620af.jpg?1562795295"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Icy Blast",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 126,
+      "tier_rating": "C",
+      "note": null,
+      "id": "b098f029-6b5d-49e4-9a81-f497ebbdb5ce",
+      "scryfall_uri": "https://scryfall.com/card/ktk/42/icy-blast",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b098f029-6b5d-49e4-9a81-f497ebbdb5ce.jpg?1562792016",
+        "normal": "https://cards.scryfall.io/normal/front/b/0/b098f029-6b5d-49e4-9a81-f497ebbdb5ce.jpg?1562792016"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Thousand Winds",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 30,
+      "tier_rating": "A",
+      "note": null,
+      "id": "249b453c-0d5b-4af9-aaec-ebd2f19c5d23",
+      "scryfall_uri": "https://scryfall.com/card/ktk/58/thousand-winds",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature — Elemental",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/249b453c-0d5b-4af9-aaec-ebd2f19c5d23.jpg?1562783727",
+        "normal": "https://cards.scryfall.io/normal/front/2/4/249b453c-0d5b-4af9-aaec-ebd2f19c5d23.jpg?1562783727"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Crater's Claws",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 50,
+      "tier_rating": "B",
+      "note": null,
+      "id": "95dde66b-b4a1-4a1e-8c9e-0bec4790b1e5",
+      "scryfall_uri": "https://scryfall.com/card/ktk/106/craters-claws",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/95dde66b-b4a1-4a1e-8c9e-0bec4790b1e5.jpg?1562790652",
+        "normal": "https://cards.scryfall.io/normal/front/9/5/95dde66b-b4a1-4a1e-8c9e-0bec4790b1e5.jpg?1562790652"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Sagu Mauler",
+      "color": "UG",
+      "rarity": "Rare",
+      "pick_order_rank": 13,
+      "tier_rating": "S",
+      "note": null,
+      "id": "4c64af58-963d-497b-ab95-104839d96b94",
+      "scryfall_uri": "https://scryfall.com/card/ktk/196/sagu-mauler",
+      "colors": [
+        "G",
+        "U"
+      ],
+      "type_line": "Creature — Beast",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c64af58-963d-497b-ab95-104839d96b94.jpg?1562786271",
+        "normal": "https://cards.scryfall.io/normal/front/4/c/4c64af58-963d-497b-ab95-104839d96b94.jpg?1562786271"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Ankle Shanker",
+      "color": "WBR",
+      "rarity": "Rare",
+      "pick_order_rank": 110,
+      "tier_rating": "C",
+      "note": null,
+      "id": "6c5bb5d2-181a-44ea-9b56-87f8d96bf634",
+      "scryfall_uri": "https://scryfall.com/card/ktk/164/ankle-shanker",
+      "colors": [
+        "B",
+        "R",
+        "W"
+      ],
+      "type_line": "Creature — Goblin Berserker",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c5bb5d2-181a-44ea-9b56-87f8d96bf634.jpg?1562788164",
+        "normal": "https://cards.scryfall.io/normal/front/6/c/6c5bb5d2-181a-44ea-9b56-87f8d96bf634.jpg?1562788164"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Butcher of the Horde",
+      "color": "WBR",
+      "rarity": "Rare",
+      "pick_order_rank": 9,
+      "tier_rating": "S",
+      "note": null,
+      "id": "4c76027b-9c8d-4181-9311-270fed0212e3",
+      "scryfall_uri": "https://scryfall.com/card/ktk/168/butcher-of-the-horde",
+      "colors": [
+        "B",
+        "R",
+        "W"
+      ],
+      "type_line": "Creature — Demon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c76027b-9c8d-4181-9311-270fed0212e3.jpg?1562786278",
+        "normal": "https://cards.scryfall.io/normal/front/4/c/4c76027b-9c8d-4181-9311-270fed0212e3.jpg?1562786278"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Savage Knuckleblade",
+      "color": "URG",
+      "rarity": "Rare",
+      "pick_order_rank": 23,
+      "tier_rating": "A",
+      "note": null,
+      "id": "4c9dddd3-7c8d-4669-8298-58149b142b8a",
+      "scryfall_uri": "https://scryfall.com/card/ktk/197/savage-knuckleblade",
+      "colors": [
+        "G",
+        "R",
+        "U"
+      ],
+      "type_line": "Creature — Ogre Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/c/4c9dddd3-7c8d-4669-8298-58149b142b8a.jpg?1562786291",
+        "normal": "https://cards.scryfall.io/normal/front/4/c/4c9dddd3-7c8d-4669-8298-58149b142b8a.jpg?1562786291"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Abzan Ascendancy",
+      "color": "WBG",
+      "rarity": "Rare",
+      "pick_order_rank": 8,
+      "tier_rating": "S",
+      "note": null,
+      "id": "9af53a53-d30a-4289-a043-953cd81ee241",
+      "scryfall_uri": "https://scryfall.com/card/ktk/160/abzan-ascendancy",
+      "colors": [
+        "B",
+        "G",
+        "W"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/a/9af53a53-d30a-4289-a043-953cd81ee241.jpg?1562790940",
+        "normal": "https://cards.scryfall.io/normal/front/9/a/9af53a53-d30a-4289-a043-953cd81ee241.jpg?1562790940"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Duneblast",
+      "color": "WBG",
+      "rarity": "Rare",
+      "pick_order_rank": 22,
+      "tier_rating": "A",
+      "note": null,
+      "id": "d076ea5f-630a-4670-9b15-29fd2cececd2",
+      "scryfall_uri": "https://scryfall.com/card/ktk/174/duneblast",
+      "colors": [
+        "B",
+        "G",
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/0/d076ea5f-630a-4670-9b15-29fd2cececd2.jpg?1562793871",
+        "normal": "https://cards.scryfall.io/normal/front/d/0/d076ea5f-630a-4670-9b15-29fd2cececd2.jpg?1562793871"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Siege Rhino",
+      "color": "WBG",
+      "rarity": "Rare",
+      "pick_order_rank": 10,
+      "tier_rating": "S",
+      "note": null,
+      "id": "9011126a-20bd-4c86-a63b-1691f79ac247",
+      "scryfall_uri": "https://scryfall.com/card/ktk/200/siege-rhino",
+      "colors": [
+        "B",
+        "G",
+        "W"
+      ],
+      "type_line": "Creature — Rhino",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/0/9011126a-20bd-4c86-a63b-1691f79ac247.jpg?1562790317",
+        "normal": "https://cards.scryfall.io/normal/front/9/0/9011126a-20bd-4c86-a63b-1691f79ac247.jpg?1562790317"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Flying Crane Technique",
+      "color": "WUR",
+      "rarity": "Rare",
+      "pick_order_rank": 101,
+      "tier_rating": "C",
+      "note": null,
+      "id": "f1ba7efe-ae5a-4d11-b535-1c2e5e6f5982",
+      "scryfall_uri": "https://scryfall.com/card/ktk/176/flying-crane-technique",
+      "colors": [
+        "R",
+        "U",
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/1/f1ba7efe-ae5a-4d11-b535-1c2e5e6f5982.jpg?1562795844",
+        "normal": "https://cards.scryfall.io/normal/front/f/1/f1ba7efe-ae5a-4d11-b535-1c2e5e6f5982.jpg?1562795844"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Mantis Rider",
+      "color": "WUR",
+      "rarity": "Rare",
+      "pick_order_rank": 34,
+      "tier_rating": "A",
+      "note": null,
+      "id": "82d5ce46-7118-4ede-ba1d-c387e7ce16e7",
+      "scryfall_uri": "https://scryfall.com/card/ktk/184/mantis-rider",
+      "colors": [
+        "R",
+        "U",
+        "W"
+      ],
+      "type_line": "Creature — Human Monk",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/2/82d5ce46-7118-4ede-ba1d-c387e7ce16e7.jpg?1562789458",
+        "normal": "https://cards.scryfall.io/normal/front/8/2/82d5ce46-7118-4ede-ba1d-c387e7ce16e7.jpg?1562789458"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Villainous Wealth",
+      "color": "UBG",
+      "rarity": "Rare",
+      "pick_order_rank": 165,
+      "tier_rating": "D",
+      "note": null,
+      "id": "0610e69b-8b7c-40e4-bb10-28ee4411f861",
+      "scryfall_uri": "https://scryfall.com/card/ktk/211/villainous-wealth",
+      "colors": [
+        "B",
+        "G",
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/0610e69b-8b7c-40e4-bb10-28ee4411f861.jpg?1562782076",
+        "normal": "https://cards.scryfall.io/normal/front/0/6/0610e69b-8b7c-40e4-bb10-28ee4411f861.jpg?1562782076"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Ghostfire Blade",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 35,
+      "tier_rating": "A",
+      "note": null,
+      "id": "711145d8-5178-4fdc-8494-4ab680f55b1a",
+      "scryfall_uri": "https://scryfall.com/card/ktk/220/ghostfire-blade",
+      "colors": [],
+      "type_line": "Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/1/711145d8-5178-4fdc-8494-4ab680f55b1a.jpg?1562788410",
+        "normal": "https://cards.scryfall.io/normal/front/7/1/711145d8-5178-4fdc-8494-4ab680f55b1a.jpg?1562788410"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    }
+  ],
+  "rares_to_avoid": [
+    {
+      "name": "Retribution of the Ancients",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 230,
+      "tier_rating": "F",
+      "note": null,
+      "id": "0d3ee29d-b374-471d-80c3-bcad7a4226e6",
+      "scryfall_uri": "https://scryfall.com/card/ktk/85/retribution-of-the-ancients",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/d/0d3ee29d-b374-471d-80c3-bcad7a4226e6.jpg?1562782474",
+        "normal": "https://cards.scryfall.io/normal/front/0/d/0d3ee29d-b374-471d-80c3-bcad7a4226e6.jpg?1562782474"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Howl of the Horde",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 231,
+      "tier_rating": "F",
+      "note": "Needs supporting cheap spells.",
+      "id": "5db4baf3-f0dc-4b27-8323-a76764332590",
+      "scryfall_uri": "https://scryfall.com/card/ktk/112/howl-of-the-horde",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/d/5db4baf3-f0dc-4b27-8323-a76764332590.jpg?1562787225",
+        "normal": "https://cards.scryfall.io/normal/front/5/d/5db4baf3-f0dc-4b27-8323-a76764332590.jpg?1562787225"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Hardened Scales",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 235,
+      "tier_rating": "F",
+      "note": "Requires extensive outlast.",
+      "id": "7dcdf1db-bfaf-4160-8003-1fa2e56b00dc",
+      "scryfall_uri": "https://scryfall.com/card/ktk/133/hardened-scales",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7dcdf1db-bfaf-4160-8003-1fa2e56b00dc.jpg?1562789138",
+        "normal": "https://cards.scryfall.io/normal/front/7/d/7dcdf1db-bfaf-4160-8003-1fa2e56b00dc.jpg?1562789138"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Deflecting Palm",
+      "color": "WR",
+      "rarity": "Rare",
+      "pick_order_rank": 239,
+      "tier_rating": "F",
+      "note": "Unreliable.",
+      "id": "32374918-1bcb-4516-96af-f27da752517e",
+      "scryfall_uri": "https://scryfall.com/card/ktk/173/deflecting-palm",
+      "colors": [
+        "R",
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/32374918-1bcb-4516-96af-f27da752517e.jpg?1562784565",
+        "normal": "https://cards.scryfall.io/normal/front/3/2/32374918-1bcb-4516-96af-f27da752517e.jpg?1562784565"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Altar of the Brood",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 242,
+      "tier_rating": "F",
+      "note": null,
+      "id": "8d59d264-87ee-4305-bffb-110549331a82",
+      "scryfall_uri": "https://scryfall.com/card/ktk/216/altar-of-the-brood",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8d59d264-87ee-4305-bffb-110549331a82.jpg?1562790137",
+        "normal": "https://cards.scryfall.io/normal/front/8/d/8d59d264-87ee-4305-bffb-110549331a82.jpg?1562790137"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    },
+    {
+      "name": "Dragon Throne of Tarkir",
+      "color": "C",
+      "rarity": "Rare",
+      "pick_order_rank": 245,
+      "tier_rating": "F",
+      "note": null,
+      "id": "d508e6a6-034c-424d-993e-7354ce212f13",
+      "scryfall_uri": "https://scryfall.com/card/ktk/219/dragon-throne-of-tarkir",
+      "colors": [],
+      "type_line": "Legendary Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/5/d508e6a6-034c-424d-993e-7354ce212f13.jpg?1562794087",
+        "normal": "https://cards.scryfall.io/normal/front/d/5/d508e6a6-034c-424d-993e-7354ce212f13.jpg?1562794087"
+      },
+      "set": "ktk",
+      "set_name": "Khans of Tarkir"
+    }
+  ],
+  "draft_priority": [
+    "Bombs (rares / best uncommons)",
+    "Mana fixing (taplands; trilands at uncommon)",
+    "Premium removal (Debilitating Injury, Bring Low, Kill Shot)",
+    "Card draw (Bitter Revelation, Treasure Cruise, Weave Fate)",
+    "Quality cards (top commons, efficient uncommons, strong morphs)",
+    "Mediocre removal (Rite of the Serpent, Throttle)",
+    "Weak commons (Sagu Archer, Archers' Parapet, Rotting Mastodon)"
+  ],
+  "mana_base_guidance": {
+    "land_counts": "17-19 lands standard; 16 acceptable for Warriors aggro; 15-16 possible for fast red (not recommended).",
+    "color_distribution": "8+ lands for primary colors; 3-4 lands for a 1-2 card splash.",
+    "taplands": "Acceptable at 4-7 copies for 3-color decks; 5-color piles can handle more. Keep 6-8 basics for early plays.",
+    "sequencing_example": "Tapland t1 → tapland t2 → untapped t3 (play morph) → tapland t4 → untapped t5 (flip morph).",
+    "warning": "Don't play off-color taplands for marginal life gain."
+  },
+  "general_tips": [
+    "Position yourself for a 5c/good-stuff pile early on, then move into a specific clan if you keep getting passed good cards.",
+    "Take relevant dual lands over just about any common.",
+    "Morphs function as mana sinks reducing flood impact.",
+    "Power creep changes mean modern drafters should expect KTK to feel somewhat awkward compared to contemporary sets."
+  ]
+}

@@ -1,0 +1,13 @@
+name = "manahub-assetlinks"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# Routes are configured in the Cloudflare dashboard once the domain is proxied.
+# See README section in this directory for instructions.
+# [[routes]]
+# pattern = "manahub.app/.well-known/assetlinks.json"
+# zone_name = "manahub.app"
+#
+# [[routes]]
+# pattern = "trades.manahub.app/.well-known/assetlinks.json"
+# zone_name = "manahub.app"

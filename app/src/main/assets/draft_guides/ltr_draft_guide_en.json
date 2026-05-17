@@ -1,0 +1,1476 @@
+{
+  "metadata": {
+    "set_name": "The Lord of the Rings: Tales of Middle-earth",
+    "set_code": "LTR",
+    "source_url": "https://draftsim.com/mtg-lotr-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "January 12, 2025"
+  },
+  "set_overview": {
+    "summary": "LTR is one of the weakest and most poorly balanced sets in recent years. Black significantly outperforms other colors while green ranks near the bottom. The set plays aggressively due to \"The Ring Tempts You\", amass mechanics, plentiful combat tricks, and landcycling options that enable low land counts (14-15 lands possible).",
+    "color_ranking": [
+      "{B} Black",
+      "{U} Blue",
+      "{R} Red",
+      "{W} White",
+      "{G} Green"
+    ],
+    "color_notes": {
+      "{B} Black": "Strongest color by a considerable margin. Premium commons (Claim the Precious, Dunland Crebain, The Torment of Gollum).",
+      "{U} Blue": "Well-balanced with consistent power. Glorious Gale, Lórien Revealed, Pelargir Survivor.",
+      "{R} Red": "Highly uneven. Strong cards (Smite the Deathless, Rally at the Hornburg) contrast with traps (Gimli's Fury, Gimli's Axe).",
+      "{W} White": "Mediocre with inconsistent quality. Errand-Rider of Gondor and Eastfarthing Farmer are the best commons.",
+      "{G} Green": "Nearly unplayable in isolation. Only draft when pursuing strong Food or Elf synergies with premium uncommons/rares."
+    },
+    "key_gameplay_notes": [
+      "Aggressive format — combat-heavy with combat tricks and skulk creating predictable blocks.",
+      "Uncommon quality significantly exceeds common quality — follow premium signposts early.",
+      "Landcyclers enable 14-15 land counts in aggressive shells.",
+      "The Ring incentivizes consistent attack patterns.",
+      "Block skulk creatures with 1/3s and 0/3s effectively."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "The Ring Tempts You",
+      "summary": "Progresses through four levels. Level 1 (skulk) is unreliable; level 2 gains traction (enables attacks); level 3 (sac mode) underwhelms; level 4 threatens a real clock but lacks consistency. Ideal ringbearers are evasive 1/X creatures.",
+      "performance": "Format-defining flavor mechanic, modest payoff.",
+      "key_examples": []
+    },
+    {
+      "name": "Amass Orcs",
+      "summary": "Creates or augments Orc armies, providing aggressive pressure and tribal synergies with lords and Orc payoffs.",
+      "performance": "Anchors BR and UB strategies.",
+      "key_examples": [
+        {
+          "name": "Mordor Muster",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 95,
+          "tier_rating": "C",
+          "note": null,
+          "id": "aae2f15a-0629-453e-992c-a199af194a3c",
+          "scryfall_uri": "https://scryfall.com/card/ltr/96/mordor-muster",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aae2f15a-0629-453e-992c-a199af194a3c.jpg?1686968586",
+            "normal": "https://cards.scryfall.io/normal/front/a/a/aae2f15a-0629-453e-992c-a199af194a3c.jpg?1686968586"
+          },
+          "set": "ltr",
+          "set_name": "The Lord of the Rings: Tales of Middle-earth"
+        }
+      ]
+    },
+    {
+      "name": "Basic Landcycling",
+      "summary": "Five commons (Eagles of the North, Lórien Revealed, Troll of Khazad-dûm, Oliphaunt, Generous Ent) cycle for a basic land. Enables mana flexibility and low land counts.",
+      "performance": "Essential utility — these commons play in nearly every deck.",
+      "key_examples": [
+        {
+          "name": "Eagles of the North",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 132,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c1bd3bc0-77bd-40fe-b4f1-835a04cb6e41",
+          "scryfall_uri": "https://scryfall.com/card/ltr/7/eagles-of-the-north",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Bird Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c1bd3bc0-77bd-40fe-b4f1-835a04cb6e41.jpg?1687210951",
+            "normal": "https://cards.scryfall.io/normal/front/c/1/c1bd3bc0-77bd-40fe-b4f1-835a04cb6e41.jpg?1687210951"
+          },
+          "set": "ltr",
+          "set_name": "The Lord of the Rings: Tales of Middle-earth"
+        },
+        {
+          "name": "Lórien Revealed",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 135,
+          "tier_rating": "C",
+          "note": null,
+          "id": "0ce44270-a684-4489-9077-521456e6dfaa",
+          "scryfall_uri": "https://scryfall.com/card/ltr/60/l%C3%B3rien-revealed",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0ce44270-a684-4489-9077-521456e6dfaa.jpg?1687210977",
+            "normal": "https://cards.scryfall.io/normal/front/0/c/0ce44270-a684-4489-9077-521456e6dfaa.jpg?1687210977"
+          },
+          "set": "ltr",
+          "set_name": "The Lord of the Rings: Tales of Middle-earth"
+        },
+        {
+          "name": "Troll of Khazad-dûm",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 100,
+          "tier_rating": "C",
+          "note": null,
+          "id": "a6539e26-b63b-4725-9407-caaf451de084",
+          "scryfall_uri": "https://scryfall.com/card/ltr/111/troll-of-khazad-d%C3%BBm",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Troll",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a6539e26-b63b-4725-9407-caaf451de084.jpg?1743419034",
+            "normal": "https://cards.scryfall.io/normal/front/a/6/a6539e26-b63b-4725-9407-caaf451de084.jpg?1743419034"
+          },
+          "set": "ltr",
+          "set_name": "The Lord of the Rings: Tales of Middle-earth"
+        },
+        {
+          "name": "Oliphaunt",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 120,
+          "tier_rating": "C",
+          "note": null,
+          "id": "6989018c-37b1-4282-a4af-9cc97f160b4d",
+          "scryfall_uri": "https://scryfall.com/card/ltr/139/oliphaunt",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Elephant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/6989018c-37b1-4282-a4af-9cc97f160b4d.jpg?1687210982",
+            "normal": "https://cards.scryfall.io/normal/front/6/9/6989018c-37b1-4282-a4af-9cc97f160b4d.jpg?1687210982"
+          },
+          "set": "ltr",
+          "set_name": "The Lord of the Rings: Tales of Middle-earth"
+        },
+        {
+          "name": "Generous Ent",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 74,
+          "tier_rating": "C",
+          "note": null,
+          "id": "85d22d5d-3875-42ff-b51e-c6e21db201f5",
+          "scryfall_uri": "https://scryfall.com/card/ltr/169/generous-ent",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature — Treefolk",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85d22d5d-3875-42ff-b51e-c6e21db201f5.jpg?1687210970",
+            "normal": "https://cards.scryfall.io/normal/front/8/5/85d22d5d-3875-42ff-b51e-c6e21db201f5.jpg?1687210970"
+          },
+          "set": "ltr",
+          "set_name": "The Lord of the Rings: Tales of Middle-earth"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_unranked": [
+      {
+        "colors": "{W}{U}",
+        "name": "UW Draw Two",
+        "strategy": "Focuses on card advantage through \"draw two\" effects.",
+        "key_cards": []
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Control / Amass",
+        "strategy": "Controls the board while building Orc armies.",
+        "key_cards": [
+          {
+            "name": "Mordor Muster",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 95,
+            "tier_rating": "C",
+            "note": null,
+            "id": "aae2f15a-0629-453e-992c-a199af194a3c",
+            "scryfall_uri": "https://scryfall.com/card/ltr/96/mordor-muster",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aae2f15a-0629-453e-992c-a199af194a3c.jpg?1686968586",
+              "normal": "https://cards.scryfall.io/normal/front/a/a/aae2f15a-0629-453e-992c-a199af194a3c.jpg?1686968586"
+            },
+            "set": "ltr",
+            "set_name": "The Lord of the Rings: Tales of Middle-earth"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "BR Orcs / Goblins",
+        "strategy": "Aggressive tribal synergies.",
+        "key_cards": []
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "RG Midrange",
+        "strategy": "Creature-focused mid-game value.",
+        "key_cards": []
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "GW Food",
+        "strategy": "Food token generation and sacrifice synergies.",
+        "key_cards": [
+          {
+            "name": "Samwise the Stouthearted",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 30,
+            "tier_rating": "B",
+            "note": null,
+            "id": "214c270e-29ca-4d69-bea6-9252ae7707ad",
+            "scryfall_uri": "https://scryfall.com/card/ltr/28/samwise-the-stouthearted",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Legendary Creature — Halfling Peasant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/214c270e-29ca-4d69-bea6-9252ae7707ad.jpg?1686967902",
+              "normal": "https://cards.scryfall.io/normal/front/2/1/214c270e-29ca-4d69-bea6-9252ae7707ad.jpg?1686967902"
+            },
+            "set": "ltr",
+            "set_name": "The Lord of the Rings: Tales of Middle-earth"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "WB Ring / Legends",
+        "strategy": "Capitalizes on Ring tempting and legendary density.",
+        "key_cards": []
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "UR Spells",
+        "strategy": "Instant/sorcery matters theme.",
+        "key_cards": []
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "BG Sac / Food / Midrange",
+        "strategy": "Flexible sacrifice-based strategies.",
+        "key_cards": []
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Humans",
+        "strategy": "Tribal human aggression.",
+        "key_cards": []
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "GU Elf-Scry",
+        "strategy": "Elf synergies with scry payoffs.",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Errand-Rider of Gondor",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 70,
+        "tier_rating": "C",
+        "note": null,
+        "id": "d3f990e7-54a3-4893-8510-645b2065447b",
+        "scryfall_uri": "https://scryfall.com/card/ltr/11/errand-rider-of-gondor",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d3f990e7-54a3-4893-8510-645b2065447b.jpg?1686967733",
+          "normal": "https://cards.scryfall.io/normal/front/d/3/d3f990e7-54a3-4893-8510-645b2065447b.jpg?1686967733"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Eastfarthing Farmer",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 148,
+        "tier_rating": "D",
+        "note": null,
+        "id": "26bb65ba-d605-4b79-a700-4a08ec5a90b4",
+        "scryfall_uri": "https://scryfall.com/card/ltr/8/eastfarthing-farmer",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Halfling Peasant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/6/26bb65ba-d605-4b79-a700-4a08ec5a90b4.jpg?1686967706",
+          "normal": "https://cards.scryfall.io/normal/front/2/6/26bb65ba-d605-4b79-a700-4a08ec5a90b4.jpg?1686967706"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Protector of Gondor",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 73,
+        "tier_rating": "C",
+        "note": null,
+        "id": "85708748-40ca-4066-a287-7a6a189ff3df",
+        "scryfall_uri": "https://scryfall.com/card/ltr/25/protector-of-gondor",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85708748-40ca-4066-a287-7a6a189ff3df.jpg?1686967875",
+          "normal": "https://cards.scryfall.io/normal/front/8/5/85708748-40ca-4066-a287-7a6a189ff3df.jpg?1686967875"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Banish from Edoras",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 176,
+        "tier_rating": "D",
+        "note": null,
+        "id": "a4410076-e1fe-45f3-a0ca-a91ab0133ff4",
+        "scryfall_uri": "https://scryfall.com/card/ltr/1/banish-from-edoras",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/4/a4410076-e1fe-45f3-a0ca-a91ab0133ff4.jpg?1686967642",
+          "normal": "https://cards.scryfall.io/normal/front/a/4/a4410076-e1fe-45f3-a0ca-a91ab0133ff4.jpg?1686967642"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Hobbit's Sting",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 170,
+        "tier_rating": "D",
+        "note": null,
+        "id": "019eab42-9e0c-4958-ac97-74d3db5580f3",
+        "scryfall_uri": "https://scryfall.com/card/ltr/20/hobbits-sting",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/019eab42-9e0c-4958-ac97-74d3db5580f3.jpg?1686967829",
+          "normal": "https://cards.scryfall.io/normal/front/0/1/019eab42-9e0c-4958-ac97-74d3db5580f3.jpg?1686967829"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Glorious Gale",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 93,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6e1057de-5710-415c-9a51-1d8bd86021a3",
+        "scryfall_uri": "https://scryfall.com/card/ltr/51/glorious-gale",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6e1057de-5710-415c-9a51-1d8bd86021a3.jpg?1686968102",
+          "normal": "https://cards.scryfall.io/normal/front/6/e/6e1057de-5710-415c-9a51-1d8bd86021a3.jpg?1686968102"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Lórien Revealed",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 135,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0ce44270-a684-4489-9077-521456e6dfaa",
+        "scryfall_uri": "https://scryfall.com/card/ltr/60/l%C3%B3rien-revealed",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/c/0ce44270-a684-4489-9077-521456e6dfaa.jpg?1687210977",
+          "normal": "https://cards.scryfall.io/normal/front/0/c/0ce44270-a684-4489-9077-521456e6dfaa.jpg?1687210977"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Pelargir Survivor",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 134,
+        "tier_rating": "C",
+        "note": null,
+        "id": "aa59141a-4645-4316-b714-bbf2c139786e",
+        "scryfall_uri": "https://scryfall.com/card/ltr/64/pelargir-survivor",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Peasant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aa59141a-4645-4316-b714-bbf2c139786e.jpg?1686968236",
+          "normal": "https://cards.scryfall.io/normal/front/a/a/aa59141a-4645-4316-b714-bbf2c139786e.jpg?1686968236"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Ithilien Kingfisher",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 174,
+        "tier_rating": "D",
+        "note": null,
+        "id": "68c29762-6859-4564-9e1d-a87fa63b951a",
+        "scryfall_uri": "https://scryfall.com/card/ltr/58/ithilien-kingfisher",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Bird",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/8/68c29762-6859-4564-9e1d-a87fa63b951a.jpg?1686968173",
+          "normal": "https://cards.scryfall.io/normal/front/6/8/68c29762-6859-4564-9e1d-a87fa63b951a.jpg?1686968173"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Willow-Wind",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 220,
+        "tier_rating": "D",
+        "note": null,
+        "id": "0adc3bff-0eb1-40e9-b954-5515babd07a3",
+        "scryfall_uri": "https://scryfall.com/card/ltr/76/willow-wind",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Elemental",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0adc3bff-0eb1-40e9-b954-5515babd07a3.jpg?1686968364",
+          "normal": "https://cards.scryfall.io/normal/front/0/a/0adc3bff-0eb1-40e9-b954-5515babd07a3.jpg?1686968364"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Claim the Precious",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 58,
+        "tier_rating": "B",
+        "note": null,
+        "id": "121c12c4-83ea-463e-8fdf-30718968a2bd",
+        "scryfall_uri": "https://scryfall.com/card/ltr/81/claim-the-precious",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/121c12c4-83ea-463e-8fdf-30718968a2bd.jpg?1686968419",
+          "normal": "https://cards.scryfall.io/normal/front/1/2/121c12c4-83ea-463e-8fdf-30718968a2bd.jpg?1686968419"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Dunland Crebain",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 65,
+        "tier_rating": "C",
+        "note": null,
+        "id": "695c05ab-e46e-46c7-bd2e-ef0b2307e449",
+        "scryfall_uri": "https://scryfall.com/card/ltr/82/dunland-crebain",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Bird Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/695c05ab-e46e-46c7-bd2e-ef0b2307e449.jpg?1686968429",
+          "normal": "https://cards.scryfall.io/normal/front/6/9/695c05ab-e46e-46c7-bd2e-ef0b2307e449.jpg?1686968429"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "The Torment of Gollum",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 61,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ba2c8c25-1fa9-4cc4-a378-5eccc25bacf0",
+        "scryfall_uri": "https://scryfall.com/card/ltr/110/the-torment-of-gollum",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/a/ba2c8c25-1fa9-4cc4-a378-5eccc25bacf0.jpg?1686968743",
+          "normal": "https://cards.scryfall.io/normal/front/b/a/ba2c8c25-1fa9-4cc4-a378-5eccc25bacf0.jpg?1686968743"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Troll of Khazad-dûm",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 100,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a6539e26-b63b-4725-9407-caaf451de084",
+        "scryfall_uri": "https://scryfall.com/card/ltr/111/troll-of-khazad-d%C3%BBm",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Troll",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a6539e26-b63b-4725-9407-caaf451de084.jpg?1743419034",
+          "normal": "https://cards.scryfall.io/normal/front/a/6/a6539e26-b63b-4725-9407-caaf451de084.jpg?1743419034"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Mordor Muster",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 95,
+        "tier_rating": "C",
+        "note": null,
+        "id": "aae2f15a-0629-453e-992c-a199af194a3c",
+        "scryfall_uri": "https://scryfall.com/card/ltr/96/mordor-muster",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aae2f15a-0629-453e-992c-a199af194a3c.jpg?1686968586",
+          "normal": "https://cards.scryfall.io/normal/front/a/a/aae2f15a-0629-453e-992c-a199af194a3c.jpg?1686968586"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Smite the Deathless",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 64,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8b716fcc-c4cc-4987-be82-2897a9888d23",
+        "scryfall_uri": "https://scryfall.com/card/ltr/148/smite-the-deathless",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/b/8b716fcc-c4cc-4987-be82-2897a9888d23.jpg?1686969173",
+          "normal": "https://cards.scryfall.io/normal/front/8/b/8b716fcc-c4cc-4987-be82-2897a9888d23.jpg?1686969173"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Rally at the Hornburg",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 57,
+        "tier_rating": "B",
+        "note": null,
+        "id": "ee7292f7-1c7e-449c-9c52-7584d6a14c2c",
+        "scryfall_uri": "https://scryfall.com/card/ltr/142/rally-at-the-hornburg",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee7292f7-1c7e-449c-9c52-7584d6a14c2c.jpg?1686969106",
+          "normal": "https://cards.scryfall.io/normal/front/e/e/ee7292f7-1c7e-449c-9c52-7584d6a14c2c.jpg?1686969106"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Warbeast of Gorgoroth",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 130,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5eeecb9e-fbde-429b-b3da-18a4dbadf6de",
+        "scryfall_uri": "https://scryfall.com/card/ltr/152/warbeast-of-gorgoroth",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Beast",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/e/5eeecb9e-fbde-429b-b3da-18a4dbadf6de.jpg?1686969217",
+          "normal": "https://cards.scryfall.io/normal/front/5/e/5eeecb9e-fbde-429b-b3da-18a4dbadf6de.jpg?1686969217"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Quarrel's End",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 107,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5a7e61a6-c602-4089-ae45-828d8e516a63",
+        "scryfall_uri": "https://scryfall.com/card/ltr/141/quarrels-end",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a7e61a6-c602-4089-ae45-828d8e516a63.jpg?1686969095",
+          "normal": "https://cards.scryfall.io/normal/front/5/a/5a7e61a6-c602-4089-ae45-828d8e516a63.jpg?1686969095"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Swarming of Moria",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 79,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0a1bd073-4351-4c56-9b07-4430d0d83084",
+        "scryfall_uri": "https://scryfall.com/card/ltr/150/swarming-of-moria",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/a/0a1bd073-4351-4c56-9b07-4430d0d83084.jpg?1686969195",
+          "normal": "https://cards.scryfall.io/normal/front/0/a/0a1bd073-4351-4c56-9b07-4430d0d83084.jpg?1686969195"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Ent's Fury",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 122,
+        "tier_rating": "C",
+        "note": null,
+        "id": "c7946af6-69ab-47a1-955c-1954a04752df",
+        "scryfall_uri": "https://scryfall.com/card/ltr/164/ents-fury",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/7/c7946af6-69ab-47a1-955c-1954a04752df.jpg?1686969344",
+          "normal": "https://cards.scryfall.io/normal/front/c/7/c7946af6-69ab-47a1-955c-1954a04752df.jpg?1686969344"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Enraged Huorn",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 178,
+        "tier_rating": "D",
+        "note": null,
+        "id": "a9b48836-6d37-46eb-8c41-a3eeecc72ae1",
+        "scryfall_uri": "https://scryfall.com/card/ltr/162/enraged-huorn",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Treefolk",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9b48836-6d37-46eb-8c41-a3eeecc72ae1.jpg?1686969323",
+          "normal": "https://cards.scryfall.io/normal/front/a/9/a9b48836-6d37-46eb-8c41-a3eeecc72ae1.jpg?1686969323"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Generous Ent",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 74,
+        "tier_rating": "C",
+        "note": null,
+        "id": "85d22d5d-3875-42ff-b51e-c6e21db201f5",
+        "scryfall_uri": "https://scryfall.com/card/ltr/169/generous-ent",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Treefolk",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/5/85d22d5d-3875-42ff-b51e-c6e21db201f5.jpg?1687210970",
+          "normal": "https://cards.scryfall.io/normal/front/8/5/85d22d5d-3875-42ff-b51e-c6e21db201f5.jpg?1687210970"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Wose Pathfinder",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 98,
+        "tier_rating": "C",
+        "note": null,
+        "id": "6589b339-9067-4e9b-bfdb-c49f8b3ef2d4",
+        "scryfall_uri": "https://scryfall.com/card/ltr/190/wose-pathfinder",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Shaman",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/6589b339-9067-4e9b-bfdb-c49f8b3ef2d4.jpg?1686969622",
+          "normal": "https://cards.scryfall.io/normal/front/6/5/6589b339-9067-4e9b-bfdb-c49f8b3ef2d4.jpg?1686969622"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Bag End Porter",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 182,
+        "tier_rating": "D",
+        "note": null,
+        "id": "b7557170-39a2-49df-823e-958c3eb34801",
+        "scryfall_uri": "https://scryfall.com/card/ltr/153/bag-end-porter",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dwarf",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/7/b7557170-39a2-49df-823e-958c3eb34801.jpg?1686969228",
+          "normal": "https://cards.scryfall.io/normal/front/b/7/b7557170-39a2-49df-823e-958c3eb34801.jpg?1686969228"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ]
+  },
+  "top_uncommons_by_color": {
+    "{W} White": [
+      {
+        "name": "Samwise the Stouthearted",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 30,
+        "tier_rating": "B",
+        "note": null,
+        "id": "214c270e-29ca-4d69-bea6-9252ae7707ad",
+        "scryfall_uri": "https://scryfall.com/card/ltr/28/samwise-the-stouthearted",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Legendary Creature — Halfling Peasant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/214c270e-29ca-4d69-bea6-9252ae7707ad.jpg?1686967902",
+          "normal": "https://cards.scryfall.io/normal/front/2/1/214c270e-29ca-4d69-bea6-9252ae7707ad.jpg?1686967902"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Bill the Pony",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 28,
+        "tier_rating": "B",
+        "note": null,
+        "id": "9ac68519-ed7f-4f38-9549-c02975f88eed",
+        "scryfall_uri": "https://scryfall.com/card/ltr/3/bill-the-pony",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Legendary Creature — Horse",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/9/a/9ac68519-ed7f-4f38-9549-c02975f88eed.jpg?1686967660",
+          "normal": "https://cards.scryfall.io/normal/front/9/a/9ac68519-ed7f-4f38-9549-c02975f88eed.jpg?1686967660"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Meneldor, Swift Savior",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 161,
+        "tier_rating": "D",
+        "note": null,
+        "id": "62d2ee20-abbc-4a9d-8d30-4223242123e8",
+        "scryfall_uri": "https://scryfall.com/card/ltr/62/meneldor-swift-savior",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Legendary Creature — Bird Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/2/62d2ee20-abbc-4a9d-8d30-4223242123e8.jpg?1686968213",
+          "normal": "https://cards.scryfall.io/normal/front/6/2/62d2ee20-abbc-4a9d-8d30-4223242123e8.jpg?1686968213"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Saruman's Trickery",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 80,
+        "tier_rating": "C",
+        "note": null,
+        "id": "8eb6c23b-e52e-4533-9625-884eb0a4d866",
+        "scryfall_uri": "https://scryfall.com/card/ltr/68/sarumans-trickery",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/8/e/8eb6c23b-e52e-4533-9625-884eb0a4d866.jpg?1686968278",
+          "normal": "https://cards.scryfall.io/normal/front/8/e/8eb6c23b-e52e-4533-9625-884eb0a4d866.jpg?1686968278"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Gandalf, Friend of the Shire",
+        "color": "U",
+        "rarity": "Uncommon",
+        "pick_order_rank": 29,
+        "tier_rating": "B",
+        "note": null,
+        "id": "cc9cfcc7-be64-4871-8d52-851e43fe3305",
+        "scryfall_uri": "https://scryfall.com/card/ltr/50/gandalf-friend-of-the-shire",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Legendary Creature — Avatar Wizard",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cc9cfcc7-be64-4871-8d52-851e43fe3305.jpg?1696231214",
+          "normal": "https://cards.scryfall.io/normal/front/c/c/cc9cfcc7-be64-4871-8d52-851e43fe3305.jpg?1696231214"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Gollum's Bite",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 71,
+        "tier_rating": "C",
+        "note": null,
+        "id": "1b1e790e-ff82-4888-8aee-9986c646241a",
+        "scryfall_uri": "https://scryfall.com/card/ltr/85/gollums-bite",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b1e790e-ff82-4888-8aee-9986c646241a.jpg?1686968460",
+          "normal": "https://cards.scryfall.io/normal/front/1/b/1b1e790e-ff82-4888-8aee-9986c646241a.jpg?1686968460"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Bitter Downfall",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 31,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e4b83aa1-33ce-4b8d-ae5a-72f64eef5f09",
+        "scryfall_uri": "https://scryfall.com/card/ltr/77/bitter-downfall",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e4b83aa1-33ce-4b8d-ae5a-72f64eef5f09.jpg?1686968375",
+          "normal": "https://cards.scryfall.io/normal/front/e/4/e4b83aa1-33ce-4b8d-ae5a-72f64eef5f09.jpg?1686968375"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Gollum, Patient Plotter",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 49,
+        "tier_rating": "B",
+        "note": null,
+        "id": "4ddda7d4-0226-404f-8418-f1f5720dcef8",
+        "scryfall_uri": "https://scryfall.com/card/ltr/84/gollum-patient-plotter",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Legendary Creature — Halfling Horror",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/d/4ddda7d4-0226-404f-8418-f1f5720dcef8.jpg?1686968450",
+          "normal": "https://cards.scryfall.io/normal/front/4/d/4ddda7d4-0226-404f-8418-f1f5720dcef8.jpg?1686968450"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Gothmog, Morgul Lieutenant",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 46,
+        "tier_rating": "B",
+        "note": null,
+        "id": "a1c10e93-88eb-46b9-8adc-583661807990",
+        "scryfall_uri": "https://scryfall.com/card/ltr/87/gothmog-morgul-lieutenant",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Legendary Creature — Human Soldier",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/1/a1c10e93-88eb-46b9-8adc-583661807990.jpg?1686968484",
+          "normal": "https://cards.scryfall.io/normal/front/a/1/a1c10e93-88eb-46b9-8adc-583661807990.jpg?1686968484"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Fear, Fire, Foes!",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 32,
+        "tier_rating": "B",
+        "note": null,
+        "id": "37be98a4-0cba-46b4-be93-a9805fe77160",
+        "scryfall_uri": "https://scryfall.com/card/ltr/125/fear-fire-foes!",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37be98a4-0cba-46b4-be93-a9805fe77160.jpg?1686968914",
+          "normal": "https://cards.scryfall.io/normal/front/3/7/37be98a4-0cba-46b4-be93-a9805fe77160.jpg?1686968914"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Quickbeam, Upstart Ent",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 143,
+        "tier_rating": "C",
+        "note": null,
+        "id": "b889037f-b95f-4756-80aa-04097d2818c3",
+        "scryfall_uri": "https://scryfall.com/card/ltr/183/quickbeam-upstart-ent",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Legendary Creature — Treefolk",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/8/b889037f-b95f-4756-80aa-04097d2818c3.jpg?1686969546",
+          "normal": "https://cards.scryfall.io/normal/front/b/8/b889037f-b95f-4756-80aa-04097d2818c3.jpg?1686969546"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Dúnedain Rangers",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 165,
+        "tier_rating": "D",
+        "note": null,
+        "id": "630e1e36-2f5d-44d4-9ff2-19ae75295016",
+        "scryfall_uri": "https://scryfall.com/card/ltr/159/d%C3%BAnedain-rangers",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Human Ranger",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/630e1e36-2f5d-44d4-9ff2-19ae75295016.jpg?1687694686",
+          "normal": "https://cards.scryfall.io/normal/front/6/3/630e1e36-2f5d-44d4-9ff2-19ae75295016.jpg?1687694686"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      },
+      {
+        "name": "Stew the Coneys",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 97,
+        "tier_rating": "C",
+        "note": null,
+        "id": "bcc7c41c-f416-457e-91ba-1f338f45eeac",
+        "scryfall_uri": "https://scryfall.com/card/ltr/189/stew-the-coneys",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/c/bcc7c41c-f416-457e-91ba-1f338f45eeac.jpg?1686969611",
+          "normal": "https://cards.scryfall.io/normal/front/b/c/bcc7c41c-f416-457e-91ba-1f338f45eeac.jpg?1686969611"
+        },
+        "set": "ltr",
+        "set_name": "The Lord of the Rings: Tales of Middle-earth"
+      }
+    ]
+  },
+  "combat_tricks_priority": [
+    {
+      "name": "Escape from Orthanc",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 204,
+      "tier_rating": "D",
+      "note": null,
+      "id": "f4ff3330-dcca-4435-87e7-871be91a68b0",
+      "scryfall_uri": "https://scryfall.com/card/ltr/12/escape-from-orthanc",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/4/f4ff3330-dcca-4435-87e7-871be91a68b0.jpg?1686967744",
+        "normal": "https://cards.scryfall.io/normal/front/f/4/f4ff3330-dcca-4435-87e7-871be91a68b0.jpg?1686967744"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Deceive the Messenger",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 137,
+      "tier_rating": "C",
+      "note": null,
+      "id": "b2984bc6-7c12-46e4-8dd3-b23e29a7a7ec",
+      "scryfall_uri": "https://scryfall.com/card/ltr/47/deceive-the-messenger",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/2/b2984bc6-7c12-46e4-8dd3-b23e29a7a7ec.jpg?1686968062",
+        "normal": "https://cards.scryfall.io/normal/front/b/2/b2984bc6-7c12-46e4-8dd3-b23e29a7a7ec.jpg?1686968062"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Shelob's Ambush",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 113,
+      "tier_rating": "C",
+      "note": null,
+      "id": "25e69fa8-7339-4bfa-8e35-9cbfe0001d8b",
+      "scryfall_uri": "https://scryfall.com/card/ltr/108/shelobs-ambush",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/5/25e69fa8-7339-4bfa-8e35-9cbfe0001d8b.jpg?1686968721",
+        "normal": "https://cards.scryfall.io/normal/front/2/5/25e69fa8-7339-4bfa-8e35-9cbfe0001d8b.jpg?1686968721"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Rush the Room",
+      "color": "R",
+      "rarity": "Common",
+      "pick_order_rank": 228,
+      "tier_rating": "D",
+      "note": null,
+      "id": "f525b727-acde-427b-9c33-20964e8cf613",
+      "scryfall_uri": "https://scryfall.com/card/ltr/147/rush-the-room",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f525b727-acde-427b-9c33-20964e8cf613.jpg?1686969162",
+        "normal": "https://cards.scryfall.io/normal/front/f/5/f525b727-acde-427b-9c33-20964e8cf613.jpg?1686969162"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Pippin's Bravery",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 208,
+      "tier_rating": "D",
+      "note": null,
+      "id": "bc60dc65-6813-4d57-877b-df195ed00d00",
+      "scryfall_uri": "https://scryfall.com/card/ltr/182/pippins-bravery",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/c/bc60dc65-6813-4d57-877b-df195ed00d00.jpg?1686969536",
+        "normal": "https://cards.scryfall.io/normal/front/b/c/bc60dc65-6813-4d57-877b-df195ed00d00.jpg?1686969536"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    }
+  ],
+  "premium_rares": [
+    {
+      "name": "Arwen, Mortal Queen",
+      "color": "WG",
+      "rarity": "Mythic",
+      "pick_order_rank": 8,
+      "tier_rating": "S",
+      "note": null,
+      "id": "547f92d4-cd1d-4ca7-a6e2-6473b4d3c832",
+      "scryfall_uri": "https://scryfall.com/card/ltr/193/arwen-mortal-queen",
+      "colors": [
+        "G",
+        "W"
+      ],
+      "type_line": "Legendary Creature — Elf Noble",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/4/547f92d4-cd1d-4ca7-a6e2-6473b4d3c832.jpg?1686969656",
+        "normal": "https://cards.scryfall.io/normal/front/5/4/547f92d4-cd1d-4ca7-a6e2-6473b4d3c832.jpg?1686969656"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Witch-King of Angmar",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 1,
+      "tier_rating": "S",
+      "note": null,
+      "id": "a55e6508-0b59-4573-bc4e-67b27279cfed",
+      "scryfall_uri": "https://scryfall.com/card/ltr/114/witch-king-of-angmar",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Creature — Wraith Noble",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a55e6508-0b59-4573-bc4e-67b27279cfed.jpg?1686968786",
+        "normal": "https://cards.scryfall.io/normal/front/a/5/a55e6508-0b59-4573-bc4e-67b27279cfed.jpg?1686968786"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Andúril, Flame of the West",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 4,
+      "tier_rating": "S",
+      "note": null,
+      "id": "7e7b9eea-a224-4db1-a089-cb385f7af20c",
+      "scryfall_uri": "https://scryfall.com/card/ltr/236/and%C3%BAril-flame-of-the-west",
+      "colors": [],
+      "type_line": "Legendary Artifact — Equipment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7e7b9eea-a224-4db1-a089-cb385f7af20c.jpg?1686970125",
+        "normal": "https://cards.scryfall.io/normal/front/7/e/7e7b9eea-a224-4db1-a089-cb385f7af20c.jpg?1686970125"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Call of the Ring",
+      "color": "B",
+      "rarity": "Rare",
+      "pick_order_rank": 19,
+      "tier_rating": "B",
+      "note": null,
+      "id": "a92a2c5a-e450-494a-b23b-7ac0a6c50535",
+      "scryfall_uri": "https://scryfall.com/card/ltr/79/call-of-the-ring",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a92a2c5a-e450-494a-b23b-7ac0a6c50535.jpg?1686968397",
+        "normal": "https://cards.scryfall.io/normal/front/a/9/a92a2c5a-e450-494a-b23b-7ac0a6c50535.jpg?1686968397"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Faramir, Prince of Ithilien",
+      "color": "WU",
+      "rarity": "Rare",
+      "pick_order_rank": 3,
+      "tier_rating": "S",
+      "note": null,
+      "id": "8700923a-e9ff-4ced-87fe-1ab26554623a",
+      "scryfall_uri": "https://scryfall.com/card/ltr/202/faramir-prince-of-ithilien",
+      "colors": [
+        "U",
+        "W"
+      ],
+      "type_line": "Legendary Creature — Human Noble",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/8700923a-e9ff-4ced-87fe-1ab26554623a.jpg?1686969755",
+        "normal": "https://cards.scryfall.io/normal/front/8/7/8700923a-e9ff-4ced-87fe-1ab26554623a.jpg?1686969755"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Palantír of Orthanc",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 54,
+      "tier_rating": "B",
+      "note": null,
+      "id": "6efb6a69-562c-4d95-858d-b067444cfd7e",
+      "scryfall_uri": "https://scryfall.com/card/ltr/247/palant%C3%ADr-of-orthanc",
+      "colors": [],
+      "type_line": "Legendary Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/e/6efb6a69-562c-4d95-858d-b067444cfd7e.jpg?1686970247",
+        "normal": "https://cards.scryfall.io/normal/front/6/e/6efb6a69-562c-4d95-858d-b067444cfd7e.jpg?1686970247"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Sauron, the Dark Lord",
+      "color": "UBR",
+      "rarity": "Mythic",
+      "pick_order_rank": 7,
+      "tier_rating": "S",
+      "note": null,
+      "id": "034e0929-b2c7-4b5f-94f2-8eaf4fb1a2a1",
+      "scryfall_uri": "https://scryfall.com/card/ltr/224/sauron-the-dark-lord",
+      "colors": [
+        "B",
+        "R",
+        "U"
+      ],
+      "type_line": "Legendary Creature — Avatar Horror",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/3/034e0929-b2c7-4b5f-94f2-8eaf4fb1a2a1.jpg?1693611218",
+        "normal": "https://cards.scryfall.io/normal/front/0/3/034e0929-b2c7-4b5f-94f2-8eaf4fb1a2a1.jpg?1693611218"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Spiteful Banditry",
+      "color": "R",
+      "rarity": "Mythic",
+      "pick_order_rank": 5,
+      "tier_rating": "S",
+      "note": null,
+      "id": "e85a82bc-49f3-4694-b688-808a541146db",
+      "scryfall_uri": "https://scryfall.com/card/ltr/149/spiteful-banditry",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/8/e85a82bc-49f3-4694-b688-808a541146db.jpg?1686969184",
+        "normal": "https://cards.scryfall.io/normal/front/e/8/e85a82bc-49f3-4694-b688-808a541146db.jpg?1686969184"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    }
+  ],
+  "rare_traps": [
+    {
+      "name": "Fangorn, Tree Shepherd",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 207,
+      "tier_rating": "D",
+      "note": null,
+      "id": "0fb0f946-2127-4aa3-88ac-9bd2e94d8983",
+      "scryfall_uri": "https://scryfall.com/card/ltr/166/fangorn-tree-shepherd",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Legendary Creature — Treefolk",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/f/0fb0f946-2127-4aa3-88ac-9bd2e94d8983.jpg?1686969365",
+        "normal": "https://cards.scryfall.io/normal/front/0/f/0fb0f946-2127-4aa3-88ac-9bd2e94d8983.jpg?1686969365"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Forge Anew",
+      "color": "W",
+      "rarity": "Rare",
+      "pick_order_rank": 248,
+      "tier_rating": "F",
+      "note": null,
+      "id": "56274b88-6e3f-4538-bb0c-eb5e52a58ef3",
+      "scryfall_uri": "https://scryfall.com/card/ltr/17/forge-anew",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Enchantment",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/6/56274b88-6e3f-4538-bb0c-eb5e52a58ef3.jpg?1686967804",
+        "normal": "https://cards.scryfall.io/normal/front/5/6/56274b88-6e3f-4538-bb0c-eb5e52a58ef3.jpg?1686967804"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Borne Upon a Wind",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 251,
+      "tier_rating": "F",
+      "note": null,
+      "id": "a9379675-1a32-4e2b-8aaf-5f908c595f31",
+      "scryfall_uri": "https://scryfall.com/card/ltr/44/borne-upon-a-wind",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9379675-1a32-4e2b-8aaf-5f908c595f31.jpg?1686968037",
+        "normal": "https://cards.scryfall.io/normal/front/a/9/a9379675-1a32-4e2b-8aaf-5f908c595f31.jpg?1686968037"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "The Watcher in the Water",
+      "color": "U",
+      "rarity": "Mythic",
+      "pick_order_rank": 242,
+      "tier_rating": "D",
+      "note": null,
+      "id": "1cb8e8bb-75a0-4b5e-b4b3-5d8f3795032d",
+      "scryfall_uri": "https://scryfall.com/card/ltr/75/the-watcher-in-the-water",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Legendary Creature — Kraken",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1cb8e8bb-75a0-4b5e-b4b3-5d8f3795032d.jpg?1686968354",
+        "normal": "https://cards.scryfall.io/normal/front/1/c/1cb8e8bb-75a0-4b5e-b4b3-5d8f3795032d.jpg?1686968354"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Last March of the Ents",
+      "color": "G",
+      "rarity": "Mythic",
+      "pick_order_rank": 237,
+      "tier_rating": "D",
+      "note": null,
+      "id": "7f1b99e0-ffb7-4f98-8ee5-4357bb79dd2e",
+      "scryfall_uri": "https://scryfall.com/card/ltr/172/last-march-of-the-ents",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f1b99e0-ffb7-4f98-8ee5-4357bb79dd2e.jpg?1687694570",
+        "normal": "https://cards.scryfall.io/normal/front/7/f/7f1b99e0-ffb7-4f98-8ee5-4357bb79dd2e.jpg?1687694570"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "Mount Doom",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 123,
+      "tier_rating": "C",
+      "note": null,
+      "id": "b5bc71a1-2344-4bc6-aa60-658cec19d0d6",
+      "scryfall_uri": "https://scryfall.com/card/ltr/258/mount-doom",
+      "colors": [],
+      "type_line": "Legendary Land",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5bc71a1-2344-4bc6-aa60-658cec19d0d6.jpg?1686970382",
+        "normal": "https://cards.scryfall.io/normal/front/b/5/b5bc71a1-2344-4bc6-aa60-658cec19d0d6.jpg?1686970382"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    },
+    {
+      "name": "The One Ring",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 50,
+      "tier_rating": "B",
+      "note": "Nonlegendary limitation reduces value in Limited.",
+      "id": "d5806e68-1054-458e-866d-1f2470f682b2",
+      "scryfall_uri": "https://scryfall.com/card/ltr/246/the-one-ring",
+      "colors": [],
+      "type_line": "Legendary Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/5/d5806e68-1054-458e-866d-1f2470f682b2.jpg?1763472900",
+        "normal": "https://cards.scryfall.io/normal/front/d/5/d5806e68-1054-458e-866d-1f2470f682b2.jpg?1763472900"
+      },
+      "set": "ltr",
+      "set_name": "The Lord of the Rings: Tales of Middle-earth"
+    }
+  ],
+  "general_tips": [
+    "Play aggressive strategies that exploit the combat-heavy nature of the format.",
+    "Uncommon quality significantly exceeds common quality — follow premium signposts early.",
+    "Use landcyclers to safely reduce land count to 14-15 in fast decks.",
+    "Block skulk creatures with 1/3s and 0/3s — they're very predictable.",
+    "Black is the strongest color by a wide margin; don't pass open black signals.",
+    "Avoid green in isolation; commit only when strong Food/Elf uncommons or rares flow your way."
+  ]
+}

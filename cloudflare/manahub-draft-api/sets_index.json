@@ -1,0 +1,306 @@
+{
+  "index_version": "2",
+  "last_updated": "2026-05-17",
+  "sets": [
+    {
+      "code": "sos",
+      "name": "Secrets of Strixhaven",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/sos.svg?1778472000",
+      "released_at": "2026-04-24",
+      "content_versions": {
+        "guide": "May 2026",
+        "tier_list": "May 2026"
+      }
+    },
+    {
+      "code": "ecl",
+      "name": "Lorwyn Eclipsed",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/ecl.svg?1778472000",
+      "released_at": "2026-01-23",
+      "content_versions": {
+        "guide": "2026-05-16",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "tla",
+      "name": "Avatar: The Last Airbender",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/tla.svg?1778472000",
+      "released_at": "2025-11-21",
+      "content_versions": {
+        "guide": "December 3, 2025",
+        "tier_list": "December 17, 2025"
+      }
+    },
+    {
+      "code": "eoe",
+      "name": "Edge of Eternities",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/eoe.svg?1778472000",
+      "released_at": "2025-08-01",
+      "content_versions": {
+        "guide": "August 8, 2025",
+        "tier_list": "August 26, 2025"
+      }
+    },
+    {
+      "code": "fin",
+      "name": "Final Fantasy",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/fin.svg?1778472000",
+      "released_at": "2025-06-13",
+      "content_versions": {
+        "guide": "2026-05-16",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "tdm",
+      "name": "Tarkir: Dragonstorm",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/tdm.svg?1778472000",
+      "released_at": "2025-04-11",
+      "content_versions": {
+        "guide": "April 18, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "dft",
+      "name": "Aetherdrift",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/dft.svg?1778472000",
+      "released_at": "2025-02-14",
+      "content_versions": {
+        "guide": "February 21, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "inr",
+      "name": "Innistrad Remastered",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/inr.svg?1778472000",
+      "released_at": "2025-01-24",
+      "content_versions": {
+        "guide": "January 24, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "fdn",
+      "name": "Foundations",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/fdn.svg?1778472000",
+      "released_at": "2024-11-15",
+      "content_versions": {
+        "guide": "December 27, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "dsk",
+      "name": "Duskmourn: House of Horror",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/dsk.svg?1778472000",
+      "released_at": "2024-09-27",
+      "content_versions": {
+        "guide": "October 11, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "blb",
+      "name": "Bloomburrow",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/blb.svg?1778472000",
+      "released_at": "2024-08-02",
+      "content_versions": {
+        "guide": "August 9, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "mh3",
+      "name": "Modern Horizons 3",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/mh3.svg?1778472000",
+      "released_at": "2024-06-14",
+      "content_versions": {
+        "guide": "January 12, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "otj",
+      "name": "Outlaws of Thunder Junction",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/otj.svg?1778472000",
+      "released_at": "2024-04-19",
+      "content_versions": {
+        "guide": "September 26, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "mkm",
+      "name": "Murders at Karlov Manor",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/mkm.svg?1778472000",
+      "released_at": "2024-02-09",
+      "content_versions": {
+        "guide": "February 16, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "rvr",
+      "name": "Ravnica Remastered",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/rvr.svg?1778472000",
+      "released_at": "2024-01-12",
+      "content_versions": {
+        "guide": "December 26, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "lci",
+      "name": "The Lost Caverns of Ixalan",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/lci.svg?1778472000",
+      "released_at": "2023-11-17",
+      "content_versions": {
+        "guide": "October 3, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "woe",
+      "name": "Wilds of Eldraine",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/woe.svg?1778472000",
+      "released_at": "2023-09-08",
+      "content_versions": {
+        "guide": "October 4, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "ltr",
+      "name": "The Lord of the Rings: Tales of Middle-earth",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/ltr.svg?1778472000",
+      "released_at": "2023-06-23",
+      "content_versions": {
+        "guide": "January 12, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "mom",
+      "name": "March of the Machine",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/mom.svg?1778472000",
+      "released_at": "2023-04-21",
+      "content_versions": {
+        "guide": "December 29, 2023",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "sir",
+      "name": "Shadows over Innistrad Remastered",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/sir.svg?1778472000",
+      "released_at": "2023-03-21",
+      "content_versions": {
+        "guide": "October 4, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "one",
+      "name": "Phyrexia: All Will Be One",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/one.svg?1778472000",
+      "released_at": "2023-02-10",
+      "content_versions": {
+        "guide": "October 3, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "dmr",
+      "name": "Dominaria Remastered",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/dmr.svg?1778472000",
+      "released_at": "2023-01-13",
+      "content_versions": {
+        "guide": "April 26, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "bro",
+      "name": "The Brothers' War",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/bro.svg?1778472000",
+      "released_at": "2022-11-18",
+      "content_versions": {
+        "guide": "March 19, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "dmu",
+      "name": "Dominaria United",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/dmu.svg?1778472000",
+      "released_at": "2022-09-09",
+      "content_versions": {
+        "guide": "April 26, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "snc",
+      "name": "Streets of New Capenna",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/snc.svg?1778472000",
+      "released_at": "2022-04-29",
+      "content_versions": {
+        "guide": "June 28, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "neo",
+      "name": "Kamigawa: Neon Dynasty",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/neo.svg?1778472000",
+      "released_at": "2022-02-18",
+      "content_versions": {
+        "guide": "August 26, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "vow",
+      "name": "Innistrad: Crimson Vow",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/vow.svg?1778472000",
+      "released_at": "2021-11-19",
+      "content_versions": {
+        "guide": "October 3, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "mid",
+      "name": "Innistrad: Midnight Hunt",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/mid.svg?1778472000",
+      "released_at": "2021-09-24",
+      "content_versions": {
+        "guide": "December 26, 2025",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "stx",
+      "name": "Strixhaven: School of Mages",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/stx.svg?1778472000",
+      "released_at": "2021-04-23",
+      "content_versions": {
+        "guide": "July 15, 2024",
+        "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "ktk",
+      "name": "Khans of Tarkir",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/ktk.svg?1778472000",
+      "released_at": "2014-09-26",
+      "content_versions": {
+        "guide": "October 11, 2024",
+        "tier_list": "2026-05-16"
+      }
+    }
+  ]
+}

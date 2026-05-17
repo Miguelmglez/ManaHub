@@ -70,6 +70,8 @@ object DatabaseModule {
                 MIGRATION_29_30,
                 MIGRATION_30_31,
                 MIGRATION_31_32,
+                MIGRATION_32_33,
+                MIGRATION_33_34,
             )
             .build()
 
@@ -240,6 +242,106 @@ object DatabaseModule {
             // migration accidentally created this index; drop it so devices that already ran
             // that version also pass schema validation on the next startup.
             db.execSQL("DROP INDEX IF EXISTS `idx_outgoing_requests_to_user_id`")
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v32 → v33
+    // Recreates the `draft_sets` table to match the new Cloudflare-based schema.
+    //
+    // Columns removed: setType, cardCount, scryfallUri (not present in the new
+    //   Cloudflare sets-index.json source).
+    // Columns added: guideVersion TEXT NOT NULL DEFAULT '', tierListVersion TEXT NOT NULL DEFAULT ''
+    //   (used for client-side cache invalidation per set).
+    //
+    // SQLite does not support DROP COLUMN, so we use the recommended 12-step table
+    // recreation pattern:
+    //   1. Create a new table with the target schema.
+    //   2. Copy compatible columns from the old table.
+    //   3. Drop the old table.
+    //   4. Rename the new table.
+    //
+    // draft_sets has no referencing foreign keys, so no cascade or constraint
+    // changes are needed. The table is a pure cache — data loss is acceptable
+    // and the next app launch will re-populate it from Cloudflare.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_32_33 = object : Migration(32, 33) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Step 1: create the new table with the target schema
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `draft_sets_new` (
+                    `id` TEXT NOT NULL,
+                    `code` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `releasedAt` TEXT NOT NULL,
+                    `iconSvgUri` TEXT NOT NULL,
+                    `guideVersion` TEXT NOT NULL DEFAULT '',
+                    `tierListVersion` TEXT NOT NULL DEFAULT '',
+                    `cachedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            // Step 2: copy rows that exist in both schemas, using empty strings for new columns
+            db.execSQL(
+                """
+                INSERT INTO `draft_sets_new` (`id`, `code`, `name`, `releasedAt`, `iconSvgUri`, `guideVersion`, `tierListVersion`, `cachedAt`)
+                SELECT `id`, `code`, `name`, `releasedAt`, `iconSvgUri`, '', '', `cachedAt`
+                FROM `draft_sets`
+                """.trimIndent()
+            )
+            // Step 3: drop old table
+            db.execSQL("DROP TABLE IF EXISTS `draft_sets`")
+            // Step 4: rename new table to target name
+            db.execSQL("ALTER TABLE `draft_sets_new` RENAME TO `draft_sets`")
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // v33 → v34
+    // Survey & game-stats overhaul:
+    //   - game_sessions gains surveyStatus (TEXT, default 'PENDING'), surveyCompletedAt
+    //     (nullable INTEGER) and deckId (nullable TEXT, UUID).
+    //   - survey_answers gains deckId (nullable TEXT, UUID) and updatedAt (NOT NULL,
+    //     default = answeredAt) plus an index on deckId for per-deck queries.
+    //
+    // Legacy rows: existing surveys that contain at least one answer row are bumped
+    // to surveyStatus = 'COMPLETED' so the new UI shows them as reviewable. The
+    // deckId backfill is intentionally left NULL — pre-migration games did not track
+    // the app user's deck UUID (player_sessions.deckId is a legacy Long that no
+    // longer maps to anything), so we let the user re-associate via the survey
+    // edit flow rather than guess.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_33_34 = object : Migration(33, 34) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "game_sessions", "surveyStatus")) {
+                db.execSQL("ALTER TABLE game_sessions ADD COLUMN surveyStatus TEXT NOT NULL DEFAULT 'PENDING'")
+            }
+            if (!columnExists(db, "game_sessions", "surveyCompletedAt")) {
+                db.execSQL("ALTER TABLE game_sessions ADD COLUMN surveyCompletedAt INTEGER")
+            }
+            if (!columnExists(db, "game_sessions", "deckId")) {
+                db.execSQL("ALTER TABLE game_sessions ADD COLUMN deckId TEXT")
+            }
+            if (!columnExists(db, "survey_answers", "deckId")) {
+                db.execSQL("ALTER TABLE survey_answers ADD COLUMN deckId TEXT")
+            }
+            if (!columnExists(db, "survey_answers", "updatedAt")) {
+                db.execSQL("ALTER TABLE survey_answers ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE survey_answers SET updatedAt = MAX(answeredAt, 1) WHERE updatedAt = 0")
+            }
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_survey_answers_deckId ON survey_answers(deckId)")
+
+            // Mark pre-migration surveys as COMPLETED if they have any answer rows.
+            db.execSQL(
+                """
+                UPDATE game_sessions
+                SET surveyStatus = 'COMPLETED',
+                    surveyCompletedAt = playedAt
+                WHERE id IN (SELECT DISTINCT sessionId FROM survey_answers)
+                """.trimIndent()
+            )
         }
     }
 

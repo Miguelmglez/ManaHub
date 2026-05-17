@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -57,7 +56,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -144,67 +142,58 @@ fun ScannerScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             cameraPermission.status.isGranted -> {
-                when {
-                    else -> {
-                        // OCR pipeline — no DB download required; camera starts immediately
-                        CameraPreview(
-                            isFlashOn = uiState.isFlashOn,
-                            isPaused = uiState.showQueueSheet || uiState.showSettingsSheet || uiState.showEditSheet
-                                || uiState.showVariantSelector || uiState.expandedVariantImageUrl != null,
-                            selectedLanguage = uiState.selectedLanguage,
-                            onRecognitionResult = viewModel::onRecognitionResult,
-                            onFlashAvailability = viewModel::onFlashAvailabilityChanged,
-                        )
+                CameraPreview(
+                    isFlashOn = uiState.isFlashOn,
+                    isPaused = uiState.showQueueSheet || uiState.showSettingsSheet || uiState.showEditSheet
+                        || uiState.showVariantSelector || uiState.expandedVariantImageUrl != null,
+                    selectedLanguage = uiState.selectedLanguage,
+                    onRecognitionResult = viewModel::onRecognitionResult,
+                    onFlashAvailability = viewModel::onFlashAvailabilityChanged,
+                )
 
-                        // Name-zone strip — only this region is scanned by ML Kit OCR
-                        NameZoneIndicator()
+                NameZoneIndicator()
 
-                        // Top bar with back button and right-side controls
-                        TopScannerControls(
-                            onBack = onBack,
-                            queueCount = uiState.scanSession.cards.sumOf { it.quantity },
-                            isFlashOn = uiState.isFlashOn,
-                            hasFlash = uiState.hasFlash,
-                            selectedLanguage = uiState.selectedLanguage,
-                            onOpenQueue = viewModel::onOpenQueue,
-                            onToggleFlash = viewModel::onToggleFlash,
-                            onOpenSettings = viewModel::onOpenSettings,
-                            onLanguageSelected = viewModel::onLanguageSelected,
-                        )
+                TopScannerControls(
+                    onBack = onBack,
+                    queueCount = uiState.scanSession.cards.sumOf { it.quantity },
+                    isFlashOn = uiState.isFlashOn,
+                    hasFlash = uiState.hasFlash,
+                    selectedLanguage = uiState.selectedLanguage,
+                    onOpenQueue = viewModel::onOpenQueue,
+                    onToggleFlash = viewModel::onToggleFlash,
+                    onOpenSettings = viewModel::onOpenSettings,
+                    onLanguageSelected = viewModel::onLanguageSelected,
+                )
 
-                        // Bottom floating card info
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
-                        ) {
-                            DetectedCardOverlay(
-                                card = uiState.lastDetectedCard,
-                                isSearching = uiState.isSearching,
-                                error = uiState.error,
-                                isQuickMode = uiState.isQuickMode,
-                                isLookupOnly = uiState.isLookupOnly,
-                                languageMismatch = uiState.languageMismatch,
-                                isFoil = uiState.selectedIsFoil,
-                                preferredCurrency = preferredCurrency,
-                                onManualAdd = viewModel::onManualAddCurrentCard,
-                                onOpenPriceDetail = viewModel::onOpenPriceDetail,
-                                onClick = { uiState.lastDetectedCard?.scryfallId?.let(onNavigateToCardDetail) },
-                            )
-                        }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
+                ) {
+                    DetectedCardOverlay(
+                        card = uiState.lastDetectedCard,
+                        isSearching = uiState.isSearching,
+                        error = uiState.error,
+                        isQuickMode = uiState.isQuickMode,
+                        isLookupOnly = uiState.isLookupOnly,
+                        languageMismatch = uiState.languageMismatch,
+                        isFoil = uiState.selectedIsFoil,
+                        preferredCurrency = preferredCurrency,
+                        onManualAdd = viewModel::onManualAddCurrentCard,
+                        onOpenPriceDetail = viewModel::onOpenPriceDetail,
+                        onClick = { uiState.lastDetectedCard?.scryfallId?.let(onNavigateToCardDetail) },
+                    )
+                }
 
-                        // Ambiguity selector
-                        if (uiState.showAmbiguitySelector && uiState.lastDetectedCard != null) {
-                            AmbiguityDropdown(
-                                cardName = uiState.lastDetectedCard!!.name,
-                                onConfirm = {
-                                    viewModel.onManualAddCurrentCard()
-                                    viewModel.onDismissAmbiguitySelector()
-                                },
-                                onSkip = viewModel::onDismissAmbiguitySelector,
-                            )
-                        }
-                    }
+                if (uiState.showAmbiguitySelector && uiState.lastDetectedCard != null) {
+                    AmbiguityDropdown(
+                        cardName = uiState.lastDetectedCard!!.name,
+                        onConfirm = {
+                            viewModel.onManualAddCurrentCard()
+                            viewModel.onDismissAmbiguitySelector()
+                        },
+                        onSkip = viewModel::onDismissAmbiguitySelector,
+                    )
                 }
             }
 
@@ -541,147 +530,6 @@ interface ScannerEntryPoint {
     fun cardOcrAnalyzer(): CardOcrAnalyzer
     // COMMENTED OUT — TFLite embedding model replaced by ML Kit OCR
     // fun cardEmbeddingModel(): CardEmbeddingModel
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Hash DB not-loaded banner
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun EmbeddingDbNotLoadedBanner(isUpdating: Boolean) {
-    val mc = MaterialTheme.magicColors
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(mc.background.copy(alpha = 0.8f))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (isUpdating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    color = mc.goldMtg,
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(
-                    Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = mc.goldMtg,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-            Text(
-                text = stringResource(R.string.scanner_db_not_loaded),
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textPrimary,
-            )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Embedding DB setup screen — shown on first launch before the DB is downloaded
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun EmbeddingDbSetupScreen(
-    onBack: () -> Unit,
-    isDownloading: Boolean,
-    downloadProgress: Float,
-) {
-    val mc = MaterialTheme.magicColors
-    val accentColor = mc.primaryAccent
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(mc.background),
-    ) {
-        // Back button
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(top = 48.dp, start = 8.dp),
-        ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = mc.textPrimary)
-        }
-
-        // Centered content
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = null,
-                tint = accentColor,
-                modifier = Modifier.size(56.dp),
-            )
-
-            Text(
-                text = stringResource(R.string.scanner_db_setup_title),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-                textAlign = TextAlign.Center,
-            )
-
-            Text(
-                text = stringResource(R.string.scanner_db_setup_desc),
-                style = MaterialTheme.magicTypography.bodySmall,
-                color = mc.textSecondary,
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            val trackColor = accentColor.copy(alpha = 0.25f)
-            if (isDownloading && downloadProgress > 0f) {
-                LinearProgressIndicator(
-                    progress = { downloadProgress },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = accentColor,
-                    trackColor = trackColor,
-                )
-            } else {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = accentColor,
-                    trackColor = trackColor,
-                )
-            }
-
-            val statusText = if (isDownloading) {
-                if (downloadProgress > 0f) {
-                    stringResource(R.string.scanner_db_setup_downloading, (downloadProgress * 100).toInt())
-                } else {
-                    stringResource(R.string.scanner_db_setup_waiting)
-                }
-            } else {
-                stringResource(R.string.scanner_db_setup_waiting)
-            }
-            Text(
-                text = statusText,
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center,
-            )
-
-            Text(
-                text = stringResource(R.string.scanner_db_setup_size_hint),
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textDisabled,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

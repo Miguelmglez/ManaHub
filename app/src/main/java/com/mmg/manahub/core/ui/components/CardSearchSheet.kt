@@ -318,7 +318,6 @@ private fun AddCardSheetRow(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val card = row.card
-    val addEnabled = true 
 
     Surface(
         onClick = {
@@ -360,8 +359,8 @@ private fun AddCardSheetRow(
                 IconButton(onClick = {
                     onInteraction()
                     onAdd()
-                }, enabled = addEnabled || isCommanderMode, modifier = Modifier.size(32.dp)) {
-                    Icon(icon, null, tint = if (isCurrentCommander) mc.goldMtg else if (addEnabled || isCommanderMode) mc.primaryAccent else mc.textDisabled, modifier = Modifier.size(16.dp))
+                }, modifier = Modifier.size(32.dp)) {
+                    Icon(icon, null, tint = if (isCurrentCommander) mc.goldMtg else mc.primaryAccent, modifier = Modifier.size(16.dp))
                 }
             }
         }

@@ -16,8 +16,9 @@ import androidx.room.PrimaryKey
         )
     ],
     indices = [
-        Index("sessionId"),
-        Index("cardReference"),
+        Index(value = ["sessionId"], name = "index_survey_answers_sessionId"),
+        Index(value = ["cardReference"], name = "index_survey_answers_cardReference"),
+        Index(value = ["deckId"], name = "index_survey_answers_deckId"),
     ],
 )
 data class SurveyAnswerEntity(
@@ -27,5 +28,7 @@ data class SurveyAnswerEntity(
     val questionType:  String,
     val answer:        String,
     val cardReference: String? = null,
+    val deckId:        String? = null,                       // UUID of the user's deck for this game (denormalized for fast per-deck queries)
     val answeredAt:    Long    = System.currentTimeMillis(),
+    val updatedAt:     Long    = System.currentTimeMillis(),
 )

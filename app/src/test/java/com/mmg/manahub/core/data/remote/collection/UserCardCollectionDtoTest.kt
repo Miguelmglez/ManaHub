@@ -34,7 +34,6 @@ class UserCardCollectionDtoTest {
         language        = "ja",
         isAlternativeArt = true,
         isForTrade      = true,
-        isInWishlist    = false,
         isDeleted       = isDeleted,
         updatedAt       = NOW,
         createdAt       = CREATED,
@@ -50,7 +49,6 @@ class UserCardCollectionDtoTest {
         language        = "ja",
         isAlternativeArt = true,
         isForTrade      = true,
-        isInWishlist    = false,
         isDeleted       = false,
         updatedAt       = NOW,
         createdAt       = CREATED,
@@ -101,11 +99,6 @@ class UserCardCollectionDtoTest {
     @Test
     fun `toEntity preserves isForTrade`() {
         assertTrue(aFullDto().toEntity().isForTrade)
-    }
-
-    @Test
-    fun `toEntity preserves isInWishlist`() {
-        assertFalse(aFullDto().toEntity().isInWishlist)
     }
 
     @Test
@@ -185,7 +178,6 @@ class UserCardCollectionDtoTest {
         assertEquals(original.language,         roundTripped.language)
         assertEquals(original.isAlternativeArt, roundTripped.isAlternativeArt)
         assertEquals(original.isForTrade,       roundTripped.isForTrade)
-        assertEquals(original.isInWishlist,     roundTripped.isInWishlist)
         assertEquals(original.isDeleted,        roundTripped.isDeleted)
         assertEquals(original.updatedAt,        roundTripped.updatedAt)
         assertEquals(original.createdAt,        roundTripped.createdAt)

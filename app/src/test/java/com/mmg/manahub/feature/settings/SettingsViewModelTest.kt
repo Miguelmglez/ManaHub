@@ -10,6 +10,10 @@ import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.settings.presentation.PreferencesState
+import com.mmg.manahub.feature.settings.presentation.SettingsViewModel
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -50,14 +54,15 @@ class SettingsViewModelTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val userPrefsDataStore  = mockk<UserPreferencesDataStore>(relaxed = true)
-    private val userPreferencesRepo = mockk<UserPreferencesRepository>(relaxed = true)
-    private val analyticsHelper     = mockk<AnalyticsHelper>(relaxed = true)
+    private val userPrefsDataStore    = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val userPreferencesRepo   = mockk<UserPreferencesRepository>(relaxed = true)
+    private val analyticsHelper       = mockk<AnalyticsHelper>(relaxed = true)
+    private val authRepository        = mockk<AuthRepository>(relaxed = true)
+    private val userProfileDataSource = mockk<UserProfileDataSource>(relaxed = true)
 
     // In-memory flow emulators for DataStore-backed properties
-    private val autoRefreshFlow  = MutableStateFlow(false)
-    private val themeFlow        = MutableStateFlow<AppTheme>(AppTheme.NeonVoid)
-    private val preferencesFlow  = MutableStateFlow(defaultPreferences())
+    private val themeFlow       = MutableStateFlow<AppTheme>(AppTheme.NeonVoid)
+    private val preferencesFlow = MutableStateFlow(defaultPreferences())
 
     private lateinit var viewModel: SettingsViewModel
 
@@ -68,24 +73,23 @@ class SettingsViewModelTest {
         cardLanguage      = CardLanguage.ENGLISH,
         newsLanguages     = setOf(NewsLanguage.ENGLISH),
         preferredCurrency = PreferredCurrency.USD,
+        collectionViewMode = com.mmg.manahub.core.domain.model.CollectionViewMode.GRID,
     )
 
     private fun buildViewModel(): SettingsViewModel {
-        every { userPrefsDataStore.autoRefreshPricesFlow } returns autoRefreshFlow
-        every { userPrefsDataStore.themeFlow }             returns themeFlow
-        every { userPreferencesRepo.preferencesFlow }      returns preferencesFlow
+        every { userPrefsDataStore.themeFlow }        returns themeFlow
+        every { userPreferencesRepo.preferencesFlow } returns preferencesFlow
 
-        coEvery { userPrefsDataStore.saveAutoRefreshPrices(any()) } coAnswers {
-            autoRefreshFlow.value = firstArg()
-        }
         coEvery { userPrefsDataStore.saveTheme(any()) } coAnswers {
             themeFlow.value = firstArg()
         }
 
         return SettingsViewModel(
-            userPrefsDataStore  = userPrefsDataStore,
-            userPreferencesRepo = userPreferencesRepo,
-            analyticsHelper     = analyticsHelper,
+            userPrefsDataStore    = userPrefsDataStore,
+            userPreferencesRepo   = userPreferencesRepo,
+            analyticsHelper       = analyticsHelper,
+            authRepository        = authRepository,
+            userProfileDataSource = userProfileDataSource,
         )
     }
 
@@ -100,41 +104,6 @@ class SettingsViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — onAutoRefreshChanged
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given autoRefresh is false when onAutoRefreshChanged true then DataStore is saved and state updates optimistically`() = runTest {
-        // Arrange
-        advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.autoRefreshPrices)
-
-        // Act
-        viewModel.onAutoRefreshChanged(true)
-        advanceUntilIdle()
-
-        // Assert: DataStore write was made
-        coVerify { userPrefsDataStore.saveAutoRefreshPrices(true) }
-        // Assert: state reflects the new value
-        assertTrue(viewModel.uiState.value.autoRefreshPrices)
-    }
-
-    @Test
-    fun `given autoRefresh is true when onAutoRefreshChanged false then state is updated to false`() = runTest {
-        // Arrange
-        autoRefreshFlow.value = true
-        advanceUntilIdle()
-
-        // Act
-        viewModel.onAutoRefreshChanged(false)
-        advanceUntilIdle()
-
-        // Assert
-        coVerify { userPrefsDataStore.saveAutoRefreshPrices(false) }
-        assertFalse(viewModel.uiState.value.autoRefreshPrices)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

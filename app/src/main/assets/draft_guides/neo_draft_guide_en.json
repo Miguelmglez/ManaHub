@@ -1,0 +1,1419 @@
+{
+  "metadata": {
+    "set_name": "Kamigawa: Neon Dynasty",
+    "set_code": "NEO",
+    "source_url": "https://draftsim.com/mtg-neo-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "August 26, 2024"
+  },
+  "set_overview": {
+    "summary": "Neon Dynasty is one of the slowest recent Limited formats, emphasizing card advantage and value over aggressive strategies. The set features 10 dual-color archetypes with flexible deckbuilding options.",
+    "color_ranking": [
+      "All five colors are balanced — pair-driven format."
+    ],
+    "color_notes": {
+      "{W} White": "Strong removal (Intercessor's Arrest, Repel the Vile) and value creatures. Pairs well with blue for vehicles and black for control.",
+      "{U} Blue": "Excellent ninjutsu enablers and tempo creatures. Moon-Circuit Hacker and Moonsnare Specialist drive the archetype.",
+      "{B} Black": "Rich in sagas and sacrifice synergies. Okiba Reckoner Raid is a premier common across multiple archetypes.",
+      "{R} Red": "Efficient removal and artifact synergies. Experimental Synthesizer generates card advantage in dedicated decks.",
+      "{G} Green": "Best color for mana fixing and enchantment density. Tales of Master Seshiro and Jukai Preserver anchor strategies."
+    },
+    "key_gameplay_notes": [
+      "Slow format — card advantage matters more than tempo.",
+      "Prioritize hard removal over soft removal given format speed.",
+      "Evaluate sagas as multi-turn value rather than immediate board impact.",
+      "Ninjutsu costs decrease significantly through alternate casting, enabling multiple activations per turn.",
+      "10 common dual lands provide baseline fixing."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Reconfigure",
+      "summary": "Artifact creatures function as both creatures and equipment, providing flexibility without overpaying.",
+      "performance": "Universal utility; slots into any deck.",
+      "key_examples": []
+    },
+    {
+      "name": "Modified",
+      "summary": "Creatures with enchantments, equipment, or counters trigger payoffs.",
+      "performance": "Anchors Gruul Modified.",
+      "key_examples": [
+        {
+          "name": "Invigorating Hot Spring",
+          "color": "RG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 85,
+          "tier_rating": "B",
+          "note": null,
+          "id": "59a118d1-30b8-42c0-ac42-6fba0778200a",
+          "scryfall_uri": "https://scryfall.com/card/neo/223/invigorating-hot-spring",
+          "colors": [
+            "G",
+            "R"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/59a118d1-30b8-42c0-ac42-6fba0778200a.jpg?1654568472",
+            "normal": "https://cards.scryfall.io/normal/front/5/9/59a118d1-30b8-42c0-ac42-6fba0778200a.jpg?1654568472"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "Unforgiving One",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 153,
+          "tier_rating": "C",
+          "note": null,
+          "id": "cfb20c08-a84a-4773-a90c-fb007b94644b",
+          "scryfall_uri": "https://scryfall.com/card/neo/127/unforgiving-one",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature — Spirit",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cfb20c08-a84a-4773-a90c-fb007b94644b.jpg?1654567456",
+            "normal": "https://cards.scryfall.io/normal/front/c/f/cfb20c08-a84a-4773-a90c-fb007b94644b.jpg?1654567456"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        }
+      ]
+    },
+    {
+      "name": "Sagas",
+      "summary": "Double-faced cards that transform into creatures at Chapter III. Play as value engines in midrange decks.",
+      "performance": "Strong in midrange archetypes — multi-turn value.",
+      "key_examples": [
+        {
+          "name": "Tales of Master Seshiro",
+          "color": "G",
+          "rarity": "Common",
+          "pick_order_rank": 131,
+          "tier_rating": "C",
+          "note": null,
+          "id": "512bc867-3a86-4da2-93f0-dd76d6a6f30d",
+          "scryfall_uri": "https://scryfall.com/card/neo/210/tales-of-master-seshiro-seshiros-living-legacy",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment — Saga // Enchantment Creature — Snake Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/1/512bc867-3a86-4da2-93f0-dd76d6a6f30d.jpg?1656453375",
+            "normal": "https://cards.scryfall.io/normal/front/5/1/512bc867-3a86-4da2-93f0-dd76d6a6f30d.jpg?1656453375"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "The Modern Age",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 105,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ee60a8e9-3201-4a7e-8aa4-2c5e1042c8a5",
+          "scryfall_uri": "https://scryfall.com/card/neo/66/the-modern-age-vector-glider",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment — Saga // Enchantment Creature — Spirit",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee60a8e9-3201-4a7e-8aa4-2c5e1042c8a5.jpg?1656453137",
+            "normal": "https://cards.scryfall.io/normal/front/e/e/ee60a8e9-3201-4a7e-8aa4-2c5e1042c8a5.jpg?1656453137"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "Behold the Unspeakable",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 38,
+          "tier_rating": "A",
+          "note": null,
+          "id": "e4d52701-e0dc-474e-b08f-88147200d210",
+          "scryfall_uri": "https://scryfall.com/card/neo/48/behold-the-unspeakable-vision-of-the-unspeakable",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment — Saga // Enchantment Creature — Spirit",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e4d52701-e0dc-474e-b08f-88147200d210.jpg?1656453117",
+            "normal": "https://cards.scryfall.io/normal/front/e/4/e4d52701-e0dc-474e-b08f-88147200d210.jpg?1656453117"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "Boseiju Reaches Skyward",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 44,
+          "tier_rating": "A",
+          "note": null,
+          "id": "1144014b-f13b-4397-97ed-a8de46371a2c",
+          "scryfall_uri": "https://scryfall.com/card/neo/177/boseiju-reaches-skyward-branch-of-boseiju",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment — Saga // Enchantment Creature — Plant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/1144014b-f13b-4397-97ed-a8de46371a2c.jpg?1656453331",
+            "normal": "https://cards.scryfall.io/normal/front/1/1/1144014b-f13b-4397-97ed-a8de46371a2c.jpg?1656453331"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "Life of Toshiro Umezawa",
+          "color": "B",
+          "rarity": "Uncommon",
+          "pick_order_rank": 53,
+          "tier_rating": "B",
+          "note": null,
+          "id": "f7f4adf7-b871-417b-8904-7f024ca21486",
+          "scryfall_uri": "https://scryfall.com/card/neo/108/life-of-toshiro-umezawa-memory-of-toshiro",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Enchantment — Saga // Enchantment Creature — Human Samurai",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7f4adf7-b871-417b-8904-7f024ca21486.jpg?1656453156",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f7f4adf7-b871-417b-8904-7f024ca21486.jpg?1656453156"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "Michiko's Reign of Truth",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 52,
+          "tier_rating": "B",
+          "note": null,
+          "id": "74f12c23-5c15-4ae6-8f4d-c5e6c1878817",
+          "scryfall_uri": "https://scryfall.com/card/neo/29/michikos-reign-of-truth-portrait-of-michiko",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment — Saga // Enchantment Creature — Human Noble",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74f12c23-5c15-4ae6-8f4d-c5e6c1878817.jpg?1656453078",
+            "normal": "https://cards.scryfall.io/normal/front/7/4/74f12c23-5c15-4ae6-8f4d-c5e6c1878817.jpg?1656453078"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        }
+      ]
+    },
+    {
+      "name": "Ninjutsu",
+      "summary": "Return an unblocked attacker to hand and put the ninja onto the battlefield tapped and attacking. Enables tempo strategies with evasive enablers.",
+      "performance": "Defines UB Ninjas (top-tier deck).",
+      "key_examples": [
+        {
+          "name": "Moon-Circuit Hacker",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 95,
+          "tier_rating": "C",
+          "note": null,
+          "id": "c6e466d1-943d-41e6-a47d-c9d951ca4262",
+          "scryfall_uri": "https://scryfall.com/card/neo/67/moon-circuit-hacker",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment Creature — Human Ninja",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/6/c6e466d1-943d-41e6-a47d-c9d951ca4262.jpg?1654566841",
+            "normal": "https://cards.scryfall.io/normal/front/c/6/c6e466d1-943d-41e6-a47d-c9d951ca4262.jpg?1654566841"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "Moonsnare Specialist",
+          "color": "U",
+          "rarity": "Common",
+          "pick_order_rank": 73,
+          "tier_rating": "B",
+          "note": null,
+          "id": "1e8b209f-f577-45cc-9d18-03c1d67d391e",
+          "scryfall_uri": "https://scryfall.com/card/neo/70/moonsnare-specialist",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature — Human Ninja",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1e8b209f-f577-45cc-9d18-03c1d67d391e.jpg?1654566866",
+            "normal": "https://cards.scryfall.io/normal/front/1/e/1e8b209f-f577-45cc-9d18-03c1d67d391e.jpg?1654566866"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        },
+        {
+          "name": "Silver-Fur Master",
+          "color": "UB",
+          "rarity": "Uncommon",
+          "pick_order_rank": 84,
+          "tier_rating": "B",
+          "note": null,
+          "id": "cacc36d9-4c4b-43b2-a8b4-d265deb1e6b2",
+          "scryfall_uri": "https://scryfall.com/card/neo/236/silver-fur-master",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Creature — Rat Ninja",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/cacc36d9-4c4b-43b2-a8b4-d265deb1e6b2.jpg?1654568620",
+            "normal": "https://cards.scryfall.io/normal/front/c/a/cacc36d9-4c4b-43b2-a8b4-d265deb1e6b2.jpg?1654568620"
+          },
+          "set": "neo",
+          "set_name": "Kamigawa: Neon Dynasty"
+        }
+      ]
+    },
+    {
+      "name": "Channel",
+      "summary": "Optional alternate effects activated by discarding the card. Provides flexibility without deckbuilding constraints.",
+      "performance": "Adds versatility; useful in graveyard decks.",
+      "key_examples": []
+    }
+  ],
+  "archetype_tier_list": {
+    "archetypes": [
+      {
+        "colors": "{W}{U}",
+        "name": "Azorius Vehicles",
+        "strategy": "Plays oversized vehicles with Pilot token generators. Signpost focuses on crew efficiency.",
+        "key_cards": [
+          {
+            "name": "Prodigy's Prototype",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 82,
+            "tier_rating": "B",
+            "note": null,
+            "id": "be046e0a-6509-450b-b34f-29d5a5e3472e",
+            "scryfall_uri": "https://scryfall.com/card/neo/231/prodigys-prototype",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Artifact — Vehicle",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/e/be046e0a-6509-450b-b34f-29d5a5e3472e.jpg?1654568557",
+              "normal": "https://cards.scryfall.io/normal/front/b/e/be046e0a-6509-450b-b34f-29d5a5e3472e.jpg?1654568557"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "Dimir Ninjas",
+        "strategy": "Tempo strategy assembling cheap creatures with ninja payoffs. Dominates through evasion and value.",
+        "key_cards": [
+          {
+            "name": "Silver-Fur Master",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 84,
+            "tier_rating": "B",
+            "note": null,
+            "id": "cacc36d9-4c4b-43b2-a8b4-d265deb1e6b2",
+            "scryfall_uri": "https://scryfall.com/card/neo/236/silver-fur-master",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature — Rat Ninja",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/cacc36d9-4c4b-43b2-a8b4-d265deb1e6b2.jpg?1654568620",
+              "normal": "https://cards.scryfall.io/normal/front/c/a/cacc36d9-4c4b-43b2-a8b4-d265deb1e6b2.jpg?1654568620"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Moon-Circuit Hacker",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 95,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c6e466d1-943d-41e6-a47d-c9d951ca4262",
+            "scryfall_uri": "https://scryfall.com/card/neo/67/moon-circuit-hacker",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Enchantment Creature — Human Ninja",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/6/c6e466d1-943d-41e6-a47d-c9d951ca4262.jpg?1654566841",
+              "normal": "https://cards.scryfall.io/normal/front/c/6/c6e466d1-943d-41e6-a47d-c9d951ca4262.jpg?1654566841"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Moonsnare Specialist",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 73,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1e8b209f-f577-45cc-9d18-03c1d67d391e",
+            "scryfall_uri": "https://scryfall.com/card/neo/70/moonsnare-specialist",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Human Ninja",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1e8b209f-f577-45cc-9d18-03c1d67d391e.jpg?1654566866",
+              "normal": "https://cards.scryfall.io/normal/front/1/e/1e8b209f-f577-45cc-9d18-03c1d67d391e.jpg?1654566866"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "Rakdos Sacrifice",
+        "strategy": "Rewards creature sacrifice. Aggressive early game transitioning to value.",
+        "key_cards": [
+          {
+            "name": "Reckoner's Bargain",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 239,
+            "tier_rating": "D",
+            "note": null,
+            "id": "6338942d-d650-4571-8ec6-4d658792c53e",
+            "scryfall_uri": "https://scryfall.com/card/neo/120/reckoners-bargain",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/3/6338942d-d650-4571-8ec6-4d658792c53e.jpg?1654567391",
+              "normal": "https://cards.scryfall.io/normal/front/6/3/6338942d-d650-4571-8ec6-4d658792c53e.jpg?1654567391"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Dockside Chef",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 68,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d80100c3-c81e-4084-8dfe-f8610637fd91",
+            "scryfall_uri": "https://scryfall.com/card/neo/93/dockside-chef",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Enchantment Creature — Human Citizen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/8/d80100c3-c81e-4084-8dfe-f8610637fd91.jpg?1654567106",
+              "normal": "https://cards.scryfall.io/normal/front/d/8/d80100c3-c81e-4084-8dfe-f8610637fd91.jpg?1654567106"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "Gruul Modified",
+        "strategy": "Stacks enchantments, equipment, and counters on creatures for payoff triggers.",
+        "key_cards": [
+          {
+            "name": "Invigorating Hot Spring",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 85,
+            "tier_rating": "B",
+            "note": null,
+            "id": "59a118d1-30b8-42c0-ac42-6fba0778200a",
+            "scryfall_uri": "https://scryfall.com/card/neo/223/invigorating-hot-spring",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Enchantment",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/59a118d1-30b8-42c0-ac42-6fba0778200a.jpg?1654568472",
+              "normal": "https://cards.scryfall.io/normal/front/5/9/59a118d1-30b8-42c0-ac42-6fba0778200a.jpg?1654568472"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Walking Skyscraper",
+            "color": "C",
+            "rarity": "Uncommon",
+            "pick_order_rank": 213,
+            "tier_rating": "D",
+            "note": null,
+            "id": "958af4ba-f29e-47ef-995e-3985982c75ad",
+            "scryfall_uri": "https://scryfall.com/card/neo/263/walking-skyscraper",
+            "colors": [],
+            "type_line": "Artifact Creature — Construct",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/5/958af4ba-f29e-47ef-995e-3985982c75ad.jpg?1654568875",
+              "normal": "https://cards.scryfall.io/normal/front/9/5/958af4ba-f29e-47ef-995e-3985982c75ad.jpg?1654568875"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{W}",
+        "name": "Selesnya Enchantments",
+        "strategy": "Density-based strategy rewarding enchantment concentration.",
+        "key_cards": [
+          {
+            "name": "Generous Visitor",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 77,
+            "tier_rating": "B",
+            "note": null,
+            "id": "d1066ccd-a932-4d05-98da-11ae4675364e",
+            "scryfall_uri": "https://scryfall.com/card/neo/185/generous-visitor",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/1/d1066ccd-a932-4d05-98da-11ae4675364e.jpg?1654568092",
+              "normal": "https://cards.scryfall.io/normal/front/d/1/d1066ccd-a932-4d05-98da-11ae4675364e.jpg?1654568092"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Sky-Blessed Samurai",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 173,
+            "tier_rating": "C",
+            "note": null,
+            "id": "c9c7ba6f-c58e-4347-92e4-51ae8f2d5a88",
+            "scryfall_uri": "https://scryfall.com/card/neo/37/sky-blessed-samurai",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Enchantment Creature — Human Samurai",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/9/c9c7ba6f-c58e-4347-92e4-51ae8f2d5a88.jpg?1654566515",
+              "normal": "https://cards.scryfall.io/normal/front/c/9/c9c7ba6f-c58e-4347-92e4-51ae8f2d5a88.jpg?1654566515"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "Orzhov Balance",
+        "strategy": "Control-oriented with dual-type payoffs (artifacts AND enchantments).",
+        "key_cards": [
+          {
+            "name": "Kami of Terrible Secrets",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 190,
+            "tier_rating": "C",
+            "note": null,
+            "id": "58f15af6-eaf5-41b8-b93d-5a90ca219478",
+            "scryfall_uri": "https://scryfall.com/card/neo/105/kami-of-terrible-secrets",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature — Spirit",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/8/58f15af6-eaf5-41b8-b93d-5a90ca219478.jpg?1654567228",
+              "normal": "https://cards.scryfall.io/normal/front/5/8/58f15af6-eaf5-41b8-b93d-5a90ca219478.jpg?1654567228"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Soul Transfer",
+            "color": "B",
+            "rarity": "Rare",
+            "pick_order_rank": 39,
+            "tier_rating": "A",
+            "note": null,
+            "id": "1e5aba90-c8c7-4f06-b7b3-1b4758d2791a",
+            "scryfall_uri": "https://scryfall.com/card/neo/122/soul-transfer",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1e5aba90-c8c7-4f06-b7b3-1b4758d2791a.jpg?1654567411",
+              "normal": "https://cards.scryfall.io/normal/front/1/e/1e5aba90-c8c7-4f06-b7b3-1b4758d2791a.jpg?1654567411"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "Izzet Artifacts",
+        "strategy": "Artifact-focused with Patchwork Automaton and Dragonspark Reactor generating value from artifact density.",
+        "key_cards": [
+          {
+            "name": "Patchwork Automaton",
+            "color": "C",
+            "rarity": "Uncommon",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7a4e1580-dd26-4f4b-ac98-3e6fa7b879d5",
+            "scryfall_uri": "https://scryfall.com/card/neo/254/patchwork-automaton",
+            "colors": [],
+            "type_line": "Artifact Creature — Construct",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/a/7a4e1580-dd26-4f4b-ac98-3e6fa7b879d5.jpg?1654568794",
+              "normal": "https://cards.scryfall.io/normal/front/7/a/7a4e1580-dd26-4f4b-ac98-3e6fa7b879d5.jpg?1654568794"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Dragonspark Reactor",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 214,
+            "tier_rating": "D",
+            "note": null,
+            "id": "5cf531dd-0a93-43e3-880b-f705fa5f533d",
+            "scryfall_uri": "https://scryfall.com/card/neo/137/dragonspark-reactor",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5cf531dd-0a93-43e3-880b-f705fa5f533d.jpg?1654567558",
+              "normal": "https://cards.scryfall.io/normal/front/5/c/5cf531dd-0a93-43e3-880b-f705fa5f533d.jpg?1654567558"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{G}",
+        "name": "Golgari Graveyard",
+        "strategy": "Leverages channel mechanics and reanimation for late-game advantage.",
+        "key_cards": [
+          {
+            "name": "Season of Renewal",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 186,
+            "tier_rating": "C",
+            "note": null,
+            "id": "841f0ec2-94c7-4cec-94bb-b365084ca45f",
+            "scryfall_uri": "https://scryfall.com/card/neo/205/season-of-renewal",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/4/841f0ec2-94c7-4cec-94bb-b365084ca45f.jpg?1654568303",
+              "normal": "https://cards.scryfall.io/normal/front/8/4/841f0ec2-94c7-4cec-94bb-b365084ca45f.jpg?1654568303"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          },
+          {
+            "name": "Okiba Salvage",
+            "color": "B",
+            "rarity": "Uncommon",
+            "pick_order_rank": 177,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d9e4485d-c208-46b4-9b5d-48e55e2ee182",
+            "scryfall_uri": "https://scryfall.com/card/neo/118/okiba-salvage",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/9/d9e4485d-c208-46b4-9b5d-48e55e2ee182.jpg?1654567370",
+              "normal": "https://cards.scryfall.io/normal/front/d/9/d9e4485d-c208-46b4-9b5d-48e55e2ee182.jpg?1654567370"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Boros Samurai",
+        "strategy": "Aggressive with pseudo-exalted abilities and first-strike payoffs.",
+        "key_cards": [
+          {
+            "name": "Kitsune Ace",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 243,
+            "tier_rating": "D",
+            "note": null,
+            "id": "ef1d446a-8607-45b8-a01f-dad17bab76e7",
+            "scryfall_uri": "https://scryfall.com/card/neo/22/kitsune-ace",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Fox Pilot",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef1d446a-8607-45b8-a01f-dad17bab76e7.jpg?1654566352",
+              "normal": "https://cards.scryfall.io/normal/front/e/f/ef1d446a-8607-45b8-a01f-dad17bab76e7.jpg?1654566352"
+            },
+            "set": "neo",
+            "set_name": "Kamigawa: Neon Dynasty"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Simic Ramp",
+        "strategy": "Mana acceleration into large threats, utilizing channel creatures for graveyard recursion value.",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Spirited Companion",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 71,
+        "tier_rating": "B",
+        "note": null,
+        "id": "5aa91a9e-2fe2-43bc-aa9c-cfb8a71829ff",
+        "scryfall_uri": "https://scryfall.com/card/neo/38/spirited-companion",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment Creature — Dog",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5aa91a9e-2fe2-43bc-aa9c-cfb8a71829ff.jpg?1654566520",
+          "normal": "https://cards.scryfall.io/normal/front/5/a/5aa91a9e-2fe2-43bc-aa9c-cfb8a71829ff.jpg?1654566520"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Sunblade Samurai",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 121,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e6c577bb-5e21-4a3e-b0a7-713a4ff7dce6",
+        "scryfall_uri": "https://scryfall.com/card/neo/39/sunblade-samurai",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Enchantment Creature — Human Samurai",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e6c577bb-5e21-4a3e-b0a7-713a4ff7dce6.jpg?1654566538",
+          "normal": "https://cards.scryfall.io/normal/front/e/6/e6c577bb-5e21-4a3e-b0a7-713a4ff7dce6.jpg?1654566538"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Imperial Oath",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 70,
+        "tier_rating": "B",
+        "note": null,
+        "id": "3d6750dd-2303-493b-885d-1bfb5787b16c",
+        "scryfall_uri": "https://scryfall.com/card/neo/17/imperial-oath",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d6750dd-2303-493b-885d-1bfb5787b16c.jpg?1654566308",
+          "normal": "https://cards.scryfall.io/normal/front/3/d/3d6750dd-2303-493b-885d-1bfb5787b16c.jpg?1654566308"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Mothrider Patrol",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 128,
+        "tier_rating": "C",
+        "note": null,
+        "id": "f657f2dc-adc8-4a66-b081-a71b3a127389",
+        "scryfall_uri": "https://scryfall.com/card/neo/30/mothrider-patrol",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Fox Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/f/6/f657f2dc-adc8-4a66-b081-a71b3a127389.jpg?1654566443",
+          "normal": "https://cards.scryfall.io/normal/front/f/6/f657f2dc-adc8-4a66-b081-a71b3a127389.jpg?1654566443"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Moonsnare Specialist",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 73,
+        "tier_rating": "B",
+        "note": null,
+        "id": "1e8b209f-f577-45cc-9d18-03c1d67d391e",
+        "scryfall_uri": "https://scryfall.com/card/neo/70/moonsnare-specialist",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Human Ninja",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1e8b209f-f577-45cc-9d18-03c1d67d391e.jpg?1654566866",
+          "normal": "https://cards.scryfall.io/normal/front/1/e/1e8b209f-f577-45cc-9d18-03c1d67d391e.jpg?1654566866"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "The Modern Age",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 105,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ee60a8e9-3201-4a7e-8aa4-2c5e1042c8a5",
+        "scryfall_uri": "https://scryfall.com/card/neo/66/the-modern-age-vector-glider",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Saga // Enchantment Creature — Spirit",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee60a8e9-3201-4a7e-8aa4-2c5e1042c8a5.jpg?1656453137",
+          "normal": "https://cards.scryfall.io/normal/front/e/e/ee60a8e9-3201-4a7e-8aa4-2c5e1042c8a5.jpg?1656453137"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Moon-Circuit Hacker",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 95,
+        "tier_rating": "C",
+        "note": null,
+        "id": "c6e466d1-943d-41e6-a47d-c9d951ca4262",
+        "scryfall_uri": "https://scryfall.com/card/neo/67/moon-circuit-hacker",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment Creature — Human Ninja",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/6/c6e466d1-943d-41e6-a47d-c9d951ca4262.jpg?1654566841",
+          "normal": "https://cards.scryfall.io/normal/front/c/6/c6e466d1-943d-41e6-a47d-c9d951ca4262.jpg?1654566841"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Network Disruptor",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 96,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5a37719a-2a87-4870-8f25-12544ca2f2cf",
+        "scryfall_uri": "https://scryfall.com/card/neo/71/network-disruptor",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Artifact Creature — Moonfolk Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a37719a-2a87-4870-8f25-12544ca2f2cf.jpg?1654566883",
+          "normal": "https://cards.scryfall.io/normal/front/5/a/5a37719a-2a87-4870-8f25-12544ca2f2cf.jpg?1654566883"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Okiba Reckoner Raid",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 106,
+        "tier_rating": "C",
+        "note": null,
+        "id": "4f0582b4-d951-4450-b158-4a34109e48cd",
+        "scryfall_uri": "https://scryfall.com/card/neo/117/okiba-reckoner-raid-nezumi-road-captain",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment — Saga // Enchantment Creature — Rat Rogue",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f0582b4-d951-4450-b158-4a34109e48cd.jpg?1656453196",
+          "normal": "https://cards.scryfall.io/normal/front/4/f/4f0582b4-d951-4450-b158-4a34109e48cd.jpg?1656453196"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Virus Beetle",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 91,
+        "tier_rating": "B",
+        "note": null,
+        "id": "488ee202-0d28-4cc0-8a7d-644d9878e952",
+        "scryfall_uri": "https://scryfall.com/card/neo/128/virus-beetle",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Artifact Creature — Insect",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/8/488ee202-0d28-4cc0-8a7d-644d9878e952.jpg?1654567473",
+          "normal": "https://cards.scryfall.io/normal/front/4/8/488ee202-0d28-4cc0-8a7d-644d9878e952.jpg?1654567473"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Twisted Embrace",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 92,
+        "tier_rating": "B",
+        "note": null,
+        "id": "e4c7919a-de62-46df-a937-593647473ef5",
+        "scryfall_uri": "https://scryfall.com/card/neo/125/twisted-embrace",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e4c7919a-de62-46df-a937-593647473ef5.jpg?1654567436",
+          "normal": "https://cards.scryfall.io/normal/front/e/4/e4c7919a-de62-46df-a937-593647473ef5.jpg?1654567436"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Inkrise Infiltrator",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 139,
+        "tier_rating": "C",
+        "note": null,
+        "id": "cbb6e447-5f40-4039-8a17-257b4a55382c",
+        "scryfall_uri": "https://scryfall.com/card/neo/100/inkrise-infiltrator",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Creature — Human Ninja",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/b/cbb6e447-5f40-4039-8a17-257b4a55382c.jpg?1654567165",
+          "normal": "https://cards.scryfall.io/normal/front/c/b/cbb6e447-5f40-4039-8a17-257b4a55382c.jpg?1654567165"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Kami's Flare",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 89,
+        "tier_rating": "B",
+        "note": null,
+        "id": "bef5d58e-b490-4682-9a44-12cd61a94c0f",
+        "scryfall_uri": "https://scryfall.com/card/neo/150/kamis-flare",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/e/bef5d58e-b490-4682-9a44-12cd61a94c0f.jpg?1654567705",
+          "normal": "https://cards.scryfall.io/normal/front/b/e/bef5d58e-b490-4682-9a44-12cd61a94c0f.jpg?1654567705"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Experimental Synthesizer",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 90,
+        "tier_rating": "B",
+        "note": null,
+        "id": "c47931c9-685d-4b83-8299-bc347224b4e8",
+        "scryfall_uri": "https://scryfall.com/card/neo/138/experimental-synthesizer",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Artifact",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/4/c47931c9-685d-4b83-8299-bc347224b4e8.jpg?1654567579",
+          "normal": "https://cards.scryfall.io/normal/front/c/4/c47931c9-685d-4b83-8299-bc347224b4e8.jpg?1654567579"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Voltage Surge",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 103,
+        "tier_rating": "C",
+        "note": null,
+        "id": "5a9b7141-45b9-4629-a4e4-b50f93929717",
+        "scryfall_uri": "https://scryfall.com/card/neo/171/voltage-surge",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a9b7141-45b9-4629-a4e4-b50f93929717.jpg?1654567941",
+          "normal": "https://cards.scryfall.io/normal/front/5/a/5a9b7141-45b9-4629-a4e4-b50f93929717.jpg?1654567941"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Simian Sling",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 144,
+        "tier_rating": "C",
+        "note": null,
+        "id": "37a00f95-d563-4d51-a5f2-af139261921a",
+        "scryfall_uri": "https://scryfall.com/card/neo/163/simian-sling",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Artifact Creature — Equipment Monkey",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37a00f95-d563-4d51-a5f2-af139261921a.jpg?1654567852",
+          "normal": "https://cards.scryfall.io/normal/front/3/7/37a00f95-d563-4d51-a5f2-af139261921a.jpg?1654567852"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Tales of Master Seshiro",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 131,
+        "tier_rating": "C",
+        "note": null,
+        "id": "512bc867-3a86-4da2-93f0-dd76d6a6f30d",
+        "scryfall_uri": "https://scryfall.com/card/neo/210/tales-of-master-seshiro-seshiros-living-legacy",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Enchantment — Saga // Enchantment Creature — Snake Warrior",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/1/512bc867-3a86-4da2-93f0-dd76d6a6f30d.jpg?1656453375",
+          "normal": "https://cards.scryfall.io/normal/front/5/1/512bc867-3a86-4da2-93f0-dd76d6a6f30d.jpg?1656453375"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Master's Rebuke",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 118,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7d42ca7c-5b36-45a9-b235-4f90e66f4377",
+        "scryfall_uri": "https://scryfall.com/card/neo/202/masters-rebuke",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/d/7d42ca7c-5b36-45a9-b235-4f90e66f4377.jpg?1654568270",
+          "normal": "https://cards.scryfall.io/normal/front/7/d/7d42ca7c-5b36-45a9-b235-4f90e66f4377.jpg?1654568270"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Jukai Preserver",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 127,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e66120a5-95a3-4d15-873c-cfba221a2299",
+        "scryfall_uri": "https://scryfall.com/card/neo/195/jukai-preserver",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Enchantment Creature — Human Druid",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e66120a5-95a3-4d15-873c-cfba221a2299.jpg?1654568198",
+          "normal": "https://cards.scryfall.io/normal/front/e/6/e66120a5-95a3-4d15-873c-cfba221a2299.jpg?1654568198"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Fade into Antiquity",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 119,
+        "tier_rating": "C",
+        "note": null,
+        "id": "55174ab7-9f2e-42e5-a61b-57458cfd33f3",
+        "scryfall_uri": "https://scryfall.com/card/neo/182/fade-into-antiquity",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Sorcery",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/55174ab7-9f2e-42e5-a61b-57458cfd33f3.jpg?1654568069",
+          "normal": "https://cards.scryfall.io/normal/front/5/5/55174ab7-9f2e-42e5-a61b-57458cfd33f3.jpg?1654568069"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      }
+    ],
+    "Colorless": [
+      {
+        "name": "Ninja's Kunai",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 157,
+        "tier_rating": "C",
+        "note": null,
+        "id": "af6ae567-c77a-416a-b609-4df3d0dd2e18",
+        "scryfall_uri": "https://scryfall.com/card/neo/252/ninjas-kunai",
+        "colors": [],
+        "type_line": "Artifact — Equipment",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/f/af6ae567-c77a-416a-b609-4df3d0dd2e18.jpg?1654568773",
+          "normal": "https://cards.scryfall.io/normal/front/a/f/af6ae567-c77a-416a-b609-4df3d0dd2e18.jpg?1654568773"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Searchlight Companion",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 156,
+        "tier_rating": "C",
+        "note": null,
+        "id": "0b79b30e-e7aa-490e-b130-de7533e6e13b",
+        "scryfall_uri": "https://scryfall.com/card/neo/258/searchlight-companion",
+        "colors": [],
+        "type_line": "Artifact Creature — Drone",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/b/0b79b30e-e7aa-490e-b130-de7533e6e13b.jpg?1654568834",
+          "normal": "https://cards.scryfall.io/normal/front/0/b/0b79b30e-e7aa-490e-b130-de7533e6e13b.jpg?1654568834"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Shrine Steward",
+        "color": "C",
+        "rarity": "Common",
+        "pick_order_rank": 215,
+        "tier_rating": "D",
+        "note": null,
+        "id": "75e8d71c-3a0b-4042-a0f7-e99e92a79dc2",
+        "scryfall_uri": "https://scryfall.com/card/neo/259/shrine-steward",
+        "colors": [],
+        "type_line": "Artifact Creature — Construct",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/75e8d71c-3a0b-4042-a0f7-e99e92a79dc2.jpg?1654568835",
+          "normal": "https://cards.scryfall.io/normal/front/7/5/75e8d71c-3a0b-4042-a0f7-e99e92a79dc2.jpg?1654568835"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      }
+    ]
+  },
+  "mythic_uncommons": [
+    {
+      "name": "Blossom Prancer",
+      "color": "G",
+      "rarity": "Uncommon",
+      "pick_order_rank": 34,
+      "tier_rating": "A",
+      "note": null,
+      "id": "d26abdf2-efd7-40e5-bfc6-d75fcadd26f8",
+      "scryfall_uri": "https://scryfall.com/card/neo/175/blossom-prancer",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Spirit",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/2/d26abdf2-efd7-40e5-bfc6-d75fcadd26f8.jpg?1654567990",
+        "normal": "https://cards.scryfall.io/normal/front/d/2/d26abdf2-efd7-40e5-bfc6-d75fcadd26f8.jpg?1654567990"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Kappa Tech-Wrecker",
+      "color": "G",
+      "rarity": "Uncommon",
+      "pick_order_rank": 35,
+      "tier_rating": "A",
+      "note": null,
+      "id": "d3a7bc69-4500-4e7e-94e4-67b85597bd82",
+      "scryfall_uri": "https://scryfall.com/card/neo/198/kappa-tech-wrecker",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Turtle Ninja",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d3a7bc69-4500-4e7e-94e4-67b85597bd82.jpg?1654568221",
+        "normal": "https://cards.scryfall.io/normal/front/d/3/d3a7bc69-4500-4e7e-94e4-67b85597bd82.jpg?1654568221"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Behold the Unspeakable",
+      "color": "U",
+      "rarity": "Uncommon",
+      "pick_order_rank": 38,
+      "tier_rating": "A",
+      "note": null,
+      "id": "e4d52701-e0dc-474e-b08f-88147200d210",
+      "scryfall_uri": "https://scryfall.com/card/neo/48/behold-the-unspeakable-vision-of-the-unspeakable",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Enchantment — Saga // Enchantment Creature — Spirit",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e4d52701-e0dc-474e-b08f-88147200d210.jpg?1656453117",
+        "normal": "https://cards.scryfall.io/normal/front/e/4/e4d52701-e0dc-474e-b08f-88147200d210.jpg?1656453117"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Boseiju Reaches Skyward",
+      "color": "G",
+      "rarity": "Uncommon",
+      "pick_order_rank": 44,
+      "tier_rating": "A",
+      "note": null,
+      "id": "1144014b-f13b-4397-97ed-a8de46371a2c",
+      "scryfall_uri": "https://scryfall.com/card/neo/177/boseiju-reaches-skyward-branch-of-boseiju",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment — Saga // Enchantment Creature — Plant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/1144014b-f13b-4397-97ed-a8de46371a2c.jpg?1656453331",
+        "normal": "https://cards.scryfall.io/normal/front/1/1/1144014b-f13b-4397-97ed-a8de46371a2c.jpg?1656453331"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Life of Toshiro Umezawa",
+      "color": "B",
+      "rarity": "Uncommon",
+      "pick_order_rank": 53,
+      "tier_rating": "B",
+      "note": null,
+      "id": "f7f4adf7-b871-417b-8904-7f024ca21486",
+      "scryfall_uri": "https://scryfall.com/card/neo/108/life-of-toshiro-umezawa-memory-of-toshiro",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Enchantment — Saga // Enchantment Creature — Human Samurai",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7f4adf7-b871-417b-8904-7f024ca21486.jpg?1656453156",
+        "normal": "https://cards.scryfall.io/normal/front/f/7/f7f4adf7-b871-417b-8904-7f024ca21486.jpg?1656453156"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Michiko's Reign of Truth",
+      "color": "W",
+      "rarity": "Uncommon",
+      "pick_order_rank": 52,
+      "tier_rating": "B",
+      "note": null,
+      "id": "74f12c23-5c15-4ae6-8f4d-c5e6c1878817",
+      "scryfall_uri": "https://scryfall.com/card/neo/29/michikos-reign-of-truth-portrait-of-michiko",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Enchantment — Saga // Enchantment Creature — Human Noble",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/4/74f12c23-5c15-4ae6-8f4d-c5e6c1878817.jpg?1656453078",
+        "normal": "https://cards.scryfall.io/normal/front/7/4/74f12c23-5c15-4ae6-8f4d-c5e6c1878817.jpg?1656453078"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    }
+  ],
+  "removal_priority": {
+    "hard_removal": [
+      {
+        "name": "Assassin's Ink",
+        "color": "B",
+        "rarity": "Uncommon",
+        "pick_order_rank": 47,
+        "tier_rating": "B",
+        "note": null,
+        "id": "5a926c10-029d-4e24-8c3f-1808025e30aa",
+        "scryfall_uri": "https://scryfall.com/card/neo/87/assassins-ink",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/a/5a926c10-029d-4e24-8c3f-1808025e30aa.jpg?1654567050",
+          "normal": "https://cards.scryfall.io/normal/front/5/a/5a926c10-029d-4e24-8c3f-1808025e30aa.jpg?1654567050"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      },
+      {
+        "name": "Tamiyo's Compleation",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 107,
+        "tier_rating": "C",
+        "note": null,
+        "id": "aee62e43-6a82-4749-972b-e21802642abf",
+        "scryfall_uri": "https://scryfall.com/card/neo/83/tamiyos-compleation",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/e/aee62e43-6a82-4749-972b-e21802642abf.jpg?1654567000",
+          "normal": "https://cards.scryfall.io/normal/front/a/e/aee62e43-6a82-4749-972b-e21802642abf.jpg?1654567000"
+        },
+        "set": "neo",
+        "set_name": "Kamigawa: Neon Dynasty"
+      }
+    ],
+    "note": "Prioritize hard removal over soft removal given the format's slow speed and high-value creatures."
+  },
+  "mana_fixing": [
+    {
+      "name": "Grafted Growth",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 187,
+      "tier_rating": "C",
+      "note": "Generates dual mana.",
+      "id": "e7a15010-1b70-4b4f-8b5d-cb2d764a1799",
+      "scryfall_uri": "https://scryfall.com/card/neo/188/grafted-growth",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment — Aura",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7a15010-1b70-4b4f-8b5d-cb2d764a1799.jpg?1654568125",
+        "normal": "https://cards.scryfall.io/normal/front/e/7/e7a15010-1b70-4b4f-8b5d-cb2d764a1799.jpg?1654568125"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Greater Tanuki",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 148,
+      "tier_rating": "C",
+      "note": null,
+      "id": "b4fbaee3-a10f-4b2d-b07e-d041a96a7e27",
+      "scryfall_uri": "https://scryfall.com/card/neo/189/greater-tanuki",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Enchantment Creature — Dog",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/4/b4fbaee3-a10f-4b2d-b07e-d041a96a7e27.jpg?1654568132",
+        "normal": "https://cards.scryfall.io/normal/front/b/4/b4fbaee3-a10f-4b2d-b07e-d041a96a7e27.jpg?1654568132"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Ecologist's Terrarium",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 158,
+      "tier_rating": "C",
+      "note": null,
+      "id": "1d981026-b2df-4d8d-a9b4-296b011d9925",
+      "scryfall_uri": "https://scryfall.com/card/neo/246/ecologists-terrarium",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/d/1d981026-b2df-4d8d-a9b4-296b011d9925.jpg?1654568706",
+        "normal": "https://cards.scryfall.io/normal/front/1/d/1d981026-b2df-4d8d-a9b4-296b011d9925.jpg?1654568706"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "name": "Network Terminal",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 185,
+      "tier_rating": "C",
+      "note": null,
+      "id": "d61e596f-97ef-4eb3-af42-ddfe50d07667",
+      "scryfall_uri": "https://scryfall.com/card/neo/251/network-terminal",
+      "colors": [],
+      "type_line": "Artifact",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/6/d61e596f-97ef-4eb3-af42-ddfe50d07667.jpg?1654568760",
+        "normal": "https://cards.scryfall.io/normal/front/d/6/d61e596f-97ef-4eb3-af42-ddfe50d07667.jpg?1654568760"
+      },
+      "set": "neo",
+      "set_name": "Kamigawa: Neon Dynasty"
+    }
+  ],
+  "general_tips": [
+    "Card advantage proves essential in extended games.",
+    "Evaluate sagas as multi-turn value, not immediate board impact.",
+    "Ninjutsu costs decrease through alternate casting — plan for multiple activations per turn.",
+    "Green provides the best fixing via Grafted Growth and Greater Tanuki.",
+    "Hard removal beats soft removal in this slow format."
+  ]
+}

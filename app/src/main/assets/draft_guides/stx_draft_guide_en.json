@@ -1,0 +1,1888 @@
+{
+  "metadata": {
+    "set_name": "Strixhaven: School of Mages",
+    "set_code": "STX",
+    "source_url": "https://draftsim.com/strixhaven-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Grant Haschak (Ghash77)",
+    "last_updated": "July 15, 2024"
+  },
+  "set_overview": {
+    "summary": "Strixhaven is a unique Limited format centered on five colleges (two-color guilds). The set emphasizes instants/sorceries heavily — most decks contain 13+ spells. The Mystical Archive bonus sheet adds powerful historic spells (Lightning Bolt, Swords to Plowshares) that significantly impact draft strategy.",
+    "color_ranking": [
+      "Tier 1: Prismari (UR), Quandrix (GU), Temur Ramp (off-color)",
+      "Tier 2: Silverquill Aggro (WB), Multicolor Good Stuff",
+      "Tier 3: Witherbloom (BG), Lorehold (RW)"
+    ],
+    "color_notes": {
+      "Note": "Strixhaven is college-driven (2-color guilds). Each college supports a unique theme. Off-school decks emerge rarely — about once every 16 drafts."
+    },
+    "key_gameplay_notes": [
+      "Apply maximum pressure early — opponents may hold game-winning bombs.",
+      "Wait until pack 2 to lock into archetypes; flexibility wins.",
+      "Lesson cards are exceptionally valuable — Environmental Sciences is the best common in the set.",
+      "Mystical Archive includes 1-mana instants — expect cheap removal at instant speed.",
+      "Off-school splashes (e.g. black in Izzet) are difficult; multicolor fixing comes mainly from learn cards."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Magecraft",
+      "summary": "Triggers whenever you cast or copy an instant or sorcery. Effects range from life gain to +1/+0 to card draw.",
+      "performance": "Highly effective in STX — most decks run 13+ spells.",
+      "key_examples": [
+        {
+          "name": "Silverquill Pledgemage",
+          "color": "WB",
+          "rarity": "Common",
+          "pick_order_rank": 213,
+          "tier_rating": "D",
+          "note": null,
+          "id": "a3f64ad2-4041-421d-baa2-206cedcecf0e",
+          "scryfall_uri": "https://scryfall.com/card/stx/233/silverquill-pledgemage",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Creature — Vampire Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a3f64ad2-4041-421d-baa2-206cedcecf0e.jpg?1624740044",
+            "normal": "https://cards.scryfall.io/normal/front/a/3/a3f64ad2-4041-421d-baa2-206cedcecf0e.jpg?1624740044"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Witherbloom Apprentice",
+          "color": "BG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 80,
+          "tier_rating": "B",
+          "note": null,
+          "id": "7f80a11b-188b-464c-b00d-c9d1cfb8ddee",
+          "scryfall_uri": "https://scryfall.com/card/stx/247/witherbloom-apprentice",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Creature — Human Druid",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f80a11b-188b-464c-b00d-c9d1cfb8ddee.jpg?1624740448",
+            "normal": "https://cards.scryfall.io/normal/front/7/f/7f80a11b-188b-464c-b00d-c9d1cfb8ddee.jpg?1624740448"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Witherbloom Pledgemage",
+          "color": "BG",
+          "rarity": "Common",
+          "pick_order_rank": 220,
+          "tier_rating": "D",
+          "note": null,
+          "id": "a6cc6914-2dcb-411d-90a5-01853ff2d5b8",
+          "scryfall_uri": "https://scryfall.com/card/stx/249/witherbloom-pledgemage",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Creature — Treefolk Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a6cc6914-2dcb-411d-90a5-01853ff2d5b8.jpg?1771242005",
+            "normal": "https://cards.scryfall.io/normal/front/a/6/a6cc6914-2dcb-411d-90a5-01853ff2d5b8.jpg?1771242005"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        }
+      ]
+    },
+    {
+      "name": "Learn / Lesson",
+      "summary": "Learn lets you search your sideboard for a lesson or discard and draw. Lessons function as flexible sideboard answers.",
+      "performance": "Format-defining. Environmental Sciences is the best common despite appearing weak in isolation.",
+      "key_examples": [
+        {
+          "name": "Environmental Sciences",
+          "color": "C",
+          "rarity": "Common",
+          "pick_order_rank": 99,
+          "tier_rating": "C",
+          "note": "Best common in the set — fixes mana and ramps.",
+          "id": "46b394fc-a99c-44e7-9226-da0699167541",
+          "scryfall_uri": "https://scryfall.com/card/stx/1/environmental-sciences",
+          "colors": [],
+          "type_line": "Sorcery — Lesson",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/6/46b394fc-a99c-44e7-9226-da0699167541.jpg?1637082125",
+            "normal": "https://cards.scryfall.io/normal/front/4/6/46b394fc-a99c-44e7-9226-da0699167541.jpg?1637082125"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Fractal Summoning",
+          "color": "UG",
+          "rarity": "Common",
+          "pick_order_rank": 130,
+          "tier_rating": "C",
+          "note": null,
+          "id": "cc3f1f7e-eb19-49c1-a1ee-93b85ac8815c",
+          "scryfall_uri": "https://scryfall.com/card/stx/187/fractal-summoning",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Sorcery — Lesson",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cc3f1f7e-eb19-49c1-a1ee-93b85ac8815c.jpg?1637082130",
+            "normal": "https://cards.scryfall.io/normal/front/c/c/cc3f1f7e-eb19-49c1-a1ee-93b85ac8815c.jpg?1637082130"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Elemental Summoning",
+          "color": "UR",
+          "rarity": "Common",
+          "pick_order_rank": 131,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ea51991c-1589-4c62-965b-5ae8d233520b",
+          "scryfall_uri": "https://scryfall.com/card/stx/183/elemental-summoning",
+          "colors": [
+            "R",
+            "U"
+          ],
+          "type_line": "Sorcery — Lesson",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/ea51991c-1589-4c62-965b-5ae8d233520b.jpg?1637082123",
+            "normal": "https://cards.scryfall.io/normal/front/e/a/ea51991c-1589-4c62-965b-5ae8d233520b.jpg?1637082123"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Inkling Summoning",
+          "color": "WB",
+          "rarity": "Common",
+          "pick_order_rank": 110,
+          "tier_rating": "C",
+          "note": null,
+          "id": "04a8a5b8-9743-4d1a-89e9-61bdf180b2e0",
+          "scryfall_uri": "https://scryfall.com/card/stx/195/inkling-summoning",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Sorcery — Lesson",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04a8a5b8-9743-4d1a-89e9-61bdf180b2e0.jpg?1637082323",
+            "normal": "https://cards.scryfall.io/normal/front/0/4/04a8a5b8-9743-4d1a-89e9-61bdf180b2e0.jpg?1637082323"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Rise of Extus",
+          "color": "WB",
+          "rarity": "Common",
+          "pick_order_rank": 84,
+          "tier_rating": "B",
+          "note": null,
+          "id": "bbf97a71-485e-4d47-98de-bdf6f6dae0c2",
+          "scryfall_uri": "https://scryfall.com/card/stx/226/rise-of-extus",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbf97a71-485e-4d47-98de-bdf6f6dae0c2.jpg?1624739773",
+            "normal": "https://cards.scryfall.io/normal/front/b/b/bbf97a71-485e-4d47-98de-bdf6f6dae0c2.jpg?1624739773"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Hunt for Specimens",
+          "color": "B",
+          "rarity": "Common",
+          "pick_order_rank": 125,
+          "tier_rating": "C",
+          "note": null,
+          "id": "8ff0f47f-75cb-42b0-ba4d-78522cad9861",
+          "scryfall_uri": "https://scryfall.com/card/stx/73/hunt-for-specimens",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8ff0f47f-75cb-42b0-ba4d-78522cad9861.jpg?1624591017",
+            "normal": "https://cards.scryfall.io/normal/front/8/f/8ff0f47f-75cb-42b0-ba4d-78522cad9861.jpg?1624591017"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Professor of Symbology",
+          "color": "W",
+          "rarity": "Uncommon",
+          "pick_order_rank": 68,
+          "tier_rating": "B",
+          "note": null,
+          "id": "f427cf73-9f5e-4ef5-bc4f-29ffbfda9d57",
+          "scryfall_uri": "https://scryfall.com/card/stx/24/professor-of-symbology",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Kor Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/4/f427cf73-9f5e-4ef5-bc4f-29ffbfda9d57.jpg?1624589635",
+            "normal": "https://cards.scryfall.io/normal/front/f/4/f427cf73-9f5e-4ef5-bc4f-29ffbfda9d57.jpg?1624589635"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        },
+        {
+          "name": "Mascot Exhibition",
+          "color": "C",
+          "rarity": "Mythic",
+          "pick_order_rank": 6,
+          "tier_rating": "S",
+          "note": null,
+          "id": "2047592c-739c-41dd-b3e8-31ae1c7688ab",
+          "scryfall_uri": "https://scryfall.com/card/stx/5/mascot-exhibition",
+          "colors": [],
+          "type_line": "Sorcery — Lesson",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/2047592c-739c-41dd-b3e8-31ae1c7688ab.jpg?1637082330",
+            "normal": "https://cards.scryfall.io/normal/front/2/0/2047592c-739c-41dd-b3e8-31ae1c7688ab.jpg?1637082330"
+          },
+          "set": "stx",
+          "set_name": "Strixhaven: School of Mages"
+        }
+      ]
+    },
+    {
+      "name": "Ward",
+      "summary": "Creatures with ward require opponents to pay a cost (mana or life) to target them.",
+      "performance": "Minor mechanic — only 4 cards in the set.",
+      "key_examples": []
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{U}{R}",
+        "name": "Prismari (Izzet) — Expensive Spells & Copying",
+        "tier": "Tier 1 — Strongest",
+        "strategy": "Cast high-mana-cost spells and copy them for value. Tolerates the slow format better than other decks. Runs minimal creatures, leveraging instants/sorceries for removal and game-ending effects.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Spectacle Mage",
+            "color": "UR",
+            "rarity": "Common",
+            "pick_order_rank": 204,
+            "tier_rating": "D",
+            "note": null,
+            "id": "f74223e1-b66b-42fa-aaac-001f5dab2aac",
+            "scryfall_uri": "https://scryfall.com/card/stx/235/spectacle-mage",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Bird Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f74223e1-b66b-42fa-aaac-001f5dab2aac.jpg?1624740097",
+              "normal": "https://cards.scryfall.io/normal/front/f/7/f74223e1-b66b-42fa-aaac-001f5dab2aac.jpg?1624740097"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Maelstrom Muse",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 94,
+            "tier_rating": "C",
+            "note": null,
+            "id": "5516e81e-16ea-411c-9df0-ed3b03670220",
+            "scryfall_uri": "https://scryfall.com/card/stx/202/maelstrom-muse",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature — Djinn Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/5516e81e-16ea-411c-9df0-ed3b03670220.jpg?1627429544",
+              "normal": "https://cards.scryfall.io/normal/front/5/5/5516e81e-16ea-411c-9df0-ed3b03670220.jpg?1627429544"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Elemental Masterpiece",
+            "color": "UR",
+            "rarity": "Common",
+            "pick_order_rank": 210,
+            "tier_rating": "D",
+            "note": null,
+            "id": "4331a7a6-e98e-4517-b0f9-ace379426a94",
+            "scryfall_uri": "https://scryfall.com/card/stx/182/elemental-masterpiece",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/4331a7a6-e98e-4517-b0f9-ace379426a94.jpg?1627428735",
+              "normal": "https://cards.scryfall.io/normal/front/4/3/4331a7a6-e98e-4517-b0f9-ace379426a94.jpg?1627428735"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Creative Outburst",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 121,
+            "tier_rating": "C",
+            "note": null,
+            "id": "eab58d87-bf01-45dc-8958-e2b3375f914b",
+            "scryfall_uri": "https://scryfall.com/card/stx/171/creative-outburst",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/eab58d87-bf01-45dc-8958-e2b3375f914b.jpg?1627428357",
+              "normal": "https://cards.scryfall.io/normal/front/e/a/eab58d87-bf01-45dc-8958-e2b3375f914b.jpg?1627428357"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Explosive Welcome",
+            "color": "R",
+            "rarity": "Uncommon",
+            "pick_order_rank": 136,
+            "tier_rating": "C",
+            "note": null,
+            "id": "122c01e6-38a6-456e-971e-9004df85ac1c",
+            "scryfall_uri": "https://scryfall.com/card/stx/100/explosive-welcome",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/2/122c01e6-38a6-456e-971e-9004df85ac1c.jpg?1624591777",
+              "normal": "https://cards.scryfall.io/normal/front/1/2/122c01e6-38a6-456e-971e-9004df85ac1c.jpg?1624591777"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Serpentine Curve",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 172,
+            "tier_rating": "C",
+            "note": null,
+            "id": "d651b9e9-d723-4340-a010-d71b2a697e73",
+            "scryfall_uri": "https://scryfall.com/card/stx/52/serpentine-curve",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/6/d651b9e9-d723-4340-a010-d71b2a697e73.jpg?1624590386",
+              "normal": "https://cards.scryfall.io/normal/front/d/6/d651b9e9-d723-4340-a010-d71b2a697e73.jpg?1624590386"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Rootha, Mercurial Artist",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 74,
+            "tier_rating": "B",
+            "note": null,
+            "id": "acb8f24d-8d1d-48aa-a534-238e969a474c",
+            "scryfall_uri": "https://scryfall.com/card/stx/227/rootha-mercurial-artist",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Orc Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/acb8f24d-8d1d-48aa-a534-238e969a474c.jpg?1624739798",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/acb8f24d-8d1d-48aa-a534-238e969a474c.jpg?1624739798"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Teach by Example",
+            "color": "UR",
+            "rarity": "Common",
+            "pick_order_rank": 211,
+            "tier_rating": "D",
+            "note": null,
+            "id": "aa7fbb9b-50a8-4d18-a667-fe965468ca16",
+            "scryfall_uri": "https://scryfall.com/card/stx/241/teach-by-example",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aa7fbb9b-50a8-4d18-a667-fe965468ca16.jpg?1715374723",
+              "normal": "https://cards.scryfall.io/normal/front/a/a/aa7fbb9b-50a8-4d18-a667-fe965468ca16.jpg?1715374723"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "Quandrix (Simic) — Lands Matter & Ramp",
+        "tier": "Tier 1 — Strongest",
+        "strategy": "Play 8+ lands to supercharge creatures. Ramp payoffs work independently. Vulnerable to aggressive decks with cheap removal.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Quandrix Pledgemage",
+            "color": "UG",
+            "rarity": "Common",
+            "pick_order_rank": 140,
+            "tier_rating": "C",
+            "note": null,
+            "id": "07633b7f-4150-458b-89c3-d05dc0e3c4bd",
+            "scryfall_uri": "https://scryfall.com/card/stx/219/quandrix-pledgemage",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Merfolk Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/7/07633b7f-4150-458b-89c3-d05dc0e3c4bd.jpg?1624739572",
+              "normal": "https://cards.scryfall.io/normal/front/0/7/07633b7f-4150-458b-89c3-d05dc0e3c4bd.jpg?1624739572"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Field Trip",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 162,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f235060a-eb49-4a73-bb5f-01228c3c4070",
+            "scryfall_uri": "https://scryfall.com/card/stx/131/field-trip",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f235060a-eb49-4a73-bb5f-01228c3c4070.jpg?1624592751",
+              "normal": "https://cards.scryfall.io/normal/front/f/2/f235060a-eb49-4a73-bb5f-01228c3c4070.jpg?1624592751"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Emergent Sequence",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 96,
+            "tier_rating": "C",
+            "note": null,
+            "id": "04a81975-5f0e-4593-a2da-b9689f9a985f",
+            "scryfall_uri": "https://scryfall.com/card/stx/129/emergent-sequence",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04a81975-5f0e-4593-a2da-b9689f9a985f.jpg?1624592681",
+              "normal": "https://cards.scryfall.io/normal/front/0/4/04a81975-5f0e-4593-a2da-b9689f9a985f.jpg?1624592681"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Quandrix Cultivator",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e3ca9ff7-0dcf-4ecc-879c-957d290ad7f5",
+            "scryfall_uri": "https://scryfall.com/card/stx/218/quandrix-cultivator",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Turtle Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e3ca9ff7-0dcf-4ecc-879c-957d290ad7f5.jpg?1624739546",
+              "normal": "https://cards.scryfall.io/normal/front/e/3/e3ca9ff7-0dcf-4ecc-879c-957d290ad7f5.jpg?1624739546"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Leyline Invocation",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 138,
+            "tier_rating": "C",
+            "note": null,
+            "id": "4edfbed0-0c0d-4aa5-bfe0-5268aff0f958",
+            "scryfall_uri": "https://scryfall.com/card/stx/136/leyline-invocation",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4edfbed0-0c0d-4aa5-bfe0-5268aff0f958.jpg?1624592930",
+              "normal": "https://cards.scryfall.io/normal/front/4/e/4edfbed0-0c0d-4aa5-bfe0-5268aff0f958.jpg?1624592930"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Divide by Zero",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 109,
+            "tier_rating": "C",
+            "note": null,
+            "id": "1958d96e-ec44-48ab-80b1-5b01a24ac7b8",
+            "scryfall_uri": "https://scryfall.com/card/stx/41/divide-by-zero",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/9/1958d96e-ec44-48ab-80b1-5b01a24ac7b8.jpg?1702134275",
+              "normal": "https://cards.scryfall.io/normal/front/1/9/1958d96e-ec44-48ab-80b1-5b01a24ac7b8.jpg?1702134275"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Mage Duel",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 128,
+            "tier_rating": "C",
+            "note": null,
+            "id": "92325638-0321-4409-8910-2287c64c182e",
+            "scryfall_uri": "https://scryfall.com/card/stx/137/mage-duel",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/92325638-0321-4409-8910-2287c64c182e.jpg?1624592958",
+              "normal": "https://cards.scryfall.io/normal/front/9/2/92325638-0321-4409-8910-2287c64c182e.jpg?1624592958"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Bury in Books",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 117,
+            "tier_rating": "C",
+            "note": null,
+            "id": "ac2a2cf5-80cf-4c06-8b04-bc04a5460de5",
+            "scryfall_uri": "https://scryfall.com/card/stx/39/bury-in-books",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/ac2a2cf5-80cf-4c06-8b04-bc04a5460de5.jpg?1624590030",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/ac2a2cf5-80cf-4c06-8b04-bc04a5460de5.jpg?1624590030"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}{R}",
+        "name": "Temur Ramp (Off-Color)",
+        "tier": "Tier 1 — Strongest (when open)",
+        "strategy": "Combines Prismari and Quandrix best elements plus green acceleration. Punishes greed — multiple drafters fighting over it lead to bad decks.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Field Trip",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 162,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f235060a-eb49-4a73-bb5f-01228c3c4070",
+            "scryfall_uri": "https://scryfall.com/card/stx/131/field-trip",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f235060a-eb49-4a73-bb5f-01228c3c4070.jpg?1624592751",
+              "normal": "https://cards.scryfall.io/normal/front/f/2/f235060a-eb49-4a73-bb5f-01228c3c4070.jpg?1624592751"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Emergent Sequence",
+            "color": "G",
+            "rarity": "Uncommon",
+            "pick_order_rank": 96,
+            "tier_rating": "C",
+            "note": null,
+            "id": "04a81975-5f0e-4593-a2da-b9689f9a985f",
+            "scryfall_uri": "https://scryfall.com/card/stx/129/emergent-sequence",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04a81975-5f0e-4593-a2da-b9689f9a985f.jpg?1624592681",
+              "normal": "https://cards.scryfall.io/normal/front/0/4/04a81975-5f0e-4593-a2da-b9689f9a985f.jpg?1624592681"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Quandrix Cultivator",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 69,
+            "tier_rating": "B",
+            "note": null,
+            "id": "e3ca9ff7-0dcf-4ecc-879c-957d290ad7f5",
+            "scryfall_uri": "https://scryfall.com/card/stx/218/quandrix-cultivator",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Turtle Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/3/e3ca9ff7-0dcf-4ecc-879c-957d290ad7f5.jpg?1624739546",
+              "normal": "https://cards.scryfall.io/normal/front/e/3/e3ca9ff7-0dcf-4ecc-879c-957d290ad7f5.jpg?1624739546"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Environmental Sciences",
+            "color": "C",
+            "rarity": "Common",
+            "pick_order_rank": 99,
+            "tier_rating": "C",
+            "note": null,
+            "id": "46b394fc-a99c-44e7-9226-da0699167541",
+            "scryfall_uri": "https://scryfall.com/card/stx/1/environmental-sciences",
+            "colors": [],
+            "type_line": "Sorcery — Lesson",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/6/46b394fc-a99c-44e7-9226-da0699167541.jpg?1637082125",
+              "normal": "https://cards.scryfall.io/normal/front/4/6/46b394fc-a99c-44e7-9226-da0699167541.jpg?1637082125"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{W}{B}",
+        "name": "Silverquill Aggro (Orzhov)",
+        "tier": "Tier 2 — Strong if Available",
+        "strategy": "Evasive creatures + interaction + magecraft triggers. Runs closer to 13 spells, maximizing Silverquill Pledgemage. The one archetype that can consistently go under big mana decks. Cannot recover from stumbles.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Silverquill Pledgemage",
+            "color": "WB",
+            "rarity": "Common",
+            "pick_order_rank": 213,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a3f64ad2-4041-421d-baa2-206cedcecf0e",
+            "scryfall_uri": "https://scryfall.com/card/stx/233/silverquill-pledgemage",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Vampire Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a3f64ad2-4041-421d-baa2-206cedcecf0e.jpg?1624740044",
+              "normal": "https://cards.scryfall.io/normal/front/a/3/a3f64ad2-4041-421d-baa2-206cedcecf0e.jpg?1624740044"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Silverquill Command",
+            "color": "WB",
+            "rarity": "Rare",
+            "pick_order_rank": 19,
+            "tier_rating": "A",
+            "note": null,
+            "id": "5c55f533-9d31-4ad1-b336-927aba6e74d6",
+            "scryfall_uri": "https://scryfall.com/card/stx/232/silverquill-command",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/c/5c55f533-9d31-4ad1-b336-927aba6e74d6.jpg?1624740020",
+              "normal": "https://cards.scryfall.io/normal/front/5/c/5c55f533-9d31-4ad1-b336-927aba6e74d6.jpg?1624740020"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Professor of Symbology",
+            "color": "W",
+            "rarity": "Uncommon",
+            "pick_order_rank": 68,
+            "tier_rating": "B",
+            "note": null,
+            "id": "f427cf73-9f5e-4ef5-bc4f-29ffbfda9d57",
+            "scryfall_uri": "https://scryfall.com/card/stx/24/professor-of-symbology",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature — Kor Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/4/f427cf73-9f5e-4ef5-bc4f-29ffbfda9d57.jpg?1624589635",
+              "normal": "https://cards.scryfall.io/normal/front/f/4/f427cf73-9f5e-4ef5-bc4f-29ffbfda9d57.jpg?1624589635"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          }
+        ]
+      },
+      {
+        "colors": "Multi",
+        "name": "Multicolor Good Stuff",
+        "tier": "Tier 2 — Strong if Available",
+        "strategy": "Splash broken rares with Environmental Sciences mana fixing. Rarely comes together because Environmental Sciences is heavily drafted.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Lorehold Command",
+            "color": "WR",
+            "rarity": "Rare",
+            "pick_order_rank": 13,
+            "tier_rating": "S",
+            "note": null,
+            "id": "e4f0885f-1049-4a19-853d-f4e6d4bec29e",
+            "scryfall_uri": "https://scryfall.com/card/stx/199/lorehold-command",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/4/e4f0885f-1049-4a19-853d-f4e6d4bec29e.jpg?1627429447",
+              "normal": "https://cards.scryfall.io/normal/front/e/4/e4f0885f-1049-4a19-853d-f4e6d4bec29e.jpg?1627429447"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Magma Opus",
+            "color": "UR",
+            "rarity": "Mythic",
+            "pick_order_rank": 32,
+            "tier_rating": "A",
+            "note": null,
+            "id": "27c914a3-2294-4feb-9450-c012cfd307a6",
+            "scryfall_uri": "https://scryfall.com/card/stx/203/magma-opus",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/27c914a3-2294-4feb-9450-c012cfd307a6.jpg?1627429585",
+              "normal": "https://cards.scryfall.io/normal/front/2/7/27c914a3-2294-4feb-9450-c012cfd307a6.jpg?1627429585"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Venerable Warsinger",
+            "color": "WR",
+            "rarity": "Rare",
+            "pick_order_rank": 18,
+            "tier_rating": "S",
+            "note": null,
+            "id": "006313f8-cc60-4a4e-8ec6-953cdf1c16e3",
+            "scryfall_uri": "https://scryfall.com/card/stx/246/venerable-warsinger",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Creature — Spirit Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/0/006313f8-cc60-4a4e-8ec6-953cdf1c16e3.jpg?1624740425",
+              "normal": "https://cards.scryfall.io/normal/front/0/0/006313f8-cc60-4a4e-8ec6-953cdf1c16e3.jpg?1624740425"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Rootha, Mercurial Artist",
+            "color": "UR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 74,
+            "tier_rating": "B",
+            "note": null,
+            "id": "acb8f24d-8d1d-48aa-a534-238e969a474c",
+            "scryfall_uri": "https://scryfall.com/card/stx/227/rootha-mercurial-artist",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Legendary Creature — Orc Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/acb8f24d-8d1d-48aa-a534-238e969a474c.jpg?1624739798",
+              "normal": "https://cards.scryfall.io/normal/front/a/c/acb8f24d-8d1d-48aa-a534-238e969a474c.jpg?1624739798"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Exponential Growth",
+            "color": "G",
+            "rarity": "Rare",
+            "pick_order_rank": 215,
+            "tier_rating": "D",
+            "note": null,
+            "id": "7c129bb7-9489-44bd-a46d-c5f738bf9d25",
+            "scryfall_uri": "https://scryfall.com/card/stx/130/exponential-growth",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/c/7c129bb7-9489-44bd-a46d-c5f738bf9d25.jpg?1624592712",
+              "normal": "https://cards.scryfall.io/normal/front/7/c/7c129bb7-9489-44bd-a46d-c5f738bf9d25.jpg?1624592712"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Tempted by the Oriq",
+            "color": "U",
+            "rarity": "Rare",
+            "pick_order_rank": 65,
+            "tier_rating": "B",
+            "note": null,
+            "id": "c23e64f9-531e-4735-9960-b0a76b32c340",
+            "scryfall_uri": "https://scryfall.com/card/stx/58/tempted-by-the-oriq",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c23e64f9-531e-4735-9960-b0a76b32c340.jpg?1624590548",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c23e64f9-531e-4735-9960-b0a76b32c340.jpg?1624590548"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Mizzix's Mastery",
+            "color": "R",
+            "rarity": "Mythic",
+            "pick_order_rank": 10,
+            "tier_rating": "S",
+            "note": null,
+            "id": "89978bd5-8222-4052-9625-3a5db81baa27",
+            "scryfall_uri": "https://scryfall.com/card/sta/43/mizzixs-mastery",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89978bd5-8222-4052-9625-3a5db81baa27.jpg?1623945645",
+              "normal": "https://cards.scryfall.io/normal/front/8/9/89978bd5-8222-4052-9625-3a5db81baa27.jpg?1623945645"
+            },
+            "set": "sta",
+            "set_name": "Strixhaven Mystical Archive"
+          },
+          {
+            "name": "Crackle with Power",
+            "color": "R",
+            "rarity": "Mythic",
+            "pick_order_rank": 56,
+            "tier_rating": "B",
+            "note": null,
+            "id": "de547f52-3798-4b3a-947d-24873251204b",
+            "scryfall_uri": "https://scryfall.com/card/stx/95/crackle-with-power",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/de547f52-3798-4b3a-947d-24873251204b.jpg?1624591645",
+              "normal": "https://cards.scryfall.io/normal/front/d/e/de547f52-3798-4b3a-947d-24873251204b.jpg?1624591645"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{B}{G}",
+        "name": "Witherbloom (Golgari) — Lifegain Engine",
+        "tier": "Tier 3 — Avoid If Possible",
+        "strategy": "Gain life repeatedly to grow Blood Researcher. Critical flaw: a boosted Blood Researcher dies to common removal (Bury in Books, Divide by Zero) which bounces it back undoing growth.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Blood Researcher",
+            "color": "BG",
+            "rarity": "Common",
+            "pick_order_rank": 148,
+            "tier_rating": "C",
+            "note": null,
+            "id": "3e35e9ba-a10e-4926-a7a6-3a65efc2a730",
+            "scryfall_uri": "https://scryfall.com/card/stx/166/blood-researcher",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Vampire Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/e/3e35e9ba-a10e-4926-a7a6-3a65efc2a730.jpg?1627428197",
+              "normal": "https://cards.scryfall.io/normal/front/3/e/3e35e9ba-a10e-4926-a7a6-3a65efc2a730.jpg?1627428197"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Witherbloom Apprentice",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 80,
+            "tier_rating": "B",
+            "note": null,
+            "id": "7f80a11b-188b-464c-b00d-c9d1cfb8ddee",
+            "scryfall_uri": "https://scryfall.com/card/stx/247/witherbloom-apprentice",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Human Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7f80a11b-188b-464c-b00d-c9d1cfb8ddee.jpg?1624740448",
+              "normal": "https://cards.scryfall.io/normal/front/7/f/7f80a11b-188b-464c-b00d-c9d1cfb8ddee.jpg?1624740448"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Witherbloom Pledgemage",
+            "color": "BG",
+            "rarity": "Common",
+            "pick_order_rank": 220,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a6cc6914-2dcb-411d-90a5-01853ff2d5b8",
+            "scryfall_uri": "https://scryfall.com/card/stx/249/witherbloom-pledgemage",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature — Treefolk Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/6/a6cc6914-2dcb-411d-90a5-01853ff2d5b8.jpg?1771242005",
+              "normal": "https://cards.scryfall.io/normal/front/a/6/a6cc6914-2dcb-411d-90a5-01853ff2d5b8.jpg?1771242005"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Witherbloom Command",
+            "color": "BG",
+            "rarity": "Rare",
+            "pick_order_rank": 101,
+            "tier_rating": "C",
+            "note": null,
+            "id": "87d5e94b-0b35-4efd-9158-1767dcaea38c",
+            "scryfall_uri": "https://scryfall.com/card/stx/248/witherbloom-command",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/87d5e94b-0b35-4efd-9158-1767dcaea38c.jpg?1624740473",
+              "normal": "https://cards.scryfall.io/normal/front/8/7/87d5e94b-0b35-4efd-9158-1767dcaea38c.jpg?1624740473"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "Lorehold (Boros) — Graveyard Value",
+        "tier": "Tier 3 — Avoid If Possible",
+        "strategy": "The designed graveyard theme underperforms. Better route: Lorehold Aggro with early 2-power creatures, Pledgemages, removal, and fliers — still struggles against big mana decks.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Quintorius, Field Historian",
+            "color": "WR",
+            "rarity": "Uncommon",
+            "pick_order_rank": 82,
+            "tier_rating": "B",
+            "note": null,
+            "id": "06c55ef1-8e62-4d43-bd4c-b2c3c5203338",
+            "scryfall_uri": "https://scryfall.com/card/stx/220/quintorius-field-historian",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Legendary Creature — Elephant Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/06c55ef1-8e62-4d43-bd4c-b2c3c5203338.jpg?1624739626",
+              "normal": "https://cards.scryfall.io/normal/front/0/6/06c55ef1-8e62-4d43-bd4c-b2c3c5203338.jpg?1624739626"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Lorehold Pledgemage",
+            "color": "WR",
+            "rarity": "Common",
+            "pick_order_rank": 192,
+            "tier_rating": "D",
+            "note": null,
+            "id": "79b88b38-6b5a-4a89-80ca-add79c11e8b9",
+            "scryfall_uri": "https://scryfall.com/card/stx/201/lorehold-pledgemage",
+            "colors": [
+              "R",
+              "W"
+            ],
+            "type_line": "Creature — Kor Shaman",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/9/79b88b38-6b5a-4a89-80ca-add79c11e8b9.jpg?1627429506",
+              "normal": "https://cards.scryfall.io/normal/front/7/9/79b88b38-6b5a-4a89-80ca-add79c11e8b9.jpg?1627429506"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          },
+          {
+            "name": "Silverquill Pledgemage",
+            "color": "WB",
+            "rarity": "Common",
+            "pick_order_rank": 213,
+            "tier_rating": "D",
+            "note": null,
+            "id": "a3f64ad2-4041-421d-baa2-206cedcecf0e",
+            "scryfall_uri": "https://scryfall.com/card/stx/233/silverquill-pledgemage",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature — Vampire Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/3/a3f64ad2-4041-421d-baa2-206cedcecf0e.jpg?1624740044",
+              "normal": "https://cards.scryfall.io/normal/front/a/3/a3f64ad2-4041-421d-baa2-206cedcecf0e.jpg?1624740044"
+            },
+            "set": "stx",
+            "set_name": "Strixhaven: School of Mages"
+          }
+        ]
+      }
+    ]
+  },
+  "key_commons": [
+    {
+      "name": "Environmental Sciences",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 99,
+      "tier_rating": "C",
+      "note": "Best common — lesson, fixes mana, ramps.",
+      "id": "46b394fc-a99c-44e7-9226-da0699167541",
+      "scryfall_uri": "https://scryfall.com/card/stx/1/environmental-sciences",
+      "colors": [],
+      "type_line": "Sorcery — Lesson",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/6/46b394fc-a99c-44e7-9226-da0699167541.jpg?1637082125",
+        "normal": "https://cards.scryfall.io/normal/front/4/6/46b394fc-a99c-44e7-9226-da0699167541.jpg?1637082125"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Expanded Anatomy",
+      "color": "C",
+      "rarity": "Common",
+      "pick_order_rank": 154,
+      "tier_rating": "C",
+      "note": null,
+      "id": "c5642b9d-0daa-4e6b-ad48-f88dd37d6574",
+      "scryfall_uri": "https://scryfall.com/card/stx/2/expanded-anatomy",
+      "colors": [],
+      "type_line": "Sorcery — Lesson",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c5642b9d-0daa-4e6b-ad48-f88dd37d6574.jpg?1637082010",
+        "normal": "https://cards.scryfall.io/normal/front/c/5/c5642b9d-0daa-4e6b-ad48-f88dd37d6574.jpg?1637082010"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Fractal Summoning",
+      "color": "UG",
+      "rarity": "Common",
+      "pick_order_rank": 130,
+      "tier_rating": "C",
+      "note": null,
+      "id": "cc3f1f7e-eb19-49c1-a1ee-93b85ac8815c",
+      "scryfall_uri": "https://scryfall.com/card/stx/187/fractal-summoning",
+      "colors": [
+        "G",
+        "U"
+      ],
+      "type_line": "Sorcery — Lesson",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cc3f1f7e-eb19-49c1-a1ee-93b85ac8815c.jpg?1637082130",
+        "normal": "https://cards.scryfall.io/normal/front/c/c/cc3f1f7e-eb19-49c1-a1ee-93b85ac8815c.jpg?1637082130"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Elemental Summoning",
+      "color": "UR",
+      "rarity": "Common",
+      "pick_order_rank": 131,
+      "tier_rating": "C",
+      "note": null,
+      "id": "ea51991c-1589-4c62-965b-5ae8d233520b",
+      "scryfall_uri": "https://scryfall.com/card/stx/183/elemental-summoning",
+      "colors": [
+        "R",
+        "U"
+      ],
+      "type_line": "Sorcery — Lesson",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/a/ea51991c-1589-4c62-965b-5ae8d233520b.jpg?1637082123",
+        "normal": "https://cards.scryfall.io/normal/front/e/a/ea51991c-1589-4c62-965b-5ae8d233520b.jpg?1637082123"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Bury in Books",
+      "color": "U",
+      "rarity": "Common",
+      "pick_order_rank": 117,
+      "tier_rating": "C",
+      "note": null,
+      "id": "ac2a2cf5-80cf-4c06-8b04-bc04a5460de5",
+      "scryfall_uri": "https://scryfall.com/card/stx/39/bury-in-books",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/a/c/ac2a2cf5-80cf-4c06-8b04-bc04a5460de5.jpg?1624590030",
+        "normal": "https://cards.scryfall.io/normal/front/a/c/ac2a2cf5-80cf-4c06-8b04-bc04a5460de5.jpg?1624590030"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Rise of Extus",
+      "color": "WB",
+      "rarity": "Common",
+      "pick_order_rank": 84,
+      "tier_rating": "B",
+      "note": null,
+      "id": "bbf97a71-485e-4d47-98de-bdf6f6dae0c2",
+      "scryfall_uri": "https://scryfall.com/card/stx/226/rise-of-extus",
+      "colors": [
+        "B",
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/b/bbf97a71-485e-4d47-98de-bdf6f6dae0c2.jpg?1624739773",
+        "normal": "https://cards.scryfall.io/normal/front/b/b/bbf97a71-485e-4d47-98de-bdf6f6dae0c2.jpg?1624739773"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Inkling Summoning",
+      "color": "WB",
+      "rarity": "Common",
+      "pick_order_rank": 110,
+      "tier_rating": "C",
+      "note": null,
+      "id": "04a8a5b8-9743-4d1a-89e9-61bdf180b2e0",
+      "scryfall_uri": "https://scryfall.com/card/stx/195/inkling-summoning",
+      "colors": [
+        "B",
+        "W"
+      ],
+      "type_line": "Sorcery — Lesson",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04a8a5b8-9743-4d1a-89e9-61bdf180b2e0.jpg?1637082323",
+        "normal": "https://cards.scryfall.io/normal/front/0/4/04a8a5b8-9743-4d1a-89e9-61bdf180b2e0.jpg?1637082323"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Hunt for Specimens",
+      "color": "B",
+      "rarity": "Common",
+      "pick_order_rank": 125,
+      "tier_rating": "C",
+      "note": null,
+      "id": "8ff0f47f-75cb-42b0-ba4d-78522cad9861",
+      "scryfall_uri": "https://scryfall.com/card/stx/73/hunt-for-specimens",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8ff0f47f-75cb-42b0-ba4d-78522cad9861.jpg?1624591017",
+        "normal": "https://cards.scryfall.io/normal/front/8/f/8ff0f47f-75cb-42b0-ba4d-78522cad9861.jpg?1624591017"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Combat Professor",
+      "color": "W",
+      "rarity": "Common",
+      "pick_order_rank": 116,
+      "tier_rating": "C",
+      "note": null,
+      "id": "3f669ac4-98ed-4e23-91a9-281f8277ab04",
+      "scryfall_uri": "https://scryfall.com/card/stx/11/combat-professor",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature — Bird Cleric",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/f/3f669ac4-98ed-4e23-91a9-281f8277ab04.jpg?1624589275",
+        "normal": "https://cards.scryfall.io/normal/front/3/f/3f669ac4-98ed-4e23-91a9-281f8277ab04.jpg?1624589275"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Mage Duel",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 128,
+      "tier_rating": "C",
+      "note": null,
+      "id": "92325638-0321-4409-8910-2287c64c182e",
+      "scryfall_uri": "https://scryfall.com/card/stx/137/mage-duel",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/9/2/92325638-0321-4409-8910-2287c64c182e.jpg?1624592958",
+        "normal": "https://cards.scryfall.io/normal/front/9/2/92325638-0321-4409-8910-2287c64c182e.jpg?1624592958"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Professor of Zoomancy",
+      "color": "G",
+      "rarity": "Common",
+      "pick_order_rank": 126,
+      "tier_rating": "C",
+      "note": null,
+      "id": "8347f2e8-ef70-4879-860a-12f7cab25902",
+      "scryfall_uri": "https://scryfall.com/card/stx/140/professor-of-zoomancy",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature — Bear Druid",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/8347f2e8-ef70-4879-860a-12f7cab25902.jpg?1624593035",
+        "normal": "https://cards.scryfall.io/normal/front/8/3/8347f2e8-ef70-4879-860a-12f7cab25902.jpg?1624593035"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    }
+  ],
+  "game_swinging_rares": [
+    {
+      "name": "Blot Out the Sky",
+      "color": "WB",
+      "rarity": "Mythic",
+      "pick_order_rank": 7,
+      "tier_rating": "S",
+      "note": null,
+      "id": "0141312f-4b68-4c56-b1dc-5b7e6afbb96c",
+      "scryfall_uri": "https://scryfall.com/card/stx/167/blot-out-the-sky",
+      "colors": [
+        "B",
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/0141312f-4b68-4c56-b1dc-5b7e6afbb96c.jpg?1627428247",
+        "normal": "https://cards.scryfall.io/normal/front/0/1/0141312f-4b68-4c56-b1dc-5b7e6afbb96c.jpg?1627428247"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Mizzix's Mastery",
+      "color": "R",
+      "rarity": "Mythic",
+      "pick_order_rank": 10,
+      "tier_rating": "S",
+      "note": null,
+      "id": "89978bd5-8222-4052-9625-3a5db81baa27",
+      "scryfall_uri": "https://scryfall.com/card/sta/43/mizzixs-mastery",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89978bd5-8222-4052-9625-3a5db81baa27.jpg?1623945645",
+        "normal": "https://cards.scryfall.io/normal/front/8/9/89978bd5-8222-4052-9625-3a5db81baa27.jpg?1623945645"
+      },
+      "set": "sta",
+      "set_name": "Strixhaven Mystical Archive"
+    },
+    {
+      "name": "Magma Opus",
+      "color": "UR",
+      "rarity": "Mythic",
+      "pick_order_rank": 32,
+      "tier_rating": "A",
+      "note": null,
+      "id": "27c914a3-2294-4feb-9450-c012cfd307a6",
+      "scryfall_uri": "https://scryfall.com/card/stx/203/magma-opus",
+      "colors": [
+        "R",
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/27c914a3-2294-4feb-9450-c012cfd307a6.jpg?1627429585",
+        "normal": "https://cards.scryfall.io/normal/front/2/7/27c914a3-2294-4feb-9450-c012cfd307a6.jpg?1627429585"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Velomachus Lorehold",
+      "color": "WR",
+      "rarity": "Mythic",
+      "pick_order_rank": 4,
+      "tier_rating": "S",
+      "note": null,
+      "id": "04ea9067-ad50-4c43-ae4d-3f66890cd898",
+      "scryfall_uri": "https://scryfall.com/card/stx/245/velomachus-lorehold",
+      "colors": [
+        "R",
+        "W"
+      ],
+      "type_line": "Legendary Creature — Elder Dragon",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/4/04ea9067-ad50-4c43-ae4d-3f66890cd898.jpg?1624740360",
+        "normal": "https://cards.scryfall.io/normal/front/0/4/04ea9067-ad50-4c43-ae4d-3f66890cd898.jpg?1624740360"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Crackle with Power",
+      "color": "R",
+      "rarity": "Mythic",
+      "pick_order_rank": 56,
+      "tier_rating": "B",
+      "note": null,
+      "id": "de547f52-3798-4b3a-947d-24873251204b",
+      "scryfall_uri": "https://scryfall.com/card/stx/95/crackle-with-power",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/d/e/de547f52-3798-4b3a-947d-24873251204b.jpg?1624591645",
+        "normal": "https://cards.scryfall.io/normal/front/d/e/de547f52-3798-4b3a-947d-24873251204b.jpg?1624591645"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Draconic Intervention",
+      "color": "R",
+      "rarity": "Rare",
+      "pick_order_rank": 52,
+      "tier_rating": "B",
+      "note": null,
+      "id": "657de246-b9fc-47b1-b932-091e9500bb82",
+      "scryfall_uri": "https://scryfall.com/card/stx/96/draconic-intervention",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/657de246-b9fc-47b1-b932-091e9500bb82.jpg?1624591671",
+        "normal": "https://cards.scryfall.io/normal/front/6/5/657de246-b9fc-47b1-b932-091e9500bb82.jpg?1624591671"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Day of Judgment",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 29,
+      "tier_rating": "A",
+      "note": null,
+      "id": "5bf85d00-52cc-4594-b4fd-5ec424210524",
+      "scryfall_uri": "https://scryfall.com/card/sta/2/day-of-judgment",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/b/5bf85d00-52cc-4594-b4fd-5ec424210524.jpg?1623592427",
+        "normal": "https://cards.scryfall.io/normal/front/5/b/5bf85d00-52cc-4594-b4fd-5ec424210524.jpg?1623592427"
+      },
+      "set": "sta",
+      "set_name": "Strixhaven Mystical Archive"
+    },
+    {
+      "name": "Crux of Fate",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 66,
+      "tier_rating": "B",
+      "note": null,
+      "id": "f3ccea48-ee90-4da8-832d-8c30c98bf1dd",
+      "scryfall_uri": "https://scryfall.com/card/sta/25/crux-of-fate",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/3/f3ccea48-ee90-4da8-832d-8c30c98bf1dd.jpg?1700330038",
+        "normal": "https://cards.scryfall.io/normal/front/f/3/f3ccea48-ee90-4da8-832d-8c30c98bf1dd.jpg?1700330038"
+      },
+      "set": "sta",
+      "set_name": "Strixhaven Mystical Archive"
+    },
+    {
+      "name": "Harness Infinity",
+      "color": "BG",
+      "rarity": "Mythic",
+      "pick_order_rank": 178,
+      "tier_rating": "C",
+      "note": null,
+      "id": "f74120ce-9f11-449f-bb72-04fe2a27a9f6",
+      "scryfall_uri": "https://scryfall.com/card/stx/191/harness-infinity",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f74120ce-9f11-449f-bb72-04fe2a27a9f6.jpg?1627429142",
+        "normal": "https://cards.scryfall.io/normal/front/f/7/f74120ce-9f11-449f-bb72-04fe2a27a9f6.jpg?1627429142"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Exponential Growth",
+      "color": "G",
+      "rarity": "Rare",
+      "pick_order_rank": 215,
+      "tier_rating": "D",
+      "note": null,
+      "id": "7c129bb7-9489-44bd-a46d-c5f738bf9d25",
+      "scryfall_uri": "https://scryfall.com/card/stx/130/exponential-growth",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/c/7c129bb7-9489-44bd-a46d-c5f738bf9d25.jpg?1624592712",
+        "normal": "https://cards.scryfall.io/normal/front/7/c/7c129bb7-9489-44bd-a46d-c5f738bf9d25.jpg?1624592712"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "name": "Culling Ritual",
+      "color": "BG",
+      "rarity": "Rare",
+      "pick_order_rank": 150,
+      "tier_rating": "C",
+      "note": null,
+      "id": "8f6f91d3-cc07-4a42-99a0-5fb83b29cc25",
+      "scryfall_uri": "https://scryfall.com/card/stx/172/culling-ritual",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/f/8f6f91d3-cc07-4a42-99a0-5fb83b29cc25.jpg?1627428386",
+        "normal": "https://cards.scryfall.io/normal/front/8/f/8f6f91d3-cc07-4a42-99a0-5fb83b29cc25.jpg?1627428386"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    }
+  ],
+  "mystical_archive": {
+    "description": "Bonus sheet (sta) of historically powerful spells inserted into packs. 1-mana instants shift removal timing calculations.",
+    "notable_cards": [
+      {
+        "name": "Swords to Plowshares",
+        "color": "W",
+        "rarity": "Rare",
+        "pick_order_rank": 36,
+        "tier_rating": "A",
+        "note": null,
+        "id": "cc9ece2f-7eda-4fc5-a562-3e16e71560e9",
+        "scryfall_uri": "https://scryfall.com/card/sta/10/swords-to-plowshares",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cc9ece2f-7eda-4fc5-a562-3e16e71560e9.jpg?1623592209",
+          "normal": "https://cards.scryfall.io/normal/front/c/c/cc9ece2f-7eda-4fc5-a562-3e16e71560e9.jpg?1623592209"
+        },
+        "set": "sta",
+        "set_name": "Strixhaven Mystical Archive"
+      },
+      {
+        "name": "Lightning Bolt",
+        "color": "R",
+        "rarity": "Rare",
+        "pick_order_rank": 45,
+        "tier_rating": "A",
+        "note": null,
+        "id": "4eaac4fd-95f5-4f38-b593-0101e79a20f9",
+        "scryfall_uri": "https://scryfall.com/card/sta/42/lightning-bolt",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/4/e/4eaac4fd-95f5-4f38-b593-0101e79a20f9.jpg?1623945607",
+          "normal": "https://cards.scryfall.io/normal/front/4/e/4eaac4fd-95f5-4f38-b593-0101e79a20f9.jpg?1623945607"
+        },
+        "set": "sta",
+        "set_name": "Strixhaven Mystical Archive"
+      },
+      {
+        "name": "Shock",
+        "color": "R",
+        "rarity": "Uncommon",
+        "pick_order_rank": 113,
+        "tier_rating": "C",
+        "note": null,
+        "id": "60eeb025-704c-4a82-90b2-f91202ae30d9",
+        "scryfall_uri": "https://scryfall.com/card/sta/44/shock",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/0/60eeb025-704c-4a82-90b2-f91202ae30d9.jpg?1623945691",
+          "normal": "https://cards.scryfall.io/normal/front/6/0/60eeb025-704c-4a82-90b2-f91202ae30d9.jpg?1623945691"
+        },
+        "set": "sta",
+        "set_name": "Strixhaven Mystical Archive"
+      },
+      {
+        "name": "Snakeskin Veil",
+        "color": "G",
+        "rarity": "Uncommon",
+        "pick_order_rank": 270,
+        "tier_rating": "D",
+        "note": null,
+        "id": "d9849b22-1fba-4f6a-bd94-df1bc1764e6b",
+        "scryfall_uri": "https://scryfall.com/card/sta/57/snakeskin-veil",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/9/d9849b22-1fba-4f6a-bd94-df1bc1764e6b.jpg?1624065596",
+          "normal": "https://cards.scryfall.io/normal/front/d/9/d9849b22-1fba-4f6a-bd94-df1bc1764e6b.jpg?1624065596"
+        },
+        "set": "sta",
+        "set_name": "Strixhaven Mystical Archive"
+      },
+      {
+        "name": "Gods Willing",
+        "color": "W",
+        "rarity": "Rare",
+        "pick_order_rank": 295,
+        "tier_rating": "D",
+        "note": null,
+        "id": "57e547cd-eba4-4a75-9c4e-8eeb6e00ddc4",
+        "scryfall_uri": "https://scryfall.com/card/sta/7/gods-willing",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/57e547cd-eba4-4a75-9c4e-8eeb6e00ddc4.jpg?1623592334",
+          "normal": "https://cards.scryfall.io/normal/front/5/7/57e547cd-eba4-4a75-9c4e-8eeb6e00ddc4.jpg?1623592334"
+        },
+        "set": "sta",
+        "set_name": "Strixhaven Mystical Archive"
+      },
+      {
+        "name": "Mana Tithe",
+        "color": "W",
+        "rarity": "Rare",
+        "pick_order_rank": 264,
+        "tier_rating": "D",
+        "note": null,
+        "id": "e7f32354-893d-4f0b-b555-e0757fb5443b",
+        "scryfall_uri": "https://scryfall.com/card/sta/8/mana-tithe",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7f32354-893d-4f0b-b555-e0757fb5443b.jpg?1623592291",
+          "normal": "https://cards.scryfall.io/normal/front/e/7/e7f32354-893d-4f0b-b555-e0757fb5443b.jpg?1623592291"
+        },
+        "set": "sta",
+        "set_name": "Strixhaven Mystical Archive"
+      },
+      {
+        "name": "Make Your Mark",
+        "color": "WR",
+        "rarity": "Common",
+        "pick_order_rank": 279,
+        "tier_rating": "D",
+        "note": null,
+        "id": "7e937830-3804-44e8-b9d0-3e5f5cf39eab",
+        "scryfall_uri": "https://scryfall.com/card/stx/204/make-your-mark",
+        "colors": [
+          "R",
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/e/7e937830-3804-44e8-b9d0-3e5f5cf39eab.jpg?1627429633",
+          "normal": "https://cards.scryfall.io/normal/front/7/e/7e937830-3804-44e8-b9d0-3e5f5cf39eab.jpg?1627429633"
+        },
+        "set": "stx",
+        "set_name": "Strixhaven: School of Mages"
+      },
+      {
+        "name": "Charge Through",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 283,
+        "tier_rating": "D",
+        "note": null,
+        "id": "ed16926f-feb0-481a-8c5e-88ea119752cd",
+        "scryfall_uri": "https://scryfall.com/card/stx/124/charge-through",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/d/ed16926f-feb0-481a-8c5e-88ea119752cd.jpg?1624592517",
+          "normal": "https://cards.scryfall.io/normal/front/e/d/ed16926f-feb0-481a-8c5e-88ea119752cd.jpg?1624592517"
+        },
+        "set": "stx",
+        "set_name": "Strixhaven: School of Mages"
+      },
+      {
+        "name": "Defiant Strike",
+        "color": "W",
+        "rarity": "Uncommon",
+        "pick_order_rank": 317,
+        "tier_rating": "D",
+        "note": null,
+        "id": "ade8f339-4afb-477a-9434-e6cd9126cd10",
+        "scryfall_uri": "https://scryfall.com/card/sta/3/defiant-strike",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/d/ade8f339-4afb-477a-9434-e6cd9126cd10.jpg?1623592405",
+          "normal": "https://cards.scryfall.io/normal/front/a/d/ade8f339-4afb-477a-9434-e6cd9126cd10.jpg?1623592405"
+        },
+        "set": "sta",
+        "set_name": "Strixhaven Mystical Archive"
+      }
+    ]
+  },
+  "notable_picks": {
+    "biggest_trap": {
+      "name": "Mascot Exhibition",
+      "color": "C",
+      "rarity": "Mythic",
+      "pick_order_rank": 6,
+      "tier_rating": "S",
+      "note": "Opponents learning for it often indicates misplays.",
+      "id": "2047592c-739c-41dd-b3e8-31ae1c7688ab",
+      "scryfall_uri": "https://scryfall.com/card/stx/5/mascot-exhibition",
+      "colors": [],
+      "type_line": "Sorcery — Lesson",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/0/2047592c-739c-41dd-b3e8-31ae1c7688ab.jpg?1637082330",
+        "normal": "https://cards.scryfall.io/normal/front/2/0/2047592c-739c-41dd-b3e8-31ae1c7688ab.jpg?1637082330"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    "high_stakes": {
+      "name": "Professor Onyx",
+      "color": "B",
+      "rarity": "Mythic",
+      "pick_order_rank": 3,
+      "tier_rating": "S",
+      "note": "Binary outcome — you either navigate it or lose.",
+      "id": "013eeb99-1b66-4fba-ad96-78deee901ea4",
+      "scryfall_uri": "https://scryfall.com/card/stx/83/professor-onyx",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Planeswalker — Liliana",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/0/1/013eeb99-1b66-4fba-ad96-78deee901ea4.jpg?1624591309",
+        "normal": "https://cards.scryfall.io/normal/front/0/1/013eeb99-1b66-4fba-ad96-78deee901ea4.jpg?1624591309"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    "rich_get_richer": {
+      "name": "Mizzix's Mastery",
+      "color": "R",
+      "rarity": "Mythic",
+      "pick_order_rank": 10,
+      "tier_rating": "S",
+      "note": "Enables replaying your best spells indefinitely.",
+      "id": "89978bd5-8222-4052-9625-3a5db81baa27",
+      "scryfall_uri": "https://scryfall.com/card/sta/43/mizzixs-mastery",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/89978bd5-8222-4052-9625-3a5db81baa27.jpg?1623945645",
+        "normal": "https://cards.scryfall.io/normal/front/8/9/89978bd5-8222-4052-9625-3a5db81baa27.jpg?1623945645"
+      },
+      "set": "sta",
+      "set_name": "Strixhaven Mystical Archive"
+    },
+    "surprise_instant": {
+      "name": "Magma Opus",
+      "color": "UR",
+      "rarity": "Mythic",
+      "pick_order_rank": 32,
+      "tier_rating": "A",
+      "note": "Instant speed surprises players.",
+      "id": "27c914a3-2294-4feb-9450-c012cfd307a6",
+      "scryfall_uri": "https://scryfall.com/card/stx/203/magma-opus",
+      "colors": [
+        "R",
+        "U"
+      ],
+      "type_line": "Instant",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/7/27c914a3-2294-4feb-9450-c012cfd307a6.jpg?1627429585",
+        "normal": "https://cards.scryfall.io/normal/front/2/7/27c914a3-2294-4feb-9450-c012cfd307a6.jpg?1627429585"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    "steal_effect": {
+      "name": "Tempted by the Oriq",
+      "color": "U",
+      "rarity": "Rare",
+      "pick_order_rank": 65,
+      "tier_rating": "B",
+      "note": "Creature theft at instant speed.",
+      "id": "c23e64f9-531e-4735-9960-b0a76b32c340",
+      "scryfall_uri": "https://scryfall.com/card/stx/58/tempted-by-the-oriq",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c23e64f9-531e-4735-9960-b0a76b32c340.jpg?1624590548",
+        "normal": "https://cards.scryfall.io/normal/front/c/2/c23e64f9-531e-4735-9960-b0a76b32c340.jpg?1624590548"
+      },
+      "set": "stx",
+      "set_name": "Strixhaven: School of Mages"
+    },
+    "win_condition": {
+      "name": "Approach of the Second Sun",
+      "color": "W",
+      "rarity": "Mythic",
+      "pick_order_rank": 34,
+      "tier_rating": "A",
+      "note": "Requires setting up double-cast conditions.",
+      "id": "e0d18742-d661-4223-8880-9ed995379b2e",
+      "scryfall_uri": "https://scryfall.com/card/sta/1/approach-of-the-second-sun",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/0/e0d18742-d661-4223-8880-9ed995379b2e.jpg?1630544626",
+        "normal": "https://cards.scryfall.io/normal/front/e/0/e0d18742-d661-4223-8880-9ed995379b2e.jpg?1630544626"
+      },
+      "set": "sta",
+      "set_name": "Strixhaven Mystical Archive"
+    }
+  },
+  "general_tips": [
+    "Apply maximum pressure early — opponents may hold game-winning bombs.",
+    "Wait until pack 2 to commit to an archetype; flexibility yields better decks.",
+    "Lesson cards are premium even when they look weak — Environmental Sciences first-pick worthy.",
+    "Account for Mystical Archive 1-mana instants when calculating combat math.",
+    "Off-school splashes are hard; rely on Environmental Sciences for fixing.",
+    "Aggressive play beats conservative play in this format due to bomb density."
+  ]
+}

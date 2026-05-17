@@ -1,0 +1,1018 @@
+{
+  "metadata": {
+    "set_name": "Aetherdrift",
+    "set_code": "DFT",
+    "source_url": "https://draftsim.com/mtg-dft-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Bryan Hohns (Veveil)",
+    "last_updated": "February 21, 2025"
+  },
+  "set_overview": {
+    "summary": "Aetherdrift is a flawed Limited format with significant balance issues. Color balance is very bad, common cards are weak, vehicles underperform despite the set's theme, and board stalls dominate gameplay. The format rewards understanding these problems rather than avoiding them.",
+    "color_ranking": [
+      "{G} Green",
+      "{B} Black",
+      "{U} Blue",
+      "{R} Red",
+      "{W} White"
+    ],
+    "color_notes": {
+      "{G} Green": "Deepest color with excellent commons (Stampeding Scurryfoot, Run Over, Migrating Ketradon). Sets the ceiling for creature size.",
+      "{B} Black": "Only slightly behind green. Strong removal answers across the rarity spectrum.",
+      "{U} Blue": "Solid commons but more fragile. Benefits from strong payoffs to convert tempo into wins.",
+      "{R} Red": "Two excellent commons (Thunderhead Gunner, Lightning Strike) but struggles against green fatties.",
+      "{W} White": "King of bad filler — tiny creatures and weak removal at common."
+    },
+    "key_gameplay_notes": [
+      "Board stalls are the default — card advantage and mana sinks become crucial late.",
+      "\"Almost everything you'd need dead dies to\" Spin Out — premium black removal.",
+      "Speed (\"Start Your Engines!\") is all-or-nothing: commit heavily or skip entirely.",
+      "Cycling doesn't justify reducing land counts below 16.",
+      "Budget for 3-5 vehicles maximum in most decks; common vehicles are among the weakest cards in the format.",
+      "Splashing works when bombs justify it; most color-fixing vehicles are undesirable standalone."
+    ]
+  },
+  "mechanics": [
+    {
+      "name": "Speed (\"Start Your Engines!\")",
+      "summary": "Three card types exist: those requiring maximum speed to function (Hazoret Godseeker), enablers that work reasonably alone (the Surveyor cycle), and weak cards only playable with payoffs. Don't dabble — either commit heavily or skip entirely. Remember to play Speed creatures before attacking.",
+      "performance": "All-or-nothing payoff theme. Defines BR Speed and feeds WB Speed.",
+      "key_examples": [
+        {
+          "name": "Hazoret, Godseeker",
+          "color": "R",
+          "rarity": "Mythic",
+          "pick_order_rank": 57,
+          "tier_rating": "B",
+          "note": null,
+          "id": "e2f66043-0872-4334-a91f-0e9bbbdddf66",
+          "scryfall_uri": "https://scryfall.com/card/dft/133/hazoret-godseeker",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Legendary Creature — God",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/2/e2f66043-0872-4334-a91f-0e9bbbdddf66.jpg?1738356431",
+            "normal": "https://cards.scryfall.io/normal/front/e/2/e2f66043-0872-4334-a91f-0e9bbbdddf66.jpg?1738356431"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        },
+        {
+          "name": "Goblin Surveyor",
+          "color": "R",
+          "rarity": "Common",
+          "pick_order_rank": 200,
+          "tier_rating": "D",
+          "note": null,
+          "id": "e1efffe9-00f8-4177-a9e6-4ad62887d32f",
+          "scryfall_uri": "https://scryfall.com/card/dft/131/goblin-surveyor",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature — Goblin Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e1efffe9-00f8-4177-a9e6-4ad62887d32f.jpg?1738356423",
+            "normal": "https://cards.scryfall.io/normal/front/e/1/e1efffe9-00f8-4177-a9e6-4ad62887d32f.jpg?1738356423"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        },
+        {
+          "name": "Leonin Surveyor",
+          "color": "W",
+          "rarity": "Common",
+          "pick_order_rank": 125,
+          "tier_rating": "C",
+          "note": null,
+          "id": "e08e4107-213f-491b-a032-8e3367009ba8",
+          "scryfall_uri": "https://scryfall.com/card/dft/18/leonin-surveyor",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature — Cat Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/0/e08e4107-213f-491b-a032-8e3367009ba8.jpg?1738356144",
+            "normal": "https://cards.scryfall.io/normal/front/e/0/e08e4107-213f-491b-a032-8e3367009ba8.jpg?1738356144"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        }
+      ]
+    },
+    {
+      "name": "Exhaust",
+      "summary": "GU and RG are primary homes. Rangers' Refueler creates cascading advantages with other exhaust cards. GU leverages board stalls through superior mana sinks.",
+      "performance": "Reliable value engine. Anchors GU Midrange and RG Exhaust.",
+      "key_examples": [
+        {
+          "name": "Rangers' Refueler",
+          "color": "U",
+          "rarity": "Uncommon",
+          "pick_order_rank": 96,
+          "tier_rating": "C",
+          "note": null,
+          "id": "67d2d713-8acb-4e3d-bd1d-0416fe9b9ef6",
+          "scryfall_uri": "https://scryfall.com/card/dft/55/rangers-refueler",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Artifact — Vehicle",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/67d2d713-8acb-4e3d-bd1d-0416fe9b9ef6.jpg?1738356236",
+            "normal": "https://cards.scryfall.io/normal/front/6/7/67d2d713-8acb-4e3d-bd1d-0416fe9b9ef6.jpg?1738356236"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        },
+        {
+          "name": "Skyserpent Seeker",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 36,
+          "tier_rating": "A",
+          "note": null,
+          "id": "8dbd9fc0-c0df-4119-a0d3-2e1790998c21",
+          "scryfall_uri": "https://scryfall.com/card/dft/224/skyserpent-seeker",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Creature — Snake",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8dbd9fc0-c0df-4119-a0d3-2e1790998c21.jpg?1738356752",
+            "normal": "https://cards.scryfall.io/normal/front/8/d/8dbd9fc0-c0df-4119-a0d3-2e1790998c21.jpg?1738356752"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        },
+        {
+          "name": "Rangers' Aetherhive",
+          "color": "UG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 60,
+          "tier_rating": "B",
+          "note": null,
+          "id": "1b238d2c-d10f-496d-aa34-5a1536e056b5",
+          "scryfall_uri": "https://scryfall.com/card/dft/217/rangers-aetherhive",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Artifact — Vehicle",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b238d2c-d10f-496d-aa34-5a1536e056b5.jpg?1738356719",
+            "normal": "https://cards.scryfall.io/normal/front/1/b/1b238d2c-d10f-496d-aa34-5a1536e056b5.jpg?1738356719"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        },
+        {
+          "name": "Boom Scholar",
+          "color": "RG",
+          "rarity": "Uncommon",
+          "pick_order_rank": 119,
+          "tier_rating": "C",
+          "note": null,
+          "id": "f2b84684-10c9-4635-a922-620f04809bb1",
+          "scryfall_uri": "https://scryfall.com/card/dft/189/boom-scholar",
+          "colors": [
+            "G",
+            "R"
+          ],
+          "type_line": "Creature — Goblin Advisor",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f2b84684-10c9-4635-a922-620f04809bb1.jpg?1738356572",
+            "normal": "https://cards.scryfall.io/normal/front/f/2/f2b84684-10c9-4635-a922-620f04809bb1.jpg?1738356572"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        }
+      ]
+    },
+    {
+      "name": "Cycling",
+      "summary": "Underwhelming mechanic except in UR. Cycling doesn't justify reducing land counts below 16. Disparity exists between 1-mana (peak convenience but colored), 2-mana (moderate), and 3-mana cycles.",
+      "performance": "Niche in UR only; otherwise mediocre.",
+      "key_examples": []
+    },
+    {
+      "name": "Vehicles",
+      "summary": "A sad tragedy — despite the set's theme, vehicles are largely ineffective due to diminishing returns and insufficient pilot tokens. Quality vehicles (Voyager Glidecar, Earthrumbler) are playable; common vehicles are among the weakest cards in the format.",
+      "performance": "Most vehicles are unplayable; a handful of premium options work.",
+      "key_examples": [
+        {
+          "name": "Voyager Glidecar",
+          "color": "W",
+          "rarity": "Rare",
+          "pick_order_rank": 30,
+          "tier_rating": "A",
+          "note": null,
+          "id": "13eb445a-dd41-4760-8299-9ba5d6de6aaf",
+          "scryfall_uri": "https://scryfall.com/card/dft/36/voyager-glidecar",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Artifact — Vehicle",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/3/13eb445a-dd41-4760-8299-9ba5d6de6aaf.jpg?1738356190",
+            "normal": "https://cards.scryfall.io/normal/front/1/3/13eb445a-dd41-4760-8299-9ba5d6de6aaf.jpg?1738356190"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        },
+        {
+          "name": "Earthrumbler",
+          "color": "G",
+          "rarity": "Uncommon",
+          "pick_order_rank": 118,
+          "tier_rating": "C",
+          "note": null,
+          "id": "ee386cd0-934a-4b33-9db3-0a9033ab577e",
+          "scryfall_uri": "https://scryfall.com/card/dft/160/earthrumbler",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Artifact — Vehicle",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/e/ee386cd0-934a-4b33-9db3-0a9033ab577e.jpg?1739091697",
+            "normal": "https://cards.scryfall.io/normal/front/e/e/ee386cd0-934a-4b33-9db3-0a9033ab577e.jpg?1739091697"
+          },
+          "set": "dft",
+          "set_name": "Aetherdrift"
+        }
+      ]
+    }
+  ],
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{B}{G}",
+        "name": "BG Midrange",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "The top tier deck. Combines green creatures with black removal and Thundering Broodwagon as a finisher. Capitalizes on board stalls.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Thundering Broodwagon",
+            "color": "BG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 122,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2d1576d4-15a3-4e91-84ef-e71e258185e7",
+            "scryfall_uri": "https://scryfall.com/card/dft/225/thundering-broodwagon",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Artifact — Vehicle",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/d/2d1576d4-15a3-4e91-84ef-e71e258185e7.jpg?1738356755",
+              "normal": "https://cards.scryfall.io/normal/front/2/d/2d1576d4-15a3-4e91-84ef-e71e258185e7.jpg?1738356755"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Stampeding Scurryfoot",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 138,
+            "tier_rating": "C",
+            "note": null,
+            "id": "7fc713d7-4a7e-4f1f-b461-e89bb1457d7d",
+            "scryfall_uri": "https://scryfall.com/card/dft/181/stampeding-scurryfoot",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Mouse",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7fc713d7-4a7e-4f1f-b461-e89bb1457d7d.jpg?1738356546",
+              "normal": "https://cards.scryfall.io/normal/front/7/f/7fc713d7-4a7e-4f1f-b461-e89bb1457d7d.jpg?1738356546"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Run Over",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 130,
+            "tier_rating": "C",
+            "note": null,
+            "id": "642f8fdd-6c58-49a3-904c-27f717cae980",
+            "scryfall_uri": "https://scryfall.com/card/dft/179/run-over",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/642f8fdd-6c58-49a3-904c-27f717cae980.jpg?1738356542",
+              "normal": "https://cards.scryfall.io/normal/front/6/4/642f8fdd-6c58-49a3-904c-27f717cae980.jpg?1738356542"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Migrating Ketradon",
+            "color": "G",
+            "rarity": "Common",
+            "pick_order_rank": 129,
+            "tier_rating": "C",
+            "note": null,
+            "id": "a9ba2219-8184-4141-8708-845cb0957299",
+            "scryfall_uri": "https://scryfall.com/card/dft/170/migrating-ketradon",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature — Dinosaur",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9ba2219-8184-4141-8708-845cb0957299.jpg?1738356519",
+              "normal": "https://cards.scryfall.io/normal/front/a/9/a9ba2219-8184-4141-8708-845cb0957299.jpg?1738356519"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Spin Out",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 128,
+            "tier_rating": "C",
+            "note": null,
+            "id": "be722ac5-e8c4-4180-aed0-7c28895afc0d",
+            "scryfall_uri": "https://scryfall.com/card/dft/106/spin-out",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/e/be722ac5-e8c4-4180-aed0-7c28895afc0d.jpg?1738356361",
+              "normal": "https://cards.scryfall.io/normal/front/b/e/be722ac5-e8c4-4180-aed0-7c28895afc0d.jpg?1738356361"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          }
+        ]
+      },
+      {
+        "colors": "{G}{U}",
+        "name": "GU Exhaust / Midrange",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Value-focused with Skyserpent Seeker and Rangers' Aetherhive as signposts. Wins long games via exhaust mana sinks.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Skyserpent Seeker",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 36,
+            "tier_rating": "A",
+            "note": null,
+            "id": "8dbd9fc0-c0df-4119-a0d3-2e1790998c21",
+            "scryfall_uri": "https://scryfall.com/card/dft/224/skyserpent-seeker",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Creature — Snake",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/d/8dbd9fc0-c0df-4119-a0d3-2e1790998c21.jpg?1738356752",
+              "normal": "https://cards.scryfall.io/normal/front/8/d/8dbd9fc0-c0df-4119-a0d3-2e1790998c21.jpg?1738356752"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Rangers' Aetherhive",
+            "color": "UG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 60,
+            "tier_rating": "B",
+            "note": null,
+            "id": "1b238d2c-d10f-496d-aa34-5a1536e056b5",
+            "scryfall_uri": "https://scryfall.com/card/dft/217/rangers-aetherhive",
+            "colors": [
+              "G",
+              "U"
+            ],
+            "type_line": "Artifact — Vehicle",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b238d2c-d10f-496d-aa34-5a1536e056b5.jpg?1738356719",
+              "normal": "https://cards.scryfall.io/normal/front/1/b/1b238d2c-d10f-496d-aa34-5a1536e056b5.jpg?1738356719"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Rangers' Refueler",
+            "color": "U",
+            "rarity": "Uncommon",
+            "pick_order_rank": 96,
+            "tier_rating": "C",
+            "note": null,
+            "id": "67d2d713-8acb-4e3d-bd1d-0416fe9b9ef6",
+            "scryfall_uri": "https://scryfall.com/card/dft/55/rangers-refueler",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Artifact — Vehicle",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/6/7/67d2d713-8acb-4e3d-bd1d-0416fe9b9ef6.jpg?1738356236",
+              "normal": "https://cards.scryfall.io/normal/front/6/7/67d2d713-8acb-4e3d-bd1d-0416fe9b9ef6.jpg?1738356236"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{G}{W}",
+        "name": "GW Mounts",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "White's best shell. Uses Ride's End and mount synergies to keep up with bigger green-based decks.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Ride's End",
+            "color": "W",
+            "rarity": "Common",
+            "pick_order_rank": 133,
+            "tier_rating": "C",
+            "note": null,
+            "id": "2f96b33b-c952-45ac-9626-40169b2bd4ef",
+            "scryfall_uri": "https://scryfall.com/card/dft/25/rides-end",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2f96b33b-c952-45ac-9626-40169b2bd4ef.jpg?1738356162",
+              "normal": "https://cards.scryfall.io/normal/front/2/f/2f96b33b-c952-45ac-9626-40169b2bd4ef.jpg?1738356162"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{G}",
+        "name": "RG Exhaust",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Faster exhaust approach with Boom Scholar and cost reduction synergies.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Boom Scholar",
+            "color": "RG",
+            "rarity": "Uncommon",
+            "pick_order_rank": 119,
+            "tier_rating": "C",
+            "note": null,
+            "id": "f2b84684-10c9-4635-a922-620f04809bb1",
+            "scryfall_uri": "https://scryfall.com/card/dft/189/boom-scholar",
+            "colors": [
+              "G",
+              "R"
+            ],
+            "type_line": "Creature — Goblin Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f2b84684-10c9-4635-a922-620f04809bb1.jpg?1738356572",
+              "normal": "https://cards.scryfall.io/normal/front/f/2/f2b84684-10c9-4635-a922-620f04809bb1.jpg?1738356572"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Artifacts",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Attrition strategy built around Pactdoll Terror and Haunt the Network.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Pactdoll Terror",
+            "color": "B",
+            "rarity": "Common",
+            "pick_order_rank": 101,
+            "tier_rating": "C",
+            "note": null,
+            "id": "70226354-47b7-4f9d-a5a8-559d17f07720",
+            "scryfall_uri": "https://scryfall.com/card/dft/99/pactdoll-terror",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Artifact Creature — Toy",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/0/70226354-47b7-4f9d-a5a8-559d17f07720.jpg?1738356343",
+              "normal": "https://cards.scryfall.io/normal/front/7/0/70226354-47b7-4f9d-a5a8-559d17f07720.jpg?1738356343"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Haunt the Network",
+            "color": "UB",
+            "rarity": "Uncommon",
+            "pick_order_rank": 39,
+            "tier_rating": "B",
+            "note": null,
+            "id": "478d236c-9778-435a-ac21-bd0017a17d5b",
+            "scryfall_uri": "https://scryfall.com/card/dft/207/haunt-the-network",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/7/478d236c-9778-435a-ac21-bd0017a17d5b.jpg?1738356667",
+              "normal": "https://cards.scryfall.io/normal/front/4/7/478d236c-9778-435a-ac21-bd0017a17d5b.jpg?1738356667"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          }
+        ]
+      },
+      {
+        "colors": "{B}{R}",
+        "name": "BR Speed",
+        "tier": "Tier 2 — Good Deck",
+        "strategy": "Premier archetype for \"Start Your Engines!\". Excellent multicolor payoffs and aggressive curve.",
+        "difficulty": "Medium",
+        "key_cards": []
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{W}{B}",
+        "name": "WB Speed",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Grindy, removal-heavy approach. Heavily dependent on black cards to be functional.",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{U}{R}",
+        "name": "UR Cycling",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "High ceiling with low floor. Requires open lane and specific uncommons to come together.",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{W}{U}",
+        "name": "WU Artifacts",
+        "tier": "Tier 3 — Decent Deck",
+        "strategy": "Artifact synergies with Voyage Home and Gearseeker Serpent as primary payoffs.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Voyage Home",
+            "color": "WU",
+            "rarity": "Uncommon",
+            "pick_order_rank": 78,
+            "tier_rating": "B",
+            "note": null,
+            "id": "4ba835da-0247-4716-9079-1b605297f6d5",
+            "scryfall_uri": "https://scryfall.com/card/dft/227/voyage-home",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4ba835da-0247-4716-9079-1b605297f6d5.jpg?1738356764",
+              "normal": "https://cards.scryfall.io/normal/front/4/b/4ba835da-0247-4716-9079-1b605297f6d5.jpg?1738356764"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          },
+          {
+            "name": "Gearseeker Serpent",
+            "color": "U",
+            "rarity": "Common",
+            "pick_order_rank": 201,
+            "tier_rating": "D",
+            "note": null,
+            "id": "3dca0007-42d3-4ee2-8e88-361d80a7103c",
+            "scryfall_uri": "https://scryfall.com/card/dft/43/gearseeker-serpent",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature — Serpent",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3dca0007-42d3-4ee2-8e88-361d80a7103c.jpg?1739091700",
+              "normal": "https://cards.scryfall.io/normal/front/3/d/3dca0007-42d3-4ee2-8e88-361d80a7103c.jpg?1739091700"
+            },
+            "set": "dft",
+            "set_name": "Aetherdrift"
+          }
+        ]
+      }
+    ],
+    "tier_4": [
+      {
+        "colors": "{R}{W}",
+        "name": "RW Vehicles",
+        "tier": "Tier 4 — Weakest Deck",
+        "strategy": "Struggles to break through green blockers. Vehicle payoffs are insufficient to support the archetype.",
+        "difficulty": "Hard",
+        "key_cards": []
+      }
+    ]
+  },
+  "key_commons_by_color": {
+    "{W} White": [
+      {
+        "name": "Ride's End",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 133,
+        "tier_rating": "C",
+        "note": "Best white removal.",
+        "id": "2f96b33b-c952-45ac-9626-40169b2bd4ef",
+        "scryfall_uri": "https://scryfall.com/card/dft/25/rides-end",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2f96b33b-c952-45ac-9626-40169b2bd4ef.jpg?1738356162",
+          "normal": "https://cards.scryfall.io/normal/front/2/f/2f96b33b-c952-45ac-9626-40169b2bd4ef.jpg?1738356162"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Lightshield Parry",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 196,
+        "tier_rating": "D",
+        "note": null,
+        "id": "dcf6a0e7-1fd4-425f-b634-c93236daea35",
+        "scryfall_uri": "https://scryfall.com/card/dft/19/lightshield-parry",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/d/c/dcf6a0e7-1fd4-425f-b634-c93236daea35.jpg?1738356149",
+          "normal": "https://cards.scryfall.io/normal/front/d/c/dcf6a0e7-1fd4-425f-b634-c93236daea35.jpg?1738356149"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Leonin Surveyor",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 125,
+        "tier_rating": "C",
+        "note": null,
+        "id": "e08e4107-213f-491b-a032-8e3367009ba8",
+        "scryfall_uri": "https://scryfall.com/card/dft/18/leonin-surveyor",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Creature — Cat Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/0/e08e4107-213f-491b-a032-8e3367009ba8.jpg?1738356144",
+          "normal": "https://cards.scryfall.io/normal/front/e/0/e08e4107-213f-491b-a032-8e3367009ba8.jpg?1738356144"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      }
+    ],
+    "{U} Blue": [
+      {
+        "name": "Flood the Engine",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 152,
+        "tier_rating": "C",
+        "note": null,
+        "id": "57402f7c-5d4c-4f1e-8bce-a2328a297111",
+        "scryfall_uri": "https://scryfall.com/card/dft/42/flood-the-engine",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Enchantment — Aura",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/5/7/57402f7c-5d4c-4f1e-8bce-a2328a297111.jpg?1738356202",
+          "normal": "https://cards.scryfall.io/normal/front/5/7/57402f7c-5d4c-4f1e-8bce-a2328a297111.jpg?1738356202"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Keen Buccaneer",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 261,
+        "tier_rating": "D",
+        "note": null,
+        "id": "0ed90a63-5aca-470a-8e1e-518d8aeb6d91",
+        "scryfall_uri": "https://scryfall.com/card/dft/48/keen-buccaneer",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Creature — Octopus Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/0/e/0ed90a63-5aca-470a-8e1e-518d8aeb6d91.jpg?1738359340",
+          "normal": "https://cards.scryfall.io/normal/front/0/e/0ed90a63-5aca-470a-8e1e-518d8aeb6d91.jpg?1738359340"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Bounce Off",
+        "color": "U",
+        "rarity": "Common",
+        "pick_order_rank": 172,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7b3c8dda-2405-4879-8dd1-e790a833c42d",
+        "scryfall_uri": "https://scryfall.com/card/dft/39/bounce-off",
+        "colors": [
+          "U"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7b3c8dda-2405-4879-8dd1-e790a833c42d.jpg?1738356198",
+          "normal": "https://cards.scryfall.io/normal/front/7/b/7b3c8dda-2405-4879-8dd1-e790a833c42d.jpg?1738356198"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      }
+    ],
+    "{B} Black": [
+      {
+        "name": "Spin Out",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 128,
+        "tier_rating": "C",
+        "note": "Premium removal — answers nearly everything.",
+        "id": "be722ac5-e8c4-4180-aed0-7c28895afc0d",
+        "scryfall_uri": "https://scryfall.com/card/dft/106/spin-out",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/e/be722ac5-e8c4-4180-aed0-7c28895afc0d.jpg?1738356361",
+          "normal": "https://cards.scryfall.io/normal/front/b/e/be722ac5-e8c4-4180-aed0-7c28895afc0d.jpg?1738356361"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Crash and Burn",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 136,
+        "tier_rating": "C",
+        "note": null,
+        "id": "339a41a1-b36f-4b81-b74c-220d279c0e26",
+        "scryfall_uri": "https://scryfall.com/card/dft/119/crash-and-burn",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/3/339a41a1-b36f-4b81-b74c-220d279c0e26.jpg?1738356395",
+          "normal": "https://cards.scryfall.io/normal/front/3/3/339a41a1-b36f-4b81-b74c-220d279c0e26.jpg?1738356395"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      }
+    ],
+    "{R} Red": [
+      {
+        "name": "Thunderhead Gunner",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 192,
+        "tier_rating": "C",
+        "note": null,
+        "id": "ef537868-b2cb-4bbd-a935-b7f73f19bd06",
+        "scryfall_uri": "https://scryfall.com/card/dft/148/thunderhead-gunner",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Shark Pirate",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef537868-b2cb-4bbd-a935-b7f73f19bd06.jpg?1738359123",
+          "normal": "https://cards.scryfall.io/normal/front/e/f/ef537868-b2cb-4bbd-a935-b7f73f19bd06.jpg?1738359123"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Lightning Strike",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 70,
+        "tier_rating": "B",
+        "note": null,
+        "id": "30077b49-b825-4dbb-a0c7-f3992f647df0",
+        "scryfall_uri": "https://scryfall.com/card/dft/136/lightning-strike",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/0/30077b49-b825-4dbb-a0c7-f3992f647df0.jpg?1738356438",
+          "normal": "https://cards.scryfall.io/normal/front/3/0/30077b49-b825-4dbb-a0c7-f3992f647df0.jpg?1738356438"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Goblin Surveyor",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 200,
+        "tier_rating": "D",
+        "note": null,
+        "id": "e1efffe9-00f8-4177-a9e6-4ad62887d32f",
+        "scryfall_uri": "https://scryfall.com/card/dft/131/goblin-surveyor",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Creature — Goblin Scout",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e1efffe9-00f8-4177-a9e6-4ad62887d32f.jpg?1738356423",
+          "normal": "https://cards.scryfall.io/normal/front/e/1/e1efffe9-00f8-4177-a9e6-4ad62887d32f.jpg?1738356423"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      }
+    ],
+    "{G} Green": [
+      {
+        "name": "Stampeding Scurryfoot",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 138,
+        "tier_rating": "C",
+        "note": null,
+        "id": "7fc713d7-4a7e-4f1f-b461-e89bb1457d7d",
+        "scryfall_uri": "https://scryfall.com/card/dft/181/stampeding-scurryfoot",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Mouse",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/7/f/7fc713d7-4a7e-4f1f-b461-e89bb1457d7d.jpg?1738356546",
+          "normal": "https://cards.scryfall.io/normal/front/7/f/7fc713d7-4a7e-4f1f-b461-e89bb1457d7d.jpg?1738356546"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Run Over",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 130,
+        "tier_rating": "C",
+        "note": null,
+        "id": "642f8fdd-6c58-49a3-904c-27f717cae980",
+        "scryfall_uri": "https://scryfall.com/card/dft/179/run-over",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/6/4/642f8fdd-6c58-49a3-904c-27f717cae980.jpg?1738356542",
+          "normal": "https://cards.scryfall.io/normal/front/6/4/642f8fdd-6c58-49a3-904c-27f717cae980.jpg?1738356542"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Migrating Ketradon",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 129,
+        "tier_rating": "C",
+        "note": null,
+        "id": "a9ba2219-8184-4141-8708-845cb0957299",
+        "scryfall_uri": "https://scryfall.com/card/dft/170/migrating-ketradon",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Dinosaur",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9ba2219-8184-4141-8708-845cb0957299.jpg?1738356519",
+          "normal": "https://cards.scryfall.io/normal/front/a/9/a9ba2219-8184-4141-8708-845cb0957299.jpg?1738356519"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Hazard of the Dunes",
+        "color": "G",
+        "rarity": "Common",
+        "pick_order_rank": 193,
+        "tier_rating": "C",
+        "note": null,
+        "id": "c3fbee7a-7e73-43cf-bc39-ccb1c63bf837",
+        "scryfall_uri": "https://scryfall.com/card/dft/165/hazard-of-the-dunes",
+        "colors": [
+          "G"
+        ],
+        "type_line": "Creature — Wurm",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3fbee7a-7e73-43cf-bc39-ccb1c63bf837.jpg?1738356508",
+          "normal": "https://cards.scryfall.io/normal/front/c/3/c3fbee7a-7e73-43cf-bc39-ccb1c63bf837.jpg?1738356508"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      }
+    ]
+  },
+  "removal_priority": {
+    "overperformers": [
+      {
+        "name": "Spin Out",
+        "color": "B",
+        "rarity": "Common",
+        "pick_order_rank": 128,
+        "tier_rating": "C",
+        "note": "Almost everything you'd need dead dies to it.",
+        "id": "be722ac5-e8c4-4180-aed0-7c28895afc0d",
+        "scryfall_uri": "https://scryfall.com/card/dft/106/spin-out",
+        "colors": [
+          "B"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/b/e/be722ac5-e8c4-4180-aed0-7c28895afc0d.jpg?1738356361",
+          "normal": "https://cards.scryfall.io/normal/front/b/e/be722ac5-e8c4-4180-aed0-7c28895afc0d.jpg?1738356361"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Ride's End",
+        "color": "W",
+        "rarity": "Common",
+        "pick_order_rank": 133,
+        "tier_rating": "C",
+        "note": null,
+        "id": "2f96b33b-c952-45ac-9626-40169b2bd4ef",
+        "scryfall_uri": "https://scryfall.com/card/dft/25/rides-end",
+        "colors": [
+          "W"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/2/f/2f96b33b-c952-45ac-9626-40169b2bd4ef.jpg?1738356162",
+          "normal": "https://cards.scryfall.io/normal/front/2/f/2f96b33b-c952-45ac-9626-40169b2bd4ef.jpg?1738356162"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      },
+      {
+        "name": "Lightning Strike",
+        "color": "R",
+        "rarity": "Common",
+        "pick_order_rank": 70,
+        "tier_rating": "B",
+        "note": null,
+        "id": "30077b49-b825-4dbb-a0c7-f3992f647df0",
+        "scryfall_uri": "https://scryfall.com/card/dft/136/lightning-strike",
+        "colors": [
+          "R"
+        ],
+        "type_line": "Instant",
+        "image_uris": {
+          "art_crop": "https://cards.scryfall.io/art_crop/front/3/0/30077b49-b825-4dbb-a0c7-f3992f647df0.jpg?1738356438",
+          "normal": "https://cards.scryfall.io/normal/front/3/0/30077b49-b825-4dbb-a0c7-f3992f647df0.jpg?1738356438"
+        },
+        "set": "dft",
+        "set_name": "Aetherdrift"
+      }
+    ],
+    "notes": [
+      "Removal is vital given board stalls — save premium removal for threats you cannot block.",
+      "Use creatures to stall while preserving answers for critical targets."
+    ]
+  },
+  "general_tips": [
+    "Budget for 3-5 vehicles maximum in most decks; artifact-heavy decks specifically require careful creature counts.",
+    "Splashing works when bombs justify it; most color-fixing vehicles are undesirable standalone.",
+    "Board stalls reaching natural decking are common — card advantage and mana sinks become crucial.",
+    "Guardian Sunmare builds can use Lotusguard Disciple tutor capability and Flood the Engine synergy.",
+    "Sab-Sunen (Luxa Embodied) has limited answers: Bounce Off, Flood the Engine, Trip Up, Possession Engine, and others.",
+    "Don't dabble with Speed — either commit heavily or skip entirely.",
+    "Remember to play Speed creatures before attacking to maximize triggers."
+  ]
+}

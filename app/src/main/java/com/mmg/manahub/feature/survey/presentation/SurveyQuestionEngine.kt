@@ -2,48 +2,123 @@ package com.mmg.manahub.feature.survey.presentation
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.MoodBad
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.QuestionMark
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.mmg.manahub.R
-import com.mmg.manahub.feature.game.domain.model.EliminationReason
-import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.feature.game.domain.model.GameResult
 import java.util.Locale
 
-// ── Answer options ────────────────────────────────────────────────────────────
+// ── Choice & Answer models ────────────────────────────────────────────────────
 
+/**
+ * A single selectable option within an [AnswerOption].
+ *
+ * @param id Stable identifier persisted to Room.
+ * @param label Human-readable label (already localised by the engine).
+ * @param icon Optional Material icon rendered instead of emoji.
+ * @param manaToken If non-null, the UI renders a mana symbol image (e.g. "W", "U", "B", "R", "G", "C").
+ */
 data class SurveyChoice(
-    val id:    String,
+    val id: String,
     val label: String,
-    val emoji: String = "",
+    val icon: ImageVector? = null,
+    val manaToken: String? = null,
 )
 
+/**
+ * Exhaustive sum type covering every kind of answer widget the survey screen knows how to render.
+ */
 sealed class AnswerOption {
+    /** Exactly one option must be selected; selection commits immediately. */
     data class SingleChoice(val options: List<SurveyChoice>) : AnswerOption()
-    data class MultiChoice(val options: List<SurveyChoice>)  : AnswerOption()
-    data class StarRating(val maxStars: Int = 5)             : AnswerOption()
-    object FreeText                                          : AnswerOption()
+
+    /** Zero or more options; requires explicit confirmation. */
+    data class MultiChoice(val options: List<SurveyChoice>) : AnswerOption()
+
+    /** 1-to-[maxStars] star picker. */
+    data class StarRating(val maxStars: Int = 5) : AnswerOption()
+
+    /** Plain multiline text field. */
+    object FreeText : AnswerOption()
+
+    /**
+     * Card-impact carousel. The screen is responsible for rendering the deck cards
+     * as Key / Average / Weak chips; the engine only declares the question type.
+     */
+    object CardImpact : AnswerOption()
 }
 
 // ── Question model ────────────────────────────────────────────────────────────
 
+/**
+ * A single survey question, fully resolved with localised text.
+ */
 data class SurveyQuestion(
-    val id:            String,
-    val type:          String,
-    val text:          String,
-    val contextBadge:  String?      = null,
-    val answerOption:  AnswerOption,
-    val cardReference: String?      = null,
+    val id: String,
+    val type: String,
+    val text: String,
+    val contextBadge: String? = null,
+    val answerOption: AnswerOption,
+    val cardReference: String? = null,
+)
+
+// ── Panel model ───────────────────────────────────────────────────────────────
+
+/** Stable identifier for each thematic group of questions. */
+enum class SurveyPanelId { MOOD, FUNDAMENTALS, CARD_IMPACT, SUMMARY }
+
+/**
+ * A named group of related [SurveyQuestion]s rendered together as a single screen page.
+ *
+ * [SUMMARY] is always empty — the screen renders its own recap UI for that panel.
+ */
+data class SurveyPanel(
+    val id: SurveyPanelId,
+    val title: String,
+    val questions: List<SurveyQuestion>,
 )
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
+/**
+ * Produces the ordered list of [SurveyPanel]s for a finished game.
+ *
+ * All visible strings are resolved from Android resources so localisation is
+ * handled by the OS resource system.  Pass [langCode] (BCP-47, e.g. "es-ES") to
+ * force a specific locale; null uses the device default.
+ */
 object SurveyQuestionEngine {
 
-    fun buildQuestions(
-        result:   GameResult,
-        context:  Context,
-        langCode: String? = null
-    ): List<SurveyQuestion> {
-        val localizedContext = if (langCode != null) {
+    /**
+     * Build the full panel list.
+     *
+     * @param won Whether the app user won the game.
+     * @param context Android context used for string resolution.
+     * @param langCode Optional BCP-47 language code override.
+     * @param hasDeck Whether the session has an associated deck; controls whether
+     *   [SurveyPanelId.CARD_IMPACT] is included.
+     */
+    fun buildPanels(
+        won: Boolean,
+        context: Context,
+        langCode: String? = null,
+        hasDeck: Boolean = false,
+    ): List<SurveyPanel> {
+        val ctx = if (langCode != null) {
             val locale = Locale.forLanguageTag(langCode)
             val config = Configuration(context.resources.configuration)
             config.setLocale(locale)
@@ -52,150 +127,207 @@ object SurveyQuestionEngine {
             context
         }
 
-        val questions   = mutableListOf<SurveyQuestion>()
-        val appUserWon  = result.appUserWon
+        val panels = mutableListOf<SurveyPanel>()
 
-        // Q1 — always: subjective outcome, branched by win/loss
-        questions += SurveyQuestion(
-            id           = "result_feel",
-            type         = "RESULT_FEEL",
-            contextBadge = if (appUserWon)
-                localizedContext.getString(R.string.survey_q_win_badge)
-            else
-                localizedContext.getString(R.string.survey_q_loss_badge),
-            text         = if (appUserWon)
-                localizedContext.getString(R.string.survey_q_result_win)
-            else
-                localizedContext.getString(R.string.survey_q_result_loss),
-            answerOption = AnswerOption.SingleChoice(
-                if (appUserWon) listOf(
-                    SurveyChoice("DOMINANT",  localizedContext.getString(R.string.survey_a_dominant),    "\uD83D\uDCAA"),
-                    SurveyChoice("CLOSE",     localizedContext.getString(R.string.survey_a_close),       "\uD83D\uDE05"),
-                    SurveyChoice("LUCKY",     localizedContext.getString(R.string.survey_a_lucky),       "\uD83C\uDF40"),
-                    SurveyChoice("SKILLFUL",  localizedContext.getString(R.string.survey_a_skillful),    "\uD83E\uDDE0"),
-                ) else listOf(
-                    SurveyChoice("OVERWHELMED", localizedContext.getString(R.string.survey_a_overwhelmed), "\u26A1"),
-                    SurveyChoice("MANA",        localizedContext.getString(R.string.survey_a_mana_issues), "\uD83C\uDFD4"),
-                    SurveyChoice("NO_ANSWERS",  localizedContext.getString(R.string.survey_a_no_answers),  "\uD83D\uDEAB"),
-                    SurveyChoice("TOO_SLOW",    localizedContext.getString(R.string.survey_a_too_slow),    "\uD83D\uDC22"),
-                )
+        // ── MOOD ──────────────────────────────────────────────────────────────
+        panels += SurveyPanel(
+            id = SurveyPanelId.MOOD,
+            title = ctx.getString(R.string.survey_panel_mood),
+            questions = listOf(
+                buildDecisiveMomentQuestion(ctx),
+                buildMatchupDifficultyQuestion(ctx),
             ),
         )
 
-        // Q2 — always: mana health
-        questions += SurveyQuestion(
-            id   = "mana_health",
-            type = "MANA",
-            text = localizedContext.getString(R.string.survey_q_mana),
-            answerOption = AnswerOption.MultiChoice(listOf(
-                SurveyChoice("SMOOTH",  localizedContext.getString(R.string.survey_a_mana_smooth),   "\u2705"),
-                SurveyChoice("FLOODED", localizedContext.getString(R.string.survey_a_mana_flooded),  "\uD83C\uDF0A"),
-                SurveyChoice("SCREWED", localizedContext.getString(R.string.survey_a_mana_screwed),  "\uD83C\uDFDC"),
-                SurveyChoice("COLORS",  localizedContext.getString(R.string.survey_a_mana_colors),   "\uD83C\uDFA8"),
-                SurveyChoice("NONE",    localizedContext.getString(R.string.survey_a_mana_none),     "\uD83D\uDC4D"),
-            )),
+        // ── FUNDAMENTALS ─────────────────────────────────────────────────────
+        panels += SurveyPanel(
+            id = SurveyPanelId.FUNDAMENTALS,
+            title = ctx.getString(R.string.survey_panel_fundamentals),
+            questions = listOf(
+                buildHandQualityQuestion(ctx),
+                buildManaHealthQuestion(ctx),
+                buildResultContextQuestion(won, ctx),
+            ),
         )
 
-        // Q3 — always: opening hand
-        questions += SurveyQuestion(
-            id           = "hand_quality",
-            type         = "HAND",
-            text         = localizedContext.getString(R.string.survey_q_hand),
-            answerOption = AnswerOption.StarRating(maxStars = 5),
-        )
-
-        if (appUserWon) {
-            // ── WIN branch ────────────────────────────────────────────────────
-
-            // Q4 win — contextual: commander damage decisive
-            val commanderWin = result.playerResults.any {
-                it.eliminationReason == EliminationReason.COMMANDER_DAMAGE
-            }
-            if (commanderWin && result.gameMode == GameMode.COMMANDER) {
-                questions += SurveyQuestion(
-                    id           = "commander_plan",
-                    type         = "COMMANDER_DAMAGE",
-                    text         = localizedContext.getString(R.string.survey_q_commander_plan),
-                    contextBadge = localizedContext.getString(R.string.survey_q_commander_badge),
-                    answerOption = AnswerOption.SingleChoice(listOf(
-                        SurveyChoice("PLANNED",   localizedContext.getString(R.string.survey_a_planned),    "\uD83C\uDFAF"),
-                        SurveyChoice("DEVELOPED", localizedContext.getString(R.string.survey_a_developed),  "\uD83C\uDF31"),
-                        SurveyChoice("SURPRISE",  localizedContext.getString(R.string.survey_a_surprise),   "\uD83D\uDE2E"),
-                    )),
-                )
-            }
-
-            // Q5 win — optional: anything to do differently?
-            questions += SurveyQuestion(
-                id           = "win_improvement",
-                type         = "FREE_TEXT",
-                text         = localizedContext.getString(R.string.survey_q_win_improvement),
-                contextBadge = localizedContext.getString(R.string.survey_q_optional_badge),
-                answerOption = AnswerOption.FreeText,
+        // ── CARD_IMPACT (only when a deck is linked) ──────────────────────────
+        if (hasDeck) {
+            panels += SurveyPanel(
+                id = SurveyPanelId.CARD_IMPACT,
+                title = ctx.getString(R.string.survey_panel_cards),
+                questions = listOf(buildCardImpactQuestion(ctx)),
             )
-
-        } else {
-            // ── LOSS branch ───────────────────────────────────────────────────
-
-            // Q4 loss — what would you change?
-            questions += SurveyQuestion(
-                id           = "loss_reason",
-                type         = "LOSS_REASON",
-                text         = localizedContext.getString(R.string.survey_q_loss_reason),
-                contextBadge = localizedContext.getString(R.string.survey_q_loss_reason_badge),
-                answerOption = AnswerOption.SingleChoice(listOf(
-                    SurveyChoice("REMOVAL",     localizedContext.getString(R.string.survey_a_more_removal),     "\u2694"),
-                    SurveyChoice("CURVE",       localizedContext.getString(R.string.survey_a_better_curve),     "\uD83D\uDCCA"),
-                    SurveyChoice("INTERACTION", localizedContext.getString(R.string.survey_a_more_interaction), "\uD83D\uDEE1"),
-                    SurveyChoice("NOTHING",     localizedContext.getString(R.string.survey_a_nothing),           "\uD83E\uDD1D"),
-                )),
-            )
-
-            // Q5 loss — contextual: sideboard if app user has a deck
-            val appUser = result.allPlayers.firstOrNull { it.isAppUser }
-            if (appUser?.deckId != null) {
-                questions += SurveyQuestion(
-                    id           = "sideboard",
-                    type         = "SIDEBOARD",
-                    text         = localizedContext.getString(R.string.survey_q_sideboard),
-                    contextBadge = localizedContext.getString(R.string.survey_q_sideboard_badge),
-                    answerOption = AnswerOption.SingleChoice(listOf(
-                        SurveyChoice("SIDE_HELPED",  localizedContext.getString(R.string.survey_a_side_helped),  "\uD83D\uDCAA"),
-                        SurveyChoice("SIDE_NO_HELP", localizedContext.getString(R.string.survey_a_side_no_help), "\uD83E\uDD37"),
-                        SurveyChoice("NO_SWAPS",     localizedContext.getString(R.string.survey_a_side_no_swaps),"\uD83D\uDEAB"),
-                        SurveyChoice("FORGOT",       localizedContext.getString(R.string.survey_a_side_forgot),  "\uD83E\uDD26"),
-                    )),
-                )
-            }
         }
 
-        // Last — always: free notes
-        questions += SurveyQuestion(
-            id           = "free_notes",
-            type         = "FREE_TEXT",
-            text         = localizedContext.getString(R.string.survey_q_free_text),
-            contextBadge = localizedContext.getString(R.string.survey_q_free_text_badge),
-            answerOption = AnswerOption.FreeText,
+        // ── SUMMARY (empty — screen renders its own UI) ───────────────────────
+        panels += SurveyPanel(
+            id = SurveyPanelId.SUMMARY,
+            title = ctx.getString(R.string.survey_panel_summary),
+            questions = emptyList(),
         )
 
-        return questions.take(8)
+        return panels
     }
 
-    // For future use when deck cards are available
-    fun buildCardImpactQuestion(
-        cardName:     String,
-        scryfallId:   String,
-        contextBadge: String? = null,
-    ) = SurveyQuestion(
-        id            = "card_impact_$scryfallId",
-        type          = "CARD_IMPACT",
-        text          = "How did $cardName perform?",
-        contextBadge  = contextBadge,
-        cardReference = scryfallId,
-        answerOption  = AnswerOption.SingleChoice(listOf(
-            SurveyChoice("KEY_CARD", "Key card", "\uD83D\uDD25"),
-            SurveyChoice("AVERAGE",  "Average",  "\uD83D\uDE10"),
-            SurveyChoice("WEAK",     "Weak",     "\uD83D\uDE34"),
-        )),
+    // ── Question builders ─────────────────────────────────────────────────────
+
+    /** MOOD Q1: What was the decisive moment of the game? */
+    private fun buildDecisiveMomentQuestion(ctx: Context) = SurveyQuestion(
+        id = "decisive_moment",
+        type = "DECISIVE_MOMENT",
+        text = ctx.getString(R.string.survey_q_decisive_moment),
+        answerOption = AnswerOption.SingleChoice(
+            listOf(
+                SurveyChoice(
+                    id = "KEY_TURN",
+                    label = ctx.getString(R.string.survey_a_key_turn),
+                    icon = Icons.Default.EmojiEvents,
+                ),
+                SurveyChoice(
+                    id = "TOP_DECK",
+                    label = ctx.getString(R.string.survey_a_top_deck),
+                    icon = Icons.Default.Casino,
+                ),
+                SurveyChoice(
+                    id = "RIVAL_ERROR",
+                    label = ctx.getString(R.string.survey_a_rival_error),
+                    icon = Icons.Default.MoodBad,
+                ),
+                SurveyChoice(
+                    id = "UNCLEAR",
+                    label = ctx.getString(R.string.survey_a_unclear),
+                    icon = Icons.Default.QuestionMark,
+                ),
+            )
+        ),
     )
+
+    /** MOOD Q2: How hard was the matchup? (1–5 stars) */
+    private fun buildMatchupDifficultyQuestion(ctx: Context) = SurveyQuestion(
+        id = "matchup_difficulty",
+        type = "STAR_RATING",
+        text = ctx.getString(R.string.survey_q_matchup_difficulty),
+        answerOption = AnswerOption.StarRating(maxStars = 5),
+    )
+
+    /** FUNDAMENTALS Q1: Opening hand quality (1–5 stars) */
+    private fun buildHandQualityQuestion(ctx: Context) = SurveyQuestion(
+        id = "hand_quality",
+        type = "HAND",
+        text = ctx.getString(R.string.survey_q_hand),
+        answerOption = AnswerOption.StarRating(maxStars = 5),
+    )
+
+    /** FUNDAMENTALS Q2: Mana health (multi-choice) */
+    private fun buildManaHealthQuestion(ctx: Context) = SurveyQuestion(
+        id = "mana_health",
+        type = "MANA",
+        text = ctx.getString(R.string.survey_q_mana),
+        answerOption = AnswerOption.MultiChoice(
+            listOf(
+                SurveyChoice(
+                    id = "SMOOTH",
+                    label = ctx.getString(R.string.survey_a_mana_smooth),
+                    icon = Icons.Default.Check,
+                ),
+                SurveyChoice(
+                    id = "FLOODED",
+                    label = ctx.getString(R.string.survey_a_mana_flooded),
+                    icon = Icons.Default.Waves,
+                ),
+                SurveyChoice(
+                    id = "SCREWED",
+                    label = ctx.getString(R.string.survey_a_mana_screwed),
+                    icon = Icons.Default.Block,
+                ),
+                SurveyChoice(
+                    id = "COLORS",
+                    label = ctx.getString(R.string.survey_a_mana_colors),
+                    icon = Icons.Default.Palette,
+                ),
+                SurveyChoice(
+                    id = "NONE",
+                    label = ctx.getString(R.string.survey_a_mana_none),
+                    icon = Icons.Default.ThumbUp,
+                ),
+            )
+        ),
+    )
+
+    /**
+     * FUNDAMENTALS Q3: Game result context — branched by win/loss.
+     *
+     * Win options: Dominant, Close, Skillful.
+     * Loss options: Overwhelmed, No answers, Too slow.
+     */
+    private fun buildResultContextQuestion(won: Boolean, ctx: Context) = SurveyQuestion(
+        id = "result_context",
+        type = "RESULT_CONTEXT",
+        text = if (won)
+            ctx.getString(R.string.survey_q_result_context_win)
+        else
+            ctx.getString(R.string.survey_q_result_context_loss),
+        answerOption = AnswerOption.SingleChoice(
+            if (won) listOf(
+                SurveyChoice(
+                    id = "DOMINANT",
+                    label = ctx.getString(R.string.survey_a_dominant),
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                ),
+                SurveyChoice(
+                    id = "CLOSE",
+                    label = ctx.getString(R.string.survey_a_close),
+                    icon = Icons.Default.HourglassBottom,
+                ),
+                SurveyChoice(
+                    id = "SKILLFUL",
+                    label = ctx.getString(R.string.survey_a_skillful),
+                    icon = Icons.Default.Star,
+                ),
+            ) else listOf(
+                SurveyChoice(
+                    id = "OVERWHELMED",
+                    label = ctx.getString(R.string.survey_a_overwhelmed),
+                    icon = Icons.Default.Whatshot,
+                ),
+                SurveyChoice(
+                    id = "NO_ANSWERS",
+                    label = ctx.getString(R.string.survey_a_no_answers),
+                    icon = Icons.Default.Block,
+                ),
+                SurveyChoice(
+                    id = "TOO_SLOW",
+                    label = ctx.getString(R.string.survey_a_too_slow),
+                    icon = Icons.Default.HourglassBottom,
+                ),
+            )
+        ),
+    )
+
+    /** CARD_IMPACT Q1: Card-impact carousel question. */
+    private fun buildCardImpactQuestion(ctx: Context) = SurveyQuestion(
+        id = "card_impact",
+        type = "CARD_IMPACT",
+        text = ctx.getString(R.string.survey_q_card_impact),
+        answerOption = AnswerOption.CardImpact,
+    )
+
+    // ── Legacy compatibility shim ─────────────────────────────────────────────
+
+    /**
+     * Flattens all panel questions into a single list for legacy callers.
+     *
+     * @deprecated Prefer [buildPanels] and iterate over [SurveyPanel.questions].
+     */
+    @Deprecated(
+        message = "Use buildPanels() instead",
+        replaceWith = ReplaceWith("buildPanels(won, context, langCode, hasDeck).flatMap { it.questions }"),
+    )
+    fun buildQuestions(
+        won: Boolean,
+        context: Context,
+        langCode: String? = null,
+        hasDeck: Boolean = false,
+    ): List<SurveyQuestion> =
+        buildPanels(won, context, langCode, hasDeck).flatMap { it.questions }
 }

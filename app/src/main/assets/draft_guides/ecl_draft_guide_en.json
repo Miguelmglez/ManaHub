@@ -1,103 +1,2623 @@
 {
-  "set_code": "ecl",
-  "set_name": "Lorwyn Eclipsed",
-  "last_updated": "2026-04-06",
-  "overview": "Lorwyn Eclipsed is a slow, boardstall-heavy format built around five main typal archetypes and the Vivid multi-color mechanic. Success depends on identifying your lane early to maximize typal payoffs.",
+  "metadata": {
+    "set_name": "Lorwyn Eclipsed",
+    "set_code": "ECL",
+    "source_url": "https://draftsim.com/mtg-ecl-draft-guide/",
+    "credit": "Data and analysis provided by Draftsim",
+    "author": "Draftsim Staff",
+    "last_updated": "2026-05-16"
+  },
+  "set_overview": {
+    "summary": "Lorwyn Eclipsed is a slow, board-stall-friendly format dominated by five primary tribal archetypes: GW Kithkin, WU Merfolk, BR Goblins, UR Elementals, and BG Elves. Efficient board wipes are scarce, so most games are decided by executing your archetype's game plan. Fliers thrive on congested boards, and rummaging/looting effects help manage mana flood. BG Elves is the strongest archetype; BR Goblins struggles relative to its peers.",
+    "color_ranking": [
+      "{B}{G} BG Elves",
+      "{W}{U} WU Merfolk",
+      "{G}{W} GW Kithkin",
+      "{U}{R} UR Elementals",
+      "{B}{R} BR Goblins"
+    ],
+    "color_notes": {
+      "Tempo": "Slow format — board stalls are common; aerial pressure and convoke decks break through.",
+      "Removal": "Universal answers like Sunderflock and Ashling's Command are among the format's strongest cards.",
+      "Tribes": "Kindred matters — cards count as their listed creature type for triggered abilities. Tribal payoffs reward mono-type devotion.",
+      "Mana flood": "Manage flood with looters and rummaging effects (Flaring Cinder, mana sinks like Timid Shieldbearer and Safewright Cavalry)."
+    },
+    "key_gameplay_notes": [
+      "\"Lorwyn Eclipsed is the safest Limited set to dump your hand that we've ever seen\" — sweepers are rare, so aggressive positioning is rewarded.",
+      "Fliers punish congested boards; aerial creatures are valuable.",
+      "Identify powerful payoff cards (bombs, tribe-specific uncommons) early, then follow supporting cards as they table.",
+      "Vivid is a strong backup plan — changelings + uncommon vivid payoffs (Kithkeeper, Rime Chill, Shimmercreep, Wildvine Pummeler) keep you flexible.",
+      "Consider 16-land builds in creature-heavy decks running convoke or mana dorks."
+    ]
+  },
   "mechanics": [
     {
       "name": "Vivid",
-      "description": "Cards that scale in power based on the number of colors of mana spent to cast them (X).",
-      "draft_tip": "Vivid cards like Explosive Prodigy are solid even with X=2, but excel in Green-based ramp decks."
+      "summary": "Some Vivid cards function as strong standalone playables; dedicated Vivid decks leverage enablers and uncommon payoffs.",
+      "performance": "Reliable both as splashable standalones and as a dedicated archetype.",
+      "key_examples": [
+        {
+          "name": "Explosive Prodigy",
+          "id": "5515ea5e-ce28-4938-a31e-5e48522a5f93",
+          "scryfall_uri": "https://scryfall.com/card/ecl/136/explosive-prodigy?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature â€” Elemental Sorcerer",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/5/5515ea5e-ce28-4938-a31e-5e48522a5f93.jpg?1767658177",
+            "normal": "https://cards.scryfall.io/normal/front/5/5/5515ea5e-ce28-4938-a31e-5e48522a5f93.jpg?1767658177"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Shinestriker",
+          "id": "214e78f9-5364-49ab-b17e-0c76549c583e",
+          "scryfall_uri": "https://scryfall.com/card/ecl/68/shinestriker?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature â€” Elemental",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/1/214e78f9-5364-49ab-b17e-0c76549c583e.jpg?1767659586",
+            "normal": "https://cards.scryfall.io/normal/front/2/1/214e78f9-5364-49ab-b17e-0c76549c583e.jpg?1767659586"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Prismabasher",
+          "id": "65c057a7-70af-4464-bd8d-1e7e158d1ae7",
+          "scryfall_uri": "https://scryfall.com/card/ecl/188/prismabasher?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Elemental",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/5/65c057a7-70af-4464-bd8d-1e7e158d1ae7.jpg?1767872056",
+            "normal": "https://cards.scryfall.io/normal/front/6/5/65c057a7-70af-4464-bd8d-1e7e158d1ae7.jpg?1767872056"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Shimmerwilds Growth",
+          "id": "c122719c-f0d1-4170-a0d1-d62172df1d21",
+          "scryfall_uri": "https://scryfall.com/card/ecl/194/shimmerwilds-growth?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Enchantment â€” Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c122719c-f0d1-4170-a0d1-d62172df1d21.jpg?1767732869",
+            "normal": "https://cards.scryfall.io/normal/front/c/1/c122719c-f0d1-4170-a0d1-d62172df1d21.jpg?1767732869"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Puca's Eye",
+          "id": "c3a5ca02-3829-4c42-b0dc-98b660f8a8f0",
+          "scryfall_uri": "https://scryfall.com/card/ecl/259/pucas-eye?utm_source=api",
+          "colors": [],
+          "type_line": "Artifact",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3a5ca02-3829-4c42-b0dc-98b660f8a8f0.jpg?1767872205",
+            "normal": "https://cards.scryfall.io/normal/front/c/3/c3a5ca02-3829-4c42-b0dc-98b660f8a8f0.jpg?1767872205"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Foraging Wickermaw",
+          "id": "f524bc08-caeb-4362-b960-eb8e0e4159d0",
+          "scryfall_uri": "https://scryfall.com/card/ecl/256/foraging-wickermaw?utm_source=api",
+          "colors": [],
+          "type_line": "Artifact Creature â€” Scarecrow",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f524bc08-caeb-4362-b960-eb8e0e4159d0.jpg?1767957290",
+            "normal": "https://cards.scryfall.io/normal/front/f/5/f524bc08-caeb-4362-b960-eb8e0e4159d0.jpg?1767957290"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Kithkeeper",
+          "id": "ef29eff7-72be-46e6-9275-0f0a44d29233",
+          "scryfall_uri": "https://scryfall.com/card/ecl/23/kithkeeper?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Elemental",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef29eff7-72be-46e6-9275-0f0a44d29233.jpg?1767871704",
+            "normal": "https://cards.scryfall.io/normal/front/e/f/ef29eff7-72be-46e6-9275-0f0a44d29233.jpg?1767871704"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Rime Chill",
+          "id": "a9a425f4-2103-4f96-88a0-91fe554037d7",
+          "scryfall_uri": "https://scryfall.com/card/ecl/64/rime-chill?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9a425f4-2103-4f96-88a0-91fe554037d7.jpg?1767957062",
+            "normal": "https://cards.scryfall.io/normal/front/a/9/a9a425f4-2103-4f96-88a0-91fe554037d7.jpg?1767957062"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Shimmercreep",
+          "id": "f7c02899-5f0f-4b38-bbbc-fbc8c46419a6",
+          "scryfall_uri": "https://scryfall.com/card/ecl/120/shimmercreep?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Elemental",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7c02899-5f0f-4b38-bbbc-fbc8c46419a6.jpg?1767732711",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f7c02899-5f0f-4b38-bbbc-fbc8c46419a6.jpg?1767732711"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Wildvine Pummeler",
+          "id": "11bad5c7-fe9a-4d89-a531-8d4f03d5a0e4",
+          "scryfall_uri": "https://scryfall.com/card/ecl/203/wildvine-pummeler?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Giant Berserker",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11bad5c7-fe9a-4d89-a531-8d4f03d5a0e4.jpg?1767957300",
+            "normal": "https://cards.scryfall.io/normal/front/1/1/11bad5c7-fe9a-4d89-a531-8d4f03d5a0e4.jpg?1767957300"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        }
+      ]
     },
     {
       "name": "Blight",
-      "description": "A mechanic focusing on -1/-1 counters to punish or weaken opponents.",
-      "draft_tip": "Blight works best as a support mechanic in Goblins or Midrange shells rather than a standalone build-around."
+      "summary": "A support mechanic built around -1/-1 counters rather than a primary strategy. Cards like Cinder Strike and Pyrrhic Strike enable it; Moonlit Lamenter and Gnarlbark Elm are payoffs but require consistent counter outlets.",
+      "performance": "Support layer for BR/BG decks; underperforms without a dedicated outlet density.",
+      "key_examples": [
+        {
+          "name": "Cinder Strike",
+          "id": "6fb6faa4-236c-4cae-9140-0981c44d2392",
+          "scryfall_uri": "https://scryfall.com/card/ecl/131/cinder-strike?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/f/6fb6faa4-236c-4cae-9140-0981c44d2392.jpg?1767957230",
+            "normal": "https://cards.scryfall.io/normal/front/6/f/6fb6faa4-236c-4cae-9140-0981c44d2392.jpg?1767957230"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Pyrrhic Strike",
+          "id": "cce5b16d-07fb-4e64-8ec9-b8b29ba86cff",
+          "scryfall_uri": "https://scryfall.com/card/ecl/30/pyrrhic-strike?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/c/cce5b16d-07fb-4e64-8ec9-b8b29ba86cff.jpg?1767732492",
+            "normal": "https://cards.scryfall.io/normal/front/c/c/cce5b16d-07fb-4e64-8ec9-b8b29ba86cff.jpg?1767732492"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Moonlit Lamenter",
+          "id": "fb8fc509-cff6-470f-abf6-b07f6c3f94e1",
+          "scryfall_uri": "https://scryfall.com/card/ecl/26/moonlit-lamenter?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Treefolk Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/b/fb8fc509-cff6-470f-abf6-b07f6c3f94e1.jpg?1767956948",
+            "normal": "https://cards.scryfall.io/normal/front/f/b/fb8fc509-cff6-470f-abf6-b07f6c3f94e1.jpg?1767956948"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Gnarlbark Elm",
+          "id": "1e9d65b6-22ff-49f2-8b2a-aeaef91088d3",
+          "scryfall_uri": "https://scryfall.com/card/ecl/103/gnarlbark-elm?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Treefolk Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1e9d65b6-22ff-49f2-8b2a-aeaef91088d3.jpg?1767871866",
+            "normal": "https://cards.scryfall.io/normal/front/1/e/1e9d65b6-22ff-49f2-8b2a-aeaef91088d3.jpg?1767871866"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        }
+      ]
+    },
+    {
+      "name": "Changeling",
+      "summary": "Every creature type. Glues tribal archetypes together while staying flexible across multiple decks.",
+      "performance": "Strong universal role-players. The common changeling cycle is especially well-rated.",
+      "key_examples": [
+        {
+          "name": "Omni-Changeling",
+          "id": "f29ce8f9-42a3-43fa-8197-666cc26e2c76",
+          "scryfall_uri": "https://scryfall.com/card/ecl/62/omni-changeling?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/2/f29ce8f9-42a3-43fa-8197-666cc26e2c76.jpg?1767732596",
+            "normal": "https://cards.scryfall.io/normal/front/f/2/f29ce8f9-42a3-43fa-8197-666cc26e2c76.jpg?1767732596"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Sizzling Changeling",
+          "id": "e58f0722-9ad1-4952-9aee-ea8137c58911",
+          "scryfall_uri": "https://scryfall.com/card/ecl/155/sizzling-changeling?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/5/e58f0722-9ad1-4952-9aee-ea8137c58911.jpg?1767658331",
+            "normal": "https://cards.scryfall.io/normal/front/e/5/e58f0722-9ad1-4952-9aee-ea8137c58911.jpg?1767658331"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Flock Impostor",
+          "id": "d32d0336-5140-41f9-bc67-f3d743b9231d",
+          "scryfall_uri": "https://scryfall.com/card/ecl/16/flock-impostor?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/3/d32d0336-5140-41f9-bc67-f3d743b9231d.jpg?1767658337",
+            "normal": "https://cards.scryfall.io/normal/front/d/3/d32d0336-5140-41f9-bc67-f3d743b9231d.jpg?1767658337"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Changeling Wayfinder",
+          "id": "6c6061aa-a4da-4115-85b6-d0aa22f2386c",
+          "scryfall_uri": "https://scryfall.com/card/ecl/1/changeling-wayfinder?utm_source=api",
+          "colors": [],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/c/6c6061aa-a4da-4115-85b6-d0aa22f2386c.jpg?1778833433",
+            "normal": "https://cards.scryfall.io/normal/front/6/c/6c6061aa-a4da-4115-85b6-d0aa22f2386c.jpg?1778833433"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Gangly Stompling",
+          "id": "502000a7-a3c1-4259-aea5-ff01724396a1",
+          "scryfall_uri": "https://scryfall.com/card/ecl/226/gangly-stompling?utm_source=api",
+          "colors": [
+            "G",
+            "R"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/502000a7-a3c1-4259-aea5-ff01724396a1.jpg?1767749620",
+            "normal": "https://cards.scryfall.io/normal/front/5/0/502000a7-a3c1-4259-aea5-ff01724396a1.jpg?1767749620"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Prideful Feastling",
+          "id": "7578cb61-f606-4559-a10a-343a583228ab",
+          "scryfall_uri": "https://scryfall.com/card/ecl/238/prideful-feastling?utm_source=api",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/7578cb61-f606-4559-a10a-343a583228ab.jpg?1767776681",
+            "normal": "https://cards.scryfall.io/normal/front/7/5/7578cb61-f606-4559-a10a-343a583228ab.jpg?1767776681"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Mischievous Sneakling",
+          "id": "3b66fa00-2fa6-4060-9e7f-8e3fde6deb73",
+          "scryfall_uri": "https://scryfall.com/card/ecl/235/mischievous-sneakling?utm_source=api",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/b/3b66fa00-2fa6-4060-9e7f-8e3fde6deb73.jpg?1767957261",
+            "normal": "https://cards.scryfall.io/normal/front/3/b/3b66fa00-2fa6-4060-9e7f-8e3fde6deb73.jpg?1767957261"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Chitinous Graspling",
+          "id": "a9767360-d536-4902-9d2d-1f3474ce89d6",
+          "scryfall_uri": "https://scryfall.com/card/ecl/211/chitinous-graspling?utm_source=api",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9767360-d536-4902-9d2d-1f3474ce89d6.jpg?1767872195",
+            "normal": "https://cards.scryfall.io/normal/front/a/9/a9767360-d536-4902-9d2d-1f3474ce89d6.jpg?1767872195"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Feisty Spikeling",
+          "id": "f69f3a27-ecda-4d27-82fe-612ed57dbb28",
+          "scryfall_uri": "https://scryfall.com/card/ecl/223/feisty-spikeling?utm_source=api",
+          "colors": [
+            "R",
+            "W"
+          ],
+          "type_line": "Creature â€” Shapeshifter",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/6/f69f3a27-ecda-4d27-82fe-612ed57dbb28.jpg?1767957251",
+            "normal": "https://cards.scryfall.io/normal/front/f/6/f69f3a27-ecda-4d27-82fe-612ed57dbb28.jpg?1767957251"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        }
+      ]
+    },
+    {
+      "name": "Kindred",
+      "summary": "Tribal payoffs. Uncommon tribe-specific cards and the rare Commands cycle drive archetype construction. Cards count as their listed creature types for triggered abilities.",
+      "performance": "Defines deck identity. The five Commands are among the format's premier rares.",
+      "key_examples": [
+        {
+          "name": "Trystan's Command",
+          "id": "ba1d99ca-740a-481a-be89-615e40d56d06",
+          "scryfall_uri": "https://scryfall.com/card/ecl/247/trystans-command?utm_source=api",
+          "colors": [
+            "B",
+            "G"
+          ],
+          "type_line": "Kindred Sorcery â€” Elf",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/a/ba1d99ca-740a-481a-be89-615e40d56d06.jpg?1767952293",
+            "normal": "https://cards.scryfall.io/normal/front/b/a/ba1d99ca-740a-481a-be89-615e40d56d06.jpg?1767952293"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Ashling's Command",
+          "id": "fe3a421d-07b6-4b94-b177-aec44c7fe689",
+          "scryfall_uri": "https://scryfall.com/card/ecl/205/ashlings-command?utm_source=api",
+          "colors": [
+            "R",
+            "U"
+          ],
+          "type_line": "Kindred Instant â€” Elemental",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe3a421d-07b6-4b94-b177-aec44c7fe689.jpg?1759144840",
+            "normal": "https://cards.scryfall.io/normal/front/f/e/fe3a421d-07b6-4b94-b177-aec44c7fe689.jpg?1759144840"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Brigid's Command",
+          "id": "cf034777-3da7-4d5c-9213-5e9d235c315a",
+          "scryfall_uri": "https://scryfall.com/card/ecl/208/brigids-command?utm_source=api",
+          "colors": [
+            "G",
+            "W"
+          ],
+          "type_line": "Kindred Sorcery â€” Kithkin",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf034777-3da7-4d5c-9213-5e9d235c315a.jpg?1767862610",
+            "normal": "https://cards.scryfall.io/normal/front/c/f/cf034777-3da7-4d5c-9213-5e9d235c315a.jpg?1767862610"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Sygg's Command",
+          "id": "8bc13fc2-e254-4db5-ad4d-f92711a1a6ca",
+          "scryfall_uri": "https://scryfall.com/card/ecl/244/syggs-command?utm_source=api",
+          "colors": [
+            "U",
+            "W"
+          ],
+          "type_line": "Kindred Sorcery â€” Merfolk",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/b/8bc13fc2-e254-4db5-ad4d-f92711a1a6ca.jpg?1767862721",
+            "normal": "https://cards.scryfall.io/normal/front/8/b/8bc13fc2-e254-4db5-ad4d-f92711a1a6ca.jpg?1767862721"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Grub's Command",
+          "id": "73013908-feff-495a-a62e-1e19548ffe6f",
+          "scryfall_uri": "https://scryfall.com/card/ecl/228/grubs-command?utm_source=api",
+          "colors": [
+            "B",
+            "R"
+          ],
+          "type_line": "Kindred Sorcery â€” Goblin",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73013908-feff-495a-a62e-1e19548ffe6f.jpg?1767662497",
+            "normal": "https://cards.scryfall.io/normal/front/7/3/73013908-feff-495a-a62e-1e19548ffe6f.jpg?1767662497"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        }
+      ]
     },
     {
       "name": "Convoke",
-      "description": "Tap creatures to help pay for spells. Centered in Merfolk (WU).",
-      "draft_tip": "Highly effective with vigilance creatures and go-wide strategies."
+      "summary": "Synergises with wide creature strategies — particularly Merfolk — and stealth-supports elemental \"4 or more\" mechanics.",
+      "performance": "Powerful enabler in go-wide and tapper-heavy decks.",
+      "key_examples": [
+        {
+          "name": "Temporal Cleansing",
+          "id": "50ee7315-ec53-43d2-841e-8ec192b850f1",
+          "scryfall_uri": "https://scryfall.com/card/ecl/78/temporal-cleansing?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50ee7315-ec53-43d2-841e-8ec192b850f1.jpg?1767732550",
+            "normal": "https://cards.scryfall.io/normal/front/5/0/50ee7315-ec53-43d2-841e-8ec192b850f1.jpg?1767732550"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Unexpected Assistance",
+          "id": "7b540a5f-7f1b-421a-864f-5af469556fc6",
+          "scryfall_uri": "https://scryfall.com/card/ecl/80/unexpected-assistance?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7b540a5f-7f1b-421a-864f-5af469556fc6.jpg?1765451670",
+            "normal": "https://cards.scryfall.io/normal/front/7/b/7b540a5f-7f1b-421a-864f-5af469556fc6.jpg?1765451670"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        }
+      ]
     },
     {
-      "name": "Eclipsed",
-      "description": "A cycle of hybrid-mana creatures that dig for cards of their type or specific lands.",
-      "draft_tip": "These are premium uncommons. Take them early to solidify your position in an archetype."
+      "name": "Behold",
+      "summary": "Reveal-a-creature-from-hand effects. The uncommon cycle (including Soulbright Seeker) provides archetype-specific value; rare Champions cards are bombs.",
+      "performance": "Builds toward archetype payoffs; Champion rares are top-tier.",
+      "key_examples": [
+        {
+          "name": "Champions of the Perfect",
+          "id": "4f359211-8be5-4818-b73c-14f24b7ddb21",
+          "scryfall_uri": "https://scryfall.com/card/ecl/171/champions-of-the-perfect?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Elf Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f359211-8be5-4818-b73c-14f24b7ddb21.jpg?1767658362",
+            "normal": "https://cards.scryfall.io/normal/front/4/f/4f359211-8be5-4818-b73c-14f24b7ddb21.jpg?1767658362"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Champions of the Shoal",
+          "id": "e1acdd9c-4a6d-4373-950c-f5539b54679f",
+          "scryfall_uri": "https://scryfall.com/card/ecl/46/champions-of-the-shoal?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature â€” Merfolk Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e1acdd9c-4a6d-4373-950c-f5539b54679f.jpg?1767951924",
+            "normal": "https://cards.scryfall.io/normal/front/e/1/e1acdd9c-4a6d-4373-950c-f5539b54679f.jpg?1767951924"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Soulbright Seeker",
+          "id": "895ac890-608a-47de-8bc8-9337fd2064e8",
+          "scryfall_uri": "https://scryfall.com/card/ecl/157/soulbright-seeker?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature â€” Elemental Sorcerer",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/895ac890-608a-47de-8bc8-9337fd2064e8.jpg?1767957180",
+            "normal": "https://cards.scryfall.io/normal/front/8/9/895ac890-608a-47de-8bc8-9337fd2064e8.jpg?1767957180"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        }
+      ]
+    },
+    {
+      "name": "Double-Faced Cards & Evokementals",
+      "summary": "Five legendary DFCs (one per archetype) and the Evokementals cycle. DFC quality varies by deck context; Evokementals offer modal value depending on available mana.",
+      "performance": "DFCs that match your archetype are bombs; off-archetype copies are mediocre.",
+      "key_examples": [
+        {
+          "name": "Brigid, Clachan's Heart // Brigid, Doun's Mind",
+          "id": "cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8",
+          "scryfall_uri": "https://scryfall.com/card/ecl/7/brigid-clachans-heart-brigid-douns-mind?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Legendary Creature â€” Kithkin Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/back/c/b/cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8.jpg?1767887768",
+            "normal": "https://cards.scryfall.io/normal/back/c/b/cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8.jpg?1767887768"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Sygg, Wanderwine Wisdom // Sygg, Wanderbrine Shield",
+          "id": "70adc870-f0db-4d4b-863b-673c2c258751",
+          "scryfall_uri": "https://scryfall.com/card/ecl/76/sygg-wanderwine-wisdom-sygg-wanderbrine-shield?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Legendary Creature â€” Merfolk Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/back/7/0/70adc870-f0db-4d4b-863b-673c2c258751.jpg?1759144840",
+            "normal": "https://cards.scryfall.io/normal/back/7/0/70adc870-f0db-4d4b-863b-673c2c258751.jpg?1759144840"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Grub, Storied Matriarch // Grub, Notorious Auntie",
+          "id": "1f51adf8-8234-4dae-aedf-7633310d5111",
+          "scryfall_uri": "https://scryfall.com/card/ecl/105/grub-storied-matriarch-grub-notorious-auntie?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Legendary Creature â€” Goblin Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1767734188",
+            "normal": "https://cards.scryfall.io/normal/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1767734188"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Ashling, Rekindled // Ashling, Rimebound",
+          "id": "7d7faefe-9c0d-45b6-8ea4-5fa666762a2c",
+          "scryfall_uri": "https://scryfall.com/card/ecl/124/ashling-rekindled-ashling-rimebound?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Legendary Creature â€” Elemental Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/back/7/d/7d7faefe-9c0d-45b6-8ea4-5fa666762a2c.jpg?1759144841",
+            "normal": "https://cards.scryfall.io/normal/back/7/d/7d7faefe-9c0d-45b6-8ea4-5fa666762a2c.jpg?1759144841"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Trystan, Callous Cultivator // Trystan, Penitent Culler",
+          "id": "2094f9b6-ce84-47d9-8819-81db14ba483f",
+          "scryfall_uri": "https://scryfall.com/card/ecl/199/trystan-callous-cultivator-trystan-penitent-culler?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Legendary Creature â€” Elf Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/back/2/0/2094f9b6-ce84-47d9-8819-81db14ba483f.jpg?1767658448",
+            "normal": "https://cards.scryfall.io/normal/back/2/0/2094f9b6-ce84-47d9-8819-81db14ba483f.jpg?1767658448"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        },
+        {
+          "name": "Eirdu, Carrier of Dawn // Isilu, Carrier of Twilight",
+          "id": "b2d9d5ca-7e15-437a-bdfc-5972b42148fe",
+          "scryfall_uri": "https://scryfall.com/card/ecl/13/eirdu-carrier-of-dawn-isilu-carrier-of-twilight?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Legendary Creature â€” Elemental God",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/back/b/2/b2d9d5ca-7e15-437a-bdfc-5972b42148fe.jpg?1759144812",
+            "normal": "https://cards.scryfall.io/normal/back/b/2/b2d9d5ca-7e15-437a-bdfc-5972b42148fe.jpg?1759144812"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "mythic"
+        },
+        {
+          "name": "Catharsis",
+          "id": "affb4500-2704-49fc-bbb4-02ed4bfb3b76",
+          "scryfall_uri": "https://scryfall.com/card/ecl/209/catharsis?utm_source=api",
+          "colors": [
+            "R",
+            "W"
+          ],
+          "type_line": "Creature â€” Elemental Incarnation",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/f/affb4500-2704-49fc-bbb4-02ed4bfb3b76.jpg?1767952383",
+            "normal": "https://cards.scryfall.io/normal/front/a/f/affb4500-2704-49fc-bbb4-02ed4bfb3b76.jpg?1767952383"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "mythic"
+        },
+        {
+          "name": "Deceit",
+          "id": "bd82c9e4-9871-4e6d-b691-ee00b4b9a3c6",
+          "scryfall_uri": "https://scryfall.com/card/ecl/212/deceit?utm_source=api",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Creature â€” Elemental Incarnation",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/d/bd82c9e4-9871-4e6d-b691-ee00b4b9a3c6.jpg?1759144842",
+            "normal": "https://cards.scryfall.io/normal/front/b/d/bd82c9e4-9871-4e6d-b691-ee00b4b9a3c6.jpg?1759144842"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "mythic"
+        },
+        {
+          "name": "Emptiness",
+          "id": "c6409eca-bef6-4f3a-8bbb-d69ec5dbfc13",
+          "scryfall_uri": "https://scryfall.com/card/ecl/222/emptiness?utm_source=api",
+          "colors": [
+            "B",
+            "W"
+          ],
+          "type_line": "Creature â€” Elemental Incarnation",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/6/c6409eca-bef6-4f3a-8bbb-d69ec5dbfc13.jpg?1759144841",
+            "normal": "https://cards.scryfall.io/normal/front/c/6/c6409eca-bef6-4f3a-8bbb-d69ec5dbfc13.jpg?1759144841"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "mythic"
+        },
+        {
+          "name": "Vibrance",
+          "id": "b9f71c3b-0840-475f-9c17-fdacbc7f3213",
+          "scryfall_uri": "https://scryfall.com/card/ecl/249/vibrance?utm_source=api",
+          "colors": [
+            "G",
+            "R"
+          ],
+          "type_line": "Creature â€” Elemental Incarnation",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/9/b9f71c3b-0840-475f-9c17-fdacbc7f3213.jpg?1767658560",
+            "normal": "https://cards.scryfall.io/normal/front/b/9/b9f71c3b-0840-475f-9c17-fdacbc7f3213.jpg?1767658560"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "mythic"
+        },
+        {
+          "name": "Wistfulness",
+          "id": "db9aa986-ac2a-44bb-a88b-04c5d0d502b2",
+          "scryfall_uri": "https://scryfall.com/card/ecl/252/wistfulness?utm_source=api",
+          "colors": [
+            "G",
+            "U"
+          ],
+          "type_line": "Creature â€” Elemental Incarnation",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/b/db9aa986-ac2a-44bb-a88b-04c5d0d502b2.jpg?1767749668",
+            "normal": "https://cards.scryfall.io/normal/front/d/b/db9aa986-ac2a-44bb-a88b-04c5d0d502b2.jpg?1767749668"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "mythic"
+        }
+      ]
     }
   ],
-  "archetypes": [
-    {
-      "colors": "BG",
-      "name": "Elves / Graveyard",
-      "tier": "S",
-      "description": "The best deck in the format. Uses mill and recursion to outvalue opponents.",
-      "strategy": "Use self-mill to enable Morcant's Eyes and Gloom Ripper while overwhelming with Elf tokens.",
-      "key_commons": ["Midnight Tilling", "Blight Rot", "Gangly Stompling"],
-      "key_uncommons": ["Eclipsed Elf", "Morcant's Eyes", "Morcant's Loyalist"]
-    },
-    {
-      "colors": "GW",
-      "name": "Kithkin / Aggro",
-      "tier": "A",
-      "description": "Straightforward aggressive deck with strong board presence.",
-      "strategy": "Curve out early and use anthems or combat tricks to push through damage.",
-      "key_commons": ["Wary Farmer", "Thoughtweft Lieutenant", "Unexpected Assistance"],
-      "key_uncommons": ["Eclipsed Kithkin", "Thoughtweft Imbuer", "Kinsbaile Aspirant"]
-    },
-    {
-      "colors": "WU",
-      "name": "Merfolk / Convoke",
-      "tier": "A",
-      "description": "Go-wide tempo deck using Convoke and tap-synergies.",
-      "strategy": "Develop a board of Merfolk to cast expensive Convoke spells like Temporal Cleansing for cheap.",
-      "key_commons": ["Merrow Skyswimmer", "Temporal Cleansing", "Wanderwine Farewell"],
-      "key_uncommons": ["Eclipsed Merrow", "Silvergill Mentor", "Deepchannel Duelist"]
-    },
-    {
-      "colors": "URx",
-      "name": "Elementals / Big Spells",
-      "tier": "A",
-      "description": "Late-game deck that rewards casting high-mana spells and splashing colors.",
-      "strategy": "Use Evoke for early value and stabilize for a massive late-game finish with Elementals.",
-      "key_commons": ["Flaring Cinder", "Summit Sentinel", "Cinder Strike"],
-      "key_uncommons": ["Eclipsed Flamekin", "Flamebraider", "Rimekin Recluse"]
-    },
-    {
-      "colors": "Gx",
-      "name": "Vivid / Ramp",
-      "tier": "A",
-      "description": "5-color control deck utilizing the best cards in the draft via fixing.",
-      "strategy": "Prioritize Shimmerwilds Growth and Noggle Robber to enable your high-impact Vivid payoffs.",
-      "key_commons": ["Wildvine Pummeler", "Foraging Wickermaw", "Great Forest Druid"],
-      "key_uncommons": ["Explosive Prodigy", "Shinestriker", "Puca's Eye"]
-    },
-    {
-      "colors": "BR",
-      "name": "Goblins / Blight",
-      "tier": "B",
-      "description": "Aggressive deck using -1/-1 counters and Goblin synergies.",
-      "strategy": "Look for Eclipsed Boggart and Boggart Mischief to keep the pressure high.",
-      "key_commons": ["Flame-Chain Mauler", "Blight Rot", "Mudbutton Cursetosser"],
-      "key_uncommons": ["Eclipsed Boggart", "Boggart Mischief", "Mudbutton Cursetosser"]
-    }
-  ],
-  "top_commons": {
-    "W": ["Merrow Skyswimmer", "Unexpected Assistance", "Wary Farmer"],
-    "U": ["Temporal Cleansing", "Wistfulness", "Summit Sentinel"],
-    "B": ["Blight Rot", "Midnight Tilling", "Moonlit Lamenter"],
-    "R": ["Cinder Strike", "Flaring Cinder", "Flame-Chain Mauler"],
-    "G": ["Gangly Stompling", "Wildvine Pummeler", "Foraging Wickermaw"]
+  "archetype_tier_list": {
+    "tier_1": [
+      {
+        "colors": "{B}{G}",
+        "name": "BG Elves",
+        "tier": "Tier 1 — Best Deck",
+        "strategy": "Self-mill enables your payoffs. The deepest common creature base in the format. Combine -1/-1 counter synergies with mill payoffs for a consistent value engine.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Morcant's Eyes",
+            "id": "a730b254-ff7c-4f89-a559-b44ad7fd6c6c",
+            "scryfall_uri": "https://scryfall.com/card/ecl/185/morcants-eyes?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Kindred Enchantment â€” Elf",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/7/a730b254-ff7c-4f89-a559-b44ad7fd6c6c.jpg?1767732849",
+              "normal": "https://cards.scryfall.io/normal/front/a/7/a730b254-ff7c-4f89-a559-b44ad7fd6c6c.jpg?1767732849"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Midnight Tilling",
+            "id": "c5112bbf-752c-41e7-9c61-4c81e6a77463",
+            "scryfall_uri": "https://scryfall.com/card/ecl/182/midnight-tilling?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/5/c5112bbf-752c-41e7-9c61-4c81e6a77463.jpg?1767732843",
+              "normal": "https://cards.scryfall.io/normal/front/c/5/c5112bbf-752c-41e7-9c61-4c81e6a77463.jpg?1767732843"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Gloom Ripper",
+            "id": "e9ee5d4f-05d1-4e3a-b8d6-f22d0fddedf7",
+            "scryfall_uri": "https://scryfall.com/card/ecl/102/gloom-ripper?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature â€” Elf Assassin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e9ee5d4f-05d1-4e3a-b8d6-f22d0fddedf7.jpg?1767952022",
+              "normal": "https://cards.scryfall.io/normal/front/e/9/e9ee5d4f-05d1-4e3a-b8d6-f22d0fddedf7.jpg?1767952022"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          },
+          {
+            "name": "Dawnhand Eulogist",
+            "id": "75a97f69-f3dc-4d33-8008-c1f1a7c15a2f",
+            "scryfall_uri": "https://scryfall.com/card/ecl/99/dawnhand-eulogist?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature â€” Elf Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/75a97f69-f3dc-4d33-8008-c1f1a7c15a2f.jpg?1767732686",
+              "normal": "https://cards.scryfall.io/normal/front/7/5/75a97f69-f3dc-4d33-8008-c1f1a7c15a2f.jpg?1767732686"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Scarblade Scout",
+            "id": "c2412fea-4591-4345-913f-edc2da9ad975",
+            "scryfall_uri": "https://scryfall.com/card/ecl/118/scarblade-scout?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature â€” Elf Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2412fea-4591-4345-913f-edc2da9ad975.jpg?1767871946",
+              "normal": "https://cards.scryfall.io/normal/front/c/2/c2412fea-4591-4345-913f-edc2da9ad975.jpg?1767871946"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Lys Alana Informant",
+            "id": "a79649c4-559e-4306-a102-5fd8750629c7",
+            "scryfall_uri": "https://scryfall.com/card/ecl/181/lys-alana-informant?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature â€” Elf Scout",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/7/a79649c4-559e-4306-a102-5fd8750629c7.jpg?1767658380",
+              "normal": "https://cards.scryfall.io/normal/front/a/7/a79649c4-559e-4306-a102-5fd8750629c7.jpg?1767658380"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Safewright Cavalry",
+            "id": "f7de412a-9731-4bfc-8fbc-c95988a3dd70",
+            "scryfall_uri": "https://scryfall.com/card/ecl/191/safewright-cavalry?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature â€” Elf Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7de412a-9731-4bfc-8fbc-c95988a3dd70.jpg?1767957270",
+              "normal": "https://cards.scryfall.io/normal/front/f/7/f7de412a-9731-4bfc-8fbc-c95988a3dd70.jpg?1767957270"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Stoic Grove-Guide",
+            "id": "3d5a3e25-c17a-47b1-a36d-d24d50e5bab3",
+            "scryfall_uri": "https://scryfall.com/card/ecl/243/stoic-grove-guide?utm_source=api",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature â€” Elf Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d5a3e25-c17a-47b1-a36d-d24d50e5bab3.jpg?1767984401",
+              "normal": "https://cards.scryfall.io/normal/front/3/d/3d5a3e25-c17a-47b1-a36d-d24d50e5bab3.jpg?1767984401"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Champion of the Weird",
+            "id": "e600dd01-65ac-489c-a52a-decbc3a9a4f3",
+            "scryfall_uri": "https://scryfall.com/card/ecl/95/champion-of-the-weird?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature â€” Goblin Berserker",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e600dd01-65ac-489c-a52a-decbc3a9a4f3.jpg?1767659622",
+              "normal": "https://cards.scryfall.io/normal/front/e/6/e600dd01-65ac-489c-a52a-decbc3a9a4f3.jpg?1767659622"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          },
+          {
+            "name": "Reaping Willow",
+            "id": "97c33cc2-3573-410a-908b-c0392fff524b",
+            "scryfall_uri": "https://scryfall.com/card/ecl/240/reaping-willow?utm_source=api",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature â€” Treefolk Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/9/7/97c33cc2-3573-410a-908b-c0392fff524b.jpg?1767952397",
+              "normal": "https://cards.scryfall.io/normal/front/9/7/97c33cc2-3573-410a-908b-c0392fff524b.jpg?1767952397"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Trystan, Callous Cultivator // Trystan, Penitent Culler",
+            "id": "2094f9b6-ce84-47d9-8819-81db14ba483f",
+            "scryfall_uri": "https://scryfall.com/card/ecl/199/trystan-callous-cultivator-trystan-penitent-culler?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Legendary Creature â€” Elf Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/back/2/0/2094f9b6-ce84-47d9-8819-81db14ba483f.jpg?1767658448",
+              "normal": "https://cards.scryfall.io/normal/back/2/0/2094f9b6-ce84-47d9-8819-81db14ba483f.jpg?1767658448"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          }
+        ]
+      }
+    ],
+    "tier_2": [
+      {
+        "colors": "{G}{W}",
+        "name": "GW Kithkin",
+        "tier": "Tier 2 — Strong Aggressive Midrange",
+        "strategy": "Aggressive midrange built on tribal payoffs. Changelings provide flexibility while keeping creature-type counts high.",
+        "difficulty": "Easy",
+        "key_cards": [
+          {
+            "name": "Brigid's Command",
+            "id": "cf034777-3da7-4d5c-9213-5e9d235c315a",
+            "scryfall_uri": "https://scryfall.com/card/ecl/208/brigids-command?utm_source=api",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Kindred Sorcery â€” Kithkin",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf034777-3da7-4d5c-9213-5e9d235c315a.jpg?1767862610",
+              "normal": "https://cards.scryfall.io/normal/front/c/f/cf034777-3da7-4d5c-9213-5e9d235c315a.jpg?1767862610"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          },
+          {
+            "name": "Kinsbaile Aspirant",
+            "id": "56dfdab1-ea3f-4663-a855-a9e72505f85e",
+            "scryfall_uri": "https://scryfall.com/card/ecl/21/kinsbaile-aspirant?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature â€” Kithkin Citizen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/6/56dfdab1-ea3f-4663-a855-a9e72505f85e.jpg?1767732481",
+              "normal": "https://cards.scryfall.io/normal/front/5/6/56dfdab1-ea3f-4663-a855-a9e72505f85e.jpg?1767732481"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Champions of the Perfect",
+            "id": "4f359211-8be5-4818-b73c-14f24b7ddb21",
+            "scryfall_uri": "https://scryfall.com/card/ecl/171/champions-of-the-perfect?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature â€” Elf Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f359211-8be5-4818-b73c-14f24b7ddb21.jpg?1767658362",
+              "normal": "https://cards.scryfall.io/normal/front/4/f/4f359211-8be5-4818-b73c-14f24b7ddb21.jpg?1767658362"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          },
+          {
+            "name": "Wary Farmer",
+            "id": "22d20c0d-176d-49c9-aa0b-2c5778548cc5",
+            "scryfall_uri": "https://scryfall.com/card/ecl/251/wary-farmer?utm_source=api",
+            "colors": [
+              "G",
+              "W"
+            ],
+            "type_line": "Creature â€” Kithkin Citizen",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/2/2/22d20c0d-176d-49c9-aa0b-2c5778548cc5.jpg?1767749680",
+              "normal": "https://cards.scryfall.io/normal/front/2/2/22d20c0d-176d-49c9-aa0b-2c5778548cc5.jpg?1767749680"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Prideful Feastling",
+            "id": "7578cb61-f606-4559-a10a-343a583228ab",
+            "scryfall_uri": "https://scryfall.com/card/ecl/238/prideful-feastling?utm_source=api",
+            "colors": [
+              "B",
+              "W"
+            ],
+            "type_line": "Creature â€” Shapeshifter",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/7578cb61-f606-4559-a10a-343a583228ab.jpg?1767776681",
+              "normal": "https://cards.scryfall.io/normal/front/7/5/7578cb61-f606-4559-a10a-343a583228ab.jpg?1767776681"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Mistmeadow Council",
+            "id": "d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f",
+            "scryfall_uri": "https://scryfall.com/card/ecl/183/mistmeadow-council?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature â€” Kithkin Advisor",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/d/4/d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f.jpg?1767872109",
+              "normal": "https://cards.scryfall.io/normal/front/d/4/d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f.jpg?1767872109"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Wanderbrine Preacher",
+            "id": "3fc3f5f2-5a83-4358-8f23-42f26f345140",
+            "scryfall_uri": "https://scryfall.com/card/ecl/41/wanderbrine-preacher?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature â€” Merfolk Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/f/3fc3f5f2-5a83-4358-8f23-42f26f345140.jpg?1767732504",
+              "normal": "https://cards.scryfall.io/normal/front/3/f/3fc3f5f2-5a83-4358-8f23-42f26f345140.jpg?1767732504"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Brigid, Clachan's Heart // Brigid, Doun's Mind",
+            "id": "cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8",
+            "scryfall_uri": "https://scryfall.com/card/ecl/7/brigid-clachans-heart-brigid-douns-mind?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Legendary Creature â€” Kithkin Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/back/c/b/cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8.jpg?1767887768",
+              "normal": "https://cards.scryfall.io/normal/back/c/b/cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8.jpg?1767887768"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          }
+        ]
+      },
+      {
+        "colors": "{W}{U}",
+        "name": "WU Merfolk",
+        "tier": "Tier 2 — Tempo / Wide",
+        "strategy": "Aggressive tempo deck leaning on convoke and wide creature development. Tappers and creatures that benefit from tapping turn on efficient spells.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Merrow Skyswimmer",
+            "id": "075b419a-fd44-4a9a-8c40-474562b7e11a",
+            "scryfall_uri": "https://scryfall.com/card/ecl/234/merrow-skyswimmer?utm_source=api",
+            "colors": [
+              "U",
+              "W"
+            ],
+            "type_line": "Creature â€” Merfolk Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/7/075b419a-fd44-4a9a-8c40-474562b7e11a.jpg?1767872219",
+              "normal": "https://cards.scryfall.io/normal/front/0/7/075b419a-fd44-4a9a-8c40-474562b7e11a.jpg?1767872219"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Silvergill Mentor",
+            "id": "e6e37fe8-459c-4992-8ae9-f782cddab2fe",
+            "scryfall_uri": "https://scryfall.com/card/ecl/69/silvergill-mentor?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature â€” Merfolk Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e6e37fe8-459c-4992-8ae9-f782cddab2fe.jpg?1768338090",
+              "normal": "https://cards.scryfall.io/normal/front/e/6/e6e37fe8-459c-4992-8ae9-f782cddab2fe.jpg?1768338090"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Champions of the Shoal",
+            "id": "e1acdd9c-4a6d-4373-950c-f5539b54679f",
+            "scryfall_uri": "https://scryfall.com/card/ecl/46/champions-of-the-shoal?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature â€” Merfolk Soldier",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e1acdd9c-4a6d-4373-950c-f5539b54679f.jpg?1767951924",
+              "normal": "https://cards.scryfall.io/normal/front/e/1/e1acdd9c-4a6d-4373-950c-f5539b54679f.jpg?1767951924"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          },
+          {
+            "name": "Sygg, Wanderwine Wisdom // Sygg, Wanderbrine Shield",
+            "id": "70adc870-f0db-4d4b-863b-673c2c258751",
+            "scryfall_uri": "https://scryfall.com/card/ecl/76/sygg-wanderwine-wisdom-sygg-wanderbrine-shield?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Legendary Creature â€” Merfolk Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/back/7/0/70adc870-f0db-4d4b-863b-673c2c258751.jpg?1759144840",
+              "normal": "https://cards.scryfall.io/normal/back/7/0/70adc870-f0db-4d4b-863b-673c2c258751.jpg?1759144840"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          },
+          {
+            "name": "Gravelgill Scoundrel",
+            "id": "320bc30c-7a8a-411a-9f36-9c69126e131b",
+            "scryfall_uri": "https://scryfall.com/card/ecl/53/gravelgill-scoundrel?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Creature â€” Merfolk Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/320bc30c-7a8a-411a-9f36-9c69126e131b.jpg?1767871759",
+              "normal": "https://cards.scryfall.io/normal/front/3/2/320bc30c-7a8a-411a-9f36-9c69126e131b.jpg?1767871759"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Wanderbrine Preacher",
+            "id": "3fc3f5f2-5a83-4358-8f23-42f26f345140",
+            "scryfall_uri": "https://scryfall.com/card/ecl/41/wanderbrine-preacher?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature â€” Merfolk Cleric",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/f/3fc3f5f2-5a83-4358-8f23-42f26f345140.jpg?1767732504",
+              "normal": "https://cards.scryfall.io/normal/front/3/f/3fc3f5f2-5a83-4358-8f23-42f26f345140.jpg?1767732504"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Temporal Cleansing",
+            "id": "50ee7315-ec53-43d2-841e-8ec192b850f1",
+            "scryfall_uri": "https://scryfall.com/card/ecl/78/temporal-cleansing?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Sorcery",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50ee7315-ec53-43d2-841e-8ec192b850f1.jpg?1767732550",
+              "normal": "https://cards.scryfall.io/normal/front/5/0/50ee7315-ec53-43d2-841e-8ec192b850f1.jpg?1767732550"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Unexpected Assistance",
+            "id": "7b540a5f-7f1b-421a-864f-5af469556fc6",
+            "scryfall_uri": "https://scryfall.com/card/ecl/80/unexpected-assistance?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7b540a5f-7f1b-421a-864f-5af469556fc6.jpg?1765451670",
+              "normal": "https://cards.scryfall.io/normal/front/7/b/7b540a5f-7f1b-421a-864f-5af469556fc6.jpg?1765451670"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          }
+        ]
+      }
+    ],
+    "tier_3": [
+      {
+        "colors": "{U}{R}",
+        "name": "UR Elementals",
+        "tier": "Tier 3 — Tempo Tribal",
+        "strategy": "Tempo-focused, leveraging elemental count and \"4 or more\" payoffs. Looters like Flaring Cinder smooth out flood; convoke supports a wide board.",
+        "difficulty": "Medium",
+        "key_cards": [
+          {
+            "name": "Flaring Cinder",
+            "id": "0691a1a9-18e7-44b7-9a34-764b1ab45a76",
+            "scryfall_uri": "https://scryfall.com/card/ecl/225/flaring-cinder?utm_source=api",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature â€” Elemental Sorcerer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/0691a1a9-18e7-44b7-9a34-764b1ab45a76.jpg?1767862636",
+              "normal": "https://cards.scryfall.io/normal/front/0/6/0691a1a9-18e7-44b7-9a34-764b1ab45a76.jpg?1767862636"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Soulbright Seeker",
+            "id": "895ac890-608a-47de-8bc8-9337fd2064e8",
+            "scryfall_uri": "https://scryfall.com/card/ecl/157/soulbright-seeker?utm_source=api",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Creature â€” Elemental Sorcerer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/8/9/895ac890-608a-47de-8bc8-9337fd2064e8.jpg?1767957180",
+              "normal": "https://cards.scryfall.io/normal/front/8/9/895ac890-608a-47de-8bc8-9337fd2064e8.jpg?1767957180"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Ashling, Rekindled // Ashling, Rimebound",
+            "id": "7d7faefe-9c0d-45b6-8ea4-5fa666762a2c",
+            "scryfall_uri": "https://scryfall.com/card/ecl/124/ashling-rekindled-ashling-rimebound?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Legendary Creature â€” Elemental Wizard",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/back/7/d/7d7faefe-9c0d-45b6-8ea4-5fa666762a2c.jpg?1759144841",
+              "normal": "https://cards.scryfall.io/normal/back/7/d/7d7faefe-9c0d-45b6-8ea4-5fa666762a2c.jpg?1759144841"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          }
+        ]
+      },
+      {
+        "colors": "Gx",
+        "name": "Gx Vivid",
+        "tier": "Tier 3 — Three-Color Backup",
+        "strategy": "When primary archetypes are closed, pivot to a green-based Vivid deck using changelings to enable uncommon Vivid payoffs.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Kithkeeper",
+            "id": "ef29eff7-72be-46e6-9275-0f0a44d29233",
+            "scryfall_uri": "https://scryfall.com/card/ecl/23/kithkeeper?utm_source=api",
+            "colors": [
+              "W"
+            ],
+            "type_line": "Creature â€” Elemental",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/e/f/ef29eff7-72be-46e6-9275-0f0a44d29233.jpg?1767871704",
+              "normal": "https://cards.scryfall.io/normal/front/e/f/ef29eff7-72be-46e6-9275-0f0a44d29233.jpg?1767871704"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Rime Chill",
+            "id": "a9a425f4-2103-4f96-88a0-91fe554037d7",
+            "scryfall_uri": "https://scryfall.com/card/ecl/64/rime-chill?utm_source=api",
+            "colors": [
+              "U"
+            ],
+            "type_line": "Instant",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9a425f4-2103-4f96-88a0-91fe554037d7.jpg?1767957062",
+              "normal": "https://cards.scryfall.io/normal/front/a/9/a9a425f4-2103-4f96-88a0-91fe554037d7.jpg?1767957062"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Shimmercreep",
+            "id": "f7c02899-5f0f-4b38-bbbc-fbc8c46419a6",
+            "scryfall_uri": "https://scryfall.com/card/ecl/120/shimmercreep?utm_source=api",
+            "colors": [
+              "B"
+            ],
+            "type_line": "Creature â€” Elemental",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7c02899-5f0f-4b38-bbbc-fbc8c46419a6.jpg?1767732711",
+              "normal": "https://cards.scryfall.io/normal/front/f/7/f7c02899-5f0f-4b38-bbbc-fbc8c46419a6.jpg?1767732711"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Wildvine Pummeler",
+            "id": "11bad5c7-fe9a-4d89-a531-8d4f03d5a0e4",
+            "scryfall_uri": "https://scryfall.com/card/ecl/203/wildvine-pummeler?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Creature â€” Giant Berserker",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11bad5c7-fe9a-4d89-a531-8d4f03d5a0e4.jpg?1767957300",
+              "normal": "https://cards.scryfall.io/normal/front/1/1/11bad5c7-fe9a-4d89-a531-8d4f03d5a0e4.jpg?1767957300"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Shimmerwilds Growth",
+            "id": "c122719c-f0d1-4170-a0d1-d62172df1d21",
+            "scryfall_uri": "https://scryfall.com/card/ecl/194/shimmerwilds-growth?utm_source=api",
+            "colors": [
+              "G"
+            ],
+            "type_line": "Enchantment â€” Aura",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/1/c122719c-f0d1-4170-a0d1-d62172df1d21.jpg?1767732869",
+              "normal": "https://cards.scryfall.io/normal/front/c/1/c122719c-f0d1-4170-a0d1-d62172df1d21.jpg?1767732869"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Puca's Eye",
+            "id": "c3a5ca02-3829-4c42-b0dc-98b660f8a8f0",
+            "scryfall_uri": "https://scryfall.com/card/ecl/259/pucas-eye?utm_source=api",
+            "colors": [],
+            "type_line": "Artifact",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/c/3/c3a5ca02-3829-4c42-b0dc-98b660f8a8f0.jpg?1767872205",
+              "normal": "https://cards.scryfall.io/normal/front/c/3/c3a5ca02-3829-4c42-b0dc-98b660f8a8f0.jpg?1767872205"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          },
+          {
+            "name": "Foraging Wickermaw",
+            "id": "f524bc08-caeb-4362-b960-eb8e0e4159d0",
+            "scryfall_uri": "https://scryfall.com/card/ecl/256/foraging-wickermaw?utm_source=api",
+            "colors": [],
+            "type_line": "Artifact Creature â€” Scarecrow",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/f/5/f524bc08-caeb-4362-b960-eb8e0e4159d0.jpg?1767957290",
+              "normal": "https://cards.scryfall.io/normal/front/f/5/f524bc08-caeb-4362-b960-eb8e0e4159d0.jpg?1767957290"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          }
+        ]
+      }
+    ],
+    "tier_4": [
+      {
+        "colors": "{B}{R}",
+        "name": "BR Goblins",
+        "tier": "Tier 4 — Weakest of the Big Five",
+        "strategy": "Blight-focused goblin tribal. Suffers from limited payoff density and inconsistent -1/-1 counter outlets compared to peer archetypes.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Grub, Storied Matriarch // Grub, Notorious Auntie",
+            "id": "1f51adf8-8234-4dae-aedf-7633310d5111",
+            "scryfall_uri": "https://scryfall.com/card/ecl/105/grub-storied-matriarch-grub-notorious-auntie?utm_source=api",
+            "colors": [
+              "R"
+            ],
+            "type_line": "Legendary Creature â€” Goblin Warrior",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1767734188",
+              "normal": "https://cards.scryfall.io/normal/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1767734188"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "rare"
+          },
+          {
+            "name": "Chaos Spewer",
+            "id": "b5918fa5-1d13-447b-8838-633b6b61e791",
+            "scryfall_uri": "https://scryfall.com/card/ecl/210/chaos-spewer?utm_source=api",
+            "colors": [
+              "B",
+              "R"
+            ],
+            "type_line": "Creature â€” Goblin Warlock",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/b/5/b5918fa5-1d13-447b-8838-633b6b61e791.jpg?1767749712",
+              "normal": "https://cards.scryfall.io/normal/front/b/5/b5918fa5-1d13-447b-8838-633b6b61e791.jpg?1767749712"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Stoic Grove-Guide",
+            "id": "3d5a3e25-c17a-47b1-a36d-d24d50e5bab3",
+            "scryfall_uri": "https://scryfall.com/card/ecl/243/stoic-grove-guide?utm_source=api",
+            "colors": [
+              "B",
+              "G"
+            ],
+            "type_line": "Creature â€” Elf Druid",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/3/d/3d5a3e25-c17a-47b1-a36d-d24d50e5bab3.jpg?1767984401",
+              "normal": "https://cards.scryfall.io/normal/front/3/d/3d5a3e25-c17a-47b1-a36d-d24d50e5bab3.jpg?1767984401"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          },
+          {
+            "name": "Flaring Cinder",
+            "id": "0691a1a9-18e7-44b7-9a34-764b1ab45a76",
+            "scryfall_uri": "https://scryfall.com/card/ecl/225/flaring-cinder?utm_source=api",
+            "colors": [
+              "R",
+              "U"
+            ],
+            "type_line": "Creature â€” Elemental Sorcerer",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/0/6/0691a1a9-18e7-44b7-9a34-764b1ab45a76.jpg?1767862636",
+              "normal": "https://cards.scryfall.io/normal/front/0/6/0691a1a9-18e7-44b7-9a34-764b1ab45a76.jpg?1767862636"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "common"
+          }
+        ]
+      },
+      {
+        "colors": "{U}{B}",
+        "name": "UB Faeries / Flash",
+        "tier": "Tier 4 — Underdeveloped",
+        "strategy": "Relies heavily on Voracious Tome-Skimmer. Poorly supported overall — only viable when the seat is wide open.",
+        "difficulty": "Hard",
+        "key_cards": [
+          {
+            "name": "Voracious Tome-Skimmer",
+            "id": "1a696fe5-410c-4699-b1d1-1a9c771d664a",
+            "scryfall_uri": "https://scryfall.com/card/ecl/250/voracious-tome-skimmer?utm_source=api",
+            "colors": [
+              "B",
+              "U"
+            ],
+            "type_line": "Creature â€” Faerie Rogue",
+            "image_uris": {
+              "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1a696fe5-410c-4699-b1d1-1a9c771d664a.jpg?1767658586",
+              "normal": "https://cards.scryfall.io/normal/front/1/a/1a696fe5-410c-4699-b1d1-1a9c771d664a.jpg?1767658586"
+            },
+            "set": "ecl",
+            "set_name": "Lorwyn Eclipsed",
+            "rarity": "uncommon"
+          }
+        ]
+      },
+      {
+        "colors": "{R}{W}",
+        "name": "RW Aggro",
+        "tier": "Tier 4 — Marginal Support",
+        "strategy": "Overlaps significantly with the primary archetypes; lacks dedicated payoffs.",
+        "difficulty": "Hard",
+        "key_cards": []
+      },
+      {
+        "colors": "{W}{B}",
+        "name": "WB Midrange",
+        "tier": "Tier 4 — Marginal Support",
+        "strategy": "Overlaps significantly with the primary archetypes; lacks dedicated payoffs.",
+        "difficulty": "Hard",
+        "key_cards": []
+      }
+    ]
   },
-  "top_uncommons": {
-    "W": ["Thoughtweft Imbuer", "United Front", "Eclipsed Kithkin"],
-    "U": ["Rimekin Recluse", "Silvergill Mentor", "Eclipsed Merrow"],
-    "B": ["Pitiless Fists", "Blight Rot", "Sacrifice for the Cause"],
-    "R": ["Sear", "Explosive Prodigy", "Eclipsed Flamekin"],
-    "G": ["Morcant's Eyes", "Moon-Vigil Adherents", "Eclipsed Elf"]
+  "top_cards_by_color": {
+    "W": {
+      "top_commons": [
+        {
+          "name": "Liminal Hold",
+          "id": "a5a40c16-7a5c-4ad1-be53-6b1b1be2affe",
+          "scryfall_uri": "https://scryfall.com/card/ecl/24/liminal-hold?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/5/a5a40c16-7a5c-4ad1-be53-6b1b1be2affe.jpg?1767732486",
+            "normal": "https://cards.scryfall.io/normal/front/a/5/a5a40c16-7a5c-4ad1-be53-6b1b1be2affe.jpg?1767732486"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Universal enchantment/artifact removal."
+        },
+        {
+          "name": "Wanderbrine Preacher",
+          "id": "3fc3f5f2-5a83-4358-8f23-42f26f345140",
+          "scryfall_uri": "https://scryfall.com/card/ecl/41/wanderbrine-preacher?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Merfolk Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/f/3fc3f5f2-5a83-4358-8f23-42f26f345140.jpg?1767732504",
+            "normal": "https://cards.scryfall.io/normal/front/3/f/3fc3f5f2-5a83-4358-8f23-42f26f345140.jpg?1767732504"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Efficient 2-drop with broad synergy."
+        },
+        {
+          "name": "Timid Shieldbearer",
+          "id": "1c672d38-a1a6-4912-a9a6-b11e7bf0cc67",
+          "scryfall_uri": "https://scryfall.com/card/ecl/39/timid-shieldbearer?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Kithkin Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/c/1c672d38-a1a6-4912-a9a6-b11e7bf0cc67.jpg?1767956979",
+            "normal": "https://cards.scryfall.io/normal/front/1/c/1c672d38-a1a6-4912-a9a6-b11e7bf0cc67.jpg?1767956979"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Reliable mana sink and blocker."
+        },
+        {
+          "name": "Spiral into Solitude",
+          "id": "e7a12664-a930-4159-8311-19862488fb05",
+          "scryfall_uri": "https://scryfall.com/card/ecl/36/spiral-into-solitude?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Enchantment â€” Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/7/e7a12664-a930-4159-8311-19862488fb05.jpg?1767871731",
+            "normal": "https://cards.scryfall.io/normal/front/e/7/e7a12664-a930-4159-8311-19862488fb05.jpg?1767871731"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Flexible removal option."
+        }
+      ],
+      "top_uncommons": [
+        {
+          "name": "Sun-Dappled Celebrant",
+          "id": "91c715a5-6643-4064-a8a8-3e05dce15979",
+          "scryfall_uri": "https://scryfall.com/card/ecl/37/sun-dappled-celebrant?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Treefolk Cleric",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/9/1/91c715a5-6643-4064-a8a8-3e05dce15979.jpg?1767659096",
+            "normal": "https://cards.scryfall.io/normal/front/9/1/91c715a5-6643-4064-a8a8-3e05dce15979.jpg?1767659096"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Reluctant Dounguard",
+          "id": "dbce93c0-5efc-4b60-9cef-9d9b374d397b",
+          "scryfall_uri": "https://scryfall.com/card/ecl/31/reluctant-dounguard?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Kithkin Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/b/dbce93c0-5efc-4b60-9cef-9d9b374d397b.jpg?1767871722",
+            "normal": "https://cards.scryfall.io/normal/front/d/b/dbce93c0-5efc-4b60-9cef-9d9b374d397b.jpg?1767871722"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Mistmeadow Council",
+          "id": "d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f",
+          "scryfall_uri": "https://scryfall.com/card/ecl/183/mistmeadow-council?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Kithkin Advisor",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/4/d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f.jpg?1767872109",
+            "normal": "https://cards.scryfall.io/normal/front/d/4/d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f.jpg?1767872109"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Kinsbaile Aspirant",
+          "id": "56dfdab1-ea3f-4663-a855-a9e72505f85e",
+          "scryfall_uri": "https://scryfall.com/card/ecl/21/kinsbaile-aspirant?utm_source=api",
+          "colors": [
+            "W"
+          ],
+          "type_line": "Creature â€” Kithkin Citizen",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/6/56dfdab1-ea3f-4663-a855-a9e72505f85e.jpg?1767732481",
+            "normal": "https://cards.scryfall.io/normal/front/5/6/56dfdab1-ea3f-4663-a855-a9e72505f85e.jpg?1767732481"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        }
+      ]
+    },
+    "U": {
+      "top_commons": [
+        {
+          "name": "Unexpected Assistance",
+          "id": "7b540a5f-7f1b-421a-864f-5af469556fc6",
+          "scryfall_uri": "https://scryfall.com/card/ecl/80/unexpected-assistance?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/b/7b540a5f-7f1b-421a-864f-5af469556fc6.jpg?1765451670",
+            "normal": "https://cards.scryfall.io/normal/front/7/b/7b540a5f-7f1b-421a-864f-5af469556fc6.jpg?1765451670"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Efficient convoke enabler."
+        },
+        {
+          "name": "Temporal Cleansing",
+          "id": "50ee7315-ec53-43d2-841e-8ec192b850f1",
+          "scryfall_uri": "https://scryfall.com/card/ecl/78/temporal-cleansing?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/0/50ee7315-ec53-43d2-841e-8ec192b850f1.jpg?1767732550",
+            "normal": "https://cards.scryfall.io/normal/front/5/0/50ee7315-ec53-43d2-841e-8ec192b850f1.jpg?1767732550"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Board recovery / reset."
+        },
+        {
+          "name": "Gravelgill Scoundrel",
+          "id": "320bc30c-7a8a-411a-9f36-9c69126e131b",
+          "scryfall_uri": "https://scryfall.com/card/ecl/53/gravelgill-scoundrel?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature â€” Merfolk Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/2/320bc30c-7a8a-411a-9f36-9c69126e131b.jpg?1767871759",
+            "normal": "https://cards.scryfall.io/normal/front/3/2/320bc30c-7a8a-411a-9f36-9c69126e131b.jpg?1767871759"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Standout in Merfolk."
+        },
+        {
+          "name": "Blossombind",
+          "id": "382b83c0-bbbc-4db8-bc04-cfea79aed1b3",
+          "scryfall_uri": "https://scryfall.com/card/ecl/45/blossombind?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Enchantment â€” Aura",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/8/382b83c0-bbbc-4db8-bc04-cfea79aed1b3.jpg?1767732510",
+            "normal": "https://cards.scryfall.io/normal/front/3/8/382b83c0-bbbc-4db8-bc04-cfea79aed1b3.jpg?1767732510"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Enchantment-based removal."
+        }
+      ],
+      "top_uncommons": [
+        {
+          "name": "Silvergill Mentor",
+          "id": "e6e37fe8-459c-4992-8ae9-f782cddab2fe",
+          "scryfall_uri": "https://scryfall.com/card/ecl/69/silvergill-mentor?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature â€” Merfolk Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/6/e6e37fe8-459c-4992-8ae9-f782cddab2fe.jpg?1768338090",
+            "normal": "https://cards.scryfall.io/normal/front/e/6/e6e37fe8-459c-4992-8ae9-f782cddab2fe.jpg?1768338090"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Merrow Skyswimmer",
+          "id": "075b419a-fd44-4a9a-8c40-474562b7e11a",
+          "scryfall_uri": "https://scryfall.com/card/ecl/234/merrow-skyswimmer?utm_source=api",
+          "colors": [
+            "U",
+            "W"
+          ],
+          "type_line": "Creature â€” Merfolk Soldier",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/7/075b419a-fd44-4a9a-8c40-474562b7e11a.jpg?1767872219",
+            "normal": "https://cards.scryfall.io/normal/front/0/7/075b419a-fd44-4a9a-8c40-474562b7e11a.jpg?1767872219"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Voracious Tome-Skimmer",
+          "id": "1a696fe5-410c-4699-b1d1-1a9c771d664a",
+          "scryfall_uri": "https://scryfall.com/card/ecl/250/voracious-tome-skimmer?utm_source=api",
+          "colors": [
+            "B",
+            "U"
+          ],
+          "type_line": "Creature â€” Faerie Rogue",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/a/1a696fe5-410c-4699-b1d1-1a9c771d664a.jpg?1767658586",
+            "normal": "https://cards.scryfall.io/normal/front/1/a/1a696fe5-410c-4699-b1d1-1a9c771d664a.jpg?1767658586"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        },
+        {
+          "name": "Glamer Gifter",
+          "id": "bd764dd4-2395-4138-ac29-260eac1aeaae",
+          "scryfall_uri": "https://scryfall.com/card/ecl/49/glamer-gifter?utm_source=api",
+          "colors": [
+            "U"
+          ],
+          "type_line": "Creature â€” Faerie Wizard",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/d/bd764dd4-2395-4138-ac29-260eac1aeaae.jpg?1767732516",
+            "normal": "https://cards.scryfall.io/normal/front/b/d/bd764dd4-2395-4138-ac29-260eac1aeaae.jpg?1767732516"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        }
+      ]
+    },
+    "B": {
+      "top_commons": [
+        {
+          "name": "Dawnhand Eulogist",
+          "id": "75a97f69-f3dc-4d33-8008-c1f1a7c15a2f",
+          "scryfall_uri": "https://scryfall.com/card/ecl/99/dawnhand-eulogist?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Elf Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/5/75a97f69-f3dc-4d33-8008-c1f1a7c15a2f.jpg?1767732686",
+            "normal": "https://cards.scryfall.io/normal/front/7/5/75a97f69-f3dc-4d33-8008-c1f1a7c15a2f.jpg?1767732686"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Premier elf creature."
+        },
+        {
+          "name": "Scarblade Scout",
+          "id": "c2412fea-4591-4345-913f-edc2da9ad975",
+          "scryfall_uri": "https://scryfall.com/card/ecl/118/scarblade-scout?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Elf Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/2/c2412fea-4591-4345-913f-edc2da9ad975.jpg?1767871946",
+            "normal": "https://cards.scryfall.io/normal/front/c/2/c2412fea-4591-4345-913f-edc2da9ad975.jpg?1767871946"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Reliable elf creature."
+        },
+        {
+          "name": "Bogslither's Embrace",
+          "id": "4beca2e7-9c6d-493b-b15f-69e483a8dfff",
+          "scryfall_uri": "https://scryfall.com/card/ecl/94/bogslithers-embrace?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/4/b/4beca2e7-9c6d-493b-b15f-69e483a8dfff.jpg?1767957120",
+            "normal": "https://cards.scryfall.io/normal/front/4/b/4beca2e7-9c6d-493b-b15f-69e483a8dfff.jpg?1767957120"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Creature enchantment removal/control."
+        },
+        {
+          "name": "Blight Rot",
+          "id": "5201bdeb-ba47-459b-ac0d-603367914578",
+          "scryfall_uri": "https://scryfall.com/card/ecl/89/blight-rot?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/2/5201bdeb-ba47-459b-ac0d-603367914578.jpg?1767952066",
+            "normal": "https://cards.scryfall.io/normal/front/5/2/5201bdeb-ba47-459b-ac0d-603367914578.jpg?1767952066"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Creature removal at common."
+        }
+      ],
+      "top_uncommons": [
+        {
+          "name": "Heirloom Auntie",
+          "id": "cac251b2-d2cc-45b6-9ca8-678e0eab56ea",
+          "scryfall_uri": "https://scryfall.com/card/ecl/107/heirloom-auntie?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Goblin Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/c/a/cac251b2-d2cc-45b6-9ca8-678e0eab56ea.jpg?1767732699",
+            "normal": "https://cards.scryfall.io/normal/front/c/a/cac251b2-d2cc-45b6-9ca8-678e0eab56ea.jpg?1767732699"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Blighted Blackthorn",
+          "id": "3515531a-45d6-4fe0-96a3-7ca1ce545068",
+          "scryfall_uri": "https://scryfall.com/card/ecl/90/blighted-blackthorn?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Treefolk Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/3515531a-45d6-4fe0-96a3-7ca1ce545068.jpg?1767871828",
+            "normal": "https://cards.scryfall.io/normal/front/3/5/3515531a-45d6-4fe0-96a3-7ca1ce545068.jpg?1767871828"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Moonglove Extractor",
+          "id": "8383e0ab-81b4-4a6b-b87b-dd9180dca1c2",
+          "scryfall_uri": "https://scryfall.com/card/ecl/109/moonglove-extractor?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Elf Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/3/8383e0ab-81b4-4a6b-b87b-dd9180dca1c2.jpg?1767658152",
+            "normal": "https://cards.scryfall.io/normal/front/8/3/8383e0ab-81b4-4a6b-b87b-dd9180dca1c2.jpg?1767658152"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Gloom Ripper",
+          "id": "e9ee5d4f-05d1-4e3a-b8d6-f22d0fddedf7",
+          "scryfall_uri": "https://scryfall.com/card/ecl/102/gloom-ripper?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Elf Assassin",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/e/9/e9ee5d4f-05d1-4e3a-b8d6-f22d0fddedf7.jpg?1767952022",
+            "normal": "https://cards.scryfall.io/normal/front/e/9/e9ee5d4f-05d1-4e3a-b8d6-f22d0fddedf7.jpg?1767952022"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "rare"
+        }
+      ]
+    },
+    "R": {
+      "top_commons": [
+        {
+          "name": "Cinder Strike",
+          "id": "6fb6faa4-236c-4cae-9140-0981c44d2392",
+          "scryfall_uri": "https://scryfall.com/card/ecl/131/cinder-strike?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/f/6fb6faa4-236c-4cae-9140-0981c44d2392.jpg?1767957230",
+            "normal": "https://cards.scryfall.io/normal/front/6/f/6fb6faa4-236c-4cae-9140-0981c44d2392.jpg?1767957230"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Removal with blight upside."
+        },
+        {
+          "name": "Kulrath Zealot",
+          "id": "3502685d-4e57-4c5c-94c6-ae69048cdfbf",
+          "scryfall_uri": "https://scryfall.com/card/ecl/148/kulrath-zealot?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature â€” Elemental Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/3502685d-4e57-4c5c-94c6-ae69048cdfbf.jpg?1767871934",
+            "normal": "https://cards.scryfall.io/normal/front/3/5/3502685d-4e57-4c5c-94c6-ae69048cdfbf.jpg?1767871934"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Mana sink utility creature."
+        },
+        {
+          "name": "Feed the Flames",
+          "id": "59740755-c353-4b6c-a84c-3b76133ce3ec",
+          "scryfall_uri": "https://scryfall.com/card/ecl/137/feed-the-flames?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/5/9/59740755-c353-4b6c-a84c-3b76133ce3ec.jpg?1767957151",
+            "normal": "https://cards.scryfall.io/normal/front/5/9/59740755-c353-4b6c-a84c-3b76133ce3ec.jpg?1767957151"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Versatile burn removal."
+        },
+        {
+          "name": "Tweeze",
+          "id": "3ceab0e6-1bb8-487d-ab4b-2da8457b970a",
+          "scryfall_uri": "https://scryfall.com/card/ecl/162/tweeze?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/3/c/3ceab0e6-1bb8-487d-ab4b-2da8457b970a.jpg?1767873738",
+            "normal": "https://cards.scryfall.io/normal/front/3/c/3ceab0e6-1bb8-487d-ab4b-2da8457b970a.jpg?1767873738"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Cheap creature removal."
+        }
+      ],
+      "top_uncommons": [
+        {
+          "name": "Flamekin Gildweaver",
+          "id": "b1628ece-a028-49d4-9065-ee997838c20a",
+          "scryfall_uri": "https://scryfall.com/card/ecl/140/flamekin-gildweaver?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature â€” Elemental Sorcerer",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/1/b1628ece-a028-49d4-9065-ee997838c20a.jpg?1767862536",
+            "normal": "https://cards.scryfall.io/normal/front/b/1/b1628ece-a028-49d4-9065-ee997838c20a.jpg?1767862536"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Reckless Ransacking",
+          "id": "24a5b025-4cdb-416d-aad6-0fc7e8da3df2",
+          "scryfall_uri": "https://scryfall.com/card/ecl/152/reckless-ransacking?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/2/4/24a5b025-4cdb-416d-aad6-0fc7e8da3df2.jpg?1767957141",
+            "normal": "https://cards.scryfall.io/normal/front/2/4/24a5b025-4cdb-416d-aad6-0fc7e8da3df2.jpg?1767957141"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Boneclub Berserker",
+          "id": "b3dbbe30-3d6e-46f8-92c1-caee995cba1a",
+          "scryfall_uri": "https://scryfall.com/card/ecl/126/boneclub-berserker?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature â€” Goblin Berserker",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/b/3/b3dbbe30-3d6e-46f8-92c1-caee995cba1a.jpg?1767732716",
+            "normal": "https://cards.scryfall.io/normal/front/b/3/b3dbbe30-3d6e-46f8-92c1-caee995cba1a.jpg?1767732716"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Boldwyr Aggressor",
+          "id": "76bbccd2-8a90-49a7-921a-6565b495efdf",
+          "scryfall_uri": "https://scryfall.com/card/ecl/125/boldwyr-aggressor?utm_source=api",
+          "colors": [
+            "R"
+          ],
+          "type_line": "Creature â€” Giant Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/7/6/76bbccd2-8a90-49a7-921a-6565b495efdf.jpg?1767871989",
+            "normal": "https://cards.scryfall.io/normal/front/7/6/76bbccd2-8a90-49a7-921a-6565b495efdf.jpg?1767871989"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        }
+      ]
+    },
+    "G": {
+      "top_commons": [
+        {
+          "name": "Assert Perfection",
+          "id": "6995b308-5582-4ca1-ab10-a536d5ca0a6d",
+          "scryfall_uri": "https://scryfall.com/card/ecl/164/assert-perfection?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Sorcery",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/6/9/6995b308-5582-4ca1-ab10-a536d5ca0a6d.jpg?1767732784",
+            "normal": "https://cards.scryfall.io/normal/front/6/9/6995b308-5582-4ca1-ab10-a536d5ca0a6d.jpg?1767732784"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Pump effect with removal bonus."
+        },
+        {
+          "name": "Mistmeadow Council",
+          "id": "d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f",
+          "scryfall_uri": "https://scryfall.com/card/ecl/183/mistmeadow-council?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Kithkin Advisor",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/d/4/d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f.jpg?1767872109",
+            "normal": "https://cards.scryfall.io/normal/front/d/4/d4a7c9bc-81c8-4c31-96a9-eb6ba7715e7f.jpg?1767872109"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Tribal payoff."
+        },
+        {
+          "name": "Lys Alana Informant",
+          "id": "a79649c4-559e-4306-a102-5fd8750629c7",
+          "scryfall_uri": "https://scryfall.com/card/ecl/181/lys-alana-informant?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Elf Scout",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/a/7/a79649c4-559e-4306-a102-5fd8750629c7.jpg?1767658380",
+            "normal": "https://cards.scryfall.io/normal/front/a/7/a79649c4-559e-4306-a102-5fd8750629c7.jpg?1767658380"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Premier elf creature."
+        },
+        {
+          "name": "Safewright Cavalry",
+          "id": "f7de412a-9731-4bfc-8fbc-c95988a3dd70",
+          "scryfall_uri": "https://scryfall.com/card/ecl/191/safewright-cavalry?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Elf Warrior",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/f/7/f7de412a-9731-4bfc-8fbc-c95988a3dd70.jpg?1767957270",
+            "normal": "https://cards.scryfall.io/normal/front/f/7/f7de412a-9731-4bfc-8fbc-c95988a3dd70.jpg?1767957270"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common",
+          "note": "Mana sink utility."
+        }
+      ],
+      "top_uncommons": [
+        {
+          "name": "Surly Farrier",
+          "id": "056f7f51-18a9-4d80-8928-decaf4d12c0d",
+          "scryfall_uri": "https://scryfall.com/card/ecl/196/surly-farrier?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Kithkin Citizen",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/5/056f7f51-18a9-4d80-8928-decaf4d12c0d.jpg?1767732856",
+            "normal": "https://cards.scryfall.io/normal/front/0/5/056f7f51-18a9-4d80-8928-decaf4d12c0d.jpg?1767732856"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Great Forest Druid",
+          "id": "8793a19e-6743-4031-86d9-2ff55f384549",
+          "scryfall_uri": "https://scryfall.com/card/ecl/178/great-forest-druid?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Creature â€” Treefolk Druid",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/7/8793a19e-6743-4031-86d9-2ff55f384549.jpg?1767732797",
+            "normal": "https://cards.scryfall.io/normal/front/8/7/8793a19e-6743-4031-86d9-2ff55f384549.jpg?1767732797"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Unforgiving Aim",
+          "id": "0bef3905-24f8-419b-aeca-396adfc6d0dc",
+          "scryfall_uri": "https://scryfall.com/card/ecl/200/unforgiving-aim?utm_source=api",
+          "colors": [
+            "G"
+          ],
+          "type_line": "Instant",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/0/b/0bef3905-24f8-419b-aeca-396adfc6d0dc.jpg?1767872046",
+            "normal": "https://cards.scryfall.io/normal/front/0/b/0bef3905-24f8-419b-aeca-396adfc6d0dc.jpg?1767872046"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "common"
+        },
+        {
+          "name": "Gnarlbark Elm",
+          "id": "1e9d65b6-22ff-49f2-8b2a-aeaef91088d3",
+          "scryfall_uri": "https://scryfall.com/card/ecl/103/gnarlbark-elm?utm_source=api",
+          "colors": [
+            "B"
+          ],
+          "type_line": "Creature â€” Treefolk Warlock",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/1/e/1e9d65b6-22ff-49f2-8b2a-aeaef91088d3.jpg?1767871866",
+            "normal": "https://cards.scryfall.io/normal/front/1/e/1e9d65b6-22ff-49f2-8b2a-aeaef91088d3.jpg?1767871866"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        }
+      ]
+    },
+    "Colorless": {
+      "top_commons": [],
+      "top_uncommons": [
+        {
+          "name": "Gathering Stone",
+          "id": "81dfbfe1-143a-4637-b683-a34cfc51993d",
+          "scryfall_uri": "https://scryfall.com/card/ecl/257/gathering-stone?utm_source=api",
+          "colors": [],
+          "type_line": "Artifact",
+          "image_uris": {
+            "art_crop": "https://cards.scryfall.io/art_crop/front/8/1/81dfbfe1-143a-4637-b683-a34cfc51993d.jpg?1767732919",
+            "normal": "https://cards.scryfall.io/normal/front/8/1/81dfbfe1-143a-4637-b683-a34cfc51993d.jpg?1767732919"
+          },
+          "set": "ecl",
+          "set_name": "Lorwyn Eclipsed",
+          "rarity": "uncommon"
+        }
+      ]
+    }
+  },
+  "notable_rares": [
+    {
+      "name": "Trystan's Command",
+      "id": "ba1d99ca-740a-481a-be89-615e40d56d06",
+      "scryfall_uri": "https://scryfall.com/card/ecl/247/trystans-command?utm_source=api",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "type_line": "Kindred Sorcery â€” Elf",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/b/a/ba1d99ca-740a-481a-be89-615e40d56d06.jpg?1767952293",
+        "normal": "https://cards.scryfall.io/normal/front/b/a/ba1d99ca-740a-481a-be89-615e40d56d06.jpg?1767952293"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "Top-rated card in the set; archetype-defining rare."
+    },
+    {
+      "name": "Ashling's Command",
+      "id": "fe3a421d-07b6-4b94-b177-aec44c7fe689",
+      "scryfall_uri": "https://scryfall.com/card/ecl/205/ashlings-command?utm_source=api",
+      "colors": [
+        "R",
+        "U"
+      ],
+      "type_line": "Kindred Instant â€” Elemental",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/f/e/fe3a421d-07b6-4b94-b177-aec44c7fe689.jpg?1759144840",
+        "normal": "https://cards.scryfall.io/normal/front/f/e/fe3a421d-07b6-4b94-b177-aec44c7fe689.jpg?1759144840"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "Premier rare command; flexible removal/value."
+    },
+    {
+      "name": "Brigid's Command",
+      "id": "cf034777-3da7-4d5c-9213-5e9d235c315a",
+      "scryfall_uri": "https://scryfall.com/card/ecl/208/brigids-command?utm_source=api",
+      "colors": [
+        "G",
+        "W"
+      ],
+      "type_line": "Kindred Sorcery â€” Kithkin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/c/f/cf034777-3da7-4d5c-9213-5e9d235c315a.jpg?1767862610",
+        "normal": "https://cards.scryfall.io/normal/front/c/f/cf034777-3da7-4d5c-9213-5e9d235c315a.jpg?1767862610"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "GW Kithkin's archetype-defining rare."
+    },
+    {
+      "name": "Sygg's Command",
+      "id": "8bc13fc2-e254-4db5-ad4d-f92711a1a6ca",
+      "scryfall_uri": "https://scryfall.com/card/ecl/244/syggs-command?utm_source=api",
+      "colors": [
+        "U",
+        "W"
+      ],
+      "type_line": "Kindred Sorcery â€” Merfolk",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/b/8bc13fc2-e254-4db5-ad4d-f92711a1a6ca.jpg?1767862721",
+        "normal": "https://cards.scryfall.io/normal/front/8/b/8bc13fc2-e254-4db5-ad4d-f92711a1a6ca.jpg?1767862721"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "WU Merfolk's archetype-defining rare."
+    },
+    {
+      "name": "Grub's Command",
+      "id": "73013908-feff-495a-a62e-1e19548ffe6f",
+      "scryfall_uri": "https://scryfall.com/card/ecl/228/grubs-command?utm_source=api",
+      "colors": [
+        "B",
+        "R"
+      ],
+      "type_line": "Kindred Sorcery â€” Goblin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/7/3/73013908-feff-495a-a62e-1e19548ffe6f.jpg?1767662497",
+        "normal": "https://cards.scryfall.io/normal/front/7/3/73013908-feff-495a-a62e-1e19548ffe6f.jpg?1767662497"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "BR Goblins' archetype-defining rare."
+    },
+    {
+      "name": "Champions of the Perfect",
+      "id": "4f359211-8be5-4818-b73c-14f24b7ddb21",
+      "scryfall_uri": "https://scryfall.com/card/ecl/171/champions-of-the-perfect?utm_source=api",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Creature â€” Elf Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/4/f/4f359211-8be5-4818-b73c-14f24b7ddb21.jpg?1767658362",
+        "normal": "https://cards.scryfall.io/normal/front/4/f/4f359211-8be5-4818-b73c-14f24b7ddb21.jpg?1767658362"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "Bomb in GW Kithkin."
+    },
+    {
+      "name": "Champions of the Shoal",
+      "id": "e1acdd9c-4a6d-4373-950c-f5539b54679f",
+      "scryfall_uri": "https://scryfall.com/card/ecl/46/champions-of-the-shoal?utm_source=api",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature â€” Merfolk Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/1/e1acdd9c-4a6d-4373-950c-f5539b54679f.jpg?1767951924",
+        "normal": "https://cards.scryfall.io/normal/front/e/1/e1acdd9c-4a6d-4373-950c-f5539b54679f.jpg?1767951924"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "Bomb in WU Merfolk."
+    },
+    {
+      "name": "Deepchannel Duelist",
+      "id": "1b742172-7118-45e7-9945-62bd77d94e85",
+      "scryfall_uri": "https://scryfall.com/card/ecl/213/deepchannel-duelist?utm_source=api",
+      "colors": [
+        "U",
+        "W"
+      ],
+      "type_line": "Creature â€” Merfolk Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/b/1b742172-7118-45e7-9945-62bd77d94e85.jpg?1767957310",
+        "normal": "https://cards.scryfall.io/normal/front/1/b/1b742172-7118-45e7-9945-62bd77d94e85.jpg?1767957310"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "uncommon",
+      "note": "Top-rated rare creature."
+    },
+    {
+      "name": "Sunderflock",
+      "id": "e5b6221e-cb22-45e4-bb98-2b960afc614c",
+      "scryfall_uri": "https://scryfall.com/card/ecl/74/sunderflock?utm_source=api",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Creature â€” Elemental",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/e/5/e5b6221e-cb22-45e4-bb98-2b960afc614c.jpg?1767732544",
+        "normal": "https://cards.scryfall.io/normal/front/e/5/e5b6221e-cb22-45e4-bb98-2b960afc614c.jpg?1767732544"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "Universal answer; format-warping."
+    },
+    {
+      "name": "Brigid, Clachan's Heart // Brigid, Doun's Mind",
+      "id": "cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8",
+      "scryfall_uri": "https://scryfall.com/card/ecl/7/brigid-clachans-heart-brigid-douns-mind?utm_source=api",
+      "colors": [
+        "G"
+      ],
+      "type_line": "Legendary Creature â€” Kithkin Soldier",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/back/c/b/cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8.jpg?1767887768",
+        "normal": "https://cards.scryfall.io/normal/back/c/b/cb7d5bbb-4f68-4e38-8bb0-a95af21b24c8.jpg?1767887768"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "DFC — bomb in GW."
+    },
+    {
+      "name": "Sygg, Wanderwine Wisdom // Sygg, Wanderbrine Shield",
+      "id": "70adc870-f0db-4d4b-863b-673c2c258751",
+      "scryfall_uri": "https://scryfall.com/card/ecl/76/sygg-wanderwine-wisdom-sygg-wanderbrine-shield?utm_source=api",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Legendary Creature â€” Merfolk Rogue",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/back/7/0/70adc870-f0db-4d4b-863b-673c2c258751.jpg?1759144840",
+        "normal": "https://cards.scryfall.io/normal/back/7/0/70adc870-f0db-4d4b-863b-673c2c258751.jpg?1759144840"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "DFC — bomb in WU."
+    },
+    {
+      "name": "Grub, Storied Matriarch // Grub, Notorious Auntie",
+      "id": "1f51adf8-8234-4dae-aedf-7633310d5111",
+      "scryfall_uri": "https://scryfall.com/card/ecl/105/grub-storied-matriarch-grub-notorious-auntie?utm_source=api",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Legendary Creature â€” Goblin Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1767734188",
+        "normal": "https://cards.scryfall.io/normal/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1767734188"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "DFC — needs goblin support."
+    },
+    {
+      "name": "Ashling, Rekindled // Ashling, Rimebound",
+      "id": "7d7faefe-9c0d-45b6-8ea4-5fa666762a2c",
+      "scryfall_uri": "https://scryfall.com/card/ecl/124/ashling-rekindled-ashling-rimebound?utm_source=api",
+      "colors": [
+        "U"
+      ],
+      "type_line": "Legendary Creature â€” Elemental Wizard",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/back/7/d/7d7faefe-9c0d-45b6-8ea4-5fa666762a2c.jpg?1759144841",
+        "normal": "https://cards.scryfall.io/normal/back/7/d/7d7faefe-9c0d-45b6-8ea4-5fa666762a2c.jpg?1759144841"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "DFC — needs blue mana for full value."
+    },
+    {
+      "name": "Trystan, Callous Cultivator // Trystan, Penitent Culler",
+      "id": "2094f9b6-ce84-47d9-8819-81db14ba483f",
+      "scryfall_uri": "https://scryfall.com/card/ecl/199/trystan-callous-cultivator-trystan-penitent-culler?utm_source=api",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Creature â€” Elf Warlock",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/back/2/0/2094f9b6-ce84-47d9-8819-81db14ba483f.jpg?1767658448",
+        "normal": "https://cards.scryfall.io/normal/back/2/0/2094f9b6-ce84-47d9-8819-81db14ba483f.jpg?1767658448"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "DFC — playable in any green deck; excellent in BG Elves."
+    },
+    {
+      "name": "Eirdu, Carrier of Dawn // Isilu, Carrier of Twilight",
+      "id": "b2d9d5ca-7e15-437a-bdfc-5972b42148fe",
+      "scryfall_uri": "https://scryfall.com/card/ecl/13/eirdu-carrier-of-dawn-isilu-carrier-of-twilight?utm_source=api",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Legendary Creature â€” Elemental God",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/back/b/2/b2d9d5ca-7e15-437a-bdfc-5972b42148fe.jpg?1759144812",
+        "normal": "https://cards.scryfall.io/normal/back/b/2/b2d9d5ca-7e15-437a-bdfc-5972b42148fe.jpg?1759144812"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "mythic",
+      "note": "DFC of the format."
+    },
+    {
+      "name": "Curious Colossus",
+      "id": "582b6e5d-0bab-471d-af4d-19438c5fd524",
+      "scryfall_uri": "https://scryfall.com/card/ecl/12/curious-colossus?utm_source=api",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature â€” Giant Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/5/8/582b6e5d-0bab-471d-af4d-19438c5fd524.jpg?1767658165",
+        "normal": "https://cards.scryfall.io/normal/front/5/8/582b6e5d-0bab-471d-af4d-19438c5fd524.jpg?1767658165"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "mythic",
+      "note": "Splashy top-end finisher."
+    },
+    {
+      "name": "Soul Immolation",
+      "id": "234b70df-8c34-4da7-946e-b8b55a8df390",
+      "scryfall_uri": "https://scryfall.com/card/ecl/156/soul-immolation?utm_source=api",
+      "colors": [
+        "R"
+      ],
+      "type_line": "Sorcery",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/2/3/234b70df-8c34-4da7-946e-b8b55a8df390.jpg?1767952116",
+        "normal": "https://cards.scryfall.io/normal/front/2/3/234b70df-8c34-4da7-946e-b8b55a8df390.jpg?1767952116"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "mythic",
+      "note": "Powerful conditional removal."
+    },
+    {
+      "name": "Nightmare Sower",
+      "id": "35dfa0f9-faf3-4a85-b02d-0c5830783511",
+      "scryfall_uri": "https://scryfall.com/card/ecl/114/nightmare-sower?utm_source=api",
+      "colors": [
+        "B"
+      ],
+      "type_line": "Creature â€” Faerie Assassin",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/3/5/35dfa0f9-faf3-4a85-b02d-0c5830783511.jpg?1767957131",
+        "normal": "https://cards.scryfall.io/normal/front/3/5/35dfa0f9-faf3-4a85-b02d-0c5830783511.jpg?1767957131"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "uncommon",
+      "note": "Threat with disruption."
+    },
+    {
+      "name": "Slumbering Walker",
+      "id": "81e82915-e734-4754-829f-f5da6a7c550d",
+      "scryfall_uri": "https://scryfall.com/card/ecl/35/slumbering-walker?utm_source=api",
+      "colors": [
+        "W"
+      ],
+      "type_line": "Creature â€” Giant Warrior",
+      "image_uris": {
+        "art_crop": "https://cards.scryfall.io/art_crop/front/8/1/81e82915-e734-4754-829f-f5da6a7c550d.jpg?1767862426",
+        "normal": "https://cards.scryfall.io/normal/front/8/1/81e82915-e734-4754-829f-f5da6a7c550d.jpg?1767862426"
+      },
+      "set": "ecl",
+      "set_name": "Lorwyn Eclipsed",
+      "rarity": "rare",
+      "note": "Common rare overperformer at common rarity."
+    }
+  ],
+  "draft_plan": {
+    "pack_1": "Take the most powerful card available. Identify a payoff card (bomb or tribe-specific uncommon) early and let it anchor your archetype choice. Universal removal (Sunderflock, Ashling's Command, Cinder Strike) is always strong. Don't lock in two colors before pack 1 ends.",
+    "pack_2": "Commit to your archetype based on signals. Pick supporting tribal pieces and the on-color Commands or DFCs aggressively. Note open colors for a pivot if signals are bad — Vivid is your best backup plan.",
+    "pack_3": "Fill out your curve and shore up weaknesses. Prioritize 2-drops, additional removal, and fliers to beat board stalls. Take changelings late if your tribal count is low."
   },
   "general_tips": [
-    "Lorwyn Eclipsed is slower than recent sets; don't be afraid to keep a slower hand with high-impact late-game cards.",
-    "The Eclipsed cycle of uncommons are effectively mythic uncommons; they are almost always worth P1P1.",
-    "Elves (BG) is the deepest and most powerful archetype, but it is often heavily contested."
+    "Sweepers are rare — feel safe dumping your hand to apply pressure.",
+    "Fliers and reach matter; board stalls are common.",
+    "Tribal payoffs reward mono-type devotion; track your creature-type counts.",
+    "Looters and rummagers (e.g., Flaring Cinder) hedge against mana flood.",
+    "Consider 16-land builds when running convoke or many mana sinks.",
+    "Universal removal (Sunderflock, Ashling's Command) is the strongest pick-up at most points.",
+    "If your primary archetype is closed, pivot to a Vivid deck using changelings + uncommon Vivid payoffs."
   ]
 }
