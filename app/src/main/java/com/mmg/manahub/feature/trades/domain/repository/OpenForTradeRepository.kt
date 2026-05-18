@@ -22,4 +22,25 @@ interface OpenForTradeRepository {
     suspend fun addRemote(userCardId: String): Result<Unit>
     suspend fun removeRemote(id: String): Result<Unit>
     suspend fun migrateLocalToRemote(userId: String): Result<Int>
+
+    /**
+     * Inserts or updates an Open-For-Trade entry in local Room and immediately pushes it
+     * to Supabase using [localCollectionId] as the remote `user_card_id`, then marks it
+     * as synced without deleting the local row.
+     *
+     * Use this method when the user is authenticated to keep the remote list current.
+     *
+     * @param userId The authenticated user's UUID (unused for the remote call but
+     *   kept for symmetry with [WishlistRepository.addAndSync]).
+     */
+    suspend fun addAndSync(
+        scryfallId: String,
+        localCollectionId: String,
+        quantity: Int = 1,
+        isFoil: Boolean = false,
+        condition: String = "NM",
+        language: String = "en",
+        isAltArt: Boolean = false,
+        userId: String,
+    ): Result<Unit>
 }

@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.draft.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.feature.draft.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
@@ -51,6 +52,11 @@ class DraftViewModel @Inject constructor(
                     }
                 }
                 is DataResult.Error -> {
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("draft_sets_load_failed: forceRefresh=$forceRefresh")
+                        setCustomKey("sync_error_type", "DraftSetsError")
+                        recordException(RuntimeException("[DraftViewModel] ${result.message}"))
+                    }
                     _uiState.update { it.copy(isLoading = false, error = result.message) }
                 }
             }

@@ -111,6 +111,14 @@ fun CollectionScreen(
 
     var showSyncSheet by remember { mutableStateOf(false) }
 
+    // Auto-close the sync sheet once the sync finishes (SUCCESS or ERROR) so the user
+    // doesn't need to manually dismiss it — the result is communicated via MagicToast.
+    LaunchedEffect(uiState.syncState) {
+        if (showSyncSheet && uiState.syncState == SyncState.SUCCESS) {
+            showSyncSheet = false
+        }
+    }
+
     CollectionContent(
         uiState               = uiState,
         onCardClick           = onCardClick,
@@ -227,6 +235,16 @@ private fun CollectionContent(
                     .fillMaxSize()
                     .padding(padding),
             ) {
+                // "Sync your collection" banner — screen-level, visible on any tab so the
+                // user is always aware of pending local changes regardless of which tab they're on.
+                AnimatedVisibility(
+                    visible = uiState.sessionState is SessionState.Authenticated &&
+                              uiState.hasUnsyncedChanges &&
+                              uiState.syncState != SyncState.SYNCING,
+                ) {
+                    SyncCollectionBanner(onSync = onShowSyncSheet)
+                }
+
                 // ── Cards / Decks / Trades sub-tabs ──────────────────────────────
                 val selectedTabIndex = when (uiState.selectedTab) {
                     CollectionTab.CARDS  -> TAB_CARDS
@@ -280,7 +298,6 @@ private fun CollectionContent(
                         onSearchQueryChange   = onSearchQueryChange,
                         onClearFilters        = onClearFilters,
                         onShowAdvancedSearch  = onShowAdvancedSearch,
-                        onShowSyncSheet       = onShowSyncSheet,
                         onViewModeToggle      = onViewModeToggle,
                         onSortChange          = onSortChange,
                     )
@@ -315,7 +332,6 @@ private fun CardsTabContent(
     onSearchQueryChange:  (String) -> Unit,
     onClearFilters:       () -> Unit,
     onShowAdvancedSearch: () -> Unit,
-    onShowSyncSheet:      () -> Unit,
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
 ) {
@@ -415,29 +431,6 @@ private fun CardsTabContent(
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (uiState.sessionState is SessionState.Authenticated) {
-                    IconButton(
-                        onClick  = onShowSyncSheet,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        if (uiState.syncState == SyncState.SYNCING) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = mc.primaryAccent
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Sync,
-                                contentDescription = stringResource(R.string.action_refresh),
-                                tint = mc.textSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                }
-
                 IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
                     Icon(
                         imageVector = if (uiState.viewMode == CollectionViewMode.GRID) Icons.Default.List else Icons.Default.GridView,
@@ -576,7 +569,7 @@ private fun CardGrid(
     onCardClick: (String) -> Unit,
 ) {
     LazyVerticalGrid(
-        columns               = GridCells.Adaptive(minSize = 110.dp),
+        columns               = GridCells.Adaptive(minSize = 100.dp),
         contentPadding        = PaddingValues(12.dp),
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -641,15 +634,12 @@ private fun SyncBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text  = stringResource(R.string.auth_section_title),
+                text  = stringResource(R.string.collection_sync_sheet_title),
                 style = MaterialTheme.magicTypography.titleLarge,
             )
 
             Surface(
-                onClick = {
-                    onSync()
-                    onDismiss()
-                },
+                onClick = { onSync() },
                 enabled = !isSyncing,
                 color   = Color.Transparent,
             ) {
@@ -680,6 +670,50 @@ private fun SyncBottomSheet(
                     trackColor = mc.surfaceVariant,
                 )
             }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sync banner
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A full-width tappable banner shown when the user has local collection changes that
+ * have not yet been pushed to Supabase. Tapping opens the [SyncBottomSheet] so the
+ * user can review and trigger the sync with visual progress feedback.
+ */
+@Composable
+private fun SyncCollectionBanner(
+    onSync: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+
+    Surface(
+        onClick = onSync,
+        color   = mc.primaryAccent.copy(alpha = 0.12f),
+        shape        = RoundedCornerShape(0.dp),
+        modifier     = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector        = Icons.Default.Sync,
+                contentDescription = null,
+                tint               = mc.primaryAccent,
+                modifier           = Modifier.size(18.dp),
+            )
+            Text(
+                text     = stringResource(R.string.collection_sync_banner),
+                style    = MaterialTheme.magicTypography.labelLarge,
+                color    = mc.primaryAccent,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }

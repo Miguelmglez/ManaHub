@@ -18,7 +18,9 @@ import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -44,6 +46,7 @@ class CardDetailViewModel @Inject constructor(
     private val deckRepo: DeckRepository,
     private val addToCollection: AddCardToCollectionUseCase,
     private val addToWishlistUseCase: AddToWishlistUseCase,
+    private val wishlistRepo: WishlistRepository,
     private val openForTradeRepo: OpenForTradeRepository,
     private val userPrefs: UserPreferencesRepository,
     private val authRepository: AuthRepository,
@@ -62,6 +65,7 @@ class CardDetailViewModel @Inject constructor(
     init {
         loadCard()
         observeUserCards()
+        observeWishlistEntries()
         observeTradeEntries()
         observeDecks()
         viewModelScope.launch {
@@ -120,6 +124,15 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
+    private fun observeWishlistEntries() {
+        viewModelScope.launch {
+            wishlistRepo.observeByScryfallId(scryfallId)
+                .collect { entries ->
+                    _uiState.update { it.copy(wishlistEntries = entries) }
+                }
+        }
+    }
+
     private fun observeTradeEntries() {
         viewModelScope.launch {
             openForTradeRepo.observeByScryfallId(scryfallId)
@@ -142,6 +155,8 @@ class CardDetailViewModel @Inject constructor(
     fun onDismissTagPicker() = _uiState.update { it.copy(showTagPicker = false) }
     fun onRequestDelete(uc: UserCard) = _uiState.update { it.copy(cardToDelete = uc) }
     fun onDismissDeleteConfirm() = _uiState.update { it.copy(cardToDelete = null) }
+    fun onRequestDeleteWishlist(entry: WishlistEntry) = _uiState.update { it.copy(wishlistEntryToDelete = entry) }
+    fun onDismissWishlistDeleteConfirm() = _uiState.update { it.copy(wishlistEntryToDelete = null) }
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 
     // ── Collection mutations ──────────────────────────────────────────────────
@@ -223,6 +238,13 @@ class CardDetailViewModel @Inject constructor(
         }
     }
 
+    fun onUpdateWishlistQuantity(id: String, quantity: Int) {
+        viewModelScope.launch {
+            wishlistRepo.updateQuantityLocal(id, quantity)
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
     fun onConfirmTradeSelection(selections: Map<String, Int>) {
         val userCards = _uiState.value.userCards
         val currentQty = _uiState.value.tradeQuantities
@@ -237,16 +259,31 @@ class CardDetailViewModel @Inject constructor(
                     return@forEach
                 }
                 if (desiredQty > 0) {
-                    // Add or update the trade entry
-                    openForTradeRepo.addLocal(
-                        scryfallId = uc.scryfallId,
-                        localCollectionId = uc.id,
-                        quantity = desiredQty,
-                        isFoil = uc.isFoil,
-                        condition = uc.condition,
-                        language = uc.language,
-                        isAltArt = uc.isAlternativeArt,
-                    ).onFailure { e ->
+                    // Add or update the trade entry — push immediately when online.
+                    val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
+                    val tradeResult = if (userId != null) {
+                        openForTradeRepo.addAndSync(
+                            scryfallId = uc.scryfallId,
+                            localCollectionId = uc.id,
+                            quantity = desiredQty,
+                            isFoil = uc.isFoil,
+                            condition = uc.condition,
+                            language = uc.language,
+                            isAltArt = uc.isAlternativeArt,
+                            userId = userId,
+                        )
+                    } else {
+                        openForTradeRepo.addLocal(
+                            scryfallId = uc.scryfallId,
+                            localCollectionId = uc.id,
+                            quantity = desiredQty,
+                            isFoil = uc.isFoil,
+                            condition = uc.condition,
+                            language = uc.language,
+                            isAltArt = uc.isAlternativeArt,
+                        )
+                    }
+                    tradeResult.onFailure { e ->
                         anyError = true
                         _uiState.update { it.copy(error = e.message) }
                     }
@@ -281,6 +318,20 @@ class CardDetailViewModel @Inject constructor(
                 .onFailure { e ->
                     helper.logEvent("error_delete_card", mapOf("card_id" to userCardId))
                     _uiState.update { it.copy(error = e.message) } }
+        }
+    }
+
+    fun onDeleteWishlistEntry(id: String) {
+        viewModelScope.launch {
+            wishlistRepo.removeLocal(id)
+                .onSuccess {
+                    helper.logEvent("delete_wishlist_entry", mapOf("id" to id))
+                    _uiState.update { it.copy(wishlistEntryToDelete = null) }
+                }
+                .onFailure { e ->
+                    helper.logEvent("error_delete_wishlist_entry", mapOf("id" to id))
+                    _uiState.update { it.copy(error = e.message) }
+                }
         }
     }
 
@@ -423,7 +474,7 @@ class CardDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { cardRepo.dismissSuggestedTag(scryfallId, tag) }
                 .onSuccess {
-                    helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.label))
+                    helper.logEvent("dismiss_suggested_tag", mapOf("tag" to tag.label))
                 }
                 .onFailure { e ->
                     helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.label))

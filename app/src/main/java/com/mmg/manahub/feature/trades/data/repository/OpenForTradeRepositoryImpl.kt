@@ -89,11 +89,51 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         val unsynced = dao.getUnsynced()
         if (unsynced.isEmpty()) return@runCatching 0
 
-        // local_collection_id maps 1:1 to user_card_collection.id in Supabase
+        // local_collection_id maps 1:1 to user_card_collection.id in Supabase.
+        // Entries remain in Room after sync (clearSynced removed) so that
+        // observeLocal() continues to show them without re-downloading from remote.
         remote.batchAddOpenForTradeEntries(unsynced.map { it.localCollectionId }).getOrThrow()
         dao.markSynced(unsynced.map { it.id })
-        dao.clearSynced()
         unsynced.size
+    }
+
+    override suspend fun addAndSync(
+        scryfallId: String,
+        localCollectionId: String,
+        quantity: Int,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isAltArt: Boolean,
+        userId: String,
+    ): Result<Unit> = runCatching {
+        val existing = dao.getByCollectionId(localCollectionId)
+        val entity: LocalOpenForTradeEntity = if (existing != null) {
+            existing.copy(
+                quantity = quantity,
+                isFoil = isFoil,
+                condition = condition,
+                language = language,
+                isAltArt = isAltArt,
+                synced = false,
+            ).also { dao.upsert(it) }
+        } else {
+            LocalOpenForTradeEntity(
+                id = UUID.randomUUID().toString(),
+                localCollectionId = localCollectionId,
+                scryfallId = scryfallId,
+                quantity = quantity,
+                isFoil = isFoil,
+                condition = condition,
+                language = language,
+                isAltArt = isAltArt,
+                synced = false,
+                createdAt = System.currentTimeMillis(),
+            ).also { dao.upsert(it) }
+        }
+        // localCollectionId == user_card_collection.id in Supabase — no lookup needed.
+        remote.batchAddOpenForTradeEntries(listOf(entity.localCollectionId)).getOrThrow()
+        dao.markSynced(listOf(entity.id))
     }
 
     private fun LocalOpenForTradeEntity.toDomain() = OpenForTradeEntry(

@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.scanner.presentation
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
@@ -223,10 +224,11 @@ class ScannerViewModel @Inject constructor(
                 _uiState.update { it.copy(scanSession = ScanSession(cards)) }
             }
         } catch (e: Exception) {
-            if (com.mmg.manahub.BuildConfig.DEBUG) {
-                android.util.Log.w("ScannerViewModel", "Failed to restore persisted queue", e)
-            } else {
-                android.util.Log.w("ScannerViewModel", "Failed to restore persisted queue: ${e.javaClass.simpleName}")
+            // Non-fatal: session data lost but app remains functional.
+            // Track to detect schema migration issues after app updates.
+            FirebaseCrashlytics.getInstance().apply {
+                log("scanner_queue_restore_failed: ${e::class.simpleName}")
+                recordException(RuntimeException("[ScannerViewModel] Queue deserialization failed", e))
             }
         }
     }
@@ -350,6 +352,9 @@ class ScannerViewModel @Inject constructor(
                             return
                         }
                         _uiState.update { it.copy(languageMismatch = false) }
+                        analyticsHelper.logEvent("scanner_card_added_quick_mode", mapOf(
+                            "set_code" to result.card.setCode,
+                        ))
                         quickAddCard(result.card)
                     }
 
@@ -439,6 +444,9 @@ class ScannerViewModel @Inject constructor(
      */
     fun onManualAddCurrentCard() {
         val card = _uiState.value.lastDetectedCard ?: return
+        analyticsHelper.logEvent("scanner_card_added_manual", mapOf(
+            "set_code" to card.setCode,
+        ))
         quickAddCard(card)
     }
 
