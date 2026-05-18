@@ -109,6 +109,13 @@ interface UserCardCollectionDao {
     @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId AND is_deleted = 0")
     fun getCountForUser(userId: String): Int
 
+    // Counts rows (including tombstones) modified after [since] for the exact [userId].
+    // Used by SyncManager.countPendingChanges to drive the "Sync your collection" banner.
+    // Unlike getAllSince this does NOT include NULL-userId guest rows — those must be
+    // migrated via assignUserIdAndSync first and must not inflate the banner count.
+    @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId AND updated_at > :since")
+    fun countPendingSync(userId: String, since: Long): Int
+
     // ── Paging 3 support ──────────────────────────────────────────────────────
 
     // Returns a PagingSource backed by Room. Requires room-paging dependency.

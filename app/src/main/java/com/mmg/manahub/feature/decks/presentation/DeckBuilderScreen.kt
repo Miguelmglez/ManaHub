@@ -280,6 +280,7 @@ fun DeckMagicDetailScreen(
     if (showAddCardsSheet) {
         CardSearchSheet(
             query = uiState.addCardsQuery,
+            offerResults = emptyList(),
             addCardsResults = uiState.addCardsResults,
             scryfallResults = uiState.scryfallResults,
             isSearchingCards = uiState.isSearchingCards,
@@ -306,6 +307,7 @@ fun DeckMagicDetailScreen(
     if (showCommanderSearchSheet) {
         CardSearchSheet(
             query = uiState.addCardsQuery,
+            offerResults = emptyList(),
             addCardsResults = uiState.addCardsResults,
             scryfallResults = uiState.scryfallResults,
             isSearchingCards = uiState.isSearchingCards,

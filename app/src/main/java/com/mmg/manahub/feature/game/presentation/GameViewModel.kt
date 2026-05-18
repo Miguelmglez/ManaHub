@@ -3,8 +3,10 @@ package com.mmg.manahub.feature.game.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.feature.game.domain.model.CounterType
@@ -79,6 +81,7 @@ class GameViewModel @Inject constructor(
     savedStateHandle:             SavedStateHandle,
     private val gameSessionRepo:  GameSessionRepository,
     private val tournamentRepo:   TournamentRepository,
+    private val analyticsHelper:  AnalyticsHelper,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -108,6 +111,14 @@ class GameViewModel @Inject constructor(
                             .onSuccess { id ->
                                 _uiState.update { it.copy(lastSessionId = id, isGameRunning = false) }
                                 recordTournamentResultIfNeeded(id, result)
+                            }
+                            .onFailure { e ->
+                                FirebaseCrashlytics.getInstance().apply {
+                                    log("game_session_save_failed: mode=${result.gameMode.name} turns=${result.totalTurns}")
+                                    setCustomKey("game_mode", result.gameMode.name)
+                                    setCustomKey("game_turn_count", result.totalTurns)
+                                    recordException(e)
+                                }
                             }
                     }
                 }
@@ -537,6 +548,17 @@ class GameViewModel @Inject constructor(
             }
         )
         _uiState.update { it.copy(winner = winner, gameResult = result, isGameRunning = false) }
+
+        FirebaseCrashlytics.getInstance().log(
+            "game_ended: mode=${result.gameMode.name} turns=${result.totalTurns} appUserWon=${result.appUserWon}"
+        )
+        analyticsHelper.logEvent("game_ended", mapOf(
+            "game_mode"        to result.gameMode.name,
+            "total_turns"      to result.totalTurns,
+            "app_user_won"     to result.appUserWon,
+            "duration_seconds" to (result.durationMs / 1000).toInt(),
+            "player_count"     to result.allPlayers.size,
+        ))
     }
 
     private fun nextActivePlayer(s: GameUiState): Int {
@@ -584,6 +606,17 @@ class GameViewModel @Inject constructor(
             isGameRunning        = true
         )
         _toolsState.value = GlobalToolsState()
+
+        FirebaseCrashlytics.getInstance().apply {
+            log("game_started: mode=${mode.name} players=${players.size} tournament=true matchId=$matchId")
+            setCustomKey("game_mode", mode.name)
+            setCustomKey("game_player_count", players.size)
+        }
+        analyticsHelper.logEvent("game_started", mapOf(
+            "game_mode"       to mode.name,
+            "player_count"    to players.size,
+            "is_tournament"   to true,
+        ))
     }
 
     private fun recordTournamentResultIfNeeded(sessionId: Long, result: GameResult) {
@@ -595,11 +628,15 @@ class GameViewModel @Inject constructor(
         // recording the result would silently map some players to wrong tournament
         // entries or drop them from life totals — abort instead of persisting garbage.
         if (s.tournamentPlayerIds.size != s.players.size) {
-            android.util.Log.e(
-                "GameViewModel",
-                "recordTournamentResultIfNeeded: tournamentPlayerIds.size (${s.tournamentPlayerIds.size}) " +
-                "!= players.size (${s.players.size}) — match result not recorded for match $matchId"
-            )
+            FirebaseCrashlytics.getInstance().apply {
+                log("tournament_result_player_id_mismatch: matchId=$matchId")
+                setCustomKey("game_player_count", s.players.size)
+                setCustomKey("game_turn_count", s.turnNumber)
+                recordException(IllegalStateException(
+                    "[GameViewModel] tournamentPlayerIds.size (${s.tournamentPlayerIds.size}) " +
+                    "!= players.size (${s.players.size}) for match $matchId"
+                ))
+            }
             return
         }
 
@@ -641,6 +678,16 @@ class GameViewModel @Inject constructor(
             isGameRunning = true
         ) }
         _toolsState.value = GlobalToolsState()
+
+        FirebaseCrashlytics.getInstance().apply {
+            log("game_started: mode=${mode.name} players=${players.size}")
+            setCustomKey("game_mode", mode.name)
+            setCustomKey("game_player_count", players.size)
+        }
+        analyticsHelper.logEvent("game_started", mapOf(
+            "game_mode"    to mode.name,
+            "player_count" to players.size,
+        ))
     }
 
     companion object {

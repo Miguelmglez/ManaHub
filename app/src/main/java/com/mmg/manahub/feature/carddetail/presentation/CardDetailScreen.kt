@@ -121,6 +121,7 @@ import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -197,6 +198,7 @@ fun CardDetailScreen(
                 uiState.card != null -> CardDetailContent(
                     card = uiState.card!!,
                     userCards = uiState.userCards,
+                    wishlistEntries = uiState.wishlistEntries,
                     tradeQuantities = uiState.tradeQuantities,
                     decksContainingCard = uiState.decksContainingCard,
                     isStale = uiState.isStale,
@@ -209,8 +211,10 @@ fun CardDetailScreen(
                     onShowAddSheet = viewModel::onShowAddSheet,
                     onShowWishlistSheet = viewModel::onShowWishlistSheet,
                     onShowTradeSheet = viewModel::onShowTradeSheet,
-                    onUpdateQuantity = { id, qty -> viewModel.onUpdateQuantity(id, qty) },
+                    onUpdateQuantity = viewModel::onUpdateQuantity,
+                    onUpdateWishlistQuantity = viewModel::onUpdateWishlistQuantity,
                     onRequestDelete = viewModel::onRequestDelete,
+                    onRequestDeleteWishlist = viewModel::onRequestDeleteWishlist,
                     onNavigateToDeck = onNavigateToDeck,
                     modifier = Modifier.padding(padding),
                 )
@@ -306,6 +310,27 @@ fun CardDetailScreen(
             },
         )
     }
+
+    uiState.wishlistEntryToDelete?.let { entry ->
+        AlertDialog(
+            onDismissRequest = viewModel::onDismissWishlistDeleteConfirm,
+            title = { Text(stringResource(R.string.carddetail_remove_wishlist_title)) },
+            text = { Text(stringResource(R.string.carddetail_remove_wishlist_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onDeleteWishlistEntry(entry.id) }) {
+                    Text(
+                        stringResource(R.string.action_remove),
+                        color = MaterialTheme.magicColors.lifeNegative
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::onDismissWishlistDeleteConfirm) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -334,6 +359,7 @@ private fun FaceFlippable(
 private fun CardDetailContent(
     card: Card,
     userCards: List<UserCard>,
+    wishlistEntries: List<WishlistEntry>,
     tradeQuantities: Map<String, Int>,
     decksContainingCard: List<Deck>,
     isStale: Boolean,
@@ -347,7 +373,9 @@ private fun CardDetailContent(
     onShowWishlistSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
     onUpdateQuantity: (String, Int) -> Unit,
+    onUpdateWishlistQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
+    onRequestDeleteWishlist: (WishlistEntry) -> Unit,
     onNavigateToDeck: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -559,10 +587,19 @@ private fun CardDetailContent(
             userCards = userCards,
             tradeQuantities = tradeQuantities,
             onShowAddSheet = onShowAddSheet,
-            onShowWishlistSheet = onShowWishlistSheet,
             onShowTradeSheet = onShowTradeSheet,
             onUpdateQuantity = onUpdateQuantity,
             onRequestDelete = onRequestDelete,
+        )
+
+        HorizontalDivider()
+
+        // Wishlist section
+        WishlistSection(
+            entries = wishlistEntries,
+            onShowWishlistSheet = onShowWishlistSheet,
+            onUpdateQuantity = onUpdateWishlistQuantity,
+            onRequestDelete = onRequestDeleteWishlist,
         )
 
         HorizontalDivider()
@@ -719,7 +756,6 @@ private fun CollectionSection(
     userCards: List<UserCard>,
     tradeQuantities: Map<String, Int>,
     onShowAddSheet: () -> Unit,
-    onShowWishlistSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
     onUpdateQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
@@ -729,7 +765,7 @@ private fun CollectionSection(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start,
     ) {
-        // Header: title + Wishlist + Add buttons
+        // Header: title + Add button
 
         Text(
             stringResource(R.string.carddetail_in_collection),
@@ -738,24 +774,6 @@ private fun CollectionSection(
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = onShowWishlistSheet,
-                border = BorderStroke(1.dp, MaterialTheme.magicColors.goldMtg),
-                modifier = Modifier.height(32.dp),
-            ) {
-                Icon(
-                    Icons.Default.Bookmark,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.magicColors.goldMtg
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    stringResource(R.string.carddetail_add_to_wishlist),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = MaterialTheme.magicColors.goldMtg
-                )
-            }
             OutlinedButton(
                 onClick = onShowAddSheet,
                 border = BorderStroke(1.dp, MaterialTheme.magicColors.primaryAccent),
@@ -900,6 +918,149 @@ private fun CollectionCopyRow(
                 Spacer(Modifier.width(8.dp))
                 IconButton(
                     onClick = { onRequestDelete(userCard) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.action_delete),
+                        tint = mc.lifeNegative,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Wishlist section: add button + list of existing entries
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun WishlistSection(
+    entries: List<WishlistEntry>,
+    onShowWishlistSheet: () -> Unit,
+    onUpdateQuantity: (String, Int) -> Unit,
+    onRequestDelete: (WishlistEntry) -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        Text(
+            stringResource(R.string.carddetail_in_wishlist),
+            style = MaterialTheme.magicTypography.labelMedium,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        OutlinedButton(
+            onClick = onShowWishlistSheet,
+            border = BorderStroke(1.dp, MaterialTheme.magicColors.goldMtg),
+            modifier = Modifier.height(32.dp),
+        ) {
+            Icon(
+                Icons.Default.Bookmark,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.magicColors.goldMtg
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                stringResource(R.string.carddetail_add_to_wishlist),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = MaterialTheme.magicColors.goldMtg
+            )
+        }
+    }
+
+    if (entries.isEmpty()) {
+        Text(
+            text = stringResource(R.string.carddetail_no_wishlist_copies),
+            style = MaterialTheme.magicTypography.bodySmall,
+            color = MaterialTheme.magicColors.textSecondary,
+        )
+    } else {
+        entries.forEach { entry ->
+            WishlistEntryRow(
+                entry = entry,
+                onUpdateQuantity = onUpdateQuantity,
+                onRequestDelete = onRequestDelete,
+            )
+        }
+    }
+}
+
+@Composable
+private fun WishlistEntryRow(
+    entry: WishlistEntry,
+    onUpdateQuantity: (String, Int) -> Unit,
+    onRequestDelete: (WishlistEntry) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        color = mc.surface,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            // Badges row
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CopyBadge(label = (entry.language ?: "").uppercase())
+                CopyBadge(label = entry.condition ?: "")
+                if (entry.isFoil) FoilBadge()
+                if (entry.isAltArt) {
+                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
+                }
+            }
+
+            // Quantity stepper + delete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.carddetail_quantity_label),
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = { onUpdateQuantity(entry.id, entry.quantity - 1) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = stringResource(R.string.action_remove),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Text(
+                    text = "${entry.quantity}",
+                    style = MaterialTheme.magicTypography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                IconButton(
+                    onClick = { onUpdateQuantity(entry.id, entry.quantity + 1) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.action_add),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                IconButton(
+                    onClick = { onRequestDelete(entry) },
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(

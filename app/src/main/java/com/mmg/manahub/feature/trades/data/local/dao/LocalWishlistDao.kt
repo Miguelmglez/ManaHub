@@ -32,6 +32,13 @@ interface LocalWishlistDao {
     @Query("SELECT * FROM local_wishlists ORDER BY created_at DESC")
     fun observeAll(): Flow<List<LocalWishlistEntity>>
 
+    @Transaction
+    @Query("SELECT * FROM local_wishlists WHERE scryfall_id = :scryfallId ORDER BY created_at DESC")
+    fun observeByScryfallIdWithCard(scryfallId: String): Flow<List<LocalWishlistWithCard>>
+
+    @Query("SELECT * FROM local_wishlists WHERE scryfall_id = :scryfallId ORDER BY created_at DESC")
+    fun observeByScryfallId(scryfallId: String): Flow<List<LocalWishlistEntity>>
+
     @Query("SELECT * FROM local_wishlists WHERE synced = 0")
     suspend fun getUnsynced(): List<LocalWishlistEntity>
 
@@ -40,6 +47,9 @@ interface LocalWishlistDao {
 
     @Update
     suspend fun update(entry: LocalWishlistEntity)
+
+    @Query("UPDATE local_wishlists SET quantity = :quantity WHERE id = :id")
+    suspend fun updateQuantity(id: String, quantity: Int)
 
     @Query("""
         SELECT * FROM local_wishlists 

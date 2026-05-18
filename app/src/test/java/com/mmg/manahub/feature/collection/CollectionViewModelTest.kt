@@ -1,6 +1,7 @@
 ﻿package com.mmg.manahub.feature.collection
 
 import androidx.work.WorkManager
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.ComparisonOperator
@@ -11,6 +12,7 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
 import com.mmg.manahub.feature.collection.presentation.SortOrder
 import com.mmg.manahub.core.sync.SyncState
@@ -23,6 +25,8 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,6 +76,7 @@ class CollectionViewModelTest {
     private val migrateLocalTradeLists = mockk<MigrateLocalTradeListsUseCase>(relaxed = true)
     private val getLocalWishlist       = mockk<GetLocalWishlistUseCase>(relaxed = true)
     private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
+    private val analyticsHelper            = mockk<AnalyticsHelper>(relaxed = true)
 
     private lateinit var viewModel: CollectionViewModel
 
@@ -124,14 +129,25 @@ class CollectionViewModelTest {
         ),
     )
 
-    private fun buildViewModel(entries: List<UserCardWithCard> = emptyList()): CollectionViewModel {
-        every { getCollection() } returns flowOf(entries)
+    /**
+     * Builds a [CollectionViewModel] for testing.
+     *
+     * @param entries The collection entries to return from [getCollection]. Ignored if
+     *   [getCollection] was already configured by the calling test.
+     * @param overrideCollection When false (default) the helper configures [getCollection]
+     *   to return [flowOf(entries)]. Set to true to skip this stub so a per-test
+     *   stub already registered on [getCollection] is not overridden.
+     */
+    private fun buildViewModel(
+        entries: List<UserCardWithCard> = emptyList(),
+        overrideCollection: Boolean = true,
+    ): CollectionViewModel {
+        if (overrideCollection) every { getCollection() } returns flowOf(entries)
         coEvery { cardRepository.refreshCollectionPrices() } returns Unit
         coEvery { authRepository.getCurrentUser() } returns null
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
         every { getLocalWishlist() } returns flowOf(emptyList())
-        every { userPreferencesRepository.collectionViewModeFlow } returns flowOf(CollectionViewMode.GRID)
         coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
 
         return CollectionViewModel(
@@ -144,6 +160,7 @@ class CollectionViewModelTest {
             migrateLocalTradeLists = migrateLocalTradeLists,
             getLocalWishlist       = getLocalWishlist,
             userPreferencesRepository = userPreferencesRepository,
+            analyticsHelper        = analyticsHelper,
         )
     }
 
@@ -152,11 +169,18 @@ class CollectionViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // Prevent FirebaseCrashlytics.getInstance() from crashing in JVM tests
+        mockkStatic(FirebaseCrashlytics::class)
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
+        // Default collectionViewModeFlow stub (can be overridden per-test before buildViewModel())
+        every { userPreferencesRepository.collectionViewModeFlow } returns flowOf(CollectionViewMode.GRID)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -707,14 +731,14 @@ class CollectionViewModelTest {
 
     @Test
     fun `given collection flow throws when observeCollection then error is set in state`() = runTest {
-        // Arrange
-        coEvery { cardRepository.refreshCollectionPrices() } returns Unit
-
-        viewModel = buildViewModel(emptyList())
-        // Override after buildViewModel so init coroutine picks up the throwing flow
+        // Arrange: configure the throwing flow before building so that buildViewModel
+        // does NOT override it (overrideCollection = false).
         every { getCollection() } returns kotlinx.coroutines.flow.flow {
             throw RuntimeException("DB error")
         }
+        coEvery { cardRepository.refreshCollectionPrices() } returns Unit
+
+        viewModel = buildViewModel(overrideCollection = false)
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)

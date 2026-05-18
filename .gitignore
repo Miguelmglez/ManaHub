@@ -316,3 +316,4 @@ $RECYCLE.BIN/
 /scripts/draftsim/fetch_tier_list.mjs
 /scripts/draftsim/upload_to_r2.mjs
 /SURVEY_OVERHAUL_STATUS.md
+/.claude/settings.json

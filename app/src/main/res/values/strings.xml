@@ -59,6 +59,8 @@
     <string name="collection_sync_success">Collection synced</string>
     <string name="collection_sync_error">Sync failed</string>
     <string name="collection_sync_pending">You have %1$d pending changes</string>
+    <string name="collection_sync_banner">Sync your collection</string>
+    <string name="collection_sync_sheet_title">Sync collection</string>
     <string name="collection_filter_all">All</string>
     <string name="collection_filter_white">White</string>
     <string name="collection_filter_blue">Blue</string>
@@ -155,6 +157,7 @@
     <string name="carddetail_quantity">%1$d in collection</string>
     <string name="carddetail_market_prices">Market prices</string>
     <string name="carddetail_in_collection">In your collection</string>
+    <string name="carddetail_in_wishlist">In your wishlist</string>
     <string name="carddetail_legality">Legal in</string>
     <string name="carddetail_condition">Condition</string>
     <string name="carddetail_language">Language</string>
@@ -164,10 +167,13 @@
     <string name="collection_copy_types">types</string>
     <string name="carddetail_add_copy">Add to collection</string>
     <string name="carddetail_no_copies">You don\'t have this card in your collection</string>
+    <string name="carddetail_no_wishlist_copies">This card is not in your wishlist</string>
     <string name="carddetail_alternative_art">Alternative art</string>
     <string name="carddetail_alternative_art_short">Alt art</string>
     <string name="carddetail_delete_copy_title">Remove copy</string>
     <string name="carddetail_delete_copy_message">Remove this copy from your collection?</string>
+    <string name="carddetail_remove_wishlist_title">Remove from wishlist</string>
+    <string name="carddetail_remove_wishlist_message">Remove this item from your wishlist?</string>
     <string name="carddetail_add_to_wishlist">Wishlist</string>
     <string name="carddetail_wishlist_sheet_title">Add to wishlist</string>
     <string name="carddetail_offer_for_trade">Mark for trade</string>
@@ -1582,6 +1588,10 @@
     <string name="trades_review_collection_proposer">Include \'Review my collection\'</string>
     <string name="trades_review_collection_receiver">Include \'Review their collection\'</string>
     <string name="trades_add_item">Add item</string>
+    <string name="trades_search_title_proposer">Search from your collection</string>
+    <string name="trades_search_title_receiver_generic">Search their collection</string>
+    <string name="trades_search_section_offers">Offers</string>
+    <string name="trades_search_section_collection">Collection</string>
 
     <!-- Phase 3: negotiation screen -->
     <string name="trades_negotiation_title">Trade Negotiation</string>

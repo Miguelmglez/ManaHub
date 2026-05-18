@@ -8,17 +8,21 @@ import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.UserCardCollectionDto
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -114,6 +118,11 @@ class CollectionSyncTest {
 
     @Before
     fun setUp() {
+        // Prevent FirebaseCrashlytics.getInstance() from crashing in JVM tests
+        mockkStatic(FirebaseCrashlytics::class)
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
+
         // Watermark: LAST_SYNC; no local changes; empty remote responses by default
         coEvery { syncPrefs.getLastSyncMillis(any()) } returns LAST_SYNC
         every { collectionDao.getAllSince(any(), any()) } returns emptyList()
@@ -135,6 +144,11 @@ class CollectionSyncTest {
             syncPrefs        = syncPrefs,
             ioDispatcher     = testDispatcher,
         )
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
