@@ -11,8 +11,10 @@ import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.sync.CollectionSyncWorker
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -49,6 +51,7 @@ class CollectionViewModel @Inject constructor(
     private val migrateLocalTradeLists: MigrateLocalTradeListsUseCase,
     private val getLocalWishlist: GetLocalWishlistUseCase,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val analyticsHelper: AnalyticsHelper,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CollectionUiState())
@@ -99,14 +102,35 @@ class CollectionViewModel @Inject constructor(
     private fun observeCollection() {
         viewModelScope.launch {
             getCollection()
-                .catch { e -> _uiState.update { it.copy(error = e.message, isLoading = false) } }
+                .catch { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("collection_observe_failed")
+                        setCustomKey("collection_size", _allCards.value.size)
+                        recordException(e)
+                    }
+                    _uiState.update { it.copy(error = e.message, isLoading = false) }
+                }
                 .collect { cards ->
                     _allCards.value = cards
                     applyFilters()
+                    // Re-check pending changes on every collection emit, but skip the check
+                    // while a sync is actively running to avoid a false-positive during the
+                    // PULL phase (Room emits new rows before the watermark is saved).
+                    val userId = authRepository.getCurrentUser()?.id
+                    // Use SyncManager's StateFlow directly — it is the authoritative source
+                    // and is set to SYNCING before any Room emissions from the PULL phase,
+                    // closing the TOCTOU window between SyncManager emitting SYNCING and
+                    // _uiState being updated by the separate observeSyncState coroutine.
+                    val hasPending = if (userId != null && syncManager.syncState.value != SyncState.SYNCING) {
+                        syncManager.countPendingChanges(userId) > 0
+                    } else {
+                        _uiState.value.hasUnsyncedChanges
+                    }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             hasStaleCards = cards.any { c -> c.card.isStale },
+                            hasUnsyncedChanges = hasPending,
                         )
                     }
                 }
@@ -116,14 +140,29 @@ class CollectionViewModel @Inject constructor(
     private fun refreshPrices() {
         viewModelScope.launch {
             runCatching { cardRepository.refreshCollectionPrices() }
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("collection_price_refresh_failed")
+                        setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
+                        recordException(RuntimeException("[CollectionViewModel] Price refresh failed", e))
+                    }
+                }
         }
     }
 
-    /** Forwards [SyncManager.syncState] into the UI state. */
+    /** Forwards [SyncManager.syncState] into the UI state and clears the banner on success. */
     private fun observeSyncState() {
         viewModelScope.launch {
             syncManager.syncState.collect { state ->
-                _uiState.update { it.copy(syncState = state) }
+                _uiState.update {
+                    it.copy(
+                        syncState = state,
+                        // After a successful sync the watermark is now up-to-date, so there
+                        // are no longer any pending changes — hide the banner immediately.
+                        hasUnsyncedChanges = if (state == SyncState.SUCCESS) false
+                                             else it.hasUnsyncedChanges,
+                    )
+                }
             }
         }
     }
@@ -155,7 +194,9 @@ class CollectionViewModel @Inject constructor(
                         // Clear any sync error so a stale ERROR from a previous background
                         // sync is not shown as fresh on the next app open or login.
                         syncManager.resetSyncState()
-                        _uiState.update { it.copy(syncState = SyncState.IDLE, syncError = null) }
+                        // Also clear hasUnsyncedChanges — a logged-out user must never see
+                        // the sync banner, and stale true would persist into the next login.
+                        _uiState.update { it.copy(syncState = SyncState.IDLE, syncError = null, hasUnsyncedChanges = false) }
                     }
                     is SessionState.Loading -> { /* no-op — wait for final state */ }
                 }
@@ -168,12 +209,17 @@ class CollectionViewModel @Inject constructor(
     /**
      * Triggers a one-shot full sync (push + pull) for the current user.
      * Runs inline so the UI reflects the result immediately via [SyncManager.syncState].
+     * After the sync completes, the pending-changes count is re-evaluated so the banner
+     * is hidden on success or kept visible on error.
      */
     fun onSync() {
         viewModelScope.launch {
             val userId = authRepository.getCurrentUser()?.id ?: return@launch
             _uiState.update { it.copy(syncError = null) }
             val result = syncManager.sync(userId)
+            // hasUnsyncedChanges is managed exclusively by observeSyncState (SUCCESS → false)
+            // and by observeCollection (re-evaluated on each Room emission after sync).
+            // Do not write it here to avoid a dual-write race.
             _uiState.update { it.copy(syncError = result.error) }
         }
     }
@@ -192,6 +238,7 @@ class CollectionViewModel @Inject constructor(
 
     fun onSortChange(sort: SortOrder) {
         _uiState.update { it.copy(sortOrder = sort) }
+        analyticsHelper.logEvent("collection_sort_changed", mapOf("sort_order" to sort.name))
         applyFilters()
     }
 
@@ -202,6 +249,7 @@ class CollectionViewModel @Inject constructor(
             } else {
                 CollectionViewMode.GRID
             }
+            analyticsHelper.logEvent("collection_view_mode_toggled", mapOf("new_mode" to newMode.name))
             userPreferencesRepository.saveCollectionViewMode(newMode)
         }
     }
@@ -226,7 +274,14 @@ class CollectionViewModel @Inject constructor(
             migrateLocalTradeLists(userId)
                 .onSuccess { count ->
                     if (count > 0) {
+                        analyticsHelper.logEvent("trade_lists_migrated", mapOf("migrated_count" to count))
                         _uiState.update { it.copy(snackbarMessage = count.toString()) }
+                    }
+                }
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("trade_list_migration_failed")
+                        recordException(e)
                     }
                 }
         }
@@ -234,6 +289,12 @@ class CollectionViewModel @Inject constructor(
 
     fun applyAdvancedFilters(query: AdvancedSearchQuery) {
         _uiState.update { it.copy(activeQuery = if (query.isEmpty()) null else query) }
+        if (!query.isEmpty()) {
+            analyticsHelper.logEvent("collection_advanced_filter_applied", mapOf(
+                "criteria_count" to query.criteria.size,
+            ))
+            FirebaseCrashlytics.getInstance().setCustomKey("collection_active_filters_count", query.criteria.size)
+        }
         applyFilters()
     }
 

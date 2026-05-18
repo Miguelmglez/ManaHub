@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.decks.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.decks.presentation.engine.DeckMagicEngine
@@ -75,6 +76,13 @@ class DeckMagicViewModel @Inject constructor(
 
     fun setStep(step: DeckMagicStep) {
         _uiState.update { it.copy(step = step) }
+        if (step == DeckMagicStep.SETUP || step == DeckMagicStep.REVIEW) {
+            FirebaseCrashlytics.getInstance().apply {
+                log("deck_magic_stub_screen_reached: step=${step.name}")
+                setCustomKey("deck_magic_step", step.name)
+                recordException(IllegalStateException("[DeckMagicScreen] User reached unimplemented step: ${step.name}"))
+            }
+        }
     }
 
     fun toggleColor(color: ManaColor) {

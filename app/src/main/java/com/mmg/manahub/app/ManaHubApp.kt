@@ -38,7 +38,10 @@ class ManaHubApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
+        FirebaseCrashlytics.getInstance().apply {
+            isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
+            setCustomKey("app_version_name", BuildConfig.VERSION_NAME)
+        }
 
         Coil.setImageLoader(
             ImageLoader.Builder(this)

@@ -8,6 +8,7 @@ import com.mmg.manahub.feature.news.domain.model.SourceType
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,7 +104,13 @@ class NewsViewModel @Inject constructor(
             _isRefreshing.value = true
             _error.value = null
             val result = refreshNewsFeed()
-            result.onFailure { _error.value = it.message }
+            result.onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("news_refresh_failed: ${e::class.simpleName}")
+                    recordException(RuntimeException("[NewsViewModel] Feed refresh failed", e))
+                }
+                _error.value = e.message
+            }
             _isRefreshing.value = false
         }
     }

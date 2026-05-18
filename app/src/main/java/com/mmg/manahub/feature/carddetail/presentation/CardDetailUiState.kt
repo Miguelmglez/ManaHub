@@ -4,10 +4,12 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserDefinedTag
+import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 
 data class CardDetailUiState(
     val card:             Card?          = null,
     val userCards:        List<UserCard> = emptyList(),
+    val wishlistEntries:  List<WishlistEntry> = emptyList(),
     val userDefinedTags:  List<UserDefinedTag> = emptyList(),
     val decksContainingCard: List<Deck>  = emptyList(),
     val isLoading:        Boolean        = true,
@@ -21,4 +23,5 @@ data class CardDetailUiState(
     val showTradeSheet:    Boolean        = false,
     val showTagPicker:     Boolean        = false,
     val cardToDelete:      UserCard?      = null,
+    val wishlistEntryToDelete: WishlistEntry? = null,
 )

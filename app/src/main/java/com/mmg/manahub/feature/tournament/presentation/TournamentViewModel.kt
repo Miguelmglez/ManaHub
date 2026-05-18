@@ -7,6 +7,7 @@ import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
@@ -74,15 +75,30 @@ class TournamentViewModel @Inject constructor(
     fun startNextMatch(onNavigateToGame: (matchId: Long) -> Unit) {
         viewModelScope.launch {
             val match = _uiState.value.nextMatch ?: return@launch
-            repository.startMatch(match.id)
-            onNavigateToGame(match.id)
+            FirebaseCrashlytics.getInstance().log("tournament_match_started: matchId=${match.id}")
+            runCatching { repository.startMatch(match.id) }
+                .onSuccess { onNavigateToGame(match.id) }
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("tournament_match_start_failed: matchId=${match.id}")
+                        setCustomKey("tournament_id", tournamentId)
+                        recordException(e)
+                    }
+                }
         }
     }
 
     fun startMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Unit) {
         viewModelScope.launch {
-            repository.startMatch(matchId)
-            onNavigateToGame(matchId)
+            runCatching { repository.startMatch(matchId) }
+                .onSuccess { onNavigateToGame(matchId) }
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("tournament_match_start_failed: matchId=$matchId")
+                        setCustomKey("tournament_id", tournamentId)
+                        recordException(e)
+                    }
+                }
         }
     }
 
@@ -123,12 +139,20 @@ class TournamentViewModel @Inject constructor(
         lifeTotals: Map<Long, Int>,
     ) {
         viewModelScope.launch {
-            repository.finishMatch(matchId, winnerId, sessionId, lifeTotals)
-            val standings = repository.calculateStandings(tournamentId)
-            _uiState.update { it.copy(standings = standings) }
-            if (repository.isFinished(tournamentId)) {
-                repository.finishTournament(tournamentId)
-                _uiState.update { it.copy(isFinished = true) }
+            runCatching {
+                repository.finishMatch(matchId, winnerId, sessionId, lifeTotals)
+                val standings = repository.calculateStandings(tournamentId)
+                _uiState.update { it.copy(standings = standings) }
+                if (repository.isFinished(tournamentId)) {
+                    repository.finishTournament(tournamentId)
+                    _uiState.update { it.copy(isFinished = true) }
+                }
+            }.onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("tournament_match_result_save_failed: matchId=$matchId winnerId=$winnerId")
+                    setCustomKey("tournament_id", tournamentId)
+                    recordException(e)
+                }
             }
         }
     }

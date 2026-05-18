@@ -33,6 +33,9 @@ class WishlistRepositoryImpl @Inject constructor(
     override fun observeLocal(): Flow<List<WishlistEntry>> =
         dao.observeAllWithCard().map { list -> list.map { it.toDomain() } }
 
+    override fun observeByScryfallId(scryfallId: String): Flow<List<WishlistEntry>> =
+        dao.observeByScryfallIdWithCard(scryfallId).map { list -> list.map { it.toDomain() } }
+
     override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
 
     override suspend fun addLocal(entry: WishlistEntry): Result<Unit> = addMutex.withLock {
@@ -57,6 +60,14 @@ class WishlistRepositoryImpl @Inject constructor(
         dao.deleteById(id)
     }
 
+    override suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit> = runCatching {
+        if (quantity <= 0) {
+            dao.deleteById(id)
+        } else {
+            dao.updateQuantity(id, quantity)
+        }
+    }
+
     override suspend fun getRemote(userId: String): Result<List<WishlistEntry>> =
         remote.getWishlist(userId).map { dtos -> dtos.map { it.toDomain() } }
 
@@ -73,15 +84,37 @@ class WishlistRepositoryImpl @Inject constructor(
         val dtos = unsynced.map { it.toDto(userId) }
         // getOrThrow() propagates the remote failure before any local state is
         // modified, keeping the two stores consistent. If the batch insert
-        // succeeds but markSynced/clearSynced crash (extremely unlikely), the
-        // next migration run will attempt to re-insert already-existing rows.
-        // The Supabase wishlists table should have an ON CONFLICT DO NOTHING
-        // (or UPSERT) policy to make that safe.
+        // succeeds but markSynced crashes (extremely unlikely), the next migration
+        // run will attempt to re-insert already-existing rows — the Supabase
+        // wishlists table should have an ON CONFLICT DO NOTHING / UPSERT policy.
+        // Entries remain in Room after sync (clearSynced removed) so that
+        // observeLocal() continues to show them without re-downloading from remote.
         remote.batchAddWishlistEntries(dtos).getOrThrow()
         dao.markSynced(unsynced.map { it.id })
-        dao.clearSynced()
         unsynced.size
     }
+
+    override suspend fun addAndSync(entry: WishlistEntry, userId: String): Result<Unit> =
+        addMutex.withLock {
+            runCatching {
+                val existing = dao.getByAttributes(
+                    scryfallId = entry.cardId,
+                    matchAnyVariant = entry.matchAnyVariant,
+                    isFoil = entry.isFoil,
+                    condition = entry.condition,
+                    language = entry.language,
+                    isAltArt = entry.isAltArt,
+                )
+                val entity: LocalWishlistEntity = if (existing != null) {
+                    existing.copy(quantity = existing.quantity + entry.quantity)
+                        .also { dao.update(it) }
+                } else {
+                    entry.toEntity().also { dao.insert(it) }
+                }
+                remote.batchAddWishlistEntries(listOf(entity.toDto(userId))).getOrThrow()
+                dao.markSynced(listOf(entity.id))
+            }
+        }
 
     private fun LocalWishlistEntity.toDomain() = WishlistEntry(
         id = id,
