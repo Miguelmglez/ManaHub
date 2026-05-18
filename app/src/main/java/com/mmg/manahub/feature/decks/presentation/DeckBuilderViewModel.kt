@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.Card
@@ -610,7 +611,14 @@ class DeckMagicDetailViewModel @Inject constructor(
                         },
                     )
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().apply {
+                    log("deck_scryfall_search_failed: query_length=${query.length}")
+                    setCustomKey("scryfall_query_length", query.length)
+                    setCustomKey("scryfall_error_type", e::class.simpleName ?: "Unknown")
+                    setCustomKey("deck_card_count", _uiState.value.totalCards)
+                    recordException(RuntimeException("[DeckBuilder] Scryfall search failed", e))
+                }
                 _uiState.update { it.copy(isSearchingScryfall = false) }
             }
         }
@@ -661,7 +669,13 @@ class DeckMagicDetailViewModel @Inject constructor(
                         },
                     )
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().apply {
+                    log("deck_commander_search_failed: query_length=${query.length}")
+                    setCustomKey("scryfall_query_length", query.length)
+                    setCustomKey("scryfall_error_type", e::class.simpleName ?: "Unknown")
+                    recordException(RuntimeException("[DeckBuilder] Commander search failed", e))
+                }
                 _uiState.update { it.copy(isSearchingScryfall = false) }
             }
         }
@@ -734,6 +748,13 @@ class DeckMagicDetailViewModel @Inject constructor(
         if (currentDeck != null && currentDeck != persistedDeck) {
             runCatching {
                 deckRepository.updateDeck(currentDeck.copy(updatedAt = System.currentTimeMillis()))
+            }.onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("deck_metadata_save_failed: deckId=$deckId")
+                    setCustomKey("deck_id", deckId)
+                    setCustomKey("deck_card_count", _uiState.value.totalCards)
+                    recordException(e)
+                }
             }
         }
 
@@ -742,6 +763,14 @@ class DeckMagicDetailViewModel @Inject constructor(
             Triple(key.first, qty, key.second)
         }
         runCatching { deckRepository.replaceAllCards(deckId, slots) }
+            .onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("deck_cards_save_failed: deckId=$deckId slots=${slots.size}")
+                    setCustomKey("deck_id", deckId)
+                    setCustomKey("deck_card_count", slots.size)
+                    recordException(e)
+                }
+            }
 
         // Mark as saved only after Room confirms
         _uiState.update { it.copy(hasUnsavedChanges = false) }

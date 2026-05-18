@@ -1,9 +1,11 @@
 package com.mmg.manahub.feature.game
 
 import androidx.lifecycle.SavedStateHandle
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.game.domain.model.CounterType
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GamePhase
@@ -12,7 +14,10 @@ import com.mmg.manahub.feature.game.presentation.GameViewModel
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -49,6 +54,7 @@ class GameViewModelTest {
 
     private val gameSessionRepo  = mockk<GameSessionRepository>(relaxed = true)
     private val tournamentRepo   = mockk<TournamentRepository>(relaxed = true)
+    private val analyticsHelper  = mockk<AnalyticsHelper>(relaxed = true)
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -59,7 +65,7 @@ class GameViewModelTest {
         playerCount: Int    = 2,
     ): GameViewModel {
         val handle = SavedStateHandle(mapOf("mode" to mode, "playerCount" to playerCount))
-        return GameViewModel(handle, gameSessionRepo, tournamentRepo)
+        return GameViewModel(handle, gameSessionRepo, tournamentRepo, analyticsHelper)
     }
 
     private fun buildPlayer(
@@ -87,6 +93,10 @@ class GameViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // Prevent FirebaseCrashlytics.getInstance() from crashing in JVM tests
+        mockkStatic(FirebaseCrashlytics::class)
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
         coEvery { gameSessionRepo.saveGameSession(any()) } returns 1L
         coEvery { tournamentRepo.finishMatch(any(), any(), any(), any()) } returns Unit
     }
@@ -94,6 +104,7 @@ class GameViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -634,7 +645,7 @@ class GameViewModelTest {
             "mode" to GameMode.STANDARD.name,
             "playerCount" to 2,
         ))
-        val vm = GameViewModel(handle, gameSessionRepo, tournamentRepo)
+        val vm = GameViewModel(handle, gameSessionRepo, tournamentRepo, analyticsHelper)
 
         val configs = listOf(
             PlayerConfig(id = 0, name = "Alice", theme = defaultTheme, isAppUser = true),

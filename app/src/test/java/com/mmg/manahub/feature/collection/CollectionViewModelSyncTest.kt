@@ -8,6 +8,7 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
 import com.mmg.manahub.core.sync.SyncResult
 import com.mmg.manahub.core.sync.SyncState
@@ -66,6 +67,7 @@ class CollectionViewModelSyncTest {
     private val migrateLocalTradeLists = mockk<MigrateLocalTradeListsUseCase>(relaxed = true)
     private val getLocalWishlist       = mockk<GetLocalWishlistUseCase>(relaxed = true)
     private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
+    private val analyticsHelper            = mockk<AnalyticsHelper>(relaxed = true)
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -111,6 +113,7 @@ class CollectionViewModelSyncTest {
         migrateLocalTradeLists = migrateLocalTradeLists,
         getLocalWishlist       = getLocalWishlist,
         userPreferencesRepository = userPreferencesRepository,
+        analyticsHelper        = analyticsHelper,
     )
 
     // ══════════════════════════════════════════════════════════════════════════

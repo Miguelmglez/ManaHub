@@ -145,30 +145,25 @@ class FriendDetailViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         // Reactively reload cards whenever the sub-tab or search query changes.
-        // debounce prevents rapid re-fetches while the user is typing.
+        // isLoadingCards is set immediately via onEach (before the debounce) so the
+        // loading indicator appears without the 300 ms jitter of the old emit(null) pattern.
         @Suppress("OPT_IN_USAGE") // flatMapLatest is stable in kotlinx.coroutines
         combine(
             _uiState.map { it.folderSubTab }.distinctUntilChanged(),
             _uiState.map { it.searchQuery }.distinctUntilChanged(),
         ) { subTab, query -> subTab to query }
+            .onEach { _uiState.update { it.copy(isLoadingCards = true, cardError = false) } }
             .debounce(300L)
             .flatMapLatest { (subTab, query) ->
-                flow {
-                    emit(null) // signal loading start
-                    emit(getFriendCollectionUseCase(friendUserId, subTab.listValue, query))
-                }
+                flow { emit(getFriendCollectionUseCase(friendUserId, subTab.listValue, query)) }
             }
             .onEach { result ->
-                if (result == null) {
-                    _uiState.update { it.copy(isLoadingCards = true, cardError = false) }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            cards = result.getOrDefault(emptyList()),
-                            isLoadingCards = false,
-                            cardError = result.isFailure,
-                        )
-                    }
+                _uiState.update {
+                    it.copy(
+                        cards = result.getOrDefault(emptyList()),
+                        isLoadingCards = false,
+                        cardError = result.isFailure,
+                    )
                 }
             }
             .launchIn(viewModelScope)

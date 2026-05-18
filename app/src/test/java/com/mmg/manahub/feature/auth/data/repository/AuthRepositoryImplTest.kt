@@ -10,7 +10,9 @@ import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.AuthConfig
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.exceptions.RestException
@@ -26,8 +28,11 @@ import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import okhttp3.Call
 import okhttp3.OkHttpClient
@@ -172,6 +177,11 @@ class AuthRepositoryImplTest {
     @Before
     fun setUp() {
         every { supabaseAuth.sessionStatus } returns sessionStatusFlow
+        every { supabaseAuth.config } returns mockk<AuthConfig>(relaxed = true)
+
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } just Runs
+        coEvery { supabaseAuth.signUpWith(any<Email>(), anyNullable(), anyNullable()) } returns null
+        coEvery { supabaseAuth.signInWith(any<IDToken>(), anyNullable(), anyNullable()) } just Runs
 
         // Default stub: upsertUserProfile returns the user unchanged (non-blocking default).
         coEvery { userProfileDataSource.upsertUserProfile(any()) } answers {
@@ -240,7 +250,7 @@ class AuthRepositoryImplTest {
         val restException = mockk<RestException>(relaxed = true) {
             every { statusCode } returns 400
         }
-        coEvery { supabaseAuth.signInWith(any<Email>(), any(), any()) } throws restException
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws restException
 
         val result = repository.signInWithEmail("wrong@example.com", "wrongpassword")
 
@@ -253,7 +263,7 @@ class AuthRepositoryImplTest {
         val restException = mockk<RestException>(relaxed = true) {
             every { statusCode } returns 404
         }
-        coEvery { supabaseAuth.signInWith(any<Email>(), any(), any()) } throws restException
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws restException
 
         val result = repository.signInWithEmail("ghost@example.com", "password123")
 
@@ -266,7 +276,7 @@ class AuthRepositoryImplTest {
         val restException = mockk<RestException>(relaxed = true) {
             every { statusCode } returns 401
         }
-        coEvery { supabaseAuth.signInWith(any<Email>(), any(), any()) } throws restException
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws restException
 
         val result = repository.signInWithEmail("test@example.com", "password123")
 
@@ -279,7 +289,7 @@ class AuthRepositoryImplTest {
         val restException = mockk<RestException>(relaxed = true) {
             every { statusCode } returns 500
         }
-        coEvery { supabaseAuth.signInWith(any<Email>(), any(), any()) } throws restException
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws restException
 
         val result = repository.signInWithEmail("test@example.com", "password123")
 
@@ -289,7 +299,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `given network failure when signInWithEmail then returns Error with NetworkError`() = runTest {
-        coEvery { supabaseAuth.signInWith(any<Email>(), any(), any()) } throws IOException("No network")
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws IOException("No network")
 
         val result = repository.signInWithEmail("test@example.com", "password123")
 
@@ -299,7 +309,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `given HTTP timeout when signInWithEmail then returns Error with NetworkError`() = runTest {
-        coEvery { supabaseAuth.signInWith(any<Email>(), any(), any()) } throws HttpRequestTimeoutException("https://supabase.io", 30_000L)
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws HttpRequestTimeoutException("https://supabase.io", 30_000L)
 
         val result = repository.signInWithEmail("test@example.com", "password123")
 
@@ -309,7 +319,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `given unexpected exception when signInWithEmail then returns Error with Unknown`() = runTest {
-        coEvery { supabaseAuth.signInWith(any<Email>(), any(), any()) } throws RuntimeException("Unexpected failure")
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws RuntimeException("Unexpected failure")
 
         val result = repository.signInWithEmail("test@example.com", "password123")
 
@@ -366,7 +376,7 @@ class AuthRepositoryImplTest {
         val restException = mockk<RestException>(relaxed = true) {
             every { statusCode } returns 422
         }
-        coEvery { supabaseAuth.signUpWith(any<Email>(), any(), any()) } throws restException
+        coEvery { supabaseAuth.signUpWith(any<Email>(), anyNullable(), anyNullable()) } throws restException
 
         val result = repository.signUpWithEmail("existing@example.com", "password123", "Hero", null)
 
@@ -376,7 +386,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `given network failure when signUpWithEmail then returns Error with NetworkError`() = runTest {
-        coEvery { supabaseAuth.signUpWith(any<Email>(), any(), any()) } throws IOException("Network down")
+        coEvery { supabaseAuth.signUpWith(any<Email>(), anyNullable(), anyNullable()) } throws IOException("Network down")
 
         val result = repository.signUpWithEmail("new@example.com", "password123", "Hero", null)
 
@@ -406,42 +416,39 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `given new Google user when signUpWithGoogle then profile created with provided nickname`() = runTest {
-        // When a user signs up with Google, they provide a nickname.
         val userInfoMock = buildUserInfoMock(
             providerName     = "google",
             nicknameMetadata = null,
-            fullNameMetadata = "Gandalf Grey", // must be ignored — nickname param takes priority
+            fullNameMetadata = "Gandalf Grey",
         )
         val expectedUser = buildExpectedAuthUser(provider = "google", nickname = "Gandalf")
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { userProfileDataSource.upsertUserProfile(any()) } returns expectedUser
+        coEvery { userProfileDataSource.completeUserProfile(any()) } returns expectedUser
 
         val result = repository.signUpWithGoogle("google-token", "raw-nonce", "Gandalf", null)
 
         assertTrue(result is AuthResult.Success)
         assertEquals("Gandalf", (result as AuthResult.Success).data.nickname)
-        coVerify(exactly = 1) { userProfileDataSource.upsertUserProfile(any()) }
-        // updateNickname RPC is never called in the Google sign-in flow
+        coVerify(exactly = 1) { userProfileDataSource.completeUserProfile(any()) }
         coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
     }
 
     @Test
     fun `given returning Google user when signInWithGoogle then upsertUserProfile is NOT called if profile exists`() = runTest {
-        // Returning user: fetchUserProfile returns an existing profile.
-        // The repository uses the existing profile data and skips upsertUserProfile.
         val userInfoMock = buildUserInfoMock(
             providerName     = "google",
             nicknameMetadata = "ExistingNick",
         )
         val existingProfile = com.mmg.manahub.feature.auth.data.remote.UserProfileDto(
-            id        = "user-uuid-001",
-            nickname  = "ExistingNick",
-            gameTag   = "#XYZ1234",
-            avatarUrl = null,
-            provider  = "google",
+            id               = "user-uuid-001",
+            nickname         = "ExistingNick",
+            gameTag          = "#XYZ1234",
+            avatarUrl        = null,
+            provider         = "google",
+            profileCompleted = true,
         )
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns existingProfile
+        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns existingProfile
 
         val result = repository.signInWithGoogle("google-token", "raw-nonce")
 
@@ -449,26 +456,22 @@ class AuthRepositoryImplTest {
         val user = (result as AuthResult.Success).data
         assertEquals("ExistingNick", user.nickname)
         assertEquals("#XYZ1234", user.gameTag)
-        // Must NOT call upsertUserProfile for returning users
         coVerify(exactly = 0) { userProfileDataSource.upsertUserProfile(any()) }
-        // Must NOT call updateNickname RPC at all
         coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
     }
 
     @Test
-    fun `given new Google user when signInWithGoogle then profile created with null nickname`() = runTest {
-        // When user signs in with Google on the sign-in tab (not sign-up).
-        // The repository stores null nickname until the user explicitly sets one.
+    fun `given new Google user with incomplete profile when signInWithGoogle then returns NoProfileFound`() = runTest {
         val userInfoMock = buildUserInfoMock(providerName = "google", nicknameMetadata = null)
-        val expectedUser = buildExpectedAuthUser(provider = "google", nickname = null)
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns null
-        coEvery { userProfileDataSource.upsertUserProfile(any()) } returns expectedUser
+        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns null
+        coEvery { supabaseAuth.signOut(any()) } just Runs
 
         val result = repository.signInWithGoogle("google-token", "raw-nonce")
 
-        assertTrue(result is AuthResult.Success)
-        coVerify(exactly = 1) { userProfileDataSource.upsertUserProfile(any()) }
+        assertTrue(result is AuthResult.Error)
+        assertTrue((result as AuthResult.Error).error is AuthError.NoProfileFound)
+        coVerify(exactly = 0) { userProfileDataSource.upsertUserProfile(any()) }
     }
 
     @Test
@@ -638,18 +641,42 @@ class AuthRepositoryImplTest {
     @Test
     fun `given SessionStatus Authenticated when sessionState collected then emits Authenticated with AuthUser`() = runTest {
         val userInfoMock = buildUserInfoMock()
+        // Stub the fields read by the real mapUserInfoToAuthUser so the mapper doesn't crash
+        // on the relaxed JsonObject mock (whose keys return JsonArray instead of JsonPrimitive).
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
         val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
             every { user } returns userInfoMock
         }
+
+        // backgroundScope as applicationScope avoids UncompletedCoroutinesError at teardown.
+        // The sharing coroutine is a background task; runTest does not wait for it to finish.
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            supabaseUserProfileService = supabaseUserProfileService,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
         sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
 
-        repository.sessionState.test {
-            // Fast first emit (from auth metadata)
-            val state = awaitItem()
-            assertTrue(state is SessionState.Authenticated)
-            assertEquals("user-uuid-001", (state as SessionState.Authenticated).user.id)
-            cancelAndIgnoreRemainingEvents()
-        }
+        // Foreground launch: ensures at least one FG task is in the queue so that
+        // advanceUntilIdle() processes BOTH the BG sharing coroutine and this FG task.
+        // advanceUntilIdle() exits when only BG tasks remain (i.e. after the FG collect
+        // coroutine has subscribed and suspended), at which point the sharing coroutine's
+        // START resumption is pending.  testScheduler.runCurrent() then drains all remaining
+        // BG events at virtual time=0: START → upstream → MockK stubs → emit(Authenticated).
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertTrue(state is SessionState.Authenticated)
+        assertEquals("user-uuid-001", (state as SessionState.Authenticated).user.id)
     }
 
     @Test

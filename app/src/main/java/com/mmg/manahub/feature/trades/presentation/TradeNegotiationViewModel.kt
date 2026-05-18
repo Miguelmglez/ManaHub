@@ -3,7 +3,9 @@ package com.mmg.manahub.feature.trades.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.trades.domain.model.TradeError
@@ -62,6 +64,7 @@ class TradeNegotiationViewModel @Inject constructor(
     private val cancelProposal: CancelProposalUseCase,
     private val revokeAcceptance: RevokeAcceptanceUseCase,
     private val markCompleted: MarkCompletedUseCase,
+    private val analyticsHelper: AnalyticsHelper,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -91,14 +94,26 @@ class TradeNegotiationViewModel @Inject constructor(
         if (_uiState.value.isProcessing) return
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
-            acceptProposal(proposalId).onFailure { e ->
-                val error = when (e) {
-                    is TradeError.CardAlreadyLocked -> NegotiationError.CardAlreadyLocked(e.cardIds)
-                    is TradeError.CannotAcceptReviewCollection -> NegotiationError.Generic("CANNOT_ACCEPT_REVIEW_COLLECTION")
-                    else -> NegotiationError.Generic(e.toUserFacingMessage())
+            FirebaseCrashlytics.getInstance().log("trade_accept_started: proposal=$proposalId")
+            acceptProposal(proposalId)
+                .onSuccess {
+                    analyticsHelper.logEvent("trade_accepted", mapOf("root_proposal_id" to rootProposalId))
                 }
-                _uiState.update { it.copy(errorDialog = error) }
-            }
+                .onFailure { e ->
+                    val error = when (e) {
+                        is TradeError.CardAlreadyLocked -> NegotiationError.CardAlreadyLocked(e.cardIds)
+                        is TradeError.CannotAcceptReviewCollection -> NegotiationError.Generic("CANNOT_ACCEPT_REVIEW_COLLECTION")
+                        else -> {
+                            FirebaseCrashlytics.getInstance().apply {
+                                log("trade_accept_failed: proposal=$proposalId")
+                                setCustomKey("trade_root_proposal_id", rootProposalId)
+                                recordException(e)
+                            }
+                            NegotiationError.Generic(e.toUserFacingMessage())
+                        }
+                    }
+                    _uiState.update { it.copy(errorDialog = error) }
+                }
             _uiState.update { it.copy(isProcessing = false) }
         }
     }
@@ -108,6 +123,11 @@ class TradeNegotiationViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
             declineProposal(proposalId).onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("trade_decline_failed: proposal=$proposalId")
+                    setCustomKey("trade_root_proposal_id", rootProposalId)
+                    recordException(e)
+                }
                 _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) }
             }
             _uiState.update { it.copy(isProcessing = false) }
@@ -119,6 +139,11 @@ class TradeNegotiationViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
             cancelProposal(proposalId).onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("trade_cancel_failed: proposal=$proposalId")
+                    setCustomKey("trade_root_proposal_id", rootProposalId)
+                    recordException(e)
+                }
                 _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) }
             }
             _uiState.update { it.copy(isProcessing = false) }
@@ -130,6 +155,11 @@ class TradeNegotiationViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
             revokeAcceptance(proposalId).onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("trade_revoke_failed: proposal=$proposalId")
+                    setCustomKey("trade_root_proposal_id", rootProposalId)
+                    recordException(e)
+                }
                 _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) }
             }
             _uiState.update { it.copy(isProcessing = false) }
@@ -140,13 +170,26 @@ class TradeNegotiationViewModel @Inject constructor(
         if (_uiState.value.isProcessing) return
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isProcessing = true) }
-            markCompleted(proposalId).onFailure { e ->
-                val error = when (e) {
-                    is TradeError.InventoryGone -> NegotiationError.InventoryGone
-                    else -> NegotiationError.Generic(e.toUserFacingMessage())
+            FirebaseCrashlytics.getInstance().log("trade_mark_completed_started: proposal=$proposalId")
+            markCompleted(proposalId)
+                .onSuccess {
+                    analyticsHelper.logEvent("trade_completed", mapOf("root_proposal_id" to rootProposalId))
+                    FirebaseCrashlytics.getInstance().log("trade_mark_completed_success: proposal=$proposalId")
                 }
-                _uiState.update { it.copy(errorDialog = error) }
-            }
+                .onFailure { e ->
+                    val error = when (e) {
+                        is TradeError.InventoryGone -> NegotiationError.InventoryGone
+                        else -> {
+                            FirebaseCrashlytics.getInstance().apply {
+                                log("trade_mark_completed_failed: proposal=$proposalId")
+                                setCustomKey("trade_root_proposal_id", rootProposalId)
+                                recordException(e)
+                            }
+                            NegotiationError.Generic(e.toUserFacingMessage())
+                        }
+                    }
+                    _uiState.update { it.copy(errorDialog = error) }
+                }
             _uiState.update { it.copy(isProcessing = false) }
         }
     }

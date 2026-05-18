@@ -85,6 +85,7 @@ import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.friends.domain.model.Friend
+import com.mmg.manahub.feature.trades.domain.model.TradeSide
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,7 +134,7 @@ fun CreateTradeProposalScreen(
         }
     }
 
-    var showAddItemSheet by remember { mutableStateOf<ItemSide?>(null) }
+    var showAddItemSheet by remember { mutableStateOf<TradeSide?>(null) }
     var editingItem by remember { mutableStateOf<TradeItemDraft?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
     var showLoginSheet by remember { mutableStateOf(false) }
@@ -247,7 +248,10 @@ fun CreateTradeProposalScreen(
                     item(key = "proposer_empty") {
                         EmptySidePlaceholder(
                             text = "Add cards you want to trade away",
-                            onClick = { showAddItemSheet = ItemSide.PROPOSER }
+                            onClick = { 
+                                viewModel.onOpenSearch(TradeSide.PROPOSER)
+                                showAddItemSheet = TradeSide.PROPOSER 
+                            }
                         )
                     }
                 } else {
@@ -262,17 +266,20 @@ fun CreateTradeProposalScreen(
                         )
                     }
 
-                    item(key = "you_offer_review") {
-                        ReviewCollectionToggle(
-                            label   = stringResource(R.string.trades_review_collection_proposer),
-                            checked = uiState.includesReviewFromProposer,
-                            onToggle = viewModel::toggleReviewCollectionProposer,
-                        )
-                    }
-
                     item(key = "you_offer_add") {
-                        AddItemButton(onClick = { showAddItemSheet = ItemSide.PROPOSER })
+                        AddItemButton(onClick = { 
+                            viewModel.onOpenSearch(TradeSide.PROPOSER)
+                            showAddItemSheet = TradeSide.PROPOSER 
+                        })
                     }
+                }
+
+                item(key = "you_offer_review") {
+                    ReviewCollectionToggle(
+                        label   = stringResource(R.string.trades_review_collection_proposer),
+                        checked = uiState.includesReviewFromProposer,
+                        onToggle = viewModel::toggleReviewCollectionProposer,
+                    )
                 }
 
                 item(key = "divider") {
@@ -302,11 +309,14 @@ fun CreateTradeProposalScreen(
                     )
                 }
 
-                if (uiState.receiverItems.isEmpty() && !uiState.includesReviewFromReceiver) {
+                if (uiState.receiverItems.isEmpty()) {
                     item(key = "receiver_empty") {
                         EmptySidePlaceholder(
                             text = "Search for cards you want from them",
-                            onClick = { showAddItemSheet = ItemSide.RECEIVER }
+                            onClick = { 
+                                viewModel.onOpenSearch(TradeSide.RECEIVER)
+                                showAddItemSheet = TradeSide.RECEIVER 
+                            }
                         )
                     }
                 } else {
@@ -321,16 +331,11 @@ fun CreateTradeProposalScreen(
                         )
                     }
 
-                    item(key = "they_offer_review") {
-                        ReviewCollectionToggle(
-                            label   = stringResource(R.string.trades_review_collection_receiver),
-                            checked = uiState.includesReviewFromReceiver,
-                            onToggle = viewModel::toggleReviewCollectionReceiver,
-                        )
-                    }
-
                     item(key = "they_offer_add") {
-                        AddItemButton(onClick = { showAddItemSheet = ItemSide.RECEIVER })
+                        AddItemButton(onClick = { 
+                            viewModel.onOpenSearch(TradeSide.RECEIVER)
+                            showAddItemSheet = TradeSide.RECEIVER 
+                        })
                     }
                 }
 
@@ -344,6 +349,7 @@ fun CreateTradeProposalScreen(
     showAddItemSheet?.let { side ->
         CardSearchSheet(
             query = uiState.addCardsQuery,
+            offerResults = uiState.offerResults,
             addCardsResults = uiState.addCardsResults,
             wishlistResults = uiState.wishlistResults,
             scryfallResults = uiState.scryfallResults,
@@ -352,7 +358,11 @@ fun CreateTradeProposalScreen(
             isSearchingScryfall = uiState.isSearchingScryfall,
             onQueryChange = viewModel::onAddCardsQueryChange,
             onScryfallSearch = viewModel::searchScryfallDirect,
-            friendName = uiState.selectedFriend?.nickname,
+            friendName = if (side == TradeSide.RECEIVER) uiState.selectedFriend?.nickname else null,
+            title = stringResource(
+                if (side == TradeSide.PROPOSER) R.string.trades_search_title_proposer
+                else R.string.trades_search_title_receiver_generic
+            ),
             onAdd = { id ->
                 focusManager.clearFocus()
                 val card = viewModel.getCardById(id)
@@ -370,8 +380,8 @@ fun CreateTradeProposalScreen(
                         language = "en"
                     )
                     when (side) {
-                        ItemSide.PROPOSER -> viewModel.addProposerItem(draft)
-                        ItemSide.RECEIVER -> viewModel.addReceiverItem(draft)
+                        TradeSide.PROPOSER -> viewModel.addProposerItem(draft)
+                        TradeSide.RECEIVER -> viewModel.addReceiverItem(draft)
                     }
                     showAddItemSheet = null
                     viewModel.clearAddCardsState()
@@ -428,8 +438,6 @@ fun CreateTradeProposalScreen(
         )
     }
 }
-
-private enum class ItemSide { PROPOSER, RECEIVER }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

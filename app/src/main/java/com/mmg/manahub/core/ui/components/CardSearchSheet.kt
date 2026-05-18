@@ -80,6 +80,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 @Composable
 fun CardSearchSheet(
     query: String,
+    offerResults: List<AddCardRow>,
     addCardsResults: List<AddCardRow>,
     scryfallResults: List<AddCardRow>,
     isSearchingCards: Boolean,
@@ -235,7 +236,7 @@ fun CardSearchSheet(
 
             val results = when (selectedTab) {
                 0 -> wishlistResults
-                1 -> addCardsResults
+                1 -> offerResults + addCardsResults
                 else -> scryfallResults
             }
             LazyColumn(
@@ -257,16 +258,62 @@ fun CardSearchSheet(
             ) {
                 item { Spacer(Modifier.height(8.dp)) }
                 
-                items(results, key = { it.card.scryfallId }) { row ->
-                    AddCardSheetRow(
-                        row = row,
-                        isCommanderMode = isCommanderMode,
-                        isCurrentCommander = isCurrentCommander(row.card.scryfallId),
-                        onAdd = { onAdd(row.card.scryfallId) },
-                        onRemove = { onRemove(row.card.scryfallId) },
-                        onClick = { onCardClick(row.card.scryfallId) },
-                        onInteraction = { forceHideKeyboard() }
-                    )
+                if (selectedTab == 1) {
+                    if (offerResults.isNotEmpty()) {
+                        item(key = "offers_header") {
+                            Text(
+                                text = stringResource(R.string.trades_search_section_offers).uppercase(),
+                                style = ty.labelSmall,
+                                color = mc.textSecondary,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        items(offerResults, key = { "off_${it.card.scryfallId}" }) { row ->
+                            AddCardSheetRow(
+                                row = row,
+                                isCommanderMode = isCommanderMode,
+                                isCurrentCommander = isCurrentCommander(row.card.scryfallId),
+                                onAdd = { onAdd(row.card.scryfallId) },
+                                onRemove = { onRemove(row.card.scryfallId) },
+                                onClick = { onCardClick(row.card.scryfallId) },
+                                onInteraction = { forceHideKeyboard() }
+                            )
+                        }
+                    }
+
+                    if (addCardsResults.isNotEmpty()) {
+                        item(key = "collection_header") {
+                            Text(
+                                text = stringResource(R.string.trades_search_section_collection).uppercase(),
+                                style = ty.labelSmall,
+                                color = mc.textSecondary,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        items(addCardsResults, key = { "coll_${it.card.scryfallId}" }) { row ->
+                            AddCardSheetRow(
+                                row = row,
+                                isCommanderMode = isCommanderMode,
+                                isCurrentCommander = isCurrentCommander(row.card.scryfallId),
+                                onAdd = { onAdd(row.card.scryfallId) },
+                                onRemove = { onRemove(row.card.scryfallId) },
+                                onClick = { onCardClick(row.card.scryfallId) },
+                                onInteraction = { forceHideKeyboard() }
+                            )
+                        }
+                    }
+                } else {
+                    items(results, key = { it.card.scryfallId }) { row ->
+                        AddCardSheetRow(
+                            row = row,
+                            isCommanderMode = isCommanderMode,
+                            isCurrentCommander = isCurrentCommander(row.card.scryfallId),
+                            onAdd = { onAdd(row.card.scryfallId) },
+                            onRemove = { onRemove(row.card.scryfallId) },
+                            onClick = { onCardClick(row.card.scryfallId) },
+                            onInteraction = { forceHideKeyboard() }
+                        )
+                    }
                 }
 
                 if (results.isEmpty()) {

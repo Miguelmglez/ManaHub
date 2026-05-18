@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -62,9 +63,11 @@ class AuthViewModel @Inject constructor(
                 when (state) {
                     is SessionState.Authenticated -> {
                         analyticsHelper.setUserId(state.user.id)
+                        FirebaseCrashlytics.getInstance().setCustomKey("session_auth_state", "authenticated")
                     }
                     is SessionState.Unauthenticated -> {
                         analyticsHelper.setUserId(null)
+                        FirebaseCrashlytics.getInstance().setCustomKey("session_auth_state", "unauthenticated")
                     }
                     else -> Unit
                 }
@@ -190,8 +193,14 @@ class AuthViewModel @Inject constructor(
                     _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_credential_unsupported))
                 }
             } catch (e: GetCredentialException) {
+                analyticsHelper.logEvent("auth_google_sign_in_cancelled")
                 _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_cancelled))
             } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().apply {
+                    log("auth_google_sign_in_failed: ${e::class.simpleName}")
+                    recordException(RuntimeException("[AuthViewModel] Google sign-in failed", e))
+                }
+                analyticsHelper.logEvent("auth_google_sign_in_failed")
                 _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_failed))
             }
         }
@@ -248,8 +257,14 @@ class AuthViewModel @Inject constructor(
                     _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_credential_unsupported))
                 }
             } catch (e: GetCredentialException) {
+                analyticsHelper.logEvent("auth_google_sign_up_cancelled")
                 _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_cancelled))
             } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().apply {
+                    log("auth_google_sign_up_failed: ${e::class.simpleName}")
+                    recordException(RuntimeException("[AuthViewModel] Google sign-up failed", e))
+                }
+                analyticsHelper.logEvent("auth_google_sign_up_failed")
                 _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_google_failed))
             }
         }

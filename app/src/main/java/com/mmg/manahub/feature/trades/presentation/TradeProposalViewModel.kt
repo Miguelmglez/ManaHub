@@ -3,7 +3,9 @@ package com.mmg.manahub.feature.trades.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
@@ -15,7 +17,9 @@ import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
 import com.mmg.manahub.feature.trades.domain.model.TradeError
+import com.mmg.manahub.feature.trades.domain.model.TradeSide
 import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
@@ -68,7 +72,8 @@ data class ProposalEditorUiState(
 
     // Search / Add cards state
     val addCardsQuery: String = "",
-    val addCardsResults: List<AddCardRow> = emptyList(), // This is Collection/Offer
+    val offerResults: List<AddCardRow> = emptyList(), // Specific offer list
+    val addCardsResults: List<AddCardRow> = emptyList(), // Full Collection
     val wishlistResults: List<AddCardRow> = emptyList(),
     val isSearchingCards: Boolean = false,
     val isSearchingWishlist: Boolean = false,
@@ -79,6 +84,7 @@ data class ProposalEditorUiState(
     val friends: List<Friend> = emptyList(),
     val selectedFriend: Friend? = null,
     val sessionState: SessionState = SessionState.Loading,
+    val searchingSide: TradeSide? = null,
 ) {
     val totalProposerValueUsd: Double get() = proposerItems.sumOf { 
         val price = if (it.isFoil) (it.priceUsdFoil ?: it.priceUsd ?: 0.0) else (it.priceUsd ?: 0.0)
@@ -108,7 +114,9 @@ class TradeProposalViewModel @Inject constructor(
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
     private val wishlistRepository: WishlistRepository,
+    private val openForTradeRepository: OpenForTradeRepository,
     private val friendRepository: FriendRepository,
+    private val analyticsHelper: AnalyticsHelper,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -118,9 +126,11 @@ class TradeProposalViewModel @Inject constructor(
     private var currentUserId: String = ""
     private var collectionCards: List<Card> = emptyList()
     private var wishlistCards: List<Card> = emptyList()
+    private var offerCards: List<Card> = emptyList()
     
     private var friendCollectionCards: List<Card> = emptyList()
     private var friendWishlistCards: List<Card> = emptyList()
+    private var friendOfferCards: List<Card> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -133,6 +143,7 @@ class TradeProposalViewModel @Inject constructor(
         }
         observeCollection()
         observeWishlist()
+        observeOffers()
         observeFriends()
         val receiverId = savedStateHandle.get<String>("receiverId") ?: ""
         val parentProposalId = savedStateHandle.get<String>("parentProposalId")
@@ -169,6 +180,15 @@ class TradeProposalViewModel @Inject constructor(
         }
     }
 
+    private fun observeOffers() {
+        viewModelScope.launch {
+            openForTradeRepository.observeLocal().collect { offers ->
+                offerCards = offers.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                updateSearchLists(_uiState.value.addCardsQuery)
+            }
+        }
+    }
+
     private fun observeFriends() {
         viewModelScope.launch {
             friendRepository.observeFriends().collect { friends ->
@@ -184,12 +204,13 @@ class TradeProposalViewModel @Inject constructor(
     }
 
     fun onFriendSelected(friend: Friend?) {
-        _uiState.update { it.copy(selectedFriend = friend) }
+        _uiState.update { it.copy(selectedFriend = friend, receiverId = friend?.userId ?: "") }
         if (friend != null) {
             fetchFriendData(friend.userId)
         } else {
             friendCollectionCards = emptyList()
             friendWishlistCards = emptyList()
+            friendOfferCards = emptyList()
             updateSearchLists(_uiState.value.addCardsQuery)
         }
     }
@@ -202,19 +223,37 @@ class TradeProposalViewModel @Inject constructor(
      */
     private fun fetchFriendData(userId: String) {
         viewModelScope.launch(ioDispatcher) {
+            // Wishlist
             wishlistRepository.getRemote(userId)
                 .onSuccess { entries ->
                     friendWishlistCards = entries.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
-                    // Friend collection cards require a dedicated remote endpoint; left empty for now.
-                    friendCollectionCards = emptyList()
                     updateSearchLists(_uiState.value.addCardsQuery)
                 }
-                .onFailure {
-                    // Non-fatal: the picker still works without the friend's wishlist.
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("trade_friend_wishlist_load_failed: userId=$userId")
+                        recordException(RuntimeException("[TradeProposal] Friend wishlist fetch failed", e))
+                    }
                     friendWishlistCards = emptyList()
-                    friendCollectionCards = emptyList()
+                }
+
+            // Offers
+            openForTradeRepository.getRemote(userId)
+                .onSuccess { entries ->
+                    friendOfferCards = entries.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
                     updateSearchLists(_uiState.value.addCardsQuery)
                 }
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("trade_friend_offers_load_failed: userId=$userId")
+                        recordException(RuntimeException("[TradeProposal] Friend offers fetch failed", e))
+                    }
+                    friendOfferCards = emptyList()
+                }
+
+            // Friend collection cards require a dedicated remote endpoint; left empty for now.
+            friendCollectionCards = emptyList()
+            updateSearchLists(_uiState.value.addCardsQuery)
         }
     }
 
@@ -223,12 +262,33 @@ class TradeProposalViewModel @Inject constructor(
         updateSearchLists(query)
     }
 
+    fun onOpenSearch(side: TradeSide) {
+        _uiState.update { it.copy(searchingSide = side) }
+        updateSearchLists(_uiState.value.addCardsQuery)
+    }
+
     private fun updateSearchLists(query: String) {
         val state = _uiState.value
         val isFriendSelected = state.selectedFriend != null
+        val searchingSide = state.searchingSide
 
-        val collectionSource = if (isFriendSelected) friendCollectionCards else collectionCards
-        val wishlistSource = if (isFriendSelected) friendWishlistCards else wishlistCards
+        val collectionSource = if (searchingSide == TradeSide.RECEIVER && isFriendSelected) {
+            friendCollectionCards
+        } else {
+            collectionCards
+        }
+        
+        val wishlistSource = if (searchingSide == TradeSide.RECEIVER && isFriendSelected) {
+            friendWishlistCards
+        } else {
+            wishlistCards
+        }
+
+        val offerSource = if (searchingSide == TradeSide.RECEIVER && isFriendSelected) {
+            friendOfferCards
+        } else {
+            offerCards
+        }
 
         val filteredCollection = if (query.isBlank()) {
             collectionSource
@@ -242,10 +302,19 @@ class TradeProposalViewModel @Inject constructor(
             wishlistSource.filter { it.name.contains(query, ignoreCase = true) }
         }
 
+        val filteredOffer = if (query.isBlank()) {
+            offerSource
+        } else {
+            offerSource.filter { it.name.contains(query, ignoreCase = true) }
+        }
+
         val ownedIds = state.collectionIds
 
         _uiState.update { s ->
             s.copy(
+                offerResults = filteredOffer.map { card ->
+                    AddCardRow(card = card, quantityInDeck = 0, isOwned = card.scryfallId in ownedIds)
+                },
                 addCardsResults = filteredCollection.map { card ->
                     AddCardRow(card = card, quantityInDeck = 0, isOwned = card.scryfallId in ownedIds)
                 },
@@ -282,7 +351,13 @@ class TradeProposalViewModel @Inject constructor(
                         },
                     )
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().apply {
+                    log("trade_scryfall_search_failed: query_length=${query.length}")
+                    setCustomKey("scryfall_query_length", query.length)
+                    setCustomKey("scryfall_error_type", e::class.simpleName ?: "Unknown")
+                    recordException(RuntimeException("[TradeProposal] Scryfall search failed", e))
+                }
                 _uiState.update { it.copy(isSearchingScryfall = false) }
             }
         }
@@ -293,7 +368,7 @@ class TradeProposalViewModel @Inject constructor(
     }
 
     fun getCardById(scryfallId: String): Card? {
-        return (uiState.value.addCardsResults + uiState.value.scryfallResults + uiState.value.wishlistResults)
+        return (uiState.value.addCardsResults + uiState.value.scryfallResults + uiState.value.wishlistResults + uiState.value.offerResults)
             .find { it.card.scryfallId == scryfallId }?.card
     }
 
@@ -368,6 +443,11 @@ class TradeProposalViewModel @Inject constructor(
                         s.copy(isSaving = false, navigateToThread = Pair(proposalId, proposalId))
                     },
                     onFailure = { e ->
+                        FirebaseCrashlytics.getInstance().apply {
+                            log("trade_proposal_save_draft_failed")
+                            setCustomKey("trade_proposer_item_count", s.proposerItems.size)
+                            recordException(e)
+                        }
                         s.copy(isSaving = false, errorMessage = e.toUserFacingMessage() ?: e.message)
                     }
                 )
@@ -399,7 +479,15 @@ class TradeProposalViewModel @Inject constructor(
                 val msg = when (e) {
                     is TradeError.ProposalVersionMismatch    -> "PROPOSAL_VERSION_MISMATCH"
                     is TradeError.InitialAsymmetryNotAllowed -> "INITIAL_ASYMMETRY"
-                    else                                     -> e.toUserFacingMessage() ?: e.message ?: "Unknown error"
+                    else -> {
+                        FirebaseCrashlytics.getInstance().apply {
+                            log("trade_proposal_send_failed: isCounter=${state.isCounterMode}")
+                            setCustomKey("trade_proposer_item_count", state.proposerItems.size)
+                            setCustomKey("trade_receiver_item_count", state.receiverItems.size)
+                            recordException(e)
+                        }
+                        e.toUserFacingMessage() ?: e.message ?: "Unknown error"
+                    }
                 }
                 _uiState.update { it.copy(isSaving = false, errorMessage = msg) }
             }
@@ -442,6 +530,12 @@ class TradeProposalViewModel @Inject constructor(
                     autoSend = true,
                 ).fold(
                     onSuccess = { newId ->
+                        analyticsHelper.logEvent("trade_proposal_sent", mapOf(
+                            "proposer_item_count" to state.proposerItems.size,
+                            "receiver_item_count" to state.receiverItems.size,
+                            "has_review_proposer" to state.includesReviewFromProposer,
+                            "has_review_receiver" to state.includesReviewFromReceiver,
+                        ))
                         _uiState.update { s ->
                             s.copy(
                                 isSaving = false,

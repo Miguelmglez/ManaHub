@@ -37,6 +37,12 @@ class EmbeddingDatabaseUnitTest {
     private lateinit var context: Context
     private lateinit var db: EmbeddingDatabase
 
+    // Production requires exactly EXPECTED_DIMS (1024) per entry
+    private val DIMS = EmbeddingDatabase.EXPECTED_DIMS
+
+    /** Zero-pads (or truncates) to DIMS so the parser accepts the file. */
+    private fun FloatArray.padTo(): FloatArray = copyOf(DIMS)
+
     @Before
     fun setUp() {
         context = mockk(relaxed = true)
@@ -50,7 +56,8 @@ class EmbeddingDatabaseUnitTest {
     /**
      * Returns the raw byte representation of a single MHEV entry:
      * 8 bytes UUID MSB (big-endian) + 8 bytes UUID LSB (big-endian) +
-     * dims * 4 bytes embedding (little-endian float32).
+     * DIMS * 4 bytes embedding (little-endian float32).
+     * The embedding is zero-padded to DIMS before encoding.
      */
     private fun encodeEntry(uuid: UUID, embedding: FloatArray): ByteArray {
         val entrySize = 16 + embedding.size * 4
@@ -65,6 +72,7 @@ class EmbeddingDatabaseUnitTest {
 
     /**
      * Builds a valid MHEV byte array from [entries].
+     * All embeddings are zero-padded to DIMS (1024) so the parser accepts them.
      *
      * @param magic   4-byte magic string (default "MHEV")
      * @param version binary version byte (default 1)
@@ -74,7 +82,7 @@ class EmbeddingDatabaseUnitTest {
         magic: String = "MHEV",
         version: Int = 1,
     ): ByteArray {
-        val dims = if (entries.isEmpty()) 4 else entries[0].second.size
+        val dims = DIMS  // Always 1024 — production rejects any other value
         val headerSize = 13
         val entrySize = 16 + dims * 4
         val totalSize = headerSize + entries.size * entrySize
@@ -91,9 +99,9 @@ class EmbeddingDatabaseUnitTest {
         buf.putInt(entries.size)
         buf.putInt(dims)
 
-        // Entries
+        // Entries — zero-pad each embedding to DIMS
         entries.forEach { (uuid, embedding) ->
-            buf.put(encodeEntry(uuid, embedding))
+            buf.put(encodeEntry(uuid, embedding.padTo()))
         }
 
         return buf.array()
@@ -158,7 +166,7 @@ class EmbeddingDatabaseUnitTest {
         loadBytes(bytes)
 
         // Act: query with the exact same embedding — dot product == 1.0
-        val match = db.findBestMatch(embedding, minSimilarity = 0.9f)
+        val match = db.findBestMatch(embedding.padTo(), minSimilarity = 0.9f)
 
         // Assert
         assertNotNull(match)
@@ -311,7 +319,7 @@ class EmbeddingDatabaseUnitTest {
         loadBytes(bytes)
 
         // Act: query with the identical vector
-        val match = db.findBestMatch(embedding.copyOf(), minSimilarity = 0.72f)
+        val match = db.findBestMatch(embedding.padTo(), minSimilarity = 0.72f)
 
         // Assert
         assertNotNull(match)
@@ -327,7 +335,7 @@ class EmbeddingDatabaseUnitTest {
         loadBytes(bytes)
 
         // Act
-        val match = db.findBestMatch(embedding.copyOf(), minSimilarity = 0.72f)
+        val match = db.findBestMatch(embedding.padTo(), minSimilarity = 0.72f)
 
         // Assert
         assertNotNull(match)
@@ -348,7 +356,7 @@ class EmbeddingDatabaseUnitTest {
 
         // Act: orthogonal query — similarity = 0.0, well below default threshold 0.72
         val query = l2Normalise(floatArrayOf(0f, 1f, 0f, 0f))
-        val match = db.findBestMatch(query, minSimilarity = 0.72f)
+        val match = db.findBestMatch(query.padTo(), minSimilarity = 0.72f)
 
         // Assert
         assertNull(match)
@@ -367,7 +375,7 @@ class EmbeddingDatabaseUnitTest {
         // cos(arccos(0.72) + 0.01) ≈ 0.71
         val theta = Math.acos(0.72) + 0.01
         val query = l2Normalise(floatArrayOf(Math.cos(theta).toFloat(), Math.sin(theta).toFloat()))
-        val match = db.findBestMatch(query, minSimilarity = 0.72f)
+        val match = db.findBestMatch(query.padTo(), minSimilarity = 0.72f)
 
         assertNull(match)
     }
@@ -382,7 +390,7 @@ class EmbeddingDatabaseUnitTest {
 
         val theta = Math.acos(0.73)
         val query = l2Normalise(floatArrayOf(Math.cos(theta).toFloat(), Math.sin(theta).toFloat()))
-        val match = db.findBestMatch(query, minSimilarity = 0.72f)
+        val match = db.findBestMatch(query.padTo(), minSimilarity = 0.72f)
 
         assertNotNull(match)
         assertTrue(match!!.similarity >= 0.72f)
@@ -426,7 +434,7 @@ class EmbeddingDatabaseUnitTest {
         // The empty-count file leaves cardCount unchanged per implementation behaviour
         // (returns without committing). Previous data stays in place.
         // The important invariant tested here: findBestMatch does not crash.
-        val match = db.findBestMatch(l2Normalise(floatArrayOf(1f, 0f, 0f, 0f)))
+        val match = db.findBestMatch(l2Normalise(floatArrayOf(1f, 0f, 0f, 0f)).padTo())
         // Result depends on whether reload succeeded; the test verifies no exception is thrown.
         // (State assertion is intentionally loose to respect implementation-defined behaviour.)
         assertTrue(match == null || match.scryfallId.isNotEmpty())
@@ -450,7 +458,7 @@ class EmbeddingDatabaseUnitTest {
         loadBytes(bytes)
 
         // Act: query is exactly v1
-        val match = db.findBestMatch(v1.copyOf(), minSimilarity = 0.72f)
+        val match = db.findBestMatch(v1.padTo(), minSimilarity = 0.72f)
 
         // Assert
         assertNotNull(match)
@@ -473,7 +481,7 @@ class EmbeddingDatabaseUnitTest {
         loadBytes(bytes)
 
         // Act
-        val match = db.findBestMatch(best.copyOf(), minSimilarity = 0.72f)
+        val match = db.findBestMatch(best.padTo(), minSimilarity = 0.72f)
 
         // Assert
         assertNotNull(match)
@@ -492,7 +500,7 @@ class EmbeddingDatabaseUnitTest {
         loadBytes(buildMhevBytes(listOf(uuid to embedding)))
 
         // Act
-        val match = db.findBestMatch(embedding.copyOf(), minSimilarity = 0.72f)
+        val match = db.findBestMatch(embedding.padTo(), minSimilarity = 0.72f)
 
         // Assert
         assertNotNull(match)
@@ -517,7 +525,7 @@ class EmbeddingDatabaseUnitTest {
         loadBytes(bytes)
 
         // Act: query exactly aligned with v2
-        val match = db.findBestMatch(v2.copyOf(), minSimilarity = 0.72f)
+        val match = db.findBestMatch(v2.padTo(), minSimilarity = 0.72f)
 
         // Assert
         assertNotNull(match)
@@ -539,7 +547,7 @@ class EmbeddingDatabaseUnitTest {
         val query = l2Normalise(floatArrayOf(1f, 1f)) // 45° — dot = 1/√2 ≈ 0.707
 
         // Act: require 0.80 — should reject the 0.707 match
-        val match = db.findBestMatch(query, minSimilarity = 0.80f)
+        val match = db.findBestMatch(query.padTo(), minSimilarity = 0.80f)
 
         assertNull(match)
     }
@@ -554,7 +562,7 @@ class EmbeddingDatabaseUnitTest {
         val query = l2Normalise(floatArrayOf(1f, 1f)) // dot = 1/√2 ≈ 0.707
 
         // Act: require 0.60 — should accept the 0.707 match
-        val match = db.findBestMatch(query, minSimilarity = 0.60f)
+        val match = db.findBestMatch(query.padTo(), minSimilarity = 0.60f)
 
         assertNotNull(match)
         assertTrue(match!!.similarity >= 0.60f)
@@ -587,7 +595,7 @@ class EmbeddingDatabaseUnitTest {
                 db.loadFromFile(reloadFile)
             }
             // Must not throw regardless of reload timing
-            db.findBestMatch(query)
+            db.findBestMatch(query.padTo())
         }
         // No assertion needed — the test passes if no exception is thrown
     }
@@ -656,12 +664,12 @@ class EmbeddingDatabaseUnitTest {
         val vB = l2Normalise(floatArrayOf(0f, 1f, 0f, 0f))
 
         loadBytes(buildMhevBytes(listOf(uuidA to vA)))
-        val beforeReload = db.findBestMatch(vA.copyOf(), minSimilarity = 0.9f)
+        val beforeReload = db.findBestMatch(vA.padTo(), minSimilarity = 0.9f)
         assertEquals(uuidA.toString(), beforeReload!!.scryfallId)
 
         // Act: reload with card B only
         loadBytes(buildMhevBytes(listOf(uuidB to vB)))
-        val afterReload = db.findBestMatch(vB.copyOf(), minSimilarity = 0.9f)
+        val afterReload = db.findBestMatch(vB.padTo(), minSimilarity = 0.9f)
 
         // Assert: new query matches card B
         assertNotNull(afterReload)
