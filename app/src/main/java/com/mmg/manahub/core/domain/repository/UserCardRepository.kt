@@ -83,4 +83,26 @@ interface UserCardRepository {
 
     /** Returns all distinct Scryfall IDs present in the local collection. */
     suspend fun getScryfallIds(): List<String>
+
+    /**
+     * Decrements the quantity of a collection entry by [quantityToDeduct].
+     *
+     * The matching row is identified by the composite key:
+     * (userId, scryfallId, isFoil, condition, language, isAlternativeArt).
+     *
+     * - If no matching row exists the call is a no-op (silent skip).
+     * - If the resulting quantity would be <= 0 the row is soft-deleted instead
+     *   (isDeleted = true, updatedAt bumped) so the sync engine propagates the
+     *   removal to Supabase on the next push cycle.
+     * - Otherwise the row's quantity is updated and updatedAt is bumped.
+     */
+    suspend fun decrementOrRemove(
+        userId: String,
+        scryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isAlternativeArt: Boolean,
+        quantityToDeduct: Int,
+    )
 }

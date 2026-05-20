@@ -334,6 +334,7 @@ fun AppNavGraph(
                 VideoPlayerScreen(
                     videoId = videoId,
                     title = title,
+                    isInPiP = isInPiP,
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -390,6 +391,14 @@ fun AppNavGraph(
             ) {
                 FriendDetailScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
+                    onNavigateToTradeDetail = { proposalId, rootProposalId ->
+                        navController.navigate(
+                            Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
+                        )
+                    },
                 )
             }
 
@@ -457,6 +466,9 @@ fun AppNavGraph(
                     },
                     onNavigateToAddFriends = {
                         navController.navigate(Screen.FriendsList.route)
+                    },
+                    onNavigateToCardDetail = { scryfallId ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                     }
                 )
             }
@@ -471,6 +483,9 @@ fun AppNavGraph(
             ) {
                 TradeNegotiationDetailScreen(
                     onBack             = { navController.popBackStack() },
+                    onNavigateToCardDetail = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
                     onNavigateToEditor = { args ->
                         val route = if (args.isCounter) {
                             Screen.CreateTradeProposal.createCounterRoute(

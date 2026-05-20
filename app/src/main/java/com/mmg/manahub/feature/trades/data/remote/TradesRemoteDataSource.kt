@@ -23,7 +23,7 @@ class TradesRemoteDataSource @Inject constructor(
     private val supabaseClient: SupabaseClient,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     suspend fun fetchProposals(userId: String): Result<List<TradeProposalDto>> =
         safeCall {
@@ -60,7 +60,7 @@ class TradesRemoteDataSource @Inject constructor(
             put("p_includes_review_from_receiver", includesReviewFromReceiver)
             put("p_auto_send", autoSend)
         }
-        supabaseClient.postgrest.rpc("create_proposal", params).decodeSingle<String>()
+        supabaseClient.postgrest.rpc("create_proposal", params).decodeAs<String>()
     }
 
     suspend fun editProposal(
@@ -109,12 +109,17 @@ class TradesRemoteDataSource @Inject constructor(
     suspend fun counterProposal(
         parentProposalId: String,
         items: List<TradeItemRequestDto>,
+        reviewFlags: ReviewFlags,
     ): Result<String> = safeCall {
         val params = buildJsonObject {
             put("p_parent_proposal_id", parentProposalId)
             put("p_items", json.encodeToJsonElement(items))
+            put("p_new_review_flags", buildJsonObject {
+                put("from_proposer", reviewFlags.fromProposer)
+                put("from_receiver", reviewFlags.fromReceiver)
+            })
         }
-        supabaseClient.postgrest.rpc("counter_proposal", params).decodeSingle<String>()
+        supabaseClient.postgrest.rpc("counter_proposal", params).decodeAs<String>()
     }
 
     suspend fun acceptProposal(proposalId: String): Result<Unit> = safeCall {

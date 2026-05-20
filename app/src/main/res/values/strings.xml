@@ -60,6 +60,7 @@
     <string name="collection_sync_error">Sync failed</string>
     <string name="collection_sync_pending">You have %1$d pending changes</string>
     <string name="collection_sync_banner">Sync your collection</string>
+    <string name="collection_syncing">Syncing…</string>
     <string name="collection_sync_sheet_title">Sync collection</string>
     <string name="collection_filter_all">All</string>
     <string name="collection_filter_white">White</string>
@@ -1045,12 +1046,15 @@
     <string name="theme_neon_void">Neon</string>
     <string name="theme_grimoire">Grimoire</string>
     <string name="theme_cosmos">Cosmos</string>
-    <string name="theme_shadow_essence">Shadow</string>
     <string name="theme_forest_murmur">Forest</string>
-    <string name="theme_mystic_echo">Echo</string>
-    <string name="theme_gilded_silver">Gilded</string>
     <string name="theme_ancient_oak">Oak</string>
-    <string name="theme_obsidian_chrome">Chrome</string>
+    <string name="theme_hallowed_print">Print</string>
+    <string name="theme_azure_flux">Azure</string>
+    <string name="theme_planar_veil">Planar</string>
+    <string name="theme_venom_shade">Venom</string>
+    <string name="theme_glacial_edge">Glacial</string>
+    <string name="theme_dusk_ember">Ember</string>
+    <string name="theme_onyx_noir">Onyx</string>
 
     <!-- ══════════════════════════════════════════
          SIDEBOARD RECOMMENDATIONS
@@ -1215,6 +1219,15 @@
     <string name="news_filter_all">All</string>
     <string name="news_filter_articles">Articles</string>
     <string name="news_filter_videos">Videos</string>
+    <string name="news_filter_title">News Filters</string>
+    <string name="news_filter_content_type">Content Type</string>
+    <string name="news_filter_language">Feed Language</string>
+    <string name="news_filter_sources">Sources</string>
+    <string name="news_filter_select_all">Select All</string>
+    <string name="news_filter_deselect_all">Deselect All</string>
+    <string name="news_filter_apply">Apply Filters</string>
+    <string name="news_language_en">English</string>
+    <string name="news_language_es">Español</string>
     <string name="news_all_sources">All Sources</string>
     <string name="news_empty">No news yet. Pull down to refresh.</string>
 
@@ -1469,6 +1482,10 @@
     <string name="friend_stats_value_usd">Value (USD)</string>
     <string name="friend_stats_favourite_color">Favourite color</string>
     <string name="friend_stats_most_valuable_color">Most valuable color</string>
+    <string name="friend_stats_section_colour_affinity">Colour Affinity</string>
+    <string name="friend_stats_section_snapshot">Snapshot</string>
+    <string name="friend_stats_last_updated">Stats last updated</string>
+    <string name="friend_stats_color_unknown">Unknown</string>
     <string name="friends_detail_remove_confirm_title">Remove Friend</string>
     <string name="friends_detail_remove_confirm_body">Are you sure you want to remove %1$s from your friends?</string>
     <string name="friends_detail_remove_confirm_ok">Remove</string>
@@ -1556,7 +1573,7 @@
     <string name="trades_status_completed">Completed</string>
     <string name="trades_status_declined">Declined</string>
     <string name="trades_status_cancelled">Cancelled</string>
-    <string name="trades_status_countered">Countered</string>
+    <string name="trades_status_countered">Counter offer</string>
     <string name="trades_status_revoked">Revoked</string>
 
     <!-- Phase 3: suggestions -->
@@ -1570,6 +1587,11 @@
     <string name="trades_history_empty">No trade history yet</string>
     <string name="trades_history_empty_hint">Completed, cancelled, and declined proposals will appear here.</string>
 
+    <!-- Unauthenticated state — trades feature promo -->
+    <string name="trades_login_required_title">Trade with your friends</string>
+    <string name="trades_login_required_subtitle">Build your wishlist, list cards you\'re open to trade, and discover smart matches with friends. Sign in to get started.</string>
+    <string name="trades_login_required_action">Log in / Sign up</string>
+
     <!-- Phase 3: status badges (canonical, used in detail screens) -->
     <string name="trade_status_draft">Draft</string>
     <string name="trade_status_proposed">Proposed</string>
@@ -1577,32 +1599,57 @@
     <string name="trade_status_completed">Completed</string>
     <string name="trade_status_declined">Declined</string>
     <string name="trade_status_cancelled">Cancelled</string>
-    <string name="trade_status_countered">Countered</string>
+    <string name="trade_status_countered">Counter offer</string>
     <string name="trade_status_revoked">Revoked</string>
 
     <!-- Phase 3: proposal editor screen -->
     <string name="trades_create_proposal_title">New Trade Proposal</string>
     <string name="trades_counter_proposal_title">Counter Proposal</string>
-    <string name="trades_you_offer_section">You offer</string>
-    <string name="trades_they_offer_section">They offer</string>
+    <string name="trades_edit_proposal_title">Edit Proposal</string>
+    <string name="trades_update_proposal">Update Proposal</string>
+    <string name="trades_you_offer_section">You send</string>
+    <string name="trades_proposer_identity_subtitle">Your cards</string>
+    <string name="trades_they_offer_section">They send</string>
+    <string name="trades_named_sends">%1$s sends</string>
     <string name="trades_review_collection_proposer">Include \'Review my collection\'</string>
     <string name="trades_review_collection_receiver">Include \'Review their collection\'</string>
     <string name="trades_add_item">Add item</string>
+    <string name="trades_friend_required">Select a trading partner first</string>
+    <string name="trades_friend_selector_placeholder">Select a trading partner</string>
+    <string name="trades_friend_selector_hint">Tap to choose who you\'re trading with</string>
+    <string name="trades_friend_selector_sheet_title">Select Friend</string>
+    <string name="trades_friend_none_option">None (Direct Trade)</string>
+    <string name="trades_proposer_empty_cta">Add cards you want to trade away</string>
+    <string name="trades_receiver_empty_cta">Search for cards you want from them</string>
+    <string name="trades_review_collection_subtitle">Let them browse your collection for more cards</string>
+    <string name="trades_suggestions_title">Trade Suggestions</string>
+    <string name="trades_suggestions_offer_section">You should offer these</string>
+    <string name="trades_suggestions_request_section">You should request these</string>
+    <string name="trades_suggestions_summary">%1$d offer · %2$d request</string>
+    <string name="trades_suggested_for_them">Suggested for them</string>
     <string name="trades_search_title_proposer">Search from your collection</string>
     <string name="trades_search_title_receiver_generic">Search their collection</string>
     <string name="trades_search_section_offers">Offers</string>
     <string name="trades_search_section_collection">Collection</string>
+    <!-- Side-aware tab labels for CardSearchSheet in the proposal editor -->
+    <string name="trades_tab_your_wishlist">Your wishlist</string>
+    <string name="trades_tab_friend_wishlist">%1$s\'s wishlist</string>
+    <string name="trades_tab_friend_offers">%1$s\'s offers</string>
+    <string name="trades_tab_your_offers">Your offers</string>
+    <string name="trades_tab_all_cards">All cards</string>
 
     <!-- Phase 3: negotiation screen -->
     <string name="trades_negotiation_title">Trade Negotiation</string>
     <string name="trades_proposal_version">Proposal v%d</string>
-    <string name="trades_proposer_offers">Proposer offers</string>
-    <string name="trades_receiver_offers">Receiver offers</string>
     <string name="trades_review_collection_placeholder">Review my collection</string>
     <string name="trades_no_proposals_yet">No proposals in this thread yet.</string>
     <string name="trades_action_accept">Accept</string>
     <string name="trades_action_decline">Decline</string>
     <string name="trades_action_cancel">Cancel</string>
+    <string name="trades_cancel_confirm_title">Cancel this trade?</string>
+    <string name="trades_cancel_confirm_body">The proposal will be cancelled and the other player will be notified. This cannot be undone.</string>
+    <string name="trades_cancel_confirm_yes">Yes, cancel trade</string>
+    <string name="trades_cancel_keep">Keep it</string>
     <string name="trades_action_revoke">Revoke</string>
     <string name="trades_action_counter">Counter offer</string>
     <string name="trades_action_edit">Edit</string>
@@ -1617,6 +1664,37 @@
     <string name="trades_error_inventory_gone_body">One or more cards could not be moved. The inventory may have changed since the trade was accepted.</string>
     <string name="trades_error_generic_title">Something went wrong</string>
     <string name="trades_error_generic_body">An unexpected error occurred. Please try again.</string>
+    <string name="trades_complete_unowned_title">Complete trade?</string>
+    <string name="trades_complete_unowned_body">You are about to receive %1$d card(s) not registered in any collection:\n\n%2$s\n\nWould you like to add them to your collection?</string>
+    <string name="trades_complete_add_to_collection">Add to collection</string>
+    <!-- Mark Complete dialog -->
+    <string name="trades_complete_dialog_title">Complete trade?</string>
+    <string name="trades_complete_dialog_you_send">You\'ll send</string>
+    <string name="trades_complete_dialog_you_receive">You\'ll receive</string>
+    <string name="trades_complete_dialog_send_note">These cards will be removed from your collection</string>
+    <string name="trades_complete_dialog_receive_note">These cards will be added to your collection</string>
+    <string name="trades_complete_dialog_no_cards">No cards will be moved in this trade</string>
+    <string name="trades_complete_update_and_complete">Update collection &amp; complete</string>
+    <string name="trades_complete_just_complete">Complete without updating</string>
+    <!-- Revoke dialog -->
+    <string name="trades_revoke_confirm_title">Revoke trade?</string>
+    <string name="trades_revoke_confirm_body">This will revoke the accepted trade. The other user will be notified.</string>
+    <string name="trades_revoke_confirm_synced_body">This will revoke the trade. Since you already updated your collection with this trade\'s cards, would you like to reverse those changes? Your previously sent cards will be restored and received cards removed.</string>
+    <string name="trades_revoke_and_reverse">Revoke &amp; reverse collection</string>
+    <string name="trades_revoke_just_revoke">Just revoke</string>
+    <string name="trades_revoke_keep">Keep it</string>
+    <string name="trades_warning_not_in_collection">Not in collection</string>
+    <string name="trades_warning_not_in_list">Not in your list</string>
+    <string name="trades_gift_accept_title">This trade is a gift</string>
+    <string name="trades_gift_accept_body">The other party hasn\'t added any specific cards — only \'Review my collection\'. Accepting means you\'ll be giving your cards without a guaranteed return. Continue?</string>
+    <string name="trades_gift_accept_confirm">Accept anyway</string>
+    <string name="trades_update_collection">Update Collection</string>
+    <string name="trades_collection_updated">✓ Collection updated</string>
+    <string name="trades_collection_update_success">Collection updated successfully</string>
+    <string name="trades_history_awaiting_response">Awaiting their response</string>
+    <string name="trades_history_your_turn">Your turn</string>
+    <string name="trades_history_refreshing">Updating…</string>
+    <string name="trades_history_pull_to_refresh">Pull to refresh</string>
 
     <!-- ══════════════════════════════════════════
          SCANNER — language names + wishlist button

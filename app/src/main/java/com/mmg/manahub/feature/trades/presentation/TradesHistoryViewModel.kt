@@ -35,6 +35,9 @@ data class TradesHistoryUiState(
     val isRefreshing: Boolean = false,
     val snackbarMessage: String? = null,
     val navigateToThread: Pair<String, String>? = null,
+    val lastRefreshedAt: Long = 0L,
+    /** True only when the user has an active authenticated session. */
+    val isLoggedIn: Boolean = false,
 ) {
     val filtered: List<TradeProposal> get() = when (filter) {
         HistoryFilter.ALL      -> proposals
@@ -43,12 +46,13 @@ data class TradesHistoryUiState(
         // Declined covers all rejection/cancellation terminal states
         HistoryFilter.DECLINED -> proposals.filter {
             it.status in setOf(
-                TradeStatus.DECLINED, TradeStatus.CANCELLED,
-                TradeStatus.REVOKED,  TradeStatus.COUNTERED,
+                TradeStatus.DECLINED, TradeStatus.CANCELLED, TradeStatus.REVOKED,
             )
         }
     }
 }
+
+private const val CACHE_TTL_MS = 5 * 60 * 1_000L
 
 @HiltViewModel
 class TradesHistoryViewModel @Inject constructor(
@@ -66,8 +70,13 @@ class TradesHistoryViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             authRepository.sessionState.collect { state ->
-                if (state is SessionState.Authenticated) {
-                    _uiState.update { it.copy(currentUserId = state.user.id) }
+                val isAuthenticated = state is SessionState.Authenticated
+                _uiState.update { it.copy(isLoggedIn = isAuthenticated) }
+                if (isAuthenticated) {
+                    val userId = (state as SessionState.Authenticated).user.id
+                    val firstAuth = _uiState.value.currentUserId.isBlank()
+                    _uiState.update { it.copy(currentUserId = userId) }
+                    if (firstAuth) refresh()
                 }
             }
         }
@@ -104,9 +113,17 @@ class TradesHistoryViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isRefreshing = true) }
             refreshTrades(userId)
+                .onSuccess { _uiState.update { s -> s.copy(lastRefreshedAt = System.currentTimeMillis()) } }
                 .onFailure { e -> _uiState.update { s -> s.copy(snackbarMessage = e.toUserFacingMessage()) } }
             _uiState.update { it.copy(isRefreshing = false) }
         }
+    }
+
+    fun refreshIfStale() {
+        val state = _uiState.value
+        if (state.isRefreshing) return
+        val age = System.currentTimeMillis() - state.lastRefreshedAt
+        if (age > CACHE_TTL_MS) refresh()
     }
 
     fun onSnackbarDismissed() = _uiState.update { it.copy(snackbarMessage = null) }

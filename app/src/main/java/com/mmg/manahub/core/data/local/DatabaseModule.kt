@@ -20,6 +20,7 @@ import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
 import com.mmg.manahub.feature.news.data.local.NewsDao
 import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -72,6 +73,7 @@ object DatabaseModule {
                 MIGRATION_31_32,
                 MIGRATION_32_33,
                 MIGRATION_33_34,
+                MIGRATION_34_35,
             )
             .build()
 
@@ -346,6 +348,32 @@ object DatabaseModule {
     }
 
     // -------------------------------------------------------------------------
+    // v34 → v35
+    // Creates the `trade_collection_sync` table.
+    //
+    // Purpose: tracks per-user, per-proposal collection sync state so the UI
+    // can show "Collection updated" instead of the "Update Collection" button
+    // after the user has already tapped it, even across process kills.
+    //
+    // Composite primary key (proposal_id, user_id): one record per user per
+    // proposal. An IGNORE conflict strategy in the DAO prevents double-inserts.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_34_35 = object : Migration(34, 35) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS trade_collection_sync (
+                    proposal_id TEXT NOT NULL,
+                    user_id     TEXT NOT NULL,
+                    synced_at   INTEGER NOT NULL,
+                    PRIMARY KEY(proposal_id, user_id)
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helper: checks whether a column already exists in a table.
     // Used as a guard so migrations are idempotent — safe to run more than once
     // (e.g. if the app crashes mid-migration and Room retries on next launch).
@@ -380,4 +408,5 @@ object DatabaseModule {
     @Provides fun provideRemoteKeyDao(db: MtgDatabase): RemoteKeyDao = db.remoteKeyDao()
     @Provides fun provideLocalWishlistDao(db: MtgDatabase): LocalWishlistDao = db.localWishlistDao()
     @Provides fun provideLocalOpenForTradeDao(db: MtgDatabase): LocalOpenForTradeDao = db.localOpenForTradeDao()
+    @Provides fun provideTradeCollectionSyncDao(db: MtgDatabase): TradeCollectionSyncDao = db.tradeCollectionSyncDao()
 }

@@ -14,22 +14,28 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
+import com.mmg.manahub.feature.friends.domain.model.FriendCard
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
+import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
 import com.mmg.manahub.feature.trades.domain.model.TradeError
 import com.mmg.manahub.feature.trades.domain.model.TradeSide
+import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
+import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -40,6 +46,10 @@ data class TradeItemDraft(
     val cardId: String,
     val cardName: String = "",
     val imageUrl: String? = null,
+    val typeLine: String? = null,
+    val setCode: String? = null,
+    val setName: String? = null,
+    val rarity: String? = null,
     val priceUsd: Double? = null,
     val priceUsdFoil: Double? = null,
     val priceEur: Double? = null,
@@ -51,6 +61,8 @@ data class TradeItemDraft(
     val isAltArt: Boolean = false,
     val userCardIdRef: String? = null,
     val isReviewCollectionPlaceholder: Boolean = false,
+    /** True if this card was found in the user's registered collection or offer list when added. */
+    val isInCollection: Boolean = true,
 )
 
 data class ProposalEditorUiState(
@@ -84,7 +96,17 @@ data class ProposalEditorUiState(
     val friends: List<Friend> = emptyList(),
     val selectedFriend: Friend? = null,
     val sessionState: SessionState = SessionState.Loading,
+    val currentUserId: String = "",
+    val currentUserNickname: String = "",
+    val currentUserAvatarUrl: String? = null,
     val searchingSide: TradeSide? = null,
+    val isNavigatingToDetail: Boolean = false,
+    val pendingAddedItems: List<TradeItemDraft> = emptyList(),
+
+    /** Cards I should offer: my offerEntries whose scryfallId is in the friend's wishlist. */
+    val proposerMatches: List<AddCardRow> = emptyList(),
+    /** Cards I should request: friend's offerCards whose scryfallId is in my wishlist. */
+    val receiverMatches: List<AddCardRow> = emptyList(),
 ) {
     val totalProposerValueUsd: Double get() = proposerItems.sumOf { 
         val price = if (it.isFoil) (it.priceUsdFoil ?: it.priceUsd ?: 0.0) else (it.priceUsd ?: 0.0)
@@ -108,6 +130,7 @@ data class ProposalEditorUiState(
 class TradeProposalViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
+    private val tradesRepository: TradesRepository,
     private val createProposal: CreateTradeProposalUseCase,
     private val editProposal: EditProposalUseCase,
     private val counterProposal: CounterProposalUseCase,
@@ -125,20 +148,38 @@ class TradeProposalViewModel @Inject constructor(
 
     private var currentUserId: String = ""
     private var collectionCards: List<Card> = emptyList()
-    private var wishlistCards: List<Card> = emptyList()
-    private var offerCards: List<Card> = emptyList()
-    
-    private var friendCollectionCards: List<Card> = emptyList()
-    private var friendWishlistCards: List<Card> = emptyList()
-    private var friendOfferCards: List<Card> = emptyList()
+    private var wishlistEntries: List<WishlistEntry> = emptyList()
+    private var offerEntries: List<OpenForTradeEntry> = emptyList()
+
+    // Friend data fetched via get_friend_collection RPC (unified endpoint).
+    // Written on ioDispatcher and read on Main; @Volatile + single-copy assignment
+    // ensures no partial-update races between the two RPC calls.
+    private data class FriendData(
+        val collection: List<Card> = emptyList(),
+        val wishlist: List<FriendCard> = emptyList(),
+        val offers: List<FriendCard> = emptyList(),
+    )
+    @Volatile private var friendData: FriendData = FriendData()
+    private var friendDataJob: Job? = null
 
     init {
         viewModelScope.launch {
             authRepository.sessionState.collect { state ->
+                var userId = ""
+                var nickname = ""
+                var avatarUrl: String? = null
                 if (state is SessionState.Authenticated) {
-                    currentUserId = state.user.id
+                    userId = state.user.id
+                    nickname = state.user.nickname ?: ""
+                    avatarUrl = state.user.avatarUrl
+                    currentUserId = userId
                 }
-                _uiState.update { it.copy(sessionState = state) }
+                _uiState.update { it.copy(
+                    sessionState = state,
+                    currentUserId = userId,
+                    currentUserNickname = nickname,
+                    currentUserAvatarUrl = avatarUrl
+                ) }
             }
         }
         observeCollection()
@@ -158,6 +199,79 @@ class TradeProposalViewModel @Inject constructor(
                 isCounterMode = parentProposalId != null,
             )
         }
+
+        val proposalToPreFill = editingProposalId ?: parentProposalId
+        if (proposalToPreFill != null && rootProposalId.isNotBlank()) {
+            viewModelScope.launch(ioDispatcher) {
+                val proposals = tradesRepository.observeProposalThread(rootProposalId).first()
+                val proposal = proposals.find { it.id == proposalToPreFill } ?: return@launch
+
+                val allCardIds = proposal.items
+                    .filter { !it.isReviewCollectionPlaceholder }
+                    .map { it.cardId }
+                    .distinct()
+                val imageMap = buildMap<String, Card?> {
+                    allCardIds.forEach { id ->
+                        val r = cardRepository.getCardById(id)
+                        if (r is DataResult.Success) put(id, r.data)
+                    }
+                }
+
+                val myItems = proposal.items
+                    .filter { it.fromUserId != receiverId && !it.isReviewCollectionPlaceholder }
+                    .map { item ->
+                        val card = imageMap[item.cardId]
+                        TradeItemDraft(
+                            cardId = item.cardId,
+                            cardName = item.cardName,
+                            imageUrl = card?.imageArtCrop ?: card?.imageNormal,
+                            typeLine = card?.typeLine,
+                            setCode = card?.setCode,
+                            setName = card?.setName,
+                            rarity = card?.rarity,
+                            quantity = item.quantity ?: 1,
+                            isFoil = item.isFoil ?: false,
+                            condition = item.condition ?: "NM",
+                            language = item.language ?: "en",
+                            isAltArt = item.isAltArt ?: false,
+                            userCardIdRef = item.userCardIdRef,
+                            isInCollection = true,
+                        )
+                    }
+                val theirItems = proposal.items
+                    .filter { it.fromUserId == receiverId && !it.isReviewCollectionPlaceholder }
+                    .map { item ->
+                        val card = imageMap[item.cardId]
+                        TradeItemDraft(
+                            cardId = item.cardId,
+                            cardName = item.cardName,
+                            imageUrl = card?.imageArtCrop ?: card?.imageNormal,
+                            typeLine = card?.typeLine,
+                            setCode = card?.setCode,
+                            setName = card?.setName,
+                            rarity = card?.rarity,
+                            quantity = item.quantity ?: 1,
+                            isFoil = item.isFoil ?: false,
+                            condition = item.condition ?: "NM",
+                            language = item.language ?: "en",
+                            isAltArt = item.isAltArt ?: false,
+                            userCardIdRef = item.userCardIdRef,
+                            isInCollection = true,
+                        )
+                    }
+
+                val iAmProposer = receiverId == proposal.receiverId
+                _uiState.update { s ->
+                    s.copy(
+                        proposerItems = myItems,
+                        receiverItems = theirItems,
+                        includesReviewFromProposer = if (iAmProposer) proposal.includesReviewCollectionFromProposer else proposal.includesReviewCollectionFromReceiver,
+                        includesReviewFromReceiver = if (iAmProposer) proposal.includesReviewCollectionFromReceiver else proposal.includesReviewCollectionFromProposer,
+                        currentVersion = proposal.proposalVersion,
+                    )
+                }
+            }
+        }
     }
 
     private fun observeCollection() {
@@ -174,7 +288,7 @@ class TradeProposalViewModel @Inject constructor(
     private fun observeWishlist() {
         viewModelScope.launch {
             wishlistRepository.observeLocal().collect { wishlist ->
-                wishlistCards = wishlist.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                wishlistEntries = wishlist.filter { it.card != null }.sortedBy { it.card?.name }
                 updateSearchLists(_uiState.value.addCardsQuery)
             }
         }
@@ -183,7 +297,7 @@ class TradeProposalViewModel @Inject constructor(
     private fun observeOffers() {
         viewModelScope.launch {
             openForTradeRepository.observeLocal().collect { offers ->
-                offerCards = offers.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                offerEntries = offers.filter { it.card != null }.sortedBy { it.card?.name }
                 updateSearchLists(_uiState.value.addCardsQuery)
             }
         }
@@ -208,25 +322,28 @@ class TradeProposalViewModel @Inject constructor(
         if (friend != null) {
             fetchFriendData(friend.userId)
         } else {
-            friendCollectionCards = emptyList()
-            friendWishlistCards = emptyList()
-            friendOfferCards = emptyList()
+            friendDataJob?.cancel()
+            friendData = FriendData()
             updateSearchLists(_uiState.value.addCardsQuery)
         }
     }
 
     /**
-     * Fetches the selected friend's remote wishlist so it can be shown in the
-     * receiver-side card picker. The friend's collection is not yet accessible
-     * via a dedicated remote endpoint; that list stays empty until a
-     * "get_friend_collection" RPC is added to Supabase.
+     * Fetches the selected friend's wishlist and open-for-trade list via the unified
+     * get_friend_collection RPC. This RPC is SECURITY DEFINER and enforces both
+     * friendship checks and per-list privacy flags (wishlist_public / trade_list_public),
+     * unlike direct table queries which only check friendship.
+     *
+     * The previous [Job] is cancelled before starting a new fetch so that switching
+     * friends quickly never applies stale data from the previous selection.
      */
     private fun fetchFriendData(userId: String) {
-        viewModelScope.launch(ioDispatcher) {
-            // Wishlist
-            wishlistRepository.getRemote(userId)
-                .onSuccess { entries ->
-                    friendWishlistCards = entries.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+        friendDataJob?.cancel()
+        friendDataJob = viewModelScope.launch(ioDispatcher) {
+            // Wishlist via unified RPC — single atomic copy update to avoid partial-state reads
+            friendRepository.getFriendCollection(userId, "wishlist", "")
+                .onSuccess { cards ->
+                    friendData = friendData.copy(wishlist = cards.sortedBy { it.name })
                     updateSearchLists(_uiState.value.addCardsQuery)
                 }
                 .onFailure { e ->
@@ -234,13 +351,13 @@ class TradeProposalViewModel @Inject constructor(
                         log("trade_friend_wishlist_load_failed: userId=$userId")
                         recordException(RuntimeException("[TradeProposal] Friend wishlist fetch failed", e))
                     }
-                    friendWishlistCards = emptyList()
+                    friendData = friendData.copy(wishlist = emptyList())
                 }
 
-            // Offers
-            openForTradeRepository.getRemote(userId)
-                .onSuccess { entries ->
-                    friendOfferCards = entries.mapNotNull { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+            // Open-for-trade via unified RPC
+            friendRepository.getFriendCollection(userId, "trade", "")
+                .onSuccess { cards ->
+                    friendData = friendData.copy(offers = cards.sortedBy { it.name })
                     updateSearchLists(_uiState.value.addCardsQuery)
                 }
                 .onFailure { e ->
@@ -248,11 +365,25 @@ class TradeProposalViewModel @Inject constructor(
                         log("trade_friend_offers_load_failed: userId=$userId")
                         recordException(RuntimeException("[TradeProposal] Friend offers fetch failed", e))
                     }
-                    friendOfferCards = emptyList()
+                    friendData = friendData.copy(offers = emptyList())
                 }
 
-            // Friend collection cards require a dedicated remote endpoint; left empty for now.
-            friendCollectionCards = emptyList()
+            // Public collection via unified RPC — used in the "You get" side Offer tab
+            friendRepository.getFriendCollection(userId, "collection", "")
+                .onSuccess { cards ->
+                    friendData = friendData.copy(
+                        collection = cards.mapNotNull { it.toCard() }.sortedBy { it.name }
+                    )
+                    updateSearchLists(_uiState.value.addCardsQuery)
+                }
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("trade_friend_collection_load_failed: userId=$userId")
+                        recordException(RuntimeException("[TradeProposal] Friend collection fetch failed", e))
+                    }
+                    friendData = friendData.copy(collection = emptyList())
+                }
+
             updateSearchLists(_uiState.value.addCardsQuery)
         }
     }
@@ -263,8 +394,12 @@ class TradeProposalViewModel @Inject constructor(
     }
 
     fun onOpenSearch(side: TradeSide) {
-        _uiState.update { it.copy(searchingSide = side) }
+        _uiState.update { it.copy(searchingSide = side, isNavigatingToDetail = false) }
         updateSearchLists(_uiState.value.addCardsQuery)
+    }
+
+    fun setNavigatingToDetail(isNavigating: Boolean) {
+        _uiState.update { it.copy(isNavigatingToDetail = isNavigating) }
     }
 
     private fun updateSearchLists(query: String) {
@@ -272,57 +407,202 @@ class TradeProposalViewModel @Inject constructor(
         val isFriendSelected = state.selectedFriend != null
         val searchingSide = state.searchingSide
 
-        val collectionSource = if (searchingSide == TradeSide.RECEIVER && isFriendSelected) {
-            friendCollectionCards
-        } else {
-            collectionCards
-        }
-        
-        val wishlistSource = if (searchingSide == TradeSide.RECEIVER && isFriendSelected) {
-            friendWishlistCards
-        } else {
-            wishlistCards
-        }
-
-        val offerSource = if (searchingSide == TradeSide.RECEIVER && isFriendSelected) {
-            friendOfferCards
-        } else {
-            offerCards
-        }
-
-        val filteredCollection = if (query.isBlank()) {
-            collectionSource
-        } else {
-            collectionSource.filter { it.name.contains(query, ignoreCase = true) }
-        }
-
-        val filteredWishlist = if (query.isBlank()) {
-            wishlistSource
-        } else {
-            wishlistSource.filter { it.name.contains(query, ignoreCase = true) }
-        }
-
-        val filteredOffer = if (query.isBlank()) {
-            offerSource
-        } else {
-            offerSource.filter { it.name.contains(query, ignoreCase = true) }
-        }
+        // My collection is always the source for the addCardsResults (collection browser).
+        val filteredCollection = if (query.isBlank()) collectionCards
+            else collectionCards.filter { it.name.contains(query, ignoreCase = true) }
 
         val ownedIds = state.collectionIds
 
+        // ── Correct side-aware mapping ─────────────────────────────────────────
+        // PROPOSER (A → B): A offers cards to B.
+        //   offerResults   → MY offers (offerEntries) — what I have available to give
+        //   wishlistResults → FRIEND's wishlist (friendWishlistCards) — what B wants
+        //   addCardsResults → MY collection (collectionCards) — fallback search
+        //
+        // RECEIVER (A ← B): A requests cards from B.
+        //   offerResults   → FRIEND's offers (friendOfferCards) — what B has available
+        //   wishlistResults → MY wishlist (wishlistEntries) — what I want
+        //   addCardsResults → MY collection (collectionCards) — fallback search
+
         _uiState.update { s ->
-            s.copy(
-                offerResults = filteredOffer.map { card ->
-                    AddCardRow(card = card, quantityInDeck = 0, isOwned = card.scryfallId in ownedIds)
-                },
-                addCardsResults = filteredCollection.map { card ->
-                    AddCardRow(card = card, quantityInDeck = 0, isOwned = card.scryfallId in ownedIds)
-                },
-                wishlistResults = filteredWishlist.map { card ->
-                    AddCardRow(card = card, quantityInDeck = 0, isOwned = card.scryfallId in ownedIds)
+            val allItems = s.proposerItems + s.receiverItems + s.pendingAddedItems
+
+            when (searchingSide) {
+                TradeSide.PROPOSER -> {
+                    // A is offering cards: show MY offers + FRIEND's wishlist
+                    val friendWishlist = friendData.wishlist
+                    val filteredOffer = if (query.isBlank()) offerEntries
+                        else offerEntries.filter { it.card?.name?.contains(query, ignoreCase = true) == true }
+                    val filteredFriendWishlist = if (query.isBlank()) friendWishlist
+                        else friendWishlist.filter { it.name.contains(query, ignoreCase = true) }
+
+                    s.copy(
+                        offerResults = filteredOffer.mapNotNull { entry ->
+                            val card = entry.card ?: return@mapNotNull null
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = allItems.filter { it.cardId == entry.scryfallId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language && it.isAltArt == entry.isAltArt }.sumOf { it.quantity },
+                                isOwned = entry.scryfallId in ownedIds,
+                                availableQuantity = entry.quantity,
+                                offerEntry = entry,
+                            )
+                        },
+                        addCardsResults = filteredCollection.map { card ->
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                                isOwned = card.scryfallId in ownedIds,
+                                availableQuantity = 0,
+                            )
+                        },
+                        wishlistResults = if (isFriendSelected) {
+                            filteredFriendWishlist.mapNotNull { fc ->
+                                val card = fc.toCard() ?: return@mapNotNull null
+                                AddCardRow(
+                                    card = card,
+                                    quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == fc.condition && it.language == fc.language }.sumOf { it.quantity },
+                                    isOwned = fc.scryfallId in ownedIds,
+                                    availableQuantity = fc.quantity,
+                                    wishlistEntry = fc.toSyntheticWishlistEntry(),
+                                )
+                            }
+                        } else emptyList(),
+                        proposerMatches = computeProposerMatches(s, ownedIds),
+                        receiverMatches = computeReceiverMatches(s, ownedIds),
+                    )
                 }
-            )
+
+                TradeSide.RECEIVER -> {
+                    // A is requesting cards: show FRIEND's offers + FRIEND's collection + MY wishlist
+                    val friendOffers = friendData.offers
+                    val friendCollection = friendData.collection
+                    val filteredWishlist = if (query.isBlank()) wishlistEntries
+                        else wishlistEntries.filter { it.card?.name?.contains(query, ignoreCase = true) == true }
+                    val filteredFriendOffers = if (query.isBlank()) friendOffers
+                        else friendOffers.filter { it.name.contains(query, ignoreCase = true) }
+                    // Friend's public collection — shown in the "Offer" tab (offerResults) alongside offers
+                    val filteredFriendCollection = if (query.isBlank()) friendCollection
+                        else friendCollection.filter { it.name.contains(query, ignoreCase = true) }
+                    // Merge friend offers + friend collection into offerResults, de-duplicating by scryfallId
+                    // (offer entries take precedence as they carry quantity/variant metadata)
+                    val offerIds = filteredFriendOffers.map { it.scryfallId }.toSet()
+                    val collectionRows = filteredFriendCollection
+                        .filter { it.scryfallId !in offerIds }
+                        .map { card ->
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                                isOwned = card.scryfallId in ownedIds,
+                                availableQuantity = 0,
+                            )
+                        }
+
+                    s.copy(
+                        offerResults = filteredFriendOffers.mapNotNull { fc ->
+                            val card = fc.toCard() ?: return@mapNotNull null
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == fc.condition && it.language == fc.language }.sumOf { it.quantity },
+                                isOwned = fc.scryfallId in ownedIds,
+                                availableQuantity = fc.quantity,
+                                offerEntry = fc.toSyntheticOfferEntry(),
+                            )
+                        } + collectionRows,
+                        addCardsResults = filteredCollection.map { card ->
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                                isOwned = card.scryfallId in ownedIds,
+                                availableQuantity = 0,
+                            )
+                        },
+                        wishlistResults = filteredWishlist.mapNotNull { entry ->
+                            val card = entry.card ?: return@mapNotNull null
+                            AddCardRow(
+                                card = card,
+                                quantityInDeck = allItems.filter { it.cardId == entry.cardId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language && it.isAltArt == entry.isAltArt }.sumOf { it.quantity },
+                                isOwned = entry.cardId in ownedIds,
+                                availableQuantity = entry.quantity,
+                                wishlistEntry = entry,
+                            )
+                        },
+                        proposerMatches = computeProposerMatches(s, ownedIds),
+                        receiverMatches = computeReceiverMatches(s, ownedIds),
+                    )
+                }
+
+                null -> {
+                    // No sheet open: only update the match suggestions (data may have refreshed)
+                    s.copy(
+                        proposerMatches = computeProposerMatches(s, ownedIds),
+                        receiverMatches = computeReceiverMatches(s, ownedIds),
+                    )
+                }
+            }
         }
+    }
+
+    /**
+     * Computes the proposer match suggestions: my [offerEntries] whose [scryfallId] appears in
+     * the friend's wishlist. Uses the friend's wishlist metadata (foil/condition/language) so
+     * the resulting [AddCardRow] carries the variant the friend actually wants.
+     */
+    private fun computeProposerMatches(
+        state: ProposalEditorUiState,
+        ownedIds: Set<String>,
+    ): List<AddCardRow> {
+        val currentFriendWishlist = friendData.wishlist
+        if (state.selectedFriend == null || currentFriendWishlist.isEmpty()) return emptyList()
+        val friendWishlistIds = currentFriendWishlist.map { it.scryfallId }.toSet()
+        val allItems = state.proposerItems + state.receiverItems + state.pendingAddedItems
+        // One AddCardRow per scryfallId: pick the offer entry with the highest quantity
+        return offerEntries
+            .filter { it.scryfallId in friendWishlistIds }
+            .groupBy { it.scryfallId }
+            .mapNotNull { (scryfallId, entries) ->
+                val entry = entries.maxByOrNull { it.quantity } ?: return@mapNotNull null
+                val card = entry.card ?: return@mapNotNull null
+                val friendWish = currentFriendWishlist.firstOrNull { it.scryfallId == scryfallId }
+                val syntheticWish = friendWish?.toSyntheticWishlistEntry()
+                AddCardRow(
+                    card = card,
+                    quantityInDeck = allItems.filter { it.cardId == scryfallId }.sumOf { it.quantity },
+                    isOwned = scryfallId in ownedIds,
+                    availableQuantity = entry.quantity,
+                    offerEntry = entry,
+                    wishlistEntry = syntheticWish,
+                )
+            }
+    }
+
+    /**
+     * Computes the receiver match suggestions: friend's [friendOfferCards] whose [scryfallId]
+     * appears in my wishlist. Uses the friend's offer metadata (foil/condition/language) so
+     * the resulting [AddCardRow] reflects the actual copy the friend has available.
+     */
+    private fun computeReceiverMatches(
+        state: ProposalEditorUiState,
+        ownedIds: Set<String>,
+    ): List<AddCardRow> {
+        val currentFriendOffers = friendData.offers
+        if (state.selectedFriend == null || currentFriendOffers.isEmpty()) return emptyList()
+        val myWishlistIds = wishlistEntries.map { it.cardId }.toSet()
+        val allItems = state.proposerItems + state.receiverItems + state.pendingAddedItems
+        // One AddCardRow per scryfallId: pick the friend offer entry with the highest quantity
+        return currentFriendOffers
+            .filter { it.scryfallId in myWishlistIds }
+            .groupBy { it.scryfallId }
+            .mapNotNull { (scryfallId, entries) ->
+                val fc = entries.maxByOrNull { it.quantity } ?: return@mapNotNull null
+                val card = fc.toCard() ?: return@mapNotNull null
+                AddCardRow(
+                    card = card,
+                    quantityInDeck = allItems.filter { it.cardId == scryfallId }.sumOf { it.quantity },
+                    isOwned = scryfallId in ownedIds,
+                    availableQuantity = fc.quantity,
+                    offerEntry = fc.toSyntheticOfferEntry(),
+                )
+            }
     }
 
     fun searchScryfallDirect(query: String) {
@@ -340,16 +620,18 @@ class TradeProposalViewModel @Inject constructor(
                 }
                 val ownedIds = _uiState.value.collectionIds
                 _uiState.update { s ->
+                    val allItems = s.proposerItems + s.receiverItems + s.pendingAddedItems
                     s.copy(
-                        isSearchingScryfall = false,
-                        scryfallResults = cards.map { card ->
-                            AddCardRow(
-                                card = card,
-                                quantityInDeck = 0,
-                                isOwned = card.scryfallId in ownedIds,
-                            )
-                        },
-                    )
+                    isSearchingScryfall = false,
+                    scryfallResults = cards.map { card ->
+                        AddCardRow(
+                            card = card,
+                            quantityInDeck = allItems.filter { it.cardId == card.scryfallId && it.userCardIdRef == null }.sumOf { it.quantity },
+                            isOwned = card.scryfallId in ownedIds,
+                            availableQuantity = 0,
+                        )
+                    },
+                )
                 }
             } catch (e: Exception) {
                 FirebaseCrashlytics.getInstance().apply {
@@ -364,7 +646,16 @@ class TradeProposalViewModel @Inject constructor(
     }
 
     fun clearAddCardsState() {
-        _uiState.update { it.copy(addCardsQuery = "", addCardsResults = emptyList(), scryfallResults = emptyList()) }
+        _uiState.update { it.copy(
+            addCardsQuery = "",
+            addCardsResults = emptyList(),
+            offerResults = emptyList(),
+            wishlistResults = emptyList(),
+            scryfallResults = emptyList(),
+            pendingAddedItems = emptyList(),
+            searchingSide = null,
+            isNavigatingToDetail = false,
+        ) }
     }
 
     fun getCardById(scryfallId: String): Card? {
@@ -373,19 +664,147 @@ class TradeProposalViewModel @Inject constructor(
     }
 
     fun addProposerItem(item: TradeItemDraft) {
-        _uiState.update { it.copy(proposerItems = it.proposerItems + item) }
+        _uiState.update { s ->
+            val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.isAltArt == item.isAltArt && it.userCardIdRef == item.userCardIdRef }
+            if (existing != null) {
+                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it })
+            } else {
+                s.copy(pendingAddedItems = s.pendingAddedItems + item)
+            }
+        }
+        updateSearchLists(_uiState.value.addCardsQuery)
     }
 
     fun removeProposerItem(id: String) {
-        _uiState.update { it.copy(proposerItems = it.proposerItems.filter { i -> i.id != id }) }
+        _uiState.update { s ->
+            val existing = s.pendingAddedItems.find { it.id == id }
+            if (existing != null && existing.quantity > 1) {
+                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == id) it.copy(quantity = it.quantity - 1) else it })
+            } else if (existing != null) {
+                s.copy(pendingAddedItems = s.pendingAddedItems.filter { it.id != id })
+            } else {
+                // If not in pending, check in main list (for direct removal from proposal)
+                val inMain = s.proposerItems.find { it.id == id }
+                if (inMain != null && inMain.quantity > 1) {
+                    s.copy(proposerItems = s.proposerItems.map { if (it.id == id) it.copy(quantity = it.quantity - 1) else it })
+                } else {
+                    s.copy(proposerItems = s.proposerItems.filter { it.id != id })
+                }
+            }
+        }
+        updateSearchLists(_uiState.value.addCardsQuery)
     }
 
     fun addReceiverItem(item: TradeItemDraft) {
-        _uiState.update { it.copy(receiverItems = it.receiverItems + item) }
+        _uiState.update { s ->
+            val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.isAltArt == item.isAltArt && it.userCardIdRef == item.userCardIdRef }
+            if (existing != null) {
+                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it })
+            } else {
+                s.copy(pendingAddedItems = s.pendingAddedItems + item)
+            }
+        }
+        updateSearchLists(_uiState.value.addCardsQuery)
     }
 
     fun removeReceiverItem(id: String) {
-        _uiState.update { it.copy(receiverItems = it.receiverItems.filter { i -> i.id != id }) }
+        _uiState.update { s ->
+            val existing = s.pendingAddedItems.find { it.id == id }
+            if (existing != null && existing.quantity > 1) {
+                s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == id) it.copy(quantity = it.quantity - 1) else it })
+            } else if (existing != null) {
+                s.copy(pendingAddedItems = s.pendingAddedItems.filter { it.id != id })
+            } else {
+                val inMain = s.receiverItems.find { it.id == id }
+                if (inMain != null && inMain.quantity > 1) {
+                    s.copy(receiverItems = s.receiverItems.map { if (it.id == id) it.copy(quantity = it.quantity - 1) else it })
+                } else {
+                    s.copy(receiverItems = s.receiverItems.filter { it.id != id })
+                }
+            }
+        }
+        updateSearchLists(_uiState.value.addCardsQuery)
+    }
+
+    /**
+     * Adds a suggestion card directly to [proposerItems] (the "They get" side).
+     * Merges by incrementing quantity if the exact same variant already exists,
+     * otherwise appends. No pending-items flow needed — suggestions bypass the sheet.
+     */
+    fun addSuggestionToProposer(item: TradeItemDraft) {
+        _uiState.update { s ->
+            val existing = s.proposerItems.find {
+                it.cardId == item.cardId &&
+                it.isFoil == item.isFoil &&
+                it.condition == item.condition &&
+                it.language == item.language &&
+                it.isAltArt == item.isAltArt &&
+                it.userCardIdRef == item.userCardIdRef
+            }
+            if (existing != null) {
+                s.copy(
+                    proposerItems = s.proposerItems.map {
+                        if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it
+                    }
+                )
+            } else {
+                s.copy(proposerItems = s.proposerItems + item)
+            }
+        }
+        updateSearchLists(_uiState.value.addCardsQuery)
+    }
+
+    /**
+     * Adds a suggestion card directly to [receiverItems] (the "You get" side).
+     * Merges by incrementing quantity if the exact same variant already exists,
+     * otherwise appends.
+     */
+    fun addSuggestionToReceiver(item: TradeItemDraft) {
+        _uiState.update { s ->
+            val existing = s.receiverItems.find {
+                it.cardId == item.cardId &&
+                it.isFoil == item.isFoil &&
+                it.condition == item.condition &&
+                it.language == item.language &&
+                it.isAltArt == item.isAltArt &&
+                it.userCardIdRef == item.userCardIdRef
+            }
+            if (existing != null) {
+                s.copy(
+                    receiverItems = s.receiverItems.map {
+                        if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it
+                    }
+                )
+            } else {
+                s.copy(receiverItems = s.receiverItems + item)
+            }
+        }
+        updateSearchLists(_uiState.value.addCardsQuery)
+    }
+
+    fun onConfirmPendingItems() {
+        val side = _uiState.value.searchingSide ?: return
+        confirmPendingItemsForSide(side)
+    }
+
+    fun confirmPendingItemsForSide(side: TradeSide) {
+        _uiState.update { state ->
+            val pending = state.pendingAddedItems
+            when (side) {
+                TradeSide.PROPOSER -> state.copy(
+                    proposerItems = state.proposerItems + pending,
+                    pendingAddedItems = emptyList()
+                )
+                TradeSide.RECEIVER -> state.copy(
+                    receiverItems = state.receiverItems + pending,
+                    pendingAddedItems = emptyList()
+                )
+            }
+        }
+    }
+
+    fun onCancelPendingItems() {
+        _uiState.update { it.copy(pendingAddedItems = emptyList()) }
     }
 
     fun toggleReviewCollectionProposer() {
@@ -408,9 +827,7 @@ class TradeProposalViewModel @Inject constructor(
         }
     }
 
-    private fun validateInitialProposal(): Boolean {
-        val state = _uiState.value
-        if (state.isCounterMode) return true
+    private fun validateInitialProposal(state: ProposalEditorUiState): Boolean {
         val proposerCovered = state.proposerItems.isNotEmpty() || state.includesReviewFromProposer
         val receiverCovered = state.receiverItems.isNotEmpty() || state.includesReviewFromReceiver
         return proposerCovered && receiverCovered
@@ -424,7 +841,7 @@ class TradeProposalViewModel @Inject constructor(
             _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
             return
         }
-        if (!validateInitialProposal()) {
+        if (!validateInitialProposal(state)) {
             _uiState.update { it.copy(errorMessage = "INITIAL_ASYMMETRY") }
             return
         }
@@ -457,21 +874,40 @@ class TradeProposalViewModel @Inject constructor(
 
     fun onSendProposal() {
         val state = _uiState.value
-        // Guard: a new proposal (not a counter-offer, not an edit) requires a
-        // receiver. Without this, an empty-string receiverId reaches the RPC.
-        if (!state.isCounterMode && state.editingProposalId == null && state.receiverId.isBlank()) {
+        val myId = state.currentUserId
+        val receiverId = state.receiverId
+
+        // Guard: a proposal requires both participants to be identified.
+        if (myId.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "Not logged in") }
+            return
+        }
+        if (receiverId.isBlank() && !state.isCounterMode && state.editingProposalId == null) {
             _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
             return
         }
-        if (!validateInitialProposal()) {
+
+        if (!validateInitialProposal(state)) {
             _uiState.update { it.copy(errorMessage = "INITIAL_ASYMMETRY") }
             return
         }
+
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isSaving = true) }
 
             val editingId = state.editingProposalId
             val parentId = state.parentProposalId
+            val items = buildItemRequestDtos(state)
+            val reviewFlags = ReviewFlags(
+                state.includesReviewFromProposer,
+                state.includesReviewFromReceiver,
+            )
+
+            FirebaseCrashlytics.getInstance().apply {
+                log("trade_proposal_send_attempt: isCounter=${state.isCounterMode}, proposerItems=${state.proposerItems.size}, receiverItems=${state.receiverItems.size}")
+                setCustomKey("trade_my_id", myId)
+                setCustomKey("trade_receiver_id", receiverId)
+            }
 
             // Each branch is handled separately so every Result stays properly typed
             // and no unchecked casts or vacuous .map { it } calls are needed.
@@ -496,11 +932,8 @@ class TradeProposalViewModel @Inject constructor(
                 editingId != null -> editProposal(
                     proposalId = editingId,
                     expectedVersion = state.currentVersion,
-                    newItems = buildItemRequestDtos(state),
-                    newReviewFlags = ReviewFlags(
-                        state.includesReviewFromProposer,
-                        state.includesReviewFromReceiver,
-                    ),
+                    newItems = items,
+                    newReviewFlags = reviewFlags,
                 ).fold(
                     onSuccess = { _uiState.update { it.copy(isSaving = false, navigateBack = true) } },
                     onFailure = handleError,
@@ -508,7 +941,8 @@ class TradeProposalViewModel @Inject constructor(
 
                 parentId != null -> counterProposal(
                     parentProposalId = parentId,
-                    items = buildItemRequestDtos(state),
+                    items = items,
+                    reviewFlags = reviewFlags,
                 ).fold(
                     onSuccess = { newId ->
                         _uiState.update { s ->
@@ -523,8 +957,8 @@ class TradeProposalViewModel @Inject constructor(
                 )
 
                 else -> createProposal(
-                    receiverId = state.receiverId,
-                    items = buildItemRequestDtos(state),
+                    receiverId = receiverId,
+                    items = items,
                     includesReviewFromProposer = state.includesReviewFromProposer,
                     includesReviewFromReceiver = state.includesReviewFromReceiver,
                     autoSend = true,
@@ -555,16 +989,93 @@ class TradeProposalViewModel @Inject constructor(
     fun onNavigationConsumed() = _uiState.update { it.copy(navigateToThread = null, navigateBack = false) }
 
     private fun buildItemRequestDtos(state: ProposalEditorUiState): List<TradeItemRequestDto> {
-        val myId = currentUserId
+        val myId = state.currentUserId
         val proposerDtos = state.proposerItems.map { it.toRequestDto(fromUserId = myId, toUserId = state.receiverId) }
         val receiverDtos = state.receiverItems.map { it.toRequestDto(fromUserId = state.receiverId, toUserId = myId) }
         return proposerDtos + receiverDtos
     }
 
+    // ── FriendCard conversion helpers ─────────────────────────────────────────
+
+    /** Builds a minimal [Card] from an enriched [FriendCard]. Returns null if the
+     *  card has no name (i.e. Room/Scryfall enrichment failed for this row). */
+    private fun FriendCard.toCard(): Card? {
+        if (name.isBlank()) return null
+        return Card(
+            scryfallId = scryfallId,
+            name = name,
+            printedName = null,
+            manaCost = null,
+            cmc = 0.0,
+            colors = emptyList(),
+            colorIdentity = emptyList(),
+            typeLine = typeLine,
+            printedTypeLine = null,
+            oracleText = null,
+            printedText = null,
+            keywords = emptyList(),
+            power = null,
+            toughness = null,
+            loyalty = null,
+            setCode = setCode ?: "",
+            setName = setName ?: "",
+            collectorNumber = "",
+            rarity = rarity ?: "",
+            releasedAt = "",
+            frameEffects = emptyList(),
+            promoTypes = emptyList(),
+            lang = "",
+            imageNormal = imageNormal,
+            imageArtCrop = imageArtCrop,
+            imageBackNormal = null,
+            priceUsd = priceUsd,
+            priceUsdFoil = priceUsdFoil,
+            priceEur = priceEur,
+            priceEurFoil = priceEurFoil,
+            legalityStandard = "",
+            legalityPioneer = "",
+            legalityModern = "",
+            legalityCommander = "",
+            flavorText = null,
+            artist = null,
+            scryfallUri = "",
+            isStale = isStale,
+        )
+    }
+
+    /** Synthetic [WishlistEntry] carrying the friend's metadata into [TradeItemDraft]. */
+    private fun FriendCard.toSyntheticWishlistEntry() = WishlistEntry(
+        id = scryfallId,
+        userId = "",
+        cardId = scryfallId,
+        quantity = quantity,
+        matchAnyVariant = false,
+        isFoil = isFoil,
+        condition = condition,
+        language = language,
+        isAltArt = false,
+        createdAt = 0L,
+    )
+
+    /** Synthetic [OpenForTradeEntry] carrying the friend's metadata into [TradeItemDraft].
+     *  userCardId is empty because the unified RPC does not expose individual copy IDs. */
+    private fun FriendCard.toSyntheticOfferEntry() = OpenForTradeEntry(
+        id = scryfallId,
+        userId = "",
+        userCardId = "",
+        scryfallId = scryfallId,
+        quantity = quantity,
+        isFoil = isFoil,
+        condition = condition ?: "NM",
+        language = language ?: "en",
+        isAltArt = false,
+        createdAt = 0L,
+    )
+
     private fun TradeItemDraft.toRequestDto(fromUserId: String, toUserId: String) = TradeItemRequestDto(
         fromUserId = fromUserId,
         toUserId = toUserId,
-        userCardIdRef = userCardIdRef,
+        userCardIdRef = userCardIdRef?.takeIf { it.isNotBlank() },
         quantity = if (isReviewCollectionPlaceholder) null else quantity,
         isFoil = if (isReviewCollectionPlaceholder) null else isFoil,
         condition = if (isReviewCollectionPlaceholder) null else condition,

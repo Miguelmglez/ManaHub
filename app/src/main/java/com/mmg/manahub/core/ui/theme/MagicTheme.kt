@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
@@ -15,12 +16,10 @@ import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.AncientOakBackground
 import com.mmg.manahub.core.ui.components.ArcaneCosmosBackground
 import com.mmg.manahub.core.ui.components.ForestMurmurBackground
-import com.mmg.manahub.core.ui.components.GildedSilverBackground
+import com.mmg.manahub.core.ui.components.HallowedPrintBackground
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MedievalGrimoireBackground
-import com.mmg.manahub.core.ui.components.MysticEchoBackground
-import com.mmg.manahub.core.ui.components.ObsidianChromeBackground
-import com.mmg.manahub.core.ui.components.ShadowEssenceBackground
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  CompositionLocals
@@ -58,6 +57,9 @@ val MaterialTheme.magicTypography: MagicTypography
  * bridges them into [MaterialTheme] so that Material 3 components
  * (NavigationBar, TopAppBar, BottomSheet, etc.) inherit the correct palette.
  *
+ * Light vs dark Material 3 base scheme is chosen automatically from
+ * [MagicColors.isLight] — currently only [AppTheme.HallowedPrint] returns true.
+ *
  * @param theme The [AppTheme] to apply. Defaults to [AppTheme.NeonVoid].
  */
 @Composable
@@ -69,24 +71,32 @@ fun MagicTheme(
         is AppTheme.NeonVoid         -> NeonVoidColors
         is AppTheme.MedievalGrimoire -> MedievalGrimoireColors
         is AppTheme.ArcaneCosmos     -> ArcaneCosmosColors
-        is AppTheme.ShadowEssence    -> ShadowEssenceColors
         is AppTheme.ForestMurmur     -> ForestMurmurColors
-        is AppTheme.MysticEcho       -> MysticEchoColors
-        is AppTheme.GildedSilver     -> GildedSilverColors
         is AppTheme.AncientOak       -> AncientOakColors
-        is AppTheme.ObsidianChrome   -> ObsidianChromeColors
+        is AppTheme.HallowedPrint    -> HallowedPrintColors
+        is AppTheme.AzureFlux        -> AzureFluxColors
+        is AppTheme.PlanarVeil       -> PlanarVeilColors
+        is AppTheme.VenomShade       -> VenomShadeColors
+        is AppTheme.GlacialEdge      -> GlacialEdgeColors
+        is AppTheme.DuskEmber        -> DuskEmberColors
+        is AppTheme.OnyxNoir         -> OnyxNoirColors
     }
 
+    // TODO(v2.1): give themes that warrant it their own typography instance.
+    // For now every theme still inherits NeonVoidTypography.
     val magicTypography = when (theme) {
         is AppTheme.NeonVoid         -> NeonVoidTypography
         is AppTheme.MedievalGrimoire -> NeonVoidTypography
         is AppTheme.ArcaneCosmos     -> NeonVoidTypography
-        is AppTheme.ShadowEssence    -> NeonVoidTypography
         is AppTheme.ForestMurmur     -> NeonVoidTypography
-        is AppTheme.MysticEcho       -> NeonVoidTypography
-        is AppTheme.GildedSilver     -> NeonVoidTypography
         is AppTheme.AncientOak       -> NeonVoidTypography
-        is AppTheme.ObsidianChrome   -> NeonVoidTypography
+        is AppTheme.HallowedPrint    -> NeonVoidTypography
+        is AppTheme.AzureFlux        -> NeonVoidTypography
+        is AppTheme.PlanarVeil       -> NeonVoidTypography
+        is AppTheme.VenomShade       -> NeonVoidTypography
+        is AppTheme.GlacialEdge      -> NeonVoidTypography
+        is AppTheme.DuskEmber        -> NeonVoidTypography
+        is AppTheme.OnyxNoir         -> NeonVoidTypography
     }
 
     CompositionLocalProvider(
@@ -107,36 +117,69 @@ fun MagicTheme(
 //  Material 3 bridge (private helpers)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-private fun MagicColors.toMaterial3ColorScheme() = darkColorScheme(
-    primary              = primaryAccent,
-    onPrimary            = Color.Black,
-    primaryContainer     = primaryAccent.copy(alpha = 0.20f),
-    onPrimaryContainer   = textPrimary,
+private fun MagicColors.toMaterial3ColorScheme() = if (isLight) {
+    lightColorScheme(
+        primary              = primaryAccent,
+        onPrimary            = Color.White,
+        primaryContainer     = primaryAccent.copy(alpha = 0.14f),
+        onPrimaryContainer   = textPrimary,
 
-    secondary            = secondaryAccent,
-    onSecondary          = Color.Black,
-    secondaryContainer   = secondaryAccent.copy(alpha = 0.20f),
-    onSecondaryContainer = textPrimary,
+        secondary            = secondaryAccent,
+        onSecondary          = Color.White,
+        secondaryContainer   = secondaryAccent.copy(alpha = 0.14f),
+        onSecondaryContainer = textPrimary,
 
-    tertiary             = goldMtg,
-    onTertiary           = Color.Black,
-    tertiaryContainer    = goldMtg.copy(alpha = 0.20f),
-    onTertiaryContainer  = textPrimary,
+        tertiary             = goldMtg,
+        onTertiary           = Color.White,
+        tertiaryContainer    = goldMtg.copy(alpha = 0.18f),
+        onTertiaryContainer  = textPrimary,
 
-    background           = background,
-    onBackground         = textPrimary,
+        background           = background,
+        onBackground         = textPrimary,
 
-    surface              = surface,
-    onSurface            = textPrimary,
-    surfaceVariant       = surfaceVariant,
-    onSurfaceVariant     = textSecondary,
+        surface              = surface,
+        onSurface            = textPrimary,
+        surfaceVariant       = surfaceVariant,
+        onSurfaceVariant     = textSecondary,
 
-    error                = lifeNegative,
-    onError              = Color.Black,
+        error                = lifeNegative,
+        onError              = Color.White,
 
-    outline              = textDisabled,
-    scrim                = Color(0x99000000),
-)
+        outline              = textDisabled,
+        scrim                = Color(0x66000000),
+    )
+} else {
+    darkColorScheme(
+        primary              = primaryAccent,
+        onPrimary            = Color.Black,
+        primaryContainer     = primaryAccent.copy(alpha = 0.20f),
+        onPrimaryContainer   = textPrimary,
+
+        secondary            = secondaryAccent,
+        onSecondary          = Color.Black,
+        secondaryContainer   = secondaryAccent.copy(alpha = 0.20f),
+        onSecondaryContainer = textPrimary,
+
+        tertiary             = goldMtg,
+        onTertiary           = Color.Black,
+        tertiaryContainer    = goldMtg.copy(alpha = 0.20f),
+        onTertiaryContainer  = textPrimary,
+
+        background           = background,
+        onBackground         = textPrimary,
+
+        surface              = surface,
+        onSurface            = textPrimary,
+        surfaceVariant       = surfaceVariant,
+        onSurfaceVariant     = textSecondary,
+
+        error                = lifeNegative,
+        onError              = Color.Black,
+
+        outline              = textDisabled,
+        scrim                = Color(0x99000000),
+    )
+}
 
 private fun MagicTypography.toMaterial3Typography() = Typography(
     displayLarge  = displayLarge,
@@ -177,10 +220,13 @@ fun ThemeBackground(
         is AppTheme.MedievalGrimoire -> MedievalGrimoireBackground(modifier = modifier)
         is AppTheme.ArcaneCosmos     -> ArcaneCosmosBackground(modifier = modifier)
         is AppTheme.ForestMurmur     -> ForestMurmurBackground(modifier = modifier)
-        is AppTheme.MysticEcho       -> MysticEchoBackground(modifier = modifier)
-        is AppTheme.GildedSilver     -> GildedSilverBackground(modifier = modifier)
         is AppTheme.AncientOak       -> AncientOakBackground(modifier = modifier)
-        is AppTheme.ShadowEssence    -> ShadowEssenceBackground(modifier = modifier)
-        is AppTheme.ObsidianChrome   -> ObsidianChromeBackground(modifier = modifier)
+        is AppTheme.HallowedPrint    -> HallowedPrintBackground(modifier = modifier)
+        is AppTheme.AzureFlux        -> HexGridBackground(modifier = modifier)
+        is AppTheme.PlanarVeil       -> HexGridBackground(modifier = modifier)
+        is AppTheme.VenomShade       -> HexGridBackground(modifier = modifier)
+        is AppTheme.GlacialEdge      -> HexGridBackground(modifier = modifier)
+        is AppTheme.DuskEmber        -> HexGridBackground(modifier = modifier)
+        is AppTheme.OnyxNoir         -> HexGridBackground(modifier = modifier)
     }
 }

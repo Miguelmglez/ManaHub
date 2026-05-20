@@ -158,16 +158,32 @@ class UserPreferencesDataStore @Inject constructor(
                 "ARCANE_COSMOS"     -> AppTheme.ArcaneCosmos
                 "NEON_VOID"         -> AppTheme.NeonVoid
                 "MEDIEVAL_GRIMOIRE" -> AppTheme.MedievalGrimoire
-                "SHADOW_ESSENCE"    -> AppTheme.ShadowEssence
                 "FOREST_MURMUR"     -> AppTheme.ForestMurmur
-                "MYSTIC_ECHO"       -> AppTheme.MysticEcho
-                "GILDED_SILVER"     -> AppTheme.GildedSilver
                 "ANCIENT_OAK"       -> AppTheme.AncientOak
-                "OBSIDIAN_CHROME"   -> AppTheme.ObsidianChrome
-                else                -> AppTheme.ArcaneCosmos
+                "HALLOWED_PRINT"    -> AppTheme.HallowedPrint
+                
+                "AZURE_FLUX"        -> AppTheme.AzureFlux
+                "PLANAR_VEIL"       -> AppTheme.PlanarVeil
+                "VENOM_SHADE"       -> AppTheme.VenomShade
+                "GLACIAL_EDGE"      -> AppTheme.GlacialEdge
+                "DUSK_EMBER"        -> AppTheme.DuskEmber
+                "ONYX_NOIR"         -> AppTheme.OnyxNoir
+
+                // ── v1 → v2 silent migrations ────────────────────────────────────
+                "MYSTIC_ECHO"       -> AppTheme.PlanarVeil      // v4: merged
+                "GILDED_SILVER"     -> AppTheme.AncientOak      // v4: replaced
+                "OBSIDIAN_CHROME"   -> AppTheme.HallowedPrint   // replaced
+
+                // ── v2 → v4 silent migrations ────────────────────────────────────
+                "SHADOW_ESSENCE"    -> AppTheme.PlanarVeil
+                "RELIQUARY"         -> AppTheme.AncientOak
+                "PYROMANCER"        -> AppTheme.MedievalGrimoire
+                "HYDROMANCY"        -> AppTheme.GlacialEdge
+
+                else                -> AppTheme.NeonVoid
             }
         }
-        .catch { emit(AppTheme.ArcaneCosmos) }
+        .catch { emit(AppTheme.NeonVoid) }
 
     suspend fun savePlayerName(name: String) {
         context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
@@ -300,12 +316,15 @@ class UserPreferencesDataStore @Inject constructor(
                 AppTheme.NeonVoid         -> "NEON_VOID"
                 AppTheme.MedievalGrimoire -> "MEDIEVAL_GRIMOIRE"
                 AppTheme.ArcaneCosmos     -> "ARCANE_COSMOS"
-                AppTheme.ShadowEssence    -> "SHADOW_ESSENCE"
                 AppTheme.ForestMurmur     -> "FOREST_MURMUR"
-                AppTheme.MysticEcho       -> "MYSTIC_ECHO"
-                AppTheme.GildedSilver     -> "GILDED_SILVER"
                 AppTheme.AncientOak       -> "ANCIENT_OAK"
-                AppTheme.ObsidianChrome   -> "OBSIDIAN_CHROME"
+                AppTheme.HallowedPrint    -> "HALLOWED_PRINT"
+                AppTheme.AzureFlux        -> "AZURE_FLUX"
+                AppTheme.PlanarVeil       -> "PLANAR_VEIL"
+                AppTheme.VenomShade       -> "VENOM_SHADE"
+                AppTheme.GlacialEdge      -> "GLACIAL_EDGE"
+                AppTheme.DuskEmber        -> "DUSK_EMBER"
+                AppTheme.OnyxNoir         -> "ONYX_NOIR"
             }
         }
     }

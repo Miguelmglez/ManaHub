@@ -11,6 +11,6 @@ enum class TradeStatus {
         else -> false
     }
 
-    val isTerminal: Boolean get() = this in setOf(CANCELLED, DECLINED, COUNTERED, COMPLETED, REVOKED)
+    val isTerminal: Boolean get() = this in setOf(CANCELLED, DECLINED, COMPLETED, REVOKED)
     val isActive: Boolean get() = !isTerminal
 }

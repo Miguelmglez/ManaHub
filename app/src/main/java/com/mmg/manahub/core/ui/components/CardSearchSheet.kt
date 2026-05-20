@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -40,11 +41,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -65,6 +69,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
@@ -75,6 +80,8 @@ import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.SetSymbol
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,12 +98,24 @@ fun CardSearchSheet(
     isCurrentCommander: (String) -> Boolean = { false },
     onQueryChange: (String) -> Unit,
     onScryfallSearch: (String) -> Unit,
-    onAdd: (String) -> Unit,
-    onRemove: (String) -> Unit,
+    onAdd: (AddCardRow) -> Unit,
+    onRemove: (AddCardRow) -> Unit,
+    onConfirm: () -> Unit = {},
+    onCancel: () -> Unit = {},
     onCardClick: (String) -> Unit,
     onDismiss: () -> Unit,
     title: String = if (isCommanderMode) "Choose Commander" else stringResource(R.string.deckbuilder_add_cards),
-    friendName: String? = null
+    friendName: String? = null,
+    /** Label for the Wishlist tab (first tab). Caller provides side-specific text. */
+    wishlistTabLabel: String = "Wishlist",
+    /** Label for the Offer tab (second tab). Caller provides side-specific text. */
+    offerTabLabel: String = "Offer",
+    /** Label for the All Cards tab (third tab). Caller provides side-specific text. */
+    allCardsTabLabel: String = "All Cards",
+    /** Section header rendered above [offerResults] inside the Offer tab. */
+    offerSectionLabel: String = stringResource(R.string.trades_search_section_offers),
+    /** Section header rendered above [addCardsResults] inside the Offer tab. */
+    collectionSectionLabel: String = stringResource(R.string.trades_search_section_collection),
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -107,7 +126,10 @@ fun CardSearchSheet(
     val sheetFocusRequester = remember { FocusRequester() }
     val textFieldFocusRequester = remember { FocusRequester() }
     val lazyListState = rememberLazyListState()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
     
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAdvancedSearch by remember { mutableStateOf(false) }
@@ -167,7 +189,24 @@ fun CardSearchSheet(
                 .focusRequester(sheetFocusRequester)
                 .focusable()
         ) {
-            Text(displayTitle, style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_close),
+                        tint = mc.textPrimary
+                    )
+                }
+                Text(
+                    text = displayTitle,
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -207,30 +246,56 @@ fun CardSearchSheet(
                 }
             }
 
-            TabRow(selectedTabIndex = selectedTab, containerColor = mc.backgroundSecondary, contentColor = mc.primaryAccent) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = mc.backgroundSecondary,
+                contentColor = mc.primaryAccent,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Tab(
                     selected = selectedTab == 0,
-                    onClick = { 
+                    onClick = {
                         selectedTab = 0
                         forceHideKeyboard()
                     },
-                    text = { Text("Wishlist", style = ty.labelLarge) }
+                    text = { 
+                        Text(
+                            text = wishlistTabLabel,
+                            style = ty.labelLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 )
                 Tab(
                     selected = selectedTab == 1,
-                    onClick = { 
+                    onClick = {
                         selectedTab = 1
                         forceHideKeyboard()
                     },
-                    text = { Text("Offer", style = ty.labelLarge) }
+                    text = { 
+                        Text(
+                            text = offerTabLabel,
+                            style = ty.labelLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 )
                 Tab(
                     selected = selectedTab == 2,
-                    onClick = { 
+                    onClick = {
                         selectedTab = 2
                         forceHideKeyboard()
                     },
-                    text = { Text("All Cards", style = ty.labelLarge) }
+                    text = { 
+                        Text(
+                            text = allCardsTabLabel,
+                            style = ty.labelLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 )
             }
 
@@ -258,61 +323,77 @@ fun CardSearchSheet(
             ) {
                 item { Spacer(Modifier.height(8.dp)) }
                 
-                if (selectedTab == 1) {
-                    if (offerResults.isNotEmpty()) {
-                        item(key = "offers_header") {
-                            Text(
-                                text = stringResource(R.string.trades_search_section_offers).uppercase(),
-                                style = ty.labelSmall,
-                                color = mc.textSecondary,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                        items(offerResults, key = { "off_${it.card.scryfallId}" }) { row ->
+                when (selectedTab) {
+                    0 -> {
+                        items(wishlistResults) { row ->
                             AddCardSheetRow(
                                 row = row,
                                 isCommanderMode = isCommanderMode,
                                 isCurrentCommander = isCurrentCommander(row.card.scryfallId),
-                                onAdd = { onAdd(row.card.scryfallId) },
-                                onRemove = { onRemove(row.card.scryfallId) },
+                                onAdd = { onAdd(row) },
+                                onRemove = { onRemove(row) },
                                 onClick = { onCardClick(row.card.scryfallId) },
                                 onInteraction = { forceHideKeyboard() }
                             )
                         }
                     }
-
-                    if (addCardsResults.isNotEmpty()) {
-                        item(key = "collection_header") {
-                            Text(
-                                text = stringResource(R.string.trades_search_section_collection).uppercase(),
-                                style = ty.labelSmall,
-                                color = mc.textSecondary,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+                    1 -> {
+                        if (offerResults.isNotEmpty()) {
+                            item(key = "offers_header") {
+                                Text(
+                                    text = offerSectionLabel.uppercase(),
+                                    style = ty.labelSmall,
+                                    color = mc.textSecondary,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                            items(offerResults) { row ->
+                                AddCardSheetRow(
+                                    row = row,
+                                    isCommanderMode = isCommanderMode,
+                                    isCurrentCommander = isCurrentCommander(row.card.scryfallId),
+                                    onAdd = { onAdd(row) },
+                                    onRemove = { onRemove(row) },
+                                    onClick = { onCardClick(row.card.scryfallId) },
+                                    onInteraction = { forceHideKeyboard() }
+                                )
+                            }
                         }
-                        items(addCardsResults, key = { "coll_${it.card.scryfallId}" }) { row ->
+                        
+                        if (addCardsResults.isNotEmpty()) {
+                            item(key = "collection_header") {
+                                Text(
+                                    text = collectionSectionLabel.uppercase(),
+                                    style = ty.labelSmall,
+                                    color = mc.textSecondary,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                            items(addCardsResults, key = { "coll_${it.uniqueKey}" }) { row ->
+                                AddCardSheetRow(
+                                    row = row,
+                                    isCommanderMode = isCommanderMode,
+                                    isCurrentCommander = isCurrentCommander(row.card.scryfallId),
+                                    onAdd = { onAdd(row) },
+                                    onRemove = { onRemove(row) },
+                                    onClick = { onCardClick(row.card.scryfallId) },
+                                    onInteraction = { forceHideKeyboard() }
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        items(scryfallResults, key = { it.uniqueKey }) { row ->
                             AddCardSheetRow(
                                 row = row,
                                 isCommanderMode = isCommanderMode,
                                 isCurrentCommander = isCurrentCommander(row.card.scryfallId),
-                                onAdd = { onAdd(row.card.scryfallId) },
-                                onRemove = { onRemove(row.card.scryfallId) },
+                                onAdd = { onAdd(row) },
+                                onRemove = { onRemove(row) },
                                 onClick = { onCardClick(row.card.scryfallId) },
                                 onInteraction = { forceHideKeyboard() }
                             )
                         }
-                    }
-                } else {
-                    items(results, key = { it.card.scryfallId }) { row ->
-                        AddCardSheetRow(
-                            row = row,
-                            isCommanderMode = isCommanderMode,
-                            isCurrentCommander = isCurrentCommander(row.card.scryfallId),
-                            onAdd = { onAdd(row.card.scryfallId) },
-                            onRemove = { onRemove(row.card.scryfallId) },
-                            onClick = { onCardClick(row.card.scryfallId) },
-                            onInteraction = { forceHideKeyboard() }
-                        )
                     }
                 }
 
@@ -344,9 +425,18 @@ fun CardSearchSheet(
 
             Button(onClick = {
                 forceHideKeyboard()
+                onConfirm()
                 onDismiss()
-            }, modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = RoundedCornerShape(8.dp)) {
-                Text(stringResource(R.string.deckbuilder_add_cards_done), style = ty.titleMedium, color = mc.background)
+            }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = RoundedCornerShape(8.dp)) {
+                Text(stringResource(R.string.action_confirm), style = ty.titleMedium, color = mc.background)
+            }
+            
+            TextButton(onClick = {
+                forceHideKeyboard()
+                onCancel()
+                onDismiss()
+            }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp)) {
+                Text(stringResource(R.string.action_cancel), style = ty.titleMedium, color = mc.textSecondary)
             }
         }
     }
@@ -386,9 +476,83 @@ private fun AddCardSheetRow(
                     maxLines      = 1,
                     overflow      = TextOverflow.Ellipsis
                 )
-                Text(card.typeLine, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SetSymbol(
+                        setCode = card.setCode,
+                        rarity = CardRarity.fromString(card.rarity),
+                        size = 13.dp,
+                    )
+                    Text(
+                        text = card.setName,
+                        style = ty.labelSmall,
+                        color = mc.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                Text(
+                    text = card.typeLine,
+                    style = ty.labelSmall,
+                    color = mc.textDisabled,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                ) {
+                    val isFoil = row.wishlistEntry?.isFoil == true || row.offerEntry?.isFoil == true
+                    val condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
+                    val language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "EN"
+                    val isAltArt = row.wishlistEntry?.isAltArt == true || row.offerEntry?.isAltArt == true
+
+                    CopyBadge(label = language.uppercase())
+                    CopyBadge(label = condition)
+                    if (isFoil) FoilBadge()
+                    if (isAltArt) {
+                        CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
+                    }
+                }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (!row.isOwned && row.availableQuantity == 0 && row.wishlistEntry == null && row.offerEntry == null) {
+                    Icon(
+                        imageVector = Icons.Default.PriorityHigh,
+                        contentDescription = stringResource(com.mmg.manahub.R.string.trades_warning_not_in_list),
+                        tint = mc.goldMtg,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                if (row.availableQuantity > 0) {
+                    val overLimit = row.quantityInDeck > row.availableQuantity
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        if (overLimit) {
+                            Icon(
+                                imageVector = Icons.Default.PriorityHigh,
+                                contentDescription = "Over limit",
+                                tint = mc.lifeNegative,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Text(
+                            text = "${row.availableQuantity}",
+                            style = ty.labelSmall,
+                            color = if (overLimit) mc.lifeNegative else mc.textSecondary
+                        )
+                    }
+                }
+
                 if (row.quantityInDeck > 0 && !isCommanderMode) {
                     IconButton(onClick = {
                         onInteraction()

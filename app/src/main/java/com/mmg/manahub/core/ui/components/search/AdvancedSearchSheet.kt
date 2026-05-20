@@ -30,8 +30,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Diamond
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Layers
@@ -941,69 +939,6 @@ fun AdvancedSearchSheet(
                         else R.string.advsearch_search_button
                     ),
                     style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                )
-            }
-        }
-    }
-}
-
-// ── Collapsible section ──────────────────────────────────────────────────────
-
-@Composable
-fun SearchSection(
-    title: String,
-    icon: ImageVector? = null,
-    collapsedByDefault: Boolean = false,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    var expanded by remember { mutableStateOf(!collapsedByDefault) }
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = mc.surface,
-        border = BorderStroke(0.5.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
-        shadowElevation = if (expanded) 1.dp else 0.dp
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-                    .padding(vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (icon != null) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = if (expanded) mc.primaryAccent else mc.textSecondary
-                    )
-                }
-                Text(
-                    title,
-                    style = ty.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (expanded) mc.textPrimary else mc.textSecondary,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = mc.textDisabled,
-                )
-            }
-            AnimatedVisibility(visible = expanded) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    content = content,
                 )
             }
         }
