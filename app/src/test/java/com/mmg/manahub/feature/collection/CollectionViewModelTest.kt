@@ -18,6 +18,8 @@ import com.mmg.manahub.feature.collection.presentation.SortOrder
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import com.mmg.manahub.util.TestFixtures
@@ -74,9 +76,11 @@ class CollectionViewModelTest {
     private val syncManager            = mockk<SyncManager>(relaxed = true)
     private val workManager            = mockk<WorkManager>(relaxed = true)
     private val migrateLocalTradeLists = mockk<MigrateLocalTradeListsUseCase>(relaxed = true)
-    private val getLocalWishlist       = mockk<GetLocalWishlistUseCase>(relaxed = true)
+    private val getLocalWishlist          = mockk<GetLocalWishlistUseCase>(relaxed = true)
+    private val wishlistRepository        = mockk<WishlistRepository>(relaxed = true)
+    private val openForTradeRepository    = mockk<OpenForTradeRepository>(relaxed = true)
     private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
-    private val analyticsHelper            = mockk<AnalyticsHelper>(relaxed = true)
+    private val analyticsHelper           = mockk<AnalyticsHelper>(relaxed = true)
 
     private lateinit var viewModel: CollectionViewModel
 
@@ -158,9 +162,11 @@ class CollectionViewModelTest {
             syncManager            = syncManager,
             workManager            = workManager,
             migrateLocalTradeLists = migrateLocalTradeLists,
-            getLocalWishlist       = getLocalWishlist,
+            getLocalWishlist          = getLocalWishlist,
+            wishlistRepository        = wishlistRepository,
+            openForTradeRepository    = openForTradeRepository,
             userPreferencesRepository = userPreferencesRepository,
-            analyticsHelper        = analyticsHelper,
+            analyticsHelper           = analyticsHelper,
         )
     }
 

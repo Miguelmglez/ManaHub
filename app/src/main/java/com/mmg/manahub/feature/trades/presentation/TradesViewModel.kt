@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.trades.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
 import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
@@ -14,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,6 +42,8 @@ data class TradesUiState(
     val selectedWishlistIds: Set<String>             = emptySet(),
     val selectedOfferIds:    Set<String>             = emptySet(),
     val snackbarMessage:     String?                 = null,
+    /** True only when the user has an active authenticated session. */
+    val isLoggedIn:          Boolean                 = false,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,6 +61,7 @@ data class TradesUiState(
  */
 @HiltViewModel
 class TradesViewModel @Inject constructor(
+    private val authRepo: AuthRepository,
     private val getLocalWishlist: GetLocalWishlistUseCase,
     private val getLocalOpenForTrade: GetLocalOpenForTradeUseCase,
     private val getFriends: GetFriendsUseCase,
@@ -64,9 +71,21 @@ class TradesViewModel @Inject constructor(
     val uiState: StateFlow<TradesUiState> = _uiState.asStateFlow()
 
     init {
+        observeSession()
         observeWishlist()
         observeOpenForTrade()
         observeFriends()
+    }
+
+    // ── Session observation ───────────────────────────────────────────────────
+
+    private fun observeSession() {
+        authRepo.sessionState
+            .onEach { state ->
+                _uiState.update { it.copy(isLoggedIn = state is SessionState.Authenticated) }
+            }
+            .catch { /* session errors are non-fatal for this screen */ }
+            .launchIn(viewModelScope)
     }
 
     // ── Observation ───────────────────────────────────────────────────────────

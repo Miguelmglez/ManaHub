@@ -961,7 +961,7 @@ private fun WishlistSection(
             modifier = Modifier.height(32.dp),
         ) {
             Icon(
-                Icons.Default.Bookmark,
+                Icons.Default.Add,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.magicColors.goldMtg

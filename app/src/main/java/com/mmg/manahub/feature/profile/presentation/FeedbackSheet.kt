@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -213,13 +214,14 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
         //    contain GPS coordinates, device model, and timestamps. This is
         //    intentional and disclosed in the Privacy Policy — the user explicitly
         //    chose to attach the file and must tap "Send" in their email app.
+        val subject = "ManaHub Feedback (${BuildConfig.VERSION_NAME} - ${BuildConfig.VERSION_CODE})"
         val imageUri = attachedImageUri
         val intent = if (imageUri != null) {
             val attachmentMime = context.contentResolver.getType(imageUri) ?: "image/*"
             Intent(Intent.ACTION_SEND).apply {
                 type = attachmentMime
                 putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL))
-                putExtra(Intent.EXTRA_SUBJECT, "ManaHub Feedback")
+                putExtra(Intent.EXTRA_SUBJECT, subject)
                 putExtra(Intent.EXTRA_TEXT, messageText)
                 putExtra(Intent.EXTRA_STREAM, imageUri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -228,7 +230,7 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
             Intent(Intent.ACTION_SENDTO).apply {
                 data = Uri.parse("mailto:")
                 putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL))
-                putExtra(Intent.EXTRA_SUBJECT, "ManaHub Feedback")
+                putExtra(Intent.EXTRA_SUBJECT, subject)
                 putExtra(Intent.EXTRA_TEXT, messageText)
             }
         }

@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.trades.presentation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,12 +47,16 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CopyBadge
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.auth.presentation.AuthViewModel
+import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
@@ -66,9 +69,11 @@ fun TradesScreen(
     onNavigateToProposal: (receiverId: String) -> Unit = {},
     onNavigateToThread: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel: TradesViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
+    var showLoginSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
@@ -86,44 +91,66 @@ fun TradesScreen(
 
             // ── Content area ──────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f)) {
-                when (uiState.selectedTab) {
-                    TradesMainTab.MY_LIST -> MyListContent(
-                        uiState = uiState,
-                        onCardClick = onCardClick,
-                        onWishlistSelect = viewModel::onToggleWishlistSelect,
-                        onOfferSelect = viewModel::onToggleOfferSelect,
+                if (!uiState.isLoggedIn) {
+                    // When unauthenticated, replace all tab content with a single
+                    // feature promo + login CTA, regardless of the selected sub-tab.
+                    EmptyState(
+                        icon        = Icons.Default.SwapHoriz,
+                        title       = stringResource(R.string.trades_login_required_title),
+                        subtitle    = stringResource(R.string.trades_login_required_subtitle),
+                        actionLabel = stringResource(R.string.trades_login_required_action),
+                        onAction    = { showLoginSheet = true },
                     )
+                } else {
+                    when (uiState.selectedTab) {
+                        TradesMainTab.MY_LIST -> MyListContent(
+                            uiState = uiState,
+                            onCardClick = onCardClick,
+                            onWishlistSelect = viewModel::onToggleWishlistSelect,
+                            onOfferSelect = viewModel::onToggleOfferSelect,
+                        )
 
-                    TradesMainTab.FRIENDS -> FriendsContent(
-                        friends = uiState.friends,
-                        onFriendClick = { friend ->
-                            onNavigateToProposal(friend.userId)
-                        }
-                    )
+                        TradesMainTab.FRIENDS -> FriendsContent(
+                            friends = uiState.friends,
+                            onFriendClick = { friend ->
+                                onNavigateToProposal(friend.userId)
+                            }
+                        )
 
-                    TradesMainTab.HISTORY -> TradesHistoryScreen(
-                        onOpenThread = onNavigateToThread,
-                    )
+                        TradesMainTab.HISTORY -> TradesHistoryScreen(
+                            onOpenThread = onNavigateToThread,
+                            onLoginClick = { showLoginSheet = true },
+                        )
+                    }
                 }
             }
         }
 
-        // ── FAB ───────────────────────────────────────────────────────────────
-        val mc = MaterialTheme.magicColors
-        FloatingActionButton(
-            onClick = { onNavigateToProposal("") },
-            containerColor = mc.primaryAccent,
-            contentColor = mc.background,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null)
+        // ── FAB — hidden when unauthenticated ─────────────────────────────────
+        if (uiState.isLoggedIn) {
+            val mc = MaterialTheme.magicColors
+            FloatingActionButton(
+                onClick = { onNavigateToProposal("") },
+                containerColor = mc.primaryAccent,
+                contentColor = mc.background,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+            }
         }
 
         MagicToastHost(
             state = toastState,
             modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+
+    if (showLoginSheet) {
+        LoginSheet(
+            authViewModel = authViewModel,
+            onDismiss = { showLoginSheet = false },
         )
     }
 }
@@ -337,19 +364,11 @@ private fun FriendDashboardRow(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(mc.primaryAccent.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = friend.nickname.take(1).uppercase(Locale.getDefault()),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.primaryAccent,
-                )
-            }
+            AvatarImage(
+                avatarUrl = friend.avatarUrl,
+                initials = friend.nickname.take(1).uppercase(Locale.getDefault()),
+                size = 40,
+            )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

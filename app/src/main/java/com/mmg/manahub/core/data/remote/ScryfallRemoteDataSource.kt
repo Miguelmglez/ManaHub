@@ -10,6 +10,7 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.MagicSet
 import com.mmg.manahub.core.domain.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.domain.model.SetType
+import com.mmg.manahub.core.network.ScryfallCache
 import com.mmg.manahub.core.network.ScryfallRequestQueue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,23 +21,63 @@ import javax.inject.Singleton
 class ScryfallRemoteDataSource @Inject constructor(
     private val api: ScryfallApi,
     private val requestQueue: ScryfallRequestQueue,
+    private val cache: ScryfallCache,
 ) {
 
-    suspend fun searchCardByName(query: String): Result<Card> =
-        safeCall { requestQueue.execute { api.getCardByName(query) }.toDomain() }
+    suspend fun searchCardByName(query: String, set: String? = null): Result<Card> =
+        safeCall {
+            val cacheKey = "fuzzy:${query.lowercase().trim()}:${set.orEmpty()}"
+            cache.cardNames.getOrFetch(cacheKey) {
+                val card = requestQueue.execute { api.getCardByName(query, set) }.toDomain()
+                // Also populate the ID-based card cache
+                cache.cards.put(card.scryfallId, card)
+                card
+            }
+        }
 
     suspend fun getCardByExactName(name: String): Result<Card> =
-        safeCall { requestQueue.execute { api.getCardByExactName(name) }.toDomain() }
+        safeCall {
+            val cacheKey = "exact:${name.lowercase().trim()}"
+            cache.cardNames.getOrFetch(cacheKey) {
+                val card = requestQueue.execute { api.getCardByExactName(name) }.toDomain()
+                cache.cards.put(card.scryfallId, card)
+                card
+            }
+        }
 
     suspend fun searchCards(query: String, page: Int = 1): Result<List<Card>> =
-        safeCall { requestQueue.execute { api.searchCards(query, page = page) }.data.toDomain() }
+        safeCall {
+            val cacheKey = "${query.lowercase().trim()}:$page"
+            cache.searches.getOrFetch(cacheKey) {
+                val cards = requestQueue.execute { api.searchCards(query, page = page) }
+                    .data.toDomain()
+                // Populate card cache with individual results
+                cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
+                cards
+            }
+        }
 
     suspend fun getCardById(scryfallId: String): Result<Card> =
-        safeCall { requestQueue.execute { api.getCardById(scryfallId) }.toDomain() }
+        safeCall {
+            cache.cards.getOrFetch(scryfallId) {
+                requestQueue.execute { api.getCardById(scryfallId) }.toDomain()
+            }
+        }
 
     suspend fun getCardBySetAndNumber(set: String, number: String): Result<Card> =
-        safeCall { requestQueue.execute { api.getCardBySetAndNumber(set, number) }.toDomain() }
+        safeCall {
+            val cacheKey = "setnum:${set.lowercase()}:$number"
+            cache.cardNames.getOrFetch(cacheKey) {
+                val card = requestQueue.execute { api.getCardBySetAndNumber(set, number) }.toDomain()
+                cache.cards.put(card.scryfallId, card)
+                card
+            }
+        }
 
+    /**
+     * Batch-fetches cards by Scryfall ID. Used for price refresh — intentionally
+     * bypasses the in-memory cache so that fresh price data is always returned.
+     */
     suspend fun getCardCollection(
         scryfallIds: List<String>,
     ): CardCollectionResponseDto {
@@ -48,7 +89,13 @@ class ScryfallRemoteDataSource @Inject constructor(
 
     suspend fun searchWithRawQuery(query: String): List<Card> =
         safeCall {
-            requestQueue.execute { api.searchCards(query, page = 1) }.data.toDomain()
+            val cacheKey = "raw:${query.lowercase().trim()}"
+            cache.searches.getOrFetch(cacheKey) {
+                val cards = requestQueue.execute { api.searchCards(query, page = 1) }
+                    .data.toDomain()
+                cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
+                cards
+            }
         }.getOrDefault(emptyList())
 
     suspend fun getCardsBatch(scryfallIds: List<String>): Result<List<Card>> =
@@ -60,36 +107,53 @@ class ScryfallRemoteDataSource @Inject constructor(
             val MAX_TOTAL = 1_000
             val sanitized = scryfallIds.take(MAX_TOTAL)
 
+            // Check which cards are already in the in-memory cache
+            val cached = mutableListOf<Card>()
+            val missing = mutableListOf<String>()
+            for (id in sanitized) {
+                val card = cache.cards.get(id)
+                if (card != null) cached.add(card)
+                else missing.add(id)
+            }
+
+            if (missing.isEmpty()) return@safeCall cached
+
+            // Only fetch the cards that aren't cached
             val allCards = mutableListOf<CardDto>()
-            sanitized.chunked(75).forEach { chunk ->
+            missing.chunked(75).forEach { chunk ->
                 val identifiers = chunk.map { CardIdentifierDto(id = it) }
                 val response = requestQueue.execute {
                     api.getCardCollection(CardCollectionRequestDto(identifiers))
                 }
                 allCards.addAll(response.data)
             }
-            allCards.toDomain()
+            val fetched = allCards.toDomain()
+            // Cache each newly fetched card
+            fetched.forEach { card -> cache.cards.put(card.scryfallId, card) }
+
+            cached + fetched
         }
 
-    suspend fun getAllSets(): List<MagicSet> {
-        return requestQueue.execute { api.getSets() }
-            .data
-            .filter { dto ->
-                !dto.digital &&
-                SetType.from(dto.setType) in PLAYABLE_SET_TYPES
-            }
-            .map { dto ->
-                MagicSet(
-                    code       = dto.code,
-                    name       = dto.name,
-                    setType    = SetType.from(dto.setType),
-                    releasedAt = dto.releasedAt,
-                    cardCount  = dto.cardCount,
-                    iconSvgUri = dto.iconSvgUri,
-                )
-            }
-            .sortedByDescending { it.releasedAt ?: "" }
-    }
+    suspend fun getAllSets(): List<MagicSet> =
+        cache.sets.getOrFetch("all") {
+            requestQueue.execute { api.getSets() }
+                .data
+                .filter { dto ->
+                    !dto.digital &&
+                    SetType.from(dto.setType) in PLAYABLE_SET_TYPES
+                }
+                .map { dto ->
+                    MagicSet(
+                        code       = dto.code,
+                        name       = dto.name,
+                        setType    = SetType.from(dto.setType),
+                        releasedAt = dto.releasedAt,
+                        cardCount  = dto.cardCount,
+                        iconSvgUri = dto.iconSvgUri,
+                    )
+                }
+                .sortedByDescending { it.releasedAt ?: "" }
+        }
 
     // Reutilizes /cards/search with unique=art to get one entry per unique artwork
     suspend fun searchPlaneswalkerArts(
@@ -108,9 +172,13 @@ class ScryfallRemoteDataSource @Inject constructor(
         safeCall {
             val safeName = name.replace("\"", "").replace("\\", "").trim()
             if (safeName.isBlank()) return@safeCall emptyList()
-            requestQueue.execute {
-                api.searchCards(query = "!\"$safeName\"", unique = "art", order = "released")
-            }.data.toDomain()
+            cache.artVariants.getOrFetch(safeName.lowercase()) {
+                val cards = requestQueue.execute {
+                    api.searchCards(query = "!\"$safeName\"", unique = "art", order = "released")
+                }.data.toDomain()
+                cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
+                cards
+            }
         }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =

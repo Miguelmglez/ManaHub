@@ -37,19 +37,19 @@ import com.mmg.manahub.feature.collection.presentation.CollectionCardGroup
 
 @Composable
 fun CardGridItem(
-    item:     CollectionCardGroup,
-    onClick:  () -> Unit,
+    item: CollectionCardGroup,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val card = item.card
-    val mc   = MaterialTheme.magicColors
+    val mc = MaterialTheme.magicColors
 
     Card(
-        onClick   = onClick,
-        modifier  = modifier.fillMaxWidth(),
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors    = CardDefaults.cardColors(containerColor = mc.surface),
-        border    = if (card.isStale)
+        colors = CardDefaults.cardColors(containerColor = mc.surface),
+        border = if (card.isStale)
             BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.45f))
         else
             BorderStroke(0.5.dp, mc.surfaceVariant),
@@ -58,10 +58,10 @@ fun CardGridItem(
             // Card image
             Box {
                 AsyncImage(
-                    model              = card.imageArtCrop ?: card.imageNormal,
+                    model = card.imageArtCrop ?: card.imageNormal,
                     contentDescription = card.name,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(4f / 3f)
                         .clip(MaterialTheme.shapes.small),
@@ -71,29 +71,39 @@ fun CardGridItem(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(4.dp),
-                    color    = mc.background.copy(alpha = 0.85f),
-                    shape    = MaterialTheme.shapes.extraSmall,
+                    color = mc.background.copy(alpha = 0.85f),
+                    shape = MaterialTheme.shapes.extraSmall,
                 ) {
                     Text(
-                        text     = "×${item.totalQuantity}${if (item.hasFoil) " ✦" else ""}",
-                        style    = MaterialTheme.magicTypography.labelSmall,
-                        color    = if (item.hasFoil) mc.goldMtg else mc.textPrimary,
+                        text = "×${item.totalQuantity}${if (item.hasFoil) " ✦" else ""}",
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = if (item.hasFoil) mc.goldMtg else mc.textPrimary,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                     )
                 }
             }
             // Card name + price
-            Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(
+                modifier = Modifier.padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
                 CardName(
-                    name          = card.name,
+                    name = card.name,
                     showFrontOnly = true,
-                    style         = MaterialTheme.magicTypography.labelSmall,
-                    color         = mc.textPrimary,
-                    maxLines      = 1,
-                    overflow      = TextOverflow.Ellipsis,
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 val preferredCurrency = LocalPreferredCurrency.current
-                val priceText = remember(card.priceUsd, card.priceUsdFoil, card.priceEur, card.priceEurFoil, item.hasFoil, preferredCurrency) {
+                val priceText = remember(
+                    card.priceUsd,
+                    card.priceUsdFoil,
+                    card.priceEur,
+                    card.priceEurFoil,
+                    item.hasFoil,
+                    preferredCurrency
+                ) {
                     PriceFormatter.formatFromScryfall(
                         priceUsd = if (item.hasFoil) card.priceUsdFoil else card.priceUsd,
                         priceEur = if (item.hasFoil) card.priceEurFoil else card.priceEur,
@@ -101,42 +111,44 @@ fun CardGridItem(
                     )
                 }
                 Row(
-                    modifier          = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (priceText != "—") {
-                        Text(
-                            text  = priceText,
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.goldMtg,
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
+                    SetSymbol(
+                        setCode = card.setCode,
+                        rarity = CardRarity.fromString(card.rarity),
+                        size = 14.dp,
+                    )
                     // Variants indicator
                     if (item.distinctCopies > 1) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier          = Modifier.padding(end = 6.dp)
+                            modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Style,
                                 contentDescription = null,
-                                modifier           = Modifier.size(12.dp),
-                                tint               = mc.primaryAccent
+                                modifier = Modifier.size(12.dp),
+                                tint = mc.primaryAccent
                             )
                             Spacer(Modifier.width(3.dp))
                             Text(
-                                text  = item.distinctCopies.toString(),
+                                text = item.distinctCopies.toString(),
                                 style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
                                 color = mc.primaryAccent,
                             )
                         }
                     }
-                    SetSymbol(
-                        setCode = card.setCode,
-                        rarity  = CardRarity.fromString(card.rarity),
-                        size    = 14.dp,
-                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    if (priceText != "—") {
+                        Text(
+                            text = priceText,
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.goldMtg,
+                        )
+                    }
                 }
             }
         }
