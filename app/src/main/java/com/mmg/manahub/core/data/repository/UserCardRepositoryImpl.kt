@@ -240,6 +240,32 @@ class UserCardRepositoryImpl @Inject constructor(
             .distinct()
     }
 
+    override suspend fun decrementOrRemove(
+        userId: String,
+        scryfallId: String,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isAlternativeArt: Boolean,
+        quantityToDeduct: Int,
+    ) = withContext(ioDispatcher) {
+        val now = System.currentTimeMillis()
+        val normCondition = condition.uppercase().trim()
+        val normLanguage = language.lowercase().trim()
+
+        val existing = userCardCollectionDao.getByCompositeKey(
+            userId, scryfallId, isFoil, normCondition, normLanguage, isAlternativeArt,
+        ) ?: return@withContext  // Row not found — skip silently, no crash.
+
+        val newQty = (existing.quantity - quantityToDeduct).coerceAtLeast(0)
+        if (newQty == 0) {
+            // Soft-delete so the sync engine propagates the removal to Supabase.
+            userCardCollectionDao.softDelete(existing.id, now)
+        } else {
+            userCardCollectionDao.upsert(existing.copy(quantity = newQty, updatedAt = now))
+        }
+    }
+
     // ── Mapping helpers ───────────────────────────────────────────────────────
 
     private fun UserCardWithCard.toDomain(): DomainUserCardWithCard? {

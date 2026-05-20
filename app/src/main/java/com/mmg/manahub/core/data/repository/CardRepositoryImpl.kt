@@ -203,6 +203,19 @@ class CardRepositoryImpl @Inject constructor(
         )
     }
 
+    override suspend fun warmCacheForIds(scryfallIds: List<String>) = withContext(ioDispatcher) {
+        if (scryfallIds.isEmpty()) return@withContext
+        val missing = scryfallIds.filterNot { cardDao.getById(it) != null }
+        if (missing.isEmpty()) return@withContext
+        missing.chunked(75).forEach { chunk ->
+            remote.getCardsBatch(chunk)
+                .onSuccess { cards ->
+                    cards.forEach { card -> runCatching { cardDao.upsert(entityWithComputedTags(card)) } }
+                }
+            // Failures are intentionally swallowed — callers fall back to individual getCardById
+        }
+    }
+
     override suspend fun evictStaleCache() =
         cardDao.evictStaleCache(System.currentTimeMillis() - CachePolicy.EVICT_MS)
 

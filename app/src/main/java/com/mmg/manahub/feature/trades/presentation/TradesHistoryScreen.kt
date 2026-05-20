@@ -16,32 +16,38 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SwapHoriz
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.PullRefreshHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.components.rememberPullRefreshState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.friends.domain.model.Friend
@@ -51,14 +57,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TradesHistoryScreen(
     onOpenThread: (proposalId: String, rootProposalId: String) -> Unit,
+    onLoginClick: () -> Unit = {},
     viewModel: TradesHistoryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
+
+    LaunchedEffect(Unit) { viewModel.refreshIfStale() }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
@@ -73,36 +83,13 @@ fun TradesHistoryScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh    = { viewModel.refresh() },
-            modifier     = Modifier.fillMaxSize(),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                FilterRow(
-                    selected  = uiState.filter,
-                    onSelect  = viewModel::onFilterSelected,
-                )
-
-                when {
-                    uiState.isLoading -> Box(
-                        modifier        = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(color = MaterialTheme.magicColors.primaryAccent)
-                    }
-
-                    uiState.filtered.isEmpty() -> EmptyHistory()
-
-                    else -> HistoryList(
-                        proposals     = uiState.filtered,
-                        currentUserId = uiState.currentUserId,
-                        friends       = uiState.friends,
-                        onItemClick   = viewModel::onProposalClick,
-                    )
-                }
-            }
-        }
+        HistoryContent(
+            uiState = uiState,
+            onRefresh = viewModel::refresh,
+            onFilterSelected = viewModel::onFilterSelected,
+            onItemClick = viewModel::onProposalClick,
+            onLoginClick = onLoginClick,
+        )
 
         MagicToastHost(
             state    = toastState,
@@ -110,6 +97,83 @@ fun TradesHistoryScreen(
         )
     }
 }
+
+@Composable
+private fun HistoryContent(
+    uiState: TradesHistoryUiState,
+    onRefresh: () -> Unit,
+    onFilterSelected: (HistoryFilter) -> Unit,
+    onItemClick: (TradeProposal) -> Unit,
+    onLoginClick: () -> Unit,
+) {
+    val pullState = rememberPullRefreshState(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh     = onRefresh,
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(pullState.nestedScrollConnection),
+    ) {
+        FilterRow(
+            selected = uiState.filter,
+            onSelect = onFilterSelected,
+        )
+
+        LazyColumn(
+            modifier        = Modifier.fillMaxSize(),
+            contentPadding  = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // ── Telegram-style pull-to-refresh header ─────────────────────────
+            if (pullState.headerHeightDp > 0.dp) {
+                item(key = "pull_header") {
+                    PullRefreshHeader(
+                        height       = pullState.headerHeightDp,
+                        isRefreshing = uiState.isRefreshing,
+                        dragFraction = pullState.dragFraction,
+                    )
+                }
+            }
+
+            // ── Main content ──────────────────────────────────────────────────
+            when {
+                uiState.isLoading -> item(key = "loading") {
+                    Box(
+                        modifier        = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier   = Modifier.size(32.dp),
+                            strokeWidth = 2.5.dp,
+                            color      = MaterialTheme.magicColors.primaryAccent,
+                        )
+                    }
+                }
+
+                uiState.filtered.isEmpty() -> item(key = "empty") {
+                    EmptyHistory(isLoggedIn = uiState.isLoggedIn, onLoginClick = onLoginClick)
+                }
+
+                else -> items(uiState.filtered, key = { it.id }) { proposal ->
+                    HistoryProposalRow(
+                        proposal      = proposal,
+                        currentUserId = uiState.currentUserId,
+                        friends       = uiState.friends,
+                        onClick       = { onItemClick(proposal) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Filter chips
+// ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,7 +183,7 @@ private fun FilterRow(
 ) {
     val mc = MaterialTheme.magicColors
     LazyRow(
-        contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding        = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(HistoryFilter.entries) { filter ->
@@ -151,27 +215,9 @@ private fun HistoryFilter.label(): String = when (this) {
     HistoryFilter.DECLINED  -> stringResource(R.string.trades_history_filter_declined)
 }
 
-@Composable
-private fun HistoryList(
-    proposals: List<TradeProposal>,
-    currentUserId: String,
-    friends: List<Friend>,
-    onItemClick: (TradeProposal) -> Unit,
-) {
-    LazyColumn(
-        contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(proposals, key = { it.id }) { proposal ->
-            HistoryProposalRow(
-                proposal      = proposal,
-                currentUserId = currentUserId,
-                friends       = friends,
-                onClick       = { onItemClick(proposal) },
-            )
-        }
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+//  History list
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun HistoryProposalRow(
@@ -183,10 +229,16 @@ private fun HistoryProposalRow(
     val mc = MaterialTheme.magicColors
     val isProposer = proposal.proposerId == currentUserId
     val otherPartyId = if (isProposer) proposal.receiverId else proposal.proposerId
-    val otherPartyLabel = friends.find { it.userId == otherPartyId }?.nickname ?: otherPartyId
+    val otherPartyFriend = friends.find { it.userId == otherPartyId }
+    val otherPartyLabel = otherPartyFriend?.nickname ?: otherPartyId
+    val otherPartyAvatarUrl = otherPartyFriend?.avatarUrl
+    val statusTint = proposal.status.tint(mc)
     val dateLabel = remember(proposal.updatedAt) {
         SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(proposal.updatedAt))
     }
+
+    val isAwaitingTheirResponse = isProposer && proposal.status == TradeStatus.PROPOSED
+    val isYourTurn = !isProposer && proposal.status == TradeStatus.PROPOSED
 
     Surface(
         shape    = RoundedCornerShape(12.dp),
@@ -199,11 +251,11 @@ private fun HistoryProposalRow(
             modifier          = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector        = Icons.Default.SwapHoriz,
-                contentDescription = null,
-                tint               = proposal.status.tint(mc),
-                modifier           = Modifier.size(28.dp),
+            OtherPartyAvatar(
+                avatarUrl  = otherPartyAvatarUrl,
+                label      = otherPartyLabel,
+                statusTint = statusTint,
+                mc         = mc,
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -213,13 +265,72 @@ private fun HistoryProposalRow(
                     color = mc.textPrimary,
                 )
                 Text(
-                    text  = "${proposal.items.size} ${stringResource(R.string.trades_history_item_count)}  ·  $dateLabel",
+                    text  = dateLabel,
                     style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.textSecondary,
                 )
+                when {
+                    isAwaitingTheirResponse -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text  = stringResource(R.string.trades_history_awaiting_response),
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.textDisabled,
+                        )
+                    }
+                    isYourTurn -> {
+                        Spacer(Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = mc.primaryAccent.copy(alpha = 0.15f),
+                        ) {
+                            Text(
+                                text     = stringResource(R.string.trades_history_your_turn),
+                                style    = MaterialTheme.magicTypography.labelSmall,
+                                color    = mc.primaryAccent,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
             }
             Spacer(Modifier.width(8.dp))
             StatusBadge(status = proposal.status)
+        }
+    }
+}
+
+@Composable
+private fun OtherPartyAvatar(
+    avatarUrl:  String?,
+    label:      String,
+    statusTint: androidx.compose.ui.graphics.Color,
+    mc:         com.mmg.manahub.core.ui.theme.MagicColors,
+) {
+    val avatarModifier = Modifier
+        .size(40.dp)
+        .clip(CircleShape)
+
+    if (!avatarUrl.isNullOrBlank()) {
+        AsyncImage(
+            model              = avatarUrl,
+            contentDescription = null,
+            contentScale       = ContentScale.Crop,
+            modifier           = avatarModifier,
+        )
+    } else {
+        Surface(
+            shape    = CircleShape,
+            color    = mc.backgroundSecondary,
+            modifier = Modifier.size(40.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text  = label.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    style = MaterialTheme.magicTypography.labelLarge,
+                    color = mc.textSecondary,
+                )
+            }
         }
     }
 }
@@ -263,31 +374,53 @@ private fun TradeStatus.tint(mc: com.mmg.manahub.core.ui.theme.MagicColors) = wh
     else                  -> mc.textSecondary
 }
 
+/**
+ * Renders the empty state for the trade history list.
+ *
+ * When [isLoggedIn] is false, shows the generic trades promo with a login CTA.
+ * When [isLoggedIn] is true, shows the authenticated empty-history message.
+ */
 @Composable
-private fun EmptyHistory() {
-    Box(
-        modifier        = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+private fun EmptyHistory(
+    isLoggedIn: Boolean,
+    onLoginClick: () -> Unit,
+) {
+    if (!isLoggedIn) {
+        EmptyState(
+            icon        = Icons.Default.SwapHoriz,
+            title       = stringResource(R.string.trades_login_required_title),
+            subtitle    = stringResource(R.string.trades_login_required_subtitle),
+            actionLabel = stringResource(R.string.trades_login_required_action),
+            onAction    = onLoginClick,
+            modifier    = Modifier
+                .fillMaxWidth()
+                .padding(top = 64.dp, start = 32.dp, end = 32.dp),
+        )
+    } else {
+        Box(
+            modifier         = Modifier
+                .fillMaxWidth()
+                .padding(top = 64.dp, start = 32.dp, end = 32.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text      = stringResource(R.string.trades_history_empty),
-                style     = MaterialTheme.magicTypography.bodyMedium,
-                color     = MaterialTheme.magicColors.textSecondary,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text      = stringResource(R.string.trades_history_empty_hint),
-                style     = MaterialTheme.magicTypography.labelSmall,
-                color     = MaterialTheme.magicColors.textDisabled,
-                textAlign = TextAlign.Center,
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text      = stringResource(R.string.trades_history_empty),
+                    style     = MaterialTheme.magicTypography.bodyMedium,
+                    color     = MaterialTheme.magicColors.textSecondary,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text      = stringResource(R.string.trades_history_empty_hint),
+                    style     = MaterialTheme.magicTypography.labelSmall,
+                    color     = MaterialTheme.magicColors.textDisabled,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

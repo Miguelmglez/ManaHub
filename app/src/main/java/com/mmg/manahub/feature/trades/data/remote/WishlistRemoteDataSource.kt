@@ -44,7 +44,9 @@ class WishlistRemoteDataSource @Inject constructor(
         withContext(ioDispatcher) {
             runCatching {
                 if (dtos.isEmpty()) return@runCatching
-                supabaseClient.postgrest["wishlists"].insert(dtos)
+                // upsert handles re-sync of entries whose local synced flag was reset,
+                // avoiding a duplicate-key error that would leave the banner stuck forever.
+                supabaseClient.postgrest["wishlists"].upsert(dtos)
                 Unit
             }
         }

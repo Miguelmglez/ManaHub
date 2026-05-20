@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.friends.data.repository
 
+import android.util.Log
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
 import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
 import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
@@ -20,9 +22,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
+import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.repository.CardRepository
+
 class FriendRepositoryImpl @Inject constructor(
     private val dao: FriendDao,
     private val remote: FriendRemoteDataSource,
+    private val cardRepo: CardRepository,
 ) : FriendRepository {
 
     override fun observeFriends(): Flow<List<Friend>> =
@@ -129,19 +135,63 @@ class FriendRepositoryImpl @Inject constructor(
         friendUserId: String,
         list: String,
         query: String,
+        filters: com.mmg.manahub.feature.friends.presentation.detail.FolderFilters?,
+        limit: Int,
+        offset: Int,
     ): Result<List<FriendCard>> = runCatching {
-        remote.getFriendCollection(friendUserId, list, query).map { dto ->
+        val dtos = remote.getFriendCollection(
+            friendUserId = friendUserId,
+            list = list,
+            query = query,
+            sets = filters?.sets?.takeIf { it.isNotEmpty() }?.toList(),
+            rarities = filters?.rarities?.takeIf { it.isNotEmpty() }?.map { it.name }?.toList(),
+            colors = filters?.colors?.takeIf { it.isNotEmpty() }?.map { it.name }?.toList(),
+            foilOnly = filters?.foilOnly?.takeIf { it },
+            conditions = filters?.conditions?.takeIf { it.isNotEmpty() }?.map { it.label }?.toList(),
+            languages = filters?.languages?.takeIf { it.isNotEmpty() }?.toList(),
+            limit = limit,
+            offset = offset
+        )
+        // Pre-warm Room cache in one batch call instead of N sequential Scryfall fetches.
+        cardRepo.warmCacheForIds(dtos.map { it.scryfallId }.distinct())
+
+        dtos.mapNotNull { dto ->
+            // The RPC returns only scryfall_id + user-specific fields. We enrich
+            // each row with card metadata from the local Room cache. getCardById
+            // automatically falls back to Scryfall and caches the result when the
+            // card is not yet in Room (e.g. first-time viewing a friend's collection).
+            val card = when (val r = cardRepo.getCardById(dto.scryfallId)) {
+                is DataResult.Success -> r.data
+                is DataResult.Error -> {
+                    Log.w("FriendRepository", "Card metadata unavailable: ${dto.scryfallId} — ${r.message}")
+                    FirebaseCrashlytics.getInstance().log(
+                        "getFriendCollection: card metadata unavailable for ${dto.scryfallId} (list=$list): ${r.message}"
+                    )
+                    null
+                }
+            }
+            if (card == null) return@mapNotNull null
+            // Apply the optional name filter client-side.
+            if (query.isNotBlank() && !card.name.contains(query, ignoreCase = true)) {
+                return@mapNotNull null
+            }
             FriendCard(
                 sourceList = dto.sourceList,
                 scryfallId = dto.scryfallId,
-                name = dto.cardName,
-                imageNormal = dto.imageNormal,
-                setName = dto.setName,
-                rarity = dto.rarity,
-                priceEur = dto.priceEur,
-                priceUsd = dto.priceUsd,
+                name = card.name,
+                typeLine = card.typeLine,
+                imageNormal = card.imageNormal,
+                imageArtCrop = card.imageArtCrop,
+                setCode = card.setCode,
+                setName = card.setName,
+                rarity = card.rarity,
+                priceEur = card.priceEur,
+                priceUsd = card.priceUsd,
+                priceEurFoil = card.priceEurFoil,
+                priceUsdFoil = card.priceUsdFoil,
                 quantity = dto.quantity,
                 isFoil = dto.isFoil,
+                isStale = card.isStale,
                 condition = dto.condition,
                 language = dto.language,
             )

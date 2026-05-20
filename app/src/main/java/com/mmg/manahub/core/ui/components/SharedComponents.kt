@@ -31,22 +31,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
 @Composable
 fun CopyBadge(label: String, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = mc.surfaceVariant.copy(alpha = 0.5f),
         shape = MaterialTheme.shapes.extraSmall,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.textDisabled.copy(alpha = 0.2f)),
         modifier = modifier
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            style = ty.labelSmall.copy(fontSize = 10.sp),
+            color = mc.textSecondary,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }
@@ -139,15 +147,17 @@ fun RarityDot(rarity: String, modifier: Modifier = Modifier) {
 @Composable
 fun FoilBadge() {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Surface(
         color = mc.goldMtg.copy(alpha = 0.18f),
         shape = MaterialTheme.shapes.extraSmall,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.goldMtg.copy(alpha = 0.4f)),
     ) {
         Text(
             text     = "foil",
-            style    = MaterialTheme.typography.labelSmall,
+            style    = ty.labelSmall.copy(fontSize = 10.sp),
             color    = mc.goldMtg,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
         )
     }
 }
@@ -189,6 +199,38 @@ fun StaleWarningBanner() {
                 text  = "Some prices couldn't be refreshed. Showing cached data.",
                 style = MaterialTheme.typography.bodySmall,
                 color = mc.lifeNegative,
+            )
+        }
+    }
+}
+
+@Composable
+fun AvatarImage(avatarUrl: String?, initials: String, size: Int, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    Box(
+        modifier = modifier
+            .size(size.dp)
+            .clip(CircleShape)
+            .background(mc.primaryAccent.copy(alpha = 0.2f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (avatarUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(avatarUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
+            )
+        } else {
+            Text(
+                text = initials,
+                color = mc.primaryAccent,
+                style = MaterialTheme.magicTypography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                fontSize = (size / 2.5).sp,
             )
         }
     }

@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.friends.presentation.detail
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,40 +55,75 @@ import java.util.Locale
  * @param tradeHistory Trade proposals already filtered to only include proposals
  *                     between the current user and [friend].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendHistoryTab(
     friend: Friend,
     tradeHistory: List<TradeProposal>,
+    onTradeClick: (proposalId: String, rootProposalId: String) -> Unit,
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
+    val mc = MaterialTheme.magicColors
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(
-            selectedTabIndex = selectedIndex,
-            containerColor = MaterialTheme.magicColors.backgroundSecondary,
-            contentColor = MaterialTheme.magicColors.primaryAccent,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Tab(
+            // Trades Tab
+            FilterChip(
+                modifier = Modifier.weight(1f),
                 selected = selectedIndex == 0,
                 onClick = { selectedIndex = 0 },
-                text = {
+                label = {
                     Text(
                         stringResource(R.string.friend_history_tab_trades),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        modifier = Modifier.padding(vertical = 12.dp),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
+                    selectedLabelColor = mc.primaryAccent,
+                    containerColor = mc.surface,
+                    labelColor = mc.textSecondary,
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = selectedIndex == 0,
+                    borderColor = mc.surfaceVariant,
+                    selectedBorderColor = mc.primaryAccent
+                )
             )
-            Tab(
+
+            // Games Tab
+            FilterChip(
+                modifier = Modifier.weight(1f),
                 selected = selectedIndex == 1,
                 onClick = { selectedIndex = 1 },
-                text = {
+                label = {
                     Text(
                         stringResource(R.string.friend_history_tab_games),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        modifier = Modifier.padding(vertical = 12.dp),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
+                    selectedLabelColor = mc.primaryAccent,
+                    containerColor = mc.surface,
+                    labelColor = mc.textSecondary,
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = selectedIndex == 1,
+                    borderColor = mc.surfaceVariant,
+                    selectedBorderColor = mc.primaryAccent
+                )
             )
         }
 
@@ -94,6 +131,7 @@ fun FriendHistoryTab(
             0 -> TradesHistoryContent(
                 friend = friend,
                 tradeHistory = tradeHistory,
+                onTradeClick = onTradeClick,
             )
             else -> GamesComingSoonContent()
         }
@@ -114,6 +152,7 @@ fun FriendHistoryTab(
 private fun TradesHistoryContent(
     friend: Friend,
     tradeHistory: List<TradeProposal>,
+    onTradeClick: (proposalId: String, rootProposalId: String) -> Unit,
 ) {
     if (tradeHistory.isEmpty()) {
         Box(
@@ -135,7 +174,10 @@ private fun TradesHistoryContent(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         ) {
             items(tradeHistory, key = { it.id }) { proposal ->
-                TradeHistoryRow(proposal = proposal)
+                TradeHistoryRow(
+                    proposal = proposal,
+                    onTradeClick = onTradeClick,
+                )
             }
         }
     }
@@ -170,7 +212,10 @@ private fun GamesComingSoonContent() {
  * @param proposal The trade proposal to render.
  */
 @Composable
-private fun TradeHistoryRow(proposal: TradeProposal) {
+private fun TradeHistoryRow(
+    proposal: TradeProposal,
+    onTradeClick: (proposalId: String, rootProposalId: String) -> Unit,
+) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
 
@@ -206,7 +251,9 @@ private fun TradeHistoryRow(proposal: TradeProposal) {
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = mc.surface,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onTradeClick(proposal.id, proposal.rootProposalId) },
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

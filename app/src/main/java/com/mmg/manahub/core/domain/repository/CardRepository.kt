@@ -48,4 +48,11 @@ interface CardRepository {
 
     /** Drop a suggested tag without confirming it. */
     suspend fun dismissSuggestedTag(scryfallId: String, tag: CardTag)
+
+    /**
+     * Pre-warms the local Room cache for the given [scryfallIds] using a batch Scryfall fetch.
+     * IDs already in Room are skipped. Called before bulk card lookups to avoid N sequential
+     * network calls. Best-effort: failures are silently swallowed so callers aren't blocked.
+     */
+    suspend fun warmCacheForIds(scryfallIds: List<String>)
 }

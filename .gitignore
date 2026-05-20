@@ -317,3 +317,6 @@ $RECYCLE.BIN/
 /scripts/draftsim/upload_to_r2.mjs
 /SURVEY_OVERHAUL_STATUS.md
 /.claude/settings.json
+/docs/plans/deck-stats-sync-plan.md
+/docs/plans/online-game-sessions.md
+/supabase/.temp/cli-latest

@@ -1,9 +1,15 @@
 package com.mmg.manahub.feature.collection.presentation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,14 +46,11 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -56,7 +59,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -109,16 +111,6 @@ fun CollectionScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
 
-    var showSyncSheet by remember { mutableStateOf(false) }
-
-    // Auto-close the sync sheet once the sync finishes (SUCCESS or ERROR) so the user
-    // doesn't need to manually dismiss it — the result is communicated via MagicToast.
-    LaunchedEffect(uiState.syncState) {
-        if (showSyncSheet && uiState.syncState == SyncState.SUCCESS) {
-            showSyncSheet = false
-        }
-    }
-
     CollectionContent(
         uiState               = uiState,
         onCardClick           = onCardClick,
@@ -136,7 +128,7 @@ fun CollectionScreen(
         },
         onErrorDismissed      = viewModel::onErrorDismissed,
         onShowAdvancedSearch  = { showAdvancedSearch = true },
-        onShowSyncSheet       = { showSyncSheet = true },
+        onSync                = viewModel::onSync,
         onTabSelected         = viewModel::onTabSelected,
         onSyncDismissed            = viewModel::onSyncDismissed,
         onSnackbarDismissed        = viewModel::onSnackbarDismissed,
@@ -154,14 +146,6 @@ fun CollectionScreen(
             },
         )
     }
-
-    if (showSyncSheet) {
-        SyncBottomSheet(
-            isSyncing = uiState.syncState == SyncState.SYNCING,
-            onSync    = viewModel::onSync,
-            onDismiss = { showSyncSheet = false }
-        )
-    }
 }
 
 @Composable
@@ -176,7 +160,7 @@ private fun CollectionContent(
     onClearFilters:       () -> Unit,
     onErrorDismissed:     () -> Unit,
     onShowAdvancedSearch: () -> Unit,
-    onShowSyncSheet:      () -> Unit,
+    onSync:               () -> Unit,
     onTabSelected:        (CollectionTab) -> Unit,
     onSyncDismissed:      () -> Unit,
     onSnackbarDismissed:  () -> Unit,
@@ -235,16 +219,6 @@ private fun CollectionContent(
                     .fillMaxSize()
                     .padding(padding),
             ) {
-                // "Sync your collection" banner — screen-level, visible on any tab so the
-                // user is always aware of pending local changes regardless of which tab they're on.
-                AnimatedVisibility(
-                    visible = uiState.sessionState is SessionState.Authenticated &&
-                              uiState.hasUnsyncedChanges &&
-                              uiState.syncState != SyncState.SYNCING,
-                ) {
-                    SyncCollectionBanner(onSync = onShowSyncSheet)
-                }
-
                 // ── Cards / Decks / Trades sub-tabs ──────────────────────────────
                 val selectedTabIndex = when (uiState.selectedTab) {
                     CollectionTab.CARDS  -> TAB_CARDS
@@ -286,6 +260,18 @@ private fun CollectionContent(
                                 style = MaterialTheme.magicTypography.labelLarge,
                             )
                         },
+                    )
+                }
+
+                // "Sync your collection" banner — below tabs so it doesn't obscure navigation.
+                // Stays visible during SYNCING so the spinner is shown inline in the list.
+                AnimatedVisibility(
+                    visible = uiState.sessionState is SessionState.Authenticated &&
+                              (uiState.hasUnsyncedChanges || uiState.syncState == SyncState.SYNCING),
+                ) {
+                    SyncCollectionBanner(
+                        isSyncing = uiState.syncState == SyncState.SYNCING,
+                        onSync    = onSync,
                     )
                 }
 
@@ -570,7 +556,7 @@ private fun CardGrid(
 ) {
     LazyVerticalGrid(
         columns               = GridCells.Adaptive(minSize = 100.dp),
-        contentPadding        = PaddingValues(12.dp),
+        contentPadding        = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 80.dp),
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -595,7 +581,7 @@ private fun CardList(
     onCardClick: (String) -> Unit,
 ) {
     androidx.compose.foundation.lazy.LazyColumn(
-        contentPadding      = PaddingValues(vertical = 4.dp),
+        contentPadding      = PaddingValues(top = 4.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         items(
@@ -611,89 +597,38 @@ private fun CardList(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SyncBottomSheet(
-    isSyncing: Boolean,
-    onSync:    () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val sheetState = rememberModalBottomSheetState()
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState       = sheetState,
-        containerColor   = mc.backgroundSecondary,
-        contentColor     = mc.textPrimary,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 32.dp, start = 24.dp, end = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text  = stringResource(R.string.collection_sync_sheet_title),
-                style = MaterialTheme.magicTypography.titleLarge,
-            )
-
-            Surface(
-                onClick = { onSync() },
-                enabled = !isSyncing,
-                color   = Color.Transparent,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = null,
-                        tint = mc.primaryAccent,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Text(
-                        text  = stringResource(R.string.action_refresh),
-                        style = MaterialTheme.magicTypography.bodyLarge,
-                    )
-                }
-            }
-
-            if (isSyncing) {
-                LinearProgressIndicator(
-                    modifier   = Modifier.fillMaxWidth(),
-                    color      = mc.primaryAccent,
-                    trackColor = mc.surfaceVariant,
-                )
-            }
-        }
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 //  Sync banner
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A full-width tappable banner shown when the user has local collection changes that
- * have not yet been pushed to Supabase. Tapping opens the [SyncBottomSheet] so the
- * user can review and trigger the sync with visual progress feedback.
+ * Full-width tappable banner for pending sync. Tapping directly triggers the sync.
+ * While [isSyncing] is true the icon spins and the row is non-interactive.
  */
 @Composable
 private fun SyncCollectionBanner(
-    onSync: () -> Unit,
+    isSyncing: Boolean,
+    onSync:    () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
 
+    val infiniteTransition = rememberInfiniteTransition(label = "sync_spin")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue  = 360f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "angle",
+    )
+
     Surface(
-        onClick = onSync,
-        color   = mc.primaryAccent.copy(alpha = 0.12f),
-        shape        = RoundedCornerShape(0.dp),
-        modifier     = Modifier.fillMaxWidth(),
+        onClick  = onSync,
+        enabled  = !isSyncing,
+        color    = mc.primaryAccent.copy(alpha = 0.12f),
+        shape    = RoundedCornerShape(0.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier              = Modifier
@@ -706,10 +641,14 @@ private fun SyncCollectionBanner(
                 imageVector        = Icons.Default.Sync,
                 contentDescription = null,
                 tint               = mc.primaryAccent,
-                modifier           = Modifier.size(18.dp),
+                modifier           = Modifier
+                    .size(18.dp)
+                    .graphicsLayer { rotationZ = if (isSyncing) angle else 0f },
             )
             Text(
-                text     = stringResource(R.string.collection_sync_banner),
+                text     = stringResource(
+                    if (isSyncing) R.string.collection_syncing else R.string.collection_sync_banner
+                ),
                 style    = MaterialTheme.magicTypography.labelLarge,
                 color    = mc.primaryAccent,
                 modifier = Modifier.weight(1f),

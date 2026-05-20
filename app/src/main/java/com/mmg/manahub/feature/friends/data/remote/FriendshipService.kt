@@ -163,18 +163,23 @@ data class GetFriendCollectionRequestDto(
     @SerializedName("p_friend_user_id") val pFriendUserId: String,
     @SerializedName("p_list") val pList: String,
     @SerializedName("p_query") val pQuery: String = "",
+    @SerializedName("p_sets") val pSets: List<String>? = null,
+    @SerializedName("p_rarities") val pRarities: List<String>? = null,
+    @SerializedName("p_colors") val pColors: List<String>? = null,
+    @SerializedName("p_foil_only") val pFoilOnly: Boolean? = null,
+    @SerializedName("p_conditions") val pConditions: List<String>? = null,
+    @SerializedName("p_languages") val pLanguages: List<String>? = null,
+    @SerializedName("p_limit") val pLimit: Int = 50,
+    @SerializedName("p_offset") val pOffset: Int = 0,
 )
 
-/** A single card row returned by the `get_friend_collection` RPC. */
+/** A single card row returned by the `get_friend_collection` RPC.
+ *  Card metadata (name, image, prices) is intentionally absent — the RPC returns only
+ *  user-specific fields. The Android client enriches each row from its local Room/Scryfall
+ *  cache in [FriendRepositoryImpl.getFriendCollection]. */
 data class FriendCardDto(
     @SerializedName("source_list") val sourceList: String,
     @SerializedName("scryfall_id") val scryfallId: String,
-    @SerializedName("card_name") val cardName: String,
-    @SerializedName("image_normal") val imageNormal: String?,
-    @SerializedName("set_name") val setName: String?,
-    @SerializedName("rarity") val rarity: String?,
-    @SerializedName("price_eur") val priceEur: Double?,
-    @SerializedName("price_usd") val priceUsd: Double?,
     @SerializedName("quantity") val quantity: Int,
     @SerializedName("is_foil") val isFoil: Boolean,
     @SerializedName("condition") val condition: String?,

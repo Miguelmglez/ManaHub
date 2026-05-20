@@ -136,12 +136,22 @@ class FriendRemoteDataSource @Inject constructor(
      *
      * @param friendUserId Auth UUID of the friend.
      * @param list         Which list to fetch: 'collection', 'wishlist', or 'trade'.
-     * @param query        Optional name filter; empty string means no filter.
+     * @param query        Optional name filter (applied client-side after enrichment).
+     * @param limit        Maximum rows to return from the server (for pagination).
+     * @param offset       Row offset for the current page.
      */
     suspend fun getFriendCollection(
         friendUserId: String,
         list: String,
         query: String,
+        sets: List<String>? = null,
+        rarities: List<String>? = null,
+        colors: List<String>? = null,
+        foilOnly: Boolean? = null,
+        conditions: List<String>? = null,
+        languages: List<String>? = null,
+        limit: Int = 50,
+        offset: Int = 0,
     ): List<FriendCardDto> =
         withContext(dispatcher) {
             service.getFriendCollection(
@@ -149,6 +159,14 @@ class FriendRemoteDataSource @Inject constructor(
                     pFriendUserId = friendUserId,
                     pList = list,
                     pQuery = query,
+                    pSets = sets,
+                    pRarities = rarities,
+                    pColors = colors,
+                    pFoilOnly = foilOnly,
+                    pConditions = conditions,
+                    pLanguages = languages,
+                    pLimit = limit,
+                    pOffset = offset,
                 )
             )
         }

@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.domain.model
 
+import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
+import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+
 data class Deck(
     val id:          String,                                   // UUID, client-generated
     val userId:      String? = null,
@@ -45,4 +48,13 @@ data class AddCardRow(
     val card: Card,
     val quantityInDeck: Int,
     val isOwned: Boolean,
-)
+    val availableQuantity: Int = 0,
+    val wishlistEntry: WishlistEntry? = null,
+    val offerEntry: OpenForTradeEntry? = null,
+) {
+    val uniqueKey: String get() = when {
+        wishlistEntry != null -> "wishlist_${wishlistEntry.id}"
+        offerEntry != null -> "offer_${offerEntry.id}"
+        else -> "scryfall_${card.scryfallId}"
+    }
+}

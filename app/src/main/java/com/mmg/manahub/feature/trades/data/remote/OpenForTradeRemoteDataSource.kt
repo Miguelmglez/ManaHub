@@ -19,7 +19,7 @@ class OpenForTradeRemoteDataSource @Inject constructor(
     suspend fun getOpenForTrade(userId: String): Result<List<OpenForTradeEntryDto>> =
         withContext(ioDispatcher) {
             runCatching {
-                supabaseClient.postgrest["open_for_trade"]
+                supabaseClient.postgrest["open_for_trade_with_card"]
                     .select { filter { eq("user_id", userId) } }
                     .decodeList<OpenForTradeEntryDto>()
             }
@@ -49,7 +49,8 @@ class OpenForTradeRemoteDataSource @Inject constructor(
             runCatching {
                 if (userCardIds.isEmpty()) return@runCatching
                 val rows = userCardIds.map { buildJsonObject { put("user_card_id", it) } }
-                supabaseClient.postgrest["open_for_trade"].insert(rows)
+                // upsert prevents duplicate-key failures when entries already exist in Supabase.
+                supabaseClient.postgrest["open_for_trade"].upsert(rows)
                 Unit
             }
         }
