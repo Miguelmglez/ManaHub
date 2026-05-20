@@ -125,27 +125,6 @@ fun ProfileEditSheet(
                         color = mc.textPrimary,
                         modifier = Modifier.offset(x = (-4).dp)
                     )
-                    
-                    // Game Tag Badge
-                    uiState.gameTag?.let { tag ->
-                        Box(
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .background(
-                                    color = mc.primaryAccent.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(6.dp),
-                                )
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = tag,
-                                color = mc.primaryAccent,
-                                style = MaterialTheme.magicTypography.labelSmall.copy(
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                                ),
-                            )
-                        }
-                    }
                 }
 
                 if (uiState.currentAvatarUrl != null) {

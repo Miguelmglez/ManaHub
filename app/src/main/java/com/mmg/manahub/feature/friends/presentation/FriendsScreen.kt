@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.friends.presentation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,7 +32,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -48,18 +46,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.AvatarImage
+import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -244,10 +239,10 @@ fun FriendsScreen(
                         }
                     }
                     if (uiState.isSearching) {
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                            color = mc.primaryAccent,
-                            trackColor = mc.surfaceVariant,
+                        MagicProgressBar(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
                         )
                     }
                     uiState.searchResult?.let { result ->
@@ -470,37 +465,6 @@ private fun FriendRow(friend: Friend, onClick: () -> Unit) {
                 Text(friend.nickname, style = MaterialTheme.magicTypography.bodyMedium, color = mc.textPrimary)
                 Text(friend.gameTag, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
             }
-        }
-    }
-}
-
-@Composable
-private fun AvatarImage(avatarUrl: String?, initials: String, size: Int) {
-    val mc = MaterialTheme.magicColors
-    Box(
-        modifier = Modifier
-            .size(size.dp)
-            .clip(CircleShape)
-            .background(mc.primaryAccent.copy(alpha = 0.2f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (avatarUrl != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(CircleShape),
-            )
-        } else {
-            Text(
-                initials,
-                color = mc.primaryAccent,
-                fontWeight = FontWeight.Bold,
-                fontSize = (size / 2.5).sp,
-            )
         }
     }
 }

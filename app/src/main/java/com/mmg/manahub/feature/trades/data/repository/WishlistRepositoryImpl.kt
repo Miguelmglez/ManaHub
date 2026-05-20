@@ -94,6 +94,19 @@ class WishlistRepositoryImpl @Inject constructor(
         unsynced.size
     }
 
+    override suspend fun decrementByScryfallId(scryfallId: String, quantity: Int): Result<Unit> =
+        runCatching {
+            val entries = dao.getByScryfallId(scryfallId)
+            entries.forEach { entry ->
+                val newQty = entry.quantity - quantity
+                if (newQty <= 0) {
+                    dao.deleteById(entry.id)
+                } else {
+                    dao.updateQuantity(entry.id, newQty)
+                }
+            }
+        }
+
     override suspend fun addAndSync(entry: WishlistEntry, userId: String): Result<Unit> =
         addMutex.withLock {
             runCatching {

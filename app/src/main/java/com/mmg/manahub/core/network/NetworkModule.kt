@@ -36,8 +36,23 @@ object NetworkModule {
             })
             .cache(Cache(File(context.cacheDir, "http_cache"), 50L * 1024 * 1024))
             .addNetworkInterceptor { chain ->
-                chain.proceed(chain.request()).newBuilder()
-                    .header("Cache-Control", "max-age=86400")
+                val request = chain.request()
+                val path = request.url.encodedPath
+
+                // Apply different Cache-Control max-age per endpoint so the
+                // OkHttp disk cache serves as a cold-start fallback behind
+                // the in-memory ScryfallCache.
+                val maxAge = when {
+                    path.contains("/symbology")   -> 604_800  // 7 days — symbols rarely change
+                    path.contains("/sets")         -> 86_400   // 24 h  — new sets are infrequent
+                    path.contains("/cards/search") -> 300      // 5 min — searches should be fresh
+                    path.contains("/cards/")       -> 86_400   // 24 h  — card data (prices daily)
+                    else                           -> 3_600    // 1 h   — safe default
+                }
+
+                chain.proceed(request).newBuilder()
+                    .header("Cache-Control", "public, max-age=$maxAge")
+                    .removeHeader("Pragma")
                     .build()
             }
             .build()

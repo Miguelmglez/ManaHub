@@ -25,4 +25,11 @@ interface WishlistRepository {
      * @param userId The authenticated user's UUID used for the remote payload.
      */
     suspend fun addAndSync(entry: WishlistEntry, userId: String): Result<Unit>
+
+    /**
+     * Decrements the quantity of every local wishlist entry for [scryfallId] by [quantity].
+     * Entries whose resulting quantity falls to zero or below are deleted.
+     * Used when the user receives a card via a trade and wants their wishlist updated.
+     */
+    suspend fun decrementByScryfallId(scryfallId: String, quantity: Int): Result<Unit>
 }

@@ -39,7 +39,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -75,6 +74,7 @@ import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.SetSymbol
@@ -342,10 +342,7 @@ private fun SearchTab(
         // ── Content states ────────────────────────────────────────────────────
         when {
             uiState.isSearching -> {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = mc.primaryAccent,
-                )
+                MagicProgressBar(modifier = Modifier.fillMaxWidth())
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
                         color = mc.primaryAccent,

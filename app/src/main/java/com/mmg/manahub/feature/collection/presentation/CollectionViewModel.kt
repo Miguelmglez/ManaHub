@@ -19,6 +19,8 @@ import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -50,6 +52,8 @@ class CollectionViewModel @Inject constructor(
     private val workManager: WorkManager,
     private val migrateLocalTradeLists: MigrateLocalTradeListsUseCase,
     private val getLocalWishlist: GetLocalWishlistUseCase,
+    private val wishlistRepository: WishlistRepository,
+    private val openForTradeRepository: OpenForTradeRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val analyticsHelper: AnalyticsHelper,
 ) : ViewModel() {
@@ -70,9 +74,16 @@ class CollectionViewModel @Inject constructor(
     // re-trigger assignUserIdAndSync on every screen rotation.
     private var previouslyAuthenticated = false
 
+    // Local unsynced counts for wishlist and open-for-trade, updated reactively.
+    // Used alongside SyncManager.countPendingChanges so the sync banner reflects
+    // ALL pending changes, not just the main collection.
+    private var wishlistUnsyncedCount = 0
+    private var openForTradeUnsyncedCount = 0
+
     init {
         observeCollection()
         observeWishlistIds()
+        observeTradeListUnsyncedCounts()
         refreshPrices()
         observeSyncState()
         observeSessionChanges()
@@ -91,10 +102,36 @@ class CollectionViewModel @Inject constructor(
         viewModelScope.launch {
             getLocalWishlist().collect { entries ->
                 _wishlistCardIds.value = entries.map { it.cardId }.toSet()
-                // Re-apply filters so active "In Wishlist" criterion picks up changes.
                 applyFilters()
             }
         }
+    }
+
+    private fun observeTradeListUnsyncedCounts() {
+        viewModelScope.launch {
+            wishlistRepository.observeUnsyncedCount().collect { count ->
+                wishlistUnsyncedCount = count
+                recomputeUnsyncedBanner()
+            }
+        }
+        viewModelScope.launch {
+            openForTradeRepository.observeUnsyncedCount().collect { count ->
+                openForTradeUnsyncedCount = count
+                recomputeUnsyncedBanner()
+            }
+        }
+    }
+
+    private suspend fun recomputeUnsyncedBanner() {
+        val userId = authRepository.getCurrentUser()?.id
+        val hasPending = if (userId != null && syncManager.syncState.value != SyncState.SYNCING) {
+            syncManager.countPendingChanges(userId) > 0
+                || wishlistUnsyncedCount > 0
+                || openForTradeUnsyncedCount > 0
+        } else {
+            wishlistUnsyncedCount > 0 || openForTradeUnsyncedCount > 0
+        }
+        _uiState.update { it.copy(hasUnsyncedChanges = hasPending) }
     }
 
     // ── Collection observation ────────────────────────────────────────────────
@@ -123,6 +160,8 @@ class CollectionViewModel @Inject constructor(
                     // _uiState being updated by the separate observeSyncState coroutine.
                     val hasPending = if (userId != null && syncManager.syncState.value != SyncState.SYNCING) {
                         syncManager.countPendingChanges(userId) > 0
+                            || wishlistUnsyncedCount > 0
+                            || openForTradeUnsyncedCount > 0
                     } else {
                         _uiState.value.hasUnsyncedChanges
                     }
@@ -157,10 +196,11 @@ class CollectionViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         syncState = state,
-                        // After a successful sync the watermark is now up-to-date, so there
-                        // are no longer any pending changes — hide the banner immediately.
-                        hasUnsyncedChanges = if (state == SyncState.SUCCESS) false
-                                             else it.hasUnsyncedChanges,
+                        // After a successful collection sync, hide the banner only if
+                        // wishlist and open-for-trade are also fully synced.
+                        hasUnsyncedChanges = if (state == SyncState.SUCCESS)
+                            wishlistUnsyncedCount > 0 || openForTradeUnsyncedCount > 0
+                        else it.hasUnsyncedChanges,
                     )
                 }
             }
@@ -216,11 +256,38 @@ class CollectionViewModel @Inject constructor(
         viewModelScope.launch {
             val userId = authRepository.getCurrentUser()?.id ?: return@launch
             _uiState.update { it.copy(syncError = null) }
-            val result = syncManager.sync(userId)
-            // hasUnsyncedChanges is managed exclusively by observeSyncState (SUCCESS → false)
-            // and by observeCollection (re-evaluated on each Room emission after sync).
-            // Do not write it here to avoid a dual-write race.
-            _uiState.update { it.copy(syncError = result.error) }
+
+            // Sync the main collection — drives syncState SYNCING → SUCCESS/ERROR
+            // which the UI observes via observeSyncState().
+            val syncResult = syncManager.sync(userId)
+
+            // Migrate any wishlist/open-for-trade entries added while offline.
+            // Capture the migration error so it can be surfaced to the UI — previously
+            // the Result was discarded, silently leaving the banner stuck when Supabase
+            // rejected the batch insert (e.g. network timeout or RLS violation).
+            val migrationError: String? = if (wishlistUnsyncedCount > 0 || openForTradeUnsyncedCount > 0) {
+                migrateLocalTradeLists(userId)
+                    .onFailure { e ->
+                        FirebaseCrashlytics.getInstance().apply {
+                            log("trade_lists_migration_failed_on_sync")
+                            recordException(e)
+                        }
+                    }
+                    .exceptionOrNull()
+                    ?.message
+            } else {
+                null
+            }
+
+            // Surface the first non-null error: collection sync error takes priority
+            // over migration error so the most critical failure is always visible.
+            _uiState.update { it.copy(syncError = syncResult.error ?: migrationError) }
+
+            // Re-evaluate the banner after migration has finished (success or failure).
+            // observeSyncState() already set hasUnsyncedChanges = (wishlistCount > 0)
+            // when SUCCESS fired, but at that point migration had not run yet.
+            // This call reconciles the flag with the actual Room counters post-migration.
+            recomputeUnsyncedBanner()
         }
     }
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
 import androidx.compose.material.icons.Icons
@@ -53,6 +54,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -153,14 +155,36 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(16.dp),
         ) {
-            // ── Hero placeholder ──────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.77f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(shimmerColor),
-            )
+            // ── User Info placeholder ──────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(shimmerColor)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(20.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(shimmerColor)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(160.dp)
+                            .height(14.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(shimmerColor)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -435,90 +459,76 @@ private fun AuthenticatedCard(
                 .fillMaxWidth()
                 .padding(16.dp),
         ) {
-            // ── Hero Section ───────────────────────────────────────────────────
-            var imageRatio by remember(avatarUrl) { mutableFloatStateOf(1.77f) }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
-                    .animateContentSize()
-                    .clip(RoundedCornerShape(16.dp)),
+            // ── User Info Section ──────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (avatarUrl != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(avatarUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        alignment = Alignment.TopCenter,
-                        onSuccess = { state ->
-                            val size = state.painter.intrinsicSize
-                            if (size.width > 0 && size.height > 0) {
-                                imageRatio = size.width / size.height
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        mc.primaryAccent.copy(alpha = 0.3f),
-                                        mc.background,
-                                    ),
-                                ),
-                            ),
-                    ) {
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(avatarUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
                         ThemeBackground(modifier = Modifier.fillMaxSize())
                         Text(
                             text = nickname.take(1).uppercase().ifEmpty { "✦" },
-                            style = ty.lifeNumberMd.copy(
-                                fontSize = 72.sp,
-                                color = mc.primaryAccent.copy(alpha = 0.3f)
-                            ),
-                            modifier = Modifier.align(Alignment.Center),
+                            style = ty.titleLarge.copy(color = mc.primaryAccent.copy(alpha = 0.7f)),
                         )
                     }
                 }
-
-                // Dark gradient overlay
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.5f),
-                                    Color.Black.copy(alpha = 0.85f),
-                                ),
-                            ),
-                        ),
-                )
-
-                // Game tag badge — bottom start
-                if (gameTag != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(12.dp)
-                            .background(
-                                color = mc.primaryAccent.copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(6.dp),
-                            )
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                    ) {
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                // Name & Email
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = gameTag,
-                            color = mc.primaryAccent,
-                            style = ty.labelSmall.copy(fontSize = 11.sp),
+                            text = nickname,
+                            style = ty.titleMedium,
+                            color = mc.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (gameTag != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = mc.primaryAccent.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp),
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            ) {
+                                Text(
+                                    text = gameTag,
+                                    color = mc.primaryAccent,
+                                    style = ty.labelSmall.copy(fontSize = 10.sp),
+                                )
+                            }
+                        }
+                    }
+                    if (user.email != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = user.email,
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

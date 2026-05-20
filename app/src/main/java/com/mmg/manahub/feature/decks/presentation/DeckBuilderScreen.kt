@@ -288,8 +288,8 @@ fun DeckMagicDetailScreen(
             isCommanderMode = false,
             onQueryChange = viewModel::onAddCardsQueryChange,
             onScryfallSearch = viewModel::searchScryfallDirect,
-            onAdd = viewModel::addCardToDeck,
-            onRemove = viewModel::removeCardFromDeck,
+            onAdd = { row -> viewModel.addCardToDeck(row.card.scryfallId) },
+            onRemove = { row -> viewModel.removeCardFromDeck(row.card.scryfallId) },
             onCardClick = { id ->
                 focusManager.clearFocus()
                 // Regular add-cards flow: no commander context.
@@ -316,13 +316,11 @@ fun DeckMagicDetailScreen(
             isCurrentCommander = { it == uiState.commanderCard?.scryfallId },
             onQueryChange = viewModel::searchCommander,
             onScryfallSearch = viewModel::searchCommander,
-            onAdd = { id ->
+            onAdd = { row ->
                 focusManager.clearFocus()
                 // Direct add from the list row: resolve card and assign as commander.
-                (uiState.addCardsResults + uiState.scryfallResults).find { it.card.scryfallId == id }?.card?.let { card ->
-                    viewModel.setCommander(card)
-                    showCommanderSearchSheet = false
-                }
+                viewModel.setCommander(row.card)
+                showCommanderSearchSheet = false
             },
             onRemove = { /* No-op in commander selection mode */ },
             onCardClick = { id ->

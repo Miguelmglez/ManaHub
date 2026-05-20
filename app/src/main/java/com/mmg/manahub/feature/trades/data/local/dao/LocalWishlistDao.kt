@@ -39,6 +39,9 @@ interface LocalWishlistDao {
     @Query("SELECT * FROM local_wishlists WHERE scryfall_id = :scryfallId ORDER BY created_at DESC")
     fun observeByScryfallId(scryfallId: String): Flow<List<LocalWishlistEntity>>
 
+    @Query("SELECT * FROM local_wishlists WHERE scryfall_id = :scryfallId")
+    suspend fun getByScryfallId(scryfallId: String): List<LocalWishlistEntity>
+
     @Query("SELECT * FROM local_wishlists WHERE synced = 0")
     suspend fun getUnsynced(): List<LocalWishlistEntity>
 

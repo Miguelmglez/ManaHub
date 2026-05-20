@@ -514,15 +514,18 @@ private fun ThemeSelectorSection(
 
         // Organizamos los temas en filas de 3 para evitar desbordamientos
         val themes = listOf(
-            Triple(stringResource(R.string.theme_cosmos), "✨", AppTheme.ArcaneCosmos),
-            Triple(stringResource(R.string.theme_neon_void), "⚡", AppTheme.NeonVoid),
-            Triple(stringResource(R.string.theme_grimoire), "📜", AppTheme.MedievalGrimoire),
-            Triple(stringResource(R.string.theme_shadow_essence), "🌑", AppTheme.ShadowEssence),
-            Triple(stringResource(R.string.theme_forest_murmur), "🍃", AppTheme.ForestMurmur),
-            Triple(stringResource(R.string.theme_mystic_echo), "🔮", AppTheme.MysticEcho),
-            Triple(stringResource(R.string.theme_gilded_silver), "👑", AppTheme.GildedSilver),
-            Triple(stringResource(R.string.theme_ancient_oak), "🪵", AppTheme.AncientOak),
-            Triple(stringResource(R.string.theme_obsidian_chrome), "🔗", AppTheme.ObsidianChrome)
+            Triple(stringResource(R.string.theme_cosmos),         "✨", AppTheme.ArcaneCosmos),
+            Triple(stringResource(R.string.theme_neon_void),      "⚡", AppTheme.NeonVoid),
+            Triple(stringResource(R.string.theme_grimoire),       "📜", AppTheme.MedievalGrimoire),
+            Triple(stringResource(R.string.theme_forest_murmur),  "🍃", AppTheme.ForestMurmur),
+            Triple(stringResource(R.string.theme_ancient_oak),    "🪵", AppTheme.AncientOak),
+            Triple(stringResource(R.string.theme_hallowed_print), "📖", AppTheme.HallowedPrint),
+            Triple(stringResource(R.string.theme_azure_flux),     "🌐", AppTheme.AzureFlux),
+            Triple(stringResource(R.string.theme_planar_veil),    "🌌", AppTheme.PlanarVeil),
+            Triple(stringResource(R.string.theme_venom_shade),    "🧪", AppTheme.VenomShade),
+            Triple(stringResource(R.string.theme_glacial_edge),   "❄️", AppTheme.GlacialEdge),
+            Triple(stringResource(R.string.theme_dusk_ember),     "🌅", AppTheme.DuskEmber),
+            Triple(stringResource(R.string.theme_onyx_noir),      "🍸", AppTheme.OnyxNoir),
         )
 
         themes.chunked(3).forEach { rowThemes ->
@@ -550,15 +553,18 @@ private fun ThemeSelectorSection(
 }
 
 private fun getPreviewColorsForTheme(theme: AppTheme): List<Color> = when (theme) {
-    AppTheme.NeonVoid -> listOf(Color(0xFF14020D), Color(0xFFFF6AD5), Color(0xFF00E5FF))
-    AppTheme.MedievalGrimoire -> listOf(Color(0xFF140202), Color(0xFFFF3131), Color(0xFFFFD700))
-    AppTheme.ArcaneCosmos -> listOf(Color(0xFF010C14), Color(0xFF00F5FF), Color(0xFFFF7F50))
-    AppTheme.ShadowEssence -> listOf(Color(0xFF0F0214), Color(0xFFD500F9), Color(0xFF7B1FA2))
-    AppTheme.ForestMurmur -> listOf(Color(0xFF010A03), Color(0xFFCDDC39), Color(0xFF1B5E20))
-    AppTheme.MysticEcho -> listOf(Color(0xFF0D0A14), Color(0xFFBF00FF), Color(0xFF00E5FF))
-    AppTheme.GildedSilver -> listOf(Color(0xFF1A1A1A), Color(0xFFFFD700), Color(0xFFC0C0C0))
-    AppTheme.AncientOak -> listOf(Color(0xFF140D02), Color(0xFFFFD600), Color(0xFFFFAB00))
-    AppTheme.ObsidianChrome -> listOf(Color(0xFF121212), Color(0xFFE0E0E0), Color(0xFF757575))
+    AppTheme.NeonVoid         -> listOf(Color(0xFF14020D), Color(0xFFFF6AD5), Color(0xFF00E5FF))
+    AppTheme.MedievalGrimoire -> listOf(Color(0xFF140202), Color(0xFFFF3131), Color(0xFFC9A55C))
+    AppTheme.ArcaneCosmos     -> listOf(Color(0xFF010C14), Color(0xFF00F5FF), Color(0xFFFF7F50))
+    AppTheme.ForestMurmur     -> listOf(Color(0xFF010A03), Color(0xFFF2FAEC), Color(0xFF2E7D32))
+    AppTheme.AncientOak       -> listOf(Color(0xFF140D02), Color(0xFFE0B038), Color(0xFFC68A1F))
+    AppTheme.HallowedPrint    -> listOf(Color(0xFFF5F1E5), Color(0xFF1F1B16), Color(0xFF7A1F2B))
+    AppTheme.AzureFlux        -> listOf(Color(0xFF02061F), Color(0xFF3B82F6), Color(0xFFFF6AD5))
+    AppTheme.PlanarVeil       -> listOf(Color(0xFF110524), Color(0xFF9B5DE5), Color(0xFFFFC857))
+    AppTheme.VenomShade       -> listOf(Color(0xFF0B0814), Color(0xFFB4FF1A), Color(0xFFC24DFF))
+    AppTheme.GlacialEdge      -> listOf(Color(0xFF050B1A), Color(0xFFB8E0FF), Color(0xFFC7A7FF))
+    AppTheme.DuskEmber        -> listOf(Color(0xFF1F0A14), Color(0xFFFF9B6A), Color(0xFFE8B85F))
+    AppTheme.OnyxNoir         -> listOf(Color(0xFF08080C), Color(0xFFD8D8E0), Color(0xFFE8C988))
 }
 
 

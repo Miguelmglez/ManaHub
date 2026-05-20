@@ -27,10 +27,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -87,10 +89,15 @@ fun CardListItem(
     modifier: Modifier = Modifier,
     quantityText: String? = null,
     hasFoil: Boolean = false,
+    condition: String? = null,
+    language: String? = null,
+    isAltArt: Boolean = false,
     isStale: Boolean = false,
     setCode: String? = null,
     setName: String? = null,
-    rarity: String? = null,    containerColor: Color = Color.Transparent,
+    rarity: String? = null,
+    typeLine: String? = null,
+    containerColor: Color = Color.Transparent,
     shape: androidx.compose.ui.graphics.Shape = androidx.compose.ui.graphics.RectangleShape,
     extraSupportingContent: @Composable (RowScope.() -> Unit)? = null,
 ) {
@@ -174,13 +181,34 @@ fun CardListItem(
                         }
                     }
 
+                    if (typeLine != null) {
+                        Text(
+                            text = typeLine,
+                            style = MaterialTheme.magicTypography.bodySmall,
+                            color = mc.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(modifier = Modifier.weight(1f)) {
-                            extraSupportingContent?.invoke(this@Row)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                language?.let { CopyBadge(label = it.uppercase()) }
+                                condition?.let { CopyBadge(label = it) }
+                                if (hasFoil) FoilBadge()
+                                if (isAltArt) {
+                                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
+                                }
+                                extraSupportingContent?.invoke(this@Row)
+                            }
                         }
 
                         val priceText = PriceFormatter.formatFromScryfall(

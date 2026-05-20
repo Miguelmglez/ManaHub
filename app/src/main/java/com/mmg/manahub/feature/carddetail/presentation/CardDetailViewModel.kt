@@ -216,7 +216,7 @@ class CardDetailViewModel @Inject constructor(
                     _uiState.update { it.copy(error = e.message) }
                     _events.emit(
                         CardDetailEvent.ShowToast(
-                            "Could not add to wishlist",
+                            "Could not add to wishlist: ${e.message}",
                             ToastSeverity.ERROR
                         )
                     )

@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.friends.presentation.detail
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -61,6 +60,13 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.blur
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import java.util.Locale
 
@@ -79,6 +85,8 @@ import java.util.Locale
 @Composable
 fun FriendDetailScreen(
     onNavigateBack: () -> Unit,
+    onCardClick: (String) -> Unit = {},
+    onNavigateToTradeDetail: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel: FriendDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -151,65 +159,6 @@ fun FriendDetailScreen(
         Scaffold(
             containerColor = mc.background,
             contentWindowInsets = WindowInsets(0),
-            topBar = {
-                Surface(
-                    color = mc.backgroundSecondary,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    TopAppBar(
-                        modifier = Modifier.statusBarsPadding(),
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = mc.backgroundSecondary,
-                            titleContentColor = mc.textPrimary,
-                            navigationIconContentColor = mc.textPrimary,
-                            actionIconContentColor = mc.textPrimary,
-                        ),
-                        navigationIcon = {
-                            IconButton(onClick = onNavigateBack) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.action_back),
-                                )
-                            }
-                        },
-                        title = {
-                            Text(
-                                text = uiState.friend?.nickname ?: "",
-                                style = MaterialTheme.magicTypography.titleLarge,
-                                maxLines = 1,
-                            )
-                        },
-                        actions = {
-                            Box {
-                                IconButton(onClick = { showMenu = true }) {
-                                    Icon(
-                                        Icons.Default.MoreVert,
-                                        contentDescription = null,
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = showMenu,
-                                    onDismissRequest = { showMenu = false },
-                                ) {
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                stringResource(R.string.friends_remove_friend),
-                                                color = mc.lifeNegative,
-                                                style = MaterialTheme.magicTypography.bodyMedium,
-                                            )
-                                        },
-                                        onClick = {
-                                            showMenu = false
-                                            showRemoveConfirm = true
-                                        },
-                                    )
-                                }
-                            }
-                        },
-                    )
-                }
-            },
         ) { padding ->
 
             if (uiState.isLoadingFriend) {
@@ -232,7 +181,13 @@ fun FriendDetailScreen(
                     .padding(padding),
             ) {
                 // ── Friend header ─────────────────────────────────────────────
-                FriendDetailHeader(friend = friend)
+                FriendDetailHeader(
+                    friend = friend,
+                    onNavigateBack = onNavigateBack,
+                    showMenu = showMenu,
+                    onShowMenuChange = { showMenu = it },
+                    onRemoveFriendClick = { showRemoveConfirm = true }
+                )
 
                 // ── Tab row ───────────────────────────────────────────────────
                 val tabs = FriendTab.entries
@@ -262,6 +217,7 @@ fun FriendDetailScreen(
                         uiState = uiState,
                         viewModel = viewModel,
                         friendNickname = friend.nickname,
+                        onCardClick = onCardClick,
                     )
                     FriendTab.STATS -> FriendStatsTab(
                         uiState = uiState,
@@ -270,6 +226,7 @@ fun FriendDetailScreen(
                     FriendTab.HISTORY -> FriendHistoryTab(
                         friend = friend,
                         tradeHistory = uiState.tradeHistory,
+                        onTradeClick = onNavigateToTradeDetail,
                     )
                 }
             }
@@ -288,20 +245,18 @@ fun FriendDetailScreen(
 
 /** Hero-style header block showing avatar background and game tag. */
 @Composable
-private fun FriendDetailHeader(friend: Friend) {
+private fun FriendDetailHeader(
+    friend: Friend,
+    onNavigateBack: () -> Unit,
+    showMenu: Boolean,
+    onShowMenuChange: (Boolean) -> Unit,
+    onRemoveFriendClick: () -> Unit,
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
-    // State to track the image's aspect ratio (defaults to 16:9)
-    var imageRatio by remember(friend.avatarUrl) { mutableFloatStateOf(1.77f) }
-
     Box(
-        modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .fillMaxWidth()
-            .aspectRatio(imageRatio.coerceIn(1.2f, 2.5f))
-            .animateContentSize()
-            .clip(RoundedCornerShape(16.dp)),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         if (friend.avatarUrl != null) {
             AsyncImage(
@@ -311,19 +266,15 @@ private fun FriendDetailHeader(friend: Friend) {
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
-                onSuccess = { state ->
-                    val size = state.painter.intrinsicSize
-                    if (size.width > 0 && size.height > 0) {
-                        imageRatio = size.width / size.height
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
+                alignment = Alignment.Center,
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(16.dp),
             )
         } else {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
@@ -332,51 +283,119 @@ private fun FriendDetailHeader(friend: Friend) {
                             ),
                         ),
                     ),
-            ) {
-                ThemeBackground(modifier = Modifier.fillMaxSize())
-                Text(
-                    text = friend.nickname.take(1).uppercase().ifEmpty { "✦" },
-                    style = ty.lifeNumberMd.copy(
-                        fontSize = 72.sp,
-                        color = mc.primaryAccent.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
+            )
         }
 
         // Dark gradient overlay
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.5f),
-                            Color.Black.copy(alpha = 0.85f),
-                        ),
-                    ),
-                ),
+                .matchParentSize()
+                .background(Color.Black.copy(alpha = 0.7f))
         )
 
-        // Game tag badge — bottom start
-        Box(
+        Row(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(12.dp)
-                .background(
-                    color = mc.primaryAccent.copy(alpha = 0.25f),
-                    shape = RoundedCornerShape(6.dp),
-                )
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(78.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = friend.gameTag,
-                color = mc.primaryAccent,
-                style = ty.labelSmall.copy(fontSize = 11.sp),
-            )
+            IconButton(onClick = onNavigateBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                    tint = mc.textPrimary
+                )
+            }
+            
+            Spacer(Modifier.width(4.dp))
+            
+            if (friend.avatarUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(friend.avatarUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, mc.primaryAccent, CircleShape)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, mc.primaryAccent, CircleShape)
+                        .background(mc.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = friend.nickname.take(1).uppercase().ifEmpty { "✦" },
+                        style = ty.labelLarge.copy(color = mc.textPrimary),
+                    )
+                }
+            }
+            
+            Spacer(Modifier.width(12.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = friend.nickname,
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Row {
+                    Text(
+                        text = friend.gameTag,
+                        color = mc.primaryAccent,
+                        style = ty.labelSmall.copy(fontSize = 11.sp),
+                        modifier = Modifier
+                            .background(
+                                color = mc.primaryAccent.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            
+            Box {
+                IconButton(onClick = { onShowMenuChange(true) }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = null,
+                        tint = mc.textPrimary
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { onShowMenuChange(false) },
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.friends_remove_friend),
+                                color = mc.lifeNegative,
+                                style = ty.bodyMedium,
+                            )
+                        },
+                        onClick = {
+                            onShowMenuChange(false)
+                            onRemoveFriendClick()
+                        },
+                    )
+                }
+            }
         }
     }
 }

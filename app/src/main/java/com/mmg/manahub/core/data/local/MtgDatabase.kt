@@ -37,8 +37,10 @@ import com.mmg.manahub.feature.news.data.local.NewsDao
 import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
 import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
+import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntity
 
 @Database(
     entities = [
@@ -63,8 +65,9 @@ import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
         OutgoingFriendRequestEntity::class,
         LocalWishlistEntity::class,
         LocalOpenForTradeEntity::class,
+        TradeCollectionSyncEntity::class,
     ],
-    version = 34,
+    version = 35,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -83,4 +86,5 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun remoteKeyDao(): RemoteKeyDao
     abstract fun localWishlistDao(): LocalWishlistDao
     abstract fun localOpenForTradeDao(): LocalOpenForTradeDao
+    abstract fun tradeCollectionSyncDao(): TradeCollectionSyncDao
 }

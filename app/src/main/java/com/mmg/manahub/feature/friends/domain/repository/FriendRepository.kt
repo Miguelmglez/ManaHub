@@ -54,6 +54,9 @@ interface FriendRepository {
         friendUserId: String,
         list: String,
         query: String,
+        filters: com.mmg.manahub.feature.friends.presentation.detail.FolderFilters? = null,
+        limit: Int = 50,
+        offset: Int = 0,
     ): Result<List<FriendCard>>
 
     /**

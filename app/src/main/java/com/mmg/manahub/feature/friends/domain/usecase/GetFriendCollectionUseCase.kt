@@ -18,5 +18,8 @@ class GetFriendCollectionUseCase @Inject constructor(
         friendUserId: String,
         list: String,
         query: String = "",
-    ): Result<List<FriendCard>> = repo.getFriendCollection(friendUserId, list, query)
+        filters: com.mmg.manahub.feature.friends.presentation.detail.FolderFilters? = null,
+        limit: Int = 50,
+        offset: Int = 0,
+    ): Result<List<FriendCard>> = repo.getFriendCollection(friendUserId, list, query, filters, limit, offset)
 }
