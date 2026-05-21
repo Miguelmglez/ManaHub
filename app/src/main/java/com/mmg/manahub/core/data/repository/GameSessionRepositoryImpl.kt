@@ -90,4 +90,7 @@ class GameSessionRepositoryImpl @Inject constructor(
             }
             streak
         }
+
+    override suspend fun deleteSession(sessionId: Long) =
+        withContext(ioDispatcher) { dao.deleteSession(sessionId) }
 }

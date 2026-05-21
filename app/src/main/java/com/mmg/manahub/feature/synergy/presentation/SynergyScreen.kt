@@ -45,6 +45,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.magicTypography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +89,7 @@ private fun SynergyContent(
     onCardClick:   (String) -> Unit,
     modifier:      Modifier = Modifier,
 ) {
+    val ty = MaterialTheme.magicTypography
     LazyColumn(
         modifier        = modifier.fillMaxSize(),
         contentPadding  = PaddingValues(16.dp),
@@ -103,7 +106,7 @@ private fun SynergyContent(
         // Deck suggestions
         if (uiState.suggestedDecks.isNotEmpty()) {
             item {
-                Text(stringResource(R.string.synergy_suggested_decks), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.synergy_suggested_decks), style = ty.titleMedium)
             }
             items(uiState.suggestedDecks) { deck ->
                 DeckSuggestionCard(suggestion = deck, onCardClick = onCardClick)
@@ -113,7 +116,7 @@ private fun SynergyContent(
         // Synergy groups
         if (uiState.synergyGroups.isNotEmpty()) {
             item {
-                Text(stringResource(R.string.synergy_groups), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.synergy_groups), style = ty.titleMedium)
             }
             items(uiState.synergyGroups) { group ->
                 SynergyGroupCard(group = group, onCardClick = onCardClick)
@@ -124,8 +127,9 @@ private fun SynergyContent(
 
 @Composable
 private fun FormatSelector(selected: DeckFormat, onChange: (DeckFormat) -> Unit) {
+    val ty = MaterialTheme.magicTypography
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.deckbuilder_format_label), style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.deckbuilder_format_label), style = ty.titleMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(DeckFormat.entries) { format ->
                 FilterChip(
@@ -143,6 +147,8 @@ private fun DeckSuggestionCard(
     suggestion:  DeckSuggestion,
     onCardClick: (String) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -150,36 +156,36 @@ private fun DeckSuggestionCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp))
-                Text(suggestion.name, style = MaterialTheme.typography.titleSmall)
+                    tint = mc.goldMtg, modifier = Modifier.size(18.dp))
+                Text(suggestion.name, style = ty.titleMedium)
                 Spacer(Modifier.weight(1f))
                 // Synergy score
                 Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = mc.primaryAccent.copy(alpha = 0.20f),
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
                         text     = stringResource(R.string.synergy_score_percent, suggestion.synergyScore),
-                        style    = MaterialTheme.typography.labelSmall,
+                        style    = ty.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
             }
             Text(
                 text  = stringResource(R.string.synergy_deck_info, suggestion.cards.size, suggestion.format.name.lowercase()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = ty.bodySmall,
+                color = mc.textSecondary,
             )
             // Color identity pills
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                suggestion.colors.forEach { color ->
+                suggestion.colors.forEach { mtgColor ->
                     Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        color = mc.secondaryAccent.copy(alpha = 0.20f),
                         shape = MaterialTheme.shapes.extraSmall,
                     ) {
                         Text(
-                            text     = color.name,
-                            style    = MaterialTheme.typography.labelSmall,
+                            text     = mtgColor.name,
+                            style    = ty.labelSmall,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
@@ -202,12 +208,12 @@ private fun DeckSuggestionCard(
                     item {
                         Surface(
                             modifier = Modifier.size(width = 48.dp, height = 34.dp),
-                            color    = MaterialTheme.colorScheme.surfaceVariant,
+                            color    = mc.surfaceVariant,
                             shape    = MaterialTheme.shapes.extraSmall,
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(stringResource(R.string.synergy_more_cards, (suggestion.cards.size - 8)),
-                                    style = MaterialTheme.typography.labelSmall)
+                                    style = ty.labelSmall)
                             }
                         }
                     }
@@ -222,14 +228,15 @@ private fun SynergyGroupCard(
     group:       SynergyGroup,
     onCardClick: (String) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors   = CardDefaults.cardColors(containerColor = mc.surfaceVariant),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(group.label, style = MaterialTheme.typography.titleSmall)
-            Text(group.description, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(group.label, style = ty.titleMedium)
+            Text(group.description, style = ty.bodySmall, color = mc.textSecondary)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(group.cards.take(6)) { item ->
                     Column(
@@ -247,7 +254,7 @@ private fun SynergyGroupCard(
                         )
                         Text(
                             text     = item.card.name,
-                            style    = MaterialTheme.typography.labelSmall,
+                            style    = ty.labelSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -260,17 +267,18 @@ private fun SynergyGroupCard(
 
 @Composable
 private fun EmptySynergyState(modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Column(
         modifier            = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(Icons.Default.AutoAwesome, contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(64.dp))
+            tint = mc.textSecondary, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.synergy_empty_title), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.synergy_empty_subtitle), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.synergy_empty_title), style = ty.titleMedium)
+        Text(stringResource(R.string.synergy_empty_subtitle), style = ty.bodyMedium, color = mc.textSecondary)
     }
 }
 

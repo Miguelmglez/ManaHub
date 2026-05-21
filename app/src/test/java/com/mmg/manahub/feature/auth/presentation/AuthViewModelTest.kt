@@ -16,10 +16,13 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -175,6 +178,13 @@ class AuthViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
+        // AuthViewModel.init collects sessionState and calls FirebaseCrashlytics.getInstance()
+        // on Authenticated/Unauthenticated transitions. Mock it statically to prevent the
+        // "Default FirebaseApp is not initialized" crash in JVM unit tests.
+        mockkStatic(FirebaseCrashlytics::class)
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
+
         every { getSessionState() } returns sessionStateFlow
         stubContextStrings()
         viewModel = buildViewModel()
@@ -183,6 +193,7 @@ class AuthViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

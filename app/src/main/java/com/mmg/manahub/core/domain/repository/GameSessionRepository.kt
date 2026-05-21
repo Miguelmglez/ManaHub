@@ -22,4 +22,5 @@ interface GameSessionRepository {
     fun observeMostFrequentElimination(): Flow<EliminationCount?>
     fun observeAvgWinTurn(playerName: String): Flow<Double?>
     fun observeCurrentStreak(playerName: String): Flow<Int>
+    suspend fun deleteSession(sessionId: Long)
 }
