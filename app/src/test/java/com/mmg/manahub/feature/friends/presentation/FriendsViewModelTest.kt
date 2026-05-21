@@ -115,6 +115,11 @@ class FriendsViewModelTest {
         coEvery { friendRepo.refreshRequests(any()) }         returns Result.success(Unit)
         coEvery { friendRepo.refreshOutgoingRequests(any()) } returns Result.success(Unit)
 
+        // shareInviteUseCase returns Result<String>. The relaxed mock returns a generic
+        // Result<Object> which causes a ClassCastException when onSuccess { url -> } is called.
+        // Stub explicitly to return a typed Result<String>.
+        coEvery { shareInviteUseCase(any()) } returns Result.success("https://example.com/invite/TESTCODE")
+
         viewModel = FriendsViewModel(
             friendRepo         = friendRepo,
             authRepo           = authRepo,

@@ -162,26 +162,28 @@ private fun ThresholdsCard(
     onAutoChange:    (Float) -> Unit,
     onSuggestChange: (Float) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     ElevatedCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.tagdictionary_thresholds_title), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.tagdictionary_thresholds_title), style = ty.titleMedium)
             Text(
                 text  = stringResource(
                     R.string.tagdictionary_thresholds_description,
                     (auto * 100).toInt(),
                     (suggest * 100).toInt()
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = ty.bodySmall,
+                color = mc.textSecondary,
             )
             Text(
                 stringResource(R.string.tagdictionary_thresholds_auto, (auto * 100).toInt()),
-                style = MaterialTheme.typography.labelMedium
+                style = ty.labelMedium
             )
             Slider(value = auto, onValueChange = onAutoChange, valueRange = 0.5f..1f)
             Text(
                 stringResource(R.string.tagdictionary_thresholds_suggest, (suggest * 100).toInt()),
-                style = MaterialTheme.typography.labelMedium
+                style = ty.labelMedium
             )
             Slider(value = suggest, onValueChange = onSuggestChange, valueRange = 0f..0.95f)
         }
@@ -194,6 +196,8 @@ private fun DictionaryRow(
     onTap: () -> Unit,
     onReset: () -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -204,7 +208,7 @@ private fun DictionaryRow(
         Column(Modifier.weight(1f)) {
             Text(
                 text  = row.key,
-                style = MaterialTheme.typography.titleSmall,
+                style = ty.titleMedium,
                 fontFamily = FontFamily.Monospace,
             )
             Spacer(Modifier.height(4.dp))
@@ -214,8 +218,8 @@ private fun DictionaryRow(
                     row.labelEn.ifBlank { "—" },
                     //row.labelEs.ifBlank { "—" }
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = ty.bodySmall,
+                color = mc.textSecondary,
             )
             val patternCount = row.patternsEn.size + row.patternsEs.size + row.patternsDe.size
             if (patternCount > 0) {
@@ -226,15 +230,15 @@ private fun DictionaryRow(
                         patternCount,
                         row.category.name
                     ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
                 )
             } else {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text  = row.category.name,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
                 )
             }
         }
@@ -255,6 +259,8 @@ private fun EditEntryDialog(
     var patternsEn by remember { mutableStateOf(initial.patternsEn.joinToString("\n")) }
     var patternsEs by remember { mutableStateOf(initial.patternsEs.joinToString("\n")) }
 
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.tagdictionary_edit_title, initial.key)) },
@@ -263,14 +269,14 @@ private fun EditEntryDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(R.string.tagdictionary_labels_section), style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.tagdictionary_labels_section), style = ty.labelMedium)
                 OutlinedTextField(value = labelEn, onValueChange = { labelEn = it }, label = { Text("EN") }, singleLine = true)
             //    OutlinedTextField(value = labelEs, onValueChange = { labelEs = it }, label = { Text("ES") }, singleLine = true)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     stringResource(R.string.tagdictionary_patterns_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
                 )
                 OutlinedTextField(value = patternsEn, onValueChange = { patternsEn = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_en_label)) }, minLines = 2)
               //  OutlinedTextField(value = patternsEs, onValueChange = { patternsEs = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_es_label)) }, minLines = 2)

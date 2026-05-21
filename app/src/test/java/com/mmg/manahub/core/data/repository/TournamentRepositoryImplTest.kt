@@ -688,8 +688,12 @@ class TournamentRepositoryImplTest {
 
     @Test
     fun `given no pending matches when isFinished then returns true`() = runTest {
-        // Arrange
+        // Arrange — isFinished now requires at least one finished match AND no pending matches,
+        // to avoid treating a brand-new empty tournament as "finished".
         coEvery { dao.getPendingMatchCount(1L) } returns 0
+        coEvery { dao.getFinishedMatches(1L) } returns listOf(
+            buildFinishedMatch(id = 1L, tournamentId = 1L, playerAId = 1L, playerBId = 2L, winnerId = 1L)
+        )
 
         // Act
         val finished = repository.isFinished(1L)

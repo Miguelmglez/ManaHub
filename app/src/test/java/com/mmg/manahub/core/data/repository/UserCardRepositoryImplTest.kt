@@ -7,6 +7,7 @@ import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import io.github.jan.supabase.SupabaseClient
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -80,6 +81,11 @@ class UserCardRepositoryImplTest {
 
     @Before
     fun setUp() {
+        // When userId is explicitly passed as null, addOrIncrement falls back to
+        // authRepository.getCurrentUser()?.id. Stub this to return null so the entity's
+        // userId is also null (guest-session behaviour) instead of a relaxed-mock proxy.
+        coEvery { authRepository.getCurrentUser() } returns null
+
         repository = UserCardRepositoryImpl(
             userCardCollectionDao      = userCardCollectionDao,
             collectionRemoteDataSource = collectionRemoteDataSource,

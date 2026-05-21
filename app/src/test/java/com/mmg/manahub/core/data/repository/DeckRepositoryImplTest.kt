@@ -160,7 +160,8 @@ class DeckRepositoryImplTest {
 
     @Test
     fun `given deck exists when updateDeck then deckDao upsertDeck is called with updated name`() = runTest {
-        every { deckDao.getDeckById(DECK_ID) } returns buildDeckEntity()
+        // updateDeck now uses getDeckByIdForSync (not getDeckById) to load the existing entity.
+        every { deckDao.getDeckByIdForSync(DECK_ID) } returns buildDeckEntity()
         val captured = slot<DeckEntity>()
         every { deckDao.upsertDeck(capture(captured)) } returns Unit
 
@@ -171,7 +172,8 @@ class DeckRepositoryImplTest {
 
     @Test
     fun `given deck not found when updateDeck then deckDao upsertDeck is NOT called`() = runTest {
-        every { deckDao.getDeckById(DECK_ID) } returns null
+        // updateDeck now uses getDeckByIdForSync (not getDeckById) to load the existing entity.
+        every { deckDao.getDeckByIdForSync(DECK_ID) } returns null
 
         repository.updateDeck(Deck(id = DECK_ID, name = "Ghost", format = "commander"))
 
@@ -180,7 +182,8 @@ class DeckRepositoryImplTest {
 
     @Test
     fun `given deck exists when updateDeck then updatedAt is bumped`() = runTest {
-        every { deckDao.getDeckById(DECK_ID) } returns buildDeckEntity(updatedAt = 100L)
+        // updateDeck now uses getDeckByIdForSync (not getDeckById) to load the existing entity.
+        every { deckDao.getDeckByIdForSync(DECK_ID) } returns buildDeckEntity(updatedAt = 100L)
         val captured = slot<DeckEntity>()
         every { deckDao.upsertDeck(capture(captured)) } returns Unit
 

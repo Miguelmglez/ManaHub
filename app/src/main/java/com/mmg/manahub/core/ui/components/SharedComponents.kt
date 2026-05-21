@@ -165,13 +165,14 @@ fun FoilBadge() {
 @Composable
 fun StaleBadge() {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Surface(
         color = mc.lifeNegative.copy(alpha = 0.18f),
         shape = MaterialTheme.shapes.extraSmall,
     ) {
         Text(
             text     = "⚠ prices",
-            style    = MaterialTheme.typography.labelSmall,
+            style    = ty.labelSmall,
             color    = mc.lifeNegative,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
         )
@@ -181,6 +182,7 @@ fun StaleBadge() {
 @Composable
 fun StaleWarningBanner() {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     Surface(color = mc.lifeNegative.copy(alpha = 0.12f)) {
         Row(
             modifier              = Modifier
@@ -197,7 +199,7 @@ fun StaleWarningBanner() {
             )
             Text(
                 text  = "Some prices couldn't be refreshed. Showing cached data.",
-                style = MaterialTheme.typography.bodySmall,
+                style = ty.bodySmall,
                 color = mc.lifeNegative,
             )
         }

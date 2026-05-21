@@ -9,12 +9,12 @@ import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.model.MagicSet
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +41,7 @@ class StatsViewModel @Inject constructor(
     // This mirrors the pattern used in ProfileViewModel and GameSetupViewModel.
     private val userPrefsStore:           UserPreferencesDataStore,
     private val gameSessionDao:           GameSessionDao,
+    private val gameSessionRepository:    GameSessionRepository,
     private val deckRepository:           DeckRepository,
 ) : ViewModel() {
 
@@ -216,13 +217,10 @@ class StatsViewModel @Inject constructor(
         _uiState.update { it.copy(selectedTab = tab) }
     }
 
-    /**
-     * Permanently removes a game session (and its linked survey via FK cascade).
-     * Runs on [Dispatchers.IO] as required by the Room suspend function.
-     */
+    /** Permanently removes a game session (and its linked survey via FK cascade). */
     fun deleteSession(sessionId: Long) {
-        viewModelScope.launch(Dispatchers.IO) {
-            gameSessionDao.deleteSession(sessionId)
+        viewModelScope.launch {
+            gameSessionRepository.deleteSession(sessionId)
         }
     }
 

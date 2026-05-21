@@ -267,6 +267,13 @@ class TradeProposalViewModelMatchesTest {
         every { wishlistRepository.observeLocal() } returns wishlistFlow
         every { openForTradeRepository.observeLocal() } returns offerFlow
         every { friendRepository.observeFriends() } returns friendsFlow
+
+        // The ViewModel's fetchFriendData calls getFriendCollection with three different list
+        // values: "wishlist", "trade", and "collection". Provide a default stub for "collection"
+        // so tests that only care about wishlist/offer matches don't need to stub it explicitly.
+        coEvery {
+            friendRepository.getFriendCollection(any(), eq("collection"), any(), any(), any())
+        } returns Result.success(emptyList())
     }
 
     @After
@@ -317,6 +324,19 @@ class TradeProposalViewModelMatchesTest {
     ) {
         coEvery {
             friendRepository.getFriendCollection(friendUserId, "trade", "", any(), any())
+        } returns Result.success(cards)
+    }
+
+    /**
+     * Stubs the "collection" list fetch (used by the ViewModel to populate the friend's
+     * public collection for the "You get" search tab). Defaults to empty list.
+     */
+    private fun stubFriendPublicCollection(
+        friendUserId: String,
+        cards: List<FriendCard> = emptyList(),
+    ) {
+        coEvery {
+            friendRepository.getFriendCollection(friendUserId, "collection", "", any(), any())
         } returns Result.success(cards)
     }
 
