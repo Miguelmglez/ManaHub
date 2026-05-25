@@ -1,6 +1,6 @@
 {
   "index_version": "2",
-  "last_updated": "2026-05-17",
+  "last_updated": "2026-05-22",
   "sets": [
     {
       "code": "sos",
@@ -10,6 +10,16 @@
       "content_versions": {
         "guide": "May 2026",
         "tier_list": "May 2026"
+      }
+    },
+    {
+      "code": "tmt",
+      "name": "Teenage Mutant Ninja Turtles",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/tmt.svg?1778472000",
+      "released_at": "2026-03-06",
+      "content_versions": {
+        "guide": "2026-05-22",
+        "tier_list": "2026-05-22"
       }
     },
     {
@@ -30,6 +40,16 @@
       "content_versions": {
         "guide": "December 3, 2025",
         "tier_list": "December 17, 2025"
+      }
+    },
+    {
+      "code": "spm",
+      "name": "Marvel's Spider-Man",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/spm.svg?1778472000",
+      "released_at": "2025-09-26",
+      "content_versions": {
+        "guide": "2026-05-22",
+        "tier_list": "2026-05-22"
       }
     },
     {
@@ -263,6 +283,16 @@
       }
     },
     {
+      "code": "dbl",
+      "name": "Innistrad: Double Feature",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/dbl.svg?1778472000",
+      "released_at": "2022-01-28",
+      "content_versions": {
+        "guide": "2026-05-22",
+        "tier_list": "2026-05-22"
+      }
+    },
+    {
       "code": "vow",
       "name": "Innistrad: Crimson Vow",
       "icon_svg_uri": "https://svgs.scryfall.io/sets/vow.svg?1778472000",
@@ -280,6 +310,16 @@
       "content_versions": {
         "guide": "December 26, 2025",
         "tier_list": "2026-05-16"
+      }
+    },
+    {
+      "code": "mh2",
+      "name": "Modern Horizons 2",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/mh2.svg?1778472000",
+      "released_at": "2021-06-18",
+      "content_versions": {
+        "guide": "2026-05-22",
+        "tier_list": "2026-05-22"
       }
     },
     {

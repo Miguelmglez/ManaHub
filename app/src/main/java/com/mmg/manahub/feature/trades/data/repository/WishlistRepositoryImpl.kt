@@ -94,6 +94,34 @@ class WishlistRepositoryImpl @Inject constructor(
         unsynced.size
     }
 
+    override suspend fun syncFromRemote(userId: String): Result<Unit> = runCatching {
+        val dtos = remote.getWishlist(userId).getOrThrow()
+        val remoteIds = dtos.map { it.id }.toSet()
+        val entities = dtos.map { dto ->
+            LocalWishlistEntity(
+                id = dto.id,
+                scryfallId = dto.cardId,
+                quantity = dto.quantity,
+                matchAnyVariant = dto.matchAnyVariant,
+                isFoil = dto.isFoil,
+                condition = dto.condition,
+                language = dto.language,
+                isAltArt = dto.isAltArt,
+                synced = true,
+                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilli() }
+                    .getOrDefault(System.currentTimeMillis()),
+            )
+        }
+        dao.upsertAll(entities)
+        // Evict synced rows that the server no longer returns.
+        // Unsynced (locally-added, not yet pushed) rows are never touched.
+        if (remoteIds.isEmpty()) {
+            dao.clearSynced()
+        } else {
+            dao.deleteSyncedNotIn(remoteIds.toList())
+        }
+    }
+
     override suspend fun decrementByScryfallId(scryfallId: String, quantity: Int): Result<Unit> =
         runCatching {
             val entries = dao.getByScryfallId(scryfallId)
@@ -106,6 +134,28 @@ class WishlistRepositoryImpl @Inject constructor(
                 }
             }
         }
+
+    override suspend fun decrementByAttributes(
+        scryfallId: String,
+        quantity: Int,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isAltArt: Boolean,
+    ): Result<Unit> = runCatching {
+        val entries = dao.getByScryfallId(scryfallId)
+        if (entries.isEmpty()) return@runCatching
+        val exactMatch = entries.firstOrNull { e ->
+            (e.isFoil ?: false) == isFoil &&
+                (e.condition == null || e.condition.equals(condition, ignoreCase = true)) &&
+                (e.language == null || e.language.equals(language, ignoreCase = true)) &&
+                (e.isAltArt ?: false) == isAltArt
+        }
+        val anyVariant = entries.firstOrNull { it.matchAnyVariant }
+        val target = exactMatch ?: anyVariant ?: entries.first()
+        val newQty = target.quantity - quantity
+        if (newQty <= 0) dao.deleteById(target.id) else dao.updateQuantity(target.id, newQty)
+    }
 
     override suspend fun addAndSync(entry: WishlistEntry, userId: String): Result<Unit> =
         addMutex.withLock {

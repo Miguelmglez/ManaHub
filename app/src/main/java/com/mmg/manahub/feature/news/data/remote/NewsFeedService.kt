@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.news.data.remote
 
 import android.util.Log
+import com.mmg.manahub.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -23,12 +24,13 @@ class NewsFeedService @Inject constructor(
                 val body = response.body?.string() ?: ""
                 Result.success(body)
             } else {
+                response.close()
                 Result.failure(Exception("HTTP ${response.code} for $url"))
             }
         } catch (e: Exception) {
             // Omit the raw URL from the log message to avoid leaking feed endpoints
             // (including any user-added custom feed URLs) into Logcat.
-            Log.w("NewsFeedService", "Failed to fetch feed: ${e.message}")
+            if (BuildConfig.DEBUG) Log.w("NewsFeedService", "Failed to fetch feed: ${e.message}")
             Result.failure(e)
         }
     }

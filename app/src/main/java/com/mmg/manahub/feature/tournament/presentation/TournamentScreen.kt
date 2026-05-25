@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +75,7 @@ fun TournamentScreen(
 ) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
     val mc           = MaterialTheme.magicColors
-    var selectedTab  by remember { mutableIntStateOf(0) }
+    var selectedTab  by rememberSaveable { mutableIntStateOf(0) }
     var recordResultForMatch by remember { mutableStateOf<TournamentMatchEntity?>(null) }
 
     Scaffold(
@@ -94,6 +96,13 @@ fun TournamentScreen(
                             contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
+                    }
+                },
+                actions = {
+                    if (!uiState.isFinished && !uiState.isPaused) {
+                        IconButton(onClick = { viewModel.pause() }) {
+                            Icon(Icons.Default.Pause, contentDescription = "Pause tournament", tint = mc.textSecondary)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
@@ -329,7 +338,7 @@ private fun MatchesTab(
     onRecordResult: (TournamentMatchEntity) -> Unit,
 ) {
     val playerMap = remember(players) { players.associateBy { it.id } }
-    val byRound   = remember(matches) { matches.groupBy { it.round } }
+    val byRound   = remember(matches) { matches.groupBy { it.round }.toSortedMap() }
 
     LazyColumn(
         modifier       = Modifier.fillMaxSize(),
@@ -350,7 +359,7 @@ private fun MatchesTab(
                     match          = match,
                     playerMap      = playerMap,
                     onStart        = if (match.status == "PENDING") ({ onStartMatch(match.id) }) else null,
-                    onRecordResult = if (match.status != "FINISHED") ({ onRecordResult(match) }) else null,
+                    onRecordResult = if (match.status == "PENDING") ({ onRecordResult(match) }) else null,
                 )
             }
         }
@@ -420,8 +429,10 @@ private fun MatchRow(
                 PlayerMatchSlot(player = p2, match = match, isP1 = false, modifier = Modifier.weight(1f))
             }
 
-            // Record result button for unfinished matches
-            if (onRecordResult != null && match.status != "FINISHED") {
+            // Record result button for PENDING matches only — not ACTIVE ones.
+            // ACTIVE matches have a live game session; allowing manual record there
+            // races with GameViewModel.recordTournamentResultIfNeeded.
+            if (onRecordResult != null && match.status == "PENDING") {
                 HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
                 TextButton(
                     onClick        = onRecordResult,

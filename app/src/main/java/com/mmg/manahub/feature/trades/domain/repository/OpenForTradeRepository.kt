@@ -17,6 +17,7 @@ interface OpenForTradeRepository {
         isAltArt: Boolean = false,
     ): Result<Unit>
     suspend fun removeByCollectionId(localCollectionId: String): Result<Unit>
+    suspend fun removeByCollectionIdAndSync(localCollectionId: String): Result<Unit>
     suspend fun removeLocal(id: String): Result<Unit>
     suspend fun getRemote(userId: String): Result<List<OpenForTradeEntry>>
     suspend fun addRemote(userCardId: String): Result<Unit>
@@ -43,4 +44,5 @@ interface OpenForTradeRepository {
         isAltArt: Boolean = false,
         userId: String,
     ): Result<Unit>
+    suspend fun syncFromRemote(userId: String): Result<Unit>
 }

@@ -227,6 +227,10 @@ fun FriendDetailScreen(
                         friend = friend,
                         tradeHistory = uiState.tradeHistory,
                         onTradeClick = onNavigateToTradeDetail,
+                        gameHistory = uiState.gameHistory,
+                        isLoadingGameHistory = uiState.isLoadingGameHistory,
+                        gameHistoryError = uiState.gameHistoryError,
+                        onRetryGameHistory = viewModel::retryGameHistory,
                     )
                 }
             }

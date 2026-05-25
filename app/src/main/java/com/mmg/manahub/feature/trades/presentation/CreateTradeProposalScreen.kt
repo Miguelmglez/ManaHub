@@ -59,7 +59,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
@@ -116,7 +119,8 @@ fun CreateTradeProposalScreen(
             "NO_RECEIVER"               -> "Please select a friend to trade with"
             "INITIAL_ASYMMETRY"         -> "Both sides must have at least one item"
             "PROPOSAL_VERSION_MISMATCH" -> "Proposal was modified; please refresh"
-            else                        -> err
+            "SELF_TRADE"                -> "You cannot trade with yourself"
+            else                        -> err.ifBlank { "An unexpected error occurred" }
         }
         toastState.show(message, MagicToastType.ERROR)
         viewModel.onErrorDismissed()
@@ -506,6 +510,7 @@ fun CreateTradeProposalScreen(
             wishlistTabLabel = wishlistLabel,
             offerTabLabel = offerLabel,
             allCardsTabLabel = allCardsLabel,
+            showWishlistTab = true,
             title = stringResource(
                 if (side == TradeSide.PROPOSER) R.string.trades_search_title_proposer
                 else R.string.trades_search_title_receiver_generic
@@ -540,23 +545,32 @@ fun CreateTradeProposalScreen(
             },
             onRemove = { row ->
                 focusManager.clearFocus()
-                val id = row.card.scryfallId
-                
+                // Derive the same normalized variant fields that onAdd uses when building the
+                // TradeItemDraft, so the findLast predicate matches the stored item exactly.
+                // WishlistEntry.condition / .language are nullable; if null, onAdd falls back to
+                // "NM" / "en" — we must apply the same fallback here or the comparison fails.
+                val resolvedIsFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false
+                val resolvedCondition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
+                val resolvedLanguage = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
+                val resolvedIsAltArt = row.wishlistEntry?.isAltArt ?: row.offerEntry?.isAltArt ?: false
+                val resolvedUserCardIdRef = row.offerEntry?.userCardId
+
+                val predicate: (TradeItemDraft) -> Boolean = { item ->
+                    item.cardId == row.card.scryfallId &&
+                        item.isFoil == resolvedIsFoil &&
+                        item.condition == resolvedCondition &&
+                        item.language == resolvedLanguage &&
+                        item.isAltArt == resolvedIsAltArt &&
+                        item.userCardIdRef == resolvedUserCardIdRef
+                }
+
                 when (side) {
-                    TradeSide.PROPOSER -> {
-                        val toRemove = uiState.pendingAddedItems.findLast { it.cardId == id && 
-                            (row.wishlistEntry == null || (it.isFoil == row.wishlistEntry.isFoil && it.condition == row.wishlistEntry.condition && it.language == row.wishlistEntry.language)) &&
-                            (row.offerEntry == null || it.userCardIdRef == row.offerEntry.userCardId)
-                        }
-                        toRemove?.let { viewModel.removeProposerItem(it.id) }
-                    }
-                    TradeSide.RECEIVER -> {
-                        val toRemove = uiState.pendingAddedItems.findLast { it.cardId == id && 
-                            (row.wishlistEntry == null || (it.isFoil == row.wishlistEntry.isFoil && it.condition == row.wishlistEntry.condition && it.language == row.wishlistEntry.language)) &&
-                            (row.offerEntry == null || it.userCardIdRef == row.offerEntry.userCardId)
-                        }
-                        toRemove?.let { viewModel.removeReceiverItem(it.id) }
-                    }
+                    TradeSide.PROPOSER ->
+                        uiState.pendingAddedItems.findLast(predicate)
+                            ?.let { viewModel.removeProposerItem(it.id) }
+                    TradeSide.RECEIVER ->
+                        uiState.pendingAddedItems.findLast(predicate)
+                            ?.let { viewModel.removeReceiverItem(it.id) }
                 }
             },
             onConfirm = viewModel::onConfirmPendingItems,
@@ -638,7 +652,7 @@ private fun FriendSelector(
         shape = RoundedCornerShape(12.dp),
         color = mc.surface.copy(alpha = if (isLocked) 0.3f else 0.5f),
         modifier = Modifier.fillMaxWidth(),
-        border = androidx.compose.foundation.BorderStroke(1.dp, mc.textDisabled.copy(alpha = if (isLocked) 0.06f else 0.1f))
+        border = BorderStroke(1.dp, mc.textDisabled.copy(alpha = if (isLocked) 0.06f else 0.1f))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -1084,43 +1098,76 @@ private fun SuggestionCardItem(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val isExact = row.isExactMatch
+    val isPartial = !isExact && row.wishlistEntry != null && row.offerEntry != null
+
+    val borderBrush = when {
+        isExact -> Brush.linearGradient(
+            colors = listOf(mc.goldMtg, mc.goldMtg.copy(alpha = 0.3f), mc.goldMtg)
+        )
+        isPartial -> Brush.linearGradient(
+            colors = listOf(mc.primaryAccent, mc.primaryAccent.copy(alpha = 0.3f), mc.primaryAccent)
+        )
+        else -> SolidColor(mc.primaryAccent.copy(alpha = 0.2f))
+    }
+
+    val glowColor = when {
+        isExact -> mc.goldMtg.copy(alpha = 0.15f)
+        isPartial -> mc.primaryAccent.copy(alpha = 0.1f)
+        else -> Color.Transparent
+    }
+
+    val addTint = if (isExact) mc.goldMtg else mc.primaryAccent
+
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = mc.surface.copy(alpha = 0.3f),
-        border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)),
-        modifier = modifier,
+        color = mc.surface.copy(alpha = 0.4f),
+        border = BorderStroke(if (isExact || isPartial) 2.dp else 1.dp, borderBrush),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(end = 4.dp)
-        ) {
-            CardListItem(
-                name = row.card.name,
-                imageUrl = row.card.imageArtCrop ?: row.card.imageNormal,
-                priceUsd = null,
-                priceEur = null,
-                onClick = onClick,
-                modifier = Modifier.weight(1f),
-                hasFoil = false,
-                condition = null,
-                language = null,
-                isAltArt = false,
-                setCode = row.card.setCode,
-                setName = row.card.setName,
-                rarity = row.card.rarity,
-                typeLine = row.card.typeLine,
-                containerColor = Color.Transparent,
-            )
-            IconButton(
-                onClick = onAdd,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(R.string.trades_add_item),
-                    tint = mc.goldMtg,
-                    modifier = Modifier.size(20.dp),
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(glowColor, Color.Transparent),
+                        center = Offset.Zero,
+                        radius = 400f
+                    )
                 )
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(end = 4.dp)
+            ) {
+                CardListItem(
+                    name = row.card.name,
+                    imageUrl = row.card.imageArtCrop ?: row.card.imageNormal,
+                    priceUsd = null,
+                    priceEur = null,
+                    onClick = onClick,
+                    modifier = Modifier.weight(1f),
+                    hasFoil = row.offerEntry?.isFoil ?: false,
+                    condition = row.offerEntry?.condition?.takeIf { it.isNotBlank() },
+                    language = row.offerEntry?.language?.takeIf { it.isNotBlank() },
+                    isAltArt = row.offerEntry?.isAltArt ?: false,
+                    setCode = row.card.setCode,
+                    setName = row.card.setName,
+                    rarity = row.card.rarity,
+                    typeLine = row.card.typeLine,
+                    containerColor = Color.Transparent,
+                )
+                IconButton(
+                    onClick = onAdd,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.trades_add_item),
+                        tint = addTint,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }

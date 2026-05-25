@@ -183,6 +183,15 @@ class FriendRemoteDataSource @Inject constructor(
         }
 
     /**
+     * Calls the `get_friend_match_history` RPC and returns the single result row,
+     * or null if no games have been played between the caller and [friendUserId].
+     */
+    suspend fun getFriendMatchHistory(friendUserId: String): FriendMatchHistoryDto? =
+        withContext(dispatcher) {
+            service.getFriendMatchHistory(GetFriendMatchHistoryRequestDto(friendUserId)).firstOrNull()
+        }
+
+    /**
      * Calls the `upsert_collection_stats` RPC to persist the caller's own stats.
      *
      * @return [Result.success] on HTTP 2xx; [Result.failure] on any error.

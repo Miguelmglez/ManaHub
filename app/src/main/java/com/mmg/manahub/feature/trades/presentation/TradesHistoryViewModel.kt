@@ -46,7 +46,7 @@ data class TradesHistoryUiState(
         // Declined covers all rejection/cancellation terminal states
         HistoryFilter.DECLINED -> proposals.filter {
             it.status in setOf(
-                TradeStatus.DECLINED, TradeStatus.CANCELLED, TradeStatus.REVOKED,
+                TradeStatus.DECLINED, TradeStatus.CANCELLED, TradeStatus.REVOKED, TradeStatus.COUNTERED,
             )
         }
     }

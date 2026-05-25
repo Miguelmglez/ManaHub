@@ -55,6 +55,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.BasicLandDistribution
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DeckCard
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
@@ -180,15 +181,18 @@ fun CommanderBanner(
                 .background(mc.surfaceVariant),
         )
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text  = stringResource(R.string.deckbuilder_commander_label),
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.goldMtg,
+            CardName(
+                name          = commander.name,
+                showFrontOnly = true,
+                style         = MaterialTheme.magicTypography.bodyMedium,
+                color         = mc.textPrimary,
+                maxLines      = 1,
+                overflow      = TextOverflow.Ellipsis,
             )
             Text(
-                text     = commander.name,
-                style    = MaterialTheme.magicTypography.bodyMedium,
-                color    = mc.textPrimary,
+                text     = commander.typeLine,
+                style    = MaterialTheme.magicTypography.labelSmall,
+                color    = mc.textDisabled,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

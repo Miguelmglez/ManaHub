@@ -80,7 +80,7 @@ fun FriendFolderTab(
                     label = {
                         Text(
                             text = subTabLabel(subTab),
-                            style = MaterialTheme.magicTypography.labelSmall,
+                            style = MaterialTheme.magicTypography.labelMedium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )

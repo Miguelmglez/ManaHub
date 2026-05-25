@@ -51,6 +51,7 @@ import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -185,7 +186,7 @@ private fun TradesSubNavigation(
                 label = {
                     Text(
                         text = label,
-                        style = MaterialTheme.magicTypography.labelSmall,
+                        style = MaterialTheme.magicTypography.labelMedium,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -443,7 +444,7 @@ private fun WishlistEntryRow(
 
     CardListItem(
         name = card?.name ?: entry.cardId,
-        imageUrl = card?.imageArtCrop,
+        imageUrl = card?.imageArtCrop ?: card?.imageNormal,
         priceUsd = if (entry.isFoil == true) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil == true) card?.priceEurFoil else card?.priceEur,
         quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
@@ -454,30 +455,16 @@ private fun WishlistEntryRow(
         setCode = card?.setCode,
         setName = card?.setName,
         rarity = card?.rarity,
+        typeLine = card?.typeLine,
+        condition = entry.condition,
+        language = entry.language,
+        isAltArt = entry.isAltArt,
         extraSupportingContent = {
-            val badges = buildVariantBadges(entry)
-            if (badges.isNotEmpty()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    badges.forEach { label ->
-                        CopyBadge(label = label)
-                    }
-                }
+            if (entry.matchAnyVariant) {
+                CopyBadge(label = "Any variant")
             }
         }
     )
-}
-
-private fun buildVariantBadges(entry: WishlistEntry): List<String> {
-    if (entry.matchAnyVariant) return listOf("Any variant")
-    return buildList {
-        entry.isFoil?.let    { if (it) add("Foil") }
-        entry.condition?.let { add(it) }
-        entry.language?.let  { add(it) }
-        entry.isAltArt?.let  { if (it) add("Alt art") }
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -496,7 +483,7 @@ private fun OfferEntryRow(
 
     CardListItem(
         name = card?.name ?: entry.scryfallId,
-        imageUrl = card?.imageArtCrop,
+        imageUrl = card?.imageArtCrop ?: card?.imageNormal,
         priceUsd = if (entry.isFoil) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil) card?.priceEurFoil else card?.priceEur,
         quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
@@ -507,25 +494,9 @@ private fun OfferEntryRow(
         setCode = card?.setCode,
         setName = card?.setName,
         rarity = card?.rarity,
-        extraSupportingContent = {
-            val badges = buildOfferBadges(entry)
-            if (badges.isNotEmpty()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    badges.forEach { label ->
-                        CopyBadge(label = label)
-                    }
-                }
-            }
-        }
+        typeLine = card?.typeLine,
+        condition = entry.condition,
+        language = entry.language,
+        isAltArt = entry.isAltArt,
     )
-}
-
-private fun buildOfferBadges(entry: OpenForTradeEntry): List<String> = buildList {
-    if (entry.isFoil)     add("Foil")
-    if (entry.condition.isNotBlank()) add(entry.condition)
-    if (entry.language.isNotBlank())  add(entry.language)
-    if (entry.isAltArt)   add("Alt art")
 }

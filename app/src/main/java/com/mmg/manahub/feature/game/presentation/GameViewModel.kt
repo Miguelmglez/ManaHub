@@ -21,8 +21,23 @@ import com.mmg.manahub.feature.game.domain.model.PhaseStop
 import com.mmg.manahub.feature.game.domain.model.Player
 import com.mmg.manahub.feature.game.domain.model.PlayerResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.mmg.manahub.core.nearby.domain.model.NearbyConnectionEvent
+import com.mmg.manahub.core.nearby.domain.model.NearbyGameMessage
+import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
+import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
+import com.mmg.manahub.core.online.domain.model.SessionEvent
+import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
+import com.mmg.manahub.core.online.domain.usecase.ConfirmDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
+import com.mmg.manahub.core.online.domain.usecase.NextTurnUseCase
+import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
+import com.mmg.manahub.core.online.domain.usecase.RevokeDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,10 +47,6 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-// TODO v2: inject val gameRepository: GameRepository
-// TODO v2: fun joinOnlineGame(code: String)
-// TODO v2: fun syncToFirebase()
 
 data class GameUiState(
     val players:          List<Player>      = emptyList(),
@@ -64,6 +75,8 @@ data class GameUiState(
     // Per-player accumulated life deltas (cleared after 1.5s of inactivity)
     val lifeDeltas:   Map<Int, Int>     = emptyMap(),
     val isGameRunning: Boolean           = false,
+    val isOnlineSession: Boolean         = false,
+    val isOnlineSessionAbandoned: Boolean = false,
     /** Set of playerIds that have played a land in the current turn. Cleared on nextTurn(). */
     val hasPlayedLand: Set<Int>          = emptySet(),
     /**
@@ -71,6 +84,7 @@ data class GameUiState(
      * currently displayed in that slot. An empty map means identity (slot 0 → player 0, etc.).
      */
     val gridAssignment: Map<Int, Int>    = emptyMap(),
+    val gameSettings:   GameSettings     = GameSettings(),
 ) {
     val appUserPlayer: Player? get() = players.firstOrNull { it.isAppUser }
     val appUserWon:    Boolean get() = winner?.isAppUser == true
@@ -78,10 +92,18 @@ data class GameUiState(
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    savedStateHandle:             SavedStateHandle,
-    private val gameSessionRepo:  GameSessionRepository,
-    private val tournamentRepo:   TournamentRepository,
-    private val analyticsHelper:  AnalyticsHelper,
+    savedStateHandle:                  SavedStateHandle,
+    private val gameSessionRepo:       GameSessionRepository,
+    private val tournamentRepo:        TournamentRepository,
+    private val analyticsHelper:       AnalyticsHelper,
+    private val observeSessionUseCase: ObserveSessionUseCase,
+    private val updateLifeUseCase:     UpdateLifeUseCase,
+    private val advancePhaseUseCase:   AdvancePhaseUseCase,
+    private val nextTurnUseCase:       NextTurnUseCase,
+    private val confirmDefeatUseCase:  ConfirmDefeatUseCase,
+    private val revokeDefeatUseCase:   RevokeDefeatUseCase,
+    private val leaveSessionUseCase:   LeaveSessionUseCase,
+    private val nearbyRepo:            NearbySessionRepository,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -98,6 +120,16 @@ class GameViewModel @Inject constructor(
     val toolsState: StateFlow<GlobalToolsState> = _toolsState.asStateFlow()
 
     private val deltaJobs = mutableMapOf<Int, Job>()
+
+    private var onlineSessionId: String? = null
+    private var mySlotIndex: Int = -1
+    private var isNearbySession: Boolean = false
+    private var isNearbyHost: Boolean = false
+    private var onlineObserveJob: Job? = null
+    private var nearbyObserveJob: Job? = null
+    private val persistLifeJobs  = mutableMapOf<Int, Job>()
+    private var persistPhaseJob: Job? = null
+    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         // Persist each unique game result to Room as soon as it appears
@@ -140,6 +172,16 @@ class GameViewModel @Inject constructor(
         }
         checkPendingDefeat()
         scheduleDeltaClear(playerId)
+
+        val sessionId = onlineSessionId
+        if (isNearbySession && playerId == mySlotIndex) {
+            val newLife = _uiState.value.players.find { it.id == playerId }?.life ?: return
+            nearbyRepo.sendMessage(NearbyGameMessage.LifeChanged(slot = playerId, life = newLife))
+        } else if (sessionId != null && playerId == mySlotIndex) {
+            val newLife = _uiState.value.players.find { it.id == playerId }?.life ?: return
+            viewModelScope.launch { updateLifeUseCase.broadcast(sessionId, playerId, newLife) }
+            schedulePersistLife(sessionId, playerId, newLife)
+        }
     }
 
 
@@ -159,6 +201,14 @@ class GameViewModel @Inject constructor(
             )
         }
         checkPendingDefeat()
+        if (isNearbySession && playerId == mySlotIndex) {
+            val player = _uiState.value.players.find { it.id == playerId } ?: return
+            when (type) {
+                CounterType.POISON -> nearbyRepo.sendMessage(NearbyGameMessage.PoisonChanged(playerId, player.poison))
+                CounterType.EXPERIENCE -> nearbyRepo.sendMessage(NearbyGameMessage.ExperienceChanged(playerId, player.experience))
+                CounterType.ENERGY -> nearbyRepo.sendMessage(NearbyGameMessage.EnergyChanged(playerId, player.energy))
+            }
+        }
     }
 
     fun addCustomCounter(playerId: Int, name: String, iconKey: String = "") {
@@ -236,6 +286,18 @@ class GameViewModel @Inject constructor(
                 s.copy(currentPhase = nextPhase)
             }
         }
+        val s = _uiState.value
+        val sessionId = onlineSessionId
+        if (isNearbySession) {
+            nearbyRepo.sendMessage(NearbyGameMessage.PhaseChanged(s.currentPhase.name))
+            if (s.currentPhase == GamePhase.UNTAP) {
+                nearbyRepo.sendMessage(NearbyGameMessage.TurnChanged(s.turnNumber, s.activePlayerId))
+            }
+        } else if (sessionId != null) {
+            val newPhase = s.currentPhase.name
+            viewModelScope.launch { advancePhaseUseCase.broadcast(sessionId, newPhase) }
+            schedulePhasePersist(sessionId)
+        }
     }
 
     fun nextTurn() {
@@ -250,6 +312,14 @@ class GameViewModel @Inject constructor(
                 turnNumber     = if (isNewRound) s.turnNumber + 1 else s.turnNumber,
                 hasPlayedLand  = emptySet(),
             )
+        }
+        val s = _uiState.value
+        val sessionId = onlineSessionId
+        if (isNearbySession) {
+            nearbyRepo.sendMessage(NearbyGameMessage.TurnChanged(s.turnNumber, s.activePlayerId))
+            nearbyRepo.sendMessage(NearbyGameMessage.PhaseChanged(s.currentPhase.name))
+        } else if (sessionId != null) {
+            viewModelScope.launch { runCatching { nextTurnUseCase(sessionId) } }
         }
     }
 
@@ -321,6 +391,12 @@ class GameViewModel @Inject constructor(
             })
         }
         checkWinner()
+        val sessionId = onlineSessionId
+        if (isNearbySession && playerId == mySlotIndex) {
+            nearbyRepo.sendMessage(NearbyGameMessage.DefeatConfirmed(playerId))
+        } else if (sessionId != null && playerId == mySlotIndex) {
+            viewModelScope.launch { runCatching { confirmDefeatUseCase(sessionId, playerId) } }
+        }
     }
 
     /** Player disputes and continues playing with negative life. */
@@ -329,6 +405,12 @@ class GameViewModel @Inject constructor(
             s.copy(players = s.players.map { p ->
                 if (p.id == playerId) p.copy(pendingDefeat = false, isSurviving = true, defeated = false) else p
             })
+        }
+        val sessionId = onlineSessionId
+        if (isNearbySession && playerId == mySlotIndex) {
+            nearbyRepo.sendMessage(NearbyGameMessage.DefeatRevoked(playerId))
+        } else if (sessionId != null && playerId == mySlotIndex) {
+            viewModelScope.launch { runCatching { revokeDefeatUseCase(sessionId, playerId) } }
         }
     }
 
@@ -489,6 +571,400 @@ class GameViewModel @Inject constructor(
         _toolsState.value = GlobalToolsState()
     }
 
+    // ── Online session ────────────────────────────────────────────────────────
+
+    fun initFromOnlineSession(
+        sessionId:   String,
+        mySlotIndex: Int,
+        configs:     List<PlayerConfig>,
+        mode:        GameMode,
+        layout:      LayoutTemplate? = null,
+    ) {
+        deltaJobs.values.forEach { it.cancel() }
+        deltaJobs.clear()
+        persistLifeJobs.values.forEach { it.cancel() }
+        persistLifeJobs.clear()
+        persistPhaseJob?.cancel()
+        onlineObserveJob?.cancel()
+
+        this.onlineSessionId = sessionId
+        this.mySlotIndex     = mySlotIndex
+
+        val players = configs.mapIndexed { i, cfg ->
+            Player(
+                id        = i,
+                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                life      = mode.startingLife,
+                theme     = cfg.theme,
+                isAppUser = i == mySlotIndex,
+            )
+        }
+        val actualLayout = layout ?: LayoutTemplates.getDefaultLayout(players.size)
+        _uiState.value = GameUiState(
+            players         = players,
+            mode            = mode,
+            activePlayerId  = players.first().id,
+            activeLayout    = actualLayout,
+            gameStartTime   = System.currentTimeMillis(),
+            isGameRunning   = true,
+            isOnlineSession = true,
+        )
+        _toolsState.value = GlobalToolsState()
+
+        FirebaseCrashlytics.getInstance().apply {
+            log("game_started: mode=${mode.name} players=${players.size} online=true sessionId=$sessionId")
+            setCustomKey("game_mode", mode.name)
+            setCustomKey("game_player_count", players.size)
+            setCustomKey("online_session_id", sessionId)
+        }
+        connectAndObserveOnlineSession(sessionId)
+    }
+
+    private fun connectAndObserveOnlineSession(sessionId: String) {
+        onlineObserveJob = viewModelScope.launch {
+            observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                val participantsBySlot = snapshot.participants.associateBy { it.slotIndex }
+                val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
+                _uiState.update { s ->
+                    s.copy(
+                        players = s.players.map { p ->
+                            val participant = participantsBySlot[p.id]
+                            val ps = playerStatesBySlot[p.id]
+                            p.copy(
+                                name = participant?.displayName?.takeIf { it.isNotBlank() } ?: p.name,
+                                theme = participant?.themeKey
+                                    ?.let { key -> PlayerTheme.ALL.firstOrNull { it.name == key } }
+                                    ?: p.theme,
+                                life       = ps?.life       ?: p.life,
+                                poison     = ps?.poison     ?: p.poison,
+                                experience = ps?.experience ?: p.experience,
+                                energy     = ps?.energy     ?: p.energy,
+                                defeated   = ps?.defeated   ?: p.defeated,
+                            )
+                        },
+                        currentPhase   = runCatching { GamePhase.valueOf(snapshot.sessionState.currentPhase) }.getOrDefault(GamePhase.UNTAP),
+                        activePlayerId = snapshot.sessionState.activePlayerSlot,
+                        turnNumber     = snapshot.sessionState.turnNumber,
+                    )
+                }
+            }
+            runCatching { observeSessionUseCase.connect(sessionId) }
+                .onFailure { throwable ->
+                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("online_game_realtime_connect_failed: ${throwable::class.simpleName}")
+                        recordException(throwable)
+                    }
+                    _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                    return@launch
+                }
+            observeSessionUseCase(sessionId).collect { event -> handleOnlineEvent(event) }
+        }
+    }
+
+    private fun handleOnlineEvent(event: SessionEvent) {
+        when (event) {
+            is SessionEvent.LifeDeltaReceived -> {
+                if (event.slotIndex != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == event.slotIndex) p.copy(life = event.newLife) else p
+                        })
+                    }
+                    checkPendingDefeat()
+                }
+            }
+            is SessionEvent.PhaseChangedReceived -> {
+                _uiState.update { s ->
+                    val phase = runCatching { GamePhase.valueOf(event.newPhase) }.getOrDefault(s.currentPhase)
+                    s.copy(currentPhase = phase)
+                }
+            }
+            is SessionEvent.StateUpdated -> {
+                _uiState.update { s ->
+                    s.copy(
+                        currentPhase   = runCatching { GamePhase.valueOf(event.state.currentPhase) }.getOrDefault(s.currentPhase),
+                        activePlayerId = event.state.activePlayerSlot,
+                        turnNumber     = event.state.turnNumber,
+                    )
+                }
+            }
+            is SessionEvent.PlayerStateUpdated -> {
+                val ps = event.playerState
+                if (ps.slotIndex != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == ps.slotIndex) p.copy(
+                                life       = ps.life,
+                                poison     = ps.poison,
+                                experience = ps.experience,
+                                energy     = ps.energy,
+                                defeated   = ps.defeated,
+                            ) else p
+                        })
+                    }
+                    checkPendingDefeat()
+                }
+            }
+            is SessionEvent.SessionStatusChanged -> {
+                if (event.status == OnlineSessionStatus.ABANDONED ||
+                    event.status == OnlineSessionStatus.FINISHED) {
+                    _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                }
+            }
+            is SessionEvent.ParticipantUpdated -> { /* presence handled in lobby */ }
+            is SessionEvent.Error -> {
+                FirebaseCrashlytics.getInstance().apply {
+                    log("online_session_event_error: ${event.message}")
+                    setCustomKey("online_session_id", onlineSessionId ?: "")
+                }
+            }
+        }
+    }
+
+    fun initFromNearbySession(
+        sessionId:   String,
+        isHost:      Boolean,
+        slotIndex:   Int,
+        configs:     List<PlayerConfig>,
+        mode:        GameMode,
+        layout:      LayoutTemplate? = null,
+    ) {
+        deltaJobs.values.forEach { it.cancel() }
+        deltaJobs.clear()
+        persistLifeJobs.values.forEach { it.cancel() }
+        persistLifeJobs.clear()
+        persistPhaseJob?.cancel()
+        onlineObserveJob?.cancel()
+        nearbyObserveJob?.cancel()
+
+        this.onlineSessionId = sessionId
+        this.mySlotIndex     = slotIndex
+        this.isNearbySession = true
+        this.isNearbyHost    = isHost
+
+        val players = configs.mapIndexed { i, cfg ->
+            Player(
+                id        = i,
+                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                life      = mode.startingLife,
+                theme     = cfg.theme,
+                isAppUser = i == slotIndex,
+            )
+        }
+        val actualLayout = layout ?: LayoutTemplates.getDefaultLayout(players.size)
+        _uiState.value = GameUiState(
+            players         = players,
+            mode            = mode,
+            activePlayerId  = players.first().id,
+            activeLayout    = actualLayout,
+            gameStartTime   = System.currentTimeMillis(),
+            isGameRunning   = true,
+            isOnlineSession = true, // Reuse online flag for UI elements that assume networked game
+        )
+        _toolsState.value = GlobalToolsState()
+
+        FirebaseCrashlytics.getInstance().apply {
+            log("game_started: mode=${mode.name} players=${players.size} nearby=true isHost=$isHost sessionId=$sessionId")
+            setCustomKey("game_mode", mode.name)
+            setCustomKey("game_player_count", players.size)
+            setCustomKey("nearby_session_id", sessionId)
+        }
+
+        nearbyRepo.fullStateSyncProvider = {
+            val s = _uiState.value
+            NearbyGameMessage.FullStateSync(
+                players = s.players.map { p ->
+                    NearbyGameMessage.PlayerSnapshot(
+                        slot = p.id,
+                        life = p.life,
+                        poison = p.poison,
+                        experience = p.experience,
+                        energy = p.energy,
+                        defeated = p.defeated,
+                        commanderDamage = p.commanderDamage,
+                    )
+                },
+                phase = s.currentPhase.name,
+                turnNumber = s.turnNumber,
+                activeSlot = s.activePlayerId,
+            )
+        }
+
+        nearbyObserveJob = viewModelScope.launch {
+            launch {
+                nearbyRepo.observeMessages().collect { msg ->
+                    handleNearbyMessage(msg)
+                }
+            }
+            launch {
+                nearbyRepo.observeConnectionEvents().collect { event ->
+                    handleNearbyConnectionEvent(event)
+                }
+            }
+        }
+    }
+
+    private fun handleNearbyMessage(message: NearbyGameMessage) {
+        when (message) {
+            is NearbyGameMessage.LifeChanged -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == message.slot) p.copy(life = message.life) else p
+                        })
+                    }
+                    checkPendingDefeat()
+                }
+            }
+            is NearbyGameMessage.PoisonChanged -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == message.slot) p.copy(poison = message.poison) else p
+                        })
+                    }
+                    checkPendingDefeat()
+                }
+            }
+            is NearbyGameMessage.ExperienceChanged -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == message.slot) p.copy(experience = message.experience) else p
+                        })
+                    }
+                }
+            }
+            is NearbyGameMessage.EnergyChanged -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == message.slot) p.copy(energy = message.energy) else p
+                        })
+                    }
+                }
+            }
+            is NearbyGameMessage.CommanderDamageChanged -> {
+                if (message.toSlot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == message.toSlot) p.copy(
+                                commanderDamage = p.commanderDamage + (message.fromSlot to message.damage)
+                            ) else p
+                        })
+                    }
+                    checkPendingDefeat()
+                }
+            }
+            is NearbyGameMessage.PhaseChanged -> {
+                _uiState.update { s ->
+                    val phase = runCatching { GamePhase.valueOf(message.phase) }.getOrDefault(s.currentPhase)
+                    s.copy(currentPhase = phase)
+                }
+            }
+            is NearbyGameMessage.TurnChanged -> {
+                _uiState.update { s ->
+                    s.copy(
+                        turnNumber = message.turnNumber,
+                        activePlayerId = message.activeSlot,
+                    )
+                }
+            }
+            is NearbyGameMessage.DefeatConfirmed -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == message.slot) p.copy(defeated = true, pendingDefeat = false, isSurviving = false) else p
+                        })
+                    }
+                    checkWinner()
+                }
+            }
+            is NearbyGameMessage.DefeatRevoked -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == message.slot) p.copy(pendingDefeat = false, isSurviving = true, defeated = false) else p
+                        })
+                    }
+                }
+            }
+            is NearbyGameMessage.GameFinished -> {
+                // Resolved locally via checkWinner, but just in case:
+            }
+            is NearbyGameMessage.FullStateSync -> {
+                if (!isNearbyHost) {
+                    _uiState.update { s ->
+                        s.copy(
+                            currentPhase = runCatching { GamePhase.valueOf(message.phase) }.getOrDefault(s.currentPhase),
+                            turnNumber = message.turnNumber,
+                            activePlayerId = message.activeSlot,
+                            players = s.players.map { p ->
+                                val snap = message.players.find { it.slot == p.id }
+                                if (snap != null) p.copy(
+                                    life = snap.life,
+                                    poison = snap.poison,
+                                    experience = snap.experience,
+                                    energy = snap.energy,
+                                    defeated = snap.defeated,
+                                    commanderDamage = snap.commanderDamage,
+                                ) else p
+                            }
+                        )
+                    }
+                    checkPendingDefeat()
+                    checkWinner()
+                }
+            }
+        }
+    }
+
+    private fun handleNearbyConnectionEvent(event: NearbyConnectionEvent) {
+        when (event) {
+            is NearbyConnectionEvent.EndpointConnected,
+            is NearbyConnectionEvent.EndpointDisconnected,
+            is NearbyConnectionEvent.ConnectionFailed -> {
+                // Handled implicitly by repo keeping peers list, could update UI later if needed.
+            }
+        }
+    }
+
+    private fun schedulePersistLife(sessionId: String, slotIndex: Int, newLife: Int) {
+        persistLifeJobs[slotIndex]?.cancel()
+        persistLifeJobs[slotIndex] = viewModelScope.launch {
+            delay(1_500L)
+            runCatching { updateLifeUseCase.persist(sessionId, slotIndex, newLife) }
+        }
+    }
+
+    private fun schedulePhasePersist(sessionId: String) {
+        persistPhaseJob?.cancel()
+        persistPhaseJob = viewModelScope.launch {
+            delay(500L)
+            runCatching { advancePhaseUseCase.persist(sessionId) }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        onlineObserveJob?.cancel()
+        nearbyObserveJob?.cancel()
+        persistLifeJobs.values.forEach { it.cancel() }
+        persistPhaseJob?.cancel()
+        val sessionId = onlineSessionId ?: return
+        if (isNearbySession) {
+            nearbyRepo.disconnect()
+        }
+        cleanupScope.launch {
+            if (!isNearbySession) {
+                observeSessionUseCase.disconnect(sessionId)
+            }
+            runCatching { leaveSessionUseCase(sessionId) }
+            cleanupScope.cancel()
+        }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun scheduleDeltaClear(playerId: Int) {
@@ -549,6 +1025,10 @@ class GameViewModel @Inject constructor(
         )
         _uiState.update { it.copy(winner = winner, gameResult = result, isGameRunning = false) }
 
+        if (isNearbySession && isNearbyHost) {
+            nearbyRepo.sendMessage(NearbyGameMessage.GameFinished(winner.id))
+        }
+
         FirebaseCrashlytics.getInstance().log(
             "game_ended: mode=${result.gameMode.name} turns=${result.totalTurns} appUserWon=${result.appUserWon}"
         )
@@ -581,6 +1061,7 @@ class GameViewModel @Inject constructor(
         configs:              List<PlayerConfig>,
         mode:                 GameMode,
         layout:               LayoutTemplate? = null,
+        settings:             GameSettings = GameSettings(),
     ) {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
@@ -603,7 +1084,8 @@ class GameViewModel @Inject constructor(
             activeTournamentId   = tournamentId,
             activeTournamentMatchId = matchId,
             tournamentPlayerIds  = tournamentPlayerIds,
-            isGameRunning        = true
+            isGameRunning        = true,
+            gameSettings         = settings,
         )
         _toolsState.value = GlobalToolsState()
 
@@ -658,7 +1140,8 @@ class GameViewModel @Inject constructor(
     fun initFromConfigs(
         configs: List<PlayerConfig>,
         mode: GameMode,
-        selectedLayout: LayoutTemplate? = null
+        selectedLayout: LayoutTemplate? = null,
+        settings: GameSettings = GameSettings(),
     ) {
         val players = configs.mapIndexed { i, config ->
             Player(
@@ -675,7 +1158,8 @@ class GameViewModel @Inject constructor(
             players = players,
             activePlayerId = players.first().id,
             activeLayout = layout,
-            isGameRunning = true
+            isGameRunning = true,
+            gameSettings = settings,
         ) }
         _toolsState.value = GlobalToolsState()
 

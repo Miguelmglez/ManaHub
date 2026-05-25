@@ -69,6 +69,7 @@ fun NewsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sources by viewModel.sources.collectAsStateWithLifecycle()
+    val rawSearchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
     val context = LocalContext.current
@@ -103,7 +104,7 @@ fun NewsScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
-                value = uiState.searchQuery,
+                value = rawSearchQuery,
                 onValueChange = viewModel::onSearchQueryChanged,
                 placeholder = {
                     Text(
@@ -241,6 +242,8 @@ fun NewsScreen(
 }
 
 private fun openArticle(context: android.content.Context, url: String, toolbarColor: Int) {
+    val uri = Uri.parse(url)
+    if (uri.scheme != "https" && uri.scheme != "http") return
     try {
         val params = CustomTabColorSchemeParams.Builder()
             .setToolbarColor(toolbarColor)
@@ -249,9 +252,10 @@ private fun openArticle(context: android.content.Context, url: String, toolbarCo
             .setDefaultColorSchemeParams(params)
             .setShowTitle(true)
             .build()
-        intent.launchUrl(context, Uri.parse(url))
+        intent.launchUrl(context, uri)
     } catch (_: Exception) {
-        val fallback = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        context.startActivity(fallback)
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (_: Exception) { /* no handler available */ }
     }
 }

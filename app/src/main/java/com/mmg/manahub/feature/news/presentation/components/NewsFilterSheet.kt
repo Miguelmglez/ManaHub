@@ -93,7 +93,7 @@ fun NewsFilterSheet(
     val allEnabledSources = remember(allSources) { allSources.filter { it.isEnabled } }
     val allEnabledSourceIds = remember(allEnabledSources) { allEnabledSources.map { it.id }.toSet() }
     
-    var selectedSourceIds by remember {
+    var selectedSourceIds by remember(allSources) {
         mutableStateOf(currentFilterSourceIds ?: allEnabledSourceIds)
     }
 

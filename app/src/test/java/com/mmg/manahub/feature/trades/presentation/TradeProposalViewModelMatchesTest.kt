@@ -177,7 +177,7 @@ class TradeProposalViewModelMatchesTest {
         language: String = "en",
         quantity: Int = 1,
     ) = OpenForTradeEntry(
-        id = "offer-$scryfallId",
+        id = "offer-${scryfallId}_${isFoil}_${condition}_${language}",
         userId = MY_USER_ID,
         userCardId = "uc-$scryfallId",
         scryfallId = scryfallId,
@@ -1167,5 +1167,105 @@ class TradeProposalViewModelMatchesTest {
         val matchIds = vm.uiState.value.proposerMatches.map { it.card.scryfallId }
         assertTrue(matchIds.contains(CARD_ID_LIGHTNING_BOLT))
         assertTrue(!matchIds.contains(CARD_ID_DARK_RITUAL))
+    }
+
+    @Test
+    fun `given two offer variants of same card then proposerMatches contains one row per variant`() = runTest {
+        // Arrange — I have two OpenForTradeEntry for LIGHTNING_BOLT: one foil, one non-foil.
+        // Both scryfallIds are in the friend's wishlist → both must appear as separate rows.
+        val card = buildCard(CARD_ID_LIGHTNING_BOLT, "Lightning Bolt")
+        offerFlow.value = listOf(
+            buildOfferEntry(CARD_ID_LIGHTNING_BOLT, card = card, isFoil = false, condition = "NM"),
+            buildOfferEntry(CARD_ID_LIGHTNING_BOLT, card = card, isFoil = true, condition = "NM"),
+        )
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT, sourceList = "wishlist")))
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        // Assert — two rows, one per variant
+        val matches = vm.uiState.value.proposerMatches
+        assertEquals("Expected one row per offer variant", 2, matches.size)
+        assertTrue("All rows must be for LIGHTNING_BOLT", matches.all { it.card.scryfallId == CARD_ID_LIGHTNING_BOLT })
+        // Keys must be distinct (no uniqueKey collision)
+        assertEquals("uniqueKey values must be distinct", 2, matches.map { it.uniqueKey }.toSet().size)
+    }
+
+    @Test
+    fun `given two friend offer variants of same card then receiverMatches contains one row per variant`() = runTest {
+        // Arrange — friend has two copies of COUNTERSPELL: foil EX in German, non-foil NM in English.
+        // My wishlist has COUNTERSPELL → both variants must appear.
+        wishlistFlow.value = listOf(buildWishlistEntry(CARD_ID_COUNTERSPELL))
+        val friend = buildFriend()
+        stubFriendWishlist(FRIEND_USER_ID, emptyList())
+        stubFriendOffers(
+            FRIEND_USER_ID,
+            listOf(
+                buildFriendCard(CARD_ID_COUNTERSPELL, sourceList = "trade", isFoil = false, condition = "NM", language = "en"),
+                buildFriendCard(CARD_ID_COUNTERSPELL, sourceList = "trade", isFoil = true, condition = "EX", language = "de"),
+            )
+        )
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        // Assert — two rows, one per variant
+        val matches = vm.uiState.value.receiverMatches
+        assertEquals("Expected one row per friend offer variant", 2, matches.size)
+        assertTrue("All rows must be for COUNTERSPELL", matches.all { it.card.scryfallId == CARD_ID_COUNTERSPELL })
+        // Keys must be distinct
+        assertEquals("uniqueKey values must be distinct", 2, matches.map { it.uniqueKey }.toSet().size)
+    }
+
+    @Test
+    fun `given exact-attribute match then isExactMatch is true`() = runTest {
+        // Arrange — I offer a foil LP Japanese LIGHTNING_BOLT; friend wants exactly that variant.
+        val card = buildCard(CARD_ID_LIGHTNING_BOLT)
+        offerFlow.value = listOf(
+            buildOfferEntry(CARD_ID_LIGHTNING_BOLT, card = card, isFoil = true, condition = "LP", language = "ja")
+        )
+        val friend = buildFriend()
+        stubFriendWishlist(
+            FRIEND_USER_ID,
+            listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT, sourceList = "wishlist", isFoil = true, condition = "LP", language = "ja"))
+        )
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        val row = vm.uiState.value.proposerMatches.first()
+        assertTrue("isExactMatch must be true when offer attributes equal wish attributes", row.isExactMatch)
+    }
+
+    @Test
+    fun `given attribute mismatch then isExactMatch is false`() = runTest {
+        // Arrange — I offer a NON-foil NM English LIGHTNING_BOLT; friend wants FOIL.
+        val card = buildCard(CARD_ID_LIGHTNING_BOLT)
+        offerFlow.value = listOf(
+            buildOfferEntry(CARD_ID_LIGHTNING_BOLT, card = card, isFoil = false, condition = "NM", language = "en")
+        )
+        val friend = buildFriend()
+        stubFriendWishlist(
+            FRIEND_USER_ID,
+            listOf(buildFriendCard(CARD_ID_LIGHTNING_BOLT, sourceList = "wishlist", isFoil = true, condition = "NM", language = "en"))
+        )
+        stubFriendOffers(FRIEND_USER_ID, emptyList())
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onFriendSelected(friend)
+        advanceUntilIdle()
+
+        val row = vm.uiState.value.proposerMatches.first()
+        assertTrue("isExactMatch must be false when foil flags differ", !row.isExactMatch)
     }
 }

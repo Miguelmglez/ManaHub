@@ -46,7 +46,7 @@ fun CardListItem(
     modifier: Modifier = Modifier,) {
     CardListItem(
         name = item.card.name,
-        imageUrl = item.card.imageArtCrop,
+        imageUrl = item.card.imageArtCrop ?: item.card.imageNormal,
         priceUsd = if (item.hasFoil) item.card.priceUsdFoil else item.card.priceUsd,
         priceEur = if (item.hasFoil) item.card.priceEurFoil else item.card.priceEur,
         quantityText = "×${item.totalQuantity}",
@@ -55,8 +55,10 @@ fun CardListItem(
         setCode = item.card.setCode,
         setName = item.card.setName,
         rarity = item.card.rarity,
+        typeLine = item.card.typeLine,
         onClick = onClick,
-        modifier = modifier,        extraSupportingContent = {
+        modifier = modifier,
+        extraSupportingContent = {
             if (item.distinctCopies > 1) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -116,7 +118,7 @@ fun CardListItem(
             leadingContent = {
                 Box(
                     modifier = Modifier
-                        .size(width = 48.dp, height = 64.dp)
+                        .size(width = 56.dp, height = 80.dp)
                         .clip(MaterialTheme.shapes.small)
                 ) {
                     AsyncImage(
@@ -127,23 +129,6 @@ fun CardListItem(
                     )
 
                     // Enhanced Foil Representation: Subtle holographic edge
-                    if (hasFoil) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0x40FF0000),
-                                            Color(0x4000FF00),
-                                            Color(0x400000FF),
-                                            Color(0x40FF00FF),
-                                        )
-                                    ),
-                                    alpha = 0.3f
-                                )
-                        )
-                    }
                 }
             },
             headlineContent = {
@@ -201,12 +186,10 @@ fun CardListItem(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                language?.let { CopyBadge(label = it.uppercase()) }
+                                language?.let { LanguageBadge(langCode = it) }
                                 condition?.let { CopyBadge(label = it) }
                                 if (hasFoil) FoilBadge()
-                                if (isAltArt) {
-                                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
-                                }
+                                if (isAltArt) AltArtBadge()
                                 extraSupportingContent?.invoke(this@Row)
                             }
                         }

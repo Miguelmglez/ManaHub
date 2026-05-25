@@ -32,4 +32,20 @@ interface WishlistRepository {
      * Used when the user receives a card via a trade and wants their wishlist updated.
      */
     suspend fun decrementByScryfallId(scryfallId: String, quantity: Int): Result<Unit>
+
+    /**
+     * Decrements the best-matching wishlist entry for the received card.
+     * Priority: exact attribute match > matchAnyVariant entry > any entry for that scryfallId.
+     * Entries whose resulting quantity reaches zero are deleted.
+     */
+    suspend fun decrementByAttributes(
+        scryfallId: String,
+        quantity: Int,
+        isFoil: Boolean,
+        condition: String,
+        language: String,
+        isAltArt: Boolean,
+    ): Result<Unit>
+
+    suspend fun syncFromRemote(userId: String): Result<Unit>
 }

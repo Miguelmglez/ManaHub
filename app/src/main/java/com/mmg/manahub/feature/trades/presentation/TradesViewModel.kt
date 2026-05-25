@@ -11,6 +11,7 @@ import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.SyncTradeListsFromRemoteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +66,7 @@ class TradesViewModel @Inject constructor(
     private val getLocalWishlist: GetLocalWishlistUseCase,
     private val getLocalOpenForTrade: GetLocalOpenForTradeUseCase,
     private val getFriends: GetFriendsUseCase,
+    private val syncTradeListsFromRemote: SyncTradeListsFromRemoteUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TradesUiState())
@@ -83,6 +85,14 @@ class TradesViewModel @Inject constructor(
         authRepo.sessionState
             .onEach { state ->
                 _uiState.update { it.copy(isLoggedIn = state is SessionState.Authenticated) }
+                if (state is SessionState.Authenticated) {
+                    viewModelScope.launch {
+                        syncTradeListsFromRemote(state.user.id)
+                            .onFailure {
+                                _uiState.update { s -> s.copy(snackbarMessage = "sync_failed") }
+                            }
+                    }
+                }
             }
             .catch { /* session errors are non-fatal for this screen */ }
             .launchIn(viewModelScope)
@@ -94,7 +104,15 @@ class TradesViewModel @Inject constructor(
         viewModelScope.launch {
             getLocalWishlist()
                 .catch { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
-                .collect { entries -> _uiState.update { it.copy(wishlist = entries) } }
+                .collect { entries ->
+                    val validIds = entries.map { it.id }.toSet()
+                    _uiState.update { s ->
+                        s.copy(
+                            wishlist = entries,
+                            selectedWishlistIds = s.selectedWishlistIds.intersect(validIds),
+                        )
+                    }
+                }
         }
     }
 
@@ -102,7 +120,15 @@ class TradesViewModel @Inject constructor(
         viewModelScope.launch {
             getLocalOpenForTrade()
                 .catch { e -> _uiState.update { it.copy(snackbarMessage = e.toUserFacingMessage()) } }
-                .collect { entries -> _uiState.update { it.copy(openForTrade = entries) } }
+                .collect { entries ->
+                    val validIds = entries.map { it.id }.toSet()
+                    _uiState.update { s ->
+                        s.copy(
+                            openForTrade = entries,
+                            selectedOfferIds = s.selectedOfferIds.intersect(validIds),
+                        )
+                    }
+                }
         }
     }
 

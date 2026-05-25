@@ -7,6 +7,7 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.model.FriendCard
+import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
 import com.mmg.manahub.feature.friends.domain.model.FriendStats
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
@@ -106,6 +107,12 @@ class FriendDetailViewModel @Inject constructor(
         val isLoadingStats: Boolean = false,
         /** True when the last stats fetch resulted in a network or server error. */
         val statsError: Boolean = false,
+        /** Aggregate match history vs this friend; null until loaded. */
+        val gameHistory: FriendMatchHistory? = null,
+        /** True while the match history request is in flight. */
+        val isLoadingGameHistory: Boolean = false,
+        /** True when the last match history fetch resulted in a network or server error. */
+        val gameHistoryError: Boolean = false,
     )
 
     private companion object {
@@ -307,9 +314,14 @@ class FriendDetailViewModel @Inject constructor(
         }
         if (tab == FriendTab.STATS) {
             val current = _uiState.value
-            // Only load if we haven't fetched yet and are not already loading.
             if (current.friendStats == null && !current.isLoadingStats && !current.statsError) {
                 loadStats()
+            }
+        }
+        if (tab == FriendTab.HISTORY) {
+            val current = _uiState.value
+            if (current.gameHistory == null && !current.isLoadingGameHistory && !current.gameHistoryError) {
+                loadGameHistory()
             }
         }
     }
@@ -320,6 +332,11 @@ class FriendDetailViewModel @Inject constructor(
      */
     fun retryStats() {
         loadStats()
+    }
+
+    /** Retries loading the match history after a previous failure. */
+    fun retryGameHistory() {
+        loadGameHistory()
     }
 
     /**
@@ -337,6 +354,20 @@ class FriendDetailViewModel @Inject constructor(
                     friendStats = result.getOrNull(),
                     isLoadingStats = false,
                     statsError = result.isFailure,
+                )
+            }
+        }
+    }
+
+    private fun loadGameHistory() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingGameHistory = true, gameHistoryError = false) }
+            val result = friendRepo.getFriendMatchHistory(friendUserId)
+            _uiState.update {
+                it.copy(
+                    gameHistory = result.getOrNull(),
+                    isLoadingGameHistory = false,
+                    gameHistoryError = result.isFailure,
                 )
             }
         }
