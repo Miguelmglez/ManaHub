@@ -216,4 +216,7 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.youtube.player)
 
+    // Nearby Connections — peer-to-peer in-person game state sync
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
+
 }

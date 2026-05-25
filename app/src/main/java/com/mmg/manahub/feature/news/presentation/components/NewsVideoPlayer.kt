@@ -40,7 +40,7 @@ private fun rememberYouTubePlayerView(
     onPlayerReady: (YouTubePlayer) -> Unit
 ): YouTubePlayerView {
     val context = LocalContext.current
-    return androidx.compose.runtime.remember {
+    return androidx.compose.runtime.remember(videoId) {
         YouTubePlayerView(context).apply {
             addYouTubePlayerListener(object : AbstractYouTubePlayerListener() {
                 override fun onReady(youTubePlayer: YouTubePlayer) {

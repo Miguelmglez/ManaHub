@@ -289,6 +289,7 @@ class TradeNegotiationViewModel @Inject constructor(
     }
 
     private fun doRevoke(proposalId: String, reverseCollection: Boolean) {
+        if (_uiState.value.isProcessing) return
         val userId = _uiState.value.currentUserId
         val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
         viewModelScope.launch(ioDispatcher) {

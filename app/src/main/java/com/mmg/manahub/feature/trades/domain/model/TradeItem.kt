@@ -19,6 +19,8 @@ data class TradeItem(
     val cardName: String = "",
     /** Art-crop image URL resolved from local Room DB; null if card not in local cache. */
     val imageUrl: String? = null,
+    /** Type line resolved from local Room DB. */
+    val typeLine: String? = null,
     /** Set code resolved from local Room DB. */
     val setCode: String? = null,
     /** Set name resolved from local Room DB. */

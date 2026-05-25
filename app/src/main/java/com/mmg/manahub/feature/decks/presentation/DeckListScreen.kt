@@ -269,7 +269,7 @@ private fun DeckItem(
                 ) {
                     Text(
                         text     = deck.format.replaceFirstChar { it.uppercase() },
-                        style    = ty.labelSmall,
+                        style    = ty.labelLarge,
                         color    = mc.background,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
@@ -290,7 +290,7 @@ private fun DeckItem(
                     // Deck name
                     Text(
                         text     = deck.name,
-                        style    = ty.titleMedium,
+                        style    = ty.titleLarge,
                         color    = mc.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -306,7 +306,7 @@ private fun DeckItem(
                         Text(
                             text  = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
                                 .format(Date(deck.updatedAt)),
-                            style = ty.bodySmall,
+                            style = ty.bodyMedium,
                             color = mc.textDisabled,
                         )
                     }

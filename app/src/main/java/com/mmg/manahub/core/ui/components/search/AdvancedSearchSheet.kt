@@ -169,7 +169,7 @@ fun AdvancedSearchSheet(
                 }
                 Text(
                     stringResource(R.string.advsearch_title),
-                    style = ty.titleMedium,
+                    style = ty.titleLarge,
                     color = mc.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
@@ -177,6 +177,7 @@ fun AdvancedSearchSheet(
                     Text(
                         stringResource(R.string.advsearch_clear),
                         color = mc.lifeNegative,
+                        style = ty.titleMedium
                     )
                 }
             }
@@ -204,6 +205,7 @@ fun AdvancedSearchSheet(
                                 Text(
                                     stringResource(R.string.advsearch_name_hint),
                                     color = mc.textDisabled,
+                                    style = ty.bodyLarge
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -222,7 +224,7 @@ fun AdvancedSearchSheet(
                             )
                             Text(
                                 stringResource(R.string.advsearch_name_exact),
-                                style = ty.bodySmall,
+                                style = ty.bodyMedium,
                                 color = mc.textSecondary,
                             )
                         }
@@ -242,6 +244,7 @@ fun AdvancedSearchSheet(
                                 Text(
                                     stringResource(R.string.advsearch_oracle_hint),
                                     color = mc.textDisabled,
+                                    style = ty.bodyLarge
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -284,7 +287,7 @@ fun AdvancedSearchSheet(
                                             "${uiState.cardType} ${option.scryfallValue}".trim()
                                         viewModel.setCardType(new)
                                     },
-                                    label = { Text(stringResource(option.labelRes), style = ty.labelSmall) },
+                                    label = { Text(stringResource(option.labelRes), style = ty.labelMedium) },
                                 )
                             }
                         }
@@ -295,6 +298,7 @@ fun AdvancedSearchSheet(
                                 Text(
                                     stringResource(R.string.advsearch_type_hint),
                                     color = mc.textDisabled,
+                                    style = ty.bodyLarge
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -319,7 +323,7 @@ fun AdvancedSearchSheet(
                                 FilterChip(
                                     selected = uiState.useColorIdentity == isIdentity,
                                     onClick = { viewModel.setUseColorIdentity(isIdentity) },
-                                    label = { Text(label, style = ty.labelSmall) },
+                                    label = { Text(label, style = ty.labelMedium) },
                                 )
                             }
                         }
@@ -340,7 +344,7 @@ fun AdvancedSearchSheet(
                             )
                             Text(
                                 stringResource(R.string.advsearch_colors_exact),
-                                style = ty.bodySmall,
+                                style = ty.bodyMedium,
                                 color = mc.textSecondary,
                             )
                         }
@@ -364,7 +368,7 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.manaCostValue,
                                 onValueChange = { v -> viewModel.setManaCost(v, uiState.manaCostOp) },
-                                placeholder = { Text(stringResource(R.string.advsearch_mana_hint), color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_mana_hint), color = mc.textDisabled, style = ty.bodyLarge) },
                                 modifier = Modifier.width(100.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
@@ -388,7 +392,7 @@ fun AdvancedSearchSheet(
                             ) {
                                 Text(
                                     stringResource(R.string.advsearch_rarity_operator),
-                                    style = ty.bodySmall,
+                                    style = ty.bodyMedium,
                                     color = mc.textSecondary,
                                 )
                                 OperatorSelector(
@@ -426,7 +430,7 @@ fun AdvancedSearchSheet(
                                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
-                                                Text(symbol, color = color, fontSize = 14.sp)
+                                                Text(symbol, color = color, style = ty.labelLarge)
                                                 Text(
                                                     stringResource(when (rarity) {
                                                         "common"   -> R.string.stats_rarity_common
@@ -434,7 +438,7 @@ fun AdvancedSearchSheet(
                                                         "rare"     -> R.string.stats_rarity_rare
                                                         else       -> R.string.stats_rarity_mythic
                                                     }),
-                                                    style = ty.labelSmall,
+                                                    style = ty.labelMedium,
                                                 )
                                             }
                                         },
@@ -485,7 +489,7 @@ fun AdvancedSearchSheet(
                                             R.string.advsearch_set_selected_count,
                                             selectedSets.size,
                                         ),
-                                    style = ty.bodyMedium,
+                                    style = ty.bodyLarge,
                                     color = if (selectedSets.isNotEmpty()) mc.primaryAccent
                                             else mc.textDisabled,
                                     modifier = Modifier.weight(1f),
@@ -527,7 +531,7 @@ fun AdvancedSearchSheet(
                                                 )
                                                 Text(
                                                     set.code.uppercase(),
-                                                    style = ty.labelSmall,
+                                                    style = ty.labelMedium,
                                                 )
                                             }
                                         },
@@ -547,7 +551,7 @@ fun AdvancedSearchSheet(
                                         label = {
                                             Text(
                                                 stringResource(R.string.advsearch_clear),
-                                                style = ty.labelSmall,
+                                                style = ty.labelMedium,
                                                 color = mc.lifeNegative,
                                             )
                                         },
@@ -606,7 +610,7 @@ fun AdvancedSearchSheet(
                                         Text(
                                             stringResource(R.string.advsearch_power_hint),
                                             color = mc.textDisabled,
-                                            fontSize = 12.sp,
+                                            style = ty.bodyLarge,
                                             maxLines = 1
                                         )
                                     },
@@ -640,7 +644,7 @@ fun AdvancedSearchSheet(
                                         Text(
                                             stringResource(R.string.advsearch_toughness_hint),
                                             color = mc.textDisabled,
-                                            fontSize = 12.sp,
+                                            style = ty.bodyLarge,
                                             maxLines = 1
                                         )
                                     },
@@ -665,7 +669,7 @@ fun AdvancedSearchSheet(
                             OutlinedTextField(
                                 value = uiState.priceMax,
                                 onValueChange = { v -> viewModel.setPrice(v, uiState.priceCurrency) },
-                                placeholder = { Text(stringResource(R.string.advsearch_price_hint), color = mc.textDisabled) },
+                                placeholder = { Text(stringResource(R.string.advsearch_price_hint), color = mc.textDisabled, style = ty.bodyLarge) },
                                 modifier = Modifier.width(100.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = magicOutlinedTextFieldColors(mc),
@@ -680,7 +684,7 @@ fun AdvancedSearchSheet(
                                     FilterChip(
                                         selected = uiState.priceCurrency == curr,
                                         onClick = { viewModel.setPrice(uiState.priceMax, curr) },
-                                        label = { Text(symbol, style = ty.labelMedium) },
+                                        label = { Text(symbol, style = ty.labelLarge) },
                                     )
                                 }
                             }
@@ -701,7 +705,7 @@ fun AdvancedSearchSheet(
                         ) {
                             Text(
                                 stringResource(R.string.advsearch_format_legal),
-                                style = ty.bodySmall,
+                                style = ty.bodyMedium,
                                 color = mc.textSecondary,
                             )
                             Switch(
@@ -720,7 +724,7 @@ fun AdvancedSearchSheet(
                                     stringResource(R.string.advsearch_format_is_legal)
                                 else
                                     stringResource(R.string.advsearch_format_is_banned),
-                                style = ty.bodySmall,
+                                style = ty.bodyMedium,
                                 color = if (uiState.formatLegal) mc.lifePositive else mc.lifeNegative,
                             )
                         }
@@ -751,7 +755,7 @@ fun AdvancedSearchSheet(
                                     label = {
                                         Text(
                                             stringResource(option.labelRes),
-                                            style = ty.labelSmall,
+                                            style = ty.labelMedium,
                                         )
                                     },
                                 )
@@ -789,7 +793,7 @@ fun AdvancedSearchSheet(
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = { viewModel.setKeyword(if (isSelected) "" else option.scryfallValue) },
-                                    label = { Text(stringResource(option.labelRes), style = ty.labelSmall) },
+                                    label = { Text(stringResource(option.labelRes), style = ty.labelMedium) },
                                 )
                             }
                         }
@@ -800,6 +804,7 @@ fun AdvancedSearchSheet(
                                 Text(
                                     stringResource(R.string.advsearch_keyword_hint),
                                     color = mc.textDisabled,
+                                    style = ty.bodyLarge
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -833,7 +838,7 @@ fun AdvancedSearchSheet(
                                             else
                                                 viewModel.setFilterForTrade(if (isSelected) null else true)
                                         },
-                                        label = { Text(label, style = ty.labelSmall) },
+                                        label = { Text(label, style = ty.labelMedium) },
                                     )
                                 }
                             }
@@ -857,7 +862,7 @@ fun AdvancedSearchSheet(
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = { viewModel.toggleFilterTag(tag.key) },
-                                        label = { Text(tag.label, style = ty.labelSmall) },
+                                        label = { Text(tag.label, style = ty.labelMedium) },
                                     )
                                 }
                             }

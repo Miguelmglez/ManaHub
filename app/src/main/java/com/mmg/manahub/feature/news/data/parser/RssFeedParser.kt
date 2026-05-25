@@ -143,7 +143,9 @@ class RssFeedParser @Inject constructor() {
             .trim()
 
     companion object {
-        private val DATE_FORMATS = listOf(
+        // SimpleDateFormat is NOT thread-safe — create fresh instances per call
+        // so concurrent coroutines (one per RSS source) don't corrupt shared state.
+        private fun buildDateFormats() = listOf(
             SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
             SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH),
             SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.ENGLISH),
@@ -160,7 +162,7 @@ class RssFeedParser @Inject constructor() {
         fun parseDate(dateStr: String): Long {
             if (dateStr.isBlank()) return 0L
             val trimmed = dateStr.trim()
-            for (fmt in DATE_FORMATS) {
+            for (fmt in buildDateFormats()) {
                 try {
                     return fmt.parse(trimmed)?.time ?: continue
                 } catch (_: Exception) { /* try next */ }

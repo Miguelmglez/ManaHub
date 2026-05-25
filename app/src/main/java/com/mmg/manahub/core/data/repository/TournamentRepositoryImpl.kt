@@ -175,6 +175,10 @@ class TournamentRepositoryImpl @Inject constructor(
         dao.updateStatus(tournamentId, "ACTIVE")
     }
 
+    override suspend fun pauseTournament(tournamentId: Long) = withContext(ioDispatcher) {
+        dao.updateStatus(tournamentId, "PAUSED")
+    }
+
     override suspend fun startMatch(matchId: Long) = withContext(ioDispatcher) {
         dao.startMatch(matchId)
     }
@@ -185,6 +189,12 @@ class TournamentRepositoryImpl @Inject constructor(
         sessionId:  Long?,
         lifeTotals: Map<Long, Int>,
     ) = withContext(ioDispatcher) {
+        val match = dao.getMatchById(matchId)
+            ?: throw IllegalArgumentException("Match $matchId not found")
+        val participantIds = parsePlayerIds(match.playerIds).toSet()
+        require(winnerId in participantIds) {
+            "winnerId $winnerId is not a participant of match $matchId (participants: $participantIds)"
+        }
         val json = lifeTotals.entries
             .joinToString(",", "{", "}") { "${it.key}:${it.value}" }
         dao.finishMatch(matchId, winnerId, sessionId, json)

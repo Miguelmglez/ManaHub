@@ -111,6 +111,7 @@ private fun TournamentListItem(
     val statusColor = when (tournament.status) {
         "ACTIVE"   -> mc.primaryAccent
         "FINISHED" -> mc.lifePositive
+        "PAUSED"   -> androidx.compose.ui.graphics.Color(0xFFFFAB40)
         else       -> mc.textDisabled
     }
     Surface(

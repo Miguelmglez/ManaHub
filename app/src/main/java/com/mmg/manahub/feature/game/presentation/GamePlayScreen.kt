@@ -7,6 +7,7 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
@@ -18,9 +19,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,6 +67,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Shield
@@ -88,6 +92,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -246,6 +251,7 @@ private fun GamePlayContent(
                     activePlayerId = uiState.activePlayerId,
                     turnNumber = uiState.turnNumber,
                     hasPlayedLand = uiState.hasPlayedLand,
+                    gameSettings = uiState.gameSettings,
                     onLifeChange = onLifeChange,
                     onCmdPanel = onCmdPanel,
                     onCtrPanel = onCtrPanel,
@@ -407,6 +413,7 @@ private fun GamePlayerGrid(
     activePlayerId: Int,
     turnNumber: Int,
     hasPlayedLand: Set<Int>,
+    gameSettings: GameSettings,
     onLifeChange: (playerId: Int, delta: Int) -> Unit,
     onCmdPanel: (playerId: Int) -> Unit,
     onCtrPanel: (playerId: Int) -> Unit,
@@ -484,6 +491,7 @@ private fun GamePlayerGrid(
                                             isActive = player.id == activePlayerId,
                                             turnNumber = turnNumber,
                                             landPlayed = player.id in hasPlayedLand,
+                                            gameSettings = gameSettings,
                                             onLife = { d -> onLifeChange(player.id, d) },
                                             onCmdPanel = { onCmdPanel(player.id) },
                                             onCtrPanel = { onCtrPanel(player.id) },
@@ -523,6 +531,7 @@ private fun GamePlayerGrid(
                                             isActive = player.id == activePlayerId,
                                             turnNumber = turnNumber,
                                             landPlayed = player.id in hasPlayedLand,
+                                            gameSettings = gameSettings,
                                             onLife = { d -> onLifeChange(player.id, d) },
                                             onCmdPanel = { onCmdPanel(player.id) },
                                             onCtrPanel = { onCtrPanel(player.id) },
@@ -571,6 +580,7 @@ private fun GamePlayerGrid(
                                                         isActive = player.id == activePlayerId,
                                                         turnNumber = turnNumber,
                                                         landPlayed = player.id in hasPlayedLand,
+                                                        gameSettings = gameSettings,
                                                         onLife = { d -> onLifeChange(player.id, d) },
                                                         onCmdPanel = { onCmdPanel(player.id) },
                                                         onCtrPanel = { onCtrPanel(player.id) },
@@ -611,6 +621,7 @@ private fun GamePlayerGrid(
                                                         isActive = player.id == activePlayerId,
                                                         turnNumber = turnNumber,
                                                         landPlayed = player.id in hasPlayedLand,
+                                                        gameSettings = gameSettings,
                                                         onLife = { d -> onLifeChange(player.id, d) },
                                                         onCmdPanel = { onCmdPanel(player.id) },
                                                         onCtrPanel = { onCtrPanel(player.id) },
@@ -668,6 +679,7 @@ private fun PlayerCard(
     isActive: Boolean,
     turnNumber: Int,
     landPlayed: Boolean,
+    gameSettings: GameSettings,
     onLife: (Int) -> Unit,
     onCmdPanel: () -> Unit,
     onCtrPanel: () -> Unit,
@@ -801,7 +813,7 @@ private fun PlayerCard(
                             modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.CenterEnd
                         ) {
-                            if (isActive && tier != CardTier.TINY) {
+                            if (gameSettings.landReminderEnabled && isActive && tier != CardTier.TINY) {
                                 val alpha by animateFloatAsState(
                                     targetValue = if (landPlayed) 0.25f else 1.0f,
                                     animationSpec = tween(200),
@@ -822,46 +834,109 @@ private fun PlayerCard(
                             }
                         }
 
-                        Box(
-                            modifier = Modifier
-                                .pointerInput(player.id) {
-                                    detectVerticalDragGestures(
-                                        onVerticalDrag = { change, dragAmount ->
-                                            change.consume()
-                                            dragAccumulator += dragAmount
-                                            // 80dp threshold for one life point (less sensitive)
-                                            val threshold = 80f
-                                            if (dragAccumulator > threshold) {
-                                                onLife(1)
-                                                dragAccumulator = 0f
-                                            } else if (dragAccumulator < -threshold) {
-                                                onLife(-1)
-                                                dragAccumulator = 0f
-                                            }
-                                        },
-                                        onDragEnd = { dragAccumulator = 0f },
-                                        onDragCancel = { dragAccumulator = 0f }
+                        if (gameSettings.lifeControlMode == LifeControlMode.SCROLL) {
+                            Box(
+                                modifier = Modifier
+                                    .pointerInput(player.id) {
+                                        detectVerticalDragGestures(
+                                            onVerticalDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragAccumulator += dragAmount
+                                                val threshold = 80f
+                                                if (dragAccumulator > threshold) {
+                                                    onLife(1)
+                                                    dragAccumulator = 0f
+                                                } else if (dragAccumulator < -threshold) {
+                                                    onLife(-1)
+                                                    dragAccumulator = 0f
+                                                }
+                                            },
+                                            onDragEnd = { dragAccumulator = 0f },
+                                            onDragCancel = { dragAccumulator = 0f }
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AnimatedContent(
+                                    targetState = player.life,
+                                    transitionSpec = {
+                                        if (targetState > initialState) {
+                                            (slideInVertically { height -> -height } + fadeIn()) togetherWith
+                                                    (slideOutVertically { height -> height } + fadeOut())
+                                        } else {
+                                            (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                                    (slideOutVertically { height -> -height } + fadeOut())
+                                        }.using(SizeTransform(clip = false))
+                                    },
+                                    label = "lifeAnimation"
+                                ) { targetLife ->
+                                    Text(
+                                        text = targetLife.toString(),
+                                        style = (if (tier == CardTier.LARGE)
+                                            MaterialTheme.magicTypography.lifeNumber
+                                        else
+                                            MaterialTheme.magicTypography.lifeNumberMd).copy(
+                                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                            lineHeightStyle = LineHeightStyle(
+                                                alignment = LineHeightStyle.Alignment.Center,
+                                                trim = LineHeightStyle.Trim.None
+                                            )
+                                        ),
+                                        color = lifeColor,
+                                        maxLines = 1,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 24.dp),
                                     )
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AnimatedContent(
-                                targetState = player.life,
-                                transitionSpec = {
-                                    if (targetState > initialState) {
-                                        (slideInVertically { height -> -height } + fadeIn()) togetherWith
-                                                (slideOutVertically { height -> height } + fadeOut())
-                                    } else {
-                                        (slideInVertically { height -> height } + fadeIn()) togetherWith
-                                                (slideOutVertically { height -> -height } + fadeOut())
-                                    }.using(
-                                        SizeTransform(clip = false)
-                                    )
-                                },
-                                label = "lifeAnimation"
-                            ) { targetLife ->
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.CenterStart
+                            ) {}
+                        } else {
+                            val numberScale = remember(player.id) { Animatable(1f) }
+                            val heartScale  = remember(player.id) { Animatable(1f) }
+                            val floatY      = remember(player.id) { Animatable(0f) }
+                            val floatAlpha  = remember(player.id) { Animatable(0f) }
+                            var lastDelta by remember(player.id) { mutableIntStateOf(0) }
+                            val prevLife = remember(player.id) { androidx.compose.runtime.mutableIntStateOf(player.life) }
+
+                            LaunchedEffect(player.life) {
+                                val delta = player.life - prevLife.intValue
+                                if (delta != 0) {
+                                    lastDelta = delta
+                                    numberScale.snapTo(0.82f)
+                                    floatY.snapTo(0f)
+                                    floatAlpha.snapTo(1f)
+                                    launch {
+                                        numberScale.animateTo(1.18f, spring(dampingRatio = 0.35f, stiffness = 700f))
+                                        numberScale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 500f))
+                                    }
+                                    if (delta > 0) {
+                                        launch {
+                                            heartScale.snapTo(1f)
+                                            heartScale.animateTo(1.55f, spring(dampingRatio = 0.3f, stiffness = 700f))
+                                            heartScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+                                        }
+                                    }
+                                    launch { floatY.animateTo(-40f, tween(800)) }
+                                    floatAlpha.animateTo(0f, tween(800, delayMillis = 300))
+                                }
+                                prevLife.intValue = player.life
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = remember(player.id) { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = { onLife(-1) },
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
                                 Text(
-                                    text = targetLife.toString(),
+                                    text = player.life.toString(),
                                     style = (if (tier == CardTier.LARGE)
                                         MaterialTheme.magicTypography.lifeNumber
                                     else
@@ -876,17 +951,35 @@ private fun PlayerCard(
                                     maxLines = 1,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier
-                                        .padding(horizontal = 24.dp) // Gap between text and icons
+                                        .padding(horizontal = 24.dp)
+                                        .graphicsLayer {
+                                            scaleX = numberScale.value
+                                            scaleY = numberScale.value
+                                        },
                                 )
                             }
-                        }
 
-                        // Right container: occupies 1/2 of remaining space
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            // Heart icon removed as life is now handled by scroll gesture
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = null,
+                                    tint = theme.accent,
+                                    modifier = Modifier
+                                        .size(iconSize)
+                                        .graphicsLayer {
+                                            scaleX = heartScale.value
+                                            scaleY = heartScale.value
+                                        }
+                                        .clickable(
+                                            interactionSource = remember(player.id) { MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = { onLife(+1) },
+                                        ),
+                                )
+                            }
                         }
                     }
 

@@ -223,72 +223,7 @@ private fun SuggestionItem(
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun DeckMagicScreenPreview() {
-    val mockCard = com.mmg.manahub.core.domain.model.Card(
-        scryfallId      = "1",
-        name            = "Sol Ring",
-        printedName     = null,
-        manaCost        = "{1}",
-        cmc             = 1.0,
-        colors          = emptyList(),
-        colorIdentity   = emptyList(),
-        typeLine        = "Artifact",
-        printedTypeLine = null,
-        oracleText      = "{T}: Add {C}{C}.",
-        printedText     = null,
-        keywords        = emptyList(),
-        power           = null,
-        toughness       = null,
-        loyalty         = null,
-        setCode         = "LEA",
-        setName         = "Limited Edition Alpha",
-        collectorNumber = "232",
-        rarity          = "rare",
-        releasedAt      = "1993-08-05",
-        frameEffects    = emptyList(),
-        promoTypes      = emptyList(),
-        lang            = "en",
-        imageNormal     = null,
-        imageArtCrop    = "https://cards.scryfall.io/art_crop/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg",
-        imageBackNormal = null,
-        priceUsd        = 1.0,
-        priceUsdFoil    = null,
-        priceEur        = 1.0,
-        priceEurFoil    = null,
-        legalityStandard = "legal",
-        legalityPioneer  = "legal",
-        legalityModern   = "legal",
-        legalityCommander = "legal",
-        flavorText      = null,
-        artist          = "Mark Poole",
-        scryfallUri     = "https://scryfall.com",
-    )
 
-    val mockMagicCard = MagicCard(mockCard, isOwned = true)
-
-    val uiState = DeckMagicUiState(
-        step = DeckMagicStep.DASHBOARD,
-        isLoading = false,
-        discoveries = listOf(
-            MagicDiscovery(
-                label = "Elf Tribal",
-                description = "12 cards with this tag in your collection",
-                cards = List(6) { mockMagicCard },
-                primaryTag = com.mmg.manahub.core.domain.model.CardTag.ELF
-            )
-        )
-    )
-
-    com.mmg.manahub.core.ui.theme.MagicTheme {
-        DashboardContent(
-            uiState = uiState,
-            onDiscoveryClick = {},
-            onStartEmpty = {}
-        )
-    }
-}
 
 
 

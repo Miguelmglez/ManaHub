@@ -1310,13 +1310,14 @@ private fun AddCardSheet(
                     items(deckCards, key = { it.scryfallId }) { card ->
                         CardListItem(
                             name = card.name,
-                            imageUrl = card.imageArtCrop,
+                            imageUrl = card.imageArtCrop ?: card.imageNormal,
                             priceUsd = card.priceUsd,
                             priceEur = card.priceEur,
                             onClick = { onPick(card) },
                             setCode = card.setCode,
                             setName = card.setName,
                             rarity = card.rarity,
+                            typeLine = card.typeLine,
                         )
                     }
                 }

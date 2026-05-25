@@ -411,7 +411,7 @@ private fun CardsTabContent(
         ) {
             Text(
                 text     = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
-                style    = MaterialTheme.magicTypography.labelSmall,
+                style    = MaterialTheme.magicTypography.labelLarge,
                 color    = mc.textSecondary,
                 modifier = Modifier.weight(1f)
             )
@@ -530,7 +530,7 @@ private fun SearchBar(
         value         = query,
         onValueChange = onQueryChange,
         modifier      = modifier.fillMaxWidth(),
-        placeholder   = { Text(stringResource(R.string.collection_search_hint), color = mc.textDisabled) },
+        placeholder   = { Text(stringResource(R.string.collection_search_hint), color = mc.textDisabled, style = MaterialTheme.magicTypography.bodyLarge) },
         leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
         trailingIcon  = if (query.isNotEmpty()) {{
             IconButton(onClick = { onQueryChange("") }) {

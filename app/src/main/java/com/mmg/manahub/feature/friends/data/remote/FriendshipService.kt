@@ -116,6 +116,17 @@ interface FriendshipService {
     suspend fun upsertCollectionStats(
         @Body body: UpsertCollectionStatsDto,
     ): Response<Unit>
+
+    /**
+     * Calls the `get_friend_match_history` Supabase RPC (SECURITY DEFINER).
+     *
+     * Uses `auth.uid()` server-side to return wins/losses from the caller's perspective.
+     * Returns a single-item list; empty list means no games played yet.
+     */
+    @POST("rpc/get_friend_match_history")
+    suspend fun getFriendMatchHistory(
+        @Body body: GetFriendMatchHistoryRequestDto,
+    ): List<FriendMatchHistoryDto>
 }
 
 data class FriendshipDto(
@@ -206,4 +217,17 @@ data class UpsertCollectionStatsDto(
     @SerializedName("p_total_value_usd") val pTotalValueUsd: Double,
     @SerializedName("p_favourite_color") val pFavouriteColor: String?,
     @SerializedName("p_most_valuable_color") val pMostValuableColor: String?,
+)
+
+/** Request body for the `get_friend_match_history` RPC. */
+data class GetFriendMatchHistoryRequestDto(
+    @SerializedName("p_friend_user_id") val pFriendUserId: String,
+)
+
+/** Response row from the `get_friend_match_history` RPC. */
+data class FriendMatchHistoryDto(
+    @SerializedName("my_wins") val myWins: Int,
+    @SerializedName("opponent_wins") val opponentWins: Int,
+    @SerializedName("total_games") val totalGames: Int,
+    @SerializedName("last_played_at") val lastPlayedAt: String?,
 )

@@ -23,6 +23,7 @@ interface TournamentRepository {
     fun observePlayers(tournamentId: Long): Flow<List<TournamentPlayerEntity>>
 
     suspend fun startTournament(tournamentId: Long)
+    suspend fun pauseTournament(tournamentId: Long)
     suspend fun startMatch(matchId: Long)
     suspend fun finishMatch(
         matchId:    Long,

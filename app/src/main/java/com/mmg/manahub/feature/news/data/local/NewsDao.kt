@@ -58,4 +58,7 @@ interface NewsDao {
 
     @Query("SELECT * FROM content_sources")
     suspend fun getAllSources(): List<ContentSourceEntity>
+
+    @Query("UPDATE content_sources SET is_enabled = :enabled WHERE id = :id")
+    suspend fun setSourceEnabled(id: String, enabled: Boolean)
 }

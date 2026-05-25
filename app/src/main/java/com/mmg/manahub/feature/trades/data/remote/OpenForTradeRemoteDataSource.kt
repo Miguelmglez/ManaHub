@@ -44,6 +44,15 @@ class OpenForTradeRemoteDataSource @Inject constructor(
             }
         }
 
+    suspend fun removeByUserCardId(userCardId: String): Result<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseClient.postgrest["open_for_trade"]
+                    .delete { filter { eq("user_card_id", userCardId) } }
+                Unit
+            }
+        }
+
     suspend fun batchAddOpenForTradeEntries(userCardIds: List<String>): Result<Unit> =
         withContext(ioDispatcher) {
             runCatching {

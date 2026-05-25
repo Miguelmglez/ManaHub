@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,17 +29,20 @@ class TournamentViewModel @Inject constructor(
     savedStateHandle:            SavedStateHandle,
 ) : ViewModel() {
 
-    private val tournamentId: Long =
-        savedStateHandle.get<Long>("tournamentId") ?: 0L
+    private val tournamentId: Long = checkNotNull(
+        savedStateHandle.get<Long>("tournamentId")?.takeIf { it > 0L }
+    ) { "TournamentViewModel requires a positive tournamentId" }
 
     data class UiState(
-        val tournament: TournamentEntity?          = null,
-        val standings:  List<TournamentStanding>   = emptyList(),
-        val matches:    List<TournamentMatchEntity> = emptyList(),
-        val players:    List<TournamentPlayerEntity> = emptyList(),
-        val nextMatch:  TournamentMatchEntity?     = null,
-        val isFinished: Boolean                    = false,
-        val isLoading:  Boolean                    = true,
+        val tournament:     TournamentEntity?           = null,
+        val standings:      List<TournamentStanding>    = emptyList(),
+        val matches:        List<TournamentMatchEntity>  = emptyList(),
+        val players:        List<TournamentPlayerEntity> = emptyList(),
+        val nextMatch:      TournamentMatchEntity?      = null,
+        val isFinished:     Boolean                     = false,
+        val isPaused:       Boolean                     = false,
+        val isLoading:      Boolean                     = true,
+        val isStartingMatch: Boolean                    = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -49,6 +54,14 @@ class TournamentViewModel @Inject constructor(
 
     private fun loadTournament() {
         viewModelScope.launch {
+            // One-time auto-resume on screen open — MUST NOT be inside the combine transformer.
+            // Putting startTournament inside combine creates a feedback loop: the DB write
+            // triggers a new emission which calls startTournament again, infinitely.
+            val current = repository.observeTournament(tournamentId).first()
+            if (current?.status == "SETUP" || current?.status == "PAUSED") {
+                runCatching { repository.startTournament(tournamentId) }
+            }
+
             combine(
                 repository.observeTournament(tournamentId),
                 repository.observeMatches(tournamentId),
@@ -57,6 +70,7 @@ class TournamentViewModel @Inject constructor(
                 val standings  = repository.calculateStandings(tournamentId)
                 val nextMatch  = matches.firstOrNull { it.status == "PENDING" }
                 val isFinished = matches.isNotEmpty() && matches.all { it.status == "FINISHED" }
+                val isPaused   = tournament?.status == "PAUSED"
                 _uiState.update { state ->
                     state.copy(
                         tournament = tournament,
@@ -65,20 +79,37 @@ class TournamentViewModel @Inject constructor(
                         standings  = standings,
                         nextMatch  = nextMatch,
                         isFinished = isFinished,
+                        isPaused   = isPaused,
                         isLoading  = false,
                     )
                 }
-            }.collect {}
+            }.distinctUntilChanged().collect {}
+        }
+    }
+
+    fun pause() {
+        viewModelScope.launch {
+            runCatching { repository.pauseTournament(tournamentId) }
+                .onSuccess { _uiState.update { it.copy(isPaused = true) } }
         }
     }
 
     fun startNextMatch(onNavigateToGame: (matchId: Long) -> Unit) {
+        if (_uiState.value.isStartingMatch) return
+        _uiState.update { it.copy(isStartingMatch = true) }
         viewModelScope.launch {
-            val match = _uiState.value.nextMatch ?: return@launch
+            val match = _uiState.value.nextMatch ?: run {
+                _uiState.update { it.copy(isStartingMatch = false) }
+                return@launch
+            }
             FirebaseCrashlytics.getInstance().log("tournament_match_started: matchId=${match.id}")
             runCatching { repository.startMatch(match.id) }
-                .onSuccess { onNavigateToGame(match.id) }
+                .onSuccess {
+                    _uiState.update { it.copy(isStartingMatch = false) }
+                    onNavigateToGame(match.id)
+                }
                 .onFailure { e ->
+                    _uiState.update { it.copy(isStartingMatch = false) }
                     FirebaseCrashlytics.getInstance().apply {
                         log("tournament_match_start_failed: matchId=${match.id}")
                         setCustomKey("tournament_id", tournamentId)
@@ -89,10 +120,16 @@ class TournamentViewModel @Inject constructor(
     }
 
     fun startMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Unit) {
+        if (_uiState.value.isStartingMatch) return
+        _uiState.update { it.copy(isStartingMatch = true) }
         viewModelScope.launch {
             runCatching { repository.startMatch(matchId) }
-                .onSuccess { onNavigateToGame(matchId) }
+                .onSuccess {
+                    _uiState.update { it.copy(isStartingMatch = false) }
+                    onNavigateToGame(matchId)
+                }
                 .onFailure { e ->
+                    _uiState.update { it.copy(isStartingMatch = false) }
                     FirebaseCrashlytics.getInstance().apply {
                         log("tournament_match_start_failed: matchId=$matchId")
                         setCustomKey("tournament_id", tournamentId)

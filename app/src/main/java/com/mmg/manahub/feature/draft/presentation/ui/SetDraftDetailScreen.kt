@@ -93,6 +93,8 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private val VALID_YOUTUBE_VIDEO_ID = Regex("^[a-zA-Z0-9_-]{11}$")
+
 private val TIER_COLORS = mapOf(
     "S" to Color(0xFFFFD700),
     "A" to Color(0xFFC77DFF),
@@ -206,6 +208,7 @@ fun SetDraftDetailScreen(
                     onToggleColor = viewModel::toggleTierListColorFilter,
                     onCardClick = onCardClick,
                 )
+                else -> GuideTab(state, state.setIconUri, onCardClick)
             }
         }
     }
@@ -359,7 +362,9 @@ private fun GuideTab(
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 state.videos.forEach { video ->
                                     VideoCard(video) {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${video.videoId}")))
+                                        if (VALID_YOUTUBE_VIDEO_ID.matches(video.videoId)) {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${video.videoId}")))
+                                        }
                                     }
                                 }
                             }
@@ -898,5 +903,5 @@ private fun formatDate(dateStr: String): String = try {
 } catch (_: Exception) { dateStr }
 
 private fun formatVideoDate(isoDate: String): String = try {
-    LocalDate.parse(isoDate.substring(0, 10)).format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH))
+    LocalDate.parse(isoDate.take(10)).format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH))
 } catch (_: Exception) { isoDate }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
@@ -30,7 +31,9 @@ class NewsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
+    private val _isInitialLoad = MutableStateFlow(true)
     private val _error = MutableStateFlow<String?>(null)
 
     // Advanced search filter state
@@ -83,8 +86,8 @@ class NewsViewModel @Inject constructor(
 
         NewsUiState(
             items             = items,
-            isLoading         = items.isEmpty() && refreshing,
-            isRefreshing      = refreshing,
+            isLoading         = _isInitialLoad.value && (items.isEmpty() || refreshing),
+            isRefreshing      = refreshing && !_isInitialLoad.value,
             searchQuery       = _searchQuery.value,
             filterTypes       = filterTypes,
             filterLanguages   = filterLanguages,
@@ -112,6 +115,7 @@ class NewsViewModel @Inject constructor(
                 _error.value = e.message
             }
             _isRefreshing.value = false
+            _isInitialLoad.value = false
         }
     }
 

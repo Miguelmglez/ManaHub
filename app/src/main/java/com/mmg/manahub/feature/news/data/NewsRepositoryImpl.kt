@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.news.data
 
 import android.util.Log
+import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.DefaultSources
 import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
@@ -50,50 +51,56 @@ class NewsRepositoryImpl @Inject constructor(
         newsDao.evictArticlesBefore(evictBefore)
         newsDao.evictVideosBefore(evictBefore)
 
-        // Check if cache is fresh
+        // Check freshness per table independently — only re-fetch stale data
+        val now = System.currentTimeMillis()
         val articleAge = newsDao.oldestArticleFetchedAt()
         val videoAge = newsDao.oldestVideoFetchedAt()
-        val now = System.currentTimeMillis()
-        val isFresh = articleAge != null && (now - articleAge) < FRESH_MS
-                && videoAge != null && (now - videoAge) < FRESH_MS
+        val articlesStale = articleAge == null || (now - articleAge) >= FRESH_MS
+        val videosStale = videoAge == null || (now - videoAge) >= FRESH_MS
 
-        if (!isFresh) {
-            fetchAllFeeds()
+        if (articlesStale || videosStale) {
+            fetchAllFeeds(fetchArticles = articlesStale, fetchVideos = videosStale)
         }
         Result.success(Unit)
     } catch (e: Exception) {
-        Log.e(TAG, "refreshAll failed", e)
+        if (BuildConfig.DEBUG) Log.e(TAG, "refreshAll failed", e)
         Result.failure(e)
     }
 
-    private suspend fun fetchAllFeeds() = coroutineScope {
+    private suspend fun fetchAllFeeds(fetchArticles: Boolean = true, fetchVideos: Boolean = true) = coroutineScope {
         val sources = newsDao.getEnabledSources()
-        val results = sources.map { source ->
-            async {
-                try {
-                    val xml = feedService.fetchFeed(source.feedUrl).getOrThrow()
-                    when (source.type) {
-                        "ARTICLE" -> {
-                            val articles = rssParser.parse(xml, source.id, source.name)
-                            if (articles.isNotEmpty()) newsDao.upsertArticles(articles)
-                        }
-                        "VIDEO" -> {
-                            val videos = ytParser.parse(xml, source.id, source.name)
-                            if (videos.isNotEmpty()) newsDao.upsertVideos(videos)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to fetch ${source.name}: ${e.message}")
+        val results = sources
+            .filter { source ->
+                when (source.type) {
+                    "ARTICLE" -> fetchArticles
+                    "VIDEO" -> fetchVideos
+                    else -> false
                 }
             }
-        }
+            .map { source ->
+                async {
+                    try {
+                        val xml = feedService.fetchFeed(source.feedUrl).getOrThrow()
+                        when (source.type) {
+                            "ARTICLE" -> {
+                                val articles = rssParser.parse(xml, source.id, source.name)
+                                if (articles.isNotEmpty()) newsDao.upsertArticles(articles)
+                            }
+                            "VIDEO" -> {
+                                val videos = ytParser.parse(xml, source.id, source.name)
+                                if (videos.isNotEmpty()) newsDao.upsertVideos(videos)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (BuildConfig.DEBUG) Log.w(TAG, "Failed to fetch ${source.name}: ${e.message}")
+                    }
+                }
+            }
         results.awaitAll()
     }
 
     override suspend fun toggleSource(sourceId: String, enabled: Boolean) {
-        val sources = newsDao.getAllSources()
-        val source = sources.find { it.id == sourceId } ?: return
-        newsDao.updateSource(source.copy(isEnabled = enabled))
+        newsDao.setSourceEnabled(sourceId, enabled)
     }
 
     override suspend fun addCustomSource(
@@ -101,9 +108,10 @@ class NewsRepositoryImpl @Inject constructor(
         feedUrl: String,
         type: SourceType,
     ): Result<ContentSource> = try {
+        require(feedUrl.startsWith("https://")) { "Feed URL must use HTTPS" }
         val entity = ContentSourceEntity(
             id = "custom_${UUID.randomUUID()}",
-            name = name,
+            name = name.trim().take(100),
             feedUrl = feedUrl,
             type = type.name,
             isEnabled = true,
