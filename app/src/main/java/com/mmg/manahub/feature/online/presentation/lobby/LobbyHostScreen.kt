@@ -72,6 +72,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.mmg.manahub.core.nearby.presentation.rememberNearbyPermissionsState
 
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
@@ -156,6 +157,7 @@ fun LobbyHostScreen(
             onCopyCode = onCopyCode,
             onResumeSession = viewModel::resumeSession,
             onAbandonSession = viewModel::abandonSession,
+            onRefresh = viewModel::refreshParticipants,
         )
         MagicToastHost(
             state = toastState,
@@ -183,6 +185,7 @@ private fun LobbyHostContent(
     onCopyCode: (String) -> Unit,
     onResumeSession: (ActiveSession) -> Unit,
     onAbandonSession: (String) -> Unit,
+    onRefresh: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -205,6 +208,17 @@ private fun LobbyHostContent(
                             contentDescription = "Back",
                             tint = mc.textPrimary,
                         )
+                    }
+                },
+                actions = {
+                    if (uiState.sessionId != null) {
+                        IconButton(onClick = onRefresh) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh players",
+                                tint = mc.textPrimary,
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -952,6 +966,7 @@ private fun LobbyHostContentPreview() {
             onCopyCode = {},
             onResumeSession = {},
             onAbandonSession = {},
+            onRefresh = {},
         )
     }
 }
@@ -982,6 +997,7 @@ private fun LobbyHostActiveSessonsPreview() {
             onCopyCode = {},
             onResumeSession = {},
             onAbandonSession = {},
+            onRefresh = {},
         )
     }
 }
