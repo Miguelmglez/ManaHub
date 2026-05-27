@@ -191,6 +191,7 @@ class LobbyHostViewModel @Inject constructor(
                         )
                     }
                     connectAndObserve(session.sessionId)
+                    startLobbyPolling(session.sessionId)
                 },
                 onFailure = { throwable ->
                     crashlytics.log("online_session_rejoin_failed: ${throwable.message}")
@@ -261,23 +262,14 @@ class LobbyHostViewModel @Inject constructor(
                             sessionCode = code,
                         )
                     }
-                    // Subscribe to Realtime FIRST to minimise the window where JOIN events
-                    // can be missed. setReady() and subsequent network calls run concurrently
-                    // in this coroutine while connectAndObserve() establishes the channel.
+                    // Immediate snapshot so the host appears in their own participant list.
+                    refreshParticipants()
+                    // Reliable 3s polling — primary mechanism, works regardless of Realtime.
+                    startLobbyPolling(sessionId)
+                    // Realtime subscription as optional fast-path.
                     connectAndObserve(sessionId)
                     repository.setReady(sessionId, true).onSuccess {
                         _uiState.update { it.copy(isHostReady = true) }
-                    }
-                    observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
-                        _uiState.update { state ->
-                            val ps = snapshot.participants.filter { it.status != ParticipantStatus.LEFT }
-                            val allReady = ps.isNotEmpty() && ps.all { it.isReady }
-                            state.copy(
-                                participants = ps,
-                                allReady = allReady,
-                                canStart = allReady && ps.size >= 2,
-                            )
-                        }
                     }
                 },
                 onFailure = { throwable ->
@@ -355,45 +347,80 @@ class LobbyHostViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 
+    /** Manually fetches the latest participant list and merges it into state. */
+    fun refreshParticipants() {
+        val sessionId = _uiState.value.sessionId ?: return
+        viewModelScope.launch {
+            observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                _uiState.update { state ->
+                    mergeSnapshotParticipants(state, snapshot.participants)
+                }
+            }.onFailure { throwable ->
+                crashlytics.log("online_session_refresh_failed: ${throwable.message}")
+            }
+        }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
+     * Polls the session snapshot every 3 s and merges participant updates into state.
+     * This is the primary reliable mechanism — it runs unconditionally regardless of
+     * whether Realtime CDC is configured in the Supabase dashboard.
+     */
+    private fun startLobbyPolling(sessionId: String) {
+        viewModelScope.launch {
+            while (_uiState.value.sessionId != null) {
+                kotlinx.coroutines.delay(3_000L)
+                if (_uiState.value.sessionId == null) break
+                observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                    _uiState.update { state ->
+                        mergeSnapshotParticipants(state, snapshot.participants)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Merges snapshot participants into current state.
+     * Snapshot wins for participants already known (updates ready-state, theme, etc.).
+     * Participants present only in current state (arrived via Realtime after snapshot was taken)
+     * are preserved to avoid a poll cycle erasing a fast Realtime update.
+     */
+    private fun mergeSnapshotParticipants(
+        state: UiState,
+        snapshotParticipants: List<OnlineParticipant>,
+    ): UiState {
+        val ps = snapshotParticipants.filter { it.status != ParticipantStatus.LEFT }
+        val snapshotIds = ps.map { it.id }.toSet()
+        val realtimeOnly = state.participants.filter { it.id !in snapshotIds }
+        val merged = (ps + realtimeOnly).sortedBy { it.slotIndex }
+        val allReady = merged.isNotEmpty() && merged.all { it.isReady }
+        return state.copy(participants = merged, allReady = allReady, canStart = allReady && merged.size >= 2)
+    }
+
+    /**
      * Connects to the Realtime channel and starts collecting [SessionEvent]s.
-     * Participant updates are merged into [_uiState], and readiness flags are recomputed.
+     * This is an optional fast-path on top of [startLobbyPolling] — failure is silent
+     * because polling guarantees lobby correctness regardless of Realtime availability.
      */
     private fun connectAndObserve(sessionId: String) {
         viewModelScope.launch {
             crashlytics.log("online_realtime_connect_started: host")
             runCatching { observeSessionUseCase.connect(sessionId) }
                 .onFailure { throwable ->
-                    // Re-throw so coroutine cancellation (navigation away) propagates correctly.
                     if (throwable is kotlinx.coroutines.CancellationException) throw throwable
                     crashlytics.log("online_realtime_connect_failed: host type=${throwable::class.simpleName}")
-                    crashlytics.recordException(throwable)
-                    _uiState.update { it.copy(error = mapBackendError(throwable.message)) }
                     return@launch
                 }
-            // Start collecting BEFORE the snapshot HTTP call so events arriving during
-            // the fetch are buffered by the SharedFlow (replay=10) and not silently dropped.
             launch {
                 observeSessionUseCase(sessionId)
                     .onEach { event -> handleEvent(event) }
                     .catch { throwable ->
                         crashlytics.log("online_realtime_stream_error: host type=${throwable::class.simpleName}")
-                        crashlytics.setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
-                        crashlytics.recordException(throwable)
-                        _uiState.update { it.copy(error = mapBackendError(throwable.message)) }
                     }
                     .collect()
-            }
-            // Snapshot refresh catches participants who joined before the subscription
-            // was confirmed (the window before blockUntilSubscribed returns).
-            observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
-                _uiState.update { state ->
-                    val ps = snapshot.participants.filter { it.status != ParticipantStatus.LEFT }
-                    val allReady = ps.isNotEmpty() && ps.all { it.isReady }
-                    state.copy(participants = ps, allReady = allReady, canStart = allReady && ps.size >= 2)
-                }
             }
         }
     }

@@ -26,5 +26,7 @@ interface OnlineSessionRepository {
     suspend fun connectRealtime(sessionId: String)
     suspend fun disconnectRealtime(sessionId: String)
     suspend fun broadcastLifeDelta(sessionId: String, slotIndex: Int, newLife: Int)
-    suspend fun broadcastPhaseChange(sessionId: String, newPhase: String)
+    suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int)
+    suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int)
+    suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int)
 }

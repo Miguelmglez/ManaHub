@@ -192,6 +192,9 @@ class LobbyJoinViewModel @Inject constructor(
                     }
                     connectAndObserve(sessionId, onGameStart)
                     setReady(true)
+                    // Reliable 3s polling — primary mechanism for participant sync and
+                    // game-start detection regardless of Realtime availability.
+                    startLobbyPolling(sessionId, onGameStart)
                 },
                 onFailure = { throwable ->
                     val errorToken = classifyJoinError(throwable.message)
@@ -262,7 +265,8 @@ class LobbyJoinViewModel @Inject constructor(
 
     /**
      * Connects to the Realtime channel for [sessionId] and starts collecting events.
-     * When the session becomes ACTIVE, [onGameStart] is invoked on the main thread.
+     * This is an optional fast-path on top of [startLobbyPolling] — failure is silent
+     * because polling guarantees lobby correctness regardless of Realtime availability.
      */
     private fun connectAndObserve(
         sessionId: String,
@@ -272,23 +276,47 @@ class LobbyJoinViewModel @Inject constructor(
             crashlytics.log("online_realtime_connect_started: joiner")
             runCatching { observeSessionUseCase.connect(sessionId) }
                 .onFailure { throwable ->
-                    // Re-throw so coroutine cancellation (navigation away) propagates correctly.
                     if (throwable is kotlinx.coroutines.CancellationException) throw throwable
                     crashlytics.log("online_realtime_connect_failed: joiner type=${throwable::class.simpleName}")
-                    crashlytics.recordException(throwable)
-                    _uiState.update { it.copy(error = mapBackendError(throwable.message)) }
                     return@launch
                 }
-            // observeSession must be called after connect() so the channel handle is ready
             observeSessionUseCase(sessionId)
                 .onEach { event -> handleEvent(event, sessionId, onGameStart) }
                 .catch { throwable ->
                     crashlytics.log("online_realtime_stream_error: joiner type=${throwable::class.simpleName}")
-                    crashlytics.setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
-                    crashlytics.recordException(throwable)
-                    _uiState.update { it.copy(error = mapBackendError(throwable.message)) }
                 }
                 .collect()
+        }
+    }
+
+    /**
+     * Polls the session snapshot every 3 s, syncs the participant list, and checks whether
+     * the host has started the game. This is the primary mechanism for game-start detection
+     * because Realtime CDC may not be available in all environments.
+     */
+    private fun startLobbyPolling(
+        sessionId: String,
+        onGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
+    ) {
+        viewModelScope.launch {
+            while (_uiState.value.sessionId != null) {
+                kotlinx.coroutines.delay(3_000L)
+                if (_uiState.value.sessionId == null) break
+                observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                    val ps = snapshot.participants.filter { it.status != ParticipantStatus.LEFT }
+                    _uiState.update { state ->
+                        state.copy(participants = if (ps.isNotEmpty()) ps.sortedBy { it.slotIndex } else state.participants)
+                    }
+                    if (snapshot.session.status == OnlineSessionStatus.ACTIVE &&
+                        _uiState.value.sessionStatus != OnlineSessionStatus.ACTIVE
+                    ) {
+                        val s = _uiState.value
+                        _uiState.update { it.copy(sessionStatus = OnlineSessionStatus.ACTIVE) }
+                        crashlytics.log("online_session_game_started_via_poll: slot=${s.slotIndex}")
+                        onGameStart(sessionId, s.slotIndex, s.sessionMode, s.sessionPlayerCount)
+                    }
+                }
+            }
         }
     }
 

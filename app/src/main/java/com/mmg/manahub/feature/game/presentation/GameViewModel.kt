@@ -32,6 +32,8 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.NextTurnUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.RevokeDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
@@ -96,14 +98,16 @@ class GameViewModel @Inject constructor(
     private val gameSessionRepo:       GameSessionRepository,
     private val tournamentRepo:        TournamentRepository,
     private val analyticsHelper:       AnalyticsHelper,
-    private val observeSessionUseCase: ObserveSessionUseCase,
-    private val updateLifeUseCase:     UpdateLifeUseCase,
-    private val advancePhaseUseCase:   AdvancePhaseUseCase,
-    private val nextTurnUseCase:       NextTurnUseCase,
-    private val confirmDefeatUseCase:  ConfirmDefeatUseCase,
-    private val revokeDefeatUseCase:   RevokeDefeatUseCase,
-    private val leaveSessionUseCase:   LeaveSessionUseCase,
-    private val nearbyRepo:            NearbySessionRepository,
+    private val observeSessionUseCase:        ObserveSessionUseCase,
+    private val updateLifeUseCase:            UpdateLifeUseCase,
+    private val advancePhaseUseCase:          AdvancePhaseUseCase,
+    private val nextTurnUseCase:              NextTurnUseCase,
+    private val updateCounterUseCase:         UpdateCounterUseCase,
+    private val updateCommanderDamageUseCase: UpdateCommanderDamageUseCase,
+    private val confirmDefeatUseCase:         ConfirmDefeatUseCase,
+    private val revokeDefeatUseCase:          RevokeDefeatUseCase,
+    private val leaveSessionUseCase:          LeaveSessionUseCase,
+    private val nearbyRepo:                   NearbySessionRepository,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -201,12 +205,23 @@ class GameViewModel @Inject constructor(
             )
         }
         checkPendingDefeat()
+        val sessionId = onlineSessionId
+        val player = _uiState.value.players.find { it.id == playerId } ?: return
         if (isNearbySession && playerId == mySlotIndex) {
-            val player = _uiState.value.players.find { it.id == playerId } ?: return
             when (type) {
-                CounterType.POISON -> nearbyRepo.sendMessage(NearbyGameMessage.PoisonChanged(playerId, player.poison))
+                CounterType.POISON     -> nearbyRepo.sendMessage(NearbyGameMessage.PoisonChanged(playerId, player.poison))
                 CounterType.EXPERIENCE -> nearbyRepo.sendMessage(NearbyGameMessage.ExperienceChanged(playerId, player.experience))
-                CounterType.ENERGY -> nearbyRepo.sendMessage(NearbyGameMessage.EnergyChanged(playerId, player.energy))
+                CounterType.ENERGY     -> nearbyRepo.sendMessage(NearbyGameMessage.EnergyChanged(playerId, player.energy))
+            }
+        } else if (sessionId != null && playerId == mySlotIndex) {
+            val newValue = when (type) {
+                CounterType.POISON     -> player.poison
+                CounterType.EXPERIENCE -> player.experience
+                CounterType.ENERGY     -> player.energy
+            }
+            viewModelScope.launch {
+                updateCounterUseCase.broadcast(sessionId, playerId, type.name, newValue)
+                runCatching { updateCounterUseCase(sessionId, playerId, type.name, delta) }
             }
         }
     }
@@ -264,6 +279,15 @@ class GameViewModel @Inject constructor(
             )
         }
         checkPendingDefeat()
+        val sessionId = onlineSessionId
+        if (sessionId != null && sourceId == mySlotIndex) {
+            val newDmg = _uiState.value.players.find { it.id == targetId }
+                ?.commanderDamage?.get(sourceId) ?: 0
+            viewModelScope.launch {
+                updateCommanderDamageUseCase.broadcast(sessionId, targetId, sourceId, newDmg)
+                runCatching { updateCommanderDamageUseCase(sessionId, targetId, sourceId, delta) }
+            }
+        }
     }
 
     // ── Phase tracker ─────────────────────────────────────────────────────────
@@ -294,8 +318,9 @@ class GameViewModel @Inject constructor(
                 nearbyRepo.sendMessage(NearbyGameMessage.TurnChanged(s.turnNumber, s.activePlayerId))
             }
         } else if (sessionId != null) {
-            val newPhase = s.currentPhase.name
-            viewModelScope.launch { advancePhaseUseCase.broadcast(sessionId, newPhase) }
+            viewModelScope.launch {
+                advancePhaseUseCase.broadcast(sessionId, s.currentPhase.name, s.activePlayerId, s.turnNumber)
+            }
             schedulePhasePersist(sessionId)
         }
     }
@@ -319,7 +344,10 @@ class GameViewModel @Inject constructor(
             nearbyRepo.sendMessage(NearbyGameMessage.TurnChanged(s.turnNumber, s.activePlayerId))
             nearbyRepo.sendMessage(NearbyGameMessage.PhaseChanged(s.currentPhase.name))
         } else if (sessionId != null) {
-            viewModelScope.launch { runCatching { nextTurnUseCase(sessionId) } }
+            viewModelScope.launch {
+                advancePhaseUseCase.broadcast(sessionId, s.currentPhase.name, s.activePlayerId, s.turnNumber)
+                runCatching { nextTurnUseCase(sessionId) }
+            }
         }
     }
 
@@ -677,7 +705,37 @@ class GameViewModel @Inject constructor(
             is SessionEvent.PhaseChangedReceived -> {
                 _uiState.update { s ->
                     val phase = runCatching { GamePhase.valueOf(event.newPhase) }.getOrDefault(s.currentPhase)
-                    s.copy(currentPhase = phase)
+                    s.copy(
+                        currentPhase   = phase,
+                        activePlayerId = event.activePlayerSlot,
+                        turnNumber     = event.turnNumber,
+                    )
+                }
+            }
+            is SessionEvent.CounterUpdatedReceived -> {
+                if (event.slotIndex != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id != event.slotIndex) p else when (event.counterType) {
+                                CounterType.POISON.name     -> p.copy(poison     = event.newValue)
+                                CounterType.EXPERIENCE.name -> p.copy(experience = event.newValue)
+                                CounterType.ENERGY.name     -> p.copy(energy     = event.newValue)
+                                else -> p
+                            }
+                        })
+                    }
+                    checkPendingDefeat()
+                }
+            }
+            is SessionEvent.CommanderDamageReceived -> {
+                if (event.sourceSlot != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id != event.targetSlot) p
+                            else p.copy(commanderDamage = p.commanderDamage + (event.sourceSlot to event.newDamage))
+                        })
+                    }
+                    checkPendingDefeat()
                 }
             }
             is SessionEvent.StateUpdated -> {
@@ -933,7 +991,7 @@ class GameViewModel @Inject constructor(
     private fun schedulePersistLife(sessionId: String, slotIndex: Int, newLife: Int) {
         persistLifeJobs[slotIndex]?.cancel()
         persistLifeJobs[slotIndex] = viewModelScope.launch {
-            delay(1_500L)
+            delay(500L)
             runCatching { updateLifeUseCase.persist(sessionId, slotIndex, newLife) }
         }
     }

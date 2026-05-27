@@ -137,7 +137,23 @@ class SupabaseRealtimeClient @Inject constructor(
         ch.broadcastFlow<PhaseChangedPayload>(event = "phase_change").also { flow ->
             sessionScope.launch {
                 flow.collect { payload ->
-                    eventFlow.emit(SessionEvent.PhaseChangedReceived(payload.newPhase))
+                    eventFlow.emit(SessionEvent.PhaseChangedReceived(payload.newPhase, payload.activePlayerSlot, payload.turnNumber))
+                }
+            }
+        }
+
+        ch.broadcastFlow<CounterUpdatePayload>(event = "counter_update").also { flow ->
+            sessionScope.launch {
+                flow.collect { payload ->
+                    eventFlow.emit(SessionEvent.CounterUpdatedReceived(payload.slotIndex, payload.counterType, payload.newValue))
+                }
+            }
+        }
+
+        ch.broadcastFlow<CommanderDamagePayload>(event = "commander_damage").also { flow ->
+            sessionScope.launch {
+                flow.collect { payload ->
+                    eventFlow.emit(SessionEvent.CommanderDamageReceived(payload.targetSlot, payload.sourceSlot, payload.newDamage))
                 }
             }
         }
@@ -182,10 +198,24 @@ class SupabaseRealtimeClient @Inject constructor(
         )
     }
 
-    suspend fun broadcastPhaseChange(sessionId: String, newPhase: String) {
+    suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int) {
         sessions[sessionId]?.channel?.broadcast(
             event = "phase_change",
-            message = PhaseChangedPayload(newPhase),
+            message = PhaseChangedPayload(newPhase, activePlayerSlot, turnNumber),
+        )
+    }
+
+    suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int) {
+        sessions[sessionId]?.channel?.broadcast(
+            event = "counter_update",
+            message = CounterUpdatePayload(slotIndex, counterType, newValue),
+        )
+    }
+
+    suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int) {
+        sessions[sessionId]?.channel?.broadcast(
+            event = "commander_damage",
+            message = CommanderDamagePayload(targetSlot, sourceSlot, newDamage),
         )
     }
 
@@ -197,6 +227,22 @@ class SupabaseRealtimeClient @Inject constructor(
 
     @Serializable
     private data class PhaseChangedPayload(
-        @SerialName("new_phase") val newPhase: String,
+        @SerialName("new_phase")          val newPhase: String,
+        @SerialName("active_player_slot") val activePlayerSlot: Int,
+        @SerialName("turn_number")        val turnNumber: Int,
+    )
+
+    @Serializable
+    private data class CounterUpdatePayload(
+        @SerialName("slot_index")    val slotIndex: Int,
+        @SerialName("counter_type") val counterType: String,
+        @SerialName("new_value")    val newValue: Int,
+    )
+
+    @Serializable
+    private data class CommanderDamagePayload(
+        @SerialName("target_slot") val targetSlot: Int,
+        @SerialName("source_slot") val sourceSlot: Int,
+        @SerialName("new_damage")  val newDamage: Int,
     )
 }

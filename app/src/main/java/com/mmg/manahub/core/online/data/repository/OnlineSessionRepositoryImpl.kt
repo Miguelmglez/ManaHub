@@ -223,6 +223,12 @@ class OnlineSessionRepositoryImpl @Inject constructor(
     override suspend fun broadcastLifeDelta(sessionId: String, slotIndex: Int, newLife: Int) =
         realtimeClient.broadcastLifeDelta(sessionId, slotIndex, newLife)
 
-    override suspend fun broadcastPhaseChange(sessionId: String, newPhase: String) =
-        realtimeClient.broadcastPhaseChange(sessionId, newPhase)
+    override suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int) =
+        realtimeClient.broadcastPhaseChange(sessionId, newPhase, activePlayerSlot, turnNumber)
+
+    override suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int) =
+        realtimeClient.broadcastCounterUpdate(sessionId, slotIndex, counterType, newValue)
+
+    override suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int) =
+        realtimeClient.broadcastCommanderDamage(sessionId, targetSlot, sourceSlot, newDamage)
 }
