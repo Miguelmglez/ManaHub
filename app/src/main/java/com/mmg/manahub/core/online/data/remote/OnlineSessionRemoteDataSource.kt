@@ -14,8 +14,8 @@ import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Validates session join code matches backend format: 6 uppercase alphanumeric chars.
-private val SESSION_CODE_REGEX = Regex("^[A-Z0-9]{6}$")
+// Validates session join code matches backend format: 6 digits.
+private val SESSION_CODE_REGEX = Regex("^[0-9]{6}$")
 
 @Singleton
 class OnlineSessionRemoteDataSource @Inject constructor(
@@ -74,7 +74,7 @@ class OnlineSessionRemoteDataSource @Inject constructor(
         themeKey: String,
     ): Result<JoinSessionResponseDto> = withContext(ioDispatcher) {
         runCatching {
-            val sanitized = code.trim().uppercase()
+            val sanitized = code.trim()
             require(SESSION_CODE_REGEX.matches(sanitized)) { "Invalid session code format" }
             require(displayName.isNotBlank() && displayName.length <= 32) { "Display name must be 1–32 characters" }
             supabaseClient.postgrest.rpc(

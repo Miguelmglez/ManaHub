@@ -8,4 +8,7 @@ class ConfirmDefeatUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(sessionId: String, slotIndex: Int): Result<Unit> =
         repository.confirmDefeat(sessionId, slotIndex)
+
+    suspend fun broadcast(sessionId: String, slotIndex: Int) =
+        repository.broadcastDefeatConfirmed(sessionId, slotIndex)
 }

@@ -291,7 +291,7 @@ private fun GameSetupScreenContent(
                             )
                         }
 
-                        // ── Online multiplayer ────────────────────────────────────────────
+                       /* // ── Online multiplayer ────────────────────────────────────────────
                         Row(
                             modifier              = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -312,7 +312,7 @@ private fun GameSetupScreenContent(
                             ) {
                                 Text("Join Game", style = MaterialTheme.magicTypography.labelLarge, color = mc.secondaryAccent)
                             }
-                        }
+                        }*/
                     }
                 }
             }

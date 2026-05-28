@@ -15,6 +15,7 @@ import com.mmg.manahub.feature.game.domain.model.EliminationReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GamePhase
 import com.mmg.manahub.feature.game.domain.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.GridSlotPosition
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.PhaseStop
@@ -32,6 +33,7 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.NextTurnUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.RevokeDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.ToggleLandPlayedUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
@@ -41,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -108,6 +111,7 @@ class GameViewModel @Inject constructor(
     private val revokeDefeatUseCase:          RevokeDefeatUseCase,
     private val leaveSessionUseCase:          LeaveSessionUseCase,
     private val nearbyRepo:                   NearbySessionRepository,
+    private val toggleLandPlayedUseCase:      ToggleLandPlayedUseCase,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -133,6 +137,7 @@ class GameViewModel @Inject constructor(
     private var nearbyObserveJob: Job? = null
     private val persistLifeJobs  = mutableMapOf<Int, Job>()
     private var persistPhaseJob: Job? = null
+    private var syncPollingJob: Job? = null
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
@@ -300,7 +305,7 @@ class GameViewModel @Inject constructor(
             if (nextIndex == 0) {
                 // Phase wrapped — player's turn ends, advance to next player
                 val nextId      = nextActivePlayer(s)
-                val isNewRound  = nextId == s.players.filter { !it.defeated }.firstOrNull()?.id
+                val isNewRound  = nextId == s.players.firstOrNull { !it.defeated }?.id
                 s.copy(
                     currentPhase   = nextPhase,
                     turnNumber     = if (isNewRound) s.turnNumber + 1 else s.turnNumber,
@@ -360,6 +365,13 @@ class GameViewModel @Inject constructor(
                 else
                     s.hasPlayedLand + playerId
             )
+        }
+        val played = playerId in _uiState.value.hasPlayedLand
+        val sessionId = onlineSessionId
+        if (isNearbySession && playerId == mySlotIndex) {
+            nearbyRepo.sendMessage(NearbyGameMessage.LandToggled(playerId, played))
+        } else if (sessionId != null && playerId == mySlotIndex) {
+            viewModelScope.launch { toggleLandPlayedUseCase.broadcast(sessionId, playerId, played) }
         }
     }
 
@@ -423,7 +435,10 @@ class GameViewModel @Inject constructor(
         if (isNearbySession && playerId == mySlotIndex) {
             nearbyRepo.sendMessage(NearbyGameMessage.DefeatConfirmed(playerId))
         } else if (sessionId != null && playerId == mySlotIndex) {
-            viewModelScope.launch { runCatching { confirmDefeatUseCase(sessionId, playerId) } }
+            viewModelScope.launch {
+                confirmDefeatUseCase.broadcast(sessionId, playerId)
+                runCatching { confirmDefeatUseCase(sessionId, playerId) }
+            }
         }
     }
 
@@ -601,6 +616,23 @@ class GameViewModel @Inject constructor(
 
     // ── Online session ────────────────────────────────────────────────────────
 
+    /**
+     * Builds a [GameUiState.gridAssignment] map that ensures the local player always appears in the
+     * FULL_WIDTH_BOTTOM slot. In a 2-player layout slot 0 is TOP (rotated 180°) and slot 1
+     * is BOTTOM (normal). Without this swap the host (slot 0) would be shown upside-down
+     * at the top while holding the device.
+     *
+     * Returns an empty map (identity) when no swap is needed or the layout has no BOTTOM slot.
+     */
+    private fun buildOnlineGridAssignment(layout: LayoutTemplate, mySlotIndex: Int): Map<Int, Int> {
+        if (mySlotIndex == -1) return emptyMap()
+        val bottomSlotPlayerId = layout.slots
+            .firstOrNull { it.position == GridSlotPosition.FULL_WIDTH_BOTTOM }
+            ?.playerId ?: return emptyMap()
+        if (mySlotIndex == bottomSlotPlayerId) return emptyMap()
+        return mapOf(bottomSlotPlayerId to mySlotIndex, mySlotIndex to bottomSlotPlayerId)
+    }
+
     fun initFromOnlineSession(
         sessionId:   String,
         mySlotIndex: Int,
@@ -633,6 +665,7 @@ class GameViewModel @Inject constructor(
             mode            = mode,
             activePlayerId  = players.first().id,
             activeLayout    = actualLayout,
+            gridAssignment  = buildOnlineGridAssignment(actualLayout, mySlotIndex),
             gameStartTime   = System.currentTimeMillis(),
             isGameRunning   = true,
             isOnlineSession = true,
@@ -646,10 +679,26 @@ class GameViewModel @Inject constructor(
             setCustomKey("online_session_id", sessionId)
         }
         connectAndObserveOnlineSession(sessionId)
+        startInGameSyncPolling(sessionId)
     }
 
     private fun connectAndObserveOnlineSession(sessionId: String) {
         onlineObserveJob = viewModelScope.launch {
+            // 1. Tear down stale lobby channel first.
+            runCatching { observeSessionUseCase.disconnect(sessionId) }
+            // 2. Create fresh game-owned subscription before the HTTP snapshot so any
+            // broadcasts during the HTTP call land in the replay buffer.
+            runCatching { observeSessionUseCase.connect(sessionId) }
+                .onFailure { throwable ->
+                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("online_game_realtime_connect_failed: ${throwable::class.simpleName}")
+                        recordException(throwable)
+                    }
+                    // Do NOT abandon — polling fallback (startInGameSyncPolling) handles sync.
+                    return@launch
+                }
+            // 3. Load initial state AFTER subscribing so broadcasts during the HTTP call are buffered.
             observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
                 val participantsBySlot = snapshot.participants.associateBy { it.slotIndex }
                 val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
@@ -676,17 +725,19 @@ class GameViewModel @Inject constructor(
                     )
                 }
             }
-            runCatching { observeSessionUseCase.connect(sessionId) }
-                .onFailure { throwable ->
-                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("online_game_realtime_connect_failed: ${throwable::class.simpleName}")
-                        recordException(throwable)
-                    }
-                    _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
-                    return@launch
+            // 4. Collect events; wrap in runCatching so a WebSocket drop is logged and
+            // does not silently cancel the job without any record.
+            runCatching {
+                observeSessionUseCase(sessionId).collect { event -> handleOnlineEvent(event) }
+            }.onFailure { throwable ->
+                if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+                FirebaseCrashlytics.getInstance().apply {
+                    log("online_game_realtime_stream_dropped: ${throwable::class.simpleName}")
+                    setCustomKey("online_session_id", sessionId)
+                    recordException(throwable)
                 }
-            observeSessionUseCase(sessionId).collect { event -> handleOnlineEvent(event) }
+                // Polling via startInGameSyncPolling continues as fallback.
+            }
         }
     }
 
@@ -705,10 +756,12 @@ class GameViewModel @Inject constructor(
             is SessionEvent.PhaseChangedReceived -> {
                 _uiState.update { s ->
                     val phase = runCatching { GamePhase.valueOf(event.newPhase) }.getOrDefault(s.currentPhase)
+                    val newTurn = event.activePlayerSlot != s.activePlayerId || event.turnNumber != s.turnNumber
                     s.copy(
                         currentPhase   = phase,
                         activePlayerId = event.activePlayerSlot,
                         turnNumber     = event.turnNumber,
+                        hasPlayedLand  = if (newTurn) emptySet() else s.hasPlayedLand,
                     )
                 }
             }
@@ -738,6 +791,26 @@ class GameViewModel @Inject constructor(
                     checkPendingDefeat()
                 }
             }
+            is SessionEvent.DefeatConfirmedReceived -> {
+                if (event.slotIndex != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == event.slotIndex) p.copy(defeated = true, pendingDefeat = false, isSurviving = false)
+                            else p
+                        })
+                    }
+                    checkWinner()
+                }
+            }
+            is SessionEvent.LandToggledReceived -> {
+                if (event.slotIndex != mySlotIndex) {
+                    _uiState.update { s ->
+                        val newSet = if (event.played) s.hasPlayedLand + event.slotIndex
+                                     else s.hasPlayedLand - event.slotIndex
+                        s.copy(hasPlayedLand = newSet)
+                    }
+                }
+            }
             is SessionEvent.StateUpdated -> {
                 _uiState.update { s ->
                     s.copy(
@@ -762,12 +835,19 @@ class GameViewModel @Inject constructor(
                         })
                     }
                     checkPendingDefeat()
+                    checkWinner()
                 }
             }
             is SessionEvent.SessionStatusChanged -> {
-                if (event.status == OnlineSessionStatus.ABANDONED ||
-                    event.status == OnlineSessionStatus.FINISHED) {
-                    _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                when (event.status) {
+                    OnlineSessionStatus.ABANDONED ->
+                        _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                    OnlineSessionStatus.FINISHED ->
+                        // Normal game end: don't abandon. Player states with defeated=true
+                        // arrive via DefeatConfirmedReceived broadcast or PlayerStateUpdated CDC,
+                        // which call checkWinner() and trigger the result screen naturally.
+                        Unit
+                    else -> Unit
                 }
             }
             is SessionEvent.ParticipantUpdated -> { /* presence handled in lobby */ }
@@ -816,6 +896,7 @@ class GameViewModel @Inject constructor(
             mode            = mode,
             activePlayerId  = players.first().id,
             activeLayout    = actualLayout,
+            gridAssignment  = buildOnlineGridAssignment(actualLayout, slotIndex),
             gameStartTime   = System.currentTimeMillis(),
             isGameRunning   = true,
             isOnlineSession = true, // Reuse online flag for UI elements that assume networked game
@@ -948,6 +1029,15 @@ class GameViewModel @Inject constructor(
                     }
                 }
             }
+            is NearbyGameMessage.LandToggled -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        val newSet = if (message.played) s.hasPlayedLand + message.slot
+                                     else s.hasPlayedLand - message.slot
+                        s.copy(hasPlayedLand = newSet)
+                    }
+                }
+            }
             is NearbyGameMessage.GameFinished -> {
                 // Resolved locally via checkWinner, but just in case:
             }
@@ -988,6 +1078,59 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Polling fallback for in-game state sync. Reads a fresh snapshot from the DB every 3 s
+     * and applies remote players' state to [_uiState]. The local player's optimistic state is
+     * never overwritten. This guarantees eventual consistency even when Supabase Realtime
+     * broadcasts fail to arrive (e.g. stale channel, network hiccup).
+     */
+    private fun startInGameSyncPolling(sessionId: String) {
+        syncPollingJob?.cancel()
+        syncPollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(3_000L)
+                val state = _uiState.value
+                if (state.winner != null || !state.isGameRunning) break
+                observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                    if (snapshot.session.status == OnlineSessionStatus.ABANDONED) {
+                        if (!_uiState.value.isOnlineSessionAbandoned) {
+                            _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                        }
+                        return@onSuccess
+                    }
+                    // FINISHED: fall through — update defeated states so checkWinner() can
+                    // trigger the result screen. Do NOT set isOnlineSessionAbandoned.
+                    val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
+                    _uiState.update { s ->
+                        val newTurn = snapshot.sessionState.activePlayerSlot != s.activePlayerId || snapshot.sessionState.turnNumber != s.turnNumber
+                        s.copy(
+                            players = s.players.map { p ->
+                                // Never overwrite the local player's optimistic state.
+                                if (p.id == mySlotIndex) return@map p
+                                val ps = playerStatesBySlot[p.id] ?: return@map p
+                                p.copy(
+                                    life       = ps.life,
+                                    poison     = ps.poison,
+                                    experience = ps.experience,
+                                    energy     = ps.energy,
+                                    defeated   = ps.defeated,
+                                )
+                            },
+                            currentPhase   = runCatching {
+                                GamePhase.valueOf(snapshot.sessionState.currentPhase)
+                            }.getOrDefault(s.currentPhase),
+                            activePlayerId = snapshot.sessionState.activePlayerSlot,
+                            turnNumber     = snapshot.sessionState.turnNumber,
+                            hasPlayedLand  = if (newTurn) emptySet() else s.hasPlayedLand,
+                        )
+                    }
+                    checkPendingDefeat()
+                    checkWinner()
+                }
+            }
+        }
+    }
+
     private fun schedulePersistLife(sessionId: String, slotIndex: Int, newLife: Int) {
         persistLifeJobs[slotIndex]?.cancel()
         persistLifeJobs[slotIndex] = viewModelScope.launch {
@@ -1010,6 +1153,7 @@ class GameViewModel @Inject constructor(
         nearbyObserveJob?.cancel()
         persistLifeJobs.values.forEach { it.cancel() }
         persistPhaseJob?.cancel()
+        syncPollingJob?.cancel()
         val sessionId = onlineSessionId ?: return
         if (isNearbySession) {
             nearbyRepo.disconnect()
@@ -1162,7 +1306,6 @@ class GameViewModel @Inject constructor(
     private fun recordTournamentResultIfNeeded(sessionId: Long, result: GameResult) {
         val s = _uiState.value
         val matchId = s.activeTournamentMatchId ?: return
-        val tournamentId = s.activeTournamentId ?: return
 
         // Guard: if tournament player id list does not cover every game player,
         // recording the result would silently map some players to wrong tournament

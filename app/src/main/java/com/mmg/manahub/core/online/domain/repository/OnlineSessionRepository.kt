@@ -29,4 +29,6 @@ interface OnlineSessionRepository {
     suspend fun broadcastPhaseChange(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int)
     suspend fun broadcastCounterUpdate(sessionId: String, slotIndex: Int, counterType: String, newValue: Int)
     suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int)
+    suspend fun broadcastDefeatConfirmed(sessionId: String, slotIndex: Int)
+    suspend fun broadcastLandToggled(sessionId: String, slotIndex: Int, played: Boolean)
 }

@@ -101,6 +101,8 @@ class LobbyHostViewModel @Inject constructor(
      */
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    private var gameLaunched = false
+
     init {
         // Pre-fill mode and playerCount if navigated from GameSetupScreen
         savedStateHandle.get<String>("mode")
@@ -307,6 +309,7 @@ class LobbyHostViewModel @Inject constructor(
 
             startSessionUseCase(sessionId).fold(
                 onSuccess = {
+                    gameLaunched = true
                     crashlytics.log("online_session_start_success: mode=${state.gameMode.name}")
                     _uiState.update { it.copy(isLoading = false) }
                     onGameStart(sessionId, state.gameMode, state.playerCount)
@@ -476,7 +479,7 @@ class LobbyHostViewModel @Inject constructor(
         "Too many failed join attempts" in message ->
             "Demasiados intentos fallidos. Espera 5 minutos."
         "Invalid session code format" in message ->
-            "Código inválido. Debe ser 6 caracteres alfanuméricos."
+            "Código inválido. Debe ser 6 dígitos."
         "Session limit reached" in message ->
             "Ya tienes una sala activa. Ciérrala antes de crear otra."
         "Session is full" in message ->
@@ -495,8 +498,12 @@ class LobbyHostViewModel @Inject constructor(
             cleanupScope.cancel()
             return
         }
-        cleanupScope.launch {
-            observeSessionUseCase.disconnect(sessionId)
+        if (!gameLaunched) {
+            cleanupScope.launch {
+                observeSessionUseCase.disconnect(sessionId)
+                cleanupScope.cancel()
+            }
+        } else {
             cleanupScope.cancel()
         }
     }
