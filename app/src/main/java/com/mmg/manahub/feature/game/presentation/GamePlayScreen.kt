@@ -252,6 +252,7 @@ private fun GamePlayContent(
                     turnNumber = uiState.turnNumber,
                     hasPlayedLand = uiState.hasPlayedLand,
                     gameSettings = uiState.gameSettings,
+                    isOnlineSession = uiState.isOnlineSession,
                     onLifeChange = onLifeChange,
                     onCmdPanel = onCmdPanel,
                     onCtrPanel = onCtrPanel,
@@ -414,6 +415,7 @@ private fun GamePlayerGrid(
     turnNumber: Int,
     hasPlayedLand: Set<Int>,
     gameSettings: GameSettings,
+    isOnlineSession: Boolean,
     onLifeChange: (playerId: Int, delta: Int) -> Unit,
     onCmdPanel: (playerId: Int) -> Unit,
     onCtrPanel: (playerId: Int) -> Unit,
@@ -484,6 +486,7 @@ private fun GamePlayerGrid(
                                     key(player.id) {
                                         val rotation = playerRotations[player.id]
                                             ?: slot.position.toDefaultDegrees()
+                                        val isInteractable = !isOnlineSession || player.isAppUser
                                         PlayerCard(
                                             player = player,
                                             gameMode = gameMode,
@@ -492,13 +495,13 @@ private fun GamePlayerGrid(
                                             turnNumber = turnNumber,
                                             landPlayed = player.id in hasPlayedLand,
                                             gameSettings = gameSettings,
-                                            onLife = { d -> onLifeChange(player.id, d) },
-                                            onCmdPanel = { onCmdPanel(player.id) },
-                                            onCtrPanel = { onCtrPanel(player.id) },
-                                            onConfirmDefeat = { onConfirmDefeat(player.id) },
-                                            onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                            onEndTurn = onEndTurn,
-                                            onLandToggle = { onToggleLand(player.id) },
+                                            onLife = if (isInteractable) { d -> onLifeChange(player.id, d) } else { _ -> },
+                                            onCmdPanel = if (isInteractable) { { onCmdPanel(player.id) } } else { {} },
+                                            onCtrPanel = if (isInteractable) { { onCtrPanel(player.id) } } else { {} },
+                                            onConfirmDefeat = if (isInteractable) { { onConfirmDefeat(player.id) } } else { {} },
+                                            onRevokeDefeat = if (isInteractable) { { onRevokeDefeat(player.id) } } else { {} },
+                                            onEndTurn = if (isInteractable) onEndTurn else { {} },
+                                            onLandToggle = if (isInteractable) { { onToggleLand(player.id) } } else { {} },
                                             onPlayerNameClick = onPlayerNameClick,
                                             modifier = Modifier.fillMaxSize(),
                                         )
@@ -524,6 +527,7 @@ private fun GamePlayerGrid(
                                     key(player.id) {
                                         val rotation = playerRotations[player.id]
                                             ?: slot.position.toDefaultDegrees()
+                                        val isInteractable = !isOnlineSession || player.isAppUser
                                         PlayerCard(
                                             player = player,
                                             gameMode = gameMode,
@@ -532,13 +536,13 @@ private fun GamePlayerGrid(
                                             turnNumber = turnNumber,
                                             landPlayed = player.id in hasPlayedLand,
                                             gameSettings = gameSettings,
-                                            onLife = { d -> onLifeChange(player.id, d) },
-                                            onCmdPanel = { onCmdPanel(player.id) },
-                                            onCtrPanel = { onCtrPanel(player.id) },
-                                            onConfirmDefeat = { onConfirmDefeat(player.id) },
-                                            onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                            onEndTurn = onEndTurn,
-                                            onLandToggle = { onToggleLand(player.id) },
+                                            onLife = if (isInteractable) { d -> onLifeChange(player.id, d) } else { _ -> },
+                                            onCmdPanel = if (isInteractable) { { onCmdPanel(player.id) } } else { {} },
+                                            onCtrPanel = if (isInteractable) { { onCtrPanel(player.id) } } else { {} },
+                                            onConfirmDefeat = if (isInteractable) { { onConfirmDefeat(player.id) } } else { {} },
+                                            onRevokeDefeat = if (isInteractable) { { onRevokeDefeat(player.id) } } else { {} },
+                                            onEndTurn = if (isInteractable) onEndTurn else { {} },
+                                            onLandToggle = if (isInteractable) { { onToggleLand(player.id) } } else { {} },
                                             onPlayerNameClick = onPlayerNameClick,
                                             modifier = Modifier.fillMaxSize(),
                                         )
@@ -573,6 +577,7 @@ private fun GamePlayerGrid(
                                                 key(player.id) {
                                                     val rotation = playerRotations[player.id]
                                                         ?: slot.position.toDefaultDegrees()
+                                                    val isInteractable = !isOnlineSession || player.isAppUser
                                                     PlayerCard(
                                                         player = player,
                                                         gameMode = gameMode,
@@ -581,13 +586,13 @@ private fun GamePlayerGrid(
                                                         turnNumber = turnNumber,
                                                         landPlayed = player.id in hasPlayedLand,
                                                         gameSettings = gameSettings,
-                                                        onLife = { d -> onLifeChange(player.id, d) },
-                                                        onCmdPanel = { onCmdPanel(player.id) },
-                                                        onCtrPanel = { onCtrPanel(player.id) },
-                                                        onConfirmDefeat = { onConfirmDefeat(player.id) },
-                                                        onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                                        onEndTurn = onEndTurn,
-                                                        onLandToggle = { onToggleLand(player.id) },
+                                                        onLife = if (isInteractable) { d -> onLifeChange(player.id, d) } else { _ -> },
+                                                        onCmdPanel = if (isInteractable) { { onCmdPanel(player.id) } } else { {} },
+                                                        onCtrPanel = if (isInteractable) { { onCtrPanel(player.id) } } else { {} },
+                                                        onConfirmDefeat = if (isInteractable) { { onConfirmDefeat(player.id) } } else { {} },
+                                                        onRevokeDefeat = if (isInteractable) { { onRevokeDefeat(player.id) } } else { {} },
+                                                        onEndTurn = if (isInteractable) onEndTurn else { {} },
+                                                        onLandToggle = if (isInteractable) { { onToggleLand(player.id) } } else { {} },
                                                         onPlayerNameClick = onPlayerNameClick,
                                                         modifier = Modifier.fillMaxSize(),
                                                     )
@@ -614,6 +619,7 @@ private fun GamePlayerGrid(
                                                 key(player.id) {
                                                     val rotation = playerRotations[player.id]
                                                         ?: slot.position.toDefaultDegrees()
+                                                    val isInteractable = !isOnlineSession || player.isAppUser
                                                     PlayerCard(
                                                         player = player,
                                                         gameMode = gameMode,
@@ -622,13 +628,13 @@ private fun GamePlayerGrid(
                                                         turnNumber = turnNumber,
                                                         landPlayed = player.id in hasPlayedLand,
                                                         gameSettings = gameSettings,
-                                                        onLife = { d -> onLifeChange(player.id, d) },
-                                                        onCmdPanel = { onCmdPanel(player.id) },
-                                                        onCtrPanel = { onCtrPanel(player.id) },
-                                                        onConfirmDefeat = { onConfirmDefeat(player.id) },
-                                                        onRevokeDefeat = { onRevokeDefeat(player.id) },
-                                                        onEndTurn = onEndTurn,
-                                                        onLandToggle = { onToggleLand(player.id) },
+                                                        onLife = if (isInteractable) { d -> onLifeChange(player.id, d) } else { _ -> },
+                                                        onCmdPanel = if (isInteractable) { { onCmdPanel(player.id) } } else { {} },
+                                                        onCtrPanel = if (isInteractable) { { onCtrPanel(player.id) } } else { {} },
+                                                        onConfirmDefeat = if (isInteractable) { { onConfirmDefeat(player.id) } } else { {} },
+                                                        onRevokeDefeat = if (isInteractable) { { onRevokeDefeat(player.id) } } else { {} },
+                                                        onEndTurn = if (isInteractable) onEndTurn else { {} },
+                                                        onLandToggle = if (isInteractable) { { onToggleLand(player.id) } } else { {} },
                                                         onPlayerNameClick = onPlayerNameClick,
                                                         modifier = Modifier.fillMaxSize(),
                                                     )
@@ -697,7 +703,7 @@ private fun PlayerCard(
 
     val lifeColor = when {
         player.life <= 0 -> mc.lifeNegative
-        player.life > startingLife -> mc.lifePositive
+        player.life > startingLife -> player.theme.accent
         else -> mc.textPrimary
     }
 

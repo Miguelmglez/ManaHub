@@ -70,7 +70,7 @@ class LobbyJoinViewModelTest {
 
     companion object {
         const val SESSION_ID   = "session-xyz-999"
-        const val SESSION_CODE = "XYZ999"
+        const val SESSION_CODE = "123456"
         const val SLOT_INDEX   = 2
     }
 
@@ -166,15 +166,15 @@ class LobbyJoinViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given lowercase code when onCodeChanged then code is uppercased`() = runTest {
+    fun `given mixed input when onCodeChanged then only digits are kept`() = runTest {
         // Arrange
         val vm = createViewModel()
 
-        // Act
+        // Act — letters are stripped, only digits remain
         vm.onCodeChanged("abc123")
 
         // Assert
-        assertEquals("ABC123", vm.uiState.value.codeInput)
+        assertEquals("123", vm.uiState.value.codeInput)
     }
 
     @Test
@@ -183,22 +183,22 @@ class LobbyJoinViewModelTest {
         val vm = createViewModel()
 
         // Act
-        vm.onCodeChanged("ABCDEFGHI")
+        vm.onCodeChanged("123456789")
 
         // Assert
-        assertEquals("ABCDEF", vm.uiState.value.codeInput)
+        assertEquals("123456", vm.uiState.value.codeInput)
     }
 
     @Test
-    fun `given exactly 6 char code when onCodeChanged then stored as-is`() = runTest {
+    fun `given exactly 6 digit code when onCodeChanged then stored as-is`() = runTest {
         // Arrange
         val vm = createViewModel()
 
         // Act
-        vm.onCodeChanged("XYZ999")
+        vm.onCodeChanged("123456")
 
         // Assert
-        assertEquals("XYZ999", vm.uiState.value.codeInput)
+        assertEquals("123456", vm.uiState.value.codeInput)
     }
 
     @Test
@@ -409,7 +409,7 @@ class LobbyJoinViewModelTest {
         advanceUntilIdle()
 
         // Assert — error set (either by client validation or mapped from backend)
-        assertEquals("Código inválido. Debe ser 6 caracteres alfanuméricos.", vm.uiState.value.error)
+        assertEquals("Código inválido. Debe ser 6 dígitos.", vm.uiState.value.error)
     }
 
     @Test
@@ -828,7 +828,7 @@ class LobbyJoinViewModelTest {
         coVerify(exactly = 0) { joinSessionUseCase(any(), any(), any()) }
         assertEquals(
             "Client-side validation must fire for non-alphanumeric code",
-            "Código inválido. Debe ser 6 caracteres alfanuméricos.",
+            "Código inválido. Debe ser 6 dígitos.",
             vm.uiState.value.error,
         )
     }
@@ -846,7 +846,7 @@ class LobbyJoinViewModelTest {
         // Assert
         coVerify(exactly = 0) { joinSessionUseCase(any(), any(), any()) }
         assertEquals(
-            "Código inválido. Debe ser 6 caracteres alfanuméricos.",
+            "Código inválido. Debe ser 6 dígitos.",
             vm.uiState.value.error,
         )
     }
@@ -864,7 +864,7 @@ class LobbyJoinViewModelTest {
         // Assert
         coVerify(exactly = 0) { joinSessionUseCase(any(), any(), any()) }
         assertEquals(
-            "Código inválido. Debe ser 6 caracteres alfanuméricos.",
+            "Código inválido. Debe ser 6 dígitos.",
             vm.uiState.value.error,
         )
     }
@@ -899,7 +899,7 @@ class LobbyJoinViewModelTest {
         // Assert
         coVerify(exactly = 0) { joinSessionUseCase(any(), any(), any()) }
         assertEquals(
-            "Código inválido. Debe ser 6 caracteres alfanuméricos.",
+            "Código inválido. Debe ser 6 dígitos.",
             vm.uiState.value.error,
         )
     }

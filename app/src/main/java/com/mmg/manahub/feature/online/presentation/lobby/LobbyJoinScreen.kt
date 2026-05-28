@@ -255,8 +255,7 @@ private fun LobbyJoinContent(
                         ),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Characters,
-                            keyboardType = KeyboardType.Ascii,
+                            keyboardType = KeyboardType.Number,
                         ),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = mc.primaryAccent,
