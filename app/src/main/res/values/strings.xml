@@ -884,6 +884,107 @@
     <string name="survey_duration_min">%1$d min</string>
 
     <!-- ══════════════════════════════════════════
+         DECK PLAYTEST
+    ═══════════════════════════════════════════ -->
+
+    <!-- Setup screen -->
+    <string name="playtest_setup_title">Deck Playtest Setup</string>
+    <string name="playtest_card_count">%1$d cards</string>
+    <string name="playtest_draw_count_label">Cards to draw</string>
+    <string name="playtest_play_draw_label">Are you on the play or the draw?</string>
+    <string name="playtest_on_the_play">On the Play</string>
+    <string name="playtest_on_the_draw">On the Draw</string>
+    <string name="playtest_draw_hand_cta">Draw Opening Hand</string>
+    <string name="playtest_commander_library_note">Commander is set aside in the Command Zone. Library: 99 cards.</string>
+
+    <!-- Hand screen -->
+    <string name="playtest_hand_title">Hand (%1$d)</string>
+    <string name="playtest_mulligan_chip">%1$d mulligan(s)</string>
+    <string name="playtest_mulligan_keep_hint">Keep → put %1$d card(s) on the bottom</string>
+    <string name="playtest_action_new_hand">New Hand</string>
+    <string name="playtest_action_keep">Keep</string>
+    <string name="playtest_action_mulligan">Mulligan</string>
+    <string name="playtest_action_start">Start Playtest</string>
+    <string name="playtest_flip">Flip</string>
+
+    <!-- Command zone -->
+    <string name="playtest_command_zone_label">Command Zone</string>
+    <string name="playtest_library_size">Library: %1$d</string>
+
+    <!-- Bottom-N selector -->
+    <string name="playtest_bottom_n_title">Put %1$d card(s) on the bottom</string>
+    <string name="playtest_bottom_n_progress">Selected %1$d / %2$d</string>
+    <string name="playtest_bottom_n_confirm">Confirm</string>
+
+    <!-- Save sheet -->
+    <string name="playtest_save_title">Save this test?</string>
+    <string name="playtest_save_summary">%1$s · %2$d-card hand · %3$d mulligan(s)</string>
+    <string name="playtest_save_without_survey">Save without survey</string>
+    <string name="playtest_save_and_survey">Save + Add survey</string>
+    <string name="playtest_discard">Discard (don\'t save)</string>
+
+    <!-- Survey sheet -->
+    <string name="playtest_survey_title">Hand Survey</string>
+    <string name="playtest_survey_back">Back</string>
+    <string name="playtest_survey_next">Next</string>
+    <string name="playtest_survey_finish">Finish</string>
+
+    <!-- Survey panels -->
+    <string name="playtest_panel_hand_quality">Hand Quality</string>
+    <string name="playtest_panel_mana_analysis">Mana Analysis</string>
+    <string name="playtest_panel_curve_feel">Curve Feel</string>
+    <string name="playtest_panel_card_judgment">Card Judgment</string>
+    <string name="playtest_panel_free_notes">Notes</string>
+
+    <!-- Survey questions -->
+    <string name="playtest_q_hand_keepable">Would you keep this hand?</string>
+    <string name="playtest_q_hand_rating">Rate the hand quality (1–5)</string>
+    <string name="playtest_q_mana_land_count">How many lands in hand?</string>
+    <string name="playtest_q_mana_health">How does the mana look?</string>
+    <string name="playtest_q_curve_feel">How does the curve feel?</string>
+    <string name="playtest_q_strategy_ready">Is the hand strategy-ready?</string>
+    <string name="playtest_q_missing_piece">What is missing from the hand?</string>
+    <string name="playtest_q_card_impact">Rate each card\'s potential impact</string>
+    <string name="playtest_q_free_notes">Any notes about this hand?</string>
+
+    <!-- Survey answers -->
+    <string name="playtest_a_snap_keep">Snap Keep</string>
+    <string name="playtest_a_keep_borderline">Keep (Borderline)</string>
+    <string name="playtest_a_mulligan_it">Would Mulligan</string>
+    <string name="playtest_a_hard_mulligan">Hard Mulligan</string>
+
+    <string name="playtest_a_lands_zero">0 lands</string>
+    <string name="playtest_a_lands_one">1 land</string>
+    <string name="playtest_a_lands_two">2 lands</string>
+    <string name="playtest_a_lands_three">3 lands</string>
+    <string name="playtest_a_lands_four_plus">4+ lands</string>
+
+    <string name="playtest_a_mana_smooth">Smooth</string>
+    <string name="playtest_a_mana_flooded">Flooded</string>
+    <string name="playtest_a_mana_screwed">Screwed</string>
+    <string name="playtest_a_mana_color_issues">Color Issues</string>
+    <string name="playtest_a_mana_perfect">Perfect</string>
+
+    <string name="playtest_a_curve_aggro">Aggro Ready</string>
+    <string name="playtest_a_curve_midrange">Midrange</string>
+    <string name="playtest_a_curve_grindy">Grindy</string>
+    <string name="playtest_a_curve_explosive">Explosive</string>
+    <string name="playtest_a_curve_clunky">Clunky</string>
+
+    <string name="playtest_a_strategy_fully">Fully Ready</string>
+    <string name="playtest_a_strategy_partially">Partially Ready</string>
+    <string name="playtest_a_strategy_barely">Barely Ready</string>
+    <string name="playtest_a_strategy_no">Not Ready</string>
+
+    <string name="playtest_a_missing_lands">Lands</string>
+    <string name="playtest_a_missing_removal">Removal</string>
+    <string name="playtest_a_missing_wincon">Win Condition</string>
+    <string name="playtest_a_missing_ramp">Ramp</string>
+    <string name="playtest_a_missing_draw">Card Draw</string>
+    <string name="playtest_a_missing_nothing">Nothing Missing</string>
+    <string name="playtest_session_expired">Playtest session data was lost (process was killed). Please go back and start a new session.</string>
+
+    <!-- ══════════════════════════════════════════
          TOURNAMENT SCREEN
     ═══════════════════════════════════════════ -->
     <string name="tournament_setup_title">New Tournament</string>

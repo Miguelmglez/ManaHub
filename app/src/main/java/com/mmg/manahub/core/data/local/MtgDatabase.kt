@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
+import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
@@ -18,6 +19,9 @@ import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.ManaSymbolEntity
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
+import com.mmg.manahub.core.data.local.entity.PlaytestCardStatEntity
+import com.mmg.manahub.core.data.local.entity.PlaytestSessionEntity
+import com.mmg.manahub.core.data.local.entity.PlaytestSurveyAnswerEntity
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
@@ -66,8 +70,11 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         LocalWishlistEntity::class,
         LocalOpenForTradeEntity::class,
         TradeCollectionSyncEntity::class,
+        PlaytestSessionEntity::class,
+        PlaytestCardStatEntity::class,
+        PlaytestSurveyAnswerEntity::class,
     ],
-    version = 35,
+    version = 36,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -87,4 +94,5 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun localWishlistDao(): LocalWishlistDao
     abstract fun localOpenForTradeDao(): LocalOpenForTradeDao
     abstract fun tradeCollectionSyncDao(): TradeCollectionSyncDao
+    abstract fun playtestDao(): PlaytestDao
 }

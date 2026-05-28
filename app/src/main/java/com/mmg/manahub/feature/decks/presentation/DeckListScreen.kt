@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -84,6 +85,7 @@ import java.util.Locale
 @Composable
 fun DeckListScreen(
     onDeckClick:       (deckId: String) -> Unit,
+    onPlaytestClick:   (deckId: String) -> Unit = {},
     viewModel:         DeckViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -128,9 +130,10 @@ fun DeckListScreen(
                     ) {
                         items(uiState.decks, key = { it.id }) { deck ->
                             DeckItem(
-                                deck     = deck,
-                                onClick  = { onDeckClick(deck.id) },
-                                onDelete = { viewModel.deleteDeck(deck.id) },
+                                deck        = deck,
+                                onClick     = { onDeckClick(deck.id) },
+                                onDelete    = { viewModel.deleteDeck(deck.id) },
+                                onPlaytest  = { onPlaytestClick(deck.id) },
                             )
                         }
                     }
@@ -178,9 +181,10 @@ fun DeckListScreen(
 
 @Composable
 private fun DeckItem(
-    deck:     DeckSummary,
-    onClick:  () -> Unit,
-    onDelete: () -> Unit,
+    deck:      DeckSummary,
+    onClick:   () -> Unit,
+    onDelete:  () -> Unit,
+    onPlaytest: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -316,6 +320,19 @@ private fun DeckItem(
                         Spacer(Modifier.height(4.dp))
                         ColorIdentityRow(colorIdentity = deck.colorIdentity)
                     }
+                }
+
+                // Playtest button
+                IconButton(
+                    onClick = onPlaytest,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = stringResource(R.string.playtest_action_start),
+                        tint               = mc.primaryAccent,
+                        modifier           = Modifier.size(20.dp),
+                    )
                 }
 
                 // Delete button

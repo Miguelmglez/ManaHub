@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -125,6 +126,7 @@ fun DeckMagicDetailScreen(
     onBack: () -> Unit,
     onImproveDeck: (String) -> Unit,
     onReviewSurvey: (Long) -> Unit = {},
+    onPlaytest: (deckId: String) -> Unit = {},
     viewModel: DeckMagicDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -192,6 +194,17 @@ fun DeckMagicDetailScreen(
                                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                                 )
                             }
+                        }
+                    }
+
+                    // Playtest button — launches setup screen for this deck.
+                    uiState.deck?.id?.let { deckId ->
+                        IconButton(onClick = { onPlaytest(deckId) }) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "Playtest deck",
+                                tint = mc.primaryAccent,
+                            )
                         }
                     }
 

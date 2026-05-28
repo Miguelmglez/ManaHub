@@ -32,6 +32,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -76,6 +77,10 @@ import com.mmg.manahub.feature.online.presentation.lobby.LobbyJoinScreen
 import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
 import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
 import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
+import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Bottom-bar visibility rules
@@ -141,6 +146,7 @@ fun AppNavGraph(
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
 
+    var pendingPlaytestSetup by remember { mutableStateOf<PlaytestSetup?>(null) }
     var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
     var pendingLayout by remember { mutableStateOf<LayoutTemplate?>(null) }
     var pendingGameSettings by remember { mutableStateOf(GameSettings()) }
@@ -200,6 +206,9 @@ fun AppNavGraph(
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
                     onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onPlaytestClick = { id ->
+                        navController.navigate(Screen.PlaytestSetup.createRoute(id))
+                    },
                     onNavigateToTradeProposal = { receiverId ->
                         navController.navigate(Screen.CreateTradeProposal.createRoute(receiverId))
                     },
@@ -254,6 +263,9 @@ fun AppNavGraph(
                     },
                     onReviewSurvey = { sessionId ->
                         navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
+                    },
+                    onPlaytest = { id ->
+                        navController.navigate(Screen.PlaytestSetup.createRoute(id))
                     },
                 )
             }
@@ -729,6 +741,53 @@ fun AppNavGraph(
                         }
                     },
                 )
+            }
+
+            // ── Deck Playtest ─────────────────────────────────────────────────
+            composable(
+                route     = Screen.PlaytestSetup.route,
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
+            ) {
+                PlaytestSetupScreen(
+                    onBack            = { navController.popBackStack() },
+                    onNavigateToHand  = { setup ->
+                        pendingPlaytestSetup = setup
+                        navController.navigate(Screen.PlaytestHand.createRoute(setup.deckId))
+                    },
+                )
+            }
+
+            composable(
+                route     = Screen.PlaytestHand.route,
+                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
+            ) {
+                val setup = pendingPlaytestSetup
+                if (setup != null) {
+                    PlaytestHandScreen(
+                        setup  = setup,
+                        onBack = { navController.popBackStack() },
+                    )
+                } else {
+                    // Process death / back-stack restore: the in-memory setup was lost.
+                    // Record as non-fatal to quantify how often process death hits real users.
+                    LaunchedEffect(Unit) {
+                        FirebaseCrashlytics.getInstance().apply {
+                            log("playtest_hand_session_expired: pendingSetup was null on route restore")
+                            recordException(
+                                IllegalStateException("[AppNavGraph] PlaytestHand restored with null pendingPlaytestSetup — process death suspected")
+                            )
+                        }
+                    }
+                    FullErrorState(
+                        message    = androidx.compose.ui.res.stringResource(
+                            com.mmg.manahub.R.string.playtest_session_expired,
+                        ),
+                        retryLabel = androidx.compose.ui.res.stringResource(
+                            com.mmg.manahub.R.string.action_back,
+                        ),
+                        onRetry    = { navController.popBackStack() },
+                    )
+                }
             }
 
             // ── Post-game survey ──────────────────────────────────────────────

@@ -105,6 +105,22 @@ sealed class Screen(val route: String) {
         fun route(code: String = "") = "online/lobby/join?code=$code"
     }
 
+    // ── Deck Playtest ─────────────────────────────────────────────────────────
+
+    /** Setup screen: choose draw count and on-the-play/draw before the first hand. */
+    object PlaytestSetup : Screen("playtest/setup/{deckId}") {
+        fun createRoute(deckId: String) = "playtest/setup/$deckId"
+    }
+
+    /**
+     * Hand screen: draw, redraw, mulligan, keep, and save the test.
+     * The [PlaytestSetup] object is passed in-memory from the setup screen —
+     * no nav args needed for the full setup payload.
+     */
+    object PlaytestHand : Screen("playtest/hand/{deckId}") {
+        fun createRoute(deckId: String) = "playtest/hand/$deckId"
+    }
+
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Puzzle : Screen("puzzle")
 

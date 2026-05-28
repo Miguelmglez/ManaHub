@@ -10,6 +10,7 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
+import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
@@ -74,6 +75,7 @@ object DatabaseModule {
                 MIGRATION_32_33,
                 MIGRATION_33_34,
                 MIGRATION_34_35,
+                MIGRATION_35_36,
             )
             .build()
 
@@ -374,6 +376,101 @@ object DatabaseModule {
     }
 
     // -------------------------------------------------------------------------
+    // v35 → v36  (Deck Playtest feature — purely additive, no existing table touched)
+    //
+    // Creates three new tables for the Deck Playtest feature:
+    //
+    //   playtest_sessions  — one row per saved test ("Guardar test"). deckId is a
+    //     plain indexed column, NOT a FK to `decks`, because:
+    //     (a) decks are soft-deleted and playtest history must survive the soft-delete;
+    //     (b) a hard FK would block or cascade on any future hard-delete scenario.
+    //
+    //   playtest_card_stats — per-card counts (copies_in_opening_hand,
+    //     copies_bottomed_on_mulligan) for each saved test. Counts instead of booleans
+    //     because a hand can contain multiple copies of the same card. FK to
+    //     playtest_sessions with CASCADE so deleting a session cleans up stats.
+    //
+    //   playtest_survey_answers — optional survey attached to a saved test. FK to
+    //     playtest_sessions with CASCADE. Zero rows = user skipped the survey.
+    //
+    // All indices are created explicitly here (Room generates them only during a
+    // fresh install; migrations must add them manually).
+    // -------------------------------------------------------------------------
+    private val MIGRATION_35_36 = object : Migration(35, 36) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // playtest_sessions
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `playtest_sessions` (
+                    `id`             INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `deck_id`        TEXT NOT NULL,
+                    `format`         TEXT NOT NULL,
+                    `draw_count`     INTEGER NOT NULL,
+                    `mulligans_used` INTEGER NOT NULL,
+                    `library_size`   INTEGER NOT NULL,
+                    `on_the_play`    INTEGER NOT NULL,
+                    `started_at`     INTEGER NOT NULL,
+                    `saved_at`       INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_playtest_sessions_deck_id` ON `playtest_sessions`(`deck_id`)"
+            )
+
+            // playtest_card_stats
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `playtest_card_stats` (
+                    `id`                       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `playtest_session_id`      INTEGER NOT NULL,
+                    `scryfall_id`              TEXT NOT NULL,
+                    `copies_in_opening_hand`   INTEGER NOT NULL,
+                    `copies_bottomed_on_mulligan` INTEGER NOT NULL,
+                    FOREIGN KEY(`playtest_session_id`) REFERENCES `playtest_sessions`(`id`) ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_playtest_card_stats_session_id` ON `playtest_card_stats`(`playtest_session_id`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_playtest_card_stats_scryfall_id` ON `playtest_card_stats`(`scryfall_id`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_playtest_card_stats_session_card` ON `playtest_card_stats`(`playtest_session_id`, `scryfall_id`)"
+            )
+
+            // playtest_survey_answers
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `playtest_survey_answers` (
+                    `id`                    INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `playtest_session_id`   INTEGER NOT NULL,
+                    `question_id`           TEXT NOT NULL,
+                    `question_type`         TEXT NOT NULL,
+                    `answer`                TEXT NOT NULL,
+                    `card_reference`        TEXT,
+                    `deck_id`               TEXT,
+                    `answered_at`           INTEGER NOT NULL,
+                    `updated_at`            INTEGER NOT NULL,
+                    FOREIGN KEY(`playtest_session_id`) REFERENCES `playtest_sessions`(`id`) ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_playtest_survey_answers_session_id` ON `playtest_survey_answers`(`playtest_session_id`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_playtest_survey_answers_card_reference` ON `playtest_survey_answers`(`card_reference`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_playtest_survey_answers_deck_id` ON `playtest_survey_answers`(`deck_id`)"
+            )
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helper: checks whether a column already exists in a table.
     // Used as a guard so migrations are idempotent — safe to run more than once
     // (e.g. if the app crashes mid-migration and Room retries on next launch).
@@ -409,4 +506,5 @@ object DatabaseModule {
     @Provides fun provideLocalWishlistDao(db: MtgDatabase): LocalWishlistDao = db.localWishlistDao()
     @Provides fun provideLocalOpenForTradeDao(db: MtgDatabase): LocalOpenForTradeDao = db.localOpenForTradeDao()
     @Provides fun provideTradeCollectionSyncDao(db: MtgDatabase): TradeCollectionSyncDao = db.tradeCollectionSyncDao()
+    @Provides fun providePlaytestDao(db: MtgDatabase): PlaytestDao = db.playtestDao()
 }
