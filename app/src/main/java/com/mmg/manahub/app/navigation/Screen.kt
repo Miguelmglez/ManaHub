@@ -88,6 +88,23 @@ sealed class Screen(val route: String) {
         ) = "draft/$setCode?setName=${Uri.encode(setName)}&setIconUri=${Uri.encode(setIconUri)}&setReleasedAt=${Uri.encode(setReleasedAt)}"
     }
 
+    // ── Online multiplayer lobby ──────────────────────────────────────────────
+
+    /** Host lobby — configure and create a new online session. */
+    object LobbyHost : Screen("online/lobby/host?mode={mode}&playerCount={playerCount}") {
+        fun route(mode: String = "", playerCount: Int = 0) =
+            "online/lobby/host?mode=$mode&playerCount=$playerCount"
+    }
+
+    /**
+     * Join lobby — enter a 6-character code and wait for the session to start.
+     * The [prefilledCode] parameter is optional (used by deep links and invite flows).
+     */
+    object LobbyJoin : Screen("online/lobby/join?code={code}") {
+        /** Builds the route with an optional pre-filled join code. */
+        fun route(code: String = "") = "online/lobby/join?code=$code"
+    }
+
     // ── v2 stubs ─────────────────────────────────────────────────────────────
     object Puzzle : Screen("puzzle")
 

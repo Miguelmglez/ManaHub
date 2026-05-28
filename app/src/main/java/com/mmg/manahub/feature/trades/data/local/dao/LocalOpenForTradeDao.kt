@@ -46,6 +46,12 @@ interface LocalOpenForTradeDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entry: LocalOpenForTradeEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(entries: List<LocalOpenForTradeEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entries: List<LocalOpenForTradeEntity>)
+
     @Delete
     suspend fun delete(entry: LocalOpenForTradeEntity)
 
@@ -60,6 +66,9 @@ interface LocalOpenForTradeDao {
 
     @Query("DELETE FROM local_open_for_trade WHERE synced = 1")
     suspend fun clearSynced()
+
+    @Query("DELETE FROM local_open_for_trade WHERE synced = 1 AND id NOT IN (:ids)")
+    suspend fun deleteSyncedNotIn(ids: List<String>)
 
     @Query("SELECT COUNT(*) FROM local_open_for_trade WHERE synced = 0")
     fun observeUnsyncedCount(): Flow<Int>

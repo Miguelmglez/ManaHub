@@ -199,7 +199,7 @@ fun FriendsScreen(
                     ) {
                         Text(
                             text = "#",
-                            style = MaterialTheme.magicTypography.titleMedium,
+                            style = MaterialTheme.magicTypography.titleLarge,
                             color = mc.textSecondary,
                             modifier = Modifier.padding(end = 6.dp),
                         )

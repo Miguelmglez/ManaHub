@@ -16,6 +16,7 @@
     <string name="action_add">Add</string>
     <string name="action_remove">Remove</string>
     <string name="action_remove_all">Remove all</string>
+    <string name="retry">Retry</string>
     <string name="action_search">Search</string>
     <string name="action_close">Close</string>
     <string name="action_back">Back</string>
@@ -581,6 +582,19 @@
     <string name="deckbuilder_remove_commander">Remove commander</string>
     <string name="deckbuilder_save_changes_button">Save changes</string>
     <string name="deckbuilder_saved_button">Saved</string>
+    <string name="deckbuilder_share_chooser">Share Deck</string>
+    <string name="deckbuilder_move_to_sideboard">1x To Sideboard</string>
+    <string name="deckbuilder_from_sideboard">1x From Sideboard</string>
+    <string name="deckbuilder_move_to_mainboard">1x To Mainboard</string>
+    <string name="deckbuilder_invalid_commander_legendary">Possibly invalid commander: Must be Legendary</string>
+    <string name="deckbuilder_error_limit_and_identity">Exceeds limit (%1$d) &amp; Invalid color identity</string>
+    <string name="deckbuilder_error_invalid_identity">Invalid color identity for this commander</string>
+    <string name="deckbuilder_land_suggestions_disable">Disable suggestions</string>
+    <string name="deckbuilder_land_suggestions_enable">Enable suggestions</string>
+    <string name="deckbuilder_sideboard_empty">No cards in sideboard</string>
+    <string name="deckbuilder_group_untagged">Untagged</string>
+    <string name="deckbuilder_cost_value">%1$d Cost</string>
+    <string name="deckbuilder_cost_7_plus">7+ Cost</string>
 
     <!-- ══════════════════════════════════════════
          DECK IMPROVEMENT SCREEN
@@ -631,6 +645,17 @@
     <string name="gamesetup_commander_hint">Search commander…</string>
     <string name="gamesetup_begin_button">Begin the Game</string>
     <string name="gamesetup_tournament_link">Create a tournament instead</string>
+    <string name="gamesetup_online_create">Create Online</string>
+    <string name="gamesetup_online_join">Join Game</string>
+    <string name="gamesetup_settings_title">Settings</string>
+    <string name="gamesetup_land_reminder_title">Land Reminder</string>
+    <string name="gamesetup_land_reminder_subtitle">Show land-played indicator on active player</string>
+    <string name="gamesetup_life_control_title">Life Control</string>
+    <string name="gamesetup_life_control_subtitle">How to change life points</string>
+    <string name="gamesetup_life_control_swipe">Swipe</string>
+    <string name="gamesetup_life_control_swipe_hint">↕ Swipe up · down</string>
+    <string name="gamesetup_life_control_tap">Tap</string>
+    <string name="gamesetup_life_control_tap_hint">Tap ▼ · Heart ▲</string>
 
     <!-- ══════════════════════════════════════════
          GAME SCREEN
@@ -1304,6 +1329,7 @@
     <string name="draft_no_sets">No draftable sets found</string>
     <string name="draft_loading_sets">Loading sets…</string>
     <string name="draft_retry">Retry</string>
+    <string name="draft_stale_data">Showing cached data. Pull to refresh.</string>
     <string name="draft_cards_all">All Cards</string>
     <string name="draft_guide_videos">Videos</string>
     <string name="draft_card_artist">Artist: %1$s</string>
@@ -1472,6 +1498,13 @@
     <string name="friend_history_tab_games">Games</string>
     <string name="friend_history_trades_empty">No trades yet with %1$s</string>
     <string name="friend_history_games_coming_soon">Coming soon — multiplayer games will be tracked when online sessions launch.</string>
+    <string name="friend_history_games_empty">No online games played with %1$s yet.</string>
+    <string name="friend_history_games_error">Could not load match history. Check your connection.</string>
+    <string name="friend_history_games_title">%1$d games played</string>
+    <string name="friend_history_games_wins">Wins</string>
+    <string name="friend_history_games_losses">Losses</string>
+    <string name="friend_history_games_winrate">Win rate</string>
+    <string name="friend_history_games_last_played">Last played %1$s</string>
     <string name="friend_history_trade_row_cards_offered_received">%1$d cards offered / %2$d cards received</string>
     <string name="friend_history_trade_row_updated">Updated %1$s</string>
     <string name="friend_stats_error">Could not load stats. Tap to retry.</string>
@@ -1496,8 +1529,8 @@
     ═══════════════════════════════════════════ -->
     <string name="collection_tab_trades">Trades</string>
     <string name="trades_tab_exploration">Exploration</string>
-    <string name="trades_tab_history">Trades</string>
-    <string name="trades_toggle_my_lists">My Folder</string>
+    <string name="trades_tab_history">Deals</string>
+    <string name="trades_toggle_my_lists">Folder</string>
     <string name="trades_toggle_friends">Friends</string>
     <string name="trades_wishlist_section">My Wishlist</string>
     <string name="trades_offers_section">My Offers</string>
@@ -1712,5 +1745,45 @@
     <string name="scanner_variant_selector_title">Select variant</string>
     <string name="scanner_variant_no_results">No variants found</string>
     <string name="scanner_add_another_copy">Add another copy with different options</string>
+
+    <!-- ══════════════════════════════════════════
+         ONLINE LOBBY
+    ═══════════════════════════════════════════ -->
+    <string name="lobby_host_title">Create Room</string>
+    <string name="lobby_join_title">Join Game</string>
+    <string name="lobby_waiting_room_title">Waiting Room</string>
+    <string name="lobby_section_game_mode">GAME MODE</string>
+    <string name="lobby_section_player_count">NUMBER OF PLAYERS</string>
+    <string name="lobby_create_button">CREATE ROOM</string>
+    <string name="lobby_players_count">PLAYERS (%1$d/%2$d)</string>
+    <string name="lobby_players_count_joined">PLAYERS (%1$d)</string>
+    <string name="lobby_start_button">START GAME</string>
+    <string name="lobby_waiting_ready">Waiting for everyone to be ready…</string>
+    <string name="lobby_code_label">ROOM CODE</string>
+    <string name="lobby_code_share_hint">Share this code with the other players</string>
+    <string name="lobby_code_copy_success">Code copied to clipboard</string>
+    <string name="lobby_player_count_suffix">players</string>
+    <string name="lobby_waiting_player">Waiting for player…</string>
+    <string name="lobby_host_badge">HOST</string>
+    <string name="lobby_ready_label">READY</string>
+    <string name="lobby_waiting_label">Waiting</string>
+    <string name="lobby_join_code_hint">XXXXXX</string>
+    <string name="lobby_join_name_label">YOUR NAME</string>
+    <string name="lobby_join_name_hint">Player Name</string>
+    <string name="lobby_join_color_label">COLOR</string>
+    <string name="lobby_join_button">JOIN</string>
+    <string name="lobby_ready_toggle">I\'m ready</string>
+    <string name="lobby_ready_toggle_hint">Waiting for the host to start</string>
+    <string name="lobby_starting_msg">The game has started. Entering…</string>
+    <string name="lobby_error_generic">An unexpected error occurred.</string>
+    <string name="lobby_error_too_many_attempts">Too many failed attempts. Wait 5 minutes.</string>
+    <string name="lobby_error_invalid_code">Invalid code. Must be 6 alphanumeric characters.</string>
+    <string name="lobby_error_active_room">You already have an active room. Close it before creating another.</string>
+    <string name="lobby_error_full">The room is full.</string>
+    <string name="lobby_error_not_found">Room not found or already started.</string>
+    <string name="lobby_header_subtitle">Multiplayer session</string>
+    <string name="lobby_existing_session_title">You already have an active room</string>
+    <string name="lobby_existing_session_subtitle">Code: %1$s · %2$s · %3$d players</string>
+    <string name="lobby_existing_session_abandon">Abandon &amp; create new</string>
 
 </resources>

@@ -9,6 +9,7 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallApi
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.network.ScryfallRequestQueue
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
@@ -57,6 +58,7 @@ import javax.inject.Singleton
 class DraftRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val scryfallApi: ScryfallApi,
+    private val scryfallQueue: ScryfallRequestQueue,
     private val youTubeApi: YouTubeApi,
     private val cloudflareApi: CloudflareContentApi,
     private val draftSetDao: DraftSetDao,
@@ -71,8 +73,8 @@ class DraftRepositoryImpl @Inject constructor(
         private const val PREF_GUIDE_VERSION = "pref_draft_%s_guide_version"
         private const val PREF_TIER_VERSION = "pref_draft_%s_tier_version"
 
-        /** Allowlist: set codes must be 2–6 lowercase ASCII letters only. */
-        private val VALID_SET_CODE = Regex("^[a-z]{2,6}$")
+        /** Allowlist: set codes must be 2–6 lowercase ASCII letters/digits (e.g. "2x2", "40k"). */
+        private val VALID_SET_CODE = Regex("^[a-z0-9]{2,6}$")
     }
 
     private val videoCache = ConcurrentHashMap<String, Pair<Long, List<DraftVideo>>>()
@@ -201,12 +203,14 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun getSetCards(setCode: String, page: Int): DataResult<List<Card>> {
         return withContext(ioDispatcher) {
             try {
-                val result = scryfallApi.searchCards(
-                    query = "set:$setCode lang:en",
-                    order = "set",
-                    unique = "cards",
-                    page = page,
-                )
+                val result = scryfallQueue.execute {
+                    scryfallApi.searchCards(
+                        query = "set:$setCode lang:en",
+                        order = "set",
+                        unique = "cards",
+                        page = page,
+                    )
+                }
                 DataResult.Success(result.data.toDomain())
             } catch (e: Exception) {
                 DataResult.Error(e.message ?: "Failed to load cards")
@@ -220,7 +224,8 @@ class DraftRepositoryImpl @Inject constructor(
 
     override suspend fun getSetVideos(setCode: String, setName: String): DataResult<List<DraftVideo>> {
         return withContext(ioDispatcher) {
-            val cached = videoCache[setCode]
+            val cacheKey = "$setCode:$setName"
+            val cached = videoCache[cacheKey]
             if (cached != null && (System.currentTimeMillis() - cached.first) < VIDEO_CACHE_DURATION_MS) {
                 return@withContext DataResult.Success(cached.second)
             }
@@ -247,7 +252,7 @@ class DraftRepositoryImpl @Inject constructor(
                     }
                 }
 
-                videoCache[setCode] = System.currentTimeMillis() to combined
+                videoCache[cacheKey] = System.currentTimeMillis() to combined
                 DataResult.Success(combined)
             } catch (e: Exception) {
                 DataResult.Error(e.message ?: "Failed to load videos")
@@ -262,11 +267,11 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun resolveCardId(cardName: String, setCode: String): DataResult<String> {
         return withContext(ioDispatcher) {
             try {
-                val card = scryfallApi.getCardByName(name = cardName, set = setCode)
+                val card = scryfallQueue.execute { scryfallApi.getCardByName(name = cardName, set = setCode) }
                 DataResult.Success(card.id)
             } catch (_: Exception) {
                 try {
-                    val card = scryfallApi.getCardByName(name = cardName)
+                    val card = scryfallQueue.execute { scryfallApi.getCardByName(name = cardName) }
                     DataResult.Success(card.id)
                 } catch (e: Exception) {
                     DataResult.Error(e.message ?: "Card not found")
@@ -278,11 +283,11 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun getCardByName(name: String, setCode: String): DataResult<Card> {
         return withContext(ioDispatcher) {
             try {
-                val card = scryfallApi.getCardByName(name = name, set = setCode)
+                val card = scryfallQueue.execute { scryfallApi.getCardByName(name = name, set = setCode) }
                 DataResult.Success(card.toDomain())
             } catch (_: Exception) {
                 try {
-                    val card = scryfallApi.getCardByName(name = name)
+                    val card = scryfallQueue.execute { scryfallApi.getCardByName(name = name) }
                     DataResult.Success(card.toDomain())
                 } catch (e: Exception) {
                     DataResult.Error(e.message ?: "Card not found")
@@ -334,11 +339,13 @@ class DraftRepositoryImpl @Inject constructor(
      */
     private fun saveJsonToFile(json: JsonObject, file: File) {
         val tmp = File(file.parent, "${file.name}.tmp")
-        tmp.writeText(gson.toJson(json))
-        if (!tmp.renameTo(file)) {
-            // renameTo can fail across filesystems; fall back to a plain copy + delete.
-            file.writeText(tmp.readText())
-            tmp.delete()
+        try {
+            tmp.writeText(gson.toJson(json))
+            if (!tmp.renameTo(file)) {
+                file.writeText(tmp.readText())
+            }
+        } finally {
+            if (tmp.exists()) tmp.delete()
         }
     }
 

@@ -22,7 +22,38 @@ class OpenForTradeRepositoryImpl @Inject constructor(
 ) : OpenForTradeRepository {
 
     override fun observeLocal(): Flow<List<OpenForTradeEntry>> =
-        dao.observeAllWithCard().map { list -> list.map { it.toDomain() } }
+        dao.observeAllWithCard().map { list ->
+            // Group rows that share the same card + variant attributes (foil, condition,
+            // language, altArt), summing their quantities. This mirrors the deduplication
+            // logic in WishlistRepositoryImpl.addLocal() but works at read-time so that
+            // entries added from different collection copies (distinct localCollectionId)
+            // still appear as a single aggregated row in the UI.
+            list.map { it.toDomain() }
+                .groupBy { entry ->
+                    GroupKey(
+                        scryfallId = entry.scryfallId,
+                        isFoil     = entry.isFoil,
+                        condition  = entry.condition,
+                        language   = entry.language,
+                        isAltArt   = entry.isAltArt,
+                    )
+                }
+                .values
+                .map { group ->
+                    // Use the oldest entry as the canonical row so the UI id is stable.
+                    val representative = group.minBy { it.createdAt }
+                    representative.copy(quantity = group.sumOf { it.quantity })
+                }
+        }
+
+    /** Value class used as the grouping key for [observeLocal] deduplication. */
+    private data class GroupKey(
+        val scryfallId: String,
+        val isFoil:     Boolean,
+        val condition:  String,
+        val language:   String,
+        val isAltArt:   Boolean,
+    )
 
     override fun observeByScryfallId(scryfallId: String): Flow<List<OpenForTradeEntry>> =
         dao.observeByScryfallId(scryfallId).map { list -> list.map { it.toDomain() } }
@@ -71,6 +102,12 @@ class OpenForTradeRepositoryImpl @Inject constructor(
 
     override suspend fun removeByCollectionId(localCollectionId: String): Result<Unit> =
         runCatching { dao.deleteByCollectionId(localCollectionId) }
+
+    override suspend fun removeByCollectionIdAndSync(localCollectionId: String): Result<Unit> =
+        runCatching {
+            dao.deleteByCollectionId(localCollectionId)
+            remote.removeByUserCardId(localCollectionId).getOrThrow()
+        }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
         dao.deleteById(id)
@@ -134,6 +171,34 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         // localCollectionId == user_card_collection.id in Supabase — no lookup needed.
         remote.batchAddOpenForTradeEntries(listOf(entity.localCollectionId)).getOrThrow()
         dao.markSynced(listOf(entity.id))
+    }
+
+    override suspend fun syncFromRemote(userId: String): Result<Unit> = runCatching {
+        val dtos = remote.getOpenForTrade(userId).getOrThrow()
+        val remoteIds = dtos.map { it.id }.toSet()
+        val entities = dtos.map { dto ->
+            LocalOpenForTradeEntity(
+                id = dto.id,
+                localCollectionId = dto.userCardId,
+                scryfallId = dto.scryfallId ?: "",
+                quantity = 1,
+                isFoil = dto.isFoil ?: false,
+                condition = dto.condition ?: "NM",
+                language = dto.language ?: "en",
+                isAltArt = dto.isAltArt ?: false,
+                synced = true,
+                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilli() }
+                    .getOrDefault(System.currentTimeMillis()),
+            )
+        }
+        dao.upsertAll(entities)
+        // Evict synced rows that the server no longer returns (e.g. post-trade orphans).
+        // Unsynced (locally-added, not yet pushed) rows are never touched.
+        if (remoteIds.isEmpty()) {
+            dao.clearSynced()
+        } else {
+            dao.deleteSyncedNotIn(remoteIds.toList())
+        }
     }
 
     private fun LocalOpenForTradeEntity.toDomain() = OpenForTradeEntry(

@@ -163,6 +163,7 @@ class TradesRepositoryImpl @Inject constructor(
         cardId = cardId,
         cardName = cardMap[cardId]?.name ?: "",
         imageUrl = cardMap[cardId]?.let { it.imageArtCrop ?: it.imageNormal },
+        typeLine = cardMap[cardId]?.typeLine,
         setCode = cardMap[cardId]?.setCode,
         setName = cardMap[cardId]?.setName,
         rarity = cardMap[cardId]?.rarity,

@@ -57,14 +57,14 @@ data class CardTag(
         val WIN_CON      = CardTag("win_con",      TagCategory.ROLE)
         val COUNTERSPELL  = CardTag("counterspell",  TagCategory.ROLE)
         val GAME_CHANGER  = CardTag("game_changer",  TagCategory.ROLE)
-
+/*
         // ── Tribal (canonical, common tribes) ─────────────────────────────────
         val GOBLIN  = CardTag("goblin",  TagCategory.TRIBAL)
         val ELF     = CardTag("elf",     TagCategory.TRIBAL)
         val DRAGON  = CardTag("dragon",  TagCategory.TRIBAL)
         val ZOMBIE  = CardTag("zombie",  TagCategory.TRIBAL)
         val WIZARD  = CardTag("wizard",  TagCategory.TRIBAL)
-        val VAMPIRE = CardTag("vampire", TagCategory.TRIBAL)
+        val VAMPIRE = CardTag("vampire", TagCategory.TRIBAL)*/
 
         /** All "well-known" tags exposed in the manual TagPicker UI. */
         val canonical: List<CardTag> = listOf(
@@ -72,8 +72,7 @@ data class CardTag(
             TOKENS, PLUS_COUNTERS, PROLIFERATE, GRAVEYARD, ENCHANTRESS, TRIBAL,
             BURN, LIFEGAIN, SACRIFICE, BLINK, INFINITE, STAX,
             MANA_ROCK, MANA_DORK, DRAW_ENGINE, REMOVAL, WRATH, TUTOR,
-            PROTECTION, WIN_CON, COUNTERSPELL, GAME_CHANGER,
-            GOBLIN, ELF, DRAGON, ZOMBIE, WIZARD, VAMPIRE,
+            PROTECTION, WIN_CON, COUNTERSPELL, GAME_CHANGER
         )
     }
 }

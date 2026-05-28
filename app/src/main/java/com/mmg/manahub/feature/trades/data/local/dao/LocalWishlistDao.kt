@@ -48,6 +48,12 @@ interface LocalWishlistDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entry: LocalWishlistEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(entries: List<LocalWishlistEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entries: List<LocalWishlistEntity>)
+
     @Update
     suspend fun update(entry: LocalWishlistEntity)
 
@@ -84,6 +90,9 @@ interface LocalWishlistDao {
 
     @Query("DELETE FROM local_wishlists WHERE synced = 1")
     suspend fun clearSynced()
+
+    @Query("DELETE FROM local_wishlists WHERE synced = 1 AND id NOT IN (:ids)")
+    suspend fun deleteSyncedNotIn(ids: List<String>)
 
     @Query("SELECT COUNT(*) FROM local_wishlists WHERE synced = 0")
     fun observeUnsyncedCount(): Flow<Int>

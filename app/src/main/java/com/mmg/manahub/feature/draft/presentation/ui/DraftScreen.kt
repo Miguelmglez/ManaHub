@@ -51,6 +51,7 @@ import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -79,6 +80,15 @@ fun DraftScreen(
                 color = colors.textPrimary,
                 modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp),
             )
+
+            if (state.isStale) {
+                InlineErrorState(
+                    message = stringResource(R.string.draft_stale_data),
+                    retryLabel = stringResource(R.string.draft_retry),
+                    onRetry = { viewModel.loadSets(forceRefresh = true) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
 
             // Search bar
             OutlinedTextField(

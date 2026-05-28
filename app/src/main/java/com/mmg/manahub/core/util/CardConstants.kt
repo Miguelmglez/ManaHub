@@ -17,7 +17,7 @@ object CardConstants {
     )
 
     val languages = listOf(
-        "en" to "🇺🇸",
+        "en" to "🇬🇧",
         "es" to "🇪🇸",
         "de" to "🇩🇪",
         "fr" to "🇫🇷",
@@ -25,6 +25,9 @@ object CardConstants {
         "pt" to "🇵🇹",
         "ja" to "🇯🇵",
         "ko" to "🇰🇷",
+        "ru" to "🇷🇺",
+        "zhs" to "🇨🇳",
+        "zht" to "🇹🇼",
     )
 
     val languageNames = mapOf(
@@ -36,6 +39,9 @@ object CardConstants {
         "pt" to "Portuguese",
         "ja" to "Japanese",
         "ko" to "Korean",
+        "ru" to "Russian",
+        "zhs" to "Chinese Simplified",
+        "zht" to "Chinese Traditional",
     )
 
     fun getFlag(langCode: String): String {

@@ -29,10 +29,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,18 +60,31 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.HexGridBackground
@@ -83,8 +100,10 @@ import kotlinx.coroutines.launch
 fun GameSetupScreen(
     viewModel: GameSetupViewModel,
     onBack: () -> Unit,
-    onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate) -> Unit,
+    onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate, GameSettings) -> Unit,
     onNavigateToTournament: () -> Unit,
+    onNavigateToOnline: (GameMode, Int) -> Unit = { _, _ -> },
+    onNavigateToJoin: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -93,10 +112,14 @@ fun GameSetupScreen(
         onBack = onBack,
         onStartGame = onStartGame,
         onNavigateToTournament = onNavigateToTournament,
+        onNavigateToOnline = onNavigateToOnline,
+        onNavigateToJoin = onNavigateToJoin,
         onModeChange = viewModel::onModeChange,
         onPlayerCountChange = viewModel::onPlayerCountChange,
         onUpdatePlayerName = viewModel::updatePlayerName,
-        onUpdatePlayerTheme = viewModel::updatePlayerTheme
+        onUpdatePlayerTheme = viewModel::updatePlayerTheme,
+        onToggleLandReminder = viewModel::toggleLandReminder,
+        onLifeControlModeChange = viewModel::setLifeControlMode,
     )
 }
 
@@ -104,12 +127,16 @@ fun GameSetupScreen(
 private fun GameSetupScreenContent(
     uiState: GameSetupUiState,
     onBack: () -> Unit,
-    onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate) -> Unit,
+    onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate, GameSettings) -> Unit,
     onNavigateToTournament: () -> Unit,
+    onNavigateToOnline: (GameMode, Int) -> Unit,
+    onNavigateToJoin: () -> Unit,
     onModeChange: (GameMode) -> Unit,
     onPlayerCountChange: (Int) -> Unit,
     onUpdatePlayerName: (Int, String) -> Unit,
     onUpdatePlayerTheme: (Int, PlayerThemeColors) -> Unit,
+    onToggleLandReminder: () -> Unit,
+    onLifeControlModeChange: (LifeControlMode) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -188,6 +215,13 @@ private fun GameSetupScreenContent(
                                 }
                             }
                         }
+                        // ── Settings ──────────────────────────────────────────────────────
+                        SettingsSection(
+                            gameSettings = uiState.gameSettings,
+                            onToggleLandReminder = onToggleLandReminder,
+                            onLifeControlModeChange = onLifeControlModeChange,
+                        )
+
 
                         // ── Player count stepper ──────────────────────────────────────────
                         PlayerCountStepper(
@@ -231,7 +265,8 @@ private fun GameSetupScreenContent(
                                 onStartGame(
                                     uiState.selectedMode,
                                     uiState.playerConfigs,
-                                    uiState.selectedLayout
+                                    uiState.selectedLayout,
+                                    uiState.gameSettings,
                                 )
                             },
                             modifier = Modifier
@@ -251,10 +286,33 @@ private fun GameSetupScreenContent(
                         ) {
                             Text(
                                 stringResource(R.string.gamesetup_begin_button).uppercase(),
-                                style = MaterialTheme.magicTypography.titleMedium,
+                                style = MaterialTheme.magicTypography.titleLarge,
                                 color = mc.background,
                             )
                         }
+
+                       /* // ── Online multiplayer ────────────────────────────────────────────
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick   = { onNavigateToOnline(uiState.selectedMode, uiState.playerCount) },
+                                modifier  = Modifier.weight(1f).height(48.dp),
+                                shape     = RoundedCornerShape(12.dp),
+                                border    = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                            ) {
+                                Text("Create Online", style = MaterialTheme.magicTypography.labelLarge, color = mc.primaryAccent)
+                            }
+                            OutlinedButton(
+                                onClick   = onNavigateToJoin,
+                                modifier  = Modifier.weight(1f).height(48.dp),
+                                shape     = RoundedCornerShape(12.dp),
+                                border    = androidx.compose.foundation.BorderStroke(1.dp, mc.secondaryAccent.copy(alpha = 0.5f)),
+                            ) {
+                                Text("Join Game", style = MaterialTheme.magicTypography.labelLarge, color = mc.secondaryAccent)
+                            }
+                        }*/
                     }
                 }
             }
@@ -569,6 +627,290 @@ private fun ColorPickerSheet(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Settings section
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SettingsSection(
+    gameSettings: GameSettings,
+    onToggleLandReminder: () -> Unit,
+    onLifeControlModeChange: (LifeControlMode) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Settings",
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textSecondary,
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(mc.surface.copy(alpha = 0.5f))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            LandReminderToggle(
+                enabled = gameSettings.landReminderEnabled,
+                onToggle = onToggleLandReminder,
+            )
+            LifeControlSelector(
+                selectedMode = gameSettings.lifeControlMode,
+                onModeChange = onLifeControlModeChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LandReminderToggle(
+    enabled: Boolean,
+    onToggle: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val iconTint by animateColorAsState(
+        targetValue = if (enabled) mc.primaryAccent else mc.textDisabled,
+        animationSpec = tween(300),
+        label = "landIconTint",
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onToggle,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_land),
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(24.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Land Reminder",
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textPrimary,
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = { onToggle() },
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = mc.primaryAccent,
+                checkedThumbColor = mc.background,
+                uncheckedTrackColor = mc.surfaceVariant,
+                uncheckedThumbColor = mc.textDisabled,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun LifeControlSelector(
+    selectedMode: LifeControlMode,
+    onModeChange: (LifeControlMode) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column {
+            Text(
+                text = "Life Control",
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textPrimary,
+            )
+
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LifeControlOptionTile(
+                mode = LifeControlMode.SCROLL,
+                label = "Swipe",
+                selected = selectedMode == LifeControlMode.SCROLL,
+                onClick = { onModeChange(LifeControlMode.SCROLL) },
+                modifier = Modifier.weight(1f),
+            )
+            LifeControlOptionTile(
+                mode = LifeControlMode.TAP,
+                label = "Tap",
+                selected = selectedMode == LifeControlMode.TAP,
+                onClick = { onModeChange(LifeControlMode.TAP) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LifeControlOptionTile(
+    mode: LifeControlMode,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent else mc.surfaceVariant,
+        animationSpec = tween(300),
+        label = "tileBorder",
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
+        animationSpec = tween(300),
+        label = "tileBg",
+    )
+    val titleColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent else mc.textSecondary,
+        animationSpec = tween(300),
+        label = "tileTitle",
+    )
+    Surface(
+        modifier = modifier
+            .border(2.dp, borderColor, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        color = bgColor,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = titleColor,
+            )
+            if (mode == LifeControlMode.SCROLL) {
+                ScrollModePreview()
+            } else {
+                TapModePreview()
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScrollModePreview() {
+    val mc = MaterialTheme.magicColors
+    var lifeValue by remember { mutableStateOf(20) }
+    var isGoingUp by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val sequence = listOf(21, 20, 19, 20)
+        val goingUp  = listOf(true, false, false, true)
+        var index = 0
+        while (true) {
+            delay(1500L)
+            isGoingUp = goingUp[index]
+            lifeValue = sequence[index]
+            index = (index + 1) % sequence.size
+        }
+    }
+
+    AnimatedContent(
+        targetState = lifeValue,
+        transitionSpec = {
+            if (isGoingUp) {
+                (slideInVertically { h -> -h } + fadeIn()) togetherWith
+                    (slideOutVertically { h -> h } + fadeOut())
+            } else {
+                (slideInVertically { h -> h } + fadeIn()) togetherWith
+                    (slideOutVertically { h -> -h } + fadeOut())
+            }
+        },
+        label = "scrollPreviewLife",
+    ) { life ->
+        Text(
+            text = life.toString(),
+            style = MaterialTheme.magicTypography.displayMedium,
+            color = mc.textPrimary,
+        )
+    }
+}
+
+@Composable
+private fun TapModePreview() {
+    val mc = MaterialTheme.magicColors
+    var lifeValue by remember { mutableStateOf(20) }
+    var lastDelta by remember { mutableStateOf(0) }
+    var pulseTrigger by remember { mutableStateOf(0) }
+
+    val numberScale = remember { Animatable(1f) }
+    val heartScale = remember { Animatable(1f) }
+    val floatY = remember { Animatable(0f) }
+    val floatAlpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        val sequence = listOf(19, 20, 21, 20)
+        var index = 0
+        while (true) {
+            delay(1400L)
+            val next = sequence[index]
+            lastDelta = next - lifeValue
+            lifeValue = next
+            pulseTrigger++
+            index = (index + 1) % sequence.size
+        }
+    }
+
+    LaunchedEffect(pulseTrigger) {
+        if (pulseTrigger == 0) return@LaunchedEffect
+        numberScale.snapTo(0.82f)
+        floatY.snapTo(0f)
+        floatAlpha.snapTo(1f)
+        launch {
+            numberScale.animateTo(1.15f, spring(dampingRatio = 0.35f, stiffness = 700f))
+            numberScale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 500f))
+        }
+        if (lastDelta > 0) {
+            launch {
+                heartScale.snapTo(1f)
+                heartScale.animateTo(1.5f, spring(dampingRatio = 0.3f, stiffness = 700f))
+                heartScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+            }
+        }
+        launch { floatY.animateTo(-26f, tween(700)) }
+        floatAlpha.animateTo(0f, tween(700, delayMillis = 200))
+    }
+
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = lifeValue.toString(),
+            style = MaterialTheme.magicTypography.displayMedium,
+            color = mc.textPrimary,
+            modifier = Modifier.graphicsLayer {
+                scaleX = numberScale.value
+                scaleY = numberScale.value
+            },
+        )
+        Icon(
+            imageVector = Icons.Default.Favorite,
+            contentDescription = null,
+            tint = mc.lifePositive,
+            modifier = Modifier
+                .size(16.dp)
+                .graphicsLayer {
+                    scaleX = heartScale.value
+                    scaleY = heartScale.value
+                },
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Mode tile
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -636,7 +978,7 @@ private fun ModeTile(
         )
         Text(
             text = "${mode.startingLife} life",
-            style = MaterialTheme.magicTypography.bodySmall,
+            style = MaterialTheme.magicTypography.bodyMedium,
             color = mc.textSecondary,
         )
     }

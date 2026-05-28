@@ -425,7 +425,14 @@ class TradeProposalViewModel @Inject constructor(
         //   addCardsResults → MY collection (collectionCards) — fallback search
 
         _uiState.update { s ->
-            val allItems = s.proposerItems + s.receiverItems + s.pendingAddedItems
+            // Only count items from the active side so the "selected" indicator and
+            // over-limit warning reflect what's been added to THIS side of the trade.
+            val sideItems = when (searchingSide) {
+                TradeSide.PROPOSER -> s.proposerItems
+                TradeSide.RECEIVER -> s.receiverItems
+                null -> s.proposerItems + s.receiverItems
+            }
+            val allItems = sideItems + s.pendingAddedItems
 
             when (searchingSide) {
                 TradeSide.PROPOSER -> {
@@ -460,7 +467,7 @@ class TradeProposalViewModel @Inject constructor(
                                 val card = fc.toCard() ?: return@mapNotNull null
                                 AddCardRow(
                                     card = card,
-                                    quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == fc.condition && it.language == fc.language }.sumOf { it.quantity },
+                                    quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == (fc.condition ?: "NM") && it.language == (fc.language ?: "en") }.sumOf { it.quantity },
                                     isOwned = fc.scryfallId in ownedIds,
                                     availableQuantity = fc.quantity,
                                     wishlistEntry = fc.toSyntheticWishlistEntry(),
@@ -502,7 +509,7 @@ class TradeProposalViewModel @Inject constructor(
                             val card = fc.toCard() ?: return@mapNotNull null
                             AddCardRow(
                                 card = card,
-                                quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == fc.condition && it.language == fc.language }.sumOf { it.quantity },
+                                quantityInDeck = allItems.filter { it.cardId == fc.scryfallId && it.isFoil == fc.isFoil && it.condition == (fc.condition ?: "NM") && it.language == (fc.language ?: "en") }.sumOf { it.quantity },
                                 isOwned = fc.scryfallId in ownedIds,
                                 availableQuantity = fc.quantity,
                                 offerEntry = fc.toSyntheticOfferEntry(),
@@ -544,8 +551,9 @@ class TradeProposalViewModel @Inject constructor(
 
     /**
      * Computes the proposer match suggestions: my [offerEntries] whose [scryfallId] appears in
-     * the friend's wishlist. Uses the friend's wishlist metadata (foil/condition/language) so
-     * the resulting [AddCardRow] carries the variant the friend actually wants.
+     * the friend's wishlist. Emits one [AddCardRow] per offer entry (all variants), assigning
+     * [AddCardRow.wishlistEntry] to the best-matching friend wish so that [AddCardRow.isExactMatch]
+     * can distinguish exact-attribute matches from partial ones.
      */
     private fun computeProposerMatches(
         state: ProposalEditorUiState,
@@ -555,30 +563,31 @@ class TradeProposalViewModel @Inject constructor(
         if (state.selectedFriend == null || currentFriendWishlist.isEmpty()) return emptyList()
         val friendWishlistIds = currentFriendWishlist.map { it.scryfallId }.toSet()
         val allItems = state.proposerItems + state.receiverItems + state.pendingAddedItems
-        // One AddCardRow per scryfallId: pick the offer entry with the highest quantity
         return offerEntries
             .filter { it.scryfallId in friendWishlistIds }
-            .groupBy { it.scryfallId }
-            .mapNotNull { (scryfallId, entries) ->
-                val entry = entries.maxByOrNull { it.quantity } ?: return@mapNotNull null
+            .mapNotNull { entry ->
                 val card = entry.card ?: return@mapNotNull null
-                val friendWish = currentFriendWishlist.firstOrNull { it.scryfallId == scryfallId }
-                val syntheticWish = friendWish?.toSyntheticWishlistEntry()
+                val friendWishes = currentFriendWishlist.filter { it.scryfallId == entry.scryfallId }
+                val bestWish = friendWishes.firstOrNull { fw ->
+                    fw.isFoil == entry.isFoil &&
+                    (fw.condition == null || fw.condition == entry.condition) &&
+                    (fw.language == null || fw.language == entry.language)
+                } ?: friendWishes.firstOrNull()
                 AddCardRow(
                     card = card,
-                    quantityInDeck = allItems.filter { it.cardId == scryfallId }.sumOf { it.quantity },
-                    isOwned = scryfallId in ownedIds,
+                    quantityInDeck = allItems.filter { it.cardId == entry.scryfallId }.sumOf { it.quantity },
+                    isOwned = entry.scryfallId in ownedIds,
                     availableQuantity = entry.quantity,
                     offerEntry = entry,
-                    wishlistEntry = syntheticWish,
+                    wishlistEntry = bestWish?.toSyntheticWishlistEntry(),
                 )
             }
     }
 
     /**
      * Computes the receiver match suggestions: friend's [friendOfferCards] whose [scryfallId]
-     * appears in my wishlist. Uses the friend's offer metadata (foil/condition/language) so
-     * the resulting [AddCardRow] reflects the actual copy the friend has available.
+     * appears in my wishlist. Emits one [AddCardRow] per FriendCard entry (all variants),
+     * attaching the best-matching [WishlistEntry] so [AddCardRow.isExactMatch] can be computed.
      */
     private fun computeReceiverMatches(
         state: ProposalEditorUiState,
@@ -588,19 +597,23 @@ class TradeProposalViewModel @Inject constructor(
         if (state.selectedFriend == null || currentFriendOffers.isEmpty()) return emptyList()
         val myWishlistIds = wishlistEntries.map { it.cardId }.toSet()
         val allItems = state.proposerItems + state.receiverItems + state.pendingAddedItems
-        // One AddCardRow per scryfallId: pick the friend offer entry with the highest quantity
         return currentFriendOffers
             .filter { it.scryfallId in myWishlistIds }
-            .groupBy { it.scryfallId }
-            .mapNotNull { (scryfallId, entries) ->
-                val fc = entries.maxByOrNull { it.quantity } ?: return@mapNotNull null
+            .mapNotNull { fc ->
                 val card = fc.toCard() ?: return@mapNotNull null
+                val myWishes = wishlistEntries.filter { it.cardId == fc.scryfallId }
+                val bestWish = myWishes.firstOrNull { w ->
+                    w.isFoil == fc.isFoil &&
+                    (w.condition == null || w.condition == fc.condition) &&
+                    (w.language == null || w.language == fc.language)
+                } ?: myWishes.firstOrNull()
                 AddCardRow(
                     card = card,
-                    quantityInDeck = allItems.filter { it.cardId == scryfallId }.sumOf { it.quantity },
-                    isOwned = scryfallId in ownedIds,
+                    quantityInDeck = allItems.filter { it.cardId == fc.scryfallId }.sumOf { it.quantity },
+                    isOwned = fc.scryfallId in ownedIds,
                     availableQuantity = fc.quantity,
                     offerEntry = fc.toSyntheticOfferEntry(),
+                    wishlistEntry = bestWish,
                 )
             }
     }
@@ -620,7 +633,12 @@ class TradeProposalViewModel @Inject constructor(
                 }
                 val ownedIds = _uiState.value.collectionIds
                 _uiState.update { s ->
-                    val allItems = s.proposerItems + s.receiverItems + s.pendingAddedItems
+                    val sideItems = when (s.searchingSide) {
+                        TradeSide.PROPOSER -> s.proposerItems
+                        TradeSide.RECEIVER -> s.receiverItems
+                        null -> s.proposerItems + s.receiverItems
+                    }
+                    val allItems = sideItems + s.pendingAddedItems
                     s.copy(
                     isSearchingScryfall = false,
                     scryfallResults = cards.map { card ->
@@ -792,15 +810,39 @@ class TradeProposalViewModel @Inject constructor(
             val pending = state.pendingAddedItems
             when (side) {
                 TradeSide.PROPOSER -> state.copy(
-                    proposerItems = state.proposerItems + pending,
+                    proposerItems = mergeDraftItems(state.proposerItems, pending),
                     pendingAddedItems = emptyList()
                 )
                 TradeSide.RECEIVER -> state.copy(
-                    receiverItems = state.receiverItems + pending,
+                    receiverItems = mergeDraftItems(state.receiverItems, pending),
                     pendingAddedItems = emptyList()
                 )
             }
         }
+    }
+
+    private fun mergeDraftItems(
+        existing: List<TradeItemDraft>,
+        additions: List<TradeItemDraft>,
+    ): List<TradeItemDraft> {
+        val result = existing.toMutableList()
+        additions.forEach { addition ->
+            val duplicate = result.find {
+                it.cardId == addition.cardId &&
+                it.isFoil == addition.isFoil &&
+                it.condition == addition.condition &&
+                it.language == addition.language &&
+                it.isAltArt == addition.isAltArt &&
+                it.userCardIdRef == addition.userCardIdRef
+            }
+            if (duplicate != null) {
+                val idx = result.indexOf(duplicate)
+                result[idx] = duplicate.copy(quantity = duplicate.quantity + addition.quantity)
+            } else {
+                result.add(addition)
+            }
+        }
+        return result
     }
 
     fun onCancelPendingItems() {
@@ -839,6 +881,10 @@ class TradeProposalViewModel @Inject constructor(
         // either fails with a cryptic server error or creates a malformed proposal.
         if (!state.isCounterMode && state.receiverId.isBlank()) {
             _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
+            return
+        }
+        if (!state.isCounterMode && state.receiverId == state.currentUserId) {
+            _uiState.update { it.copy(errorMessage = "SELF_TRADE") }
             return
         }
         if (!validateInitialProposal(state)) {
@@ -884,6 +930,10 @@ class TradeProposalViewModel @Inject constructor(
         }
         if (receiverId.isBlank() && !state.isCounterMode && state.editingProposalId == null) {
             _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
+            return
+        }
+        if (!state.isCounterMode && state.editingProposalId == null && receiverId == myId) {
+            _uiState.update { it.copy(errorMessage = "SELF_TRADE") }
             return
         }
 
@@ -1058,9 +1108,11 @@ class TradeProposalViewModel @Inject constructor(
     )
 
     /** Synthetic [OpenForTradeEntry] carrying the friend's metadata into [TradeItemDraft].
-     *  userCardId is empty because the unified RPC does not expose individual copy IDs. */
+     *  userCardId is empty because the unified RPC does not expose individual copy IDs.
+     *  The id is a composite key so that multiple variants of the same scryfallId produce
+     *  distinct [AddCardRow.uniqueKey] values and don't collide in the suggestions list. */
     private fun FriendCard.toSyntheticOfferEntry() = OpenForTradeEntry(
-        id = scryfallId,
+        id = "${scryfallId}_${isFoil}_${condition}_${language}",
         userId = "",
         userCardId = "",
         scryfallId = scryfallId,

@@ -57,4 +57,14 @@ data class AddCardRow(
         offerEntry != null -> "offer_${offerEntry.id}"
         else -> "scryfall_${card.scryfallId}"
     }
+
+    val isExactMatch: Boolean get() {
+        val wish = wishlistEntry ?: return false
+        val offer = offerEntry ?: return false
+        if (wish.matchAnyVariant) return true
+        return wish.isFoil == offer.isFoil &&
+               (wish.condition == null || wish.condition == offer.condition) &&
+               (wish.language == null || wish.language == offer.language) &&
+               wish.isAltArt == offer.isAltArt
+    }
 }

@@ -564,6 +564,7 @@ private fun ItemsSection(
             setCode = item.setCode,
             setName = item.setName,
             rarity = item.rarity,
+            typeLine = item.typeLine,
             containerColor = mc.backgroundSecondary.copy(alpha = 0.5f),
             shape = androidx.compose.ui.graphics.RectangleShape,
         )

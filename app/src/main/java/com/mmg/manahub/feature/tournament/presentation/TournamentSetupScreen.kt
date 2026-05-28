@@ -44,10 +44,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +65,6 @@ import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.tournament.domain.model.PlayerConfig
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,8 +74,11 @@ fun TournamentSetupScreen(
     viewModel:           TournamentSetupViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scope   = rememberCoroutineScope()
     val mc      = MaterialTheme.magicColors
+
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvent.collect { id -> onTournamentCreated(id) }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets.statusBars,
@@ -293,12 +295,7 @@ fun TournamentSetupScreen(
             item {
                 Spacer(Modifier.height(8.dp))
                 Button(
-                    onClick  = {
-                        scope.launch {
-                            val id = viewModel.createTournament()
-                            onTournamentCreated(id)
-                        }
-                    },
+                    onClick  = { viewModel.createTournament() },
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape    = RoundedCornerShape(14.dp),
                     colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
@@ -316,6 +313,17 @@ fun TournamentSetupScreen(
                             style = MaterialTheme.magicTypography.labelLarge,
                         )
                     }
+                }
+            }
+
+            if (uiState.error != null) {
+                item {
+                    Text(
+                        text     = uiState.error!!,
+                        style    = MaterialTheme.magicTypography.bodySmall,
+                        color    = MaterialTheme.magicColors.lifeNegative,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
                 }
             }
         }

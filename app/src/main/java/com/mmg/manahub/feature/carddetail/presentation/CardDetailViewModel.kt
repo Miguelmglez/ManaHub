@@ -199,6 +199,7 @@ class CardDetailViewModel @Inject constructor(
                 id              = UUID.randomUUID().toString(),
                 userId          = "",
                 cardId          = scryfallId,
+                quantity        = quantity,
                 matchAnyVariant = false,
                 isFoil          = isFoil,
                 condition       = condition.uppercase().trim(),

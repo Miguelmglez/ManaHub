@@ -3,6 +3,7 @@ package com.mmg.manahub.core.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
@@ -28,6 +29,9 @@ abstract class TournamentDao {
 
     @Query("SELECT * FROM tournaments WHERE id = :id")
     abstract suspend fun getTournamentById(id: Long): TournamentEntity?
+
+    @Query("SELECT * FROM tournament_matches WHERE id = :matchId LIMIT 1")
+    abstract suspend fun getMatchById(matchId: Long): TournamentMatchEntity?
 
     @Query("UPDATE tournaments SET status = :status WHERE id = :id")
     abstract suspend fun updateStatus(id: Long, status: String)
@@ -108,6 +112,7 @@ abstract class TournamentDao {
      *                    without breaking the transaction boundary.
      * @return The auto-generated tournament id.
      */
+    @Transaction
     open suspend fun insertTournamentAtomically(
         tournament:   TournamentEntity,
         players:      List<TournamentPlayerEntity>,

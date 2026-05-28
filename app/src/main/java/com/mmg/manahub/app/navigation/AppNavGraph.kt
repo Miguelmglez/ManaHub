@@ -51,9 +51,11 @@ import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewM
 import com.mmg.manahub.feature.game.presentation.GamePlayScreen
 import com.mmg.manahub.feature.game.presentation.GameSetupScreen
 import com.mmg.manahub.feature.game.presentation.GameSetupViewModel
+import com.mmg.manahub.feature.game.presentation.GameSettings
 import com.mmg.manahub.feature.game.presentation.GameViewModel
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.game.domain.model.GameMode
+import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
 import com.mmg.manahub.feature.news.presentation.NewsScreen
@@ -69,6 +71,8 @@ import com.mmg.manahub.feature.tournament.presentation.TournamentListScreen
 import com.mmg.manahub.feature.tournament.presentation.TournamentScreen
 import com.mmg.manahub.feature.tournament.presentation.TournamentSetupScreen
 import com.mmg.manahub.feature.tournament.presentation.TournamentViewModel
+import com.mmg.manahub.feature.online.presentation.lobby.LobbyHostScreen
+import com.mmg.manahub.feature.online.presentation.lobby.LobbyJoinScreen
 import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
 import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
 import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
@@ -139,6 +143,7 @@ fun AppNavGraph(
 
     var pendingPlayerConfigs by remember { mutableStateOf<List<PlayerConfig>?>(null) }
     var pendingLayout by remember { mutableStateOf<LayoutTemplate?>(null) }
+    var pendingGameSettings by remember { mutableStateOf(GameSettings()) }
     var pendingTournamentMatchId by remember { mutableStateOf<Long?>(null) }
     var pendingTournamentId by remember { mutableStateOf<Long?>(null) }
     var pendingTournamentPlayers by remember { mutableStateOf<List<Long>>(emptyList()) }
@@ -569,9 +574,10 @@ fun AppNavGraph(
                 GameSetupScreen(
                     viewModel = setupVm,
                     onBack = { navController.popBackStack() },
-                    onStartGame = { mode, configs, layout ->
+                    onStartGame = { mode, configs, layout, settings ->
                         pendingPlayerConfigs = configs
                         pendingLayout = layout
+                        pendingGameSettings = settings
                         pendingTournamentMatchId = null
                         pendingTournamentId = null
                         pendingTournamentPlayers = emptyList()
@@ -586,6 +592,8 @@ fun AppNavGraph(
                         }
                     },
                     onNavigateToTournament = { navController.navigate(Screen.TournamentSetup.route) },
+                    onNavigateToOnline = { mode, playerCount -> navController.navigate(Screen.LobbyHost.route(mode.name, playerCount)) },
+                    onNavigateToJoin   = { navController.navigate(Screen.LobbyJoin.route()) },
                 )
             }
 
@@ -618,10 +626,11 @@ fun AppNavGraph(
                             pendingTournamentPlayers = emptyList()
                             pendingTournamentMode = null
                         } else {
-                            gameVm.initFromConfigs(configs, routeMode, pendingLayout)
+                            gameVm.initFromConfigs(configs, routeMode, pendingLayout, pendingGameSettings)
                         }
                         pendingPlayerConfigs = null
                         pendingLayout = null
+                        pendingGameSettings = GameSettings()
                     }
                 }
                 // Re-read from ViewModel state to get most up-to-date tournament context
@@ -660,6 +669,68 @@ fun AppNavGraph(
                     },
                 )
             }
+            // ── Online multiplayer lobby ──────────────────────────────────────
+
+            composable(
+                route = Screen.LobbyHost.route,
+                arguments = listOf(
+                    navArgument("mode") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("playerCount") { type = NavType.IntType; defaultValue = 0 },
+                ),
+            ) {
+                LobbyHostScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onGameStart = { sessionId, mode, playerCount ->
+                        val configs = (0 until playerCount).mapIndexed { i, _ ->
+                            PlayerConfig(
+                                id        = i,
+                                name      = "",
+                                theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                                isAppUser = i == 0,
+                            )
+                        }
+                        gameVm.initFromOnlineSession(sessionId, 0, configs, mode)
+                        navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
+                            popUpTo(Screen.LobbyHost.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.LobbyJoin.route,
+                arguments = listOf(
+                    navArgument("code") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+                deepLinks = listOf(
+                    navDeepLink { uriPattern = "manahub://join/{code}" },
+                ),
+            ) { backStackEntry ->
+                val code = backStackEntry.arguments?.getString("code") ?: ""
+                LobbyJoinScreen(
+                    prefilledCode = code,
+                    onNavigateBack = { navController.popBackStack() },
+                    onGameStart = { sessionId, slotIndex, modeStr, playerCount ->
+                        val mode = runCatching { GameMode.valueOf(modeStr) }.getOrDefault(GameMode.STANDARD)
+                        val configs = (0 until playerCount).mapIndexed { i, _ ->
+                            PlayerConfig(
+                                id        = i,
+                                name      = "",
+                                theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                                isAppUser = i == slotIndex,
+                            )
+                        }
+                        gameVm.initFromOnlineSession(sessionId, slotIndex, configs, mode)
+                        navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
+                            popUpTo(Screen.LobbyJoin.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
             // ── Post-game survey ──────────────────────────────────────────────
             composable(
                 route = Screen.GameSurvey.route,

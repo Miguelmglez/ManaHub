@@ -105,10 +105,12 @@ import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.ui.components.AddCardSheet
+import com.mmg.manahub.core.ui.components.AltArtBadge
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.FoilBadge
+import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaCostImages
@@ -858,12 +860,10 @@ private fun CollectionCopyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CopyBadge(label = userCard.language.uppercase())
+                LanguageBadge(langCode = userCard.language)
                 CopyBadge(label = userCard.condition)
                 if (userCard.isFoil) FoilBadge()
-                if (userCard.isAlternativeArt) {
-                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
-                }
+                if (userCard.isAlternativeArt) AltArtBadge()
                 if (tradeQuantity > 0) {
                     Surface(
                         color = mc.secondaryAccent.copy(alpha = 0.15f),
@@ -1014,12 +1014,10 @@ private fun WishlistEntryRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CopyBadge(label = (entry.language ?: "").uppercase())
+                LanguageBadge(langCode = entry.language ?: "en")
                 CopyBadge(label = entry.condition ?: "")
                 if (entry.isFoil) FoilBadge()
-                if (entry.isAltArt) {
-                    CopyBadge(label = stringResource(R.string.carddetail_alternative_art_short))
-                }
+                if (entry.isAltArt) AltArtBadge()
             }
 
             // Quantity stepper + delete

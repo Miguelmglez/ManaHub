@@ -69,18 +69,37 @@ fun CardGridItem(
                 // Quantity badge (total across all copies)
                 Surface(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
+                        .align(Alignment.BottomEnd)
                         .padding(4.dp),
                     color = mc.background.copy(alpha = 0.85f),
                     shape = MaterialTheme.shapes.extraSmall,
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "×${item.totalQuantity}${if (item.hasFoil) " ✦" else ""}",
+                        text = "×${item.totalQuantity}${if (item.hasFoil) "✦" else ""}",
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = if (item.hasFoil) mc.goldMtg else mc.textPrimary,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 1.dp),
                     )
+                    if (item.distinctCopies > 1) {
+                            Icon(
+                                imageVector = Icons.Default.Style,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = mc.primaryAccent
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                text = item.distinctCopies.toString(),
+                                style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
+                                color = mc.primaryAccent,
+                                modifier = Modifier.padding(end = 2.dp)
+                            )
+                        }
+                    }
                 }
+
             }
             // Card name + price
             Column(
@@ -119,26 +138,7 @@ fun CardGridItem(
                         rarity = CardRarity.fromString(card.rarity),
                         size = 14.dp,
                     )
-                    // Variants indicator
-                    if (item.distinctCopies > 1) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(end = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Style,
-                                contentDescription = null,
-                                modifier = Modifier.size(12.dp),
-                                tint = mc.primaryAccent
-                            )
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = item.distinctCopies.toString(),
-                                style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 11.sp),
-                                color = mc.primaryAccent,
-                            )
-                        }
-                    }
+
 
                     Spacer(modifier = Modifier.weight(1f))
 

@@ -50,18 +50,27 @@ class NewsSourcesSettingsViewModel @Inject constructor(
         val state = _addState.value
         if (state.name.isBlank() || state.feedUrl.isBlank()) return
 
+        val normalizedUrl = state.feedUrl.trim()
+        if (!normalizedUrl.startsWith("https://")) {
+            _addState.update { it.copy(error = "Only HTTPS feed URLs are accepted") }
+            return
+        }
+
         viewModelScope.launch {
             _addState.update { it.copy(isValidating = true, error = null, previewCount = null) }
 
             // Try to resolve YouTube channel URL to RSS feed
-            val resolvedUrl = resolveYouTubeUrl(state.feedUrl, state.type)
+            val resolvedUrl = resolveYouTubeUrl(normalizedUrl, state.type)
 
             val result = manageSources.validateFeed(resolvedUrl, state.type)
             result.onSuccess { count ->
                 _addState.update { it.copy(isValidating = false, previewCount = count) }
-                // Auto-add after successful validation
-                manageSources.addCustomSource(state.name, resolvedUrl, state.type)
-                _addState.value = AddSourceState() // reset
+                val addResult = manageSources.addCustomSource(state.name, resolvedUrl, state.type)
+                addResult.onSuccess {
+                    _addState.value = AddSourceState()
+                }.onFailure { e ->
+                    _addState.update { it.copy(error = e.message) }
+                }
             }.onFailure { e ->
                 _addState.update { it.copy(isValidating = false, error = e.message) }
             }

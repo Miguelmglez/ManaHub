@@ -5,6 +5,7 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntity
 import com.mmg.manahub.feature.trades.domain.model.TradeItem
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -29,11 +30,18 @@ import javax.inject.Singleton
  *
  * Individual card failures are swallowed via [runCatching] so a single bad item
  * cannot block the rest of the sync or leave the sync record unwritten.
+ *
+ * Additionally, in normal mode sent items also remove the corresponding [OpenForTradeRepository]
+ * entry (the card is no longer in the collection so it should not remain offered for trade), and
+ * received items are matched against the best-fitting wishlist entry by attributes before
+ * decrementing (foil / condition / language / isAltArt), falling back to a matchAnyVariant entry
+ * or any entry for that scryfallId when no exact match exists.
  */
 @Singleton
 class UpdateTradeCollectionUseCase @Inject constructor(
     private val userCardRepository: UserCardRepository,
     private val wishlistRepository: WishlistRepository,
+    private val openForTradeRepository: OpenForTradeRepository,
     private val syncDao: TradeCollectionSyncDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
@@ -96,6 +104,9 @@ class UpdateTradeCollectionUseCase @Inject constructor(
                 sentItems.forEach { item ->
                     val ref = item.userCardIdRef ?: return@forEach
                     runCatching { userCardRepository.deleteCard(ref) }
+                    // Removes the open_for_trade entry both locally and from Supabase.
+                    // The card is no longer owned so it must not remain offered for trade.
+                    runCatching { openForTradeRepository.removeByCollectionIdAndSync(ref) }
                     // Individual failures are intentionally swallowed — a missing row
                     // (card already sold/deleted) must not abort the whole sync.
                 }
@@ -115,9 +126,13 @@ class UpdateTradeCollectionUseCase @Inject constructor(
                         )
                     }
                     runCatching {
-                        wishlistRepository.decrementByScryfallId(
+                        wishlistRepository.decrementByAttributes(
                             scryfallId = item.cardId,
                             quantity   = item.quantity ?: 1,
+                            isFoil     = item.isFoil ?: false,
+                            condition  = item.condition?.uppercase()?.trim() ?: "NM",
+                            language   = item.language?.lowercase()?.trim() ?: "en",
+                            isAltArt   = item.isAltArt ?: false,
                         )
                     }
                 }

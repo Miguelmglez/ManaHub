@@ -32,11 +32,19 @@ data class PlayerConfig(
     val isDefaultName: Boolean = false,
 )
 
+enum class LifeControlMode { SCROLL, TAP }
+
+data class GameSettings(
+    val landReminderEnabled: Boolean     = true,
+    val lifeControlMode:     LifeControlMode = LifeControlMode.SCROLL,
+)
+
 data class GameSetupUiState(
     val selectedMode:   GameMode          = GameMode.STANDARD,
     val playerCount:    Int               = 2,
     val playerConfigs:  List<PlayerConfig> = emptyList(),
     val selectedLayout: LayoutTemplate    = LayoutTemplates.getDefaultLayout(2),
+    val gameSettings:   GameSettings      = GameSettings(),
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,6 +115,20 @@ class GameSetupViewModel @Inject constructor(
             configs[index] = configs[index].copy(theme = theme)
             _uiState.update { it.copy(playerConfigs = configs) }
         }
+    }
+
+    fun toggleLandReminder() {
+        _uiState.update { it.copy(
+            gameSettings = it.gameSettings.copy(
+                landReminderEnabled = !it.gameSettings.landReminderEnabled
+            )
+        )}
+    }
+
+    fun setLifeControlMode(mode: LifeControlMode) {
+        _uiState.update { it.copy(
+            gameSettings = it.gameSettings.copy(lifeControlMode = mode)
+        )}
     }
 
 

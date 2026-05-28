@@ -10,12 +10,14 @@ import com.mmg.manahub.feature.draft.domain.model.SetTierList
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 data class SetDraftDetailUiState(
@@ -62,9 +64,9 @@ class SetDraftDetailViewModel @Inject constructor(
     )
     val uiState: StateFlow<SetDraftDetailUiState> = _uiState.asStateFlow()
 
-    private var guideLoaded = false
-    private var tierListLoaded = false
-    private var videosLoaded = false
+    private val guideLoaded = AtomicBoolean(false)
+    private val tierListLoaded = AtomicBoolean(false)
+    private val videosLoaded = AtomicBoolean(false)
 
     init {
         loadGuide()
@@ -73,7 +75,7 @@ class SetDraftDetailViewModel @Inject constructor(
 
     fun onTabSelected(tab: Int) {
         _uiState.update { it.copy(selectedTab = tab) }
-        if (tab == 1 && !tierListLoaded) loadTierList()
+        if (tab == 1 && !tierListLoaded.get()) loadTierList()
     }
 
     fun loadGuide() {
@@ -81,11 +83,11 @@ class SetDraftDetailViewModel @Inject constructor(
             _uiState.update { it.copy(isGuideLoading = true, guideError = null) }
             when (val result = getSetGuideUseCase(setCode)) {
                 is DataResult.Success -> {
-                    guideLoaded = true
+                    guideLoaded.set(true)
                     _uiState.update { it.copy(guide = result.data, isGuideLoading = false) }
                 }
                 is DataResult.Error -> {
-                    guideLoaded = true
+                    // Do NOT set guideLoaded = true on error so the UI can offer a retry
                     _uiState.update { it.copy(isGuideLoading = false, guideError = result.message) }
                 }
             }
@@ -97,11 +99,11 @@ class SetDraftDetailViewModel @Inject constructor(
             _uiState.update { it.copy(isTierListLoading = true, tierListError = null) }
             when (val result = getSetTierListUseCase(setCode)) {
                 is DataResult.Success -> {
-                    tierListLoaded = true
+                    tierListLoaded.set(true)
                     _uiState.update { it.copy(tierList = result.data, isTierListLoading = false) }
                 }
                 is DataResult.Error -> {
-                    tierListLoaded = true
+                    // Do NOT set tierListLoaded = true on error so the UI can offer a retry
                     _uiState.update { it.copy(isTierListLoading = false, tierListError = result.message) }
                 }
             }
@@ -113,12 +115,16 @@ class SetDraftDetailViewModel @Inject constructor(
             _uiState.update { it.copy(isVideosLoading = true) }
             when (val result = getSetVideosUseCase(setCode, setName)) {
                 is DataResult.Success -> {
-                    videosLoaded = true
+                    videosLoaded.set(true)
                     _uiState.update { it.copy(videos = result.data, isVideosLoading = false) }
                 }
                 is DataResult.Error -> {
-                    videosLoaded = true
+                    videosLoaded.set(true)
                     _uiState.update { it.copy(isVideosLoading = false) }
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("draft_videos_load_failed: set=$setCode error=${result.message}")
+                        setCustomKey("draft_set_code", setCode)
+                    }
                 }
             }
         }

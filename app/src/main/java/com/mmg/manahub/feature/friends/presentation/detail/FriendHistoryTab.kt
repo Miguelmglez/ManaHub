@@ -11,16 +11,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -36,6 +39,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.friends.domain.model.Friend
+import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.model.TradeStatus
 import java.time.Instant
@@ -47,13 +51,16 @@ import java.util.Locale
  * History tab on the friend detail screen.
  *
  * Shows two sub-tabs:
- * - **Trades**: a list of past [TradeProposal]s shared with this friend, filtered
- *   and provided by [FriendDetailViewModel]. Empty state shown when the list is empty.
- * - **Games**: a "coming soon" placeholder.
+ * - **Trades**: a list of past [TradeProposal]s shared with this friend.
+ * - **Games**: aggregate match history from online sessions against this friend.
  *
- * @param friend       The friend whose history is being displayed.
- * @param tradeHistory Trade proposals already filtered to only include proposals
- *                     between the current user and [friend].
+ * @param friend              The friend whose history is being displayed.
+ * @param tradeHistory        Trade proposals filtered to only include proposals between the
+ *                            current user and [friend].
+ * @param gameHistory         Aggregate win/loss record; null while loading or if never played.
+ * @param isLoadingGameHistory True while the game history request is in flight.
+ * @param gameHistoryError    True when the last game history request failed.
+ * @param onRetryGameHistory  Called when the user taps Retry after a game history error.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +68,10 @@ fun FriendHistoryTab(
     friend: Friend,
     tradeHistory: List<TradeProposal>,
     onTradeClick: (proposalId: String, rootProposalId: String) -> Unit,
+    gameHistory: FriendMatchHistory? = null,
+    isLoadingGameHistory: Boolean = false,
+    gameHistoryError: Boolean = false,
+    onRetryGameHistory: () -> Unit = {},
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
     val mc = MaterialTheme.magicColors
@@ -133,7 +144,13 @@ fun FriendHistoryTab(
                 tradeHistory = tradeHistory,
                 onTradeClick = onTradeClick,
             )
-            else -> GamesComingSoonContent()
+            else -> GamesHistoryContent(
+                friend = friend,
+                gameHistory = gameHistory,
+                isLoading = isLoadingGameHistory,
+                hasError = gameHistoryError,
+                onRetry = onRetryGameHistory,
+            )
         }
     }
 }
@@ -183,19 +200,167 @@ private fun TradesHistoryContent(
     }
 }
 
-/** Centered placeholder for the Games sub-tab. */
+/**
+ * Games sub-tab showing aggregate win/loss record against this friend.
+ *
+ * States:
+ * - Loading: spinner while the RPC call is in flight.
+ * - Error: message + Retry button when the call failed.
+ * - No games: empty-state text when totalGames == 0.
+ * - Data: a summary card showing wins, losses, and last played date.
+ */
 @Composable
-private fun GamesComingSoonContent() {
+private fun GamesHistoryContent(
+    friend: Friend,
+    gameHistory: FriendMatchHistory?,
+    isLoading: Boolean,
+    hasError: Boolean,
+    onRetry: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val mt = MaterialTheme.magicTypography
+
     Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(32.dp))
+                }
+            }
+
+            hasError -> {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.friend_history_games_error),
+                        style = mt.bodySmall,
+                        color = mc.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(onClick = onRetry) {
+                        Text(
+                            text = stringResource(R.string.retry),
+                            color = mc.primaryAccent,
+                            style = mt.labelMedium,
+                        )
+                    }
+                }
+            }
+
+            gameHistory == null || gameHistory.totalGames == 0 -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = stringResource(R.string.friend_history_games_empty, friend.nickname),
+                        style = mt.bodySmall,
+                        color = mc.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(32.dp),
+                    )
+                }
+            }
+
+            else -> {
+                MatchHistoryCard(friend = friend, history = gameHistory)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MatchHistoryCard(
+    friend: Friend,
+    history: FriendMatchHistory,
+) {
+    val mc = MaterialTheme.magicColors
+    val mt = MaterialTheme.magicTypography
+
+    val lastPlayedFormatted = remember(history.lastPlayedAt) {
+        if (history.lastPlayedAt == 0L) null
+        else DateTimeFormatter
+            .ofPattern("dd MMM yyyy", Locale.ENGLISH)
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.ofEpochMilli(history.lastPlayedAt))
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.friend_history_games_title, history.totalGames),
+                style = mt.titleMedium,
+                color = mc.textPrimary,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                WinLossStat(
+                    label = stringResource(R.string.friend_history_games_wins),
+                    value = history.myWins,
+                    color = mc.lifePositive,
+                )
+                WinLossStat(
+                    label = stringResource(R.string.friend_history_games_losses),
+                    value = history.opponentWins,
+                    color = mc.lifeNegative,
+                )
+                WinLossStat(
+                    label = stringResource(R.string.friend_history_games_winrate),
+                    value = if (history.totalGames > 0)
+                        (history.myWins * 100 / history.totalGames)
+                    else 0,
+                    suffix = "%",
+                    color = mc.primaryAccent,
+                )
+            }
+
+            if (lastPlayedFormatted != null) {
+                Text(
+                    text = stringResource(R.string.friend_history_games_last_played, lastPlayedFormatted),
+                    style = mt.bodySmall,
+                    color = mc.textSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WinLossStat(
+    label: String,
+    value: Int,
+    color: Color,
+    suffix: String = "",
+) {
+    val mt = MaterialTheme.magicTypography
+    val mc = MaterialTheme.magicColors
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = stringResource(R.string.friend_history_games_coming_soon),
-            style = MaterialTheme.magicTypography.bodySmall,
-            color = MaterialTheme.magicColors.textSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(32.dp),
+            text = "$value$suffix",
+            style = mt.titleLarge,
+            color = color,
+        )
+        Text(
+            text = label,
+            style = mt.labelSmall,
+            color = mc.textSecondary,
         )
     }
 }

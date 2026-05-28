@@ -275,22 +275,10 @@ private fun CopyRow(
                     )
 
                     // Foil
-                    if (userCard.isFoil) {
-                        AttributeBadge(
-                            stringResource(R.string.addcard_confirm_foil),
-                            mc.goldMtg,
-                            mc.goldMtg.copy(alpha = 0.15f),
-                        )
-                    }
+                    if (userCard.isFoil) FoilBadge()
 
                     // Alt art
-                    if (userCard.isAlternativeArt) {
-                        AttributeBadge(
-                            stringResource(R.string.carddetail_alternative_art_short),
-                            mc.secondaryAccent,
-                            mc.secondaryAccent.copy(alpha = 0.15f),
-                        )
-                    }
+                    if (userCard.isAlternativeArt) AltArtBadge()
                 }
 
                 // Trade status line

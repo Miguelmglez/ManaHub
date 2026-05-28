@@ -31,33 +31,51 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
 @Composable
-fun CopyBadge(label: String, modifier: Modifier = Modifier) {
+fun CopyBadge(
+    label: String,
+    modifier: Modifier = Modifier,
+    showBackground: Boolean = true
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     Surface(
-        color = mc.surfaceVariant.copy(alpha = 0.5f),
+        color = if (showBackground) mc.surfaceVariant.copy(alpha = 0.5f) else Color.Transparent,
         shape = MaterialTheme.shapes.extraSmall,
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.textDisabled.copy(alpha = 0.2f)),
+        border = if (showBackground) androidx.compose.foundation.BorderStroke(0.5.dp, mc.textDisabled.copy(alpha = 0.2f)) else null,
         modifier = modifier
     ) {
         Text(
             text = label,
-            style = ty.labelSmall.copy(fontSize = 10.sp),
+            style = ty.labelSmall.copy(fontSize = if (showBackground) 10.sp else 14.sp),
             color = mc.textSecondary,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(
+                horizontal = if (showBackground) 6.dp else 0.dp,
+                vertical = if (showBackground) 2.dp else 0.dp
+            ),
         )
     }
+}
+
+@Composable
+fun LanguageBadge(langCode: String, modifier: Modifier = Modifier) {
+    val flag = com.mmg.manahub.core.util.CardConstants.getFlag(langCode)
+    val isFlag = flag.isNotEmpty()
+    val displayLabel = flag.ifEmpty { langCode.uppercase() }
+    CopyBadge(label = displayLabel, modifier = modifier, showBackground = !isFlag)
 }
 
 @Composable
@@ -154,9 +172,27 @@ fun FoilBadge() {
         border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.goldMtg.copy(alpha = 0.4f)),
     ) {
         Text(
-            text     = "foil",
+            text     = "Foil",
             style    = ty.labelSmall.copy(fontSize = 10.sp),
             color    = mc.goldMtg,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+        )
+    }
+}
+
+@Composable
+fun AltArtBadge() {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(
+        color = mc.primaryAccent.copy(alpha = 0.18f),
+        shape = MaterialTheme.shapes.extraSmall,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.4f)),
+    ) {
+        Text(
+            text     = stringResource(R.string.carddetail_alternative_art_short),
+            style    = ty.labelSmall.copy(fontSize = 10.sp),
+            color    = mc.primaryAccent,
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
         )
     }

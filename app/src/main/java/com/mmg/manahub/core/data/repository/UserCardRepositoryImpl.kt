@@ -180,18 +180,8 @@ class UserCardRepositoryImpl @Inject constructor(
             )
         }
 
-        if (existing != null && !existing.isDeleted) {
-            // INCREMENT existing row's quantity
-            userCardCollectionDao.upsert(
-                existing.copy(
-                    quantity  = existing.quantity + quantity,
-                    isForTrade = isForTrade || existing.isForTrade,
-                    updatedAt = now,
-                )
-            )
-        } else {
-            // INSERT new row
-            userCardCollectionDao.upsert(
+        when {
+            existing == null -> userCardCollectionDao.upsert(
                 UserCardCollectionEntity(
                     id               = UUID.randomUUID().toString(),
                     userId           = resolvedUserId,
@@ -205,6 +195,23 @@ class UserCardRepositoryImpl @Inject constructor(
                     isDeleted        = false,
                     updatedAt        = now,
                     createdAt        = now,
+                )
+            )
+            existing.isDeleted -> userCardCollectionDao.upsert(
+                // Restore the same row (same UUID) so no duplicate is created.
+                // Quantity resets to the incoming value — the card was gone before.
+                existing.copy(
+                    quantity   = quantity,
+                    isDeleted  = false,
+                    isForTrade = isForTrade,
+                    updatedAt  = now,
+                )
+            )
+            else -> userCardCollectionDao.upsert(
+                existing.copy(
+                    quantity   = existing.quantity + quantity,
+                    isForTrade = isForTrade || existing.isForTrade,
+                    updatedAt  = now,
                 )
             )
         }

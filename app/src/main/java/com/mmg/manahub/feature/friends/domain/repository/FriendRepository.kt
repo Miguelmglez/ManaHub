@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.friends.domain.repository
 import com.mmg.manahub.feature.friends.domain.model.AcceptInviteResult
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.model.FriendCard
+import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
 import com.mmg.manahub.feature.friends.domain.model.FriendRequest
 import com.mmg.manahub.feature.friends.domain.model.FriendStats
 import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
@@ -67,6 +68,14 @@ interface FriendRepository {
      * network or HTTP errors.
      */
     suspend fun getFriendStats(friendUserId: String): Result<FriendStats?>
+
+    /**
+     * Fetches the aggregate match history between the current user and [friendUserId].
+     *
+     * Returns `Result.success(null)` when no games have been played yet.
+     * Returns `Result.failure` on network or server errors.
+     */
+    suspend fun getFriendMatchHistory(friendUserId: String): Result<FriendMatchHistory?>
 
     /**
      * Pushes the caller's own collection statistics to Supabase via `upsert_collection_stats`.

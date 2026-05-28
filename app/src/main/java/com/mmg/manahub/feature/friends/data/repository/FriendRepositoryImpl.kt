@@ -13,6 +13,7 @@ import com.mmg.manahub.feature.friends.data.remote.OutgoingRequestWithProfile
 import com.mmg.manahub.feature.friends.domain.model.AcceptInviteResult
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.model.FriendCard
+import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
 import com.mmg.manahub.feature.friends.domain.model.FriendRequest
 import com.mmg.manahub.feature.friends.domain.model.FriendStats
 import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
@@ -203,6 +204,11 @@ class FriendRepositoryImpl @Inject constructor(
             remote.getFriendStats(friendUserId)?.toDomain()
         }
 
+    override suspend fun getFriendMatchHistory(friendUserId: String): Result<FriendMatchHistory?> =
+        runCatching {
+            remote.getFriendMatchHistory(friendUserId)?.toDomain()
+        }
+
     override suspend fun upsertMyStats(
         uniqueCards: Int,
         totalCards: Int,
@@ -218,6 +224,16 @@ class FriendRepositoryImpl @Inject constructor(
             totalValueUsd = totalValueUsd,
             favouriteColor = favouriteColor,
             mostValuableColor = mostValuableColor,
+        )
+
+    private fun com.mmg.manahub.feature.friends.data.remote.FriendMatchHistoryDto.toDomain() =
+        FriendMatchHistory(
+            myWins = myWins,
+            opponentWins = opponentWins,
+            totalGames = totalGames,
+            lastPlayedAt = lastPlayedAt?.let {
+                runCatching { java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrDefault(0L)
+            } ?: 0L,
         )
 
     private fun com.mmg.manahub.feature.friends.data.remote.FriendStatsDto.toDomain() =
