@@ -46,6 +46,9 @@ private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_ove
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
 private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
 
+// ── Feature flags ─────────────────────────────────────────────────────────
+private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
+
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
 
 // ── Privacy settings — persisted locally so SettingsScreen renders without a network call ──
@@ -274,6 +277,17 @@ class UserPreferencesDataStore @Inject constructor(
     /** Persists the version number after a successful R2 download. */
     suspend fun saveEmbeddingDbVersion(version: Int) {
         context.userPrefsDataStore.edit { it[KEY_EMBEDDING_DB_VERSION] = version }
+    }
+
+    // ── Feature flags ─────────────────────────────────────────────────────────
+
+    /** Controls whether FCM push notifications are sent and displayed. Default: false (disabled until rollout). */
+    val pushNotificationsEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_PUSH_NOTIFICATIONS_ENABLED] ?: false }
+        .catch { emit(false) }
+
+    suspend fun savePushNotificationsEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_PUSH_NOTIFICATIONS_ENABLED] = enabled }
     }
 
     // ── Privacy settings ──────────────────────────────────────────────────────
