@@ -321,3 +321,9 @@ $RECYCLE.BIN/
 /docs/plans/online-game-sessions.md
 /supabase/.temp/cli-latest
 /docs/*
+!/docs/PUSH_NOTIFICATIONS_TODO.md
+/.claude/skills/compose-ui/SKILL.md
+/.claude/skills/compose-ui/references/visual-loop-setup.md
+/.claude/skills/compose-ui/references/components.md
+/.claude/skills/compose-ui/references/design-system.md
+/.claude/skills/compose-ui/references/dos-and-donts.md
