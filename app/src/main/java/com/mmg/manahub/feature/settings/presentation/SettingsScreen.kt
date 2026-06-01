@@ -1,6 +1,9 @@
 package com.mmg.manahub.feature.settings.presentation
 
 import android.app.Activity
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +28,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.RadioButton
@@ -37,6 +44,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,8 +57,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionState
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
@@ -64,7 +78,7 @@ import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -75,10 +89,22 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
+    val pushEnabled by viewModel.pushNotificationsEnabled.collectAsStateWithLifecycle()
+    val notificationPrefs by viewModel.notificationPrefs.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
-    val activity = LocalContext.current as? Activity
+    val context = LocalContext.current
+    val activity = context as? Activity
     val privacyToastState = rememberMagicToastState()
     val privacyErrorMsg = stringResource(R.string.settings_privacy_error)
+
+    // POST_NOTIFICATIONS is a runtime permission only on Android 13+ (API 33). On older
+    // devices notifications are granted at install time, so the rationale banner is skipped.
+    val notificationPermissionState: PermissionState? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            rememberPermissionState(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            null
+        }
 
     LaunchedEffect(Unit) {
         viewModel.appLanguageChanged.collect { activity?.recreate() }
@@ -229,6 +255,23 @@ fun SettingsScreen(
             )
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            NotificationsSection(
+                pushEnabled = pushEnabled,
+                prefs = notificationPrefs,
+                permissionGranted = notificationPermissionState?.status?.isGranted ?: true,
+                showRationale = notificationPermissionState?.status?.shouldShowRationale ?: false,
+                onPushEnabledChange = viewModel::setPushNotificationsEnabled,
+                onGroupChange = viewModel::setNotificationGroupEnabled,
+                onRequestPermission = { notificationPermissionState?.launchPermissionRequest() },
+                onOpenSystemSettings = {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    }
+                    context.startActivity(intent)
+                },
+            )
+
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             ThemeSelectorSection(
                 currentTheme = uiState.currentTheme,
                 onThemeSelected = viewModel::selectTheme,
@@ -321,6 +364,245 @@ private fun PrivacySection(
             checked = tradeListPublic,
             onCheckedChange = onTradeListPublicChange,
         )
+    }
+}
+
+// ── Notifications section ───────────────────────────────────────────────────────
+
+/**
+ * Logical groupings of backend event types surfaced as a single toggle each. Toggling a group
+ * applies the same value to every event in [eventTypes]. A group is considered ON only when all
+ * of its events are enabled (key missing = enabled, opt-out model).
+ */
+private object NotificationGroups {
+    val TRADE_PROPOSALS = listOf("trade_proposed", "trade_countered")
+    val TRADE_UPDATES = listOf(
+        "trade_accepted",
+        "trade_declined",
+        "trade_edited",
+        "trade_cancelled",
+        "trade_revoked",
+        "trade_completed",
+    )
+    val FRIENDS = listOf("friend_request", "friend_accepted", "friend_invite_joined")
+}
+
+/**
+ * A group toggle is ON when every event it controls is enabled. A missing key defaults to
+ * enabled, so an untouched preference map yields all groups ON.
+ */
+private fun Map<String, Boolean>.isGroupEnabled(eventTypes: List<String>): Boolean =
+    eventTypes.all { this[it] ?: true }
+
+/**
+ * Notifications preferences block: a master push toggle, per-group event toggles (shown only
+ * when the master is ON), a permission rationale banner (Android 13+), and a deep link into the
+ * system notification settings. Stateless — all values are hoisted to the ViewModel/permission state.
+ */
+@Composable
+private fun NotificationsSection(
+    pushEnabled: Boolean,
+    prefs: Map<String, Boolean>,
+    permissionGranted: Boolean,
+    showRationale: Boolean,
+    onPushEnabledChange: (Boolean) -> Unit,
+    onGroupChange: (List<String>, Boolean) -> Unit,
+    onRequestPermission: () -> Unit,
+    onOpenSystemSettings: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_section_notifications),
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
+        Spacer(Modifier.height(4.dp))
+
+        // Permission rationale banner — only relevant when the OS permission is missing.
+        if (!permissionGranted) {
+            NotificationPermissionBanner(
+                // shouldShowRationale becomes true after a first denial; once permanently denied
+                // it stays false, so we route the user to the system settings instead.
+                permanentlyDenied = !showRationale,
+                onRequestPermission = onRequestPermission,
+                onOpenSettings = onOpenSystemSettings,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+
+        NotificationToggleRow(
+            icon = Icons.Filled.NotificationsActive,
+            title = stringResource(R.string.settings_push_master),
+            subtitle = stringResource(R.string.settings_push_master_subtitle),
+            checked = pushEnabled,
+            onCheckedChange = onPushEnabledChange,
+        )
+
+        // Per-event-type toggles are only meaningful while the master switch is ON.
+        if (pushEnabled) {
+            NotificationToggleRow(
+                icon = Icons.Filled.SwapHoriz,
+                title = stringResource(R.string.settings_push_trade_proposals),
+                subtitle = stringResource(R.string.settings_push_trade_proposals_subtitle),
+                checked = prefs.isGroupEnabled(NotificationGroups.TRADE_PROPOSALS),
+                onCheckedChange = { onGroupChange(NotificationGroups.TRADE_PROPOSALS, it) },
+            )
+            NotificationToggleRow(
+                icon = Icons.Filled.SwapHoriz,
+                title = stringResource(R.string.settings_push_trade_updates),
+                subtitle = stringResource(R.string.settings_push_trade_updates_subtitle),
+                checked = prefs.isGroupEnabled(NotificationGroups.TRADE_UPDATES),
+                onCheckedChange = { onGroupChange(NotificationGroups.TRADE_UPDATES, it) },
+            )
+            NotificationToggleRow(
+                icon = Icons.Filled.People,
+                title = stringResource(R.string.settings_push_friend_requests),
+                subtitle = stringResource(R.string.settings_push_friend_requests_subtitle),
+                checked = prefs.isGroupEnabled(NotificationGroups.FRIENDS),
+                onCheckedChange = { onGroupChange(NotificationGroups.FRIENDS, it) },
+            )
+        }
+
+        // System notification settings deep link.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenSystemSettings)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Notifications,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                )
+                Column {
+                    Text(
+                        stringResource(R.string.settings_push_open_system_settings),
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textPrimary,
+                    )
+                    Text(
+                        stringResource(R.string.settings_push_open_system_settings_subtitle),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = mc.textSecondary,
+            )
+        }
+    }
+}
+
+/**
+ * A single notification preference row: leading icon + title/subtitle + trailing [Switch].
+ *
+ * @param permanentlyDenied unused here; kept distinct from the banner composable for clarity.
+ */
+@Composable
+private fun NotificationToggleRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(icon, contentDescription = null, tint = mc.textSecondary)
+            Column {
+                Text(title, style = MaterialTheme.magicTypography.bodyMedium, color = mc.textPrimary)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
+                )
+            }
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = mc.surface,
+                checkedTrackColor = mc.primaryAccent,
+                checkedIconColor = mc.primaryAccent,
+            ),
+        )
+    }
+}
+
+/**
+ * Inline banner prompting the user to grant the POST_NOTIFICATIONS permission. When the permission
+ * is [permanentlyDenied] the action routes to the system settings instead of re-prompting.
+ */
+@Composable
+private fun NotificationPermissionBanner(
+    permanentlyDenied: Boolean,
+    onRequestPermission: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = mc.primaryAccent.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                Icons.Filled.NotificationsActive,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+            )
+            Text(
+                text = stringResource(R.string.settings_push_permission_rationale),
+                style = MaterialTheme.magicTypography.bodySmall,
+                color = mc.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = if (permanentlyDenied) onOpenSettings else onRequestPermission) {
+                Text(
+                    text = stringResource(
+                        if (permanentlyDenied) {
+                            R.string.settings_push_open_settings
+                        } else {
+                            R.string.settings_push_allow
+                        },
+                    ),
+                    style = MaterialTheme.magicTypography.labelLarge,
+                    color = mc.primaryAccent,
+                )
+            }
+        }
     }
 }
 
