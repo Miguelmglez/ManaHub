@@ -7,6 +7,7 @@ import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -35,6 +36,7 @@ class SettingsViewModel @Inject constructor(
     private val analyticsHelper: AnalyticsHelper,
     private val authRepository: AuthRepository,
     private val userProfileDataSource: UserProfileDataSource,
+    private val pushTokenRepository: PushTokenRepository,
 //    private val langPref:              LanguagePreference
 ) : ViewModel() {
 
@@ -86,6 +88,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepo.setAppLanguage(language)
             _appLanguageChanged.emit(Unit)
+        }
+        // Keep the backend locale in sync so future push notifications use the new language.
+        viewModelScope.launch {
+            runCatching { pushTokenRepository.updateLocale(language.code) }
         }
     }
 
