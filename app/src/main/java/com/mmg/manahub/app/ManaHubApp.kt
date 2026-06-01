@@ -1,6 +1,9 @@
 package com.mmg.manahub.app
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 import androidx.work.WorkManager
 import coil.Coil
 import coil.ImageLoader
@@ -37,6 +40,8 @@ class ManaHubApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        createNotificationChannels()
 
         FirebaseCrashlytics.getInstance().apply {
             isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
@@ -77,5 +82,21 @@ class ManaHubApp : Application() {
                 }
             }
         }
+    }
+
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val nm = getSystemService(NotificationManager::class.java) ?: return
+        listOf(
+            NotificationChannel("trades_high", "Trade Proposals", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "New trade proposals and counter-proposals"
+            },
+            NotificationChannel("trades_updates", "Trade Updates", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Trade accepted, declined, cancelled, completed"
+            },
+            NotificationChannel("friends", "Friends", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Friend requests and acceptances"
+            }
+        ).forEach { nm.createNotificationChannel(it) }
     }
 }
