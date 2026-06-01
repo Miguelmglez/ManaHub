@@ -48,7 +48,10 @@ class UnregisterPushTokenWorker @AssistedInject constructor(
                 )
                 .setInputData(Data.Builder().putString(KEY_TOKEN, token).build())
                 .build()
-            workManager.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+            // REPLACE (not KEEP): if the user re-authenticates while offline and the previous
+            // unregister worker is still queued, REPLACE cancels that stale request so it does not
+            // silently delete the freshly-registered token after connectivity resumes.
+            workManager.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)
         }
     }
 }

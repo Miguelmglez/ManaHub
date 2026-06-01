@@ -406,6 +406,11 @@ fun AppNavGraph(
                 route = Screen.FriendsList.route,
                 deepLinks = listOf(navDeepLink { uriPattern = "manahub://friends" }),
             ) {
+                // Suppress foreground friend push notifications while the user is on this screen.
+                DisposableEffect(Unit) {
+                    ForegroundScreenTracker.setCurrentDeeplink("manahub://friends")
+                    onDispose { ForegroundScreenTracker.setCurrentDeeplink(null) }
+                }
                 FriendsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToFriendDetail = { userId ->
