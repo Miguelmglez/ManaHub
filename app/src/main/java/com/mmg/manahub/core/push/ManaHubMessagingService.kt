@@ -1,7 +1,13 @@
 package com.mmg.manahub.core.push
 
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.net.Uri
+import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -24,8 +30,48 @@ class ManaHubMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        // Phase 6 will implement the full notification builder and routing here.
-        android.util.Log.d("ManaHubFCM", "FCM message received: type=${message.data["type"]}")
+        val data = message.data
+        val type = data["type"] ?: return
+        val title = data["title"] ?: message.notification?.title ?: return
+        val body = data["body"] ?: message.notification?.body ?: return
+        val deeplink = data["deeplink"]
+        val threadId = data["thread_id"]?.takeIf { it.isNotEmpty() }
+        val entityId = data["entity_id"] ?: ""
+        val eventId = data["event_id"] ?: ""
+
+        // Foreground suppression: skip if the user is already viewing this exact screen.
+        if (deeplink != null && ForegroundScreenTracker.isViewingDeeplink(deeplink)) return
+
+        val channelId = when {
+            type == "trade_proposed" || type == "trade_countered" || type == "trade_accepted" -> "trades_high"
+            type.startsWith("friend") -> "friends"
+            else -> "trades_updates"
+        }
+
+        val notificationId = eventId.hashCode()
+        // Grouping tag: collapse repeated notifications for the same thread/friend.
+        val tag = threadId?.let { "thread:$it" } ?: "friend:$entityId"
+
+        val pendingIntent = deeplink?.let { link ->
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).apply {
+                setPackage(packageName)
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            PendingIntent.getActivity(
+                this, notificationId, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        getSystemService(NotificationManager::class.java).notify(tag, notificationId, notification)
     }
 
     @EntryPoint

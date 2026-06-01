@@ -94,6 +94,20 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="manahub" android:host="invite" />
             </intent-filter>
+            <!-- Push notification deep links — trade threads -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="manahub" android:host="trade" />
+            </intent-filter>
+            <!-- Push notification deep links — friends -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="manahub" android:host="friends" />
+            </intent-filter>
         </activity>
 
         <service

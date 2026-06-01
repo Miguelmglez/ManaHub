@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.mmg.manahub.core.push.ForegroundScreenTracker
+import com.mmg.manahub.core.push.PushDeeplinkRouter
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -71,8 +74,6 @@ import com.mmg.manahub.feature.tournament.presentation.TournamentListScreen
 import com.mmg.manahub.feature.tournament.presentation.TournamentScreen
 import com.mmg.manahub.feature.tournament.presentation.TournamentSetupScreen
 import com.mmg.manahub.feature.tournament.presentation.TournamentViewModel
-import com.mmg.manahub.feature.online.presentation.lobby.LobbyHostScreen
-import com.mmg.manahub.feature.online.presentation.lobby.LobbyJoinScreen
 import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
 import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
 import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
@@ -105,6 +106,16 @@ fun AppNavGraph(
     val inviteVm: InviteDispatcherViewModel = hiltViewModel(activity)
 
     val navController = rememberNavController()
+
+    // Bridge FCM background deeplinks (Intent extras) into Compose navigation.
+    // The callback is cleared on dispose so neither the NavController nor the Activity leaks.
+    DisposableEffect(navController) {
+        PushDeeplinkRouter.setNavigator { deeplink ->
+            runCatching { navController.navigate(android.net.Uri.parse(deeplink)) }
+                .onFailure { android.util.Log.w("AppNavGraph", "Push deeplink nav failed: $deeplink", it) }
+        }
+        onDispose { PushDeeplinkRouter.setNavigator(null) }
+    }
 
     // Toast for invite results — shown at the global level so it is visible regardless of
     // which screen the user ends up on after the InviteDispatcherScreen navigates away.
@@ -171,7 +182,7 @@ fun AppNavGraph(
                                     )
                                 ) { launchSingleTop = true }
                             } else {
-                                navController.navigate(Screen.GameSetup.route)
+                                navController.navigate(Screen.GameSetup.baseRoute)
                             }
                         },
                         onDraftClick = { navController.navigateTab(Screen.Draft.route) },
@@ -239,6 +250,11 @@ fun AppNavGraph(
                     onBack              = { navController.popBackStack() },
                     onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
                     onNavigateToDeck    = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onNavigateToCard    = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id)) {
+                            popUpTo(Screen.CollectionCardDetail.route) { inclusive = true }
+                        }
+                    },
                 )
             }
 
@@ -381,7 +397,10 @@ fun AppNavGraph(
                 )
             }
 
-            composable(Screen.FriendsList.route) {
+            composable(
+                route = Screen.FriendsList.route,
+                deepLinks = listOf(navDeepLink { uriPattern = "manahub://friends" }),
+            ) {
                 FriendsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToFriendDetail = { userId ->
@@ -485,7 +504,18 @@ fun AppNavGraph(
                     navArgument("proposalId") { type = NavType.StringType },
                     navArgument("rootProposalId") { type = NavType.StringType },
                 ),
-            ) {
+                // URI order is root-first then proposal — matches the push deeplink format.
+                deepLinks = listOf(
+                    navDeepLink { uriPattern = "manahub://trade/{rootProposalId}/{proposalId}" },
+                ),
+            ) { backStack ->
+                val proposalId = backStack.arguments?.getString("proposalId") ?: ""
+                val rootProposalId = backStack.arguments?.getString("rootProposalId") ?: ""
+                // Suppress foreground push notifications while this exact thread is on screen.
+                DisposableEffect(proposalId, rootProposalId) {
+                    ForegroundScreenTracker.setCurrentDeeplink("manahub://trade/$rootProposalId/$proposalId")
+                    onDispose { ForegroundScreenTracker.setCurrentDeeplink(null) }
+                }
                 TradeNegotiationDetailScreen(
                     onBack             = { navController.popBackStack() },
                     onNavigateToCardDetail = { id ->
@@ -516,11 +546,7 @@ fun AppNavGraph(
                     onNavigateBack = { navController.popBackStack() },
                     onCreateTournament = { navController.navigate(Screen.TournamentSetup.route) },
                     onOpenTournament = { id ->
-                        navController.navigate(
-                            Screen.TournamentDetail.route(
-                                id
-                            )
-                        )
+                        navController.navigate(Screen.TournamentDetail.route(id))
                     },
                 )
             }
@@ -569,7 +595,18 @@ fun AppNavGraph(
             }
 
             // ── Game flow ─────────────────────────────────────────────────────
-            composable(Screen.GameSetup.route) {
+            //
+            // GameSetup now supports an optional joinCode query parameter.
+            // All navigate() calls to GameSetup must use Screen.GameSetup.baseRoute
+            // (no join code) or Screen.GameSetup.routeWithJoinCode(code) when a deep-link
+            // join code needs to pre-open the join sheet.
+            composable(
+                route = Screen.GameSetup.route, // "game/setup?joinCode={joinCode}"
+                arguments = listOf(
+                    navArgument("joinCode") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { backStackEntry ->
+                val joinCode = backStackEntry.arguments?.getString("joinCode")?.takeIf { it.isNotBlank() }
                 val setupVm: GameSetupViewModel = hiltViewModel()
                 GameSetupScreen(
                     viewModel = setupVm,
@@ -583,17 +620,43 @@ fun AppNavGraph(
                         pendingTournamentPlayers = emptyList()
                         pendingTournamentMode = null
                         navController.navigate(
-                            Screen.GamePlay.createRoute(
-                                mode.name,
-                                configs.size
-                            )
+                            Screen.GamePlay.createRoute(mode.name, configs.size)
                         ) {
-                            popUpTo(Screen.GameSetup.route) { inclusive = true }
+                            popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
                         }
                     },
-                    onNavigateToTournament = { navController.navigate(Screen.TournamentSetup.route) },
-                    onNavigateToOnline = { mode, playerCount -> navController.navigate(Screen.LobbyHost.route(mode.name, playerCount)) },
-                    onNavigateToJoin   = { navController.navigate(Screen.LobbyJoin.route()) },
+                    onOnlineHostGameStart = { sessionId, mode, playerCount ->
+                        val configs = (0 until playerCount).mapIndexed { i, _ ->
+                            PlayerConfig(
+                                id        = i,
+                                name      = "",
+                                theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                                isAppUser = i == 0,
+                            )
+                        }
+                        gameVm.initFromOnlineSession(sessionId, 0, configs, mode)
+                        navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
+                            popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
+                        }
+                    },
+                    onOnlineJoinGameStart = { sessionId, slotIndex, modeStr, playerCount ->
+                        val mode = runCatching { GameMode.valueOf(modeStr) }.getOrDefault(GameMode.STANDARD)
+                        val configs = (0 until playerCount).mapIndexed { i, _ ->
+                            PlayerConfig(
+                                id        = i,
+                                name      = "",
+                                theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
+                                isAppUser = i == slotIndex,
+                            )
+                        }
+                        gameVm.initFromOnlineSession(sessionId, slotIndex, configs, mode)
+                        navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
+                            popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
+                        }
+                    },
+                    onNavigateToTournamentSetup = { navController.navigate(Screen.TournamentSetup.route) },
+                    onNavigateToTournamentDetail = { id -> navController.navigate(Screen.TournamentDetail.route(id)) },
+                    prefilledJoinCode = joinCode,
                 )
             }
 
@@ -641,14 +704,14 @@ fun AppNavGraph(
                         { navController.navigate(Screen.TournamentDetail.route(tId)) }
                     },
                     onNewGame = {
-                        navController.navigate(Screen.GameSetup.route) {
+                        navController.navigate(Screen.GameSetup.baseRoute) {
                             popUpTo(Screen.GamePlay.route) { inclusive = true }
                         }
                     },
                     onBackHome = {
                         // Finish the current game and return to setup
                         gameVm.finishGame()
-                        navController.navigate(Screen.GameSetup.route) {
+                        navController.navigate(Screen.GameSetup.baseRoute) {
                             popUpTo(Screen.Collection.route) { inclusive = false }
                         }
                     },
@@ -660,7 +723,7 @@ fun AppNavGraph(
                     },
                     onExitGame = {
                         gameVm.finishGame()
-                        navController.navigate(Screen.GameSetup.route) {
+                        navController.navigate(Screen.GameSetup.baseRoute) {
                             popUpTo(Screen.Collection.route) { inclusive = false }
                         }
                     },
@@ -669,7 +732,12 @@ fun AppNavGraph(
                     },
                 )
             }
-            // ── Online multiplayer lobby ──────────────────────────────────────
+
+            // ── Online multiplayer lobby (redirect stubs) ─────────────────────
+            //
+            // LobbyHost and LobbyJoin are no longer full-screen destinations.
+            // They redirect back to GameSetupScreen (optionally carrying the join code)
+            // so the new sheet-based flow handles everything.
 
             composable(
                 route = Screen.LobbyHost.route,
@@ -678,57 +746,35 @@ fun AppNavGraph(
                     navArgument("playerCount") { type = NavType.IntType; defaultValue = 0 },
                 ),
             ) {
-                LobbyHostScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onGameStart = { sessionId, mode, playerCount ->
-                        val configs = (0 until playerCount).mapIndexed { i, _ ->
-                            PlayerConfig(
-                                id        = i,
-                                name      = "",
-                                theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
-                                isAppUser = i == 0,
-                            )
-                        }
-                        gameVm.initFromOnlineSession(sessionId, 0, configs, mode)
-                        navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
-                            popUpTo(Screen.LobbyHost.route) { inclusive = true }
-                        }
-                    },
-                )
+                // Redirect: any navigation to the old LobbyHost route lands back on GameSetup.
+                LaunchedEffect(Unit) {
+                    navController.navigate(Screen.GameSetup.baseRoute) {
+                        popUpTo(Screen.LobbyHost.route) { inclusive = true }
+                    }
+                }
             }
 
             composable(
                 route = Screen.LobbyJoin.route,
                 arguments = listOf(
-                    navArgument("code") {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
+                    navArgument("code") { type = NavType.StringType; defaultValue = "" },
                 ),
                 deepLinks = listOf(
                     navDeepLink { uriPattern = "manahub://join/{code}" },
                 ),
             ) { backStackEntry ->
                 val code = backStackEntry.arguments?.getString("code") ?: ""
-                LobbyJoinScreen(
-                    prefilledCode = code,
-                    onNavigateBack = { navController.popBackStack() },
-                    onGameStart = { sessionId, slotIndex, modeStr, playerCount ->
-                        val mode = runCatching { GameMode.valueOf(modeStr) }.getOrDefault(GameMode.STANDARD)
-                        val configs = (0 until playerCount).mapIndexed { i, _ ->
-                            PlayerConfig(
-                                id        = i,
-                                name      = "",
-                                theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
-                                isAppUser = i == slotIndex,
-                            )
-                        }
-                        gameVm.initFromOnlineSession(sessionId, slotIndex, configs, mode)
-                        navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
-                            popUpTo(Screen.LobbyJoin.route) { inclusive = true }
-                        }
-                    },
-                )
+                // Redirect: carry the join code to GameSetup so it can auto-open the join sheet.
+                LaunchedEffect(code) {
+                    val dest = if (code.isNotBlank()) {
+                        Screen.GameSetup.routeWithJoinCode(code)
+                    } else {
+                        Screen.GameSetup.baseRoute
+                    }
+                    navController.navigate(dest) {
+                        popUpTo(Screen.LobbyJoin.route) { inclusive = true }
+                    }
+                }
             }
 
             // ── Post-game survey ──────────────────────────────────────────────
@@ -746,7 +792,7 @@ fun AppNavGraph(
                             navController.popBackStack()
                         } else {
                             gameVm.finishGame()
-                            navController.navigate(Screen.GameSetup.route) {
+                            navController.navigate(Screen.GameSetup.baseRoute) {
                                 popUpTo(Screen.Collection.route) { inclusive = false }
                             }
                         }
@@ -778,5 +824,3 @@ private fun NavController.navigateTab(route: String) {
         restoreState = true
     }
 }
-
-
