@@ -111,7 +111,12 @@ fun AppNavGraph(
     // The callback is cleared on dispose so neither the NavController nor the Activity leaks.
     DisposableEffect(navController) {
         PushDeeplinkRouter.setNavigator { deeplink ->
-            runCatching { navController.navigate(android.net.Uri.parse(deeplink)) }
+            val uri = runCatching { android.net.Uri.parse(deeplink) }.getOrNull()
+            if (uri == null || uri.scheme != "manahub") {
+                android.util.Log.w("AppNavGraph", "Rejected push deeplink with invalid scheme: $deeplink")
+                return@setNavigator
+            }
+            runCatching { navController.navigate(uri) }
                 .onFailure { android.util.Log.w("AppNavGraph", "Push deeplink nav failed: $deeplink", it) }
         }
         onDispose { PushDeeplinkRouter.setNavigator(null) }
