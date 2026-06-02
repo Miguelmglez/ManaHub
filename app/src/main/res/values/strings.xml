@@ -35,6 +35,13 @@
     <string name="action_play_again">Play Again</string>
     <string name="action_flash_on">Turn flash on</string>
     <string name="action_flash_off">Turn flash off</string>
+    <string name="action_add_symbol">+</string>
+    <string name="action_remove_symbol">−</string>
+    <string name="game_caution_symbol">⚠ </string>
+    <string name="game_skull_symbol">💀</string>
+    <string name="game_star_symbol">✦</string>
+    <string name="game_crown_symbol">👑</string>
+    <string name="game_cross_symbol">×</string>
 
     <!-- Estados genéricos -->
     <string name="state_loading">Loading…</string>
@@ -170,8 +177,9 @@
     <string name="carddetail_add_copy">Add to collection</string>
     <string name="carddetail_no_copies">You don\'t have this card in your collection</string>
     <string name="carddetail_no_wishlist_copies">This card is not in your wishlist</string>
-    <string name="carddetail_alternative_art">Alternative art</string>
-    <string name="carddetail_alternative_art_short">Alt art</string>
+    <string name="carddetail_other_prints">Other prints</string>
+    <string name="carddetail_other_prints_title">Explore All Versions</string>
+    <string name="carddetail_other_prints_desc">Alternate art, special frames &amp; prints</string>
     <string name="carddetail_delete_copy_title">Remove copy</string>
     <string name="carddetail_delete_copy_message">Remove this copy from your collection?</string>
     <string name="carddetail_remove_wishlist_title">Remove from wishlist</string>
@@ -637,6 +645,7 @@
     <string name="gamesetup_mode_commander_life">40 life</string>
     <string name="gamesetup_players_label">Players</string>
     <string name="gamesetup_player_name_hint">Player %1$d</string>
+    <string name="gamesetup_player_placeholder">P%1$d</string>
     <string name="gamesetup_choose_color">Choose color</string>
     <string name="gamesetup_layout_label">Tap a player to change position</string>
     <string name="gamesetup_deck_label">Your Deck</string>
@@ -647,6 +656,14 @@
     <string name="gamesetup_tournament_link">Create a tournament instead</string>
     <string name="gamesetup_online_create">Create Online</string>
     <string name="gamesetup_online_join">Join Game</string>
+    <string name="gamesetup_play_with_friends">Play with friends</string>
+    <string name="gamesetup_play_with_friends_title">Play with Friends</string>
+    <string name="gamesetup_friends_host_title">Host online room</string>
+    <string name="gamesetup_friends_host_subtitle">Create a room and share the code</string>
+    <string name="gamesetup_friends_join_title">Join with code</string>
+    <string name="gamesetup_friends_join_subtitle">Enter a 6-digit room code</string>
+    <string name="gamesetup_friends_tournaments_title">Tournaments</string>
+    <string name="gamesetup_friends_tournaments_subtitle">Create or join a tournament</string>
     <string name="gamesetup_settings_title">Settings</string>
     <string name="gamesetup_land_reminder_title">Land Reminder</string>
     <string name="gamesetup_land_reminder_subtitle">Show land-played indicator on active player</string>
@@ -656,12 +673,20 @@
     <string name="gamesetup_life_control_swipe_hint">↕ Swipe up · down</string>
     <string name="gamesetup_life_control_tap">Tap</string>
     <string name="gamesetup_life_control_tap_hint">Tap ▼ · Heart ▲</string>
+    <string name="gamesetup_voice_land_reminder_title">Voice Land Reminder</string>
+    <string name="gamesetup_voice_land_reminder_subtitle">\"I play a land\"</string>
+    <string name="gamesetup_voice_download_label">Download voice model (~40 MB)</string>
+    <string name="gamesetup_voice_downloading_label">Downloading voice model…</string>
+    <string name="gamesetup_voice_download_failed">Download failed.</string>
 
     <!-- ══════════════════════════════════════════
          GAME SCREEN
     ═══════════════════════════════════════════ -->
     <string name="game_title">ManaHub</string>
     <string name="game_turn_label">T%1$d</string>
+    <string name="game_turn_indicator">Turn: %1$d</string>
+    <string name="game_land_played_toast">Land played</string>
+    <string name="game_voice_listening_desc">Listening for voice commands</string>
     <string name="game_tournament_badge">Tournament</string>
     <string name="game_tournament_standings_desc">Tournament standings</string>
     <string name="game_mode_standard">STANDARD</string>
@@ -724,7 +749,34 @@
     <string name="game_manage_turn_order_title">Turn Order</string>
     <string name="game_manage_apply_order">Apply</string>
     <string name="game_manage_layout_title">Select Layout</string>
-    <string name="game_pause_message">Partida abandonada temporalmente. Vuelve desde el botón Play.</string>
+    <string name="game_edit_player_title">Edit Player</string>
+    <string name="game_edit_player_name_label">Name</string>
+    <string name="game_edit_player_name_placeholder">Enter name</string>
+    <string name="game_edit_player_color_label">Choose Color</string>
+    <string name="game_pause_message">Game paused. Resume from the Play button.</string>
+    <string name="game_duration_format_hm">%1$dh %2$dm</string>
+    <string name="game_duration_format_m">%1$dm</string>
+
+    <!-- Game Phases -->
+    <string name="game_phase_untap">Untap</string>
+    <string name="game_phase_upkeep">Upkeep</string>
+    <string name="game_phase_draw">Draw</string>
+    <string name="game_phase_main1">Main Phase I</string>
+    <string name="game_phase_begin_combat">Begin Combat</string>
+    <string name="game_phase_declare_attackers">Declare Attackers</string>
+    <string name="game_phase_declare_blockers">Declare Blockers</string>
+    <string name="game_phase_combat_damage">Combat Damage</string>
+    <string name="game_phase_end_combat">End Combat</string>
+    <string name="game_phase_main2">Main Phase II</string>
+    <string name="game_phase_end_step">End Step</string>
+    <string name="game_phase_cleanup">Cleanup</string>
+    <string name="game_phase_short_main1">Main I</string>
+    <string name="game_phase_short_begin_combat">Combat ▶</string>
+    <string name="game_phase_short_declare_attackers">Attackers</string>
+    <string name="game_phase_short_declare_blockers">Blockers</string>
+    <string name="game_phase_short_combat_damage">Damage</string>
+    <string name="game_phase_short_main2">Main II</string>
+    <string name="game_phase_short_end_step">End</string>
 
     <!-- Victory overlay -->
     <string name="game_wins_label">WINS!</string>
@@ -921,6 +973,20 @@
     <string name="tournament_match_play">Play</string>
     <string name="tournament_round_label">Round %1$d</string>
     <string name="tournament_finished_label">Tournament finished</string>
+    <string name="tournament_list_title">Tournaments</string>
+    <string name="tournament_new_cd">New tournament</string>
+    <string name="tournament_empty_title">No tournaments yet</string>
+    <string name="tournament_empty_action">Create your first tournament</string>
+    <string name="tournament_default_name">Tournament</string>
+    <string name="tournament_pause_cd">Pause tournament</string>
+    <string name="tournament_record_result_manual">Record result manually</string>
+    <string name="tournament_who_won">Who won?</string>
+    <string name="tournament_match_win">WIN</string>
+    <string name="tournament_match_draw">DRAW</string>
+    <string name="tournament_resume_match">Resume match</string>
+    <string name="tournament_reset_match">Reset match</string>
+    <string name="tournament_standings_d">D</string>
+    <string name="tournament_standings_omw">OMW%</string>
 
     <!-- ══════════════════════════════════════════
          PROFILE SCREEN
@@ -1064,6 +1130,24 @@
     <string name="settings_privacy_trade_list">Public trade list</string>
     <string name="settings_privacy_trade_list_subtitle">Let friends see your trade offers</string>
     <string name="settings_privacy_error">Could not update privacy settings. Please try again.</string>
+    <string name="settings_privacy_voice_title">Voice commands</string>
+    <string name="settings_privacy_voice_subtitle">Microphone audio is processed on-device only. No audio is recorded or transmitted.</string>
+
+    <!-- Notification settings -->
+    <string name="settings_section_notifications">Notifications</string>
+    <string name="settings_push_master">Push notifications</string>
+    <string name="settings_push_master_subtitle">Receive alerts about trades and friends</string>
+    <string name="settings_push_trade_proposals">Trade proposals</string>
+    <string name="settings_push_trade_proposals_subtitle">New offers and counter-offers</string>
+    <string name="settings_push_trade_updates">Trade updates</string>
+    <string name="settings_push_trade_updates_subtitle">Accepted, declined, edited or completed trades</string>
+    <string name="settings_push_friend_requests">Friend requests</string>
+    <string name="settings_push_friend_requests_subtitle">New requests and accepted invitations</string>
+    <string name="settings_push_open_system_settings">Notification settings</string>
+    <string name="settings_push_open_system_settings_subtitle">Open the system notification settings for ManaHub</string>
+    <string name="settings_push_permission_rationale">Enable notifications to receive trade and friend updates</string>
+    <string name="settings_push_allow">Allow</string>
+    <string name="settings_push_open_settings">Open settings</string>
 
     <!-- ══════════════════════════════════════════
          THEMES
@@ -1560,7 +1644,6 @@
     <string name="trades_foil">Foil</string>
     <string name="trades_condition">Condition</string>
     <string name="trades_language">Language</string>
-    <string name="trades_alt_art">Alternative Art</string>
 
     <!-- Phase 3: proposal creation -->
     <string name="trades_you_give">You give</string>
@@ -1744,12 +1827,14 @@
     <string name="scanner_select_variant">Variants</string>
     <string name="scanner_variant_selector_title">Select variant</string>
     <string name="scanner_variant_no_results">No variants found</string>
+    <string name="variant_tap_to_expand">Tap to expand %s</string>
     <string name="scanner_add_another_copy">Add another copy with different options</string>
 
     <!-- ══════════════════════════════════════════
          ONLINE LOBBY
     ═══════════════════════════════════════════ -->
     <string name="lobby_host_title">Create Room</string>
+    <string name="lobby_host_sheet_title">Host Online Game</string>
     <string name="lobby_join_title">Join Game</string>
     <string name="lobby_waiting_room_title">Waiting Room</string>
     <string name="lobby_section_game_mode">GAME MODE</string>
@@ -1759,31 +1844,44 @@
     <string name="lobby_players_count_joined">PLAYERS (%1$d)</string>
     <string name="lobby_start_button">START GAME</string>
     <string name="lobby_waiting_ready">Waiting for everyone to be ready…</string>
+    <string name="lobby_waiting_players_msg">Waiting for players to join…</string>
     <string name="lobby_code_label">ROOM CODE</string>
+    <string name="lobby_room_code_label">Room Code</string>
     <string name="lobby_code_share_hint">Share this code with the other players</string>
     <string name="lobby_code_copy_success">Code copied to clipboard</string>
+    <string name="lobby_share_message">Join my ManaHub game! Code: %1$s</string>
+    <string name="lobby_share_chooser_title">Share room code</string>
     <string name="lobby_player_count_suffix">players</string>
     <string name="lobby_waiting_player">Waiting for player…</string>
     <string name="lobby_host_badge">HOST</string>
+    <string name="lobby_you_badge">YOU</string>
     <string name="lobby_ready_label">READY</string>
     <string name="lobby_waiting_label">Waiting</string>
+    <string name="lobby_status_in_progress">In Progress</string>
     <string name="lobby_join_code_hint">XXXXXX</string>
     <string name="lobby_join_name_label">YOUR NAME</string>
     <string name="lobby_join_name_hint">Player Name</string>
     <string name="lobby_join_color_label">COLOR</string>
+    <string name="lobby_your_color_label">Your color</string>
     <string name="lobby_join_button">JOIN</string>
     <string name="lobby_ready_toggle">I\'m ready</string>
     <string name="lobby_ready_toggle_hint">Waiting for the host to start</string>
     <string name="lobby_starting_msg">The game has started. Entering…</string>
+    <string name="lobby_active_rooms_title">Your active rooms</string>
+    <string name="lobby_action_rejoin">Rejoin</string>
+    <string name="lobby_action_abandon">Abandon</string>
+    <string name="lobby_action_copy_code">Copy code</string>
     <string name="lobby_error_generic">An unexpected error occurred.</string>
     <string name="lobby_error_too_many_attempts">Too many failed attempts. Wait 5 minutes.</string>
-    <string name="lobby_error_invalid_code">Invalid code. Must be 6 alphanumeric characters.</string>
+    <string name="lobby_error_invalid_code">Invalid code. Must be 6 digits.</string>
     <string name="lobby_error_active_room">You already have an active room. Close it before creating another.</string>
     <string name="lobby_error_full">The room is full.</string>
     <string name="lobby_error_not_found">Room not found or already started.</string>
     <string name="lobby_header_subtitle">Multiplayer session</string>
     <string name="lobby_existing_session_title">You already have an active room</string>
     <string name="lobby_existing_session_subtitle">Code: %1$s · %2$s · %3$d players</string>
+    <string name="lobby_host_default_name">Host</string>
+    <string name="lobby_player_default_name">Player</string>
     <string name="lobby_existing_session_abandon">Abandon &amp; create new</string>
 
 </resources>

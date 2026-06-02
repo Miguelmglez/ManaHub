@@ -30,6 +30,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -84,7 +85,7 @@ fun TournamentScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text  = uiState.tournament?.name ?: "Tournament",
+                        text  = uiState.tournament?.name ?: stringResource(R.string.tournament_default_name),
                         style = MaterialTheme.magicTypography.titleMedium,
                         color = mc.textPrimary,
                     )
@@ -101,7 +102,11 @@ fun TournamentScreen(
                 actions = {
                     if (!uiState.isFinished && !uiState.isPaused) {
                         IconButton(onClick = { viewModel.pause() }) {
-                            Icon(Icons.Default.Pause, contentDescription = "Pause tournament", tint = mc.textSecondary)
+                            Icon(
+                                Icons.Default.Pause,
+                                contentDescription = stringResource(R.string.tournament_pause_cd),
+                                tint = mc.textSecondary,
+                            )
                         }
                     }
                 },
@@ -148,9 +153,15 @@ fun TournamentScreen(
                     standings       = uiState.standings,
                     isFinished      = uiState.isFinished,
                     nextMatch       = uiState.nextMatch,
+                    activeMatch     = uiState.activeMatch,
                     onStartNextMatch = {
                         viewModel.startNextMatch { matchId ->
                             onStartMatch(matchId, tournamentId)
+                        }
+                    },
+                    onResumeActiveMatch = { matchId ->
+                        viewModel.resumeMatch(matchId) { id ->
+                            onStartMatch(id, tournamentId)
                         }
                     },
                 )
@@ -162,6 +173,12 @@ fun TournamentScreen(
                             onStartMatch(matchId, tournamentId)
                         }
                     },
+                    onResumeMatch   = { matchId ->
+                        viewModel.resumeMatch(matchId) { id ->
+                            onStartMatch(id, tournamentId)
+                        }
+                    },
+                    onResetMatch    = { matchId -> viewModel.resetMatch(matchId) },
                     onRecordResult  = { match -> recordResultForMatch = match },
                 )
             }
@@ -180,6 +197,10 @@ fun TournamentScreen(
                 viewModel.recordMatchResultManual(match.id, winnerId)
                 recordResultForMatch = null
             },
+            onDraw    = {
+                viewModel.recordDrawManual(match.id)
+                recordResultForMatch = null
+            },
             onDismiss = { recordResultForMatch = null },
         )
     }
@@ -189,10 +210,12 @@ fun TournamentScreen(
 
 @Composable
 private fun StandingsTab(
-    standings:        List<TournamentStanding>,
-    isFinished:       Boolean,
-    nextMatch:        TournamentMatchEntity?,
-    onStartNextMatch: () -> Unit,
+    standings:           List<TournamentStanding>,
+    isFinished:          Boolean,
+    nextMatch:           TournamentMatchEntity?,
+    activeMatch:         TournamentMatchEntity?,
+    onStartNextMatch:    () -> Unit,
+    onResumeActiveMatch: (Long) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     LazyColumn(
@@ -226,7 +249,7 @@ private fun StandingsTab(
                             color = playerColor,
                         )
                         Text(
-                            text  = "${winner.wins}W · ${winner.losses}L · ${winner.points} pts",
+                            text  = "${winner.wins}W · ${winner.losses}L · ${winner.draws}D · ${winner.points} pts",
                             style = MaterialTheme.magicTypography.bodyMedium,
                             color = mc.textSecondary,
                         )
@@ -235,8 +258,39 @@ private fun StandingsTab(
             }
         }
 
-        // Next match button
-        if (!isFinished && nextMatch != null) {
+        // Active match resume banner (soft-lock recovery)
+        if (activeMatch != null) {
+            item {
+                Surface(
+                    shape    = RoundedCornerShape(14.dp),
+                    color    = mc.primaryAccent.copy(alpha = 0.1f),
+                    border   = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier              = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.tournament_resume_match),
+                            style = MaterialTheme.magicTypography.bodyMedium,
+                            color = mc.primaryAccent,
+                        )
+                        Button(
+                            onClick  = { onResumeActiveMatch(activeMatch.id) },
+                            colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                            shape    = RoundedCornerShape(10.dp),
+                        ) {
+                            Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelMedium)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Next match button (only when no active match)
+        if (!isFinished && nextMatch != null && activeMatch == null) {
             item {
                 Button(
                     onClick  = onStartNextMatch,
@@ -257,7 +311,12 @@ private fun StandingsTab(
             ) {
                 Text(stringResource(R.string.tournament_standings_header_player), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    listOf(stringResource(R.string.tournament_standings_w), stringResource(R.string.tournament_standings_l), stringResource(R.string.tournament_standings_pts), stringResource(R.string.tournament_standings_life)).forEach { col ->
+                    listOf(
+                        stringResource(R.string.tournament_standings_w),
+                        stringResource(R.string.tournament_standings_d),
+                        stringResource(R.string.tournament_standings_l),
+                        stringResource(R.string.tournament_standings_pts),
+                    ).forEach { col ->
                         Text(col, style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
                     }
                 }
@@ -265,7 +324,7 @@ private fun StandingsTab(
         }
 
         // Standing rows
-        items(standings) { standing ->
+        items(standings, key = { it.player.id }) { standing ->
             StandingRow(standing = standing)
         }
     }
@@ -315,6 +374,7 @@ private fun StandingRow(standing: TournamentStanding) {
                 verticalAlignment     = Alignment.CenterVertically,
             ) {
                 Text("${standing.wins}",   style = MaterialTheme.magicTypography.bodyMedium, color = mc.lifePositive)
+                Text("${standing.draws}",  style = MaterialTheme.magicTypography.bodyMedium, color = mc.textSecondary)
                 Text("${standing.losses}", style = MaterialTheme.magicTypography.bodyMedium, color = mc.lifeNegative)
                 Text(
                     text       = "${standing.points}",
@@ -322,7 +382,6 @@ private fun StandingRow(standing: TournamentStanding) {
                     color      = mc.textPrimary,
                     fontWeight = FontWeight.Bold,
                 )
-                Text("${standing.lifeTotal}", style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
             }
         }
     }
@@ -335,6 +394,8 @@ private fun MatchesTab(
     matches:        List<TournamentMatchEntity>,
     players:        List<TournamentPlayerEntity>,
     onStartMatch:   (Long) -> Unit,
+    onResumeMatch:  (Long) -> Unit,
+    onResetMatch:   (Long) -> Unit,
     onRecordResult: (TournamentMatchEntity) -> Unit,
 ) {
     val playerMap = remember(players) { players.associateBy { it.id } }
@@ -346,7 +407,7 @@ private fun MatchesTab(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         byRound.forEach { (round, roundMatches) ->
-            item {
+            item(key = "round_$round") {
                 Text(
                     stringResource(R.string.tournament_round_label, round),
                     style    = MaterialTheme.magicTypography.labelLarge,
@@ -354,11 +415,13 @@ private fun MatchesTab(
                     modifier = Modifier.padding(vertical = 4.dp),
                 )
             }
-            items(roundMatches) { match ->
+            items(roundMatches, key = { it.id }) { match ->
                 MatchRow(
                     match          = match,
                     playerMap      = playerMap,
                     onStart        = if (match.status == "PENDING") ({ onStartMatch(match.id) }) else null,
+                    onResume       = if (match.status == "ACTIVE") ({ onResumeMatch(match.id) }) else null,
+                    onReset        = if (match.status == "ACTIVE") ({ onResetMatch(match.id) }) else null,
                     onRecordResult = if (match.status == "PENDING") ({ onRecordResult(match) }) else null,
                 )
             }
@@ -371,12 +434,15 @@ private fun MatchRow(
     match:          TournamentMatchEntity,
     playerMap:      Map<Long, TournamentPlayerEntity>,
     onStart:        (() -> Unit)?,
+    onResume:       (() -> Unit)?,
+    onReset:        (() -> Unit)?,
     onRecordResult: (() -> Unit)?,
 ) {
     val mc  = MaterialTheme.magicColors
     val ids = match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+    val isBye = ids.size == 1
     val p1  = playerMap[ids.getOrNull(0)]
-    val p2  = playerMap[ids.getOrNull(1)]
+    val p2  = if (isBye) null else playerMap[ids.getOrNull(1)]
 
     Surface(
         shape    = RoundedCornerShape(12.dp),
@@ -407,7 +473,13 @@ private fun MatchRow(
                     modifier            = Modifier.padding(horizontal = 12.dp),
                 ) {
                     Text(
-                        text  = when (match.status) { "FINISHED" -> "✓"; "ACTIVE" -> "●"; else -> stringResource(R.string.tournament_match_vs) },
+                        text  = when {
+                            isBye -> "BYE"
+                            match.status == "FINISHED" && match.winnerId == null -> "="
+                            match.status == "FINISHED" -> "✓"
+                            match.status == "ACTIVE"   -> "●"
+                            else                       -> stringResource(R.string.tournament_match_vs)
+                        },
                         style = MaterialTheme.magicTypography.titleMedium,
                         color = when (match.status) {
                             "FINISHED" -> mc.lifePositive.copy(alpha = 0.6f)
@@ -424,14 +496,21 @@ private fun MatchRow(
                             Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
                         }
                     }
+                    if (onResume != null) {
+                        Spacer(Modifier.height(4.dp))
+                        TextButton(
+                            onClick        = onResume,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(stringResource(R.string.tournament_resume_match), style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                        }
+                    }
                 }
 
                 PlayerMatchSlot(player = p2, match = match, isP1 = false, modifier = Modifier.weight(1f))
             }
 
-            // Record result button for PENDING matches only — not ACTIVE ones.
-            // ACTIVE matches have a live game session; allowing manual record there
-            // races with GameViewModel.recordTournamentResultIfNeeded.
+            // Action row for PENDING matches: record result
             if (onRecordResult != null && match.status == "PENDING") {
                 HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
                 TextButton(
@@ -440,9 +519,25 @@ private fun MatchRow(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text  = "Record result manually",
+                        text  = stringResource(R.string.tournament_record_result_manual),
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.textSecondary,
+                    )
+                }
+            }
+
+            // Action row for ACTIVE matches: reset to pending
+            if (onReset != null && match.status == "ACTIVE") {
+                HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
+                TextButton(
+                    onClick        = onReset,
+                    modifier       = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text  = stringResource(R.string.tournament_reset_match),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.lifeNegative.copy(alpha = 0.8f),
                     )
                 }
             }
@@ -455,6 +550,7 @@ private fun RecordResultDialog(
     p1:        TournamentPlayerEntity?,
     p2:        TournamentPlayerEntity?,
     onConfirm: (winnerId: Long) -> Unit,
+    onDraw:    () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -463,7 +559,7 @@ private fun RecordResultDialog(
         containerColor   = mc.surface,
         title = {
             Text(
-                text  = "Who won?",
+                text  = stringResource(R.string.tournament_who_won),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
@@ -480,16 +576,27 @@ private fun RecordResultDialog(
                         Text(
                             text  = player.playerName,
                             style = MaterialTheme.magicTypography.labelLarge,
-                            color = androidx.compose.ui.graphics.Color.White,
+                            color = Color.White,
                         )
                     }
+                }
+                OutlinedButton(
+                    onClick  = onDraw,
+                    modifier = Modifier.fillMaxWidth(),
+                    border   = BorderStroke(1.dp, mc.textSecondary.copy(alpha = 0.5f)),
+                ) {
+                    Text(
+                        text  = stringResource(R.string.tournament_match_draw),
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.textSecondary,
+                    )
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = mc.textSecondary)
+                Text(stringResource(R.string.action_cancel), color = mc.textSecondary)
             }
         },
     )
@@ -504,6 +611,7 @@ private fun PlayerMatchSlot(
 ) {
     val mc          = MaterialTheme.magicColors
     val playerColor = parseColor(player?.playerColor ?: if (isP1) "#E63946" else "#4CC9F0")
+    val isDraw      = match.status == "FINISHED" && match.winnerId == null
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -523,8 +631,11 @@ private fun PlayerMatchSlot(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (match.winnerId == player?.id) {
-            Text("WIN", style = MaterialTheme.magicTypography.labelSmall, color = mc.lifePositive)
+        when {
+            match.winnerId == player?.id ->
+                Text(stringResource(R.string.tournament_match_win), style = MaterialTheme.magicTypography.labelSmall, color = mc.lifePositive)
+            isDraw && player != null ->
+                Text(stringResource(R.string.tournament_match_draw), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
         }
     }
 }

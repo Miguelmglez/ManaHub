@@ -25,13 +25,21 @@ interface TournamentRepository {
     suspend fun startTournament(tournamentId: Long)
     suspend fun pauseTournament(tournamentId: Long)
     suspend fun startMatch(matchId: Long)
+
+    /** winnerId = null means draw. */
     suspend fun finishMatch(
         matchId:    Long,
-        winnerId:   Long,
+        winnerId:   Long?,
         sessionId:  Long?,
         lifeTotals: Map<Long, Int>,
     )
+
+    suspend fun resetMatch(matchId: Long)
     suspend fun finishTournament(tournamentId: Long)
     suspend fun calculateStandings(tournamentId: Long): List<TournamentStanding>
+
+    /** @deprecated Use GenerateNextRoundUseCase instead. */
     suspend fun isFinished(tournamentId: Long): Boolean
+
+    suspend fun deleteTournament(tournamentId: Long)
 }

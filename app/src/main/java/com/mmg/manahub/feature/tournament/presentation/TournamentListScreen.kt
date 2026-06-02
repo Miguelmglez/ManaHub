@@ -33,9 +33,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -59,16 +61,28 @@ fun TournamentListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Tournaments", style = MaterialTheme.magicTypography.titleLarge, color = mc.textPrimary)
+                    Text(
+                        stringResource(R.string.tournament_list_title),
+                        style = MaterialTheme.magicTypography.titleLarge,
+                        color = mc.textPrimary,
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = mc.textPrimary)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            tint = mc.textPrimary,
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = onCreateTournament) {
-                        Icon(Icons.Default.Add, contentDescription = "New tournament", tint = mc.primaryAccent)
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = stringResource(R.string.tournament_new_cd),
+                            tint = mc.primaryAccent,
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
@@ -79,8 +93,8 @@ fun TournamentListScreen(
         if (tournaments.isEmpty()) {
             EmptyState(
                 icon        = Icons.Default.EmojiEvents,
-                title       = "No tournaments yet",
-                actionLabel = "Create your first tournament",
+                title       = stringResource(R.string.tournament_empty_title),
+                actionLabel = stringResource(R.string.tournament_empty_action),
                 onAction    = onCreateTournament,
                 modifier    = Modifier.fillMaxSize().padding(padding),
             )
