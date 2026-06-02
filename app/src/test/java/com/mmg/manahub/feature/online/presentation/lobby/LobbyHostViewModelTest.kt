@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.online.presentation.lobby
 
+import androidx.lifecycle.SavedStateHandle
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.online.domain.model.ActiveSession
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
@@ -110,12 +111,13 @@ class LobbyHostViewModelTest {
             abandonMyActiveSessionUseCase = abandonMyActiveSessionUseCase,
             repository                    = repository,
             userPreferencesDataStore      = userPreferencesDataStore,
+            savedStateHandle              = SavedStateHandle(),
         )
     }
 
     companion object {
         const val SESSION_ID   = "session-abc-123"
-        const val SESSION_CODE = "ABC123"
+        const val SESSION_CODE = "123456"
     }
 
     // ── Setup / Teardown ──────────────────────────────────────────────────────

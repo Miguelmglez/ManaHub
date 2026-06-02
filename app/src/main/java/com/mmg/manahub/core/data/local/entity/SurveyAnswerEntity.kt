@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -31,4 +32,12 @@ data class SurveyAnswerEntity(
     val deckId:        String? = null,                       // UUID of the user's deck for this game (denormalized for fast per-deck queries)
     val answeredAt:    Long    = System.currentTimeMillis(),
     val updatedAt:     Long    = System.currentTimeMillis(),
+
+    /**
+     * Lifecycle of this answer set: "DRAFT" while auto-saving in the background,
+     * "COMPLETED" once the user submits the review. Stored per row so a single query
+     * can distinguish committed reviews from in-progress drafts.
+     */
+    @ColumnInfo(name = "status", defaultValue = "DRAFT")
+    val status: String = "DRAFT",                            // "DRAFT" | "COMPLETED"
 )

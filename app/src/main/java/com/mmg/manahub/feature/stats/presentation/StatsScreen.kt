@@ -1403,6 +1403,31 @@ private fun GameStatsContent(
             }
         }
 
+        // ── Matchup win rates (by opponent archetype) ─────────────────────────
+        if (uiState.archetypeMatchups.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text   = stringResource(R.string.stats_section_matchups).uppercase(),
+                    style  = ty.labelLarge,
+                    color  = mc.textPrimary,
+                    letterSpacing = 2.sp,
+                )
+                Card(
+                    shape  = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = mc.surface),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        uiState.archetypeMatchups.forEach { matchup ->
+                            ArchetypeMatchupItem(matchup = matchup, mc = mc)
+                        }
+                    }
+                }
+            }
+        }
+
         // ── Session history ───────────────────────────────────────────────────
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
@@ -1529,6 +1554,43 @@ private fun DeckPerformanceRow(
         }
         LinearProgressIndicator(
             progress   = { deck.winrate },
+            modifier   = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+            color      = mc.primaryAccent,
+            trackColor = mc.surfaceVariant,
+        )
+    }
+}
+
+/** One row in the matchup section: opponent archetype name, W/total, and a win-rate bar. */
+@Composable
+private fun ArchetypeMatchupItem(
+    matchup: com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow,
+    mc: MagicColors,
+) {
+    val ty = MaterialTheme.magicTypography
+    val winrate = if (matchup.totalGames > 0) matchup.wins.toFloat() / matchup.totalGames else 0f
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            Text(
+                text     = matchup.opponentArchetype,
+                style    = ty.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color    = mc.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text  = "${matchup.wins}/${matchup.totalGames}",
+                style = ty.labelMedium,
+                color = mc.textSecondary,
+            )
+        }
+        LinearProgressIndicator(
+            progress   = { winrate },
             modifier   = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
             color      = mc.primaryAccent,
             trackColor = mc.surfaceVariant,
