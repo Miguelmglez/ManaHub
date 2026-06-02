@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +42,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -710,73 +713,93 @@ private fun FriendSelector(
     }
 
     if (showSheet && !isLocked) {
+        val sheetState = rememberModalBottomSheetState(
+            confirmValueChange = { it != SheetValue.Hidden }
+        )
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
             containerColor = mc.backgroundSecondary,
             contentColor = mc.textPrimary,
-            dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled.copy(alpha = 0.4f)) }
+            dragHandle = null,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .navigationBarsPadding(),
             ) {
-                Text(
-                    text = stringResource(R.string.trades_friend_selector_sheet_title),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.textPrimary
-                )
+                // Header Row
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { showSheet = false },
+                        modifier = Modifier.offset(x = (-12).dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_cancel),
+                            tint = mc.textSecondary
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.trades_friend_selector_sheet_title),
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = mc.textPrimary
+                    )
 
-                when {
-                    sessionState is SessionState.Unauthenticated -> {
-                        EmptyState(
-                            title = "Log in to trade with your friends and sync your collection across devices.",
-                            actionLabel = "Log In",
-                            onAction = {
-                                showSheet = false
-                                onNavigateToLogin()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    friends.isEmpty() -> {
-                        EmptyState(
-                            title = "You don't have any friends yet. Add friends to start trading!",
-                            actionLabel = "Add Friends",
-                            onAction = {
-                                showSheet = false
-                                onNavigateToAddFriends()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    else -> {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
-                        ) {
-                            item {
-                                Surface(
-                                    onClick = {
-                                        onFriendSelected(null)
-                                        showSheet = false
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        stringResource(R.string.trades_friend_none_option),
-                                        modifier = Modifier.padding(16.dp),
-                                        style = MaterialTheme.magicTypography.bodyMedium,
-                                        color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
-                                    )
-                                }
+                    when {
+                        sessionState is SessionState.Unauthenticated -> {
+                            EmptyState(
+                                title = "Log in to trade with your friends and sync your collection across devices.",
+                                actionLabel = "Log In",
+                                onAction = {
+                                    showSheet = false
+                                    onNavigateToLogin()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        friends.isEmpty() -> {
+                            EmptyState(
+                                title = "You don't have any friends yet. Add friends to start trading!",
+                                actionLabel = "Add Friends",
+                                onAction = {
+                                    showSheet = false
+                                    onNavigateToAddFriends()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        else -> {
+                            // "None" option
+                            Surface(
+                                onClick = {
+                                    onFriendSelected(null)
+                                    showSheet = false
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    stringResource(R.string.trades_friend_none_option),
+                                    modifier = Modifier.padding(16.dp),
+                                    style = MaterialTheme.magicTypography.bodyMedium,
+                                    color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
+                                )
                             }
-                            items(friends) { friend ->
+
+                            friends.forEach { friend ->
                                 Surface(
                                     onClick = {
                                         onFriendSelected(friend)
@@ -815,7 +838,6 @@ private fun FriendSelector(
                         }
                     }
                 }
-                Spacer(Modifier.height(24.dp))
             }
         }
     }

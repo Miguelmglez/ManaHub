@@ -41,6 +41,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -487,86 +493,112 @@ private fun CreateDeckBottomSheet(
     val ty         = MaterialTheme.magicTypography
     var name       by remember { mutableStateOf("") }
     var format     by remember { mutableStateOf("standard") }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState       = sheetState,
         containerColor   = mc.backgroundSecondary,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+        dragHandle = null,
     ) {
         Column(
             modifier            = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .navigationBarsPadding(),
         ) {
-            Text(
-                text  = stringResource(R.string.decklist_create_button),
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-            )
-
-            OutlinedTextField(
-                value         = name,
-                onValueChange = { name = it },
-                label         = {
-                    Text(
-                        text  = stringResource(R.string.deckbuilder_name_hint),
-                        style = ty.bodySmall,
-                    )
-                },
-                singleLine    = true,
-                modifier      = Modifier.fillMaxWidth(),
-                colors        = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor   = mc.primaryAccent,
-                    unfocusedBorderColor = mc.surfaceVariant,
-                    focusedLabelColor    = mc.primaryAccent,
-                    focusedTextColor     = mc.textPrimary,
-                    unfocusedTextColor   = mc.textPrimary,
-                    cursorColor          = mc.primaryAccent,
-                ),
-            )
-
-            FormatSelector(selected = format, onSelect = { format = it })
-
-            Button(
-                onClick  = { if (name.isNotBlank()) onCreate(name, format) },
-                enabled  = name.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-                shape    = RoundedCornerShape(10.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor         = mc.primaryAccent,
-                    disabledContainerColor = mc.primaryAccent.copy(alpha = 0.3f),
-                ),
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = mc.background)
-                Spacer(Modifier.width(8.dp))
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.offset(x = (-12).dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 Text(
                     text  = stringResource(R.string.decklist_create_button),
-                    style = ty.labelLarge,
-                    color = mc.background,
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
                 )
-            }
 
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                thickness = 0.5.dp,
-                color = mc.surfaceVariant
-            )
-
-            OutlinedButton(
-                onClick = onImportClick,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, mc.primaryAccent),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent)
-            ) {
-                Text(
-                    text = stringResource(R.string.deck_import_title),
-                    style = ty.labelLarge
+                OutlinedTextField(
+                    value         = name,
+                    onValueChange = { name = it },
+                    label         = {
+                        Text(
+                            text  = stringResource(R.string.deckbuilder_name_hint),
+                            style = ty.bodySmall,
+                        )
+                    },
+                    singleLine    = true,
+                    modifier      = Modifier.fillMaxWidth(),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = mc.primaryAccent,
+                        unfocusedBorderColor = mc.surfaceVariant,
+                        focusedLabelColor    = mc.primaryAccent,
+                        focusedTextColor     = mc.textPrimary,
+                        unfocusedTextColor   = mc.textPrimary,
+                        cursorColor          = mc.primaryAccent,
+                    ),
                 )
+
+                FormatSelector(selected = format, onSelect = { format = it })
+
+                Button(
+                    onClick  = { if (name.isNotBlank()) onCreate(name, format) },
+                    enabled  = name.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(10.dp),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor         = mc.primaryAccent,
+                        disabledContainerColor = mc.primaryAccent.copy(alpha = 0.3f),
+                    ),
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = mc.background)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text  = stringResource(R.string.decklist_create_button),
+                        style = ty.labelLarge,
+                        color = mc.background,
+                    )
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    thickness = 0.5.dp,
+                    color = mc.surfaceVariant
+                )
+
+                OutlinedButton(
+                    onClick = onImportClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, mc.primaryAccent),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent)
+                ) {
+                    Text(
+                        text = stringResource(R.string.deck_import_title),
+                        style = ty.labelLarge
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
