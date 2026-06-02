@@ -1,8 +1,14 @@
 package com.mmg.manahub.feature.tournament.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,11 +23,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -42,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,8 +75,10 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,108 +93,115 @@ fun TournamentScreen(
     var selectedTab  by rememberSaveable { mutableIntStateOf(0) }
     var recordResultForMatch by remember { mutableStateOf<TournamentMatchEntity?>(null) }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets.statusBars,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text  = uiState.tournament?.name ?: stringResource(R.string.tournament_default_name),
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = mc.textPrimary,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                            tint = mc.textPrimary,
+    Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
+        HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
+
+        Scaffold(
+            contentWindowInsets = WindowInsets.statusBars,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text  = uiState.tournament?.name ?: stringResource(R.string.tournament_default_name),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textPrimary,
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
+                                tint = mc.textPrimary,
+                            )
+                        }
+                    },
+                    actions = {
+                        if (!uiState.isFinished && !uiState.isPaused) {
+                            IconButton(onClick = { viewModel.pause() }) {
+                                Icon(
+                                    Icons.Default.Pause,
+                                    contentDescription = stringResource(R.string.tournament_pause_cd),
+                                    tint = mc.textSecondary,
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                )
+            },
+            containerColor = Color.Transparent,
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                // ── Tab row ───────────────────────────────────────────────────────
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor   = mc.backgroundSecondary.copy(alpha = 0.8f),
+                    contentColor     = mc.primaryAccent,
+                    indicator        = { tabPositions ->
+                        @Suppress("DEPRECATION")
+                        TabRowDefaults.SecondaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color    = mc.primaryAccent,
+                        )
+                    },
+                    divider = {}
+                ) {
+                    listOf(stringResource(R.string.tournament_tab_standings), stringResource(R.string.tournament_tab_matches)).forEachIndexed { i, title ->
+                        Tab(
+                            selected = selectedTab == i,
+                            onClick  = { selectedTab = i },
+                            text     = {
+                                Text(
+                                    text  = title.uppercase(Locale.getDefault()),
+                                    style = MaterialTheme.magicTypography.labelLarge,
+                                    color = if (selectedTab == i) mc.primaryAccent else mc.textDisabled,
+                                )
+                            },
                         )
                     }
-                },
-                actions = {
-                    if (!uiState.isFinished && !uiState.isPaused) {
-                        IconButton(onClick = { viewModel.pause() }) {
-                            Icon(
-                                Icons.Default.Pause,
-                                contentDescription = stringResource(R.string.tournament_pause_cd),
-                                tint = mc.textSecondary,
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary),
-            )
-        },
-        containerColor = mc.background,
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            // ── Tab row ───────────────────────────────────────────────────────
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor   = mc.backgroundSecondary,
-                contentColor     = mc.primaryAccent,
-                indicator        = { tabPositions ->
-                    @Suppress("DEPRECATION")
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color    = mc.primaryAccent,
-                    )
-                },
-            ) {
-                listOf(stringResource(R.string.tournament_tab_standings), stringResource(R.string.tournament_tab_matches)).forEachIndexed { i, title ->
-                    Tab(
-                        selected = selectedTab == i,
-                        onClick  = { selectedTab = i },
-                        text     = {
-                            Text(
-                                text  = title,
-                                style = MaterialTheme.magicTypography.labelMedium,
-                                color = if (selectedTab == i) mc.primaryAccent else mc.textDisabled,
-                            )
+                }
+
+                when (selectedTab) {
+                    0 -> StandingsTab(
+                        standings       = uiState.standings,
+                        isFinished      = uiState.isFinished,
+                        nextMatch       = uiState.nextMatch,
+                        activeMatch     = uiState.activeMatch,
+                        onStartNextMatch = {
+                            viewModel.startNextMatch { matchId ->
+                                onStartMatch(matchId, tournamentId)
+                            }
                         },
+                        onResumeActiveMatch = { matchId ->
+                            viewModel.resumeMatch(matchId) { id ->
+                                onStartMatch(id, tournamentId)
+                            }
+                        },
+                        mc = mc
+                    )
+                    1 -> MatchesTab(
+                        matches         = uiState.matches,
+                        players         = uiState.players,
+                        onStartMatch    = { matchId ->
+                            viewModel.startMatch(matchId) { _ ->
+                                onStartMatch(matchId, tournamentId)
+                            }
+                        },
+                        onResumeMatch   = { matchId ->
+                            viewModel.resumeMatch(matchId) { id ->
+                                onStartMatch(id, tournamentId)
+                            }
+                        },
+                        onResetMatch    = { matchId -> viewModel.resetMatch(matchId) },
+                        onRecordResult  = { match -> recordResultForMatch = match },
+                        mc = mc
                     )
                 }
-            }
-
-            when (selectedTab) {
-                0 -> StandingsTab(
-                    standings       = uiState.standings,
-                    isFinished      = uiState.isFinished,
-                    nextMatch       = uiState.nextMatch,
-                    activeMatch     = uiState.activeMatch,
-                    onStartNextMatch = {
-                        viewModel.startNextMatch { matchId ->
-                            onStartMatch(matchId, tournamentId)
-                        }
-                    },
-                    onResumeActiveMatch = { matchId ->
-                        viewModel.resumeMatch(matchId) { id ->
-                            onStartMatch(id, tournamentId)
-                        }
-                    },
-                )
-                1 -> MatchesTab(
-                    matches         = uiState.matches,
-                    players         = uiState.players,
-                    onStartMatch    = { matchId ->
-                        viewModel.startMatch(matchId) { _ ->
-                            onStartMatch(matchId, tournamentId)
-                        }
-                    },
-                    onResumeMatch   = { matchId ->
-                        viewModel.resumeMatch(matchId) { id ->
-                            onStartMatch(id, tournamentId)
-                        }
-                    },
-                    onResetMatch    = { matchId -> viewModel.resetMatch(matchId) },
-                    onRecordResult  = { match -> recordResultForMatch = match },
-                )
             }
         }
     }
@@ -216,8 +237,8 @@ private fun StandingsTab(
     activeMatch:         TournamentMatchEntity?,
     onStartNextMatch:    () -> Unit,
     onResumeActiveMatch: (Long) -> Unit,
+    mc:                  com.mmg.manahub.core.ui.theme.MagicColors
 ) {
-    val mc = MaterialTheme.magicColors
     LazyColumn(
         modifier       = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -229,30 +250,58 @@ private fun StandingsTab(
                 val winner      = standings.first()
                 val playerColor = parseColor(winner.player.playerColor)
                 Surface(
-                    shape    = RoundedCornerShape(16.dp),
+                    shape    = RoundedCornerShape(20.dp),
                     color    = playerColor.copy(alpha = 0.15f),
-                    border   = BorderStroke(1.5.dp, playerColor.copy(alpha = 0.6f)),
+                    border   = BorderStroke(2.dp, playerColor.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(
-                        modifier            = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            stringResource(R.string.tournament_winner_label),
-                            style = MaterialTheme.magicTypography.labelLarge,
-                            color = mc.goldMtg,
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        // Background Decoration
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = playerColor.copy(alpha = 0.1f),
+                            modifier = Modifier
+                                .size(140.dp)
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 16.dp)
                         )
-                        Text(
-                            text  = winner.player.playerName,
-                            style = MaterialTheme.magicTypography.displayMedium,
-                            color = playerColor,
-                        )
-                        Text(
-                            text  = "${winner.wins}W · ${winner.losses}L · ${winner.draws}D · ${winner.points} pts",
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.textSecondary,
-                        )
+
+                        Column(
+                            modifier            = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = mc.goldMtg,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.tournament_winner_label).uppercase(),
+                                style = MaterialTheme.magicTypography.labelLarge,
+                                color = mc.goldMtg,
+                            )
+                            Text(
+                                text  = winner.player.playerName,
+                                style = MaterialTheme.magicTypography.displayMedium,
+                                color = mc.textPrimary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
+                                color = playerColor.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text  = "${winner.wins}W · ${winner.losses}L · ${winner.draws}D · ${winner.points} pts",
+                                    style = MaterialTheme.magicTypography.bodyMedium,
+                                    color = mc.textPrimary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -262,9 +311,9 @@ private fun StandingsTab(
         if (activeMatch != null) {
             item {
                 Surface(
-                    shape    = RoundedCornerShape(14.dp),
-                    color    = mc.primaryAccent.copy(alpha = 0.1f),
-                    border   = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                    shape    = RoundedCornerShape(16.dp),
+                    color    = mc.primaryAccent.copy(alpha = 0.12f),
+                    border   = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
@@ -272,16 +321,28 @@ private fun StandingsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment     = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            stringResource(R.string.tournament_resume_match),
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.primaryAccent,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(mc.primaryAccent)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                stringResource(R.string.tournament_resume_match),
+                                style = MaterialTheme.magicTypography.bodyMedium,
+                                color = mc.textPrimary,
+                            )
+                        }
                         Button(
                             onClick  = { onResumeActiveMatch(activeMatch.id) },
                             colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                            shape    = RoundedCornerShape(10.dp),
+                            shape    = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                         ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelMedium)
                         }
                     }
@@ -294,10 +355,12 @@ private fun StandingsTab(
             item {
                 Button(
                     onClick  = onStartNextMatch,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape    = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape    = RoundedCornerShape(16.dp),
                     colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                 ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
                     Text(stringResource(R.string.tournament_start_next), style = MaterialTheme.magicTypography.labelLarge)
                 }
             }
@@ -305,82 +368,141 @@ private fun StandingsTab(
 
         // Table header
         item {
-            Row(
-                modifier              = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+            Surface(
+                color = mc.surfaceVariant.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             ) {
-                Text(stringResource(R.string.tournament_standings_header_player), style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    listOf(
-                        stringResource(R.string.tournament_standings_w),
-                        stringResource(R.string.tournament_standings_d),
-                        stringResource(R.string.tournament_standings_l),
-                        stringResource(R.string.tournament_standings_pts),
-                    ).forEach { col ->
-                        Text(col, style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+                Row(
+                    modifier              = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        stringResource(R.string.tournament_standings_header_player).uppercase(),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textDisabled
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        listOf(
+                            stringResource(R.string.tournament_standings_w),
+                            stringResource(R.string.tournament_standings_d),
+                            stringResource(R.string.tournament_standings_l),
+                            stringResource(R.string.tournament_standings_pts),
+                        ).forEach { col ->
+                            Text(
+                                col.uppercase(),
+                                style = MaterialTheme.magicTypography.labelSmall,
+                                color = mc.textDisabled,
+                                modifier = Modifier.width(20.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
         }
 
         // Standing rows
-        items(standings, key = { it.player.id }) { standing ->
-            StandingRow(standing = standing)
+        itemsIndexed(standings, key = { _, s -> s.player.id }) { index, standing ->
+            StandingRow(
+                standing = standing,
+                isFirst  = index == 0,
+                isLast   = index == standings.size - 1
+            )
         }
     }
 }
 
 @Composable
-private fun StandingRow(standing: TournamentStanding) {
+private fun StandingRow(
+    standing: TournamentStanding,
+    isFirst: Boolean,
+    isLast: Boolean
+) {
     val mc          = MaterialTheme.magicColors
     val playerColor = parseColor(standing.player.playerColor)
 
     Surface(
-        shape    = RoundedCornerShape(12.dp),
-        color    = if (standing.position == 1) playerColor.copy(alpha = 0.1f) else mc.surface,
-        border   = if (standing.position == 1) BorderStroke(1.dp, playerColor.copy(alpha = 0.4f)) else null,
+        shape    = RoundedCornerShape(
+            bottomStart = if (isLast) 12.dp else 0.dp,
+            bottomEnd   = if (isLast) 12.dp else 0.dp
+        ),
+        color    = if (standing.position == 1) playerColor.copy(alpha = 0.08f) else mc.surface.copy(alpha = 0.6f),
+        border   = if (standing.position == 1) BorderStroke(0.5.dp, playerColor.copy(alpha = 0.3f)) else null,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier              = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Column {
             Row(
+                modifier              = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier              = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text     = when (standing.position) { 1 -> "🥇"; 2 -> "🥈"; 3 -> "🥉"; else -> "${standing.position}" },
-                    fontSize = if (standing.position <= 3) 20.sp else 16.sp,
-                )
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(playerColor),
-                )
-                Text(
-                    text     = standing.player.playerName,
-                    style    = MaterialTheme.magicTypography.bodyMedium,
-                    color    = if (standing.position == 1) playerColor else mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier              = Modifier.weight(1f),
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.width(28.dp)) {
+                        Text(
+                            text     = when (standing.position) { 1 -> "🥇"; 2 -> "🥈"; 3 -> "🥉"; else -> "${standing.position}" },
+                            fontSize = if (standing.position <= 3) 20.sp else 16.sp,
+                            color    = if (standing.position <= 3) Color.Unspecified else mc.textDisabled
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(playerColor),
+                    )
+                    Text(
+                        text     = standing.player.playerName,
+                        style    = MaterialTheme.magicTypography.bodyLarge,
+                        color    = if (standing.position == 1) mc.textPrimary else mc.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${standing.wins}",
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.lifePositive,
+                        modifier = Modifier.width(20.dp),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        "${standing.draws}",
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textSecondary,
+                        modifier = Modifier.width(20.dp),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        "${standing.losses}",
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.lifeNegative,
+                        modifier = Modifier.width(20.dp),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text       = "${standing.points}",
+                        style      = MaterialTheme.magicTypography.bodyLarge,
+                        color      = if (standing.position == 1) mc.primaryAccent else mc.textPrimary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(20.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment     = Alignment.CenterVertically,
-            ) {
-                Text("${standing.wins}",   style = MaterialTheme.magicTypography.bodyMedium, color = mc.lifePositive)
-                Text("${standing.draws}",  style = MaterialTheme.magicTypography.bodyMedium, color = mc.textSecondary)
-                Text("${standing.losses}", style = MaterialTheme.magicTypography.bodyMedium, color = mc.lifeNegative)
-                Text(
-                    text       = "${standing.points}",
-                    style      = MaterialTheme.magicTypography.bodyMedium,
-                    color      = mc.textPrimary,
-                    fontWeight = FontWeight.Bold,
+            if (!isLast) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    thickness = 0.5.dp,
+                    color = mc.surfaceVariant.copy(alpha = 0.3f)
                 )
             }
         }
@@ -397,6 +519,7 @@ private fun MatchesTab(
     onResumeMatch:  (Long) -> Unit,
     onResetMatch:   (Long) -> Unit,
     onRecordResult: (TournamentMatchEntity) -> Unit,
+    mc:             com.mmg.manahub.core.ui.theme.MagicColors
 ) {
     val playerMap = remember(players) { players.associateBy { it.id } }
     val byRound   = remember(matches) { matches.groupBy { it.round }.toSortedMap() }
@@ -404,16 +527,22 @@ private fun MatchesTab(
     LazyColumn(
         modifier       = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         byRound.forEach { (round, roundMatches) ->
             item(key = "round_$round") {
-                Text(
-                    stringResource(R.string.tournament_round_label, round),
-                    style    = MaterialTheme.magicTypography.labelLarge,
-                    color    = MaterialTheme.magicColors.textSecondary,
-                    modifier = Modifier.padding(vertical = 4.dp),
-                )
+                Surface(
+                    color = mc.primaryAccent.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.tournament_round_label, round).uppercase(),
+                        style    = MaterialTheme.magicTypography.labelMedium,
+                        color    = mc.primaryAccent,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                }
             }
             items(roundMatches, key = { it.id }) { match ->
                 MatchRow(
@@ -439,22 +568,23 @@ private fun MatchRow(
     onRecordResult: (() -> Unit)?,
 ) {
     val mc  = MaterialTheme.magicColors
+    val ty  = MaterialTheme.magicTypography
     val ids = match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
     val isBye = ids.size == 1
     val p1  = playerMap[ids.getOrNull(0)]
     val p2  = if (isBye) null else playerMap[ids.getOrNull(1)]
 
     Surface(
-        shape    = RoundedCornerShape(12.dp),
+        shape    = RoundedCornerShape(16.dp),
         color    = when (match.status) {
-            "FINISHED" -> mc.surface.copy(alpha = 0.5f)
+            "FINISHED" -> mc.surface.copy(alpha = 0.4f)
             "ACTIVE"   -> mc.primaryAccent.copy(alpha = 0.08f)
-            else       -> mc.surface
+            else       -> mc.surface.copy(alpha = 0.7f)
         },
         border   = BorderStroke(
-            width = 0.5.dp,
+            width = if (match.status == "ACTIVE") 1.dp else 0.5.dp,
             color = when (match.status) {
-                "ACTIVE" -> mc.primaryAccent.copy(alpha = 0.5f)
+                "ACTIVE" -> mc.primaryAccent
                 else     -> mc.surfaceVariant
             },
         ),
@@ -462,7 +592,7 @@ private fun MatchRow(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier              = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                modifier              = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -470,39 +600,52 @@ private fun MatchRow(
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier            = Modifier.padding(horizontal = 12.dp),
+                    modifier            = Modifier.padding(horizontal = 16.dp),
                 ) {
-                    Text(
-                        text  = when {
-                            isBye -> "BYE"
-                            match.status == "FINISHED" && match.winnerId == null -> "="
-                            match.status == "FINISHED" -> "✓"
-                            match.status == "ACTIVE"   -> "●"
-                            else                       -> stringResource(R.string.tournament_match_vs)
-                        },
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = when (match.status) {
-                            "FINISHED" -> mc.lifePositive.copy(alpha = 0.6f)
-                            "ACTIVE"   -> mc.primaryAccent
-                            else       -> mc.textDisabled
-                        },
-                    )
+                    val vsIconColor = when (match.status) {
+                        "FINISHED" -> mc.lifePositive.copy(alpha = 0.5f)
+                        "ACTIVE"   -> mc.primaryAccent
+                        else       -> mc.textDisabled
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(vsIconColor.copy(alpha = 0.1f))
+                            .border(1.dp, vsIconColor.copy(alpha = 0.3f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text  = when {
+                                isBye -> "BYE"
+                                match.status == "FINISHED" && match.winnerId == null -> "="
+                                match.status == "FINISHED" -> "✓"
+                                match.status == "ACTIVE"   -> "●"
+                                else                       -> "VS"
+                            },
+                            style = ty.labelMedium,
+                            color = vsIconColor,
+                            fontSize = if (isBye) 10.sp else 12.sp
+                        )
+                    }
+
                     if (onStart != null) {
-                        Spacer(Modifier.height(4.dp))
-                        TextButton(
-                            onClick        = onStart,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        Spacer(Modifier.height(8.dp))
+                        IconButton(
+                            onClick = onStart,
+                            modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape)
                         ) {
-                            Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                     }
                     if (onResume != null) {
-                        Spacer(Modifier.height(4.dp))
-                        TextButton(
-                            onClick        = onResume,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        Spacer(Modifier.height(8.dp))
+                        IconButton(
+                            onClick = onResume,
+                            modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape)
                         ) {
-                            Text(stringResource(R.string.tournament_resume_match), style = MaterialTheme.magicTypography.labelSmall, color = mc.primaryAccent)
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -510,35 +653,41 @@ private fun MatchRow(
                 PlayerMatchSlot(player = p2, match = match, isP1 = false, modifier = Modifier.weight(1f))
             }
 
-            // Action row for PENDING matches: record result
-            if (onRecordResult != null && match.status == "PENDING") {
-                HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
-                TextButton(
-                    onClick        = onRecordResult,
-                    modifier       = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            // Action row
+            if (onRecordResult != null || onReset != null) {
+                HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant.copy(alpha = 0.5f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text  = stringResource(R.string.tournament_record_result_manual),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary,
-                    )
-                }
-            }
-
-            // Action row for ACTIVE matches: reset to pending
-            if (onReset != null && match.status == "ACTIVE") {
-                HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant)
-                TextButton(
-                    onClick        = onReset,
-                    modifier       = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text  = stringResource(R.string.tournament_reset_match),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.lifeNegative.copy(alpha = 0.8f),
-                    )
+                    if (onRecordResult != null && match.status == "PENDING") {
+                        TextButton(
+                            onClick        = onRecordResult,
+                            modifier       = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text  = stringResource(R.string.tournament_record_result_manual),
+                                style = ty.labelSmall,
+                                color = mc.textSecondary,
+                            )
+                        }
+                    }
+                    if (onReset != null && match.status == "ACTIVE") {
+                        TextButton(
+                            onClick        = onReset,
+                            modifier       = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Text(
+                                text  = stringResource(R.string.tournament_reset_match),
+                                style = ty.labelSmall,
+                                color = mc.lifeNegative.copy(alpha = 0.8f),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -610,7 +759,9 @@ private fun PlayerMatchSlot(
     modifier: Modifier = Modifier,
 ) {
     val mc          = MaterialTheme.magicColors
+    val ty          = MaterialTheme.magicTypography
     val playerColor = parseColor(player?.playerColor ?: if (isP1) "#E63946" else "#4CC9F0")
+    val isWinner    = match.winnerId == player?.id
     val isDraw      = match.status == "FINISHED" && match.winnerId == null
 
     Column(
@@ -619,23 +770,30 @@ private fun PlayerMatchSlot(
     ) {
         Box(
             modifier = Modifier
-                .size(10.dp)
+                .size(12.dp)
                 .clip(CircleShape)
-                .background(playerColor),
+                .background(playerColor)
+                .border(2.dp, Color.White.copy(alpha = 0.2f), CircleShape),
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
-            text     = player?.playerName ?: "?",
-            style    = MaterialTheme.magicTypography.bodyMedium,
-            color    = if (match.winnerId == player?.id) mc.lifePositive else mc.textPrimary,
+            text     = player?.playerName ?: "BYE",
+            style    = if (isWinner) ty.bodyLarge else ty.bodyMedium,
+            color    = if (isWinner) mc.lifePositive else mc.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal
         )
-        when {
-            match.winnerId == player?.id ->
-                Text(stringResource(R.string.tournament_match_win), style = MaterialTheme.magicTypography.labelSmall, color = mc.lifePositive)
-            isDraw && player != null ->
-                Text(stringResource(R.string.tournament_match_draw), style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+        if (match.status == "FINISHED") {
+            Text(
+                text  = when {
+                    isWinner -> stringResource(R.string.tournament_match_win).uppercase()
+                    isDraw   -> stringResource(R.string.tournament_match_draw).uppercase()
+                    else     -> ""
+                },
+                style = ty.labelSmall,
+                color = if (isWinner) mc.lifePositive else mc.textDisabled,
+            )
         }
     }
 }

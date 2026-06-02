@@ -294,7 +294,6 @@ fun CreateTradeProposalScreen(
                                         isFoil       = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
                                         condition    = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
                                         language     = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                                        isAltArt     = row.wishlistEntry?.isAltArt ?: row.offerEntry?.isAltArt ?: false,
                                         userCardIdRef = row.offerEntry?.userCardId,
                                         isInCollection = row.isOwned || row.offerEntry != null,
                                     )
@@ -415,7 +414,6 @@ fun CreateTradeProposalScreen(
                                         isFoil       = row.offerEntry?.isFoil ?: false,
                                         condition    = row.offerEntry?.condition ?: "NM",
                                         language     = row.offerEntry?.language ?: "en",
-                                        isAltArt     = row.offerEntry?.isAltArt ?: false,
                                         userCardIdRef = row.offerEntry?.userCardId,
                                         isInCollection = row.offerEntry != null,
                                     )
@@ -534,7 +532,6 @@ fun CreateTradeProposalScreen(
                     isFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
                     condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
                     language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                    isAltArt = row.wishlistEntry?.isAltArt ?: row.offerEntry?.isAltArt ?: false,
                     userCardIdRef = row.offerEntry?.userCardId,
                     isInCollection = row.isOwned || row.offerEntry != null || row.wishlistEntry != null,
                 )
@@ -552,7 +549,6 @@ fun CreateTradeProposalScreen(
                 val resolvedIsFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false
                 val resolvedCondition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
                 val resolvedLanguage = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
-                val resolvedIsAltArt = row.wishlistEntry?.isAltArt ?: row.offerEntry?.isAltArt ?: false
                 val resolvedUserCardIdRef = row.offerEntry?.userCardId
 
                 val predicate: (TradeItemDraft) -> Boolean = { item ->
@@ -560,8 +556,7 @@ fun CreateTradeProposalScreen(
                         item.isFoil == resolvedIsFoil &&
                         item.condition == resolvedCondition &&
                         item.language == resolvedLanguage &&
-                        item.isAltArt == resolvedIsAltArt &&
-                        item.userCardIdRef == resolvedUserCardIdRef
+                            item.userCardIdRef == resolvedUserCardIdRef
                 }
 
                 when (side) {
@@ -596,13 +591,12 @@ fun CreateTradeProposalScreen(
         editingItem?.let { item ->
             AddCardSheet(
                 cardName = item.cardName,
-                onConfirm = { isFoil, isAltArt, condition, language, qty ->
+                onConfirm = { isFoil, condition, language, qty ->
                     val updated = item.copy(
                         quantity = qty,
                         isFoil = isFoil,
                         condition = condition,
                         language = language,
-                        isAltArt = isAltArt
                     )
                     if (uiState.proposerItems.any { it.id == item.id }) {
                         viewModel.updateProposerItem(updated)
@@ -920,7 +914,6 @@ private fun TradeItemDraftRow(
                 hasFoil       = item.isFoil,
                 condition     = item.condition.takeIf { it.isNotBlank() },
                 language      = item.language.takeIf { it.isNotBlank() },
-                isAltArt      = item.isAltArt,
                 typeLine      = item.typeLine,
                 setCode       = item.setCode,
                 setName       = item.setName,
@@ -1150,7 +1143,6 @@ private fun SuggestionCardItem(
                     hasFoil = row.offerEntry?.isFoil ?: false,
                     condition = row.offerEntry?.condition?.takeIf { it.isNotBlank() },
                     language = row.offerEntry?.language?.takeIf { it.isNotBlank() },
-                    isAltArt = row.offerEntry?.isAltArt ?: false,
                     setCode = row.card.setCode,
                     setName = row.card.setName,
                     rarity = row.card.rarity,

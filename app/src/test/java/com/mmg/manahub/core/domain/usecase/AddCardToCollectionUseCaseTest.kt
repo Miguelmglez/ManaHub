@@ -66,7 +66,6 @@ class AddCardToCollectionUseCaseTest {
                 isFoil           = false,
                 condition        = "NM",
                 language         = "en",
-                isAlternativeArt = false,
                 isForTrade       = false,
                 userId           = null,
             )
@@ -85,26 +84,6 @@ class AddCardToCollectionUseCaseTest {
                 isFoil           = true,
                 condition        = any(),
                 language         = any(),
-                isAlternativeArt = any(),
-                isForTrade       = any(),
-                userId           = any(),
-            )
-        }
-    }
-
-    @Test
-    fun `given alternative art flag when invoke then addOrIncrement receives isAlternativeArt true`() = runTest {
-        coEvery { cardRepository.getCardById("id-001") } returns DataResult.Success(TestFixtures.buildCard("id-001"))
-
-        useCase(scryfallId = "id-001", isAlternativeArt = true)
-
-        coVerify(exactly = 1) {
-            userCardRepository.addOrIncrement(
-                scryfallId       = "id-001",
-                isFoil           = any(),
-                condition        = any(),
-                language         = any(),
-                isAlternativeArt = true,
                 isForTrade       = any(),
                 userId           = any(),
             )
@@ -123,7 +102,6 @@ class AddCardToCollectionUseCaseTest {
                 isFoil           = any(),
                 condition        = "LP",
                 language         = "de",
-                isAlternativeArt = any(),
                 isForTrade       = any(),
                 userId           = any(),
             )
@@ -142,7 +120,6 @@ class AddCardToCollectionUseCaseTest {
                 isFoil           = any(),
                 condition        = any(),
                 language         = any(),
-                isAlternativeArt = any(),
                 isForTrade       = any(),
                 userId           = "user-abc",
             )
@@ -156,7 +133,7 @@ class AddCardToCollectionUseCaseTest {
         useCase(scryfallId = "id-001")
         useCase(scryfallId = "id-001")
 
-        coVerify(exactly = 2) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 2) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -167,7 +144,7 @@ class AddCardToCollectionUseCaseTest {
         val result = useCase(scryfallId = "id-001")
 
         assertTrue(result is DataResult.Success)
-        coVerify(exactly = 1) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -190,7 +167,7 @@ class AddCardToCollectionUseCaseTest {
 
         useCase(scryfallId = "id-unknown")
 
-        coVerify(exactly = 0) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -200,7 +177,7 @@ class AddCardToCollectionUseCaseTest {
         val result = useCase(scryfallId = "id-offline")
 
         assertTrue(result is DataResult.Error)
-        coVerify(exactly = 0) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -219,7 +196,6 @@ class AddCardToCollectionUseCaseTest {
                 isFoil           = any(),
                 condition        = any(),
                 language         = any(),
-                isAlternativeArt = any(),
                 isForTrade       = false,
                 userId           = any(),
             )

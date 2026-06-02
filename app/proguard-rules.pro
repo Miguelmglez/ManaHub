@@ -103,6 +103,14 @@
 -keep class com.mmg.manahub.feature.auth.** { *; }
 -dontwarn com.mmg.manahub.feature.auth.**
 
+# ── Vosk offline speech recognition ──────────────────────────────────────────
+-keep class org.vosk.** { *; }
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class * extends com.sun.jna.** { *; }
+-dontwarn java.awt.**
+-dontwarn org.vosk.**
+-dontwarn com.sun.jna.**
+
 # ── Strip all logs in release ─────────────────────────────────────────────────
 -assumenosideeffects class android.util.Log {
     public static int v(...);

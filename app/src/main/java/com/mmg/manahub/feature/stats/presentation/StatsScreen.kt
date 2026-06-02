@@ -626,22 +626,13 @@ private fun AestheticsArtSection(
 ) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AestheticStatCard(
-                label = stringResource(R.string.stats_label_foil_cards),
-                value = stats.totalFoil.toString(),
-                percentage = if (stats.totalCards > 0) (stats.totalFoil.toFloat() / stats.totalCards) else 0f,
-                isFoil = true,
-                modifier = Modifier.weight(1f)
-            )
-            AestheticStatCard(
-                label = stringResource(R.string.stats_label_full_art_cards),
-                value = stats.totalFullArt.toString(),
-                percentage = if (stats.totalCards > 0) (stats.totalFullArt.toFloat() / stats.totalCards) else 0f,
-                isFoil = false,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        AestheticStatCard(
+            label = stringResource(R.string.stats_label_foil_cards),
+            value = stats.totalFoil.toString(),
+            percentage = if (stats.totalCards > 0) (stats.totalFoil.toFloat() / stats.totalCards) else 0f,
+            isFoil = true,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         CuriousStatBox(
             label = stringResource(R.string.stats_label_top_artist),
@@ -663,44 +654,56 @@ private fun AestheticStatCard(
 ) {
     val mc = MaterialTheme.magicColors
     
-    val foilBrush = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF00E5FF).copy(alpha = 0.2f),
-            Color(0xFFBF00FF).copy(alpha = 0.2f),
-            Color(0xFFFFD700).copy(alpha = 0.2f),
-            Color(0xFF00FFCC).copy(alpha = 0.2f)
-        )
+    val foilColors = listOf(
+        Color(0xFF00E5FF),
+        Color(0xFFBF00FF),
+        Color(0xFFFFD700),
+        Color(0xFF00FFCC)
     )
+    val foilBrush = Brush.linearGradient(colors = foilColors)
 
     Card(
-        modifier = modifier.height(110.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.height(115.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = mc.surface),
-        border = if (isFoil) BorderStroke(1.dp, foilBrush) else BorderStroke(1.dp, mc.surfaceVariant)
+        border = if (isFoil) BorderStroke(1.5.dp, foilBrush) else BorderStroke(1.dp, mc.surfaceVariant)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (isFoil) {
-                Box(modifier = Modifier.fillMaxSize().background(foilBrush))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.linearGradient(colors = foilColors.map { it.copy(alpha = 0.12f) }))
+                )
             }
             
-            Column(Modifier.padding(12.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text(
+                        text = label.uppercase(), 
+                        style = MaterialTheme.magicTypography.labelSmall, 
+                        color = mc.textSecondary,
+                        letterSpacing = 1.sp
+                    )
                     Text(
                         text = value,
-                        style = MaterialTheme.magicTypography.titleLarge.copy(fontSize = 24.sp),
+                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 32.sp),
                         color = mc.textPrimary
                     )
                 }
                 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${(percentage * 100).toInt()}%", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Text(
+                            text = "${(percentage * 100).toInt()}% " + stringResource(R.string.stats_label_total).lowercase(), 
+                            style = MaterialTheme.magicTypography.labelSmall, 
+                            color = mc.textDisabled
+                        )
                     }
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(4.dp)
+                            .height(8.dp)
                             .clip(CircleShape)
                             .background(mc.surfaceVariant.copy(alpha = 0.3f))
                     ) {

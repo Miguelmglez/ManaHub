@@ -364,6 +364,19 @@ private fun PrivacySection(
             checked = tradeListPublic,
             onCheckedChange = onTradeListPublicChange,
         )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.settings_privacy_voice_title),
+            style = MaterialTheme.magicTypography.labelMedium,
+            color = mc.textPrimary,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Text(
+            text = stringResource(R.string.settings_privacy_voice_subtitle),
+            style = MaterialTheme.magicTypography.bodySmall,
+            color = mc.textSecondary,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        )
     }
 }
 

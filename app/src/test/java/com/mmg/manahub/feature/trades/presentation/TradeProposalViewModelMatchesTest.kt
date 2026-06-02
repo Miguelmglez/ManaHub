@@ -162,7 +162,6 @@ class TradeProposalViewModelMatchesTest {
             scryfallId = scryfallId,
             quantity = 1,
             isFoil = false,
-            isAlternativeArt = false,
             condition = "NM",
             language = "en",
         ),
@@ -185,7 +184,6 @@ class TradeProposalViewModelMatchesTest {
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = false,
         createdAt = 0L,
         card = card,
     )
@@ -205,7 +203,6 @@ class TradeProposalViewModelMatchesTest {
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = false,
         createdAt = 0L,
         card = card,
     )

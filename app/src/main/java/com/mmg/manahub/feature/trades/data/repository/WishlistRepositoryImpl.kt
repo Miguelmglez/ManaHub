@@ -46,7 +46,6 @@ class WishlistRepositoryImpl @Inject constructor(
                 isFoil = entry.isFoil,
                 condition = entry.condition,
                 language = entry.language,
-                isAltArt = entry.isAltArt
             )
             if (existing != null) {
                 dao.update(existing.copy(quantity = existing.quantity + entry.quantity))
@@ -106,7 +105,6 @@ class WishlistRepositoryImpl @Inject constructor(
                 isFoil = dto.isFoil,
                 condition = dto.condition,
                 language = dto.language,
-                isAltArt = dto.isAltArt,
                 synced = true,
                 createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilli() }
                     .getOrDefault(System.currentTimeMillis()),
@@ -141,15 +139,13 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAltArt: Boolean,
     ): Result<Unit> = runCatching {
         val entries = dao.getByScryfallId(scryfallId)
         if (entries.isEmpty()) return@runCatching
         val exactMatch = entries.firstOrNull { e ->
             (e.isFoil ?: false) == isFoil &&
                 (e.condition == null || e.condition.equals(condition, ignoreCase = true)) &&
-                (e.language == null || e.language.equals(language, ignoreCase = true)) &&
-                (e.isAltArt ?: false) == isAltArt
+                (e.language == null || e.language.equals(language, ignoreCase = true))
         }
         val anyVariant = entries.firstOrNull { it.matchAnyVariant }
         val target = exactMatch ?: anyVariant ?: entries.first()
@@ -166,7 +162,6 @@ class WishlistRepositoryImpl @Inject constructor(
                     isFoil = entry.isFoil,
                     condition = entry.condition,
                     language = entry.language,
-                    isAltArt = entry.isAltArt,
                 )
                 val entity: LocalWishlistEntity = if (existing != null) {
                     existing.copy(quantity = existing.quantity + entry.quantity)
@@ -188,7 +183,6 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil ?: false,
         condition = condition,
         language = language,
-        isAltArt = isAltArt ?: false,
         createdAt = createdAt,
     )
 
@@ -204,7 +198,6 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
         synced = false,
         createdAt = createdAt,
     )
@@ -218,7 +211,6 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
         createdAt = Instant.ofEpochMilli(createdAt).toString(),
     )
 
@@ -231,7 +223,6 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil ?: false,
         condition = condition,
         language = language,
-        isAltArt = isAltArt ?: false,
         createdAt = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrDefault(0L),
     )
 
@@ -244,7 +235,6 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
         createdAt = Instant.ofEpochMilli(createdAt).toString(),
     )
 }

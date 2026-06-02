@@ -17,6 +17,36 @@ export default {
       return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
     }
 
+    // ── Voice model downloads ──────────────────────────────────────────────
+    // GET /voice/models/{lang}.zip  (also HEAD for pre-flight size checks)
+    // Android VoiceModelRepositoryImpl downloads from this endpoint.
+    const voiceMatch = path.match(/^\/voice\/models\/([a-z]{2})\.zip$/);
+    if (voiceMatch) {
+      const lang = voiceMatch[1];
+      const object = await env.MANAHUB_ASSETS.get(`voice-models/${lang}.zip`);
+
+      if (object === null) {
+        return new Response(JSON.stringify({ error: 'Model not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const headers = new Headers(corsHeaders);
+      headers.set('Content-Type', 'application/zip');
+      headers.set('Cache-Control', 'public, max-age=86400');
+      headers.set('Content-Length', object.size.toString());
+      if (object.httpEtag) headers.set('ETag', object.httpEtag);
+
+      // HEAD: return metadata only, no body
+      if (request.method === 'HEAD') {
+        return new Response(null, { status: 200, headers });
+      }
+
+      return new Response(object.body, { status: 200, headers });
+    }
+
+    // ── Draft content ──────────────────────────────────────────────────────
     // Allowed paths:
     //   /draft/sets-index.json
     //   /draft/{setCode}/guide.json

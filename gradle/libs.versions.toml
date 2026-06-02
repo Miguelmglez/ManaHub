@@ -76,6 +76,7 @@ room-testing            = { group = "androidx.room", name = "room-testing",     
 retrofit                = { group = "com.squareup.retrofit2", name = "retrofit",           version.ref = "retrofit" }
 retrofit-gson           = { group = "com.squareup.retrofit2", name = "converter-gson",     version.ref = "retrofit" }
 okhttp-logging          = { group = "com.squareup.okhttp3", name = "logging-interceptor",  version.ref = "okhttp" }
+okhttp-mockwebserver    = { group = "com.squareup.okhttp3", name = "mockwebserver",          version.ref = "okhttp" }
 coil-compose            = { group = "io.coil-kt", name = "coil-compose",                   version.ref = "coil" }
 coil-svg                = { group = "io.coil-kt", name = "coil-svg",                       version.ref = "coil" }
 camerax-camera2         = { group = "androidx.camera", name = "camera-camera2",            version.ref = "camerax" }

@@ -48,12 +48,12 @@ interface UserCardCollectionDao {
     // UUID reconciliation: finds a local row that matches the Supabase composite key but
     // may have a different UUID (guest-generated vs. Supabase-canonical). Used in the
     // PULL loop to detect and fix UUID mismatches before upserting the remote row.
-    @Query("SELECT * FROM user_card_collection WHERE user_id = :userId AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language AND is_alternative_art = :isAlternativeArt LIMIT 1")
-    fun getByCompositeKey(userId: String, scryfallId: String, isFoil: Boolean, condition: String, language: String, isAlternativeArt: Boolean): UserCardCollectionEntity?
+    @Query("SELECT * FROM user_card_collection WHERE user_id = :userId AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language LIMIT 1")
+    fun getByCompositeKey(userId: String, scryfallId: String, isFoil: Boolean, condition: String, language: String): UserCardCollectionEntity?
 
     // Guest-session variant: matches rows where user_id is NULL or empty.
-    @Query("SELECT * FROM user_card_collection WHERE (user_id IS NULL OR user_id = '') AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language AND is_alternative_art = :isAlternativeArt LIMIT 1")
-    fun getByCompositeKeyGuest(scryfallId: String, isFoil: Boolean, condition: String, language: String, isAlternativeArt: Boolean): UserCardCollectionEntity?
+    @Query("SELECT * FROM user_card_collection WHERE (user_id IS NULL OR user_id = '') AND scryfall_id = :scryfallId AND is_foil = :isFoil AND condition = :condition AND language = :language LIMIT 1")
+    fun getByCompositeKeyGuest(scryfallId: String, isFoil: Boolean, condition: String, language: String): UserCardCollectionEntity?
 
     // Hard-delete used only for UUID reconciliation: removes the stale guest-UUID row so
     // the Supabase-canonical UUID row can be inserted without a composite UNIQUE conflict.

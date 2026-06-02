@@ -259,6 +259,9 @@ $RECYCLE.BIN/
 # Local Claude Code settings overrides (personal, machine-specific).
 .claude/settings.local.json
 
+# Git worktrees created by Claude Code agents — ephemeral, never commit.
+.claude/worktrees/
+
 
 # =============================================================================
 # SECTION 9 — MISCELLANEOUS GENERATED FILES
@@ -286,7 +289,6 @@ $RECYCLE.BIN/
 /SUPABASE_AUTH_SETUP.md
 
 /CLAUDE.md
-/.claude/worktrees/agent-abd89b3b/
 /app/supabase/migrations/20260421_friends.sql
 /.artifacts/
 /app/DEEPLINKS.md

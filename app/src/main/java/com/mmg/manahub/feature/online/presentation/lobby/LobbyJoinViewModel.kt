@@ -1,8 +1,10 @@
 package com.mmg.manahub.feature.online.presentation.lobby
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
 import com.mmg.manahub.core.online.domain.model.ParticipantStatus
@@ -13,6 +15,7 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,6 +47,7 @@ class LobbyJoinViewModel @Inject constructor(
     private val leaveSessionUseCase: LeaveSessionUseCase,
     private val repository: OnlineSessionRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     // ── UI state ──────────────────────────────────────────────────────────────
@@ -150,7 +154,7 @@ class LobbyJoinViewModel @Inject constructor(
 
         if (!numericCodeRegex.matches(state.codeInput)) {
             _uiState.update {
-                it.copy(error = "Código inválido. Debe ser 6 dígitos.")
+                it.copy(error = appContext.getString(R.string.lobby_error_invalid_code))
             }
             return
         }
@@ -161,7 +165,7 @@ class LobbyJoinViewModel @Inject constructor(
 
             joinSessionUseCase(
                 code = state.codeInput,
-                displayName = state.displayName.ifBlank { "Player" },
+                displayName = state.displayName.ifBlank { appContext.getString(R.string.lobby_player_default_name) },
                 themeKey = state.selectedThemeKey,
             ).fold(
                 onSuccess = { (sessionId, slotIndex) ->
@@ -383,18 +387,18 @@ class LobbyJoinViewModel @Inject constructor(
      * Crashlytics separately by each call site before invoking this function.
      */
     private fun mapBackendError(message: String?): String = when {
-        message == null -> "Ocurrió un error inesperado."
+        message == null -> appContext.getString(R.string.lobby_error_generic)
         "Too many failed join attempts" in message ->
-            "Demasiados intentos fallidos. Espera 5 minutos."
+            appContext.getString(R.string.lobby_error_too_many_attempts)
         "Invalid session code format" in message ->
-            "Código inválido. Debe ser 6 dígitos."
+            appContext.getString(R.string.lobby_error_invalid_code)
         "Session limit reached" in message ->
-            "Ya tienes una sala activa. Ciérrala antes de crear otra."
+            appContext.getString(R.string.lobby_error_active_room)
         "Session is full" in message ->
-            "La sala ya está llena."
+            appContext.getString(R.string.lobby_error_full)
         "not in LOBBY" in message ->
-            "Sala no encontrada o ya iniciada."
-        else -> "Ocurrió un error inesperado."
+            appContext.getString(R.string.lobby_error_not_found)
+        else -> appContext.getString(R.string.lobby_error_generic)
     }
 
     override fun onCleared() {

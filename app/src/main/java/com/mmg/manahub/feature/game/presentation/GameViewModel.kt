@@ -1,9 +1,11 @@
 package com.mmg.manahub.feature.game.presentation
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -37,6 +39,10 @@ import com.mmg.manahub.core.online.domain.usecase.ToggleLandPlayedUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
+import com.mmg.manahub.core.voice.domain.VoiceCommand
+import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,8 +50,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapNotNull
@@ -112,6 +121,8 @@ class GameViewModel @Inject constructor(
     private val leaveSessionUseCase:          LeaveSessionUseCase,
     private val nearbyRepo:                   NearbySessionRepository,
     private val toggleLandPlayedUseCase:      ToggleLandPlayedUseCase,
+    private val voiceCommandRecognizer:       VoiceCommandRecognizer,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -121,11 +132,16 @@ class GameViewModel @Inject constructor(
     private val initPlayerCount: Int =
         savedStateHandle.get<Int>("playerCount")?.coerceIn(2, 6) ?: 2
 
-    private val _uiState = MutableStateFlow(buildInitialState(initMode, initPlayerCount))
+    private val _uiState = MutableStateFlow(buildInitialState(initMode, initPlayerCount, appContext))
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
     private val _toolsState = MutableStateFlow(GlobalToolsState())
     val toolsState: StateFlow<GlobalToolsState> = _toolsState.asStateFlow()
+
+    val isVoiceListening: StateFlow<Boolean> = voiceCommandRecognizer.isListening
+
+    private val _voiceCommandEvents = MutableSharedFlow<VoiceCommand>(extraBufferCapacity = 1)
+    val voiceCommandEvents: Flow<VoiceCommand> = _voiceCommandEvents.asSharedFlow()
 
     private val deltaJobs = mutableMapOf<Int, Job>()
 
@@ -141,6 +157,16 @@ class GameViewModel @Inject constructor(
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
+        // Collect voice commands and route them to game actions
+        viewModelScope.launch {
+            voiceCommandRecognizer.commands.collect { command ->
+                when (command) {
+                    is VoiceCommand.PlayLand -> onVoicePlayLand()
+                    is VoiceCommand.EndTurn -> onVoiceEndTurn()
+                }
+            }
+        }
+
         // Persist each unique game result to Room as soon as it appears
         viewModelScope.launch {
             uiState
@@ -354,6 +380,41 @@ class GameViewModel @Inject constructor(
                 runCatching { nextTurnUseCase(sessionId) }
             }
         }
+    }
+
+    /** Marks the active player's land as played via a voice command. Idempotent: no-op if already played. */
+    private fun onVoicePlayLand() {
+        val state = _uiState.value
+        if (!state.gameSettings.voiceLandReminderEnabled) return
+        val activeId = state.activePlayerId
+        if (activeId in state.hasPlayedLand) return
+        toggleLandPlayed(activeId)
+        viewModelScope.launch { _voiceCommandEvents.emit(VoiceCommand.PlayLand) }
+    }
+
+    /** Advances to the next turn via a voice command. No-op unless the voice end-turn setting is enabled. */
+    private fun onVoiceEndTurn() {
+        val state = _uiState.value
+        if (!state.gameSettings.voiceEndTurnEnabled) return
+        nextTurn()
+        viewModelScope.launch { _voiceCommandEvents.emit(VoiceCommand.EndTurn) }
+    }
+
+    fun startVoiceListening() {
+        val settings = _uiState.value.gameSettings
+        val isAnyEnabled = settings.voiceLandReminderEnabled || settings.voiceEndTurnEnabled
+        if (!isAnyEnabled) return
+        val enabledCommands = buildSet<VoiceCommand> {
+            if (settings.voiceLandReminderEnabled) add(VoiceCommand.PlayLand)
+            if (settings.voiceEndTurnEnabled) add(VoiceCommand.EndTurn)
+        }
+        viewModelScope.launch {
+            voiceCommandRecognizer.start(enabledCommands, settings.voiceLanguages)
+        }
+    }
+
+    fun stopVoiceListening() {
+        voiceCommandRecognizer.stop()
     }
 
     /** Toggles whether the given player has played a land this turn. */
@@ -653,7 +714,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
-                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = cfg.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = cfg.theme,
                 isAppUser = i == mySlotIndex,
@@ -884,7 +945,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
-                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = cfg.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = cfg.theme,
                 isAppUser = i == slotIndex,
@@ -1149,6 +1210,7 @@ class GameViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        voiceCommandRecognizer.release()
         onlineObserveJob?.cancel()
         nearbyObserveJob?.cancel()
         persistLifeJobs.values.forEach { it.cancel() }
@@ -1270,7 +1332,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
-                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = cfg.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = cfg.theme,
                 isAppUser = cfg.isAppUser,
@@ -1347,7 +1409,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, config ->
             Player(
                 id        = i,
-                name      = config.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = config.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = config.theme,
                 isAppUser = config.isAppUser,
@@ -1376,12 +1438,24 @@ class GameViewModel @Inject constructor(
     }
 
     companion object {
-        fun buildInitialState(mode: GameMode, playerCount: Int): GameUiState {
+        fun buildInitialState(mode: GameMode, playerCount: Int): GameUiState =
+            buildInitialState(mode, playerCount, defaultName = { i -> "Player ${i + 1}" })
+
+        fun buildInitialState(mode: GameMode, playerCount: Int, context: Context): GameUiState =
+            buildInitialState(mode, playerCount, defaultName = { i ->
+                context.getString(R.string.game_setup_default_player_name) + " ${i + 1}"
+            })
+
+        private fun buildInitialState(
+            mode: GameMode,
+            playerCount: Int,
+            defaultName: (Int) -> String,
+        ): GameUiState {
             val clampedCount = playerCount.coerceIn(2, 6)
             val players = (0 until clampedCount).map { i ->
                 Player(
                     id        = i,
-                    name      = "Wizard ${i + 1}",
+                    name      = defaultName(i),
                     life      = mode.startingLife,
                     theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
                     isAppUser = i == 0,

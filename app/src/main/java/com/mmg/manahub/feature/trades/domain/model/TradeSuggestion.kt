@@ -9,6 +9,5 @@ data class TradeSuggestion(
     val offerFoil: Boolean,
     val offerCondition: String,
     val offerLanguage: String,
-    val offerAltArt: Boolean,
     val suggestionType: String,
 )

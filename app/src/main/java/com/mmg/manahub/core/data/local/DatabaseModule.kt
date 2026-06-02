@@ -376,23 +376,23 @@ object DatabaseModule {
     }
 
     // -------------------------------------------------------------------------
-    // v35 → v36
-    // Per-seat survey/stats rebuild (Phases 1 & 2, see ADR-001). One consolidated
-    // migration covering both phases:
+    // v35 → v36  — consolidated migration (survey/stats rebuild + collection cleanup)
     //
-    //   player_sessions:
-    //     - is_local           INTEGER NOT NULL DEFAULT 0  (Phase 1: app-user seat marker)
-    //     - archetype          TEXT                        (Phase 2: deck archetype)
-    //     - linked_profile_tag TEXT                        (Phase 2: cross-player hook)
-    //     - deckId (legacy INTEGER) is RETYPED to deck_id TEXT (UUID). The legacy column
-    //       was never written (always NULL), so dropping its integer value is loss-less.
+    // player_sessions (Phase 1+2, ADR-001):
+    //   - is_local           INTEGER NOT NULL DEFAULT 0  (app-user seat marker)
+    //   - archetype          TEXT                        (deck archetype for matchup stats)
+    //   - linked_profile_tag TEXT                        (cross-player stats hook, server v2)
+    //   - deckId (legacy INTEGER, always NULL) RETYPED to deck_id TEXT (UUID, loss-less)
     //
-    //   survey_card_impacts: new table (Phase 2) with three CASCADE foreign keys
-    //   (game_sessions, player_sessions, cards) and an index on each FK column.
+    // survey_card_impacts: new table — per-seat MVP/DEAD card ratings (Phase 2)
+    // survey_answers: new `status` column — DRAFT/COMPLETED lifecycle (Phase 3)
     //
-    // SQLite cannot rename a column type, so player_sessions is rebuilt with the
-    // standard 12-step table-recreation pattern. The new schema below MUST mirror the
-    // @Entity definition or Room's schema validation fails at startup.
+    // user_card_collection: drop is_alternative_art column (variant picker replaced it)
+    // local_wishlists: drop is_alt_art column
+    // local_open_for_trade: drop is_alt_art column
+    //
+    // Tables with column drops/renames use the 12-step SQLite table-recreation pattern.
+    // Each new schema MUST mirror its @Entity or Room schema validation fails at startup.
     // -------------------------------------------------------------------------
     private val MIGRATION_35_36 = object : Migration(35, 36) {
         override fun migrate(db: SupportSQLiteDatabase) {
@@ -421,8 +421,6 @@ object DatabaseModule {
                 )
                 """.trimIndent()
             )
-            // Copy retained columns. Legacy `deckId` (INTEGER, always NULL) is dropped:
-            // `deck_id` is seeded NULL since no pre-v36 row carried a usable deck UUID here.
             db.execSQL(
                 """
                 INSERT INTO `player_sessions_new` (
@@ -467,14 +465,120 @@ object DatabaseModule {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_survey_card_impacts_player_session_id` ON `survey_card_impacts` (`player_session_id`)")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_survey_card_impacts_card_id` ON `survey_card_impacts` (`card_id`)")
 
-            // ── survey_answers: add per-answer lifecycle status column ────────────
-            // "DRAFT" while auto-saving, "COMPLETED" once the review is submitted.
-            // Guarded by columnExists so the migration stays idempotent if retried.
+            // ── survey_answers: add lifecycle status column ──────────────────────
             if (!columnExists(db, "survey_answers", "status")) {
                 db.execSQL(
                     "ALTER TABLE `survey_answers` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'DRAFT'"
                 )
             }
+
+            // ── user_card_collection: drop is_alternative_art (variant picker replaced it) ──
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `user_card_collection_new` (
+                    `id` TEXT NOT NULL,
+                    `user_id` TEXT,
+                    `scryfall_id` TEXT NOT NULL,
+                    `quantity` INTEGER NOT NULL,
+                    `is_foil` INTEGER NOT NULL,
+                    `condition` TEXT NOT NULL,
+                    `language` TEXT NOT NULL,
+                    `is_for_trade` INTEGER NOT NULL,
+                    `is_deleted` INTEGER NOT NULL,
+                    `updated_at` INTEGER NOT NULL,
+                    `created_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`scryfall_id`) REFERENCES `cards`(`scryfall_id`)
+                        ON UPDATE NO ACTION ON DELETE RESTRICT
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `user_card_collection_new` (
+                    `id`, `user_id`, `scryfall_id`, `quantity`, `is_foil`, `condition`,
+                    `language`, `is_for_trade`, `is_deleted`, `updated_at`, `created_at`
+                )
+                SELECT `id`, `user_id`, `scryfall_id`, `quantity`, `is_foil`, `condition`,
+                       `language`, `is_for_trade`, `is_deleted`, `updated_at`, `created_at`
+                FROM `user_card_collection`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `user_card_collection`")
+            db.execSQL("ALTER TABLE `user_card_collection_new` RENAME TO `user_card_collection`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_scryfall_id` ON `user_card_collection` (`scryfall_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_user_id` ON `user_card_collection` (`user_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_updated_at` ON `user_card_collection` (`updated_at`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_is_deleted` ON `user_card_collection` (`is_deleted`)")
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_user_card_collection_user_id_scryfall_id_is_foil_condition_language` " +
+                    "ON `user_card_collection` (`user_id`, `scryfall_id`, `is_foil`, `condition`, `language`)"
+            )
+
+            // ── local_wishlists: drop is_alt_art ─────────────────────────────────
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `local_wishlists_new` (
+                    `id` TEXT NOT NULL,
+                    `scryfall_id` TEXT NOT NULL,
+                    `quantity` INTEGER NOT NULL,
+                    `match_any_variant` INTEGER NOT NULL,
+                    `is_foil` INTEGER,
+                    `condition` TEXT,
+                    `language` TEXT,
+                    `synced` INTEGER NOT NULL,
+                    `created_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `local_wishlists_new` (
+                    `id`, `scryfall_id`, `quantity`, `match_any_variant`, `is_foil`,
+                    `condition`, `language`, `synced`, `created_at`
+                )
+                SELECT `id`, `scryfall_id`, `quantity`, `match_any_variant`, `is_foil`,
+                       `condition`, `language`, `synced`, `created_at`
+                FROM `local_wishlists`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `local_wishlists`")
+            db.execSQL("ALTER TABLE `local_wishlists_new` RENAME TO `local_wishlists`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_wishlists_scryfall_id` ON `local_wishlists` (`scryfall_id`)")
+
+            // ── local_open_for_trade: drop is_alt_art ────────────────────────────
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `local_open_for_trade_new` (
+                    `id` TEXT NOT NULL,
+                    `local_collection_id` TEXT NOT NULL,
+                    `scryfall_id` TEXT NOT NULL,
+                    `quantity` INTEGER NOT NULL,
+                    `is_foil` INTEGER NOT NULL,
+                    `condition` TEXT NOT NULL,
+                    `language` TEXT NOT NULL,
+                    `synced` INTEGER NOT NULL,
+                    `created_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `local_open_for_trade_new` (
+                    `id`, `local_collection_id`, `scryfall_id`, `quantity`, `is_foil`,
+                    `condition`, `language`, `synced`, `created_at`
+                )
+                SELECT `id`, `local_collection_id`, `scryfall_id`, `quantity`, `is_foil`,
+                       `condition`, `language`, `synced`, `created_at`
+                FROM `local_open_for_trade`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `local_open_for_trade`")
+            db.execSQL("ALTER TABLE `local_open_for_trade_new` RENAME TO `local_open_for_trade`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_open_for_trade_local_collection_id` ON `local_open_for_trade` (`local_collection_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_open_for_trade_scryfall_id` ON `local_open_for_trade` (`scryfall_id`)")
         }
     }
 

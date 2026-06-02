@@ -56,6 +56,7 @@ data class MagicToastMessage(
     val message: String,
     val type: MagicToastType = MagicToastType.SUCCESS,
     val durationMs: Long = 2500L,
+    val onClick: (() -> Unit)? = null,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,8 +71,9 @@ class MagicToastState {
         message: String,
         type: MagicToastType = MagicToastType.SUCCESS,
         durationMs: Long = 2500L,
+        onClick: (() -> Unit)? = null,
     ) {
-        _events.tryEmit(MagicToastMessage(message, type, durationMs))
+        _events.tryEmit(MagicToastMessage(message, type, durationMs, onClick))
     }
 }
 
@@ -127,7 +129,10 @@ fun MagicToastHost(
                 animationSpec  = tween(durationMillis = 260),
             ) + fadeOut(animationSpec = tween(200)),
         ) {
-            current?.let { MagicToastCard(it) }
+            current?.let { MagicToastCard(it) {
+                visible = false
+                it.onClick?.invoke()
+            } }
         }
     }
 }
@@ -137,7 +142,7 @@ fun MagicToastHost(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun MagicToastCard(msg: MagicToastMessage) {
+private fun MagicToastCard(msg: MagicToastMessage, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
@@ -150,6 +155,7 @@ private fun MagicToastCard(msg: MagicToastMessage) {
     }
 
     Surface(
+        onClick        = { if (msg.onClick != null) onClick() },
         shape          = RoundedCornerShape(20.dp),
         color          = mc.backgroundSecondary,
         shadowElevation = 14.dp,

@@ -20,6 +20,8 @@
     <string name="action_search">Search</string>
     <string name="action_close">Close</string>
     <string name="action_back">Back</string>
+    <string name="action_ok">OK</string>
+    <string name="action_info">Info</string>
     <string name="action_skip">Skip</string>
     <string name="action_next">Next</string>
     <string name="action_done">Done</string>
@@ -674,8 +676,14 @@
     <string name="gamesetup_life_control_swipe_hint">↕ Swipe up · down</string>
     <string name="gamesetup_life_control_tap">Tap</string>
     <string name="gamesetup_life_control_tap_hint">Tap ▼ · Heart ▲</string>
-    <string name="gamesetup_voice_land_reminder_title">Voice Land Reminder</string>
-    <string name="gamesetup_voice_land_reminder_subtitle">\"I play a land\"</string>
+    <string name="gamesetup_voice_land_reminder_title">Voice: Land reminder</string>
+    <string name="gamesetup_voice_land_reminder_subtitle">Say a phrase to mark your land as played</string>
+    <string name="gamesetup_voice_end_turn_title">Voice: End turn</string>
+    <string name="gamesetup_voice_end_turn_subtitle">Say a phrase to advance to the next turn</string>
+    <string name="gamesetup_voice_languages_title">Recognized languages</string>
+    <string name="gamesetup_voice_land_phrases_title">Land reminder — voice phrases</string>
+    <string name="gamesetup_voice_end_turn_phrases_title">End turn — voice phrases</string>
+    <string name="gamesetup_voice_no_phrases">No phrases available for the selected languages.</string>
     <string name="gamesetup_voice_download_label">Download voice model (~40 MB)</string>
     <string name="gamesetup_voice_downloading_label">Downloading voice model…</string>
     <string name="gamesetup_voice_download_failed">Download failed.</string>
@@ -687,6 +695,7 @@
     <string name="game_turn_label">T%1$d</string>
     <string name="game_turn_indicator">Turn: %1$d</string>
     <string name="game_land_played_toast">Land played</string>
+    <string name="game_land_played_label">Land played!</string>
     <string name="game_voice_listening_desc">Listening for voice commands</string>
     <string name="game_tournament_badge">Tournament</string>
     <string name="game_tournament_standings_desc">Tournament standings</string>
@@ -1612,7 +1621,8 @@
     <string name="friends_error_cancel_outgoing">Could not cancel invitation. Please try again.</string>
     <string name="friends_search_placeholder_no_hash">Game tag (e.g. A3KX9Z)</string>
     <!-- Invite link sharing -->
-    <string name="friends_share_my_link">Share my link</string>
+    <string name="friends_share_my_link">Share my Game Tag</string>
+    <string name="friends_gametag_copied">Game Tag copied to clipboard</string>
     <string name="friends_share_chooser_title">Share your ManaHub invite</string>
     <string name="friends_invite_self">That\'s your own invite link</string>
     <string name="friends_invite_invalid">Invitation is no longer valid</string>
