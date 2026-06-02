@@ -262,6 +262,21 @@ $RECYCLE.BIN/
 # Git worktrees created by Claude Code agents — ephemeral, never commit.
 .claude/worktrees/
 
+# AI agent task-planning documents — ephemeral, never commit.
+# These are intermediate files created by Claude/LLMs during task execution.
+# They are deleted when the task is finished and must NEVER contain secrets.
+# Pattern covers common naming conventions: *_TODO.md, *_PLAN.md, PLAN_*.md, PLAN.md
+# at any depth. Proper design docs (ADRs, RFCs) live under docs/adr/ and ARE committed.
+docs/*_TODO.md
+docs/*_PLAN.md
+docs/PLAN_*.md
+docs/PLAN.md
+*_TODO.md
+PLAN.md
+# Catch-all for agent scratchpad files at repo root
+TASK_*.md
+NOTES_*.md
+
 
 # =============================================================================
 # SECTION 9 — MISCELLANEOUS GENERATED FILES
@@ -288,7 +303,6 @@ $RECYCLE.BIN/
 /.mcp.json
 /SUPABASE_AUTH_SETUP.md
 
-/CLAUDE.md
 /app/supabase/migrations/20260421_friends.sql
 /.artifacts/
 /app/DEEPLINKS.md
