@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 
 /** Projection for per-deck game statistics. */
 data class DeckStatsRow(
-    val deckId:     Long?,
+    val deckId:     String?,   // deck UUID (was Long? before v37)
     val deckName:   String?,
     val totalGames: Int,
     val wins:       Int,
@@ -101,12 +101,12 @@ abstract class GameSessionDao {
     abstract fun observeAvgLifeOnLoss(): Flow<Double?>
 
     @Query("""
-        SELECT ps.deckId, ps.deckName,
+        SELECT ps.deck_id AS deckId, ps.deckName AS deckName,
                COUNT(*) AS totalGames,
                COALESCE(SUM(CASE WHEN ps.isWinner = 1 THEN 1 ELSE 0 END), 0) AS wins
         FROM player_sessions ps
-        WHERE ps.deckId IS NOT NULL
-        GROUP BY ps.deckId
+        WHERE ps.deck_id IS NOT NULL
+        GROUP BY ps.deck_id
     """)
     abstract fun observeDeckStats(): Flow<List<DeckStatsRow>>
 
@@ -120,6 +120,27 @@ abstract class GameSessionDao {
 
     @Query("UPDATE game_sessions SET deckId = :deckId WHERE id = :sessionId")
     abstract suspend fun updateSessionDeck(sessionId: Long, deckId: String?)
+
+    // ── Result write-back (survey can correct the recorded outcome) ──────────────
+
+    /** Records a concrete winner for the session (used when the survey result is a win). */
+    @Query("UPDATE game_sessions SET winnerId = :winnerId, winnerName = :winnerName WHERE id = :sessionId")
+    abstract suspend fun updateSessionResult(sessionId: Long, winnerId: Int, winnerName: String)
+
+    /** Records a draw for the session (winnerId = -1 sentinel, winnerName = "Draw"). */
+    @Query("UPDATE game_sessions SET winnerId = -1, winnerName = 'Draw' WHERE id = :sessionId")
+    abstract suspend fun updateSessionResultDraw(sessionId: Long)
+
+    /**
+     * Updates the local seat's [PlayerSessionEntity.isWinner] flag without touching any
+     * opponent seat. [localIsWinner] is applied only to the seat with `is_local = 1`.
+     */
+    @Query("UPDATE player_sessions SET isWinner = CASE WHEN is_local = 1 THEN :localIsWinner ELSE isWinner END WHERE sessionId = :sessionId")
+    abstract suspend fun updateLocalSeatWinner(sessionId: Long, localIsWinner: Boolean)
+
+    /** Sets the deck archetype on a specific opponent seat (matched by playerId). */
+    @Query("UPDATE player_sessions SET archetype = :archetype WHERE sessionId = :sessionId AND playerId = :playerId")
+    abstract suspend fun updateSeatArchetype(sessionId: Long, playerId: Int, archetype: String)
 
     @Query("SELECT COUNT(*) FROM game_sessions WHERE surveyStatus IN ('PENDING','PARTIAL')")
     abstract fun observePendingSurveyCount(): Flow<Int>

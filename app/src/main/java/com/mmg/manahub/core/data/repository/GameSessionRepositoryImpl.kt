@@ -44,6 +44,10 @@ class GameSessionRepositoryImpl @Inject constructor(
                 commanderDamageDealt    = pr.totalCommanderDamageDealt,
                 commanderDamageReceived = pr.totalCommanderDamageReceived,
                 isWinner                = pr.player.id == result.winner.id,
+                // Persist the app user's seat so the post-game survey can determine
+                // win/loss reliably (see ADR-001). isWinner alone is insufficient —
+                // every finished game has a winner.
+                isLocal                 = pr.player.isAppUser,
             )
         }
         dao.insertSessionWithPlayers(sessionEntity, playerEntities)

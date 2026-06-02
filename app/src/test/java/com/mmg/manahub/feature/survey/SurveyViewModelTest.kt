@@ -102,6 +102,94 @@ class SurveyViewModelTest {
         assertEquals("COMMANDER", state.recap?.mode)
     }
 
+    // ── ADR-001 win/loss derivation (Bug #1, #4) ────────────────────────────────
+
+    @Test
+    fun `given_loseGame_survey_shows_loss_recap`() = runTest(dispatcher) {
+        // Local seat is NOT the winner — opponent won. Recap must show a LOSS.
+        coEvery { gameSessionDao.getSessionById(sessionId) } returns
+            fakeSessionWithPlayers(localIsWinner = false)
+        val vm = buildVm()
+        val state = vm.uiState.value
+        assertEquals(false, state.recap?.won)
+        // winnerName reflects the actual winner seat (the rival), not the local player.
+        assertEquals("Rival", state.recap?.winnerName)
+        // Bug #4: opponentNames must exclude the local seat even after a loss.
+        assertEquals(listOf("Rival"), state.recap?.opponentNames)
+    }
+
+    @Test
+    fun `given_winGame_survey_shows_win_recap`() = runTest(dispatcher) {
+        // Local seat IS the winner — recap must show a WIN.
+        coEvery { gameSessionDao.getSessionById(sessionId) } returns
+            fakeSessionWithPlayers(localIsWinner = true)
+        val vm = buildVm()
+        val state = vm.uiState.value
+        assertEquals(true, state.recap?.won)
+        assertEquals("Me", state.recap?.winnerName)
+        assertEquals(listOf("Rival"), state.recap?.opponentNames)
+    }
+
+    @Test
+    fun `given_draw_no_winner_survey_shows_draw`() = runTest(dispatcher) {
+        // No seat is flagged as winner (draw). The local seat's isWinner is false, so
+        // appUserWon falls back to false (safe default, loss-side recap). winnerName
+        // falls back to the session's recorded winnerName.
+        val session = GameSessionEntity(
+            id = sessionId,
+            playedAt = 1_700_000_000_000L,
+            durationMs = 600_000L,
+            mode = "STANDARD",
+            totalTurns = 8,
+            playerCount = 2,
+            winnerId = -1,
+            winnerName = "Draw",
+            surveyStatus = "PENDING",
+        )
+        val players = listOf(
+            PlayerSessionEntity(sessionId = sessionId, playerId = 1, playerName = "Me", finalLife = 0, finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = true),
+            PlayerSessionEntity(sessionId = sessionId, playerId = 2, playerName = "Rival", finalLife = 0, finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = false),
+        )
+        coEvery { gameSessionDao.getSessionById(sessionId) } returns GameSessionWithPlayers(session, players)
+
+        val vm = buildVm()
+        val state = vm.uiState.value
+        assertEquals(false, state.recap?.won)
+        // No seat is the winner, so winnerName falls back to session.winnerName.
+        assertEquals("Draw", state.recap?.winnerName)
+        assertEquals(listOf("Rival"), state.recap?.opponentNames)
+    }
+
+    @Test
+    fun `given_multiPlayer_local_player_loses_opponent_wins_recap_correct`() = runTest(dispatcher) {
+        // 4-player game: local seat loses, one of three opponents wins.
+        val session = GameSessionEntity(
+            id = sessionId,
+            playedAt = 1_700_000_000_000L,
+            durationMs = 2_400_000L,
+            mode = "COMMANDER",
+            totalTurns = 20,
+            playerCount = 4,
+            winnerId = 3,
+            winnerName = "Carol",
+            surveyStatus = "PENDING",
+        )
+        val players = listOf(
+            PlayerSessionEntity(sessionId = sessionId, playerId = 1, playerName = "Me", finalLife = -2, finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = true),
+            PlayerSessionEntity(sessionId = sessionId, playerId = 2, playerName = "Bob", finalLife = 0, finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = false),
+            PlayerSessionEntity(sessionId = sessionId, playerId = 3, playerName = "Carol", finalLife = 18, finalPoison = 0, eliminationReason = null, isWinner = true, isLocal = false),
+            PlayerSessionEntity(sessionId = sessionId, playerId = 4, playerName = "Dave", finalLife = 0, finalPoison = 0, eliminationReason = "LIFE", isWinner = false, isLocal = false),
+        )
+        coEvery { gameSessionDao.getSessionById(sessionId) } returns GameSessionWithPlayers(session, players)
+
+        val vm = buildVm()
+        val state = vm.uiState.value
+        assertEquals(false, state.recap?.won)
+        assertEquals("Carol", state.recap?.winnerName)
+        // All three non-local seats are opponents; the local seat is excluded.
+        assertEquals(listOf("Bob", "Carol", "Dave"), state.recap?.opponentNames)
+    }
+
     @Test
     fun `init restores existing answers including CARD_IMPACT and FREE_TEXT`() = runTest(dispatcher) {
         coEvery { surveyAnswerDao.getAnswersForSession(sessionId) } returns listOf(
@@ -224,7 +312,17 @@ class SurveyViewModelTest {
         savedStateHandle = SavedStateHandle(mapOf("sessionId" to sessionId, "mode" to "COMPLETE")),
     )
 
-    private fun fakeSessionWithPlayers(surveyStatus: String = "PENDING"): GameSessionWithPlayers {
+    /**
+     * Default fake: the local seat ("Me") is the winner — a WIN.
+     *
+     * The [localIsWinner] flag flips win/loss for the local seat while keeping a
+     * non-null winner, exercising the ADR-001 fix (win/loss derived from `isLocal`,
+     * not from `isWinner`).
+     */
+    private fun fakeSessionWithPlayers(
+        surveyStatus: String = "PENDING",
+        localIsWinner: Boolean = true,
+    ): GameSessionWithPlayers {
         val session = GameSessionEntity(
             id = sessionId,
             playedAt = 1_700_000_000_000L,
@@ -232,13 +330,23 @@ class SurveyViewModelTest {
             mode = "COMMANDER",
             totalTurns = 14,
             playerCount = 2,
-            winnerId = 1,
-            winnerName = "Me",
+            winnerId = if (localIsWinner) 1 else 2,
+            winnerName = if (localIsWinner) "Me" else "Rival",
             surveyStatus = surveyStatus,
         )
         val players = listOf(
-            PlayerSessionEntity(sessionId = sessionId, playerId = 1, playerName = "Me", finalLife = 30, finalPoison = 0, eliminationReason = null, isWinner = true),
-            PlayerSessionEntity(sessionId = sessionId, playerId = 2, playerName = "Rival", finalLife = -3, finalPoison = 0, eliminationReason = "LIFE", isWinner = false),
+            PlayerSessionEntity(
+                sessionId = sessionId, playerId = 1, playerName = "Me",
+                finalLife = if (localIsWinner) 30 else -3, finalPoison = 0,
+                eliminationReason = if (localIsWinner) null else "LIFE",
+                isWinner = localIsWinner, isLocal = true,
+            ),
+            PlayerSessionEntity(
+                sessionId = sessionId, playerId = 2, playerName = "Rival",
+                finalLife = if (localIsWinner) -3 else 30, finalPoison = 0,
+                eliminationReason = if (localIsWinner) "LIFE" else null,
+                isWinner = !localIsWinner, isLocal = false,
+            ),
         )
         return GameSessionWithPlayers(session, players)
     }

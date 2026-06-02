@@ -883,6 +883,58 @@
     <string name="survey_no_deck_notice">No deck associated — card impact tracking unavailable</string>
     <string name="survey_duration_min">%1$d min</string>
 
+    <!-- Phase 3 — single-form survey redesign -->
+    <string name="survey_section_result">Game result</string>
+    <string name="survey_section_elimination">How did it end?</string>
+    <string name="survey_section_opening_hand">Opening hand</string>
+    <string name="survey_section_mana_flow">Mana flow</string>
+    <string name="survey_section_card_impact">Card impact</string>
+    <string name="survey_section_opponents">Opponents</string>
+    <string name="survey_section_commander">Commander</string>
+    <string name="survey_section_sideboard">Sideboard</string>
+    <string name="survey_section_rating">How was the game?</string>
+    <string name="survey_section_notes">Notes</string>
+    <string name="survey_result_win">Win</string>
+    <string name="survey_result_lose">Lose</string>
+    <string name="survey_result_draw">Draw</string>
+    <string name="survey_hand_unkeepable">Unkeepable</string>
+    <string name="survey_hand_risky">Risky</string>
+    <string name="survey_hand_solid">Solid</string>
+    <string name="survey_hand_perfect">Perfect</string>
+    <string name="survey_mana_screwed">Screwed</string>
+    <string name="survey_mana_tight">Tight</string>
+    <string name="survey_mana_smooth">Smooth</string>
+    <string name="survey_mana_flooded">Flooded</string>
+    <string name="survey_archetype_aggro">Aggro</string>
+    <string name="survey_archetype_midrange">Midrange</string>
+    <string name="survey_archetype_control">Control</string>
+    <string name="survey_archetype_combo">Combo</string>
+    <string name="survey_archetype_ramp">Ramp</string>
+    <string name="survey_mulligan_label">Mulligans taken</string>
+    <string name="survey_pick_deck">Which deck did you play?</string>
+    <string name="survey_save_exit">Save &amp; exit</string>
+    <string name="survey_submit">Submit review</string>
+    <string name="survey_commander_carried_yes">Yes, carried</string>
+    <string name="survey_commander_carried_partial">Partially</string>
+    <string name="survey_commander_carried_no">Didn\'t matter</string>
+    <string name="survey_sideboard_yes">Yes, it swung it</string>
+    <string name="survey_sideboard_no">No change</string>
+    <string name="survey_win_combat">Combat damage</string>
+    <string name="survey_win_combo">Combo finish</string>
+    <string name="survey_win_commander">Commander damage</string>
+    <string name="survey_win_mill">Mill</string>
+    <string name="survey_win_poison">Poison</string>
+    <string name="survey_win_alt">Alt-win</string>
+    <string name="survey_lose_no_stabilize">Couldn\'t stabilize</string>
+    <string name="survey_lose_mana">Mana issues</string>
+    <string name="survey_lose_wipe">Board wipe</string>
+    <string name="survey_lose_overwhelmed">Overwhelmed</string>
+    <string name="survey_lose_conceded">Conceded</string>
+    <string name="survey_card_impact_mvp">MVP</string>
+    <string name="survey_card_impact_dead">Dead</string>
+    <string name="survey_context_players">%1$d players</string>
+    <string name="survey_context_turns">%1$d turns</string>
+
     <!-- ══════════════════════════════════════════
          TOURNAMENT SCREEN
     ═══════════════════════════════════════════ -->

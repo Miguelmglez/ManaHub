@@ -10,6 +10,7 @@ import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
@@ -19,6 +20,7 @@ import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.ManaSymbolEntity
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
+import com.mmg.manahub.core.data.local.entity.SurveyCardImpactEntity
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
@@ -53,6 +55,7 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         GameSessionEntity::class,
         PlayerSessionEntity::class,
         SurveyAnswerEntity::class,
+        SurveyCardImpactEntity::class,
         TournamentEntity::class,
         TournamentPlayerEntity::class,
         TournamentMatchEntity::class,
@@ -67,7 +70,7 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         LocalOpenForTradeEntity::class,
         TradeCollectionSyncEntity::class,
     ],
-    version = 35,
+    version = 36,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -79,6 +82,7 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun manaSymbolDao(): ManaSymbolDao
     abstract fun gameSessionDao(): GameSessionDao
     abstract fun surveyAnswerDao(): SurveyAnswerDao
+    abstract fun surveyCardImpactDao(): SurveyCardImpactDao
     abstract fun tournamentDao(): TournamentDao
     abstract fun newsDao(): NewsDao
     abstract fun draftSetDao(): DraftSetDao
