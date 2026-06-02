@@ -395,6 +395,7 @@
 
     <!-- Games tab sections -->
     <string name="stats_section_deck_performance">Deck Performance</string>
+    <string name="stats_section_matchups">Matchup win rates</string>
     <string name="stats_section_history">History</string>
     <string name="stats_empty_decks_subtitle">Associate games with decks via the post-game survey to see deck stats here</string>
     <string name="stats_empty_history_subtitle">Recorded game sessions will appear here</string>

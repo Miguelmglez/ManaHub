@@ -362,7 +362,7 @@ private fun SurveySection(
         ) {
             Text(
                 text = title,
-                style = ty.titleSmall,
+                style = ty.titleMedium,
                 color = mc.textPrimary,
                 fontWeight = FontWeight.Bold,
             )
@@ -600,7 +600,7 @@ private fun CardImpactSection(uiState: SurveyUiState, viewModel: SurveyViewModel
             ) {
                 Text(
                     text = stringResource(R.string.survey_section_card_impact),
-                    style = ty.titleSmall,
+                    style = ty.titleMedium,
                     color = mc.textPrimary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -787,7 +787,7 @@ private fun OpponentArchetypeRow(
     Column(verticalArrangement = Arrangement.spacedBy(ContentGap)) {
         Text(
             text = opponentName,
-            style = ty.titleSmall,
+            style = ty.titleMedium,
             color = mc.textPrimary,
         )
         ChipFlowRow(

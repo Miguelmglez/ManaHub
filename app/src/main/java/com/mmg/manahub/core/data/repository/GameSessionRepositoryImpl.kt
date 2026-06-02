@@ -3,6 +3,7 @@ package com.mmg.manahub.core.data.repository
 import com.mmg.manahub.core.data.local.dao.DeckStatsRow
 import com.mmg.manahub.core.data.local.dao.EliminationCount
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow
 import com.mmg.manahub.core.data.local.dao.ModeCount
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
@@ -64,6 +65,12 @@ class GameSessionRepositoryImpl @Inject constructor(
 
     override fun observeWins(playerName: String): Flow<Int> =
         dao.observeWins(playerName)
+
+    override fun observeLocalWins(): Flow<Int> =
+        dao.observeLocalWins()
+
+    override fun observeLocalSessionHistory(limit: Int): Flow<List<LocalSessionHistoryRow>> =
+        dao.observeLocalSessionHistory(limit)
 
     override fun observeAvgLifeOnWin(): Flow<Double?> =
         dao.observeAvgLifeOnWin()
