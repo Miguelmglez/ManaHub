@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
@@ -18,7 +19,6 @@ import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.feature.survey.presentation.CardImpactRating
 import com.mmg.manahub.feature.survey.presentation.SurveyMode
 import com.mmg.manahub.feature.survey.presentation.SurveyViewModel
 import io.mockk.coEvery
@@ -50,6 +50,7 @@ class SurveyViewModelTest {
     private val sessionId = 42L
 
     private lateinit var surveyAnswerDao: SurveyAnswerDao
+    private lateinit var surveyCardImpactDao: SurveyCardImpactDao
     private lateinit var gameSessionDao: GameSessionDao
     private lateinit var deckRepository: DeckRepository
     private lateinit var cardDao: CardDao
@@ -63,6 +64,7 @@ class SurveyViewModelTest {
         Dispatchers.setMain(dispatcher)
 
         surveyAnswerDao = mockk(relaxUnitFun = true)
+        surveyCardImpactDao = mockk(relaxUnitFun = true)
         gameSessionDao = mockk(relaxUnitFun = true)
         deckRepository = mockk()
         cardDao = mockk()
@@ -85,6 +87,7 @@ class SurveyViewModelTest {
 
         coEvery { gameSessionDao.getSessionById(sessionId) } returns fakeSessionWithPlayers()
         coEvery { surveyAnswerDao.getAnswersForSession(sessionId) } returns emptyList()
+        every { surveyCardImpactDao.observeForSession(sessionId) } returns flowOf(emptyList())
         every { deckRepository.observeAllDecks() } returns flowOf(emptyList())
     }
 
@@ -191,17 +194,28 @@ class SurveyViewModelTest {
     }
 
     @Test
-    fun `init restores existing answers including CARD_IMPACT and FREE_TEXT`() = runTest(dispatcher) {
+    fun `init restores existing generic answers and FREE_TEXT`() = runTest(dispatcher) {
         coEvery { surveyAnswerDao.getAnswersForSession(sessionId) } returns listOf(
             SurveyAnswerEntity(sessionId = sessionId, questionId = "decisive_moment", questionType = "DECISIVE_MOMENT", answer = "KEY_TURN"),
-            SurveyAnswerEntity(sessionId = sessionId, questionId = "card_impact", questionType = "CARD_IMPACT", answer = "KEY_CARD", cardReference = "card-a"),
             SurveyAnswerEntity(sessionId = sessionId, questionId = "free_notes", questionType = "FREE_TEXT", answer = "felt slow"),
         )
         val vm = buildVm()
         val state = vm.uiState.value
         assertEquals("KEY_TURN", state.answers["decisive_moment"])
-        assertEquals(CardImpactRating.KEY_CARD, state.cardImpactSelections["card-a"])
         assertEquals("felt slow", state.freeNotes)
+    }
+
+    @Test
+    fun `init restores per-seat card impacts keyed by playerSessionId and cardId`() = runTest(dispatcher) {
+        every { surveyCardImpactDao.observeForSession(sessionId) } returns flowOf(
+            listOf(
+                com.mmg.manahub.core.data.local.entity.SurveyCardImpactEntity(
+                    sessionId = sessionId, playerSessionId = 7L, cardId = "card-a", impact = "MVP",
+                ),
+            ),
+        )
+        val vm = buildVm()
+        assertEquals("MVP", vm.uiState.value.cardImpactRatings["7:card-a"])
     }
 
     @Test
@@ -268,6 +282,7 @@ class SurveyViewModelTest {
     fun `REVIEW mode propagates to state`() = runTest(dispatcher) {
         val vm = SurveyViewModel(
             surveyAnswerDao = surveyAnswerDao,
+            surveyCardImpactDao = surveyCardImpactDao,
             gameSessionDao = gameSessionDao,
             deckRepository = deckRepository,
             cardDao = cardDao,
@@ -280,29 +295,26 @@ class SurveyViewModelTest {
     }
 
     @Test
-    fun `addExtraImpactCard dedupes by scryfallId`() = runTest(dispatcher) {
+    fun `setCardImpact stores rating keyed by playerSessionId and cardId`() = runTest(dispatcher) {
         val vm = buildVm()
-        val card = fakeCard("card-a")
-        vm.addExtraImpactCard(card)
-        vm.addExtraImpactCard(card)
-        assertEquals(1, vm.uiState.value.extraImpactCards.size)
+        vm.setCardImpact(playerSessionId = 7L, cardId = "card-x", impact = "MVP")
+        assertEquals("MVP", vm.uiState.value.cardImpactRatings["7:card-x"])
     }
 
     @Test
-    fun `removeImpactCard clears both selection and extra entry`() = runTest(dispatcher) {
+    fun `setCardImpact toggling the same impact clears the entry`() = runTest(dispatcher) {
         val vm = buildVm()
-        val card = fakeCard("card-x")
-        vm.addExtraImpactCard(card)
-        vm.setCardImpact("card-x", CardImpactRating.WEAK)
-        vm.removeImpactCard("card-x")
-        assertTrue(vm.uiState.value.extraImpactCards.isEmpty())
-        assertTrue(vm.uiState.value.cardImpactSelections.isEmpty())
+        vm.setCardImpact(playerSessionId = 7L, cardId = "card-x", impact = "MVP")
+        // Tapping the same impact again returns the card to the neutral (unset) state.
+        vm.setCardImpact(playerSessionId = 7L, cardId = "card-x", impact = "MVP")
+        assertTrue(vm.uiState.value.cardImpactRatings.isEmpty())
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private fun buildVm() = SurveyViewModel(
         surveyAnswerDao = surveyAnswerDao,
+        surveyCardImpactDao = surveyCardImpactDao,
         gameSessionDao = gameSessionDao,
         deckRepository = deckRepository,
         cardDao = cardDao,
@@ -350,44 +362,4 @@ class SurveyViewModelTest {
         )
         return GameSessionWithPlayers(session, players)
     }
-
-    private fun fakeCard(id: String) = com.mmg.manahub.core.domain.model.Card(
-        scryfallId = id,
-        name = "Stub $id",
-        printedName = null,
-        manaCost = null,
-        cmc = 3.0,
-        colors = emptyList(),
-        colorIdentity = emptyList(),
-        typeLine = "Creature",
-        printedTypeLine = null,
-        oracleText = null,
-        printedText = null,
-        keywords = emptyList(),
-        power = null,
-        toughness = null,
-        loyalty = null,
-        setCode = "",
-        setName = "",
-        collectorNumber = "",
-        rarity = "",
-        releasedAt = "",
-        frameEffects = emptyList(),
-        promoTypes = emptyList(),
-        lang = "",
-        imageNormal = null,
-        imageArtCrop = null,
-        imageBackNormal = null,
-        priceUsd = null,
-        priceUsdFoil = null,
-        priceEur = null,
-        priceEurFoil = null,
-        legalityStandard = "",
-        legalityPioneer = "",
-        legalityModern = "",
-        legalityCommander = "",
-        flavorText = null,
-        artist = null,
-        scryfallUri = "",
-    )
 }
