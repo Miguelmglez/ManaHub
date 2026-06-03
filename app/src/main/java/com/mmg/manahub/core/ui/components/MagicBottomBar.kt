@@ -110,7 +110,7 @@ fun MagicBottomBar(
                 modifier = Modifier.weight(1f),
             )
 
-            /*// Slot 2 — Draft
+            // Slot 2 — Draft
             BottomBarTab(
                 label    = "DRAFT",
                 icon     = Icons.Default.Style,
@@ -118,7 +118,6 @@ fun MagicBottomBar(
                 onClick  = onDraftClick,
                 modifier = Modifier.weight(1f),
             )
-*/
             // Slot 3 — Play FAB (overflows upward by 8 dp)
             Box(
                 modifier         = Modifier
@@ -134,13 +133,13 @@ fun MagicBottomBar(
 
             // Slot 4 — News
 
-            /*BottomBarTab(
+            BottomBarTab(
                 label    = "NEWS",
                 icon     = Icons.Default.Newspaper,
                 selected = currentRoute == Screen.News.route,
                 onClick  = onNewsClick,
                 modifier = Modifier.weight(1f),
-            )*/
+            )
             // Slot 5 — Profile
             BottomBarTab(
                 label    = "PROFILE",

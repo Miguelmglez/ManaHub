@@ -218,6 +218,27 @@ class DraftRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getSetCardsPage(
+        setCode: String,
+        page: Int,
+    ): DataResult<Pair<List<Card>, Boolean>> {
+        return withContext(ioDispatcher) {
+            try {
+                val result = scryfallQueue.execute {
+                    scryfallApi.searchCards(
+                        query = "set:$setCode lang:en",
+                        order = "set",
+                        unique = "cards",
+                        page = page,
+                    )
+                }
+                DataResult.Success(result.data.toDomain() to result.hasMore)
+            } catch (e: Exception) {
+                DataResult.Error(e.message ?: "Failed to load cards")
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // getSetVideos — YouTube API with in-memory cache (unchanged)
     // -------------------------------------------------------------------------

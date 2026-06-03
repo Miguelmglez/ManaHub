@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -101,9 +100,14 @@ fun DraftingScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Navigate forward once the draft is done picking.
+    // Navigate forward once the draft is done picking. Guarded so two consecutive BUILDING/COMPLETE
+    // emissions cannot fire onNavigateToResult() twice (which would push the result screen twice).
+    val hasNavigated = remember { mutableStateOf(false) }
     LaunchedEffect(state) {
-        if (state is DraftSimUiState.Building || state is DraftSimUiState.Complete) {
+        if (!hasNavigated.value &&
+            (state is DraftSimUiState.Building || state is DraftSimUiState.Complete)
+        ) {
+            hasNavigated.value = true
             onNavigateToResult()
         }
     }
@@ -214,10 +218,12 @@ private fun DraftingContent(
                 horizontalArrangement = Arrangement.spacedBy(sp.sm),
                 verticalArrangement = Arrangement.spacedBy(sp.sm),
             ) {
-                items(
+                itemsIndexed(
                     items = state.currentPack,
-                    key = { "${it.card.scryfallId}:${it.isFoil}" },
-                ) { draftCard ->
+                    // Include the index so two copies of the same card (possible after
+                    // balanceColors) do not produce duplicate grid keys, which crash Compose.
+                    key = { index, it -> "${it.card.scryfallId}:${it.isFoil}:$index" },
+                ) { _, draftCard ->
                     DraftPackCard(
                         draftCard = draftCard,
                         onClick = { onPick(draftCard.card.scryfallId) },

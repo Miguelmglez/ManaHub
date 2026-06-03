@@ -130,12 +130,13 @@ fun DraftSetupScreen(
                             DraftConfig(
                                 setCode = s.setCode,
                                 mode = selectedMode,
-                                seatCount = 8,
+                                seatCount = if (selectedMode == DraftMode.SEALED) 1 else 8,
                                 packCount = if (selectedMode == DraftMode.SEALED) 6 else 3,
                                 pickTimerSeconds = pickTimer,
                             )
                         )
                     },
+                    startEnabled = state !is DraftSimUiState.Loading,
                 )
 
                 // Building / Complete are owned by the result screen; setup just waits.
@@ -164,6 +165,7 @@ private fun SetupForm(
     timerIndex: Int,
     onTimerChanged: (Int) -> Unit,
     onStart: () -> Unit,
+    startEnabled: Boolean,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -250,6 +252,7 @@ private fun SetupForm(
 
         Button(
             onClick = onStart,
+            enabled = startEnabled,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)

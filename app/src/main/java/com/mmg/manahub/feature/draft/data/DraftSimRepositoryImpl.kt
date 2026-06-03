@@ -26,7 +26,7 @@ import com.mmg.manahub.feature.draft.domain.model.DraftableSet
 import com.mmg.manahub.feature.draft.domain.model.TierCard
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -57,7 +57,7 @@ class DraftSimRepositoryImpl @Inject constructor(
     private val cloudflareApi: CloudflareContentApi,
     private val getDraftableSets: GetDraftableSetsUseCase,
     private val getSetTierList: GetSetTierListUseCase,
-    private val getSetCards: GetSetCardsUseCase,
+    private val getSetCardsPage: GetSetCardsPageUseCase,
     private val deckRepository: DeckRepository,
     private val draftSessionDao: DraftSessionDao,
     private val gson: Gson,
@@ -102,14 +102,17 @@ class DraftSimRepositoryImpl @Inject constructor(
                     return@withContext DataResult.Error(DraftError.SetNotDraftable.toString())
                 }
 
-                // 2. Fetch the full card pool, paging until the page comes back empty.
+                // 2. Fetch the full card pool, paging until Scryfall reports there are no more
+                // pages. Using has_more avoids the trailing 422 that occurs when requesting one
+                // page past the last.
                 val cards = mutableListOf<Card>()
                 var page = 1
                 while (true) {
-                    when (val pageResult = getSetCards(setCode, page)) {
+                    when (val pageResult = getSetCardsPage(setCode, page)) {
                         is DataResult.Success -> {
-                            if (pageResult.data.isEmpty()) break
-                            cards += pageResult.data
+                            val (pageCards, hasMore) = pageResult.data
+                            cards += pageCards
+                            if (!hasMore || pageCards.isEmpty()) break
                             page++
                         }
                         is DataResult.Error ->
@@ -129,16 +132,15 @@ class DraftSimRepositoryImpl @Inject constructor(
                 }
 
                 // 3. Fetch the tier list and build the scryfallId → TierCard rating map.
+                // The tier list is an optional enhancement: the bots already handle an empty
+                // ratings map by falling back to heuristics. A missing or empty tier list must
+                // therefore degrade gracefully (empty map) rather than block the whole feature.
                 val ratings: Map<String, TierCard> = when (val tier = getSetTierList(setCode)) {
                     is DataResult.Success ->
                         tier.data.tiers
                             .flatMap { it.cards }
                             .associateBy { it.scryfallId }
-                    is DataResult.Error ->
-                        return@withContext DataResult.Error(DraftError.RatingsMissing.toString())
-                }
-                if (ratings.isEmpty()) {
-                    return@withContext DataResult.Error(DraftError.RatingsMissing.toString())
+                    is DataResult.Error -> emptyMap()
                 }
 
                 // 4. Fetch and parse booster.json.
@@ -272,9 +274,13 @@ class DraftSimRepositoryImpl @Inject constructor(
         }
     }
 
-    /** One active session per (set, mode) pair. */
+    /**
+     * One active session per (set, mode) pair. The set code is normalised to lowercase so a
+     * session saved with an uppercase config code is still found when looked up with the
+     * Scryfall-canonical lowercase code (and vice versa).
+     */
     private fun deriveSessionId(state: DraftState): String =
-        "${state.config.setCode}-${state.config.mode.name}"
+        "${state.config.setCode.lowercase()}-${state.config.mode.name}"
 
     // -------------------------------------------------------------------------
     // completeAndSaveDeck
@@ -298,7 +304,16 @@ class DraftSimRepositoryImpl @Inject constructor(
                         add(Triple(basic.scryfallId, basic.count, false))
                     }
                 }
-                deckRepository.replaceAllCards(deckId, slots)
+                // If populating the deck fails, compensate by deleting the freshly-created empty
+                // deck so we never leave an orphaned, card-less deck behind. Rethrow so the outer
+                // catch surfaces the error and the session is NOT marked complete.
+                runCatching {
+                    deckRepository.replaceAllCards(deckId, slots)
+                }.onFailure { e ->
+                    runCatching { deckRepository.deleteDeck(deckId) }
+                    FirebaseCrashlytics.getInstance().recordException(e)
+                    throw e
+                }
 
                 // Mark the matching active session complete, if one exists.
                 // Completion must never fail the deck save, so it is best-effort.
@@ -319,8 +334,11 @@ class DraftSimRepositoryImpl @Inject constructor(
      * came from a DRAFT or SEALED run.
      */
     private suspend fun markCompleteForSet(setCode: String, deckId: String) {
+        // Match the lowercase normalisation used by deriveSessionId so the session id resolves
+        // regardless of the casing the deck's setCode happened to carry.
+        val normalizedCode = setCode.lowercase()
         listOf("DRAFT", "SEALED").forEach { mode ->
-            val id = "$setCode-$mode"
+            val id = "$normalizedCode-$mode"
             if (draftSessionDao.getById(id) != null) {
                 draftSessionDao.markComplete(id, deckId)
             }
