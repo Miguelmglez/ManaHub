@@ -170,8 +170,9 @@ class DraftSimRepositoryImpl @Inject constructor(
             BoosterSheet(
                 foil = sheetDto.foil ?: false,
                 balanceColors = sheetDto.balanceColors ?: false,
-                cards = sheetDto.cards.orEmpty().map { (id, weight) ->
-                    BoosterCardEntry(id = id, weight = weight)
+                cards = sheetDto.cards.orEmpty().mapNotNull { entry ->
+                    val id = entry.id ?: return@mapNotNull null
+                    BoosterCardEntry(id = id, weight = entry.weight ?: 1)
                 },
             )
         }
