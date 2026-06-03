@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.playtest.presentation.components
+package com.mmg.manahub.core.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween

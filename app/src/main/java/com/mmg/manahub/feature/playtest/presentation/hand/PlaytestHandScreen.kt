@@ -62,7 +62,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
@@ -74,8 +74,8 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.ui.components.CardFullScreenDialog
 import com.mmg.manahub.feature.playtest.presentation.components.BottomNSelector
-import com.mmg.manahub.feature.playtest.presentation.components.CardFullScreenDialog
 import com.mmg.manahub.feature.playtest.presentation.components.CommandZoneArea
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestHandCard
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestSaveSheet
@@ -202,7 +202,6 @@ fun PlaytestHandScreen(
                         // be reached on the next Keep: mulligansUsed >= drawCount - 1.
                         canMulligan          = uiState.snapshot!!.hand.size > 1 &&
                             uiState.snapshot!!.mulligansUsed < setup.drawCount - 1,
-                        originalLibrarySize  = if (setup.commanderCard != null) 99 else uiState.snapshot!!.library.size + uiState.snapshot!!.hand.size,
                     )
                 }
             }
@@ -272,7 +271,6 @@ private fun HandContent(
     onKeep: () -> Unit,
     onMulligan: () -> Unit,
     canMulligan: Boolean,
-    originalLibrarySize: Int,
 ) {
     val orientation = LocalConfiguration.current.orientation
     val isLandscape = orientation == Configuration.ORIENTATION_LANDSCAPE
