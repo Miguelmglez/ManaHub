@@ -7,6 +7,7 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.SetDraftGuide
 import com.mmg.manahub.feature.draft.domain.model.SetTierList
+import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
@@ -39,6 +40,8 @@ data class SetDraftDetailUiState(
     // Videos (loaded in background, shown in Guide tab)
     val videos: List<DraftVideo> = emptyList(),
     val isVideosLoading: Boolean = false,
+    /** Non-null when this set has a published booster.json and can be draft-simulated. */
+    val boosterVersion: String? = null,
 )
 
 @HiltViewModel
@@ -47,6 +50,7 @@ class SetDraftDetailViewModel @Inject constructor(
     private val getSetGuideUseCase: GetSetGuideUseCase,
     private val getSetTierListUseCase: GetSetTierListUseCase,
     private val getSetVideosUseCase: GetSetVideosUseCase,
+    private val getDraftableSetsUseCase: GetDraftableSetsUseCase,
 ) : ViewModel() {
 
     val setCode: String = savedStateHandle.get<String>("setCode") ?: ""
@@ -71,6 +75,25 @@ class SetDraftDetailViewModel @Inject constructor(
     init {
         loadGuide()
         loadVideos()
+        loadDraftability()
+    }
+
+    /**
+     * Resolves whether this set is draft-simulable by looking up its booster version in the
+     * draftable-sets index. Failures are silent — the Simulate Draft button simply stays hidden.
+     */
+    private fun loadDraftability() {
+        viewModelScope.launch {
+            when (val result = getDraftableSetsUseCase()) {
+                is DataResult.Success -> {
+                    val version = result.data
+                        .firstOrNull { it.code.equals(setCode, ignoreCase = true) }
+                        ?.boosterVersion
+                    _uiState.update { it.copy(boosterVersion = version) }
+                }
+                is DataResult.Error -> Unit
+            }
+        }
     }
 
     fun onTabSelected(tab: Int) {
