@@ -112,7 +112,7 @@ class DraftSimViewModel @Inject constructor(
                     )
                 }
                 is DataResult.Error -> {
-                    _uiState.value = DraftSimUiState.Error(DraftError.OfflineNoCache)
+                    _uiState.value = DraftSimUiState.Error(parseDraftError(result.message))
                 }
             }
         }
@@ -331,6 +331,19 @@ class DraftSimViewModel @Inject constructor(
     private fun cancelTimer() {
         timerJob?.cancel()
         timerJob = null
+    }
+
+    /**
+     * Maps a [DataResult.Error] message string back to a [DraftError] for display.
+     * The repository serializes [DraftError] via `.toString()` — this reverses that mapping
+     * so the UI shows a relevant message instead of always "No connection and no cached data".
+     */
+    private fun parseDraftError(message: String): DraftError = when {
+        message.contains("SetNotDraftable", ignoreCase = true)  -> DraftError.SetNotDraftable
+        message.contains("RatingsMissing",  ignoreCase = true)  -> DraftError.RatingsMissing
+        message.contains("SetNotDownloaded",ignoreCase = true)  -> DraftError.SetNotDownloaded
+        message.contains("OfflineNoCache",  ignoreCase = true)  -> DraftError.OfflineNoCache
+        else -> DraftError.Unexpected(message)
     }
 
     override fun onCleared() {
