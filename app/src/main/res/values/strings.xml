@@ -1598,6 +1598,32 @@
     <string name="draft_archetype_difficulty">Difficulty: %1$s</string>
     <string name="draft_pick_order_rank">Pick #%1$d</string>
 
+    <!-- Draft Simulator -->
+    <string name="draft_sim_setup_title">Draft Simulator</string>
+    <string name="draft_sim_mode_draft">Draft (8 players)</string>
+    <string name="draft_sim_mode_sealed">Sealed (6 packs)</string>
+    <string name="draft_sim_start_button">Start Draft</string>
+    <string name="draft_sim_pick_counter">Round %1$d · Pick %2$d</string>
+    <string name="draft_sim_pool_size">%1$d cards</string>
+    <string name="draft_sim_auto_pick">Auto-pick</string>
+    <string name="draft_sim_save_deck">Save Deck</string>
+    <string name="draft_sim_deck_saved">Draft deck saved!</string>
+    <string name="draft_sim_simulate_button">Simulate Draft</string>
+    <string name="draft_sim_error_not_draftable">This set is not available for simulation yet.</string>
+    <string name="draft_sim_error_offline">No connection and no cached data.</string>
+    <string name="draft_sim_setup_description">Simulate a draft of %1$s</string>
+    <string name="draft_sim_mode_label">Mode</string>
+    <string name="draft_sim_players_label">8 players (7 bots)</string>
+    <string name="draft_sim_timer_label">Pick timer</string>
+    <string name="draft_sim_timer_off">Off</string>
+    <string name="draft_sim_timer_seconds">%1$ds</string>
+    <string name="draft_sim_building_title">Drafting complete</string>
+    <string name="draft_sim_pool_panel_title">Your pool</string>
+    <string name="draft_sim_basics_header">Basic Lands (%1$d)</string>
+    <string name="draft_sim_empty_pack">Pack is empty.</string>
+    <string name="draft_sim_loading">Building draft…</string>
+    <string name="draft_sim_error_generic">Something went wrong with the draft.</string>
+
     <!-- Deck import / export -->
     <string name="deck_import_title">Import Deck</string>
     <string name="deck_import_hint">Paste a deck list in Moxfield or MTG Arena format. Each line should follow the pattern: 4 Lightning Bolt or 4 Lightning Bolt (M11) 163</string>

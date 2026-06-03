@@ -47,6 +47,9 @@ import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.presentation.DeckMagicScreen
 import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
+import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
+import com.mmg.manahub.feature.draft.presentation.ui.DraftSetupScreen
+import com.mmg.manahub.feature.draft.presentation.ui.DraftingScreen
 import com.mmg.manahub.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailScreen
@@ -402,6 +405,48 @@ fun AppNavGraph(
                     onCardClick = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
+                    onSimulateDraft = { setCode ->
+                        navController.navigate(Screen.DraftSimSetup.createRoute(setCode))
+                    },
+                )
+            }
+
+            // ── Draft Simulator ─────────────────────────────────────────────────
+            composable(
+                route = Screen.DraftSimSetup.route,
+                arguments = listOf(navArgument("setCode") { type = NavType.StringType }),
+            ) {
+                val setCode = it.arguments?.getString("setCode") ?: return@composable
+                DraftSetupScreen(
+                    onNavigateToDrafting = {
+                        navController.navigate(Screen.DraftSimDrafting.createRoute(setCode))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.DraftSimDrafting.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+            ) {
+                val sessionId = it.arguments?.getString("sessionId") ?: return@composable
+                DraftingScreen(
+                    onNavigateToResult = {
+                        navController.navigate(Screen.DraftSimResult.createRoute(sessionId))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.DraftSimResult.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+            ) {
+                DraftResultScreen(
+                    onDeckSaved = {
+                        navController.popBackStack(Screen.Draft.route, inclusive = false)
+                    },
+                    onBack = { navController.popBackStack() },
                 )
             }
 
