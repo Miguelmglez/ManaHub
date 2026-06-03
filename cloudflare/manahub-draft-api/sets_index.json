@@ -1,6 +1,6 @@
 {
-  "index_version": "2",
-  "last_updated": "2026-05-22",
+  "index_version": "3",
+  "last_updated": "2026-06-03",
   "sets": [
     {
       "code": "sos",
@@ -79,7 +79,8 @@
       "released_at": "2025-04-11",
       "content_versions": {
         "guide": "April 18, 2025",
-        "tier_list": "2026-05-16"
+        "tier_list": "2026-05-16",
+        "booster": "2026-06-03"
       }
     },
     {
@@ -119,7 +120,8 @@
       "released_at": "2024-09-27",
       "content_versions": {
         "guide": "October 11, 2024",
-        "tier_list": "2026-05-16"
+        "tier_list": "2026-05-16",
+        "booster": "2026-06-03"
       }
     },
     {
@@ -129,7 +131,8 @@
       "released_at": "2024-08-02",
       "content_versions": {
         "guide": "August 9, 2024",
-        "tier_list": "2026-05-16"
+        "tier_list": "2026-05-16",
+        "booster": "2026-06-03"
       }
     },
     {

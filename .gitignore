@@ -275,6 +275,16 @@ docs/PLAN.md
 PLAN.md
 # Catch-all for agent scratchpad files at repo root
 TASK_*.md
+
+
+# =============================================================================
+# SECTION 9 — TOOLS / COLLATION SCRIPT OUTPUTS
+#
+# build-booster.mjs generates booster.json files from MTGJSON data.
+# These are uploaded to Cloudflare R2 out-of-band and must not be committed.
+# =============================================================================
+
+tools/collation/output/
 NOTES_*.md
 
 
