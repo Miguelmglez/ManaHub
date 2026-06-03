@@ -40,6 +40,9 @@ credentials          = "1.5.0"
 googleid             = "1.1.1"
 security-crypto      = "1.1.0-alpha07"
 youtube-player       = "13.0.0"
+play-app-update      = "2.1.0"
+play-review          = "2.0.1"
+vosk                 = "0.3.47"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -56,6 +59,7 @@ compose-material3       = { group = "androidx.compose.material3", name = "materi
 compose-tooling         = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
@@ -72,6 +76,7 @@ room-testing            = { group = "androidx.room", name = "room-testing",     
 retrofit                = { group = "com.squareup.retrofit2", name = "retrofit",           version.ref = "retrofit" }
 retrofit-gson           = { group = "com.squareup.retrofit2", name = "converter-gson",     version.ref = "retrofit" }
 okhttp-logging          = { group = "com.squareup.okhttp3", name = "logging-interceptor",  version.ref = "okhttp" }
+okhttp-mockwebserver    = { group = "com.squareup.okhttp3", name = "mockwebserver",          version.ref = "okhttp" }
 coil-compose            = { group = "io.coil-kt", name = "coil-compose",                   version.ref = "coil" }
 coil-svg                = { group = "io.coil-kt", name = "coil-svg",                       version.ref = "coil" }
 camerax-camera2         = { group = "androidx.camera", name = "camera-camera2",            version.ref = "camerax" }
@@ -105,6 +110,9 @@ credentials-play     = { module = "androidx.credentials:credentials-play-service
 googleid             = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 security-crypto      = { group = "androidx.security", name = "security-crypto",              version.ref = "security-crypto" }
 youtube-player       = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", name = "core", version.ref = "youtube-player" }
+play-app-update      = { module = "com.google.android.play:app-update-ktx", version.ref = "play-app-update" }
+play-review          = { module = "com.google.android.play:review-ktx", version.ref = "play-review" }
+vosk-android         = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 
 [plugins]
 android-application  = { id = "com.android.application",                       version.ref = "agp" }

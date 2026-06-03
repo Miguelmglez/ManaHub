@@ -13,6 +13,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.app.navigation.AppNavGraph
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.push.PushDeeplinkRouter
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
@@ -25,8 +26,20 @@ import javax.inject.Inject
 
 import android.app.PictureInPictureParams
 import android.util.Rational
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import com.google.android.play.core.appupdate.AppUpdateManager
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.UpdateAvailability
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -95,11 +108,23 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(context)
     }
 
+    /**
+     * Routes an FCM background notification tap. When the app is in background/killed, FCM
+     * delivers the `data` payload as Intent extras directly to this Activity. The deeplink is
+     * forwarded to [PushDeeplinkRouter], which buffers it if the NavController is not yet composed
+     * (cold start) and flushes it once navigation registers.
+     */
+    private fun handlePushDeeplink(intent: Intent?) {
+        val deeplink = intent?.getStringExtra("deeplink") ?: return
+        PushDeeplinkRouter.enqueue(deeplink)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (isSupabaseAuthDeepLink(intent)) {
             supabaseClient.handleDeeplinks(intent)
         }
+        handlePushDeeplink(intent)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -112,7 +137,37 @@ class MainActivity : ComponentActivity() {
         if (isSupabaseAuthDeepLink(intent)) {
             supabaseClient.handleDeeplinks(intent)
         }
+        // Cold-start from a notification tap: buffered until AppNavGraph registers its navigator.
+        handlePushDeeplink(intent)
+
+        val appUpdateManager = AppUpdateManagerFactory.create(this)
+        val appUpdateInfoTask = appUpdateManager.appUpdateInfo
+
         setContent {
+            val updateToastState = rememberMagicToastState()
+
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
+                    if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                        && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+                    ) {
+                        updateToastState.show(
+                            message = "New app update available. Tap to update.",
+                            type = MagicToastType.INFO,
+                            durationMs = 10000,
+                            onClick = {
+                                appUpdateManager.startUpdateFlowForResult(
+                                    appUpdateInfo,
+                                    AppUpdateType.FLEXIBLE,
+                                    this@MainActivity,
+                                    500
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+
             val theme by userPreferencesDataStore.themeFlow
                 .collectAsStateWithLifecycle(initialValue = AppTheme.NeonVoid)
 
@@ -123,8 +178,26 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalPreferredCurrency provides (userPrefs?.preferredCurrency ?: com.mmg.manahub.core.domain.model.PreferredCurrency.USD),
                 ) {
-                    AppNavGraph(isInPiP = isInPiP)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AppNavGraph(isInPiP = isInPiP)
+                        MagicToastHost(
+                            state = updateToastState,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding(),
+                        )
+                    }
                 }
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 500) {
+            if (resultCode != RESULT_OK) {
+                // Update failed or cancelled
             }
         }
     }

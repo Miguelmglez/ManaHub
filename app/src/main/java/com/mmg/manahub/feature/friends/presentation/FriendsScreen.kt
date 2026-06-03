@@ -265,13 +265,13 @@ fun FriendsScreen(
                     }
                 }
 
-                // Share invite link section — only visible when the URL is ready
-                if (uiState.shareUrl != null) {
+                // Share Game Tag section — only visible when the game tag is ready
+                if (uiState.gameTag != null) {
                     item {
                         val context = LocalContext.current
                         Spacer(Modifier.height(4.dp))
                         OutlinedButton(
-                            onClick = { viewModel.onShareMyLinkClicked(context) },
+                            onClick = { viewModel.onCopyGameTagClicked(context) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, mc.primaryAccent),

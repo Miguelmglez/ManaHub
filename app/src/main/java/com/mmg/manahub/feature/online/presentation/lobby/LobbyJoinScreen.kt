@@ -203,7 +203,7 @@ private fun LobbyJoinContent(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
                     }
@@ -279,7 +279,7 @@ private fun LobbyJoinContent(
                         border = androidx.compose.foundation.BorderStroke(1.dp, mc.surfaceVariant),
                     ) {
                         Text(
-                            text = uiState.displayName.ifBlank { "Player" },
+                            text = uiState.displayName.ifBlank { stringResource(R.string.lobby_join_name_hint) },
                             style = ty.bodyLarge.copy(color = mc.textPrimary),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                         )
@@ -521,7 +521,7 @@ private fun JoinedParticipantRow(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = "Ready",
+                        contentDescription = stringResource(R.string.lobby_ready_label),
                         tint = mc.lifePositive,
                         modifier = Modifier.size(16.dp),
                     )

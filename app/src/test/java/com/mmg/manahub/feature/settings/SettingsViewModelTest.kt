@@ -54,11 +54,13 @@ class SettingsViewModelTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val userPrefsDataStore    = mockk<UserPreferencesDataStore>(relaxed = true)
-    private val userPreferencesRepo   = mockk<UserPreferencesRepository>(relaxed = true)
-    private val analyticsHelper       = mockk<AnalyticsHelper>(relaxed = true)
-    private val authRepository        = mockk<AuthRepository>(relaxed = true)
-    private val userProfileDataSource = mockk<UserProfileDataSource>(relaxed = true)
+    private val userPrefsDataStore          = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val userPreferencesRepo         = mockk<UserPreferencesRepository>(relaxed = true)
+    private val analyticsHelper             = mockk<AnalyticsHelper>(relaxed = true)
+    private val authRepository              = mockk<AuthRepository>(relaxed = true)
+    private val userProfileDataSource       = mockk<UserProfileDataSource>(relaxed = true)
+    private val pushTokenRepository         = mockk<com.mmg.manahub.core.domain.repository.PushTokenRepository>(relaxed = true)
+    private val notificationPrefsRepository = mockk<com.mmg.manahub.core.domain.repository.NotificationPrefsRepository>(relaxed = true)
 
     // In-memory flow emulators for DataStore-backed properties
     private val themeFlow       = MutableStateFlow<AppTheme>(AppTheme.NeonVoid)
@@ -85,11 +87,13 @@ class SettingsViewModelTest {
         }
 
         return SettingsViewModel(
-            userPrefsDataStore    = userPrefsDataStore,
-            userPreferencesRepo   = userPreferencesRepo,
-            analyticsHelper       = analyticsHelper,
-            authRepository        = authRepository,
-            userProfileDataSource = userProfileDataSource,
+            userPrefsDataStore          = userPrefsDataStore,
+            userPreferencesRepo         = userPreferencesRepo,
+            analyticsHelper             = analyticsHelper,
+            authRepository              = authRepository,
+            userProfileDataSource       = userProfileDataSource,
+            pushTokenRepository         = pushTokenRepository,
+            notificationPrefsRepository = notificationPrefsRepository,
         )
     }
 

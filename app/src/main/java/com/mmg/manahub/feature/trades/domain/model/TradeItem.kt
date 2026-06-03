@@ -12,7 +12,6 @@ data class TradeItem(
     val isFoil: Boolean?,
     val condition: String?,
     val language: String?,
-    val isAltArt: Boolean?,
     /** Scryfall card id. */
     val cardId: String,
     /** Display name resolved from local Room DB; empty string if card not in local cache. */

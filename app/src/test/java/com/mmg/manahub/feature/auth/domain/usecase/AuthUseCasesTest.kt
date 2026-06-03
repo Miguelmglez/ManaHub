@@ -33,7 +33,8 @@ class AuthUseCasesTest {
 
     // ── Mock ──────────────────────────────────────────────────────────────────
 
-    private val repository = mockk<AuthRepository>()
+    private val repository         = mockk<AuthRepository>()
+    private val pushTokenRepository = mockk<com.mmg.manahub.core.domain.repository.PushTokenRepository>(relaxed = true)
 
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -270,7 +271,7 @@ class AuthUseCasesTest {
     @Test
     fun `when DeleteAccountUseCase invoked then delegates to repository_deleteAccount`() = runTest {
         coEvery { repository.deleteAccount() } returns successUnit
-        val useCase = DeleteAccountUseCase(repository)
+        val useCase = DeleteAccountUseCase(repository, pushTokenRepository)
 
         val result = useCase()
 
@@ -282,7 +283,7 @@ class AuthUseCasesTest {
     fun `given repository deleteAccount returns Error when DeleteAccountUseCase invoked then propagates Error`() = runTest {
         val error = AuthResult.Error(AuthError.SessionExpired)
         coEvery { repository.deleteAccount() } returns error
-        val useCase = DeleteAccountUseCase(repository)
+        val useCase = DeleteAccountUseCase(repository, pushTokenRepository)
 
         val result = useCase()
 

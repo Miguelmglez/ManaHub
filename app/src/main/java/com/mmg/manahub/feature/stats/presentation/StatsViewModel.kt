@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.stats.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
@@ -36,10 +35,6 @@ class StatsViewModel @Inject constructor(
     private val scryfallDataSource:       ScryfallRemoteDataSource,
     private val refreshPricesUseCase:     RefreshCollectionPricesUseCase,
     private val userPreferencesDataStore: UserPreferencesRepository,
-    // UserPreferencesDataStore is injected directly (not via the interface) because
-    // playerNameFlow is not part of the UserPreferencesRepository contract.
-    // This mirrors the pattern used in ProfileViewModel and GameSetupViewModel.
-    private val userPrefsStore:           UserPreferencesDataStore,
     private val gameSessionDao:           GameSessionDao,
     private val gameSessionRepository:    GameSessionRepository,
     private val deckRepository:           DeckRepository,
@@ -109,86 +104,98 @@ class StatsViewModel @Inject constructor(
 
     private fun observeGameStats() {
         viewModelScope.launch {
-            // playerNameFlow is the canonical source for the app user's name.
-            // It defaults to "Wizard" when no name has been set by the user.
-            userPrefsStore.playerNameFlow.flatMapLatest { playerName ->
-                combine(
-                    gameSessionDao.observeTotalGames(),
-                    gameSessionDao.observeWins(playerName),
-                    gameSessionDao.observeAvgDurationMs(),
-                    gameSessionDao.observeFavoriteMode(),
-                    gameSessionDao.observeMostFrequentElimination(),
-                    gameSessionDao.observePendingSurveyCount(),
-                    gameSessionDao.observeAllSessionSummaries(),
-                    gameSessionDao.observeDeckGameStats(playerName),
-                    deckRepository.observeAllDecks(),
-                ) { args ->
-                    // combine with 9 flows uses the array variant
-                    @Suppress("UNCHECKED_CAST")
-                    val totalGames   = args[0] as Int
-                    val wins         = args[1] as Int
-                    val avgDuration  = args[2] as Double?
-                    val favoriteMode = args[3] as com.mmg.manahub.core.data.local.dao.ModeCount?
-                    val mostLoss     = args[4] as com.mmg.manahub.core.data.local.dao.EliminationCount?
-                    val pending      = args[5] as Int
-                    val summaries    = args[6] as List<com.mmg.manahub.core.data.local.dao.SessionSummary>
-                    val deckStats    = args[7] as List<com.mmg.manahub.core.data.local.dao.DeckGameStatsRow>
-                    val allDecks     = args[8] as List<com.mmg.manahub.core.domain.model.Deck>
+            // Win/loss, history, and per-deck stats are resolved against the local seat
+            // (is_local = 1), not a playerName match (see ADR-001). The stored seat name
+            // can diverge from the current UserPreferences name (default "Wizard"), which
+            // would silently zero out the win-rate and W/L badges.
+            combine(
+                gameSessionDao.observeTotalGames(),
+                gameSessionDao.observeLocalWins(),
+                gameSessionDao.observeAvgDurationMs(),
+                gameSessionDao.observeFavoriteMode(),
+                gameSessionDao.observeMostFrequentElimination(),
+                gameSessionDao.observePendingSurveyCount(),
+                gameSessionDao.observeLocalSessionHistory(),
+                gameSessionDao.observeLocalDeckGameStats(),
+                gameSessionDao.observeArchetypeMatchups(),
+                deckRepository.observeAllDecks(),
+            ) { args ->
+                // combine with 10 flows uses the array variant
+                @Suppress("UNCHECKED_CAST")
+                val totalGames   = args[0] as Int
+                val wins         = args[1] as Int
+                val avgDuration  = args[2] as Double?
+                val favoriteMode = args[3] as com.mmg.manahub.core.data.local.dao.ModeCount?
+                val mostLoss     = args[4] as com.mmg.manahub.core.data.local.dao.EliminationCount?
+                val pending      = args[5] as Int
+                val history      = args[6] as List<com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow>
+                val deckStats    = args[7] as List<com.mmg.manahub.core.data.local.dao.DeckStatsRow>
+                val matchups     = args[8] as List<com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow>
+                val allDecks     = args[9] as List<com.mmg.manahub.core.domain.model.Deck>
 
-                    val deckNameById = allDecks.associate { it.id to it.name }
+                val deckNameById = allDecks.associate { it.id to it.name }
 
-                    val gameStats = GameStats(
-                        totalGames       = totalGames,
-                        wins             = wins,
-                        winrate          = if (totalGames > 0) wins.toFloat() / totalGames else 0f,
-                        avgDurationMs    = avgDuration?.toLong() ?: 0L,
-                        favoriteMode     = favoriteMode?.mode,
-                        mostFrequentLoss = mostLoss?.eliminationReason,
-                        pendingSurveys   = pending,
+                val gameStats = GameStats(
+                    totalGames       = totalGames,
+                    wins             = wins,
+                    winrate          = if (totalGames > 0) wins.toFloat() / totalGames else 0f,
+                    avgDurationMs    = avgDuration?.toLong() ?: 0L,
+                    favoriteMode     = favoriteMode?.mode,
+                    mostFrequentLoss = mostLoss?.eliminationReason,
+                    pendingSurveys   = pending,
+                )
+
+                val historyItems = history.map { row ->
+                    GameHistoryItem(
+                        sessionId     = row.sessionId,
+                        playedAt      = row.playedAt,
+                        mode          = row.mode,
+                        durationMs    = row.durationMs,
+                        winnerName    = row.winnerName,
+                        isWin         = row.localIsWinner,
+                        surveyStatus  = runCatching { SurveyStatus.valueOf(row.surveyStatus) }.getOrDefault(SurveyStatus.PENDING),
+                        deckId        = row.localDeckId,
+                        deckName      = row.localDeckId?.let { deckNameById[it] },
                     )
-
-                    val history = summaries.map { row ->
-                        GameHistoryItem(
-                            sessionId     = row.id,
-                            playedAt      = row.playedAt,
-                            mode          = row.mode,
-                            durationMs    = row.durationMs,
-                            winnerName    = row.winnerName,
-                            isWin         = row.winnerName == playerName,
-                            surveyStatus  = runCatching { SurveyStatus.valueOf(row.surveyStatus) }.getOrDefault(SurveyStatus.PENDING),
-                            deckId        = row.deckId,
-                            deckName      = row.deckId?.let { deckNameById[it] },
-                        )
-                    }
-
-                    val deckPerf = deckStats.mapNotNull { row ->
-                        val name = deckNameById[row.deckId] ?: return@mapNotNull null
-                        if (row.totalGames == 0) return@mapNotNull null
-                        DeckPerformance(
-                            deckId     = row.deckId,
-                            deckName   = name,
-                            totalGames = row.totalGames,
-                            wins       = row.wins,
-                            winrate    = if (row.totalGames > 0) row.wins.toFloat() / row.totalGames else 0f,
-                        )
-                    }.sortedByDescending { it.totalGames }
-
-                    Triple(gameStats, history, deckPerf)
                 }
+
+                val deckPerf = deckStats.mapNotNull { row ->
+                    val deckId = row.deckId ?: return@mapNotNull null
+                    val name = deckNameById[deckId] ?: return@mapNotNull null
+                    if (row.totalGames == 0) return@mapNotNull null
+                    DeckPerformance(
+                        deckId     = deckId,
+                        deckName   = name,
+                        totalGames = row.totalGames,
+                        wins       = row.wins,
+                        winrate    = if (row.totalGames > 0) row.wins.toFloat() / row.totalGames else 0f,
+                    )
+                }.sortedByDescending { it.totalGames }
+
+                GameStatsResult(gameStats, historyItems, deckPerf, matchups)
             }
             .catch { e -> android.util.Log.e("StatsViewModel", "Game stats pipeline failed", e) }
-            .collect { (gameStats, history, deckPerf) ->
+            .collect { result ->
                 _uiState.update {
                     it.copy(
-                        hasGameStats     = gameStats.totalGames > 0,
-                        gameStats        = gameStats,
-                        sessionHistory   = history,
-                        deckPerformance  = deckPerf,
+                        hasGameStats      = result.gameStats.totalGames > 0,
+                        gameStats         = result.gameStats,
+                        sessionHistory    = result.history,
+                        deckPerformance   = result.deckPerformance,
+                        archetypeMatchups = result.matchups,
                     )
                 }
             }
         }
     }
+
+    /** Internal carrier for the game-stats pipeline output (combine emits a single object). */
+    private data class GameStatsResult(
+        val gameStats: GameStats,
+        val history: List<GameHistoryItem>,
+        val deckPerformance: List<DeckPerformance>,
+        val matchups: List<com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow>,
+    )
 
     // ── Public actions ────────────────────────────────────────────────────────
 

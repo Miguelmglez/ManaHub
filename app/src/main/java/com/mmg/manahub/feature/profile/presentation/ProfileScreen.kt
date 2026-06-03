@@ -29,14 +29,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -100,6 +105,23 @@ fun ProfileScreen(
     var loginSheetInitialTab by remember { mutableIntStateOf(0) }
     var showAccountSheet by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val activity = context as? androidx.activity.ComponentActivity
+    val appUpdateManager = remember { com.google.android.play.core.appupdate.AppUpdateManagerFactory.create(context) }
+    var updateAvailable by remember { mutableStateOf(false) }
+    var appUpdateInfo by remember { mutableStateOf<com.google.android.play.core.appupdate.AppUpdateInfo?>(null) }
+
+    LaunchedEffect(Unit) {
+        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
+            if (info.updateAvailability() == com.google.android.play.core.install.model.UpdateAvailability.UPDATE_AVAILABLE
+                && info.isUpdateTypeAllowed(com.google.android.play.core.install.model.AppUpdateType.FLEXIBLE)
+            ) {
+                updateAvailable = true
+                appUpdateInfo = info
+            }
+        }
+    }
+
     if (showProfileEdit) {
         ProfileEditSheet(
             onDismiss = { showProfileEdit = false },
@@ -126,32 +148,49 @@ fun ProfileScreen(
     }
 
     if (showAccountSheet) {
+        val sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { it != SheetValue.Hidden }
+        )
         ModalBottomSheet(
             onDismissRequest = { showAccountSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = sheetState,
             containerColor = mc.backgroundSecondary,
-            dragHandle = { Spacer(modifier = Modifier.height(8.dp)) },
+            dragHandle = null,
         ) {
-            AccountSection(
-                sessionState = sessionState,
-                onLoginClick = {
-                    showAccountSheet = false
-                    loginSheetInitialTab = 0
-                    showLoginSheet = true
-                },
-                onSignUpClick = {
-                    showAccountSheet = false
-                    loginSheetInitialTab = 1
-                    showLoginSheet = true
-                },
-                onSignOutClick = { authViewModel.signOut() },
-                onDeleteAccountClick = { authViewModel.deleteAccount() },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                playerName = uiState.playerName,
-                avatarUrl = uiState.avatarUrl,
-                shareUrl = uiState.shareUrl,
-            )
-            Spacer(modifier = Modifier.navigationBarsPadding())
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showAccountSheet = false }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_cancel),
+                            tint = mc.textSecondary
+                        )
+                    }
+                }
+                AccountSection(
+                    sessionState = sessionState,
+                    onLoginClick = {
+                        showAccountSheet = false
+                        loginSheetInitialTab = 0
+                        showLoginSheet = true
+                    },
+                    onSignUpClick = {
+                        showAccountSheet = false
+                        loginSheetInitialTab = 1
+                        showLoginSheet = true
+                    },
+                    onSignOutClick = { authViewModel.signOut() },
+                    onDeleteAccountClick = { authViewModel.deleteAccount() },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    playerName = uiState.playerName,
+                    avatarUrl = uiState.avatarUrl,
+                )
+                Spacer(modifier = Modifier.navigationBarsPadding())
+            }
         }
     }
 
@@ -261,6 +300,53 @@ fun ProfileScreen(
                         viewModel = viewModel
                     )
                 }
+            }
+
+            // ── App Update ────────────────────────────────────────────────────
+            if (updateAvailable) {
+                item {
+                    AppUpdateRow(
+                        onClick = {
+                            appUpdateInfo?.let { info ->
+                                activity?.let {
+                                    appUpdateManager.startUpdateFlowForResult(
+                                        info,
+                                        com.google.android.play.core.install.model.AppUpdateType.FLEXIBLE,
+                                        it,
+                                        500
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
+            // ── Rate the app ──────────────────────────────────────────────────
+            item {
+                RateAppRow(
+                    onClick = {
+                        val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
+                        val request = reviewManager.requestReviewFlow()
+                        request.addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val reviewInfo = task.result
+                                activity?.let {
+                                    reviewManager.launchReviewFlow(it, reviewInfo)
+                                }
+                            } else {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
 
             // ── Send feedback ─────────────────────────────────────────────────
@@ -675,6 +761,92 @@ private fun SendFeedbackRow(
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = stringResource(R.string.feedback_title),
+                style = MaterialTheme.magicTypography.bodyMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+// ── App Update row ────────────────────────────────────────────────────────────
+
+@Composable
+private fun AppUpdateRow(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.SystemUpdate,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "New app update available",
+                style = MaterialTheme.magicTypography.bodyMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+// ── Rate App row ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun RateAppRow(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = mc.surface,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                tint = mc.goldMtg,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Rate the app",
                 style = MaterialTheme.magicTypography.bodyMedium,
                 color = mc.textPrimary,
                 modifier = Modifier.weight(1f),

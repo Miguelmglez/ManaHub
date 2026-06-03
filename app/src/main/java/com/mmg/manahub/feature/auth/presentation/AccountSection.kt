@@ -83,7 +83,6 @@ fun AccountSection(
     modifier: Modifier = Modifier,
     playerName: String? = null,
     avatarUrl: String? = null,
-    shareUrl: String? = null,
 ) {
     when (sessionState) {
         SessionState.Loading -> AccountSectionSkeleton(modifier = modifier)
@@ -104,7 +103,6 @@ fun AccountSection(
                 modifier = modifier,
                 displayName = playerName,
                 displayAvatarUrl = avatarUrl,
-                shareUrl = shareUrl,
             )
         }
     }
@@ -386,7 +384,6 @@ private fun AuthenticatedCard(
     modifier: Modifier = Modifier,
     displayName: String? = null,
     displayAvatarUrl: String? = null,
-    shareUrl: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -534,22 +531,25 @@ private fun AuthenticatedCard(
                 }
             }
 
-            // ── Share invite link button ───────────────────────────────────────
-            if (shareUrl != null) {
+            // ── Share Game Tag button ─────────────────────────────────────────
+            if (gameTag != null) {
                 val context = LocalContext.current
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
                     onClick = {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareUrl)
-                        }
-                        context.startActivity(
-                            Intent.createChooser(
-                                intent,
-                                context.getString(com.mmg.manahub.R.string.friends_share_chooser_title)
-                            )
-                        )
+                        val tagToCopy = gameTag.removePrefix("#")
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("Game Tag", tagToCopy)
+                        clipboard.setPrimaryClip(clip)
+                        
+                        // We use a simple toast if possible, but since we are in a Composable without direct toast state
+                        // we can either use a standard Android toast or just skip it if it's too complex to add now.
+                        // Standard Android toast is fine for a quick feedback.
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(com.mmg.manahub.R.string.friends_gametag_copied),
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),

@@ -30,6 +30,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.ui.tooling.preview.Preview
+import com.mmg.manahub.core.ui.theme.MagicTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +73,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -80,6 +84,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -104,6 +109,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -120,8 +128,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.voice.domain.VoiceCommand
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
@@ -137,6 +151,7 @@ import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.Player
 import com.mmg.manahub.feature.game.domain.model.ScreenedGridSlotPosition
 import com.mmg.manahub.feature.game.domain.model.toDefaultDegrees
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -155,38 +170,59 @@ fun GamePlayScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toolsState by viewModel.toolsState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    GamePlayContent(
-        uiState = uiState,
-        toolsState = toolsState,
-        onNewGame = onNewGame,
-        onBackHome = onBackHome,
-        onSurvey = onSurvey,
-        onTournamentClick = onTournamentClick,
-        onResetGame = viewModel::resetGame,
-        onAbandonGame = onAbandonGame,
-        onExitGame = onExitGame,
-        onLifeChange = viewModel::changeLife,
-        onCmdPanel = viewModel::showCmdPanel,
-        onCtrPanel = viewModel::showCounterPanel,
-        onConfirmDefeat = viewModel::confirmDefeat,
-        onRevokeDefeat = viewModel::revokeDefeat,
-        onToggleTools = viewModel::toggleTools,
-        onRollDice = viewModel::rollDice,
-        onFlipCoin = viewModel::flipCoin,
-        onSelectLayout = viewModel::selectLayout,
-        onRenamePlayer = viewModel::renamePlayer,
-        onCmdDamage = viewModel::changeCommanderDamage,
-        onCounter = viewModel::changeCounter,
-        onCustomChange = viewModel::changeCustomCounter,
-        onCustomRemove = viewModel::removeCustomCounter,
-        onAddCustom = { pid, name, iconKey -> viewModel.addCustomCounter(pid, name, iconKey) },
-        onUpdateTheme = viewModel::updatePlayerTheme,
-        onSwapGridSlots = viewModel::swapGridSlots,
-        onReorderTurnOrder = viewModel::reorderTurnOrder,
-        onEndTurn = viewModel::nextTurn,
-        onToggleLand = viewModel::toggleLandPlayed,
-    )
+    val isAnyVoiceEnabled = uiState.gameSettings.voiceLandReminderEnabled || uiState.gameSettings.voiceEndTurnEnabled
+    DisposableEffect(lifecycleOwner, isAnyVoiceEnabled) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (isAnyVoiceEnabled) {
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> viewModel.startVoiceListening()
+                    Lifecycle.Event.ON_PAUSE  -> viewModel.stopVoiceListening()
+                    else -> {}
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.stopVoiceListening()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        GamePlayContent(
+            uiState = uiState,
+            toolsState = toolsState,
+            onNewGame = onNewGame,
+            onBackHome = onBackHome,
+            onSurvey = onSurvey,
+            onTournamentClick = onTournamentClick,
+            onResetGame = viewModel::resetGame,
+            onAbandonGame = onAbandonGame,
+            onExitGame = onExitGame,
+            onLifeChange = viewModel::changeLife,
+            onCmdPanel = viewModel::showCmdPanel,
+            onCtrPanel = viewModel::showCounterPanel,
+            onConfirmDefeat = viewModel::confirmDefeat,
+            onRevokeDefeat = viewModel::revokeDefeat,
+            onToggleTools = viewModel::toggleTools,
+            onRollDice = viewModel::rollDice,
+            onFlipCoin = viewModel::flipCoin,
+            onSelectLayout = viewModel::selectLayout,
+            onRenamePlayer = viewModel::renamePlayer,
+            onCmdDamage = viewModel::changeCommanderDamage,
+            onCounter = viewModel::changeCounter,
+            onCustomChange = viewModel::changeCustomCounter,
+            onCustomRemove = viewModel::removeCustomCounter,
+            onAddCustom = { pid, name, iconKey -> viewModel.addCustomCounter(pid, name, iconKey) },
+            onUpdateTheme = viewModel::updatePlayerTheme,
+            onSwapGridSlots = viewModel::swapGridSlots,
+            onReorderTurnOrder = viewModel::reorderTurnOrder,
+            onEndTurn = viewModel::nextTurn,
+            onToggleLand = viewModel::toggleLandPlayed,
+        )
+    }
 }
 
 /**
@@ -731,6 +767,33 @@ private fun PlayerCard(
 
         var dragAccumulator by remember(player.id) { mutableFloatStateOf(0f) }
 
+        // Land played animation — triggers on false→true transition of [landPlayed].
+        var showLandAnimation by remember(player.id) { mutableStateOf(false) }
+        val landIconScale = remember(player.id) { Animatable(1f) }
+        val landRingScale = remember(player.id) { Animatable(0f) }
+        val landRingAlpha = remember(player.id) { Animatable(0f) }
+
+        LaunchedEffect(landPlayed) {
+            if (landPlayed) {
+                showLandAnimation = true
+                launch {
+                    landIconScale.snapTo(0.8f)
+                    landIconScale.animateTo(1.3f, spring(dampingRatio = 0.4f, stiffness = 500f))
+                    landIconScale.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 300f))
+                }
+                launch {
+                    landRingScale.snapTo(1f)
+                    landRingAlpha.snapTo(0.7f)
+                    landRingScale.animateTo(2.5f, tween(400, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    landRingAlpha.animateTo(0f, tween(400))
+                }
+                delay(500)
+                showLandAnimation = false
+            }
+        }
+
         PlayerCardSurface(
             isActive = isActive,
             theme = theme,
@@ -787,7 +850,7 @@ private fun PlayerCard(
                                     ),
                             )
                             Text(
-                                text = "Turn: $turnNumber",
+                                text = stringResource(R.string.game_turn_indicator, turnNumber),
                                 style = MaterialTheme.magicTypography.labelMedium,
                                 color = MaterialTheme.magicColors.goldMtg,
                             )
@@ -820,23 +883,44 @@ private fun PlayerCard(
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             if (gameSettings.landReminderEnabled && isActive && tier != CardTier.TINY) {
-                                val alpha by animateFloatAsState(
+                                val landIconAlpha by animateFloatAsState(
                                     targetValue = if (landPlayed) 0.25f else 1.0f,
                                     animationSpec = tween(200),
                                     label = "landAlpha",
                                 )
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_land),
-                                    contentDescription = stringResource(R.string.game_counters_button),
-                                    tint = theme.accent.copy(alpha = alpha),
-                                    modifier = Modifier
-                                        .size(iconSize)
-                                        .clickable(
-                                            interactionSource = remember(player.id) { MutableInteractionSource() },
-                                            indication = null,
-                                            onClick = onLandToggle,
-                                        ),
-                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.wrapContentSize()
+                                ) {
+                                    if (showLandAnimation) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(iconSize)
+                                                .graphicsLayer {
+                                                    scaleX = landRingScale.value
+                                                    scaleY = landRingScale.value
+                                                    this.alpha = landRingAlpha.value
+                                                }
+                                                .border(1.5.dp, theme.accent, CircleShape)
+                                        )
+                                    }
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_land),
+                                        contentDescription = stringResource(R.string.gamesetup_land_reminder_title),
+                                        tint = theme.accent.copy(alpha = landIconAlpha),
+                                        modifier = Modifier
+                                            .size(iconSize)
+                                            .graphicsLayer {
+                                                scaleX = landIconScale.value
+                                                scaleY = landIconScale.value
+                                            }
+                                            .clickable(
+                                                interactionSource = remember(player.id) { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = onLandToggle,
+                                            ),
+                                    )
+                                }
                             }
                         }
 
@@ -1058,6 +1142,9 @@ private fun PlayerCard(
                 }
             }
 
+            // ── Land played animation overlay ─────────────────────────────────
+            // REMOVED invasive overlay
+
             // ── Pending defeat overlay ────────────────────────────────────────
             AnimatedVisibility(
                 visible = player.pendingDefeat && !player.isSurviving,
@@ -1075,7 +1162,7 @@ private fun PlayerCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(12.dp),
                     ) {
-                        Text(text = "💀", style = mt.titleMedium, textAlign = TextAlign.Center)
+                        Text(text = stringResource(R.string.game_skull_symbol), style = mt.titleMedium, textAlign = TextAlign.Center)
 
                         Button(
                             onClick = onConfirmDefeat,
@@ -1193,44 +1280,44 @@ private fun EndTurnButton(
     theme: PlayerThemeColors,
     onClick: () -> Unit,
 ) {
-    if (tier != CardTier.TINY) {
+    val mc = MaterialTheme.magicColors
+    val infiniteTransition = rememberInfiniteTransition(label = "endTurnPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = theme.accent.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, theme.accent.copy(alpha = 0.5f)),
+        modifier = Modifier
+            .graphicsLayer {
+                scaleX = pulseScale
+                scaleY = pulseScale
+            }
+    ) {
         Box(
-            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .height(36.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(theme.accent.copy(alpha = 0.15f))
-                .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.game_end_turn),
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = theme.accent,
-            )
-        }
-    } else {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(16.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(theme.accent.copy(alpha = 0.15f))
-                .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
+                .padding(
+                    horizontal = if (tier == CardTier.TINY) 10.dp else 16.dp,
+                    vertical = if (tier == CardTier.TINY) 6.dp else 8.dp
                 ),
+            contentAlignment = Alignment.Center
         ) {
             Text(
-                text = stringResource(R.string.game_end_turn),
-                style = MaterialTheme.magicTypography.labelMedium,
+                text = if (tier == CardTier.TINY) "END" else stringResource(R.string.game_end_turn),
+                style = when(tier) {
+                    CardTier.LARGE -> MaterialTheme.magicTypography.labelLarge
+                    CardTier.SMALL -> MaterialTheme.magicTypography.labelMedium
+                    CardTier.TINY -> MaterialTheme.magicTypography.labelSmall.copy(fontSize = 9.sp)
+                },
                 color = theme.accent,
             )
         }
@@ -1416,7 +1503,7 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(text = "💀", fontSize = 20.sp, textAlign = TextAlign.Center)
+            Text(text = stringResource(R.string.game_skull_symbol), fontSize = 20.sp, textAlign = TextAlign.Center)
             Text(
                 text = stringResource(R.string.game_fallen_label),
                 color = mc.lifeNegative,
@@ -1448,16 +1535,38 @@ private fun CmdDamagePanel(
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
-        contentWindowInsets = { WindowInsets(0) }) {
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
         Column(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.offset(x = (-12).dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
             Text(
                 stringResource(R.string.game_cmd_damage_title, target.name),
                 style = MaterialTheme.magicTypography.titleMedium,
@@ -1485,7 +1594,7 @@ private fun CmdDamagePanel(
                     )
                     if (damage >= 21) {
                         Text(
-                            "⚠ ",
+                            stringResource(R.string.game_caution_symbol),
                             style = MaterialTheme.magicTypography.bodyMedium,
                             color = mc.lifeNegative
                         )
@@ -1525,10 +1634,15 @@ private fun CountersPanel(
     var selectedIconKey by remember { mutableStateOf(CounterIconKey.DEFAULT) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
@@ -1538,6 +1652,22 @@ private fun CountersPanel(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.offset(x = (-12).dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
             Text(
                 stringResource(R.string.game_counters_title, player.name),
                 style = MaterialTheme.magicTypography.titleMedium,
@@ -1760,7 +1890,7 @@ private fun CounterRow(
                 .background(theme.accent.copy(alpha = 0.15f))
                 .clickable(onClick = onDecrement),
         ) {
-            Text("−", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+            Text(stringResource(R.string.action_remove_symbol), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         }
         Text(
             value.toString(),
@@ -1777,7 +1907,7 @@ private fun CounterRow(
                 .background(theme.accent.copy(alpha = 0.15f))
                 .clickable(onClick = onIncrement),
         ) {
-            Text("+", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+            Text(stringResource(R.string.action_add_symbol), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         }
     }
 }
@@ -1797,66 +1927,92 @@ private fun ConfirmDefeatSheet(
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val sheetState = rememberModalBottomSheetState()
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
         contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .navigationBarsPadding(),
         ) {
-            Text(
-                text = "☠",
-                style = MaterialTheme.magicTypography.lifeNumberMd,
-                color = mc.lifeNegative
-            )
-            Text(
-                text = stringResource(R.string.game_pending_defeat_message, player.name),
-                style = MaterialTheme.magicTypography.titleLarge,
-                color = mc.textPrimary,
-                textAlign = TextAlign.Center
-            )
+            // Header Row
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
+                IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = mc.lifePositive
-                    ),
-                    border = BorderStroke(1.dp, mc.lifePositive.copy(alpha = 0.5f))
+                    modifier = Modifier.offset(x = (-12).dp)
                 ) {
-                    Text(
-                        stringResource(R.string.game_confirm_defeat_alive),
-                        style = MaterialTheme.magicTypography.labelLarge
-                    )
-                }
-
-                Button(
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.lifeNegative
-                    )
-                ) {
-                    Text(
-                        stringResource(R.string.game_confirm_defeat_defeat),
-                        style = MaterialTheme.magicTypography.labelLarge
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
                     )
                 }
             }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.game_skull_symbol),
+                    style = ty.lifeNumberMd,
+                    color = mc.lifeNegative
+                )
+                Text(
+                    text = stringResource(R.string.game_pending_defeat_message, player.name),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    textAlign = TextAlign.Center
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = mc.lifePositive
+                        ),
+                        border = BorderStroke(1.dp, mc.lifePositive.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            stringResource(R.string.game_confirm_defeat_alive),
+                            style = ty.labelLarge
+                        )
+                    }
+
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = mc.lifeNegative
+                        )
+                    ) {
+                        Text(
+                            stringResource(R.string.game_confirm_defeat_defeat),
+                            style = ty.labelLarge
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }
@@ -2452,6 +2608,40 @@ private fun TurnOrderTab(
             Text(
                 stringResource(R.string.game_manage_apply_order),
                 color = mc.background,
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Mic listening indicator
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun MicListeningIndicator() {
+    val mc = MaterialTheme.magicColors
+    val infiniteTransition = rememberInfiniteTransition(label = "micPulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "micAlpha",
+    )
+    Surface(
+        shape = CircleShape,
+        color = mc.primaryAccent.copy(alpha = 0.15f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent.copy(alpha = alpha)),
+        modifier = Modifier.size(40.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = stringResource(R.string.game_voice_listening_desc),
+                tint = mc.primaryAccent.copy(alpha = alpha),
+                modifier = Modifier.size(20.dp),
             )
         }
     }

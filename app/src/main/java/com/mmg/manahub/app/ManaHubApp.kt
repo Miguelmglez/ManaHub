@@ -1,12 +1,17 @@
 package com.mmg.manahub.app
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 import androidx.work.WorkManager
+import com.google.firebase.messaging.FirebaseMessaging
 import coil.Coil
 import coil.ImageLoader
 import coil.decode.SvgDecoder
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
@@ -20,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 
@@ -30,6 +36,7 @@ class ManaHubApp : Application() {
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
     @Inject lateinit var authRepository: AuthRepository
+    @Inject lateinit var pushTokenRepository: PushTokenRepository
     @Inject lateinit var okHttpClient: OkHttpClient
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
@@ -37,6 +44,8 @@ class ManaHubApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        createNotificationChannels()
 
         FirebaseCrashlytics.getInstance().apply {
             isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
@@ -67,15 +76,44 @@ class ManaHubApp : Application() {
         appScope.launch {
             authRepository.sessionState.collect { state ->
                 when (state) {
-                    is SessionState.Authenticated ->
+                    is SessionState.Authenticated -> {
                         CollectionSyncWorker.schedulePeriodicSync(workManager)
+                        appScope.launch {
+                            runCatching {
+                                val token = FirebaseMessaging.getInstance().token.await()
+                                pushTokenRepository.register(token)
+                            }
+                        }
+                    }
                     is SessionState.Unauthenticated -> {
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
+                        appScope.launch {
+                            runCatching {
+                                val token = FirebaseMessaging.getInstance().token.await()
+                                pushTokenRepository.unregister(token)
+                            }
+                        }
                     }
                     else -> {}
                 }
             }
         }
+    }
+
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val nm = getSystemService(NotificationManager::class.java) ?: return
+        listOf(
+            NotificationChannel("trades_high", "Trade Proposals", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "New trade proposals and counter-proposals"
+            },
+            NotificationChannel("trades_updates", "Trade Updates", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Trade accepted, declined, cancelled, completed"
+            },
+            NotificationChannel("friends", "Friends", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Friend requests and acceptances"
+            }
+        ).forEach { nm.createNotificationChannel(it) }
     }
 }

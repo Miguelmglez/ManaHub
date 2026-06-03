@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -362,14 +363,17 @@ fun CommanderSearchSheet(
     onDismiss:        () -> Unit,
 ) {
     val mc           = MaterialTheme.magicColors
-    val sheetState   = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState   = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
     var query        by remember { mutableStateOf("") }
 
     ModalBottomSheet(
         onDismissRequest   = onDismiss,
         sheetState         = sheetState,
         containerColor     = mc.backgroundSecondary,
-        dragHandle         = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
+        dragHandle         = null,
     ) {
         Column(
             modifier = Modifier
@@ -378,6 +382,19 @@ fun CommanderSearchSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
             Text(
                 text  = stringResource(R.string.deckbuilder_setup_commander_label),
                 style = MaterialTheme.magicTypography.titleMedium,

@@ -7,15 +7,21 @@ import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
+import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import com.mmg.manahub.core.voice.domain.VoiceModelRepository
+import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +29,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -35,6 +42,9 @@ class SettingsViewModel @Inject constructor(
     private val analyticsHelper: AnalyticsHelper,
     private val authRepository: AuthRepository,
     private val userProfileDataSource: UserProfileDataSource,
+    private val pushTokenRepository: PushTokenRepository,
+    private val notificationPrefsRepository: NotificationPrefsRepository,
+    private val voiceModelRepository: VoiceModelRepository,
 //    private val langPref:              LanguagePreference
 ) : ViewModel() {
 
@@ -46,6 +56,34 @@ class SettingsViewModel @Inject constructor(
 
     private val _prefsState = MutableStateFlow(PreferencesState())
     val prefsState: StateFlow<PreferencesState> = _prefsState.asStateFlow()
+
+    // ── Notification preferences ────────────────────────────────────────────────
+
+    /**
+     * The per-event-type notification preference map (`event_type -> boolean`).
+     * A missing key means the event is enabled (opt-out model).
+     */
+    val notificationPrefs: StateFlow<Map<String, Boolean>> =
+        notificationPrefsRepository.prefsFlow
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyMap(),
+            )
+
+    /** Master push-notifications switch backed by the local DataStore. */
+    val pushNotificationsEnabled: StateFlow<Boolean> =
+        userPrefsDataStore.pushNotificationsEnabledFlow
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = false,
+            )
+
+    /** Per-language voice-model state, mirrored from the repository. */
+    val voiceModelStates: StateFlow<Map<VoiceLanguage, VoiceModelState>> =
+        voiceModelRepository.modelStates
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     init {
         userPrefsDataStore.themeFlow
@@ -86,6 +124,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepo.setAppLanguage(language)
             _appLanguageChanged.emit(Unit)
+        }
+        // Keep the backend locale in sync so future push notifications use the new language.
+        viewModelScope.launch {
+            runCatching { pushTokenRepository.updateLocale(language.code) }
         }
     }
 
@@ -183,6 +225,56 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(privacyToastMessage = errorMsg, privacyToastIsError = true) }
             }
         }
+    }
+
+    // ── Notification settings ───────────────────────────────────────────────────
+
+    /**
+     * Toggles the master push-notifications preference in the local DataStore.
+     *
+     * @param enabled `true` to allow push notifications, `false` to silence all of them.
+     */
+    fun setPushNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPrefsDataStore.savePushNotificationsEnabled(enabled) }
+    }
+
+    /**
+     * Enables or disables a single notification event type and persists it to Supabase.
+     *
+     * @param eventType The backend event identifier (e.g. `"trade_proposed"`).
+     * @param enabled `true` to receive notifications for this event, `false` to silence them.
+     */
+    fun setNotificationEventEnabled(eventType: String, enabled: Boolean) {
+        viewModelScope.launch {
+            notificationPrefsRepository.setEventEnabled(eventType, enabled)
+        }
+    }
+
+    /**
+     * Enables or disables every event type in a logical group with a single tap.
+     * Each event is persisted independently so a partial failure still records the rest.
+     *
+     * @param eventTypes The backend event identifiers controlled by the group toggle.
+     * @param enabled The new value applied to all [eventTypes].
+     */
+    fun setNotificationGroupEnabled(eventTypes: List<String>, enabled: Boolean) {
+        viewModelScope.launch {
+            eventTypes.forEach { eventType ->
+                notificationPrefsRepository.setEventEnabled(eventType, enabled)
+            }
+        }
+    }
+
+    // ── Voice recognition models ─────────────────────────────────────────────────
+
+    /** Downloads the offline voice-recognition model for [language]. */
+    fun downloadVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.download(language) }
+    }
+
+    /** Deletes the downloaded voice-recognition model for [language]. */
+    fun deleteVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.delete(language) }
     }
 
     /** Clears the privacy toast message after it has been displayed. */

@@ -31,6 +31,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
@@ -101,8 +104,10 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.SetSymbol
+import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -265,7 +270,7 @@ fun ScannerScreen(
     // Variant selector sheet
     if (uiState.showVariantSelector && uiState.variantSelectorEntry != null) {
         VariantSelectorSheet(
-            entry = uiState.variantSelectorEntry!!,
+            currentCardId = uiState.variantSelectorEntry!!.card.scryfallId,
             variants = uiState.cardVariants,
             isLoading = uiState.isLoadingVariants,
             onDismiss = viewModel::onCloseVariantSelector,
@@ -865,9 +870,12 @@ private fun ScanQueueSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
     var searchQuery by remember { mutableStateOf("") }
-    
+
     val filtered = remember(session.cards, searchQuery) {
         if (searchQuery.isBlank()) session.cards
         else session.cards.filter { it.card.name.contains(searchQuery, ignoreCase = true) }
@@ -889,10 +897,23 @@ private fun ScanQueueSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.background,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textPrimary.copy(0.3f)) }
+        dragHandle = null,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
+                // Header Row
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_cancel),
+                            tint = mc.textSecondary
+                        )
+                    }
+                }
                 // Header
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -1176,7 +1197,7 @@ private fun EditScannedCardSheet(
     val ty = MaterialTheme.magicTypography
     AddCardSheet(
         cardName = scannedCard.card.name,
-        onConfirm = { foil: Boolean, _: Boolean, cond: String, lang: String, q: Int ->
+        onConfirm = { foil: Boolean, cond: String, lang: String, q: Int ->
             onConfirm(scannedCard.copy(
                 isFoil = foil,
                 condition = cond,
@@ -1208,219 +1229,6 @@ private fun EditScannedCardSheet(
     )
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Variant Selector Sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun VariantSelectorSheet(
-    entry: ScannedCard,
-    variants: List<Card>,
-    isLoading: Boolean,
-    onDismiss: () -> Unit,
-    onSelectVariant: (Card) -> Unit,
-    onExpandImage: (String) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { newValue -> if (newValue == SheetValue.Hidden) !isLoading else true },
-    )
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = mc.background,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textPrimary.copy(0.3f)) },
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.scanner_variant_selector_title),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close), tint = mc.textPrimary)
-                }
-            }
-
-            when {
-                isLoading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(color = mc.primaryAccent)
-                    }
-                }
-                variants.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.scanner_variant_no_results),
-                            style = ty.bodyMedium,
-                            color = mc.textSecondary,
-                        )
-                    }
-                }
-                else -> {
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
-                        items(variants, key = { it.scryfallId }) { variant ->
-                            VariantCardItem(
-                                card = variant,
-                                isFoil = entry.isFoil,
-                                onSelectVariant = { onSelectVariant(variant) },
-                                onExpandImage = {
-                                    val url = variant.imageNormal ?: variant.imageArtCrop
-                                    if (!url.isNullOrBlank()) onExpandImage(url)
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VariantCardItem(
-    card: Card,
-    isFoil: Boolean,
-    onSelectVariant: () -> Unit,
-    onExpandImage: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val preferredCurrency = LocalPreferredCurrency.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onSelectVariant() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Box {
-                AsyncImage(
-                    model = card.imageNormal ?: card.imageArtCrop,
-                    contentDescription = card.name,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .width(80.dp)
-                        .height(112.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onExpandImage() },
-                )
-                Icon(
-                    imageVector = Icons.Default.ZoomIn,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .size(20.dp)
-                        .align(Alignment.BottomEnd)
-                        .padding(2.dp),
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = card.name,
-                    style = ty.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SetSymbol(
-                        setCode = card.setCode,
-                        rarity = CardRarity.fromString(card.rarity),
-                        size = 14.dp,
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = "${card.setName} #${card.collectorNumber}",
-                        style = ty.labelSmall,
-                        color = mc.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (card.rarity.isNotBlank()) AttrTag(card.rarity.replaceFirstChar { it.uppercaseChar() })
-                Text(
-                    text = PriceFormatter.formatFromScryfall(
-                        if (isFoil) card.priceUsdFoil else card.priceUsd,
-                        if (isFoil) card.priceEurFoil else card.priceEur,
-                        preferredCurrency,
-                    ),
-                    style = ty.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = mc.goldMtg,
-                )
-            }
-        }
-    }
-    HorizontalDivider(color = mc.textPrimary.copy(alpha = 0.05f))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Full-screen image viewer
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun FullScreenImageViewer(
-    imageUrl: String,
-    onDismiss: () -> Unit,
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                .clickable { onDismiss() },
-            contentAlignment = Alignment.Center,
-        ) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 48.dp, end = 16.dp)
-                    .size(40.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape),
-            ) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close), tint = Color.White)
-            }
-        }
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 //  Price detail / Settings / Permission — reused or simplified
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1442,17 +1250,53 @@ private fun ScannerSettingsSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = mc.backgroundSecondary) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(text = stringResource(R.string.scanner_settings_title), style = ty.titleMedium, color = mc.textPrimary)
-            SettingsToggleRow(stringResource(R.string.scanner_sound_effects), stringResource(R.string.scanner_sound_effects_desc), isSoundEnabled, { onToggleSound() })
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .navigationBarsPadding(),
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.offset(x = (-12).dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(text = stringResource(R.string.scanner_settings_title), style = ty.titleMedium, color = mc.textPrimary)
+                SettingsToggleRow(stringResource(R.string.scanner_sound_effects), stringResource(R.string.scanner_sound_effects_desc), isSoundEnabled, { onToggleSound() })
 
-            // COMMENTED OUT — embedding DB status row replaced by ML Kit OCR (always ready)
-            // HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-            // Row(...) { /* embeddingDbVersion, embeddingDbCardCount, isEmbeddingDbUpdating UI */ }
+                // COMMENTED OUT — embedding DB status row replaced by ML Kit OCR (always ready)
+                // HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                // Row(...) { /* embeddingDbVersion, embeddingDbCardCount, isEmbeddingDbUpdating UI */ }
 
-            Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }

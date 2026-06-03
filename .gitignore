@@ -259,6 +259,24 @@ $RECYCLE.BIN/
 # Local Claude Code settings overrides (personal, machine-specific).
 .claude/settings.local.json
 
+# Git worktrees created by Claude Code agents — ephemeral, never commit.
+.claude/worktrees/
+
+# AI agent task-planning documents — ephemeral, never commit.
+# These are intermediate files created by Claude/LLMs during task execution.
+# They are deleted when the task is finished and must NEVER contain secrets.
+# Pattern covers common naming conventions: *_TODO.md, *_PLAN.md, PLAN_*.md, PLAN.md
+# at any depth. Proper design docs (ADRs, RFCs) live under docs/adr/ and ARE committed.
+docs/*_TODO.md
+docs/*_PLAN.md
+docs/PLAN_*.md
+docs/PLAN.md
+*_TODO.md
+PLAN.md
+# Catch-all for agent scratchpad files at repo root
+TASK_*.md
+NOTES_*.md
+
 
 # =============================================================================
 # SECTION 9 — MISCELLANEOUS GENERATED FILES
@@ -285,8 +303,6 @@ $RECYCLE.BIN/
 /.mcp.json
 /SUPABASE_AUTH_SETUP.md
 
-/CLAUDE.md
-/.claude/worktrees/agent-abd89b3b/
 /app/supabase/migrations/20260421_friends.sql
 /.artifacts/
 /app/DEEPLINKS.md
@@ -321,3 +337,9 @@ $RECYCLE.BIN/
 /docs/plans/online-game-sessions.md
 /supabase/.temp/cli-latest
 /docs/*
+!/docs/PUSH_NOTIFICATIONS_TODO.md
+/.claude/skills/compose-ui/SKILL.md
+/.claude/skills/compose-ui/references/visual-loop-setup.md
+/.claude/skills/compose-ui/references/components.md
+/.claude/skills/compose-ui/references/design-system.md
+/.claude/skills/compose-ui/references/dos-and-donts.md

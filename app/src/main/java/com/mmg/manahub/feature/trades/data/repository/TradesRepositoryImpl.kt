@@ -159,7 +159,6 @@ class TradesRepositoryImpl @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
         cardId = cardId,
         cardName = cardMap[cardId]?.name ?: "",
         imageUrl = cardMap[cardId]?.let { it.imageArtCrop ?: it.imageNormal },
