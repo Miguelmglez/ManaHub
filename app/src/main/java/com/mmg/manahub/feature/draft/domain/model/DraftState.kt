@@ -11,4 +11,6 @@ data class DraftState(
     val packsInFlight: Map<Int, BoosterPack>,
     val passDirection: PassDirection,
     val status: DraftStatus,
+    /** Packs for future rounds per seat (key = seat index, value = ordered list round 2..N). */
+    val pendingPacks: Map<Int, List<BoosterPack>> = emptyMap(),
 )
