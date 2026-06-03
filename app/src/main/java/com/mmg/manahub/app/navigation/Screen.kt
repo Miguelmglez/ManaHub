@@ -99,6 +99,23 @@ sealed class Screen(val route: String) {
         ) = "draft/$setCode?setName=${Uri.encode(setName)}&setIconUri=${Uri.encode(setIconUri)}&setReleasedAt=${Uri.encode(setReleasedAt)}"
     }
 
+    // ── Draft Simulator ──────────────────────────────────────────────────────
+
+    /** Setup screen: choose draft mode and optional timer. Entry from DraftSetDetail. */
+    object DraftSimSetup : Screen("draft/sim/setup/{setCode}") {
+        fun createRoute(setCode: String) = "draft/sim/setup/$setCode"
+    }
+
+    /** Active drafting screen: pick cards pack by pack. */
+    object DraftSimDrafting : Screen("draft/sim/drafting/{sessionId}") {
+        fun createRoute(sessionId: String) = "draft/sim/drafting/$sessionId"
+    }
+
+    /** Result / deck-build screen after all packs are drafted. */
+    object DraftSimResult : Screen("draft/sim/result/{sessionId}") {
+        fun createRoute(sessionId: String) = "draft/sim/result/$sessionId"
+    }
+
     // ── Online multiplayer lobby ──────────────────────────────────────────────
 
     /** Host lobby — configure and create a new online session. */
