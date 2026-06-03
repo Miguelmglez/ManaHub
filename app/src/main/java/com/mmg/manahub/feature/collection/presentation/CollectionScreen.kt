@@ -103,6 +103,7 @@ fun CollectionScreen(
     onCardClick:              (scryfallId: String) -> Unit,
     onScannerClick:           () -> Unit,
     onDeckClick:              (deckId: String) -> Unit,
+    onPlaytestClick:          (deckId: String) -> Unit = {},
     onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel:                CollectionViewModel = hiltViewModel(),
@@ -119,6 +120,7 @@ fun CollectionScreen(
             viewModel.onTabSelected(CollectionTab.DECKS)
             onDeckClick(id)
         },
+        onPlaytestClick       = onPlaytestClick,
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
@@ -154,6 +156,7 @@ private fun CollectionContent(
     onCardClick:          (String) -> Unit,
     onScannerClick:       () -> Unit,
     onDeckClick:          (String) -> Unit,
+    onPlaytestClick:      (String) -> Unit = {},
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
@@ -287,7 +290,10 @@ private fun CollectionContent(
                         onViewModeToggle      = onViewModeToggle,
                         onSortChange          = onSortChange,
                     )
-                    CollectionTab.DECKS   -> DeckListScreen(onDeckClick = onDeckClick)
+                    CollectionTab.DECKS   -> DeckListScreen(
+                        onDeckClick     = onDeckClick,
+                        onPlaytestClick = onPlaytestClick,
+                    )
                     CollectionTab.TRADES  -> TradesScreen(
                         onCardClick           = onCardClick,
                         onNavigateToProposal  = onNavigateToTradeProposal,

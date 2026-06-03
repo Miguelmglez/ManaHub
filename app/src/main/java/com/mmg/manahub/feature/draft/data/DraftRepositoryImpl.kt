@@ -218,6 +218,43 @@ class DraftRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getSetCardsPage(
+        setCode: String,
+        page: Int,
+    ): DataResult<Pair<List<Card>, Boolean>> {
+        return withContext(ioDispatcher) {
+            try {
+                val result = scryfallQueue.execute {
+                    scryfallApi.searchCards(
+                        query = "set:$setCode lang:en",
+                        order = "set",
+                        unique = "cards",
+                        page = page,
+                    )
+                }
+                DataResult.Success(result.data.toDomain() to result.hasMore)
+            } catch (first: Exception) {
+                // OkHttp may return a bare HTTP 304 to Retrofit when the cached response body
+                // was evicted from the disk cache (e.g. Coil image loads fill the 50 MB cache).
+                // Retrofit throws HttpException(304) in that case. Retry once without cache so
+                // Scryfall returns a full 200 response.
+                try {
+                    val result = scryfallQueue.execute {
+                        scryfallApi.searchCardsNoCache(
+                            query = "set:$setCode lang:en",
+                            order = "set",
+                            unique = "cards",
+                            page = page,
+                        )
+                    }
+                    DataResult.Success(result.data.toDomain() to result.hasMore)
+                } catch (e: Exception) {
+                    DataResult.Error(e.message ?: "Failed to load cards for $setCode page $page")
+                }
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // getSetVideos — YouTube API with in-memory cache (unchanged)
     // -------------------------------------------------------------------------

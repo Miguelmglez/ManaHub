@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -109,6 +110,8 @@ import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardSearchSheet
+import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.ui.components.GroupingFlowSelector
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.OracleText
@@ -125,6 +128,7 @@ fun DeckMagicDetailScreen(
     onBack: () -> Unit,
     onImproveDeck: (String) -> Unit,
     onReviewSurvey: (Long) -> Unit = {},
+    onPlaytest: (deckId: String) -> Unit = {},
     viewModel: DeckMagicDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -192,6 +196,17 @@ fun DeckMagicDetailScreen(
                                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                                 )
                             }
+                        }
+                    }
+
+                    // Playtest button — launches setup screen for this deck.
+                    uiState.deck?.id?.let { deckId ->
+                        IconButton(onClick = { onPlaytest(deckId) }) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "Playtest deck",
+                                tint = mc.primaryAccent,
+                            )
                         }
                     }
 
@@ -790,38 +805,6 @@ private fun MovementRow(
                     modifier = Modifier.size(16.dp).graphicsLayer { rotationY = 180f }
                 )
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun GroupingFlowSelector(
-    selected: GroupingMode,
-    onSelect: (GroupingMode) -> Unit
-) {
-    val mc = MaterialTheme.magicColors
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        GroupingMode.entries.forEach { mode ->
-            val label = when (mode) {
-                GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
-                GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
-                GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
-                GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
-            }
-            FilterChip(
-                selected = mode == selected,
-                onClick = { onSelect(mode) },
-                label = { Text(label) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent,
-                    selectedLabelColor = mc.background
-                )
-            )
         }
     }
 }

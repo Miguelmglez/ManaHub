@@ -137,6 +137,7 @@ private val RARITY_ITEMS = listOf(
 fun SetDraftDetailScreen(
     onBack: () -> Unit,
     onCardClick: (String) -> Unit,
+    onSimulateDraft: (String) -> Unit = {},
     viewModel: SetDraftDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -171,6 +172,33 @@ fun SetDraftDetailScreen(
                     Text(state.setName, style = typography.titleMedium, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (state.setReleasedAt.isNotBlank()) {
                         Text(formatDate(state.setReleasedAt), style = typography.labelSmall, color = colors.textSecondary)
+                    }
+                }
+                // Simulate Draft entry point — only when the set has a published booster config.
+                if (state.boosterVersion != null) {
+                    Surface(
+                        onClick = { onSimulateDraft(state.setCode) },
+                        shape = RoundedCornerShape(10.dp),
+                        color = colors.primaryAccent.copy(alpha = 0.15f),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.PlayCircle,
+                                contentDescription = null,
+                                tint = colors.primaryAccent,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(R.string.draft_sim_simulate_button),
+                                style = typography.labelMedium,
+                                color = colors.primaryAccent,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
                 }
             }

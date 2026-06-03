@@ -44,6 +44,12 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import com.mmg.manahub.core.domain.model.GroupingMode
+
 @Composable
 fun CopyBadge(
     label: String,
@@ -219,6 +225,38 @@ fun StaleWarningBanner() {
                 text  = "Some prices couldn't be refreshed. Showing cached data.",
                 style = ty.bodySmall,
                 color = mc.lifeNegative,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun GroupingFlowSelector(
+    selected: GroupingMode,
+    onSelect: (GroupingMode) -> Unit
+) {
+    val mc = MaterialTheme.magicColors
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        GroupingMode.entries.forEach { mode ->
+            val label = when (mode) {
+                GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
+                GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
+                GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
+                GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
+            }
+            FilterChip(
+                selected = mode == selected,
+                onClick = { onSelect(mode) },
+                label = { Text(label) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = mc.primaryAccent,
+                    selectedLabelColor = mc.background
+                )
             )
         }
     }
