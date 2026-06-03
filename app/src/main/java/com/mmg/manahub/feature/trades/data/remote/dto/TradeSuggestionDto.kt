@@ -13,6 +13,5 @@ data class TradeSuggestionDto(
     @SerialName("offer_foil") val offerFoil: Boolean,
     @SerialName("offer_condition") val offerCondition: String,
     @SerialName("offer_language") val offerLanguage: String,
-    @SerialName("offer_alt_art") val offerAltArt: Boolean,
     @SerialName("suggestion_type") val suggestionType: String,
 )

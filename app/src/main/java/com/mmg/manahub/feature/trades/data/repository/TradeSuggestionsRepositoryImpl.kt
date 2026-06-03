@@ -30,7 +30,6 @@ class TradeSuggestionsRepositoryImpl @Inject constructor(
         offerFoil = offerFoil,
         offerCondition = offerCondition,
         offerLanguage = offerLanguage,
-        offerAltArt = offerAltArt,
         suggestionType = suggestionType,
     )
 }

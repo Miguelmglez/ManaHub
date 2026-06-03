@@ -1,356 +1,349 @@
-# ManaHub
+ManaHub
+The ultimate Magic: The Gathering companion app for Android.
+ManaHub brings your collection, decks, games, and community into one place — a life counter, collection manager, deck builder with a synergy engine, OCR card scanner, draft guide, news, analytics, tournament organiser, friends, trades, and real-time online multiplayer. Built local-first: every core feature works offline and without an account.
 
-**The ultimate Magic: The Gathering companion app for Android.**
+Highlights
 
-ManaHub combines a life counter, collection manager, deck builder, draft guide, game analytics, and tournament organiser into one unified experience — designed for players who take their game seriously.
+Local-first. Collection, decks, life counter, statistics, tournaments and the OCR scanner all work fully offline with no account required.
+Optional account (Supabase) unlocks social and cloud features: friends, trades, online multiplayer and cross-device sync.
+Multilingual throughout: English, Spanish, and German (app UI, card text, and news).
+Privacy-respecting. OCR runs on-device, no location is collected, no ads, no data selling.
 
----
 
-## Features
+Features
+⚔ Life Counter
+Track life totals for 2 to 6 players simultaneously. Built for Commander and Standard, with full support for poison, experience, energy counters, and commander damage.
 
-### ⚔ Life Counter
-Track life totals for 2 to 6 players simultaneously. Built for Commander and Standard, with full support for poison counters, experience counters, energy counters, energy counters, and commander damage tracking. Each player gets a personalised colour theme, an editable name, and a configurable position on screen.
+Commander damage panel with automatic elimination at 21
+Poison (≥10) and life (≤0) auto-elimination with confirmation dialog
+Custom counters (name + icon) per player
+Dice roller (d20) and coin flip with animation
+Phase tracker with configurable phase stops per player
+Land-played tracker per turn
+Drag-and-drop layout editor — reorder and swap player positions mid-game
+Turn counter that increments on full-round completion
+Per-player colour themes
+Tournament-aware: links a game result to an open tournament match automatically
 
-- Commander damage panel with automatic elimination at 21
-- Poison (≥10) and life (≤0) auto-elimination with confirmation dialog
-- Custom counters (name + icon) per player
-- Dice roller (d20) and coin flip with animation
-- Phase tracker with configurable phase stops per player
-- Land-played tracker per turn
-- Layout editor — drag players to reorder and swap positions mid-game
-- Turn counter increments on full-round completion
-- Grid slot reassignment by drag-and-drop
-- Player theme customisation (colour gradient presets)
-- Tournament-aware: links game result to an open tournament match automatically
+🌐 Online Multiplayer
+Play synchronised games across devices in real time, powered by Supabase Realtime.
 
-### 📷 Card Scanner
-Identify cards by pointing the camera at the card name. Uses on-device ML Kit OCR — no image is sent to any server.
+Host / join lobby with a shareable code
+Deep-link join (open an invite link straight into the lobby)
+Live sync of life totals, counters, commander damage, phases, turns, and lands played
+Defeat confirmation / revocation flow
+Leave or abandon a session cleanly
 
-- **Auto-permission**: the system dialog is presented immediately on first launch
-- **OCR toggle button**: pause and resume text recognition with one tap, so you can reposition the camera freely before scanning
-- **Tap-to-focus**: tap anywhere on the preview to focus the camera at that point and toggle OCR on/off simultaneously
-- **Auto-pause after add**: OCR pauses automatically after a card is added, preventing double-scanning the same card
-- Flash on/off toggle — flash state is preserved when the confirm sheet closes
-- Debounced search (200ms) + two-stage lookup: full-text search → exact name fallback
-- Confirm sheet with foil, condition, language and quantity options
+📡 In-Person Multiplayer (Nearby)
+Sync game state device-to-device with no server and no internet, using Google Nearby Connections (Bluetooth / Wi-Fi).
+📷 Card Scanner
+Identify cards by pointing the camera at the card name. Uses on-device ML Kit OCR — no image ever leaves the device.
 
-### 📁 Collection Manager
-Search and manage your entire card collection with real-time Scryfall data.
+Auto-permission: the system dialog is presented immediately on first launch
+OCR toggle: pause and resume recognition with one tap to reposition freely
+Tap-to-focus: tap the preview to focus and toggle OCR simultaneously
+Auto-pause after add: prevents double-scanning the same card
+Flash toggle (state preserved across the confirm sheet)
+Debounced search (200 ms) with a two-stage lookup: full-text → exact-name fallback
+Confirm sheet with foil, condition, language, and quantity
 
-- Search by card name in English, Spanish, and German
-- Filter by colour (W/U/B/R/G + Multicolour + Colourless) with official mana SVG icons
-- Filter by rarity, mana value, format legality, price, oracle text, and trade status
-- Grid and list view with toggle
-- Card detail with double-faced card support and art crop
-- Edit quantity, condition, language, foil, and alternative-art flag per copy
-- Wishlist mode: the same card can exist in your collection and your wishlist simultaneously
-- Batch price refresh via Scryfall collection endpoint
-- Stale-cache indicator when Scryfall data could not be refreshed
+📁 Collection Manager
+Search and manage your entire collection with real-time Scryfall data.
 
-### 🏷 Automatic Card Tagging
-Cards are tagged automatically as they enter your collection using oracle text analysis.
+Search by card name in English, Spanish, and German
+Filter by colour (W/U/B/R/G + Multicolour + Colourless) with official mana SVG icons
+Filter by rarity, mana value, format legality, price, oracle text, and trade status
+Grid and list views
+Card detail with double-faced card support and art crop
+Edit quantity, condition, language, foil, and alternative-art flag per copy
+Wishlist mode: a card can live in both your collection and your wishlist
+Batch price refresh via the Scryfall collection endpoint
+Stale-cache indicator when Scryfall data could not be refreshed
 
-- 30+ built-in tags across categories: Keyword, Strategy, Role, Archetype, Tribal
-- Tags with confidence scores: auto-confirmed above threshold, suggested below
-- Multilingual pattern matching (EN/ES/DE)
-- User-overridable tag dictionary: edit labels, patterns, and categories per tag
-- Add completely new tags with custom labels and detection patterns
-- Configurable auto-confirm and suggest thresholds via sliders
-- Tags feed the deck builder's synergy scoring engine
+🏷 Automatic Card Tagging
+Cards are tagged automatically as they enter your collection, via oracle-text analysis.
 
-### 🃏 Deck Builder
+30+ built-in tags across Keyword, Strategy, Role, Archetype, and Tribal categories
+Confidence scores: auto-confirmed above threshold, suggested below
+User-overridable tag dictionary: edit labels, patterns, and categories
+Add brand-new tags with custom labels and detection patterns
+Configurable auto-confirm and suggest thresholds
+Tags feed the deck builder's synergy scoring engine
+
+🃏 Deck Builder
 Build decks with an intelligent suggestion engine that analyses synergies between your cards.
 
-- Three-step flow: Setup → Suggestions → Review
-- Choose a seed strategy (Tokens, +1/+1 Counters, Ramp, Control, Combo, Graveyard, Burn, Tribal)
-- Card suggestions scored by tag overlap, mana curve fit, colour identity, and collection ownership
-- Mainboard and sideboard tabs
-- Sideboard change recommendations based on post-game survey patterns
-- Mana curve chart
-- Import deck from text (Moxfield/MTGO format)
-- Export deck to clipboard
-- Basic land auto-calculator
-- Format validation (Standard, Pioneer, Modern, Commander, Casual)
+Three-step flow: Setup → Suggestions → Review
+Seed strategies (Tokens, +1/+1 Counters, Ramp, Control, Combo, Graveyard, Burn, Tribal)
+Suggestions scored by tag overlap, mana-curve fit, colour identity, and collection ownership
+Mainboard and sideboard tabs
+Sideboard recommendations based on post-game survey patterns
+Mana-curve chart and basic-land auto-calculator
+Import / export in Moxfield / MTGO text format
+Format validation (Standard, Pioneer, Modern, Commander, Casual)
+Deck Improvement screen for upgrading an existing list
+Standalone Synergy Explorer to inspect card interactions
 
-### 📰 MTG News
-Stay up to date with the Magic community directly from the app.
+👥 Friends
 
-- Aggregates articles and videos from configurable RSS/Atom sources
-- Separate tabs for articles and YouTube videos
-- Filter by language (EN/ES/DE)
-- Articles open in Chrome Custom Tabs
-- Videos link directly to YouTube
-- Add, enable, or disable individual news sources
+Send and receive friend requests (incoming / outgoing)
+Invite by shareable link or QR
+Search players by Game Tag
+Browse a friend's collection
+Head-to-head stats and match history per friend
 
-### 📺 Draft Guide
-Set-by-set draft guidance with tier lists, strategy breakdowns, and curated video content.
+🔄 Trades
 
-- Browse draftable sets with release dates and card counts
-- Per-set tier lists with card-by-card ratings
-- Strategy guide with archetype breakdown and key cards
-- YouTube video integration — watch draft guides without leaving the app
-- Offline-capable with local asset caching
+Trade proposals with full negotiation: counter-offer, edit, accept, decline, cancel, revoke acceptance, mark completed
+Wishlist and open-for-trade lists (local, with remote sync)
+Shared lists published via a public link
+Server-generated trade suggestions
+Migration of local lists to your account when you sign in
 
-### 📊 Statistics
-Deep analytics on your collection and game history.
+📰 MTG News
 
-- Collection value in USD or EUR with automatic Scryfall price refresh
-- Mana curve and colour distribution charts
-- Win rate, average life on win/loss, average game duration, average win turn
-- Per-deck win rate with dedicated stats table
-- Favourite game mode and most frequent elimination reason
-- Current win streak
-- Survey-derived insights: mana health, opening hand ratings, favourite win style
+Aggregates articles and videos from configurable RSS / Atom sources
+Separate tabs for articles and YouTube videos
+Filter by language (EN/ES)
+Articles open in Chrome Custom Tabs
+Add, enable, or disable individual sources
 
-### 👤 Profile
-A personalised dashboard that grows with your play history.
+📺 Draft Guide
+Set-by-set draft guidance with tier lists, strategy breakdowns, and curated videos.
 
-- Player name and avatar customisation
-- Play style auto-detected from your history (Aggro, Midrange, Control, Balanced)
-- 15 unlockable achievements (First Blood, Dominant, Poison Master, High Roller, and more)
-- Collection insights: favourite colour, most valuable colour identity
-- Recent game history with W/L badges and duration
-- Best deck highlighted by win rate
-- Mana issue rate and hand quality from survey data
-- **Send Feedback** — compose a message and optionally attach an image from your photo library; sent to the developer via your device's email app. No data is transmitted by ManaHub itself.
+Browse draftable sets with release dates and card counts
+Per-set tier lists with card-by-card ratings
+Strategy guide with archetype breakdowns and key cards
+Integrated YouTube video content
+Offline-capable with local asset caching
+Content served from a Cloudflare Worker backed by R2 storage
 
-### 🏆 Tournaments
-Organise local tournaments with automatic bracket generation and live standings.
+📊 Statistics
 
-- Round Robin, Swiss, and Single Elimination formats
-- Configurable matches per pairing (best of 1/2/3)
-- Random or manual pairings
-- Standings with points system (Win = 3 pts) and life-total tiebreaker
-- Matches launch directly into the life counter — results recorded automatically
-- Manual result entry when playing without the app
+Collection value in USD or EUR with automatic Scryfall price refresh
+Mana-curve and colour-distribution charts
+Win rate, average life on win/loss, average game duration, average win turn
+Per-deck win rate
+Favourite game mode and most frequent elimination reason
+Current win streak
+Survey-derived insights: mana health, opening-hand ratings, favourite win style
 
-### 📋 Post-Game Survey
-An optional 2-minute review after each game that feeds your analytics.
+👤 Profile
 
-- Contextual questions based on what happened (commander damage, sideboard, loss reason)
-- Opening hand quality rating
-- Mana health assessment (smooth, flooded, screwed, inconsistent)
-- Result-feel rating (dominant, close, lucky, skillful)
-- Card impact assessment for cards in played decks
-- Responses surfaced as insights in the Profile screen
-- Data feeds deck synergy scoring for future suggestions
+Player name and avatar
+Play style auto-detected from history (Aggro, Midrange, Control, Balanced)
+15 unlockable achievements
+Collection insights (favourite colour, most valuable colour identity)
+Recent game history with W/L badges
+Best deck highlighted by win rate
+Mana-issue rate and hand quality from survey data
+Send Feedback — compose a message with an optional image, sent to the developer via your device's email app. No data is transmitted by ManaHub itself.
 
-### ⚙ Settings
-- App language (English, Spanish, German)
-- Card language preference for oracle text and printed text
-- News language filter
-- Preferred currency (USD / EUR)
-- Auto-refresh prices on app launch toggle
-- Visual theme (Neon Void, Medieval Grimoire, Arcane Cosmos)
+🏆 Tournaments
 
----
+Round Robin, Swiss, and Single Elimination formats
+Configurable matches per pairing (best of 1/2/3)
+Random or manual pairings
+Standings with a points system (Win = 3 pts) and life-total tiebreaker
+Matches launch directly into the life counter, recording results automatically
+Manual result entry supported
 
-## Screenshots
+📋 Post-Game Survey
+An optional ~2-minute review after each game that feeds your analytics.
 
-*Coming soon*
+Contextual questions based on what happened (commander damage, sideboard, loss reason)
+Opening-hand quality rating
+Mana-health assessment (smooth, flooded, screwed, inconsistent)
+Result-feel rating (dominant, close, lucky, skillful)
+Per-card impact assessment
+Insights surfaced in the Profile screen and used to refine deck suggestions
 
----
+🔐 Account & Sync
 
-## Tech Stack
+Sign up / sign in with email + password or Google
+Auto-generated Game Tag (e.g. #A3KX9Z) as your unique identifier
+Link a Google identity, reset password, change nickname, delete account
+Encrypted session stored on disk
+Background cloud sync of collection, decks, and stats via WorkManager
 
-| Layer | Technology |
-|---|---|
-| Language | Kotlin |
-| UI | Jetpack Compose + Material 3 |
-| Architecture | MVVM + Clean Architecture (feature modules) |
-| Database | Room 2.8 with full migration history (v1→21) |
-| Dependency Injection | Hilt |
-| Networking | Retrofit 3 + OkHttp 5 |
-| Image Loading | Coil 2 with SVG decoder |
-| Camera | CameraX |
-| OCR | ML Kit Text Recognition (on-device) |
-| Card Data | Scryfall API |
-| Video | YouTube Data API v3 |
-| Async | Kotlin Coroutines + Flow |
-| Preferences | Jetpack DataStore |
-| Navigation | Navigation Compose |
-| Build | KSP, Gradle Kotlin DSL |
-| Min SDK | 29 (Android 10) |
-| Target SDK | 35 (Android 15) |
+⚙ Settings
 
----
+App language (English, Spanish, German)
+Card-text language preference
+News language filter
+Preferred currency (USD / EUR)
+Auto-refresh prices on launch toggle
+Visual theme (Neon Void, Medieval Grimoire, Arcane Cosmos)
 
-## Architecture
 
-```
+Screenshots
+Coming soon
+
+Tech Stack
+LayerTechnologyVersionLanguageKotlin2.3.20BuildAGP / Gradle Kotlin DSL / KSPAGP 9.1.0 · KSP 2.3.6UIJetpack Compose (BOM) + Material 3BOM 2026.03.01 · M3 1.4.0ArchitectureMVVM + Clean Architecture (feature modules)—Dependency InjectionHilt2.59.2DatabaseRoom (exported schemas, DB v35)2.8.4NetworkingRetrofit + OkHttp3.0.0 / 5.3.2Backend HTTP clientKtor (used by Supabase)3.1.3Image loadingCoil + SVG decoder2.7.0CameraCameraX1.6.0OCRML Kit Text Recognition (on-device, + JP/KR)16.0.1AsyncCoroutines + Flow1.10.2PreferencesJetpack DataStore1.2.1NavigationNavigation Compose2.9.7PagingPaging 3 + room-paging3.3.6Background workWorkManager + Hilt Work2.10.1Backend (BaaS)Supabase (auth + postgrest + realtime)BOM 3.1.4Google Sign-InCredentials API + googleid1.5.0 / 1.1.1TelemetryFirebase Analytics + CrashlyticsBOM 34.12.0Securityandroidx.security-crypto (encrypted session)1.1.0-alpha07VideoYouTube Player + YouTube Data API v313.0.0In-person multiplayerGoogle Nearby Connections19.3.0Card dataScryfall API—
+SDK: minSdk = 29 (Android 10) · targetSdk = 35 (Android 15) · compileSdk = 36. JDK 17.
+Release builds use R8 (minification + resource shrinking) with a custom proguard-rules.pro. Sensitive values (YOUTUBE_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, GOOGLE_CLIENT_ID, CLOUDFLARE_WORKER_URL) are injected via BuildConfig from local.properties (git-ignored) or CI environment variables.
+
+Architecture
+Clean Architecture by layer (data / domain / presentation) within each module. Root package: com.mmg.manahub.
 app/
+├── app/
+│   ├── ManaHubApp.kt        — @HiltAndroidApp; schedules workers, inits Crashlytics, syncs mana symbols
+│   ├── MainActivity.kt      — singleTask, deep links, App Links
+│   └── navigation/          — AppNavGraph.kt, Screen.kt (sealed routes)
 ├── core/
+│   ├── auth/                — EncryptedSessionManager (encrypted on-disk session)
 │   ├── data/
-│   │   ├── local/          — Room entities, DAOs, migrations (v1→21)
-│   │   ├── remote/         — Scryfall API, DTOs, mappers
-│   │   └── repository/     — Repository implementations + CachePolicy
-│   ├── domain/
-│   │   ├── model/          — Domain models
-│   │   ├── repository/     — Repository interfaces
-│   │   └── usecase/        — Business logic use cases
-│   ├── network/            — OkHttp client, rate-limiting request queue
-│   ├── tagging/            — Tag dictionary, analyzers, override repository
-│   └── ui/
-│       ├── components/     — Shared composables (MagicToast, AddToCollectionSheet, …)
-│       └── theme/          — NeonVoid / Medieval Grimoire / Arcane Cosmos themes
+│   │   ├── local/           — Room: MtgDatabase (v35), DAOs, entities, converters, paging, mappers
+│   │   ├── remote/          — Scryfall API, DTOs, mappers
+│   │   └── repository/      — repository implementations + cache policy
+│   ├── di/                  — Hilt modules (Analytics, Crashlytics, Coroutines, Dispatchers, Database, Repository, Supabase, Sync)
+│   ├── domain/              — shared models, repository interfaces, use cases
+│   ├── nearby/              — Nearby Connections (P2P) for in-person games
+│   ├── network/             — OkHttp client, rate-limiting request queue (≤10 req/s for Scryfall)
+│   ├── online/              — online sessions (Supabase Realtime): repos, use cases, models
+│   ├── sync/                — WorkManager workers: CollectionSyncWorker, CollectionStatsSyncWorker, PriceRefreshWorker, SyncManager
+│   ├── tagging/             — TagDictionary, TagAnalyzers, override repository
+│   ├── ui/                  — shared composables + themes
+│   └── util/                — utilities
 └── feature/
-    ├── addcard/            — Card search + advanced search + set picker
-    ├── carddetail/         — Card detail + tag management
-    ├── collection/         — Collection browse + filters
-    ├── decks/              — Deck list, detail, builder, import/export
-    ├── draft/              — Draft guide, tier lists, set videos
-    ├── game/               — Game setup, life counter, phase tracker, result screen
-    ├── news/               — MTG news articles + YouTube videos
-    ├── profile/            — Player profile, achievements, insights
-    ├── scanner/            — OCR camera scanner
-    ├── settings/           — App preferences
-    ├── stats/              — Collection statistics
-    ├── survey/             — Post-game survey engine
-    ├── synergy/            — Card synergy explorer
-    ├── tagdictionary/      — Tag dictionary editor
-    └── tournament/         — Tournament setup and live standings
-```
+├── addcard/             — card search + advanced search + set picker
+├── auth/                — sign-in/up, account management
+├── carddetail/          — card detail + tag management
+├── collection/          — collection browse + filters
+├── decks/               — deck list, detail, builder, import/export, improvement
+├── draft/               — draft guide, tier lists, set videos
+├── friends/             — friend list, invites, detail (folder/history/stats)
+├── game/                — game setup, life counter, phase tracker, result screen
+├── news/                — MTG news articles + YouTube videos
+├── online/              — host/join lobby, deep-link join
+├── profile/             — player profile, achievements, insights
+├── scanner/             — OCR camera scanner
+├── settings/            — app preferences
+├── splash/              — startup screen
+├── stats/               — collection & game statistics
+├── survey/              — post-game survey engine
+├── synergy/             — card synergy explorer
+├── tagdictionary/       — tag dictionary editor
+├── tournament/          — tournament setup and live standings
+└── trades/              — proposals, negotiation, wishlist, open-for-trade, shared lists
+The initial navigation destination is the Collection screen.
 
----
+Backend & External Services
+Supabase (primary BaaS)
 
-## API & External Services
+Auth: email/password + Google. Passwords are stored only as a bcrypt hash and are never readable by the developer.
+Postgres tables: profiles, friendships, friend_requests, trades, trade_proposals, wishlists, open_for_trade, shared_lists, online_sessions, session_participants, player_states.
+RPC functions: batch_upsert_collection, batch_upsert_decks, upsert_deck_cards, get_deck_cards_for_deck, get_collection_changes_since, get_deck_changes_since, create_proposal, counter_proposal, edit_proposal, resolve_shared_list, get_suggestions_for_card, get_trade_suggestions, refresh_trade_suggestions, get_my_active_session(s).
+Realtime: online game session state.
+Email templates: in supabase/email-templates/ (sign-up confirmation, password reset, email/password change, user invite).
 
-### Scryfall API
-ManaHub uses the [Scryfall API](https://scryfall.com/docs/api) for card data, prices, images, and set information.
+Cloudflare Worker — manahub-draft-api
+Serves Draft Guide data from an R2 bucket (manahub-assets).
 
-- All requests include the required `User-Agent: ManaHub/1.0 Android` and `Accept` headers per Scryfall's guidelines
-- A rate-limiting queue enforces ≤10 req/s
-- Card and set data is cached in Room; prices refresh on demand or on launch if auto-refresh is enabled
-- Batch price updates use the `/cards/collection` endpoint in chunks of 75 (capped at 1,000 IDs per call)
+Routes: /draft/sets-index.json, /draft/{setCode}/guide.json, /draft/{setCode}/tier-list.json
+ETag-based caching (304 Not Modified) with Cache-Control: max-age=300, stale-while-revalidate=60
+GET/HEAD only, open CORS
+Default URL: https://manahub-draft-api.miguel-mglez.workers.dev/
 
-### YouTube Data API v3
-The Draft Guide fetches set-specific video content from YouTube. The API key is stored in `local.properties` and injected via `BuildConfig` — it is never hardcoded in source or visible in network logs.
+Scryfall API
+Card data, prices, images, and set information.
 
-### ML Kit (Google)
-Text recognition runs entirely **on-device**. No camera frames or OCR results are transmitted externally.
+All requests include the required User-Agent: ManaHub/1.0 Android and Accept headers
+A rate-limiting queue enforces ≤10 req/s
+Card and set data is cached in Room; prices refresh on demand or on launch (if enabled)
+Batch price updates use the /cards/collection endpoint in chunks of 75 (capped at 1,000 IDs per call)
 
-### RSS / Atom Feeds
-The News feature fetches article content from publicly available RSS feeds. Feed URLs are stored locally and no user data is attached to these requests.
+YouTube Data API v3
+Set-specific videos for the Draft Guide and News. The API key is injected via BuildConfig; if absent, the feature is gracefully disabled (no crash).
+ML Kit (Google)
+Text recognition runs entirely on-device. No camera frames or OCR results are transmitted externally.
+RSS / Atom Feeds
+The News feature fetches content from publicly available feeds. Feed URLs are stored locally and no user data is attached.
+App Links (GitHub Pages)
 
----
+https://miguelmglez.github.io/list/{shareId} → shared trade lists
+https://miguelmglez.github.io/invite/{code} → friend invites
+Custom-scheme fallbacks: manahub://invite/{code} and manahub://auth (Supabase email verification)
+assetlinks.json provided under .well-known/ for App Link verification
 
-## Security
 
-- Network traffic restricted to HTTPS via `network_security_config.xml` (`cleartextTrafficPermitted="false"`)
-- HTTP logging (`HttpLoggingInterceptor`) is `BODY` level in debug builds only; `NONE` in release
-- Room database and DataStore excluded from Google Drive auto-backup via `backup_rules.xml` and `data_extraction_rules.xml`
-- Release builds use R8 minification and resource shrinking with a custom `proguard-rules.pro`
-- YouTube API key injected via OkHttp interceptor — not visible in Retrofit signatures or Logcat
-- Scryfall search queries sanitised with an allowlist before being appended to API URLs
-- Camera frames never leave the device (ML Kit on-device processing)
+Data & Privacy
+ManaHub is local-first. The following lives only on your device and is never transmitted unless explicitly noted:
 
----
+Collection, decks, game history, surveys, tournaments, Scryfall metadata cache (Room) · name, avatar, currency, languages, tag dictionary, settings (DataStore).
 
-## Getting Started
+If you create an account, only the following is stored on Supabase: email, nickname, Game Tag, and auth provider. Passwords are bcrypt-hashed. No location is collected. No ads. No data selling. See PRIVACY_POLICY.md for the full policy.
 
-### Prerequisites
+Security
 
-- Android Studio Meerkat or later
-- JDK 17 (bundled with Android Studio)
-- Android SDK 35
+Traffic restricted to HTTPS via network_security_config.xml (cleartextTrafficPermitted="false")
+HttpLoggingInterceptor is BODY level in debug only; NONE in release
+Room and DataStore excluded from Google Drive auto-backup (backup_rules.xml, data_extraction_rules.xml)
+Release builds use R8 minification and resource shrinking with a custom proguard-rules.pro
+YouTube API key injected via an OkHttp interceptor — not visible in Retrofit signatures or Logcat
+Scryfall search queries sanitised with an allowlist before being appended to API URLs
+Camera frames never leave the device (on-device ML Kit)
+User session encrypted on disk (EncryptedSessionManager + security-crypto)
 
-### Clone and build
 
-```bash
-git clone https://github.com/Miguelmglez/Magic_Folder.git
-cd Magic_Folder
+Getting Started
+Prerequisites
+
+Android Studio Meerkat or later
+JDK 17 (bundled with Android Studio)
+Android SDK 35
+
+Clone and build
+bashgit clone https://github.com/Miguelmglez/ManaHub.git
+cd ManaHub
 ./gradlew assembleDebug
-```
+Configure local.properties
+Required keys are marked with *:
+propertiesSUPABASE_URL=...            # *
+SUPABASE_ANON_KEY=...       # *
+GOOGLE_CLIENT_ID=...        # *
+YOUTUBE_API_KEY=...         # optional — Draft Guide videos disabled if absent
+CLOUDFLARE_WORKER_URL=...   # optional — has a default
 
-### YouTube API key (optional)
+# Release signing (optional)
+KEY_STORE_PATH=
+KEY_STORE_PASSWORD=
+KEY_ALIAS=
+KEY_PASSWORD=
+Open the project in Android Studio and run the app configuration on a device or emulator running Android 10 (API 29) or higher. Camera features require a physical device.
 
-The Draft Guide video feature requires a YouTube Data API v3 key. Without it the feature is gracefully disabled (no crash). To enable it:
-
-1. Create a key at [Google Cloud Console](https://console.cloud.google.com/)
-2. Add it to `local.properties` (this file is git-ignored):
-```properties
-YOUTUBE_API_KEY=your_key_here
-```
-
-### Run on device or emulator
-
-Open the project in Android Studio and run the `app` configuration on a device or emulator running Android 10 (API 29) or higher. Camera features require a physical device.
-
----
-
-## Testing
-
-The project includes **270+ unit tests** and **10 instrumented Room tests**.
-
-```bash
-# Unit tests
+Testing
+The project includes ~970 unit-test methods (47 files) plus instrumented Room tests.
+bash# Unit tests
 ./gradlew test
 
 # Instrumented tests (requires connected device/emulator)
 ./gradlew connectedAndroidTest
-```
+Coverage spans repositories (Card, UserCard, Deck, GameSession, Tournament…), use cases, and ViewModels (Game, Tournament, Collection, AddCard, CardDetail, Scanner, Survey, Settings, Profile, TagDictionary…). A key instrumented regression test ensures the card upsert (CASCADE) never deletes the user's cards.
+Test stack: JUnit 4, MockK, Turbine, kotlinx-coroutines-test, arch-core-testing, Espresso, room-testing.
 
-### Test coverage
+Roadmap
+Implemented
+Life counter with full Commander support · collection manager with Scryfall integration and automatic tagging · OCR card scanner · deck builder with synergy engine and import/export · draft guide with tier lists and videos · MTG news aggregator · post-game survey and analytics · tournaments (Round Robin, Swiss, Single Elimination) · player profile with achievements · tag dictionary editor · accounts (Supabase + Google) · friends · trades with shared lists · online multiplayer (Realtime) · in-person multiplayer (Nearby) · cloud sync.
+Planned (v2)
 
-| Area | Type |
-|---|---|
-| CardRepository, UserCardRepository | Unit + Room instrumented |
-| DeckRepository, GameSessionRepository, TournamentRepository | Unit |
-| AddCardToCollectionUseCase, CollectionUseCases | Unit |
-| GameViewModel, TournamentViewModel, CollectionViewModel | Unit |
-| AddCardViewModel, CardDetailViewModel, ScannerViewModel | Unit |
-| SurveyViewModel, SettingsViewModel, ProfileViewModel | Unit |
-| TagDictionaryRepository, TagDictionaryViewModel | Unit |
-| CardDao CASCADE regression (upsert must not delete user cards) | Room in-memory |
+Daily puzzle (Wordle-style MTG scenarios) — route stub already in place
+Additional visual themes
+Tablet and foldable layout support
+Play Store release
 
----
 
-## Roadmap
-
-### v1 — Current
-- Life counter with full Commander support
-- Collection manager with Scryfall integration and automatic tagging
-- OCR card scanner with tap-to-focus
-- Deck builder with synergy engine and import/export
-- Draft guide with tier lists and YouTube videos
-- MTG news aggregator
-- Post-game survey and analytics
-- Tournaments (Round Robin, Swiss, Single Elimination)
-- Player profile with achievements
-- Tag Dictionary editor
-
-### v2 — Planned
-- Online multiplayer (Firebase Realtime Database)
-- Trading system (local and online)
-- Daily puzzle (Wordle-style MTG scenarios)
-- Multiple visual themes (additional presets)
-- Tablet and foldable layout support
-- Play Store release
-
----
-
-## Contributing
-
+Contributing
 This project is currently in active development. Issues and pull requests are welcome once v1 is stable.
 
----
-
-## Legal
-
+Legal
 ManaHub is an unofficial fan project and is not affiliated with, endorsed by, or sponsored by Wizards of the Coast.
-
 Magic: The Gathering and all associated card names, imagery, and lore are intellectual property of Wizards of the Coast LLC.
+Card data and images are provided by Scryfall under their terms of service.
+Set symbols and mana symbols are copyright Wizards of the Coast and are used in accordance with their fan content policy.
 
-Card data and images are provided by [Scryfall](https://scryfall.com) under their [terms of service](https://scryfall.com/docs/terms).
+License
+This project is licensed under the MIT License — see the LICENSE file for details.
 
-Set symbols and mana symbols are copyright Wizards of the Coast and are used in accordance with their [fan content policy](https://company.wizards.com/en/legal/fancontentpolicy).
-
----
-
-## License
-
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
----
-
-*Built with ☕ and too many Commander games.*
+Built with ☕ and too many Commander games.

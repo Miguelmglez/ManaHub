@@ -71,6 +71,11 @@ sealed class NearbyGameMessage {
     @SerialName("defeat_revoked")
     data class DefeatRevoked(val slot: Int) : NearbyGameMessage()
 
+    /** Notifies all peers that the active player has toggled their land-played status. */
+    @Serializable
+    @SerialName("land_toggled")
+    data class LandToggled(val slot: Int, val played: Boolean) : NearbyGameMessage()
+
     /** Notifies all peers that the game has ended with a winner. */
     @Serializable
     @SerialName("game_finished")

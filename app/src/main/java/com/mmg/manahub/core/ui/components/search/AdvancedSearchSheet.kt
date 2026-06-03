@@ -126,14 +126,10 @@ fun AdvancedSearchSheet(
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { newValue ->
-            newValue != SheetValue.Hidden || canDismiss
-        }
+        confirmValueChange = { it != SheetValue.Hidden }
     )
 
     fun handleDismiss() {
-        if (canDismiss) return
-        canDismiss = true
         scope.launch {
             sheetState.hide()
             onDismiss()

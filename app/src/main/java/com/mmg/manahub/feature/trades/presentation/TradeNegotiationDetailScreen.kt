@@ -560,7 +560,6 @@ private fun ItemsSection(
             hasFoil = item.isFoil == true,
             condition = item.condition?.takeIf { it.isNotBlank() },
             language = item.language?.takeIf { it.isNotBlank() },
-            isAltArt = item.isAltArt == true,
             setCode = item.setCode,
             setName = item.setName,
             rarity = item.rarity,

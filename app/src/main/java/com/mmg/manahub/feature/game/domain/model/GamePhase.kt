@@ -1,38 +1,22 @@
 package com.mmg.manahub.feature.game.domain.model
 
-enum class GamePhase {
-    UNTAP, UPKEEP, DRAW, MAIN1,
-    BEGIN_COMBAT, DECLARE_ATTACKERS, DECLARE_BLOCKERS,
-    COMBAT_DAMAGE, END_COMBAT,
-    MAIN2, END_STEP, CLEANUP,
-}
+import androidx.annotation.StringRes
+import com.mmg.manahub.R
 
-val GamePhase.displayName: String get() = when (this) {
-    GamePhase.UNTAP              -> "Untap"
-    GamePhase.UPKEEP             -> "Upkeep"
-    GamePhase.DRAW               -> "Draw"
-    GamePhase.MAIN1              -> "Main Phase I"
-    GamePhase.BEGIN_COMBAT       -> "Begin Combat"
-    GamePhase.DECLARE_ATTACKERS  -> "Declare Attackers"
-    GamePhase.DECLARE_BLOCKERS   -> "Declare Blockers"
-    GamePhase.COMBAT_DAMAGE      -> "Combat Damage"
-    GamePhase.END_COMBAT         -> "End Combat"
-    GamePhase.MAIN2              -> "Main Phase II"
-    GamePhase.END_STEP           -> "End Step"
-    GamePhase.CLEANUP            -> "Cleanup"
-}
-
-val GamePhase.shortName: String get() = when (this) {
-    GamePhase.UNTAP              -> "Untap"
-    GamePhase.UPKEEP             -> "Upkeep"
-    GamePhase.DRAW               -> "Draw"
-    GamePhase.MAIN1              -> "Main I"
-    GamePhase.BEGIN_COMBAT       -> "Combat ▶"
-    GamePhase.DECLARE_ATTACKERS  -> "Attackers"
-    GamePhase.DECLARE_BLOCKERS   -> "Blockers"
-    GamePhase.COMBAT_DAMAGE      -> "Damage"
-    GamePhase.END_COMBAT         -> "End Combat"
-    GamePhase.MAIN2              -> "Main II"
-    GamePhase.END_STEP           -> "End"
-    GamePhase.CLEANUP            -> "Cleanup"
+enum class GamePhase(
+    @StringRes val displayNameRes: Int,
+    @StringRes val shortNameRes: Int,
+) {
+    UNTAP(R.string.game_phase_untap, R.string.game_phase_untap),
+    UPKEEP(R.string.game_phase_upkeep, R.string.game_phase_upkeep),
+    DRAW(R.string.game_phase_draw, R.string.game_phase_draw),
+    MAIN1(R.string.game_phase_main1, R.string.game_phase_short_main1),
+    BEGIN_COMBAT(R.string.game_phase_begin_combat, R.string.game_phase_short_begin_combat),
+    DECLARE_ATTACKERS(R.string.game_phase_declare_attackers, R.string.game_phase_short_declare_attackers),
+    DECLARE_BLOCKERS(R.string.game_phase_declare_blockers, R.string.game_phase_short_declare_blockers),
+    COMBAT_DAMAGE(R.string.game_phase_combat_damage, R.string.game_phase_short_combat_damage),
+    END_COMBAT(R.string.game_phase_end_combat, R.string.game_phase_end_combat),
+    MAIN2(R.string.game_phase_main2, R.string.game_phase_short_main2),
+    END_STEP(R.string.game_phase_end_step, R.string.game_phase_short_end_step),
+    CLEANUP(R.string.game_phase_cleanup, R.string.game_phase_cleanup),
 }

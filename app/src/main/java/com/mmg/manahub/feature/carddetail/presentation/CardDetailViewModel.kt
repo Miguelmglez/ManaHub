@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.carddetail.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.model.TagCategory
@@ -23,6 +24,7 @@ import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -61,6 +63,9 @@ class CardDetailViewModel @Inject constructor(
     // One-shot UI events (toasts, navigation, etc.)
     private val _events = MutableSharedFlow<CardDetailEvent>(extraBufferCapacity = 8)
     val events: SharedFlow<CardDetailEvent> = _events.asSharedFlow()
+
+    // Tracks the in-flight variant-load coroutine so it can be cancelled on dismiss.
+    private var variantJob: Job? = null
 
     init {
         loadCard()
@@ -159,17 +164,52 @@ class CardDetailViewModel @Inject constructor(
     fun onDismissWishlistDeleteConfirm() = _uiState.update { it.copy(wishlistEntryToDelete = null) }
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 
+    // ── Variant (other prints) selector ─────────────────────────────────────────
+
+    /** Opens the variant selector and loads all art variants for the current card. */
+    fun onOpenVariantSelector() {
+        val cardName = _uiState.value.card?.name ?: return
+        variantJob?.cancel()
+        _uiState.update { it.copy(showVariantSelector = true, isLoadingVariants = true, cardVariants = emptyList()) }
+        variantJob = viewModelScope.launch {
+            try {
+                when (val result = cardRepo.getCardArtVariants(cardName)) {
+                    is DataResult.Success -> _uiState.update { it.copy(cardVariants = result.data, isLoadingVariants = false) }
+                    is DataResult.Error -> {
+                        _uiState.update { it.copy(isLoadingVariants = false) }
+                        _events.emit(CardDetailEvent.ShowToast("Could not load other prints", ToastSeverity.ERROR))
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(isLoadingVariants = false) }
+            }
+        }
+    }
+
+    fun onCloseVariantSelector() {
+        variantJob?.cancel()
+        _uiState.update { it.copy(showVariantSelector = false, cardVariants = emptyList(), isLoadingVariants = false, expandedVariantImageUrl = null) }
+    }
+
+    /** Picks a variant; emits a [CardDetailEvent.NavigateToCard] one-shot event. */
+    fun onSelectVariant(card: Card) {
+        _uiState.update { it.copy(showVariantSelector = false) }
+        viewModelScope.launch { _events.emit(CardDetailEvent.NavigateToCard(card.scryfallId)) }
+    }
+
+    fun onExpandVariantImage(url: String) = _uiState.update { it.copy(expandedVariantImageUrl = url) }
+    fun onCloseExpandedImage() = _uiState.update { it.copy(expandedVariantImageUrl = null) }
+
     // ── Collection mutations ──────────────────────────────────────────────────
 
     fun onAddToCollection(
-        isFoil: Boolean, isAlternativeArt: Boolean,
+        isFoil: Boolean,
         condition: String, language: String, quantity: Int,
     ) {
         viewModelScope.launch {
             val result = addToCollection(
                 scryfallId = scryfallId,
                 isFoil = isFoil,
-                isAlternativeArt = isAlternativeArt,
                 condition = condition,
                 language = language,
                 quantity = quantity,
@@ -191,7 +231,7 @@ class CardDetailViewModel @Inject constructor(
     }
 
     fun onAddToWishlist(
-        isFoil: Boolean, isAlternativeArt: Boolean,
+        isFoil: Boolean,
         condition: String, language: String, quantity: Int,
     ) {
         viewModelScope.launch {
@@ -204,7 +244,6 @@ class CardDetailViewModel @Inject constructor(
                 isFoil          = isFoil,
                 condition       = condition.uppercase().trim(),
                 language        = language.lowercase().trim(),
-                isAltArt        = isAlternativeArt,
                 createdAt       = System.currentTimeMillis(),
             )
             addToWishlistUseCase(entry)
@@ -270,7 +309,6 @@ class CardDetailViewModel @Inject constructor(
                             isFoil = uc.isFoil,
                             condition = uc.condition,
                             language = uc.language,
-                            isAltArt = uc.isAlternativeArt,
                             userId = userId,
                         )
                     } else {
@@ -281,7 +319,6 @@ class CardDetailViewModel @Inject constructor(
                             isFoil = uc.isFoil,
                             condition = uc.condition,
                             language = uc.language,
-                            isAltArt = uc.isAlternativeArt,
                         )
                     }
                     tradeResult.onFailure { e ->

@@ -166,7 +166,7 @@ fun GlobalToolsOverlay(
                 ),
         ) {
             Text(
-                text = if (state.isExpanded) "×" else "✦",
+                text = if (state.isExpanded) stringResource(R.string.game_cross_symbol) else stringResource(R.string.game_star_symbol),
                 style = mt.titleMedium.copy(
                     fontSize = if (state.isExpanded) 20.sp else 14.sp,
                     lineHeight = 14.sp,
@@ -533,7 +533,7 @@ fun AnimatedCoin(
             ),
     ) {
         when {
-            isFlipping -> Text("✦", fontSize = 24.sp, color = mc.goldMtg)
+            isFlipping -> Text(stringResource(R.string.game_star_symbol), fontSize = 24.sp, color = mc.goldMtg)
             result == true -> {
                 Icon(
                     painter = painterResource(R.drawable.ic_heads),

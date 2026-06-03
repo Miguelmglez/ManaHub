@@ -100,10 +100,10 @@ class OnlineSessionRepositoryImplTest {
     fun `given remote returns CreateSessionResponseDto when createSession then returns Pair(sessionId, code)`() = runTest {
         // Arrange
         val dto = CreateSessionResponseDto(sessionId = SESSION_ID, code = SESSION_CODE)
-        coEvery { remoteDataSource.createSession("COMMANDER", 4, null) } returns Result.success(dto)
+        coEvery { remoteDataSource.createSession("COMMANDER", 4, null, any(), any()) } returns Result.success(dto)
 
         // Act
-        val result = repository.createSession("COMMANDER", 4, null)
+        val result = repository.createSession("COMMANDER", 4, null, "TestPlayer", "Crimson")
 
         // Assert
         assertTrue(result.isSuccess)
@@ -113,11 +113,11 @@ class OnlineSessionRepositoryImplTest {
     @Test
     fun `given remote fails when createSession then Result is failure`() = runTest {
         // Arrange
-        coEvery { remoteDataSource.createSession(any(), any(), any()) } returns
+        coEvery { remoteDataSource.createSession(any(), any(), any(), any(), any()) } returns
             Result.failure(RuntimeException("Session limit reached"))
 
         // Act
-        val result = repository.createSession("STANDARD", 2, null)
+        val result = repository.createSession("STANDARD", 2, null, "TestPlayer", "Crimson")
 
         // Assert
         assertTrue(result.isFailure)
@@ -128,14 +128,14 @@ class OnlineSessionRepositoryImplTest {
     fun `given layoutKey provided when createSession then it is forwarded to remote`() = runTest {
         // Arrange
         val dto = CreateSessionResponseDto(sessionId = SESSION_ID, code = SESSION_CODE)
-        coEvery { remoteDataSource.createSession("BRAWL", 2, "custom-layout") } returns Result.success(dto)
+        coEvery { remoteDataSource.createSession("BRAWL", 2, "custom-layout", any(), any()) } returns Result.success(dto)
 
         // Act
-        val result = repository.createSession("BRAWL", 2, "custom-layout")
+        val result = repository.createSession("BRAWL", 2, "custom-layout", "TestPlayer", "Crimson")
 
         // Assert
         assertTrue(result.isSuccess)
-        coVerify { remoteDataSource.createSession("BRAWL", 2, "custom-layout") }
+        coVerify { remoteDataSource.createSession("BRAWL", 2, "custom-layout", any(), any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

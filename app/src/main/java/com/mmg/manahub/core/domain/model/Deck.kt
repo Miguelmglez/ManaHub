@@ -64,7 +64,6 @@ data class AddCardRow(
         if (wish.matchAnyVariant) return true
         return wish.isFoil == offer.isFoil &&
                (wish.condition == null || wish.condition == offer.condition) &&
-               (wish.language == null || wish.language == offer.language) &&
-               wish.isAltArt == offer.isAltArt
+               (wish.language == null || wish.language == offer.language)
     }
 }

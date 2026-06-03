@@ -54,7 +54,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -62,7 +61,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.MagicTheme
@@ -75,16 +73,15 @@ import com.mmg.manahub.core.util.CardConstants
 @Composable
 fun AddCardSheet(
     cardName: String,
-    onConfirm: (isFoil: Boolean, isAlternativeArt: Boolean, condition: String, language: String, qty: Int) -> Unit,
+    onConfirm: (isFoil: Boolean, condition: String, language: String, qty: Int) -> Unit,
     onDismiss: () -> Unit,
     manaCost: String?,
     cardImage: String?,
-    closeButton: Boolean = false,
+    closeButton: Boolean = true,
     initialFoil: Boolean = false,
     initialCondition: String = "NM",
     initialLanguage: String = "en",
     initialQty: Int = 1,
-    initialAlternativeArt: Boolean = false,
     confirmButtonText: String = stringResource(R.string.scanner_add_to_collection),
     setCode: String? = null,
     setName: String? = null,
@@ -98,16 +95,14 @@ fun AddCardSheet(
     val languages = CardConstants.languages
 
     var isFoil by remember { mutableStateOf(initialFoil) }
-    var isAlternativeArt by remember { mutableStateOf(initialAlternativeArt) }
     var condition by remember { mutableStateOf(initialCondition) }
     var language by remember { mutableStateOf(initialLanguage) }
     var qty by remember { mutableIntStateOf(initialQty) }
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-    ) {
-        if (closeButton) it != SheetValue.Hidden else true
-    }
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -256,40 +251,7 @@ fun AddCardSheet(
                                     checkedTrackColor = mc.primaryAccent,
                                     uncheckedThumbColor = mc.textDisabled,
                                     uncheckedTrackColor = mc.surfaceVariant
-                                ),
-                                modifier = Modifier.scale(0.9f)
-                            )
-                        }
-                    }
-
-                    // Alternative art toggle
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        color = if (isAlternativeArt) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface,
-                        shape = RoundedCornerShape(16.dp),
-                        border = if (isAlternativeArt) BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)) else null,
-                        onClick = { isAlternativeArt = !isAlternativeArt }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                stringResource(R.string.carddetail_alternative_art),
-                                Modifier.weight(1f),
-                                style = ty.bodyLarge,
-                                color = if (isAlternativeArt) mc.primaryAccent else mc.textPrimary
-                            )
-                            Switch(
-                                checked = isAlternativeArt, 
-                                onCheckedChange = { isAlternativeArt = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = mc.background,
-                                    checkedTrackColor = mc.primaryAccent,
-                                    uncheckedThumbColor = mc.textDisabled,
-                                    uncheckedTrackColor = mc.surfaceVariant
-                                ),
-                                modifier = Modifier.scale(0.9f)
+                                )
                             )
                         }
                     }
@@ -430,8 +392,8 @@ fun AddCardSheet(
                         }
                         
                         Text(
-                            qty.toString(), 
-                            style = ty.displayMedium.copy(fontSize = 24.sp),
+                            qty.toString(),
+                            style = ty.titleLarge,
                             color = mc.primaryAccent,
                             modifier = Modifier.width(32.dp),
                             textAlign = TextAlign.Center
@@ -475,7 +437,6 @@ fun AddCardSheet(
                     onClick = {
                         onConfirm(
                             isFoil,
-                            isAlternativeArt,
                             condition,
                             language,
                             qty

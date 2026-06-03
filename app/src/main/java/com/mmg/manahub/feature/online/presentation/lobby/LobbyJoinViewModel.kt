@@ -1,8 +1,10 @@
 package com.mmg.manahub.feature.online.presentation.lobby
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
 import com.mmg.manahub.core.online.domain.model.ParticipantStatus
@@ -13,6 +15,7 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,6 +47,7 @@ class LobbyJoinViewModel @Inject constructor(
     private val leaveSessionUseCase: LeaveSessionUseCase,
     private val repository: OnlineSessionRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     // ── UI state ──────────────────────────────────────────────────────────────
@@ -90,8 +94,9 @@ class LobbyJoinViewModel @Inject constructor(
      */
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** Regex that accepts only uppercase alphanumeric characters (A-Z, 0-9). */
-    private val alphanumericRegex = Regex("^[A-Z0-9]+$")
+    private var gameLaunched = false
+
+    private val numericCodeRegex = Regex("^[0-9]{6}$")
 
     init {
         viewModelScope.launch {
@@ -106,11 +111,11 @@ class LobbyJoinViewModel @Inject constructor(
 
     /**
      * Updates the code input field.
-     * Characters are forced to uppercase and the string is capped at 6 characters.
+     * Only digits are accepted; capped at 6 characters.
      */
     fun onCodeChanged(code: String) {
         _uiState.update {
-            it.copy(codeInput = code.uppercase().take(6))
+            it.copy(codeInput = code.filter { c -> c.isDigit() }.take(6))
         }
     }
 
@@ -147,12 +152,9 @@ class LobbyJoinViewModel @Inject constructor(
         val state = _uiState.value
         if (state.sessionId != null) return // already joined
 
-        // Client-side validation: reject codes that are not exactly 6 uppercase alphanumeric
-        // characters before hitting the network. This prevents unnecessary backend calls and
-        // blocks injection attempts (e.g. SQL metacharacters, path traversal sequences).
-        if (state.codeInput.length != 6 || !alphanumericRegex.matches(state.codeInput)) {
+        if (!numericCodeRegex.matches(state.codeInput)) {
             _uiState.update {
-                it.copy(error = "Código inválido. Debe ser 6 caracteres alfanuméricos.")
+                it.copy(error = appContext.getString(R.string.lobby_error_invalid_code))
             }
             return
         }
@@ -163,7 +165,7 @@ class LobbyJoinViewModel @Inject constructor(
 
             joinSessionUseCase(
                 code = state.codeInput,
-                displayName = state.displayName.ifBlank { "Player" },
+                displayName = state.displayName.ifBlank { appContext.getString(R.string.lobby_player_default_name) },
                 themeKey = state.selectedThemeKey,
             ).fold(
                 onSuccess = { (sessionId, slotIndex) ->
@@ -311,6 +313,7 @@ class LobbyJoinViewModel @Inject constructor(
                         _uiState.value.sessionStatus != OnlineSessionStatus.ACTIVE
                     ) {
                         val s = _uiState.value
+                        gameLaunched = true
                         _uiState.update { it.copy(sessionStatus = OnlineSessionStatus.ACTIVE) }
                         crashlytics.log("online_session_game_started_via_poll: slot=${s.slotIndex}")
                         onGameStart(sessionId, s.slotIndex, s.sessionMode, s.sessionPlayerCount)
@@ -343,6 +346,7 @@ class LobbyJoinViewModel @Inject constructor(
                 when (event.status) {
                     OnlineSessionStatus.ACTIVE -> {
                         val s = _uiState.value
+                        gameLaunched = true
                         crashlytics.log("online_session_game_started: slot_index=${s.slotIndex} mode=${s.sessionMode}")
                         onGameStart(sessionId, s.slotIndex, s.sessionMode, s.sessionPlayerCount)
                     }
@@ -383,18 +387,18 @@ class LobbyJoinViewModel @Inject constructor(
      * Crashlytics separately by each call site before invoking this function.
      */
     private fun mapBackendError(message: String?): String = when {
-        message == null -> "Ocurrió un error inesperado."
+        message == null -> appContext.getString(R.string.lobby_error_generic)
         "Too many failed join attempts" in message ->
-            "Demasiados intentos fallidos. Espera 5 minutos."
+            appContext.getString(R.string.lobby_error_too_many_attempts)
         "Invalid session code format" in message ->
-            "Código inválido. Debe ser 6 caracteres alfanuméricos."
+            appContext.getString(R.string.lobby_error_invalid_code)
         "Session limit reached" in message ->
-            "Ya tienes una sala activa. Ciérrala antes de crear otra."
+            appContext.getString(R.string.lobby_error_active_room)
         "Session is full" in message ->
-            "La sala ya está llena."
+            appContext.getString(R.string.lobby_error_full)
         "not in LOBBY" in message ->
-            "Sala no encontrada o ya iniciada."
-        else -> "Ocurrió un error inesperado."
+            appContext.getString(R.string.lobby_error_not_found)
+        else -> appContext.getString(R.string.lobby_error_generic)
     }
 
     override fun onCleared() {
@@ -406,8 +410,12 @@ class LobbyJoinViewModel @Inject constructor(
             cleanupScope.cancel()
             return
         }
-        cleanupScope.launch {
-            observeSessionUseCase.disconnect(sessionId)
+        if (!gameLaunched) {
+            cleanupScope.launch {
+                observeSessionUseCase.disconnect(sessionId)
+                cleanupScope.cancel()
+            }
+        } else {
             cleanupScope.cancel()
         }
     }

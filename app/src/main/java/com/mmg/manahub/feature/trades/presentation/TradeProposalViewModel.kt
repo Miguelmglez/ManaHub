@@ -58,7 +58,6 @@ data class TradeItemDraft(
     val isFoil: Boolean = false,
     val condition: String = "NM",
     val language: String = "en",
-    val isAltArt: Boolean = false,
     val userCardIdRef: String? = null,
     val isReviewCollectionPlaceholder: Boolean = false,
     /** True if this card was found in the user's registered collection or offer list when added. */
@@ -233,7 +232,6 @@ class TradeProposalViewModel @Inject constructor(
                             isFoil = item.isFoil ?: false,
                             condition = item.condition ?: "NM",
                             language = item.language ?: "en",
-                            isAltArt = item.isAltArt ?: false,
                             userCardIdRef = item.userCardIdRef,
                             isInCollection = true,
                         )
@@ -254,7 +252,6 @@ class TradeProposalViewModel @Inject constructor(
                             isFoil = item.isFoil ?: false,
                             condition = item.condition ?: "NM",
                             language = item.language ?: "en",
-                            isAltArt = item.isAltArt ?: false,
                             userCardIdRef = item.userCardIdRef,
                             isInCollection = true,
                         )
@@ -448,7 +445,7 @@ class TradeProposalViewModel @Inject constructor(
                             val card = entry.card ?: return@mapNotNull null
                             AddCardRow(
                                 card = card,
-                                quantityInDeck = allItems.filter { it.cardId == entry.scryfallId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language && it.isAltArt == entry.isAltArt }.sumOf { it.quantity },
+                                quantityInDeck = allItems.filter { it.cardId == entry.scryfallId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language }.sumOf { it.quantity },
                                 isOwned = entry.scryfallId in ownedIds,
                                 availableQuantity = entry.quantity,
                                 offerEntry = entry,
@@ -527,7 +524,7 @@ class TradeProposalViewModel @Inject constructor(
                             val card = entry.card ?: return@mapNotNull null
                             AddCardRow(
                                 card = card,
-                                quantityInDeck = allItems.filter { it.cardId == entry.cardId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language && it.isAltArt == entry.isAltArt }.sumOf { it.quantity },
+                                quantityInDeck = allItems.filter { it.cardId == entry.cardId && it.isFoil == entry.isFoil && it.condition == entry.condition && it.language == entry.language }.sumOf { it.quantity },
                                 isOwned = entry.cardId in ownedIds,
                                 availableQuantity = entry.quantity,
                                 wishlistEntry = entry,
@@ -683,7 +680,7 @@ class TradeProposalViewModel @Inject constructor(
 
     fun addProposerItem(item: TradeItemDraft) {
         _uiState.update { s ->
-            val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.isAltArt == item.isAltArt && it.userCardIdRef == item.userCardIdRef }
+            val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.userCardIdRef == item.userCardIdRef }
             if (existing != null) {
                 s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it })
             } else {
@@ -715,7 +712,7 @@ class TradeProposalViewModel @Inject constructor(
 
     fun addReceiverItem(item: TradeItemDraft) {
         _uiState.update { s ->
-            val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.isAltArt == item.isAltArt && it.userCardIdRef == item.userCardIdRef }
+            val existing = s.pendingAddedItems.find { it.cardId == item.cardId && it.isFoil == item.isFoil && it.condition == item.condition && it.language == item.language && it.userCardIdRef == item.userCardIdRef }
             if (existing != null) {
                 s.copy(pendingAddedItems = s.pendingAddedItems.map { if (it.id == existing.id) it.copy(quantity = it.quantity + 1) else it })
             } else {
@@ -756,7 +753,6 @@ class TradeProposalViewModel @Inject constructor(
                 it.isFoil == item.isFoil &&
                 it.condition == item.condition &&
                 it.language == item.language &&
-                it.isAltArt == item.isAltArt &&
                 it.userCardIdRef == item.userCardIdRef
             }
             if (existing != null) {
@@ -784,7 +780,6 @@ class TradeProposalViewModel @Inject constructor(
                 it.isFoil == item.isFoil &&
                 it.condition == item.condition &&
                 it.language == item.language &&
-                it.isAltArt == item.isAltArt &&
                 it.userCardIdRef == item.userCardIdRef
             }
             if (existing != null) {
@@ -832,7 +827,6 @@ class TradeProposalViewModel @Inject constructor(
                 it.isFoil == addition.isFoil &&
                 it.condition == addition.condition &&
                 it.language == addition.language &&
-                it.isAltArt == addition.isAltArt &&
                 it.userCardIdRef == addition.userCardIdRef
             }
             if (duplicate != null) {
@@ -1103,7 +1097,6 @@ class TradeProposalViewModel @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = false,
         createdAt = 0L,
     )
 
@@ -1120,7 +1113,6 @@ class TradeProposalViewModel @Inject constructor(
         isFoil = isFoil,
         condition = condition ?: "NM",
         language = language ?: "en",
-        isAltArt = false,
         createdAt = 0L,
     )
 
@@ -1132,7 +1124,6 @@ class TradeProposalViewModel @Inject constructor(
         isFoil = if (isReviewCollectionPlaceholder) null else isFoil,
         condition = if (isReviewCollectionPlaceholder) null else condition,
         language = if (isReviewCollectionPlaceholder) null else language,
-        isAltArt = if (isReviewCollectionPlaceholder) null else isAltArt,
         cardId = cardId,
         isReviewCollectionPlaceholder = isReviewCollectionPlaceholder,
     )

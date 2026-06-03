@@ -22,6 +22,5 @@ data class WishlistEntryDto(
     @SerialName("is_foil") val isFoil: Boolean? = null,
     val condition: String? = null,
     val language: String? = null,
-    @SerialName("is_alt_art") val isAltArt: Boolean? = null,
     @SerialName("created_at") val createdAt: String,
 )

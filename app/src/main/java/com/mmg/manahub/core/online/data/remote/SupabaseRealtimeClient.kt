@@ -158,6 +158,22 @@ class SupabaseRealtimeClient @Inject constructor(
             }
         }
 
+        ch.broadcastFlow<DefeatConfirmedPayload>(event = "defeat_confirmed").also { flow ->
+            sessionScope.launch {
+                flow.collect { payload ->
+                    eventFlow.emit(SessionEvent.DefeatConfirmedReceived(payload.slotIndex))
+                }
+            }
+        }
+
+        ch.broadcastFlow<LandToggledPayload>(event = "land_toggled").also { flow ->
+            sessionScope.launch {
+                flow.collect { payload ->
+                    eventFlow.emit(SessionEvent.LandToggledReceived(payload.slotIndex, payload.played))
+                }
+            }
+        }
+
         // Store handle before subscribe so observeSession() returns the real flow immediately
         sessions[sessionId] = SessionHandle(ch, eventFlow, sessionScope)
 
@@ -184,7 +200,10 @@ class SupabaseRealtimeClient @Inject constructor(
     suspend fun disconnect(sessionId: String) {
         sessions.remove(sessionId)?.let { handle ->
             handle.scope.cancel()
-            runCatching { supabaseClient.realtime.removeChannel(handle.channel) }
+            // Not calling removeChannel() here: doing so closes the Supabase Realtime WebSocket,
+            // causing IllegalArgumentException ("Engine doesn't support WebSocketCapability")
+            // when a subsequent session tries to subscribe. The channel is orphaned in the SDK
+            // registry but the WebSocket stays alive for future connect() calls.
         }
     }
 
@@ -219,6 +238,20 @@ class SupabaseRealtimeClient @Inject constructor(
         )
     }
 
+    suspend fun broadcastDefeatConfirmed(sessionId: String, slotIndex: Int) {
+        sessions[sessionId]?.channel?.broadcast(
+            event = "defeat_confirmed",
+            message = DefeatConfirmedPayload(slotIndex),
+        )
+    }
+
+    suspend fun broadcastLandToggled(sessionId: String, slotIndex: Int, played: Boolean) {
+        sessions[sessionId]?.channel?.broadcast(
+            event = "land_toggled",
+            message = LandToggledPayload(slotIndex, played),
+        )
+    }
+
     @Serializable
     private data class LifeDeltaPayload(
         @SerialName("slot_index") val slotIndex: Int,
@@ -244,5 +277,16 @@ class SupabaseRealtimeClient @Inject constructor(
         @SerialName("target_slot") val targetSlot: Int,
         @SerialName("source_slot") val sourceSlot: Int,
         @SerialName("new_damage")  val newDamage: Int,
+    )
+
+    @Serializable
+    private data class DefeatConfirmedPayload(
+        @SerialName("slot_index") val slotIndex: Int,
+    )
+
+    @Serializable
+    private data class LandToggledPayload(
+        @SerialName("slot_index") val slotIndex: Int,
+        @SerialName("played")     val played: Boolean,
     )
 }

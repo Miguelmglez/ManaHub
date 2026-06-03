@@ -24,4 +24,9 @@ data class CardDetailUiState(
     val showTagPicker:     Boolean        = false,
     val cardToDelete:      UserCard?      = null,
     val wishlistEntryToDelete: WishlistEntry? = null,
+    // Variant (other prints) selector state
+    val showVariantSelector: Boolean      = false,
+    val cardVariants:        List<Card>   = emptyList(),
+    val isLoadingVariants:   Boolean      = false,
+    val expandedVariantImageUrl: String?  = null,
 )

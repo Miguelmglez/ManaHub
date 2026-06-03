@@ -7,6 +7,7 @@ import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -49,20 +50,20 @@ class TournamentRepositoryImpl @Inject constructor(
             tournament   = tournament,
             players      = playerEntities,
             buildMatches = { tournamentId, playerIds ->
-                generateMatches(
-                    tournamentId      = tournamentId,
-                    playerIds         = playerIds,
-                    structure         = structure,
+                generateFirstRound(
+                    tournamentId     = tournamentId,
+                    playerIds        = playerIds,
+                    structure        = structure,
                     matchesPerPairing = matchesPerPairing,
-                    isRandom          = isRandomPairings,
+                    isRandom         = isRandomPairings,
                 )
             },
         )
     }
 
-    // ── Match generation ──────────────────────────────────────────────────────
+    // ── First-round match generation ──────────────────────────────────────────
 
-    private fun generateMatches(
+    private fun generateFirstRound(
         tournamentId:      Long,
         playerIds:         List<Long>,
         structure:         String,
@@ -71,8 +72,8 @@ class TournamentRepositoryImpl @Inject constructor(
     ): List<TournamentMatchEntity> {
         val ordered = if (isRandom) playerIds.shuffled() else playerIds
         return when (structure) {
-            "SWISS"       -> generatePairedFirstRound(tournamentId, ordered)
-            "SINGLE_ELIM" -> generatePairedFirstRound(tournamentId, ordered)
+            "SWISS"       -> generateSwissFirstRound(tournamentId, ordered)
+            "SINGLE_ELIM" -> generateSingleElimFirstRound(tournamentId, ordered)
             else          -> generateRoundRobin(tournamentId, ordered, matchesPerPairing)
         }
     }
@@ -102,72 +103,113 @@ class TournamentRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Pairs consecutive players for the first round.
-     *
-     * Used by both Swiss (first round only) and Single Elimination brackets.
-     * Players are already ordered/shuffled by [generateMatches] before reaching this method.
+     * Swiss round 1: pair consecutive players; the last player gets a bye if count is odd.
+     * A bye is stored as a single-player finished match (playerIds = "[id]", winnerId = id).
      */
-    private fun generatePairedFirstRound(
+    private fun generateSwissFirstRound(
         tournamentId: Long,
         playerIds:    List<Long>,
     ): List<TournamentMatchEntity> {
         val matches = mutableListOf<TournamentMatchEntity>()
         var order   = 0
-        for (i in playerIds.indices step 2) {
-            if (i + 1 < playerIds.size) {
+        var i = 0
+        while (i + 1 < playerIds.size) {
+            matches.add(
+                TournamentMatchEntity(
+                    tournamentId   = tournamentId,
+                    round          = 1,
+                    playerIds      = "[${playerIds[i]},${playerIds[i + 1]}]",
+                    scheduledOrder = order++,
+                )
+            )
+            i += 2
+        }
+        if (i < playerIds.size) {
+            // Odd player out → bye (auto-finished, 3 points)
+            matches.add(
+                TournamentMatchEntity(
+                    tournamentId   = tournamentId,
+                    round          = 1,
+                    playerIds      = "[${playerIds[i]}]",
+                    winnerId       = playerIds[i],
+                    status         = "FINISHED",
+                    scheduledOrder = order,
+                )
+            )
+        }
+        return matches
+    }
+
+    /**
+     * Single-elimination round 1: seed to nearest power of 2.
+     * Top seeds get byes (auto-finished); remaining players pair consecutively.
+     */
+    private fun generateSingleElimFirstRound(
+        tournamentId: Long,
+        playerIds:    List<Long>,
+    ): List<TournamentMatchEntity> {
+        val matches = mutableListOf<TournamentMatchEntity>()
+        var order   = 0
+
+        val nextPow2 = nextPowerOf2(playerIds.size)
+        val byeCount = nextPow2 - playerIds.size
+
+        var byesAssigned = 0
+        val playing = mutableListOf<Long>()
+
+        for (player in playerIds) {
+            if (byesAssigned < byeCount) {
                 matches.add(
                     TournamentMatchEntity(
                         tournamentId   = tournamentId,
                         round          = 1,
-                        playerIds      = "[${playerIds[i]},${playerIds[i + 1]}]",
+                        playerIds      = "[$player]",
+                        winnerId       = player,
+                        status         = "FINISHED",
                         scheduledOrder = order++,
                     )
                 )
+                byesAssigned++
+            } else {
+                playing.add(player)
             }
+        }
+
+        var j = 0
+        while (j + 1 < playing.size) {
+            matches.add(
+                TournamentMatchEntity(
+                    tournamentId   = tournamentId,
+                    round          = 1,
+                    playerIds      = "[${playing[j]},${playing[j + 1]}]",
+                    scheduledOrder = order++,
+                )
+            )
+            j += 2
+        }
+        if (j < playing.size) {
+            matches.add(
+                TournamentMatchEntity(
+                    tournamentId   = tournamentId,
+                    round          = 1,
+                    playerIds      = "[${playing[j]}]",
+                    winnerId       = playing[j],
+                    status         = "FINISHED",
+                    scheduledOrder = order,
+                )
+            )
         }
         return matches
     }
 
     // ── Standings ─────────────────────────────────────────────────────────────
 
-    override suspend fun calculateStandings(tournamentId: Long): List<TournamentStanding> = withContext(ioDispatcher) {
-        val players  = dao.getPlayers(tournamentId)
-        val finished = dao.getFinishedMatches(tournamentId)
-
-        players.map { player ->
-            var wins      = 0
-            var losses    = 0
-            var lifeTotal = 0
-
-            finished.forEach { match ->
-                val ids = parsePlayerIds(match.playerIds)
-                if (player.id in ids) {
-                    lifeTotal += parseLifeTotals(match.finalLifeTotals)[player.id] ?: 0
-                    when {
-                        match.winnerId == player.id -> wins++
-                        match.winnerId != null       -> losses++
-                    }
-                }
-            }
-
-            TournamentStanding(
-                player        = player,
-                wins          = wins,
-                losses        = losses,
-                draws         = 0,
-                points        = wins * 3,
-                lifeTotal     = lifeTotal,
-                matchesPlayed = wins + losses,
-                position      = 0,
-            )
+    override suspend fun calculateStandings(tournamentId: Long): List<TournamentStanding> =
+        withContext(ioDispatcher) {
+            val players         = dao.getPlayers(tournamentId)
+            val finishedMatches = dao.getFinishedMatches(tournamentId)
+            StandingsCalculator.calculate(players, finishedMatches)
         }
-            .sortedWith(
-                compareByDescending<TournamentStanding> { it.points }
-                    .thenByDescending { it.lifeTotal }
-                    .thenByDescending { it.wins }
-            )
-            .mapIndexed { index, standing -> standing.copy(position = index + 1) }
-    }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -185,19 +227,27 @@ class TournamentRepositoryImpl @Inject constructor(
 
     override suspend fun finishMatch(
         matchId:    Long,
-        winnerId:   Long,
+        winnerId:   Long?,
         sessionId:  Long?,
         lifeTotals: Map<Long, Int>,
     ) = withContext(ioDispatcher) {
         val match = dao.getMatchById(matchId)
             ?: throw IllegalArgumentException("Match $matchId not found")
-        val participantIds = parsePlayerIds(match.playerIds).toSet()
-        require(winnerId in participantIds) {
-            "winnerId $winnerId is not a participant of match $matchId (participants: $participantIds)"
+
+        if (winnerId != null) {
+            val participantIds = parsePlayerIds(match.playerIds).toSet()
+            require(winnerId in participantIds) {
+                "winnerId $winnerId is not a participant of match $matchId (participants: $participantIds)"
+            }
         }
+
         val json = lifeTotals.entries
             .joinToString(",", "{", "}") { "${it.key}:${it.value}" }
         dao.finishMatch(matchId, winnerId, sessionId, json)
+    }
+
+    override suspend fun resetMatch(matchId: Long) = withContext(ioDispatcher) {
+        dao.resetMatchToPending(matchId)
     }
 
     override suspend fun finishTournament(tournamentId: Long) = withContext(ioDispatcher) {
@@ -205,12 +255,13 @@ class TournamentRepositoryImpl @Inject constructor(
     }
 
     override suspend fun isFinished(tournamentId: Long): Boolean = withContext(ioDispatcher) {
-        // A tournament with 0 matches must NOT be considered finished.
-        // getPendingMatchCount == 0 is vacuously true on an empty match list,
-        // which would cause finishTournament to be called immediately after creation.
         val finished = dao.getFinishedMatches(tournamentId)
         val pending  = dao.getPendingMatchCount(tournamentId)
         finished.isNotEmpty() && pending == 0
+    }
+
+    override suspend fun deleteTournament(tournamentId: Long) = withContext(ioDispatcher) {
+        dao.deleteTournament(tournamentId)
     }
 
     // ── Observe ───────────────────────────────────────────────────────────────
@@ -232,17 +283,9 @@ class TournamentRepositoryImpl @Inject constructor(
     private fun parsePlayerIds(json: String): List<Long> =
         json.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
 
-    private fun parseLifeTotals(json: String): Map<Long, Int> {
-        if (json.isBlank()) return emptyMap()
-        return json.trim('{', '}').split(",").mapNotNull { entry ->
-            // Use indexOf(':') instead of split(":") so that negative life values
-            // (e.g. "101:-3") are correctly parsed — split would produce 3 parts
-            // and the old size==2 guard would silently drop the entry.
-            val colonIdx = entry.indexOf(':')
-            if (colonIdx == -1) return@mapNotNull null
-            val id   = entry.substring(0, colonIdx).trim().toLongOrNull()
-            val life = entry.substring(colonIdx + 1).trim().toIntOrNull()
-            if (id != null && life != null) id to life else null
-        }.toMap()
+    private fun nextPowerOf2(n: Int): Int {
+        var pow = 1
+        while (pow < n) pow = pow shl 1
+        return pow
     }
 }

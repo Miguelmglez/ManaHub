@@ -13,7 +13,6 @@ import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import com.mmg.manahub.feature.profile.presentation.PlayStyle
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel
 import com.mmg.manahub.util.TestFixtures
@@ -75,7 +74,6 @@ class ProfileViewModelTest {
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
     private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
-    private val shareInviteUseCase       = mockk<ShareInviteUseCase>(relaxed = true)
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Wizard")
@@ -165,7 +163,6 @@ class ProfileViewModelTest {
         checkAchievementsUseCase = checkAchievementsUseCase,
         userPreferencesDataStore = userPreferencesDataStore,
         friendRepository         = friendRepository,
-        shareInviteUseCase       = shareInviteUseCase,
         authRepository           = authRepository,
     )
 

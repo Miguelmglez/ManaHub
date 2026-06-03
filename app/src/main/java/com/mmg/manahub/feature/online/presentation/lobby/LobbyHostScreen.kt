@@ -205,7 +205,7 @@ private fun LobbyHostContent(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             tint = mc.textPrimary,
                         )
                     }
@@ -215,7 +215,7 @@ private fun LobbyHostContent(
                         IconButton(onClick = onRefresh) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh players",
+                                contentDescription = stringResource(R.string.action_refresh),
                                 tint = mc.textPrimary,
                             )
                         }
@@ -263,7 +263,7 @@ private fun LobbyHostContent(
             // ── Active sessions list (shown before create form when sessions exist) ──
             if (uiState.existingSessions.isNotEmpty() && uiState.sessionId == null) {
                 item {
-                    SectionLabel(text = "Your active rooms", mc = mc, ty = ty)
+                    SectionLabel(text = stringResource(R.string.lobby_active_rooms_title), mc = mc, ty = ty)
                 }
                 items(
                     items = uiState.existingSessions,
@@ -314,7 +314,7 @@ private fun LobbyHostContent(
                         border = androidx.compose.foundation.BorderStroke(1.dp, mc.surfaceVariant),
                     ) {
                         Text(
-                            text = uiState.displayName.ifBlank { "Host" },
+                            text = uiState.displayName.ifBlank { stringResource(R.string.lobby_host_badge) },
                             style = ty.bodyLarge.copy(color = mc.textPrimary),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                         )
@@ -522,7 +522,7 @@ private fun SessionCodeCard(
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
                 Text(
-                    text = "Copy code",
+                    text = stringResource(R.string.lobby_action_copy_code),
                     style = ty.labelLarge,
                 )
             }
@@ -545,7 +545,7 @@ private fun GameModeSelector(
                 onClick = { onModeSelected(mode) },
                 label = {
                     Text(
-                        text = mode.displayName,
+                        text = stringResource(mode.displayNameRes),
                         style = ty.labelMedium,
                     )
                 },
@@ -588,7 +588,7 @@ private fun PlayerCountStepper(
         ) {
             Icon(
                 imageVector = Icons.Default.Remove,
-                contentDescription = "Decrease player count",
+                contentDescription = stringResource(R.string.action_remove),
                 tint = if (count > 2) mc.textPrimary else mc.textDisabled,
             )
         }
@@ -607,7 +607,7 @@ private fun PlayerCountStepper(
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Increase player count",
+                contentDescription = stringResource(R.string.action_add),
                 tint = if (count < 6) mc.textPrimary else mc.textDisabled,
             )
         }
@@ -716,7 +716,7 @@ private fun ReadyBadge(
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Ready",
+                    contentDescription = stringResource(R.string.lobby_ready_label),
                     tint = mc.lifePositive,
                     modifier = Modifier.size(16.dp),
                 )
@@ -752,12 +752,16 @@ private fun ActiveSessionCard(
     ty: MagicTypography,
 ) {
     val statusLabel = when (session.status.uppercase()) {
-        "ACTIVE" -> "In Progress"
-        else -> "Waiting"
+        "ACTIVE" -> stringResource(R.string.lobby_status_in_progress)
+        else -> stringResource(R.string.lobby_waiting_label)
     }
     val statusColor = when (session.status.uppercase()) {
         "ACTIVE" -> mc.lifePositive
         else -> mc.textSecondary
+    }
+
+    val modeDisplay = remember(session.gameMode) {
+        GameMode.entries.find { it.name == session.gameMode.uppercase() }
     }
 
     Surface(
@@ -794,7 +798,7 @@ private fun ActiveSessionCard(
                 }
             }
             Text(
-                text = "${session.gameMode} · ${session.playerCount} players",
+                text = "${modeDisplay?.let { stringResource(it.displayNameRes) } ?: session.gameMode} · ${session.playerCount} ${stringResource(R.string.lobby_player_count_suffix)}",
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )
@@ -816,7 +820,7 @@ private fun ActiveSessionCard(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text(text = "Rejoin", style = ty.labelMedium)
+                        Text(text = stringResource(R.string.lobby_action_rejoin), style = ty.labelMedium)
                     }
                 }
                 Button(
@@ -829,7 +833,7 @@ private fun ActiveSessionCard(
                     ),
                     shape = RoundedCornerShape(10.dp),
                 ) {
-                    Text(text = "Abandon", style = ty.labelMedium)
+                    Text(text = stringResource(R.string.lobby_action_abandon), style = ty.labelMedium)
                 }
             }
         }

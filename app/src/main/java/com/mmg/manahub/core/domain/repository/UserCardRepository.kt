@@ -47,7 +47,7 @@ interface UserCardRepository {
      * Adds a new collection entry or increments the quantity of an existing one.
      *
      * The "existing" match is determined by the unique key:
-     * (userId, scryfallId, isFoil, condition, language, isAlternativeArt).
+     * (userId, scryfallId, isFoil, condition, language).
      * A new UUID is generated client-side when inserting a new row.
      *
      * The row's [updatedAt] is set to [System.currentTimeMillis] so the next
@@ -58,7 +58,6 @@ interface UserCardRepository {
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAlternativeArt: Boolean,
         isForTrade: Boolean,
         userId: String?,
         quantity: Int = 1,
@@ -88,7 +87,7 @@ interface UserCardRepository {
      * Decrements the quantity of a collection entry by [quantityToDeduct].
      *
      * The matching row is identified by the composite key:
-     * (userId, scryfallId, isFoil, condition, language, isAlternativeArt).
+     * (userId, scryfallId, isFoil, condition, language).
      *
      * - If no matching row exists the call is a no-op (silent skip).
      * - If the resulting quantity would be <= 0 the row is soft-deleted instead
@@ -102,7 +101,6 @@ interface UserCardRepository {
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAlternativeArt: Boolean,
         quantityToDeduct: Int,
     )
 }

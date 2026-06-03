@@ -44,7 +44,6 @@ interface WishlistRepository {
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAltArt: Boolean,
     ): Result<Unit>
 
     suspend fun syncFromRemote(userId: String): Result<Unit>

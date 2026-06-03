@@ -11,6 +11,7 @@ import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
@@ -23,6 +24,7 @@ import com.mmg.manahub.core.data.local.entity.PlaytestCardStatEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSessionEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSurveyAnswerEntity
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
+import com.mmg.manahub.core.data.local.entity.SurveyCardImpactEntity
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
@@ -57,6 +59,7 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         GameSessionEntity::class,
         PlayerSessionEntity::class,
         SurveyAnswerEntity::class,
+        SurveyCardImpactEntity::class,
         TournamentEntity::class,
         TournamentPlayerEntity::class,
         TournamentMatchEntity::class,
@@ -86,6 +89,7 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun manaSymbolDao(): ManaSymbolDao
     abstract fun gameSessionDao(): GameSessionDao
     abstract fun surveyAnswerDao(): SurveyAnswerDao
+    abstract fun surveyCardImpactDao(): SurveyCardImpactDao
     abstract fun tournamentDao(): TournamentDao
     abstract fun newsDao(): NewsDao
     abstract fun draftSetDao(): DraftSetDao

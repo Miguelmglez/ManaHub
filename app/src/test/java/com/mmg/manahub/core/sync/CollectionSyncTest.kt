@@ -83,7 +83,6 @@ class CollectionSyncTest {
         isFoil           = false,
         condition        = "NM",
         language         = "en",
-        isAlternativeArt = false,
         isForTrade       = false,
         isDeleted        = isDeleted,
         updatedAt        = updatedAt,
@@ -105,7 +104,6 @@ class CollectionSyncTest {
         isFoil           = false,
         condition        = "NM",
         language         = "en",
-        isAlternativeArt = false,
         isForTrade       = false,
         isDeleted        = isDeleted,
         updatedAt        = updatedAt,
@@ -482,7 +480,6 @@ class CollectionSyncTest {
             isFoil           = true,
             condition        = "NM",
             language         = "ja",
-            isAlternativeArt = true,
             isForTrade       = false,
             isDeleted        = false,
             updatedAt        = LAST_SYNC + 1L,
@@ -499,7 +496,6 @@ class CollectionSyncTest {
         // Assert: all attributes preserved through toDto() mapping
         val dto = capturedDtos.captured.first()
         assertTrue(dto.isFoil)
-        assertTrue(dto.isAlternativeArt)
         assertEquals("ja", dto.language)
         assertEquals(USER_ID, dto.userId)
     }

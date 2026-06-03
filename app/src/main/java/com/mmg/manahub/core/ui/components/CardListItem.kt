@@ -93,7 +93,6 @@ fun CardListItem(
     hasFoil: Boolean = false,
     condition: String? = null,
     language: String? = null,
-    isAltArt: Boolean = false,
     isStale: Boolean = false,
     setCode: String? = null,
     setName: String? = null,
@@ -189,7 +188,6 @@ fun CardListItem(
                                 language?.let { LanguageBadge(langCode = it) }
                                 condition?.let { CopyBadge(label = it) }
                                 if (hasFoil) FoilBadge()
-                                if (isAltArt) AltArtBadge()
                                 extraSupportingContent?.invoke(this@Row)
                             }
                         }

@@ -13,6 +13,7 @@ import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
@@ -471,6 +472,213 @@ object DatabaseModule {
     }
 
     // -------------------------------------------------------------------------
+    // v35 → v36  — consolidated migration (survey/stats rebuild + collection cleanup)
+    //
+    // player_sessions (Phase 1+2, ADR-001):
+    //   - is_local           INTEGER NOT NULL DEFAULT 0  (app-user seat marker)
+    //   - archetype          TEXT                        (deck archetype for matchup stats)
+    //   - linked_profile_tag TEXT                        (cross-player stats hook, server v2)
+    //   - deckId (legacy INTEGER, always NULL) RETYPED to deck_id TEXT (UUID, loss-less)
+    //
+    // survey_card_impacts: new table — per-seat MVP/DEAD card ratings (Phase 2)
+    // survey_answers: new `status` column — DRAFT/COMPLETED lifecycle (Phase 3)
+    //
+    // user_card_collection: drop is_alternative_art column (variant picker replaced it)
+    // local_wishlists: drop is_alt_art column
+    // local_open_for_trade: drop is_alt_art column
+    //
+    // Tables with column drops/renames use the 12-step SQLite table-recreation pattern.
+    // Each new schema MUST mirror its @Entity or Room schema validation fails at startup.
+    // -------------------------------------------------------------------------
+    private val MIGRATION_35_36 = object : Migration(35, 36) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // ── player_sessions: rebuild to retype deckId → deck_id TEXT and add columns ──
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `player_sessions_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `sessionId` INTEGER NOT NULL,
+                    `playerId` INTEGER NOT NULL,
+                    `playerName` TEXT NOT NULL,
+                    `finalLife` INTEGER NOT NULL,
+                    `finalPoison` INTEGER NOT NULL,
+                    `eliminationReason` TEXT,
+                    `commanderDamageDealt` INTEGER NOT NULL,
+                    `commanderDamageReceived` INTEGER NOT NULL,
+                    `deck_id` TEXT,
+                    `deckName` TEXT,
+                    `opponentColors` TEXT NOT NULL,
+                    `isWinner` INTEGER NOT NULL,
+                    `is_local` INTEGER NOT NULL DEFAULT 0,
+                    `archetype` TEXT,
+                    `linked_profile_tag` TEXT,
+                    FOREIGN KEY(`sessionId`) REFERENCES `game_sessions`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `player_sessions_new` (
+                    `id`, `sessionId`, `playerId`, `playerName`, `finalLife`, `finalPoison`,
+                    `eliminationReason`, `commanderDamageDealt`, `commanderDamageReceived`,
+                    `deck_id`, `deckName`, `opponentColors`, `isWinner`, `is_local`,
+                    `archetype`, `linked_profile_tag`
+                )
+                SELECT
+                    `id`, `sessionId`, `playerId`, `playerName`, `finalLife`, `finalPoison`,
+                    `eliminationReason`, `commanderDamageDealt`, `commanderDamageReceived`,
+                    NULL, `deckName`, `opponentColors`, `isWinner`, 0,
+                    NULL, NULL
+                FROM `player_sessions`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `player_sessions`")
+            db.execSQL("ALTER TABLE `player_sessions_new` RENAME TO `player_sessions`")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_player_sessions_sessionId` ON `player_sessions` (`sessionId`)"
+            )
+
+            // ── survey_card_impacts: new per-seat card-impact table ──────────────
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `survey_card_impacts` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `session_id` INTEGER NOT NULL,
+                    `player_session_id` INTEGER NOT NULL,
+                    `card_id` TEXT NOT NULL,
+                    `impact` TEXT NOT NULL,
+                    FOREIGN KEY(`session_id`) REFERENCES `game_sessions`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`player_session_id`) REFERENCES `player_sessions`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`card_id`) REFERENCES `cards`(`scryfall_id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_survey_card_impacts_session_id` ON `survey_card_impacts` (`session_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_survey_card_impacts_player_session_id` ON `survey_card_impacts` (`player_session_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_survey_card_impacts_card_id` ON `survey_card_impacts` (`card_id`)")
+
+            // ── survey_answers: add lifecycle status column ──────────────────────
+            if (!columnExists(db, "survey_answers", "status")) {
+                db.execSQL(
+                    "ALTER TABLE `survey_answers` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'DRAFT'"
+                )
+            }
+
+            // ── user_card_collection: drop is_alternative_art (variant picker replaced it) ──
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `user_card_collection_new` (
+                    `id` TEXT NOT NULL,
+                    `user_id` TEXT,
+                    `scryfall_id` TEXT NOT NULL,
+                    `quantity` INTEGER NOT NULL,
+                    `is_foil` INTEGER NOT NULL,
+                    `condition` TEXT NOT NULL,
+                    `language` TEXT NOT NULL,
+                    `is_for_trade` INTEGER NOT NULL,
+                    `is_deleted` INTEGER NOT NULL,
+                    `updated_at` INTEGER NOT NULL,
+                    `created_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`scryfall_id`) REFERENCES `cards`(`scryfall_id`)
+                        ON UPDATE NO ACTION ON DELETE RESTRICT
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `user_card_collection_new` (
+                    `id`, `user_id`, `scryfall_id`, `quantity`, `is_foil`, `condition`,
+                    `language`, `is_for_trade`, `is_deleted`, `updated_at`, `created_at`
+                )
+                SELECT `id`, `user_id`, `scryfall_id`, `quantity`, `is_foil`, `condition`,
+                       `language`, `is_for_trade`, `is_deleted`, `updated_at`, `created_at`
+                FROM `user_card_collection`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `user_card_collection`")
+            db.execSQL("ALTER TABLE `user_card_collection_new` RENAME TO `user_card_collection`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_scryfall_id` ON `user_card_collection` (`scryfall_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_user_id` ON `user_card_collection` (`user_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_updated_at` ON `user_card_collection` (`updated_at`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_card_collection_is_deleted` ON `user_card_collection` (`is_deleted`)")
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_user_card_collection_user_id_scryfall_id_is_foil_condition_language` " +
+                    "ON `user_card_collection` (`user_id`, `scryfall_id`, `is_foil`, `condition`, `language`)"
+            )
+
+            // ── local_wishlists: drop is_alt_art ─────────────────────────────────
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `local_wishlists_new` (
+                    `id` TEXT NOT NULL,
+                    `scryfall_id` TEXT NOT NULL,
+                    `quantity` INTEGER NOT NULL,
+                    `match_any_variant` INTEGER NOT NULL,
+                    `is_foil` INTEGER,
+                    `condition` TEXT,
+                    `language` TEXT,
+                    `synced` INTEGER NOT NULL,
+                    `created_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `local_wishlists_new` (
+                    `id`, `scryfall_id`, `quantity`, `match_any_variant`, `is_foil`,
+                    `condition`, `language`, `synced`, `created_at`
+                )
+                SELECT `id`, `scryfall_id`, `quantity`, `match_any_variant`, `is_foil`,
+                       `condition`, `language`, `synced`, `created_at`
+                FROM `local_wishlists`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `local_wishlists`")
+            db.execSQL("ALTER TABLE `local_wishlists_new` RENAME TO `local_wishlists`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_wishlists_scryfall_id` ON `local_wishlists` (`scryfall_id`)")
+
+            // ── local_open_for_trade: drop is_alt_art ────────────────────────────
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `local_open_for_trade_new` (
+                    `id` TEXT NOT NULL,
+                    `local_collection_id` TEXT NOT NULL,
+                    `scryfall_id` TEXT NOT NULL,
+                    `quantity` INTEGER NOT NULL,
+                    `is_foil` INTEGER NOT NULL,
+                    `condition` TEXT NOT NULL,
+                    `language` TEXT NOT NULL,
+                    `synced` INTEGER NOT NULL,
+                    `created_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `local_open_for_trade_new` (
+                    `id`, `local_collection_id`, `scryfall_id`, `quantity`, `is_foil`,
+                    `condition`, `language`, `synced`, `created_at`
+                )
+                SELECT `id`, `local_collection_id`, `scryfall_id`, `quantity`, `is_foil`,
+                       `condition`, `language`, `synced`, `created_at`
+                FROM `local_open_for_trade`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `local_open_for_trade`")
+            db.execSQL("ALTER TABLE `local_open_for_trade_new` RENAME TO `local_open_for_trade`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_open_for_trade_local_collection_id` ON `local_open_for_trade` (`local_collection_id`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_open_for_trade_scryfall_id` ON `local_open_for_trade` (`scryfall_id`)")
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helper: checks whether a column already exists in a table.
     // Used as a guard so migrations are idempotent — safe to run more than once
     // (e.g. if the app crashes mid-migration and Room retries on next launch).
@@ -498,6 +706,7 @@ object DatabaseModule {
     @Provides fun provideManaSymbolDao(db: MtgDatabase): ManaSymbolDao = db.manaSymbolDao()
     @Provides fun provideGameSessionDao(db: MtgDatabase): GameSessionDao = db.gameSessionDao()
     @Provides fun provideSurveyAnswerDao(db: MtgDatabase): SurveyAnswerDao = db.surveyAnswerDao()
+    @Provides fun provideSurveyCardImpactDao(db: MtgDatabase): SurveyCardImpactDao = db.surveyCardImpactDao()
     @Provides fun provideTournamentDao(db: MtgDatabase): TournamentDao = db.tournamentDao()
     @Provides fun provideNewsDao(db: MtgDatabase): NewsDao = db.newsDao()
     @Provides fun provideDraftSetDao(db: MtgDatabase): DraftSetDao = db.draftSetDao()

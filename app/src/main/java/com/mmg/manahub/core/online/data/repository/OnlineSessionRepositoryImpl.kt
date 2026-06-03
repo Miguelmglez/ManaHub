@@ -231,4 +231,10 @@ class OnlineSessionRepositoryImpl @Inject constructor(
 
     override suspend fun broadcastCommanderDamage(sessionId: String, targetSlot: Int, sourceSlot: Int, newDamage: Int) =
         realtimeClient.broadcastCommanderDamage(sessionId, targetSlot, sourceSlot, newDamage)
+
+    override suspend fun broadcastDefeatConfirmed(sessionId: String, slotIndex: Int) =
+        realtimeClient.broadcastDefeatConfirmed(sessionId, slotIndex)
+
+    override suspend fun broadcastLandToggled(sessionId: String, slotIndex: Int, played: Boolean) =
+        realtimeClient.broadcastLandToggled(sessionId, slotIndex, played)
 }

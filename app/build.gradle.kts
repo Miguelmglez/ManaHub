@@ -182,6 +182,7 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.arch.core.testing)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
@@ -214,9 +215,15 @@ dependencies {
     implementation(libs.security.crypto)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+    implementation(libs.firebase.messaging)
     implementation(libs.youtube.player)
 
     // Nearby Connections — peer-to-peer in-person game state sync
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
 
+    implementation(libs.play.app.update)
+    implementation(libs.play.review)
+
+    // Vosk — offline grammar-restricted voice recognition
+    implementation(libs.vosk.android)
 }

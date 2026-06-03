@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
@@ -66,6 +68,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -74,6 +77,7 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -105,8 +109,9 @@ import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.ui.components.AddCardSheet
-import com.mmg.manahub.core.ui.components.AltArtBadge
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.FullScreenImageViewer
+import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.FoilBadge
@@ -119,6 +124,9 @@ import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.StaleBadge
 import com.mmg.manahub.core.ui.components.TradeSelectionSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -131,6 +139,7 @@ fun CardDetailScreen(
     onBack: () -> Unit,
     onNavigateToAddCard: () -> Unit,
     onNavigateToDeck: (String) -> Unit = {},
+    onNavigateToCard: (scryfallId: String) -> Unit = {},
     viewModel: CardDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -148,6 +157,7 @@ fun CardDetailScreen(
                         ToastSeverity.ERROR -> MagicToastType.ERROR
                     },
                 )
+                is CardDetailEvent.NavigateToCard -> onNavigateToCard(event.scryfallId)
             }
         }
     }
@@ -213,6 +223,7 @@ fun CardDetailScreen(
                     onShowAddSheet = viewModel::onShowAddSheet,
                     onShowWishlistSheet = viewModel::onShowWishlistSheet,
                     onShowTradeSheet = viewModel::onShowTradeSheet,
+                    onShowVariantSelector = viewModel::onOpenVariantSelector,
                     onUpdateQuantity = viewModel::onUpdateQuantity,
                     onUpdateWishlistQuantity = viewModel::onUpdateWishlistQuantity,
                     onRequestDelete = viewModel::onRequestDelete,
@@ -254,8 +265,8 @@ fun CardDetailScreen(
                 setName = card.setName,
                 rarity = card.rarity,
                 confirmButtonText = stringResource(R.string.carddetail_add_copy),
-                onConfirm = { isFoil: Boolean, isAltArt: Boolean, condition: String, language: String, qty: Int ->
-                    viewModel.onAddToCollection(isFoil, isAltArt, condition, language, qty)
+                onConfirm = { isFoil: Boolean, condition: String, language: String, qty: Int ->
+                    viewModel.onAddToCollection(isFoil, condition, language, qty)
                 },
                 onDismiss = viewModel::onDismissAddSheet,
             )
@@ -273,8 +284,8 @@ fun CardDetailScreen(
                 setName = card.setName,
                 rarity = card.rarity,
                 confirmButtonText = stringResource(R.string.carddetail_wishlist_sheet_title),
-                onConfirm = { isFoil: Boolean, isAltArt: Boolean, condition: String, language: String, qty: Int ->
-                    viewModel.onAddToWishlist(isFoil, isAltArt, condition, language, qty)
+                onConfirm = { isFoil: Boolean, condition: String, language: String, qty: Int ->
+                    viewModel.onAddToWishlist(isFoil, condition, language, qty)
                 },
                 onDismiss = viewModel::onDismissWishlistSheet,
             )
@@ -333,6 +344,24 @@ fun CardDetailScreen(
             },
         )
     }
+
+    // Variant (other prints) selector
+    if (uiState.showVariantSelector) {
+        VariantSelectorSheet(
+            currentCardId = uiState.card?.scryfallId ?: "",
+            variants = uiState.cardVariants,
+            isLoading = uiState.isLoadingVariants,
+            onDismiss = viewModel::onCloseVariantSelector,
+            onSelectVariant = viewModel::onSelectVariant,
+            onExpandImage = viewModel::onExpandVariantImage,
+        )
+    }
+    if (uiState.expandedVariantImageUrl != null) {
+        FullScreenImageViewer(
+            imageUrl = uiState.expandedVariantImageUrl!!,
+            onDismiss = viewModel::onCloseExpandedImage,
+        )
+    }
 }
 
 @Composable
@@ -374,6 +403,7 @@ private fun CardDetailContent(
     onShowAddSheet: () -> Unit,
     onShowWishlistSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
+    onShowVariantSelector: () -> Unit,
     onUpdateQuantity: (String, Int) -> Unit,
     onUpdateWishlistQuantity: (String, Int) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
@@ -409,7 +439,7 @@ private fun CardDetailContent(
                         rotationY = rotation
                         cameraDistance = 12f * density
                     }
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(CardShape)
                     .then(
                         if (card.imageBackNormal != null)
                             Modifier.clickable { showBackFace = !showBackFace }
@@ -574,6 +604,60 @@ private fun CardDetailContent(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )
                 }
+            }
+        }
+
+        // Improved Variants & Prints Section
+        Surface(
+            onClick = onShowVariantSelector,
+            color = MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.08f),
+            shape = CardShape,
+            border = BorderStroke(1.dp, MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.2f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Icon with a soft circular highlight
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.15f),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.magicColors.primaryAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.carddetail_other_prints_title),
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = MaterialTheme.magicColors.textPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.carddetail_other_prints_desc),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = MaterialTheme.magicColors.textSecondary
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.magicColors.textDisabled,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
 
@@ -772,6 +856,7 @@ private fun CollectionSection(
         Text(
             stringResource(R.string.carddetail_in_collection),
             style = MaterialTheme.magicTypography.labelMedium,
+            color = MaterialTheme.magicColors.textPrimary,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -847,7 +932,7 @@ private fun CollectionCopyRow(
     val mc = MaterialTheme.magicColors
     Surface(
         color = mc.surface,
-        shape = MaterialTheme.shapes.small,
+        shape = CardShape,
     ) {
         Column(
             modifier = Modifier
@@ -857,17 +942,17 @@ private fun CollectionCopyRow(
         ) {
             // Badges row
             Row(
+                modifier = Modifier.heightIn(min = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LanguageBadge(langCode = userCard.language)
                 CopyBadge(label = userCard.condition)
                 if (userCard.isFoil) FoilBadge()
-                if (userCard.isAlternativeArt) AltArtBadge()
                 if (tradeQuantity > 0) {
                     Surface(
                         color = mc.secondaryAccent.copy(alpha = 0.15f),
-                        shape = MaterialTheme.shapes.extraSmall,
+                        shape = ChipShape,
                     ) {
                         Text(
                             text = stringResource(R.string.carddetail_for_trade_badge),
@@ -892,7 +977,8 @@ private fun CollectionCopyRow(
                 )
                 IconButton(
                     onClick = { onUpdateQuantity(userCard.id, userCard.quantity - 1) },
-                    modifier = Modifier.size(32.dp),
+                    // 40dp keeps the row compact while staying above the minimum touch target.
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         Icons.Default.Remove,
@@ -907,7 +993,8 @@ private fun CollectionCopyRow(
                 )
                 IconButton(
                     onClick = { onUpdateQuantity(userCard.id, userCard.quantity + 1) },
-                    modifier = Modifier.size(32.dp),
+                    // 40dp keeps the row compact while staying above the minimum touch target.
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         Icons.Default.Add,
@@ -918,7 +1005,8 @@ private fun CollectionCopyRow(
                 Spacer(Modifier.width(8.dp))
                 IconButton(
                     onClick = { onRequestDelete(userCard) },
-                    modifier = Modifier.size(32.dp),
+                    // 40dp keeps the row compact while staying above the minimum touch target.
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         Icons.Default.Delete,
@@ -952,6 +1040,7 @@ private fun WishlistSection(
         Text(
             stringResource(R.string.carddetail_in_wishlist),
             style = MaterialTheme.magicTypography.labelMedium,
+            color = MaterialTheme.magicColors.textPrimary,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -1001,7 +1090,7 @@ private fun WishlistEntryRow(
     val mc = MaterialTheme.magicColors
     Surface(
         color = mc.surface,
-        shape = MaterialTheme.shapes.small,
+        shape = CardShape,
     ) {
         Column(
             modifier = Modifier
@@ -1011,13 +1100,13 @@ private fun WishlistEntryRow(
         ) {
             // Badges row
             Row(
+                modifier = Modifier.heightIn(min = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LanguageBadge(langCode = entry.language ?: "en")
                 CopyBadge(label = entry.condition ?: "")
                 if (entry.isFoil) FoilBadge()
-                if (entry.isAltArt) AltArtBadge()
             }
 
             // Quantity stepper + delete
@@ -1033,7 +1122,8 @@ private fun WishlistEntryRow(
                 )
                 IconButton(
                     onClick = { onUpdateQuantity(entry.id, entry.quantity - 1) },
-                    modifier = Modifier.size(32.dp),
+                    // 40dp keeps the row compact while staying above the minimum touch target.
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         Icons.Default.Remove,
@@ -1048,7 +1138,8 @@ private fun WishlistEntryRow(
                 )
                 IconButton(
                     onClick = { onUpdateQuantity(entry.id, entry.quantity + 1) },
-                    modifier = Modifier.size(32.dp),
+                    // 40dp keeps the row compact while staying above the minimum touch target.
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         Icons.Default.Add,
@@ -1059,7 +1150,8 @@ private fun WishlistEntryRow(
                 Spacer(Modifier.width(8.dp))
                 IconButton(
                     onClick = { onRequestDelete(entry) },
-                    modifier = Modifier.size(32.dp),
+                    // 40dp keeps the row compact while staying above the minimum touch target.
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         Icons.Default.Delete,
@@ -1145,7 +1237,7 @@ private fun LegalityChip(format: String, legality: String) {
     val isLegal = legality == "legal"
     Surface(
         color = if (isLegal) mc.lifePositive.copy(alpha = 0.15f) else mc.surfaceVariant,
-        shape = MaterialTheme.shapes.small,
+        shape = ChipShape,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1520,10 +1612,15 @@ private fun TagPickerSheet(
     // ── Edit user-defined tag state ───────────────────────────────────────────
     var editingTagKey by remember { mutableStateOf<String?>(null) }
     var editingTagLabel by remember { mutableStateOf("") }
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
     ) {
         LazyColumn(
             modifier = Modifier.navigationBarsPadding(),
@@ -1532,10 +1629,22 @@ private fun TagPickerSheet(
         ) {
             // ── Header ──────────────────────────────────────────────────────
             item {
-                Text(
-                    stringResource(R.string.carddetail_tags_picker_title),
-                    style = MaterialTheme.magicTypography.titleMedium
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_cancel),
+                            tint = MaterialTheme.magicColors.textSecondary
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.carddetail_tags_picker_title),
+                        style = MaterialTheme.magicTypography.titleMedium
+                    )
+                }
             }
 
             // ── Custom tag creator ───────────────────────────────────────────
