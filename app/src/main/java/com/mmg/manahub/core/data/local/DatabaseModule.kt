@@ -377,29 +377,32 @@ object DatabaseModule {
     }
 
     // -------------------------------------------------------------------------
-    // v35 → v36  (Deck Playtest feature — purely additive, no existing table touched)
+    // v35 → v36  — combined migration (Deck Playtest tables + stats/collection rebuild)
     //
-    // Creates three new tables for the Deck Playtest feature:
+    // Deck Playtest (additive, no existing tables touched):
+    //   playtest_sessions      — one row per saved test; deck_id is plain TEXT (no FK)
+    //                            because decks are soft-deleted and history must survive.
+    //   playtest_card_stats    — per-card copy counts (opening hand + mulligan bottoms).
+    //                            Counts not booleans: a hand can hold 2–4 copies of the
+    //                            same card. FK to playtest_sessions CASCADE.
+    //   playtest_survey_answers — optional survey for a saved test. FK CASCADE.
     //
-    //   playtest_sessions  — one row per saved test ("Guardar test"). deckId is a
-    //     plain indexed column, NOT a FK to `decks`, because:
-    //     (a) decks are soft-deleted and playtest history must survive the soft-delete;
-    //     (b) a hard FK would block or cascade on any future hard-delete scenario.
+    // Per-seat stats model (ADR-001) + collection cleanup:
+    //   player_sessions: deckId (legacy INTEGER) retyped to deck_id TEXT (UUID);
+    //     new columns is_local, archetype, linked_profile_tag via 12-step recreation.
+    //   survey_card_impacts: new per-seat MVP/DEAD card ratings table.
+    //   survey_answers: new `status` column (DRAFT/COMPLETED lifecycle).
+    //   user_card_collection: drop is_alternative_art (variant picker replaced it).
+    //   local_wishlists: drop is_alt_art.
+    //   local_open_for_trade: drop is_alt_art.
     //
-    //   playtest_card_stats — per-card counts (copies_in_opening_hand,
-    //     copies_bottomed_on_mulligan) for each saved test. Counts instead of booleans
-    //     because a hand can contain multiple copies of the same card. FK to
-    //     playtest_sessions with CASCADE so deleting a session cleans up stats.
-    //
-    //   playtest_survey_answers — optional survey attached to a saved test. FK to
-    //     playtest_sessions with CASCADE. Zero rows = user skipped the survey.
-    //
-    // All indices are created explicitly here (Room generates them only during a
-    // fresh install; migrations must add them manually).
+    // Tables with column drops use the 12-step SQLite table-recreation pattern.
+    // All indices are created explicitly (Room generates them only on fresh installs).
     // -------------------------------------------------------------------------
     private val MIGRATION_35_36 = object : Migration(35, 36) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            // playtest_sessions
+
+            // ── playtest_sessions ────────────────────────────────────────────────
             db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS `playtest_sessions` (
@@ -419,14 +422,14 @@ object DatabaseModule {
                 "CREATE INDEX IF NOT EXISTS `index_playtest_sessions_deck_id` ON `playtest_sessions`(`deck_id`)"
             )
 
-            // playtest_card_stats
+            // ── playtest_card_stats ──────────────────────────────────────────────
             db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS `playtest_card_stats` (
-                    `id`                       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    `playtest_session_id`      INTEGER NOT NULL,
-                    `scryfall_id`              TEXT NOT NULL,
-                    `copies_in_opening_hand`   INTEGER NOT NULL,
+                    `id`                          INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `playtest_session_id`         INTEGER NOT NULL,
+                    `scryfall_id`                 TEXT NOT NULL,
+                    `copies_in_opening_hand`      INTEGER NOT NULL,
                     `copies_bottomed_on_mulligan` INTEGER NOT NULL,
                     FOREIGN KEY(`playtest_session_id`) REFERENCES `playtest_sessions`(`id`) ON DELETE CASCADE
                 )
@@ -442,19 +445,19 @@ object DatabaseModule {
                 "CREATE INDEX IF NOT EXISTS `index_playtest_card_stats_session_card` ON `playtest_card_stats`(`playtest_session_id`, `scryfall_id`)"
             )
 
-            // playtest_survey_answers
+            // ── playtest_survey_answers ──────────────────────────────────────────
             db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS `playtest_survey_answers` (
-                    `id`                    INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    `playtest_session_id`   INTEGER NOT NULL,
-                    `question_id`           TEXT NOT NULL,
-                    `question_type`         TEXT NOT NULL,
-                    `answer`                TEXT NOT NULL,
-                    `card_reference`        TEXT,
-                    `deck_id`               TEXT,
-                    `answered_at`           INTEGER NOT NULL,
-                    `updated_at`            INTEGER NOT NULL,
+                    `id`                  INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `playtest_session_id` INTEGER NOT NULL,
+                    `question_id`         TEXT NOT NULL,
+                    `question_type`       TEXT NOT NULL,
+                    `answer`              TEXT NOT NULL,
+                    `card_reference`      TEXT,
+                    `deck_id`             TEXT,
+                    `answered_at`         INTEGER NOT NULL,
+                    `updated_at`          INTEGER NOT NULL,
                     FOREIGN KEY(`playtest_session_id`) REFERENCES `playtest_sessions`(`id`) ON DELETE CASCADE
                 )
                 """.trimIndent()
@@ -468,30 +471,7 @@ object DatabaseModule {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_playtest_survey_answers_deck_id` ON `playtest_survey_answers`(`deck_id`)"
             )
-        }
-    }
 
-    // -------------------------------------------------------------------------
-    // v35 → v36  — consolidated migration (survey/stats rebuild + collection cleanup)
-    //
-    // player_sessions (Phase 1+2, ADR-001):
-    //   - is_local           INTEGER NOT NULL DEFAULT 0  (app-user seat marker)
-    //   - archetype          TEXT                        (deck archetype for matchup stats)
-    //   - linked_profile_tag TEXT                        (cross-player stats hook, server v2)
-    //   - deckId (legacy INTEGER, always NULL) RETYPED to deck_id TEXT (UUID, loss-less)
-    //
-    // survey_card_impacts: new table — per-seat MVP/DEAD card ratings (Phase 2)
-    // survey_answers: new `status` column — DRAFT/COMPLETED lifecycle (Phase 3)
-    //
-    // user_card_collection: drop is_alternative_art column (variant picker replaced it)
-    // local_wishlists: drop is_alt_art column
-    // local_open_for_trade: drop is_alt_art column
-    //
-    // Tables with column drops/renames use the 12-step SQLite table-recreation pattern.
-    // Each new schema MUST mirror its @Entity or Room schema validation fails at startup.
-    // -------------------------------------------------------------------------
-    private val MIGRATION_35_36 = object : Migration(35, 36) {
-        override fun migrate(db: SupportSQLiteDatabase) {
             // ── player_sessions: rebuild to retype deckId → deck_id TEXT and add columns ──
             db.execSQL(
                 """
