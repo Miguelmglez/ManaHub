@@ -39,4 +39,14 @@ interface CloudflareContentApi {
      */
     @GET("draft/{setCode}/tier-list.json")
     suspend fun getSetTierList(@Path("setCode") setCode: String): JsonObject
+
+    /**
+     * Fetches the raw booster.json describing the set's pack structure
+     * (weighted booster variants + named card sheets). Parsed in
+     * [com.mmg.manahub.feature.draft.data.DraftSimRepositoryImpl].
+     *
+     * @param setCode Lowercase set code (e.g. "tdm").
+     */
+    @GET("draft/{setCode}/booster.json")
+    suspend fun getSetBooster(@Path("setCode") setCode: String): JsonObject
 }

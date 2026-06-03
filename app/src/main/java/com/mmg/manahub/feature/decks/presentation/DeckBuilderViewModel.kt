@@ -11,6 +11,7 @@ import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.model.GroupingMode
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
@@ -48,8 +49,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-enum class GroupingMode { TYPE, COLOR, COST, TAG }
 
 data class LandDelta(
     val landName: String,

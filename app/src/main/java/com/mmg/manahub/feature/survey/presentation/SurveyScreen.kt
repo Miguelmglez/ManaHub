@@ -1,10 +1,21 @@
 package com.mmg.manahub.feature.survey.presentation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +27,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -69,13 +81,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -122,144 +138,200 @@ fun SurveyScreen(
         return
     }
 
-    val mc = MaterialTheme.magicColors
+    Box(modifier = Modifier.fillMaxSize()) {
+        SurveyBackground()
 
-    Scaffold(
-        containerColor = mc.background,
-        topBar = {
-            SurveyTopBar(onBack = { viewModel.postpone() })
-        },
-        bottomBar = {
-            SurveyBottomBar(
-                uiState = uiState,
-                onSaveExit = { viewModel.postpone() },
-                onSubmit = { viewModel.complete() },
-            )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = ScreenPadding,
-                end = ScreenPadding,
-                top = innerPadding.calculateTopPadding() + ContentGap,
-                bottom = innerPadding.calculateBottomPadding() + SectionGap,
-            ),
-            verticalArrangement = Arrangement.spacedBy(SectionGap),
-        ) {
-            recap?.let { r ->
-                item(key = "context_strip") {
-                    ContextStrip(
-                        recap = r,
-                        deck = uiState.availableDecks.find { it.id == uiState.selectedDeckId },
-                    )
-                }
-            }
-
-            item(key = "result") {
-                SurveySection(title = stringResource(R.string.survey_section_result)) {
-                    ResultRow(uiState.resultAnswer, viewModel::setResult)
-                }
-            }
-
-            item(key = "elimination") {
-                AnimatedVisibility(
-                    visible = uiState.resultAnswer == "WIN" || uiState.resultAnswer == "LOSE"
-                ) {
-                    SurveySection(title = stringResource(R.string.survey_section_elimination)) {
-                        EliminationRow(
-                            result = uiState.resultAnswer,
-                            selected = uiState.eliminationCause,
-                            onSelect = viewModel::setEliminationCause,
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                SurveyTopBar(onBack = { viewModel.postpone() })
+            },
+            bottomBar = {
+                SurveyBottomBar(
+                    uiState = uiState,
+                    onSaveExit = { viewModel.postpone() },
+                    onSubmit = { viewModel.complete() },
+                )
+            },
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = ScreenPadding,
+                    end = ScreenPadding,
+                    top = innerPadding.calculateTopPadding() + ContentGap,
+                    bottom = innerPadding.calculateBottomPadding() + SectionGap,
+                ),
+                verticalArrangement = Arrangement.spacedBy(SectionGap),
+            ) {
+                recap?.let { r ->
+                    item(key = "context_strip") {
+                        ContextStrip(
+                            recap = r,
+                            deck = uiState.availableDecks.find { it.id == uiState.selectedDeckId },
                         )
                     }
                 }
-            }
 
-            item(key = "opening_hand") {
-                SurveySection(title = stringResource(R.string.survey_section_opening_hand)) {
-                    HandQualityRow(uiState.handQualityRating, viewModel::setHandQuality)
-                    Spacer(Modifier.height(ContentGap))
-                    MulliganRow(uiState.mulligansCount, viewModel::setMulligan)
+                item(key = "result") {
+                    SurveySection(title = stringResource(R.string.survey_section_result)) {
+                        ResultRow(uiState.resultAnswer, viewModel::setResult)
+                    }
                 }
-            }
 
-            item(key = "mana_flow") {
-                SurveySection(title = stringResource(R.string.survey_section_mana_flow)) {
-                    ManaFlowRow(uiState.manaFlowAnswer, viewModel::setManaFlow)
-                }
-            }
-
-            item(key = "card_impact") {
-                CardImpactSection(uiState, viewModel)
-            }
-
-            if (recap?.opponents?.isNotEmpty() == true) {
-                item(key = "opponents") {
-                    SurveySection(title = stringResource(R.string.survey_section_opponents)) {
-                        recap.opponents.forEach { (playerId, name) ->
-                            OpponentArchetypeRow(
-                                opponentName = name,
-                                selected = uiState.opponentArchetypes[playerId],
-                                onSelect = { archetype ->
-                                    viewModel.setOpponentArchetype(playerId, archetype)
-                                },
+                item(key = "elimination") {
+                    AnimatedVisibility(
+                        visible = (uiState.resultAnswer == "WIN" || uiState.resultAnswer == "LOSE"),
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut(),
+                    ) {
+                        SurveySection(title = stringResource(R.string.survey_section_elimination)) {
+                            EliminationRow(
+                                result = uiState.resultAnswer,
+                                selected = uiState.eliminationCause,
+                                onSelect = viewModel::setEliminationCause,
                             )
                         }
                     }
                 }
-            }
 
-            item(key = "commander") {
-                AnimatedVisibility(visible = recap?.mode == "COMMANDER") {
-                    SurveySection(title = stringResource(R.string.survey_section_commander)) {
-                        CommanderRow(uiState.commanderCarriedAnswer, viewModel::setCommanderCarried)
+                item(key = "opening_hand") {
+                    SurveySection(title = stringResource(R.string.survey_section_opening_hand)) {
+                        HandQualityRow(uiState.handQualityRating, viewModel::setHandQuality)
+                        Spacer(Modifier.height(ContentGap))
+                        MulliganRow(uiState.mulligansCount, viewModel::setMulligan)
                     }
                 }
-            }
 
-            item(key = "sideboard") {
-                AnimatedVisibility(visible = uiState.hasSideboard) {
-                    SurveySection(title = stringResource(R.string.survey_section_sideboard)) {
-                        SideboardRow(uiState.sideboardSwingAnswer, viewModel::setSideboardSwing)
+                item(key = "mana_flow") {
+                    SurveySection(title = stringResource(R.string.survey_section_mana_flow)) {
+                        ManaFlowRow(uiState.manaFlowAnswer, viewModel::setManaFlow)
                     }
                 }
-            }
 
-            item(key = "rating") {
-                SurveySection(title = stringResource(R.string.survey_section_rating)) {
-                    StarRatingRow(
-                        rating = uiState.answers["game_rating"]?.toIntOrNull() ?: 0,
-                        onRate = { viewModel.setAnswer("game_rating", it.toString()) },
-                    )
+                item(key = "card_impact") {
+                    CardImpactSection(uiState, viewModel)
                 }
-            }
 
-            item(key = "notes") {
-                SurveySection(title = stringResource(R.string.survey_section_notes)) {
-                    val mcInner = MaterialTheme.magicColors
-                    OutlinedTextField(
-                        value = uiState.freeNotes,
-                        onValueChange = viewModel::setFreeNotes,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text(
-                                text = stringResource(R.string.survey_free_text_hint),
-                                style = MaterialTheme.magicTypography.bodySmall,
-                                color = mcInner.textDisabled,
-                            )
-                        },
-                        textStyle = MaterialTheme.magicTypography.bodyMedium.copy(color = mcInner.textPrimary),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = mcInner.primaryAccent,
-                            unfocusedBorderColor = mcInner.surfaceVariant,
-                            cursorColor = mcInner.primaryAccent,
-                        ),
-                        maxLines = 6,
-                    )
+                if (recap?.opponents?.isNotEmpty() == true) {
+                    item(key = "opponents") {
+                        SurveySection(title = stringResource(R.string.survey_section_opponents)) {
+                            recap.opponents.forEach { (playerId, name) ->
+                                OpponentArchetypeRow(
+                                    opponentName = name,
+                                    selected = uiState.opponentArchetypes[playerId],
+                                    onSelect = { archetype ->
+                                        viewModel.setOpponentArchetype(playerId, archetype)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item(key = "commander") {
+                    AnimatedVisibility(
+                        visible = recap?.mode == "COMMANDER",
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut(),
+                    ) {
+                        SurveySection(title = stringResource(R.string.survey_section_commander)) {
+                            CommanderRow(uiState.commanderCarriedAnswer, viewModel::setCommanderCarried)
+                        }
+                    }
+                }
+
+                item(key = "sideboard") {
+                    AnimatedVisibility(
+                        visible = uiState.hasSideboard,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut(),
+                    ) {
+                        SurveySection(title = stringResource(R.string.survey_section_sideboard)) {
+                            SideboardRow(uiState.sideboardSwingAnswer, viewModel::setSideboardSwing)
+                        }
+                    }
+                }
+
+                item(key = "rating") {
+                    SurveySection(title = stringResource(R.string.survey_section_rating)) {
+                        StarRatingRow(
+                            rating = uiState.answers["game_rating"]?.toIntOrNull() ?: 0,
+                            onRate = { viewModel.setAnswer("game_rating", it.toString()) },
+                        )
+                    }
+                }
+
+                item(key = "notes") {
+                    SurveySection(title = stringResource(R.string.survey_section_notes)) {
+                        val mcInner = MaterialTheme.magicColors
+                        OutlinedTextField(
+                            value = uiState.freeNotes,
+                            onValueChange = viewModel::setFreeNotes,
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = {
+                                Text(
+                                    text = stringResource(R.string.survey_free_text_hint),
+                                    style = MaterialTheme.magicTypography.bodySmall,
+                                    color = mcInner.textDisabled,
+                                )
+                            },
+                            textStyle = MaterialTheme.magicTypography.bodyMedium.copy(color = mcInner.textPrimary),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = mcInner.primaryAccent,
+                                unfocusedBorderColor = mcInner.surfaceVariant,
+                                cursorColor = mcInner.primaryAccent,
+                            ),
+                            maxLines = 6,
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SurveyBackground
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SurveyBackground() {
+    val mc = MaterialTheme.magicColors
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(mc.background)
+    ) {
+        // Subtle gradient overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            mc.backgroundSecondary,
+                            mc.background,
+                        )
+                    )
+                )
+        )
+
+        // Accent blur in the corner
+        Box(
+            modifier = Modifier
+                .size(300.dp)
+                .align(Alignment.TopEnd)
+                .graphicsLayer(translationX = 100f, translationY = -100f)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            mc.primaryAccent.copy(alpha = 0.08f),
+                            Color.Transparent,
+                        )
+                    )
+                )
+        )
     }
 }
 
@@ -353,18 +425,20 @@ private fun SurveySection(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = mc.surface,
-        shape = RoundedCornerShape(12.dp),
+        color = mc.surface.copy(alpha = 0.7f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.3f)),
     ) {
         Column(
-            modifier = Modifier.padding(ContentGap + 4.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(ContentGap),
         ) {
             Text(
-                text = title,
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-                fontWeight = FontWeight.Bold,
+                text = title.uppercase(),
+                style = ty.labelSmall,
+                color = mc.primaryAccent,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.5.sp,
             )
             content()
         }
@@ -411,19 +485,38 @@ private fun ResultChip(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.02f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "result_chip_scale",
+    )
+
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent else mc.surface.copy(alpha = 0.5f),
+        label = "result_chip_bg",
+    )
+
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) mc.background else mc.textSecondary,
+        label = "result_chip_text",
+    )
+
     Surface(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 48.dp),
-        color = if (selected) mc.primaryAccent else mc.surfaceVariant,
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale),
+        color = containerColor,
         shape = RoundedCornerShape(10.dp),
-        border = if (selected) null else BorderStroke(1.dp, mc.surfaceVariant),
+        border = if (selected) null else BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             Text(
                 text = label,
                 style = ty.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (selected) mc.background else mc.textSecondary,
+                color = contentColor,
             )
         }
     }
@@ -673,23 +766,30 @@ private fun CardImpactItem(
     onCycle: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    // neutral → MVP → DEAD → neutral. setCardImpact clears when the same value is
-    // re-applied, so the cycle is: pick MVP (from neutral), pick DEAD (from MVP),
-    // re-pick DEAD (back to neutral).
+    // neutral → MVP → DEAD → neutral
     val next = when (impact) {
         null -> "MVP"
         "MVP" -> "DEAD"
-        else -> "DEAD" // re-applying DEAD clears it in the ViewModel
+        else -> "DEAD"
     }
-    val borderColor = when (impact) {
-        "MVP" -> mc.goldMtg
-        "DEAD" -> mc.lifeNegative
-        else -> mc.surfaceVariant
-    }
+    val borderColor by animateColorAsState(
+        targetValue = when (impact) {
+            "MVP" -> mc.goldMtg
+            "DEAD" -> mc.lifeNegative
+            else -> Color.Transparent
+        },
+        label = "card_impact_border"
+    )
+
+    val scale by animateFloatAsState(
+        targetValue = if (impact != null) 1.05f else 1f,
+        label = "card_impact_scale"
+    )
 
     Box(
         modifier = Modifier
             .width(96.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .clickable { onCycle(next) },
     ) {
         Column {
@@ -698,6 +798,11 @@ private fun CardImpactItem(
                     .fillMaxWidth()
                     .height(72.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    .border(
+                        width = 2.dp,
+                        color = borderColor,
+                        shape = RoundedCornerShape(8.dp)
+                    )
             ) {
                 AsyncImage(
                     model = card.imageArtCrop ?: card.imageNormal,
@@ -705,41 +810,34 @@ private fun CardImpactItem(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                when (impact) {
-                    "MVP" -> ImpactBadge(
-                        icon = Icons.Default.Star,
-                        tint = mc.goldMtg,
-                    )
-                    "DEAD" -> ImpactBadge(
-                        icon = Icons.Default.Close,
-                        tint = mc.lifeNegative,
-                    )
-                    else -> Unit
+                
+                AnimatedContent(
+                    targetState = impact,
+                    transitionSpec = {
+                        (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
+                    },
+                    label = "impact_badge_anim"
+                ) { targetImpact ->
+                    when (targetImpact) {
+                        "MVP" -> ImpactBadge(
+                            icon = Icons.Default.Star,
+                            tint = mc.goldMtg,
+                        )
+                        "DEAD" -> ImpactBadge(
+                            icon = Icons.Default.Close,
+                            tint = mc.lifeNegative,
+                        )
+                        else -> Unit
+                    }
                 }
             }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = card.name,
                 style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary,
+                color = if (impact != null) mc.textPrimary else mc.textSecondary,
                 maxLines = 1,
             )
-        }
-        // Border highlight ring.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp)
-                .clip(RoundedCornerShape(8.dp))
-        ) {
-            if (impact != null) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color.Transparent,
-                    border = BorderStroke(2.dp, borderColor),
-                    shape = RoundedCornerShape(8.dp),
-                ) {}
-            }
         }
     }
 }
@@ -863,12 +961,28 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit) {
         repeat(5) { idx ->
             val starIndex = idx + 1
             val filled = starIndex <= rating
+
+            val starScale by animateFloatAsState(
+                targetValue = if (filled) 1.2f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "star_scale"
+            )
+
+            val starColor by animateColorAsState(
+                targetValue = if (filled) mc.goldMtg else mc.textDisabled.copy(alpha = 0.3f),
+                label = "star_color"
+            )
+
             Icon(
                 imageVector = if (filled) Icons.Default.Star else Icons.Default.StarBorder,
                 contentDescription = null,
-                tint = if (filled) mc.goldMtg else mc.textDisabled,
+                tint = starColor,
                 modifier = Modifier
                     .size(36.dp)
+                    .graphicsLayer(scaleX = starScale, scaleY = starScale)
                     .clickable { onRate(starIndex) },
             )
         }
@@ -894,16 +1008,30 @@ private fun ChipFlowRow(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         options.forEach { (value, label) ->
+            val isSelected = selected == value
+            val chipAlpha by animateFloatAsState(if (isSelected) 1f else 0.7f, label = "chip_alpha")
+            val chipScale by animateFloatAsState(if (isSelected) 1.05f else 1f, label = "chip_scale")
+
             FilterChip(
-                selected = selected == value,
+                selected = isSelected,
                 onClick = { onSelect(value) },
                 label = { Text(label, style = ty.labelMedium) },
+                modifier = Modifier
+                    .graphicsLayer(scaleX = chipScale, scaleY = chipScale)
+                    .alpha(chipAlpha),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
                     selectedLabelColor = mc.primaryAccent,
-                    containerColor = mc.surfaceVariant,
+                    selectedLeadingIconColor = mc.primaryAccent,
+                    containerColor = mc.surfaceVariant.copy(alpha = 0.4f),
                     labelColor = mc.textSecondary,
                 ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = mc.surfaceVariant.copy(alpha = 0.5f),
+                    selectedBorderColor = mc.primaryAccent.copy(alpha = 0.5f),
+                )
             )
         }
     }
@@ -1007,13 +1135,42 @@ private fun SurveyBottomBar(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
 
-    Column(modifier = Modifier.fillMaxWidth().background(mc.background)) {
-        LinearProgressIndicator(
-            progress = { uiState.completionFraction },
-            modifier = Modifier.fillMaxWidth(),
-            color = mc.primaryAccent,
-            trackColor = mc.surfaceVariant,
-        )
+    val animatedProgress by animateFloatAsState(
+        targetValue = uiState.completionFraction,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "completion_progress"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        mc.background.copy(alpha = 0.95f)
+                    )
+                )
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .background(mc.surfaceVariant.copy(alpha = 0.3f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedProgress)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(mc.secondaryAccent, mc.primaryAccent)
+                        )
+                    )
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1024,22 +1181,26 @@ private fun SurveyBottomBar(
             OutlinedButton(
                 onClick = onSaveExit,
                 modifier = Modifier.weight(1f),
-                border = BorderStroke(1.dp, mc.surfaceVariant),
+                border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.textSecondary)
             ) {
                 Text(
                     text = stringResource(R.string.survey_save_exit),
-                    color = mc.textSecondary,
                 )
             }
             Button(
                 onClick = onSubmit,
                 enabled = uiState.resultAnswer != null,
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = mc.primaryAccent,
+                    disabledContainerColor = mc.surfaceVariant.copy(alpha = 0.3f)
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
                 Text(
                     text = stringResource(R.string.survey_submit),
-                    color = mc.background,
+                    color = if (uiState.resultAnswer != null) mc.background else mc.textDisabled,
                     style = ty.labelMedium,
                     fontWeight = FontWeight.Bold,
                 )

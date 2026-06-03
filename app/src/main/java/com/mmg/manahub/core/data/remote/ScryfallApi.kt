@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.remote.dto.SearchResultDto
 import com.mmg.manahub.core.data.remote.dto.SymbologyListDto
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -25,6 +26,21 @@ interface ScryfallApi {
 
     @GET("cards/search")
     suspend fun searchCards(
+        @Query("q")      query:  String,
+        @Query("order")  order:  String = "name",
+        @Query("dir")    dir:    String = "auto",
+        @Query("unique") unique: String = "cards",
+        @Query("page")   page:   Int    = 1,
+    ): SearchResultDto
+
+    /**
+     * Same as [searchCards] but bypasses the OkHttp disk cache.
+     * Used as a fallback when OkHttp returns a 304 without being able to serve the
+     * cached body (the body was evicted from the 50 MB disk cache by Coil image data).
+     */
+    @GET("cards/search")
+    @Headers("Cache-Control: no-cache")
+    suspend fun searchCardsNoCache(
         @Query("q")      query:  String,
         @Query("order")  order:  String = "name",
         @Query("dir")    dir:    String = "auto",
