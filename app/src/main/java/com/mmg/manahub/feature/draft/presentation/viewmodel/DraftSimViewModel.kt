@@ -3,7 +3,9 @@ package com.mmg.manahub.feature.draft.presentation.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.draft.domain.model.DraftCard
 import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftError
@@ -43,6 +45,7 @@ class DraftSimViewModel @Inject constructor(
     private val observeDraft: ObserveDraftUseCase,
     private val completeDraft: CompleteDraftUseCase,
     private val getDraftableSimSet: GetDraftableSimSetUseCase,
+    private val analytics: AnalyticsHelper,
 ) : ViewModel() {
 
     /** Set code passed via the [com.mmg.manahub.app.navigation.Screen.DraftSimSetup] route. */
@@ -111,9 +114,24 @@ class DraftSimViewModel @Inject constructor(
     fun startDraft(config: DraftConfig) {
         viewModelScope.launch {
             _uiState.value = DraftSimUiState.Loading
+            // Tag the crash session so any failure during this draft carries its parameters.
+            FirebaseCrashlytics.getInstance().apply {
+                log("draft_sim: startDraft set=${config.setCode} mode=${config.mode.name}")
+                setCustomKey("draft_set_code", config.setCode)
+                setCustomKey("draft_mode", config.mode.name)
+                setCustomKey("draft_pack_count", config.packCount)
+                setCustomKey("draft_seat_count", config.seatCount)
+            }
             when (val result = startDraft(config.setCode, config)) {
                 is DataResult.Success -> {
                     activeConfig = config
+                    analytics.logEvent(
+                        "draft_started",
+                        mapOf(
+                            "set_code" to config.setCode,
+                            "mode" to config.mode.name,
+                        ),
+                    )
                     observeActiveSession()
                 }
                 is DataResult.Error -> {
@@ -160,9 +178,27 @@ class DraftSimViewModel @Inject constructor(
         val state = currentDraftState ?: return
         viewModelScope.launch {
             _uiState.value = DraftSimUiState.Loading
+            val setCode = state.config.setCode
+            val pickCount = state.seats.firstOrNull { it.isHuman }?.pool?.size?.toLong() ?: 0L
             when (val result = completeDraft(state)) {
-                is DataResult.Success ->
-                    _uiState.value = DraftSimUiState.Complete(result.data)
+                is DataResult.Success -> {
+                    val deckId = result.data
+                    analytics.logEvent(
+                        "draft_completed",
+                        mapOf(
+                            "set_code" to setCode,
+                            "pick_count" to pickCount,
+                        ),
+                    )
+                    analytics.logEvent(
+                        "deck_saved_from_draft",
+                        mapOf(
+                            "deck_id" to deckId,
+                            "set_code" to setCode,
+                        ),
+                    )
+                    _uiState.value = DraftSimUiState.Complete(deckId)
+                }
                 is DataResult.Error ->
                     _uiState.value = DraftSimUiState.Error(DraftError.Unexpected(result.message))
             }

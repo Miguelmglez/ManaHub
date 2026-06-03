@@ -111,6 +111,29 @@
 -dontwarn org.vosk.**
 -dontwarn com.sun.jna.**
 
+# ── Draft Simulator ───────────────────────────────────────────────────────────
+# DraftState (and nested models) are persisted as a single Gson JSON blob in the
+# Room `draft_sessions.stateJson` column. R8 must not rename/strip their fields or
+# Gson deserialisation of an in-progress session would silently return defaults.
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftState { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftConfig { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftSeat { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftCard { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.BoosterPack { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.PassDirection { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftStatus { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftMode { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftResult { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.DraftDeck { *; }
+-keep class com.mmg.manahub.feature.draft.domain.model.BasicLandSlot { *; }
+# Gson DTOs for the Worker's booster.json (deserialised by name)
+-keep class com.mmg.manahub.feature.draft.data.remote.dto.BoosterConfigDto { *; }
+-keep class com.mmg.manahub.feature.draft.data.remote.dto.BoosterVariantDto { *; }
+-keep class com.mmg.manahub.feature.draft.data.remote.dto.BoosterSheetDto { *; }
+# Catch-all for any nested model used inside the DraftState JSON tree
+# (BoosterConfig, BoosterSheet, BoosterVariant, BoosterCardEntry, DraftableSet, …).
+-keepclassmembers class com.mmg.manahub.feature.draft.domain.model.** { *; }
+
 # ── Strip all logs in release ─────────────────────────────────────────────────
 -assumenosideeffects class android.util.Log {
     public static int v(...);
