@@ -23,5 +23,6 @@ data class DraftSetEntity(
     val iconSvgUri: String,
     val guideVersion: String,
     val tierListVersion: String,
+    val boosterVersion: String? = null,
     val cachedAt: Long = System.currentTimeMillis(),
 )

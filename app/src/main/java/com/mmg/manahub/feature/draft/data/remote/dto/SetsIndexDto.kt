@@ -39,4 +39,6 @@ data class SetIndexEntryDto(
 data class ContentVersionsDto(
     @SerializedName("guide") val guide: String,
     @SerializedName("tier_list") val tierList: String,
+    /** Present in the sets-index once a booster.json has been published for this set. */
+    @SerializedName("booster") val booster: String? = null,
 )
