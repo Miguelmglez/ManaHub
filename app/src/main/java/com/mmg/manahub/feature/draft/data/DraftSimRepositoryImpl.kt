@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.draft.data
 
 import android.content.Context
+import coil.Coil
 import coil.ImageLoader
 import coil.request.ImageRequest
 import com.google.firebase.crashlytics.FirebaseCrashlytics
@@ -79,7 +80,10 @@ class DraftSimRepositoryImpl @Inject constructor(
     /** Best-effort, fire-and-forget scope for image pre-warming. Failures are ignored. */
     private val prewarmScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
-    private val imageLoader: ImageLoader by lazy { ImageLoader.Builder(context).build() }
+    // Use the app-level ImageLoader (already backed by the global OkHttpClient) rather than
+    // creating a private instance. A private instance would spawn a second OkHttpClient and
+    // connection pool, competing with Scryfall API calls and Supabase token-refresh requests.
+    private val imageLoader: ImageLoader get() = Coil.imageLoader(context)
 
     // -------------------------------------------------------------------------
     // getDraftableSimSet
@@ -202,9 +206,14 @@ class DraftSimRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Enqueues a Coil preload for each card's art crop, throttled to ≤10/s.
-     * Runs in a detached supervisor scope: it must never block the caller or
-     * propagate failures into the draft flow.
+     * Pre-warms the Coil disk cache for card art crops at ≤10 req/s.
+     *
+     * Runs in a detached supervisor scope so it never blocks the caller or propagates
+     * failures into the draft flow. Each request is awaited (not just enqueued) before
+     * the next delay fires — this is the only way to enforce the rate limit, because
+     * `enqueue` is non-blocking and Coil would otherwise dispatch all requests immediately
+     * from its own dispatcher pool, saturating the network and interfering with background
+     * Supabase token-refresh requests.
      */
     private fun prewarmImageCache(cards: List<Card>) {
         prewarmScope.launch {
@@ -212,8 +221,9 @@ class DraftSimRepositoryImpl @Inject constructor(
                 val url = card.imageArtCrop ?: continue
                 val request = ImageRequest.Builder(context)
                     .data(url)
+                    .allowHardware(false)
                     .build()
-                imageLoader.enqueue(request)
+                runCatching { imageLoader.execute(request) }  // await — enforces rate limit
                 delay(IMAGE_PREWARM_DELAY_MS)
             }
         }
