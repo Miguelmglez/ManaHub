@@ -268,11 +268,16 @@ class DraftSimViewModel @Inject constructor(
                 when (state.status) {
                     DraftStatus.SETUP -> _uiState.value = DraftSimUiState.Loading
                     DraftStatus.DRAFTING -> {
+                        val pack = humanPack(state)
+                        val suggestedId = pack.minWithOrNull(
+                            compareBy({ it.pickOrderRank ?: Int.MAX_VALUE }, { it.card.name })
+                        )?.card?.scryfallId
                         _uiState.value = DraftSimUiState.Drafting(
                             state = state,
-                            currentPack = humanPack(state),
+                            currentPack = pack,
                             poolSize = humanPoolSize(state),
                             timerSecondsLeft = state.config.pickTimerSeconds,
+                            suggestedPickId = suggestedId,
                         )
                         restartTimerIfConfigured()
                     }

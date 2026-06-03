@@ -1,5 +1,11 @@
 package com.mmg.manahub.feature.draft.presentation.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,16 +15,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,18 +40,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -76,13 +88,19 @@ fun DraftSetupScreen(
     val sp = MaterialTheme.spacing
     val toastState = rememberMagicToastState()
 
-    var selectedMode by remember { mutableStateOf(DraftMode.DRAFT) }
     var timerIndex by remember { mutableStateOf(0) }
 
     // Navigate to drafting once a draft begins.
     LaunchedEffect(state) {
         if (state is DraftSimUiState.Drafting) {
             onNavigateToDrafting()
+        }
+    }
+
+    var showForm by remember { mutableStateOf(false) }
+    LaunchedEffect(state) {
+        if (state is DraftSimUiState.SetupReady) {
+            showForm = true
         }
     }
 
@@ -107,6 +125,15 @@ fun DraftSetupScreen(
                     style = ty.titleLarge,
                     color = mc.textPrimary,
                 )
+                if (state is DraftSimUiState.SetupReady) {
+                    Spacer(Modifier.weight(1f))
+                    SetSymbol(
+                        setCode = (state as DraftSimUiState.SetupReady).setCode,
+                        rarity = CardRarity.RARE,
+                        size = 32.dp,
+                        modifier = Modifier.padding(end = sp.md)
+                    )
+                }
             }
 
             when (val s = state) {
@@ -118,26 +145,31 @@ fun DraftSetupScreen(
                     onRetry = if (s.retryable) viewModel::retryLoadSet else null,
                 )
 
-                is DraftSimUiState.SetupReady -> SetupForm(
-                    setName = s.setName,
-                    selectedMode = selectedMode,
-                    onModeSelected = { selectedMode = it },
-                    timerIndex = timerIndex,
-                    onTimerChanged = { timerIndex = it },
-                    onStart = {
-                        val pickTimer = TIMER_PRESETS[timerIndex].takeIf { it > 0 }
-                        viewModel.startDraft(
-                            DraftConfig(
-                                setCode = s.setCode,
-                                mode = selectedMode,
-                                seatCount = if (selectedMode == DraftMode.SEALED) 1 else 8,
-                                packCount = if (selectedMode == DraftMode.SEALED) 6 else 3,
-                                pickTimerSeconds = pickTimer,
-                            )
+                is DraftSimUiState.SetupReady -> {
+                    AnimatedVisibility(
+                        visible = showForm,
+                        enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 2 }
+                    ) {
+                        SetupForm(
+                            setName = s.setName,
+                            timerIndex = timerIndex,
+                            onTimerChanged = { timerIndex = it },
+                            onStart = {
+                                val pickTimer = TIMER_PRESETS[timerIndex].takeIf { it > 0 }
+                                viewModel.startDraft(
+                                    DraftConfig(
+                                        setCode = s.setCode,
+                                        mode = DraftMode.DRAFT,
+                                        seatCount = 8,
+                                        packCount = 3,
+                                        pickTimerSeconds = pickTimer,
+                                    )
+                                )
+                            },
+                            startEnabled = true,
                         )
-                    },
-                    startEnabled = state !is DraftSimUiState.Loading,
-                )
+                    }
+                }
 
                 // Building / Complete are owned by the result screen; setup just waits.
                 else -> LoadingContent()
@@ -156,12 +188,9 @@ private fun LoadingContent() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SetupForm(
     setName: String,
-    selectedMode: DraftMode,
-    onModeSelected: (DraftMode) -> Unit,
     timerIndex: Int,
     onTimerChanged: (Int) -> Unit,
     onStart: () -> Unit,
@@ -183,46 +212,40 @@ private fun SetupForm(
             color = mc.textSecondary,
         )
 
-        // Mode selector
-        SectionLabel(stringResource(R.string.draft_sim_mode_label))
-        Row(horizontalArrangement = Arrangement.spacedBy(sp.sm)) {
-            FilterChip(
-                selected = selectedMode == DraftMode.DRAFT,
-                onClick = { onModeSelected(DraftMode.DRAFT) },
-                label = { Text(stringResource(R.string.draft_sim_mode_draft)) },
-                shape = ChipShape,
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.18f),
-                    selectedLabelColor = mc.primaryAccent,
-                    labelColor = mc.textSecondary,
-                ),
-            )
-            FilterChip(
-                selected = selectedMode == DraftMode.SEALED,
-                onClick = { onModeSelected(DraftMode.SEALED) },
-                label = { Text(stringResource(R.string.draft_sim_mode_sealed)) },
-                shape = ChipShape,
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.18f),
-                    selectedLabelColor = mc.primaryAccent,
-                    labelColor = mc.textSecondary,
-                ),
-            )
-        }
-
-        // Seat info (fixed)
-        Surface(shape = CardShape, color = mc.surface, tonalElevation = 1.dp) {
-            Text(
-                text = stringResource(R.string.draft_sim_players_label),
-                style = ty.bodyMedium,
-                color = mc.textPrimary,
+        // Seat info
+        Surface(
+            shape = CardShape,
+            color = mc.surface,
+            tonalElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
                 modifier = Modifier.padding(sp.md),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(sp.sm)
+            ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "8 Players (7 Bots)",
+                    style = ty.bodyMedium,
+                    color = mc.textPrimary,
+                )
+            }
         }
 
-        // Timer (only meaningful for Draft mode; Sealed has no per-pick rounds)
-        if (selectedMode == DraftMode.DRAFT) {
-            SectionLabel(stringResource(R.string.draft_sim_timer_label))
+        // Timer
+        SectionLabel(stringResource(R.string.draft_sim_timer_label))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(mc.surface, CardShape)
+                .padding(sp.md)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Slider(
                     value = timerIndex.toFloat(),
@@ -243,8 +266,21 @@ private fun SetupForm(
                     else stringResource(R.string.draft_sim_timer_seconds, timerValue),
                     style = ty.labelLarge,
                     color = mc.textPrimary,
-                    modifier = Modifier.width(48.dp),
+                    modifier = Modifier.width(52.dp),
                 )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TIMER_PRESETS.forEachIndexed { index, value ->
+                    Text(
+                        text = if (value == 0) "Off" else "${value}s",
+                        style = ty.labelSmall,
+                        color = if (timerIndex == index) mc.primaryAccent else mc.textDisabled,
+                        fontWeight = if (timerIndex == index) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
         }
 
@@ -255,17 +291,29 @@ private fun SetupForm(
             enabled = startEnabled,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
-                .padding(bottom = sp.lg),
+                .height(60.dp)
+                .padding(bottom = sp.lg)
+                .graphicsLayer {
+                    shadowElevation = 8.dp.toPx()
+                    shape = ButtonShape
+                    clip = true
+                },
             shape = ButtonShape,
-            colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = mc.primaryAccent,
+                disabledContainerColor = mc.surfaceVariant
+            ),
         ) {
-            Text(
-                text = stringResource(R.string.draft_sim_start_button),
-                style = ty.labelLarge,
-                color = mc.background,
-                fontWeight = FontWeight.Bold,
-            )
+            Box(contentAlignment = Alignment.Center) {
+                // Subtle shimmer background could be added here if we had a dedicated modifier
+                Text(
+                    text = stringResource(R.string.draft_sim_start_button).uppercase(),
+                    style = ty.labelLarge,
+                    color = if (startEnabled) mc.background else mc.textDisabled,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 2.sp
+                )
+            }
         }
     }
 }

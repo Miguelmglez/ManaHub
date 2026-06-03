@@ -55,12 +55,13 @@ class WeightedBoosterGenerator(
         set: DraftableSet,
     ): List<DraftCard> {
         if (sheet.cards.isEmpty()) return emptyList()
-
-        val actualCount = minOf(count, sheet.cards.size)
-        val selected = weightedSampleWithoutReplacement(sheet.cards, actualCount)
-
+        // Pre-filter to only entries that resolve to a card in the set pool, so mapNotNull
+        // never silently drops a slot (avoids packs shorter than expected).
+        val resolvable = sheet.cards.filter { entry -> set.cards.any { it.scryfallId == entry.id } }
+        if (resolvable.isEmpty()) return emptyList()
+        val actualCount = minOf(count, resolvable.size)
+        val selected = weightedSampleWithoutReplacement(resolvable, actualCount)
         val result = selected.mapNotNull { entry -> toDraftCard(entry, sheet.foil, set) }
-
         return if (sheet.balanceColors) balanceColors(result, sheet, set) else result
     }
 

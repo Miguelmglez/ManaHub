@@ -38,12 +38,14 @@ sealed interface DraftSimUiState {
      * @property currentPack the cards in the pack currently in front of the human seat.
      * @property poolSize number of cards the human has drafted so far.
      * @property timerSecondsLeft remaining seconds on the pick timer, or null when no timer is configured.
+     * @property suggestedPickId scryfallId of the highest-rated card in the current pack, or null when none can be ranked.
      */
     data class Drafting(
         val state: DraftState,
         val currentPack: List<DraftCard>,
         val poolSize: Int,
         val timerSecondsLeft: Int?,
+        val suggestedPickId: String? = null,
     ) : DraftSimUiState
 
     /**

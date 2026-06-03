@@ -110,6 +110,8 @@ import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardSearchSheet
+import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.ui.components.GroupingFlowSelector
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.OracleText
@@ -803,38 +805,6 @@ private fun MovementRow(
                     modifier = Modifier.size(16.dp).graphicsLayer { rotationY = 180f }
                 )
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun GroupingFlowSelector(
-    selected: GroupingMode,
-    onSelect: (GroupingMode) -> Unit
-) {
-    val mc = MaterialTheme.magicColors
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        GroupingMode.entries.forEach { mode ->
-            val label = when (mode) {
-                GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
-                GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
-                GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
-                GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
-            }
-            FilterChip(
-                selected = mode == selected,
-                onClick = { onSelect(mode) },
-                label = { Text(label) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent,
-                    selectedLabelColor = mc.background
-                )
-            )
         }
     }
 }

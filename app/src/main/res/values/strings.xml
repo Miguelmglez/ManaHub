@@ -1623,6 +1623,14 @@
     <string name="draft_sim_empty_pack">Pack is empty.</string>
     <string name="draft_sim_loading">Building draft…</string>
     <string name="draft_sim_error_generic">Something went wrong with the draft.</string>
+    <string name="draft_sim_confirm_pick">Pick this card</string>
+    <string name="draft_sim_suggested_pick">Suggested pick</string>
+    <string name="draft_sim_rarity_mythic">Mythic</string>
+    <string name="draft_sim_rarity_rare">Rare</string>
+    <string name="draft_sim_rarity_uncommon">Uncommon</string>
+    <string name="draft_sim_rarity_common">Common</string>
+    <string name="draft_sim_pool_empty">Your pool is empty</string>
+    <string name="draft_sim_pool_filter_showing">Showing %1$d / %2$d cards</string>
 
     <!-- Deck import / export -->
     <string name="deck_import_title">Import Deck</string>
