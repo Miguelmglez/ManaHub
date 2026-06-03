@@ -83,7 +83,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.data.local.entity.SurveyStatus
+// TODO: Re-enable when Survey review for games is fully implemented
+//import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.domain.model.CardValue
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.MagicSet
@@ -626,22 +627,13 @@ private fun AestheticsArtSection(
 ) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AestheticStatCard(
-                label = stringResource(R.string.stats_label_foil_cards),
-                value = stats.totalFoil.toString(),
-                percentage = if (stats.totalCards > 0) (stats.totalFoil.toFloat() / stats.totalCards) else 0f,
-                isFoil = true,
-                modifier = Modifier.weight(1f)
-            )
-            AestheticStatCard(
-                label = stringResource(R.string.stats_label_full_art_cards),
-                value = stats.totalFullArt.toString(),
-                percentage = if (stats.totalCards > 0) (stats.totalFullArt.toFloat() / stats.totalCards) else 0f,
-                isFoil = false,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        AestheticStatCard(
+            label = stringResource(R.string.stats_label_foil_cards),
+            value = stats.totalFoil.toString(),
+            percentage = if (stats.totalCards > 0) (stats.totalFoil.toFloat() / stats.totalCards) else 0f,
+            isFoil = true,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         CuriousStatBox(
             label = stringResource(R.string.stats_label_top_artist),
@@ -663,44 +655,56 @@ private fun AestheticStatCard(
 ) {
     val mc = MaterialTheme.magicColors
     
-    val foilBrush = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF00E5FF).copy(alpha = 0.2f),
-            Color(0xFFBF00FF).copy(alpha = 0.2f),
-            Color(0xFFFFD700).copy(alpha = 0.2f),
-            Color(0xFF00FFCC).copy(alpha = 0.2f)
-        )
+    val foilColors = listOf(
+        Color(0xFF00E5FF),
+        Color(0xFFBF00FF),
+        Color(0xFFFFD700),
+        Color(0xFF00FFCC)
     )
+    val foilBrush = Brush.linearGradient(colors = foilColors)
 
     Card(
-        modifier = modifier.height(110.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.height(115.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = mc.surface),
-        border = if (isFoil) BorderStroke(1.dp, foilBrush) else BorderStroke(1.dp, mc.surfaceVariant)
+        border = if (isFoil) BorderStroke(1.5.dp, foilBrush) else BorderStroke(1.dp, mc.surfaceVariant)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (isFoil) {
-                Box(modifier = Modifier.fillMaxSize().background(foilBrush))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.linearGradient(colors = foilColors.map { it.copy(alpha = 0.12f) }))
+                )
             }
             
-            Column(Modifier.padding(12.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text(label, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                    Text(
+                        text = label.uppercase(), 
+                        style = MaterialTheme.magicTypography.labelSmall, 
+                        color = mc.textSecondary,
+                        letterSpacing = 1.sp
+                    )
                     Text(
                         text = value,
-                        style = MaterialTheme.magicTypography.titleLarge.copy(fontSize = 24.sp),
+                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 32.sp),
                         color = mc.textPrimary
                     )
                 }
                 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${(percentage * 100).toInt()}%", style = MaterialTheme.magicTypography.labelSmall, color = mc.textDisabled)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Text(
+                            text = "${(percentage * 100).toInt()}% " + stringResource(R.string.stats_label_total).lowercase(), 
+                            style = MaterialTheme.magicTypography.labelSmall, 
+                            color = mc.textDisabled
+                        )
                     }
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(4.dp)
+                            .height(8.dp)
                             .clip(CircleShape)
                             .background(mc.surfaceVariant.copy(alpha = 0.3f))
                     ) {
@@ -1348,22 +1352,22 @@ private fun GameStatsContent(
                     )
                 }
 
-                // Pending surveys banner
-                if (gs.pendingSurveys > 0) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape    = RoundedCornerShape(12.dp),
-                        colors   = CardDefaults.cardColors(containerColor = mc.goldMtg.copy(alpha = 0.15f)),
-                        border   = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)),
-                    ) {
-                        Text(
-                            text     = stringResource(R.string.stats_pending_surveys, gs.pendingSurveys),
-                            style    = ty.bodySmall,
-                            color    = mc.goldMtg,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        )
-                    }
-                }
+                // TODO: Re-enable when Survey review for games is fully implemented
+//                if (gs.pendingSurveys > 0) {
+//                    Card(
+//                        modifier = Modifier.fillMaxWidth(),
+//                        shape    = RoundedCornerShape(12.dp),
+//                        colors   = CardDefaults.cardColors(containerColor = mc.goldMtg.copy(alpha = 0.15f)),
+//                        border   = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)),
+//                    ) {
+//                        Text(
+//                            text     = stringResource(R.string.stats_pending_surveys, gs.pendingSurveys),
+//                            style    = ty.bodySmall,
+//                            color    = mc.goldMtg,
+//                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+//                        )
+//                    }
+//                }
             }
         }
 
@@ -1397,6 +1401,31 @@ private fun GameStatsContent(
                                 mc          = mc,
                                 onDeckClick = { onDeckClick(deck.deckId) },
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Matchup win rates (by opponent archetype) ─────────────────────────
+        if (uiState.archetypeMatchups.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text   = stringResource(R.string.stats_section_matchups).uppercase(),
+                    style  = ty.labelLarge,
+                    color  = mc.textPrimary,
+                    letterSpacing = 2.sp,
+                )
+                Card(
+                    shape  = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = mc.surface),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        uiState.archetypeMatchups.forEach { matchup ->
+                            ArchetypeMatchupItem(matchup = matchup, mc = mc)
                         }
                     }
                 }
@@ -1536,6 +1565,43 @@ private fun DeckPerformanceRow(
     }
 }
 
+/** One row in the matchup section: opponent archetype name, W/total, and a win-rate bar. */
+@Composable
+private fun ArchetypeMatchupItem(
+    matchup: com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow,
+    mc: MagicColors,
+) {
+    val ty = MaterialTheme.magicTypography
+    val winrate = if (matchup.totalGames > 0) matchup.wins.toFloat() / matchup.totalGames else 0f
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            Text(
+                text     = matchup.opponentArchetype,
+                style    = ty.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color    = mc.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text  = "${matchup.wins}/${matchup.totalGames}",
+                style = ty.labelMedium,
+                color = mc.textSecondary,
+            )
+        }
+        LinearProgressIndicator(
+            progress   = { winrate },
+            modifier   = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+            color      = mc.primaryAccent,
+            trackColor = mc.surfaceVariant,
+        )
+    }
+}
+
 @Composable
 private fun SessionHistoryRow(
     item: GameHistoryItem,
@@ -1606,8 +1672,8 @@ private fun SessionHistoryRow(
                 )
             }
 
-            // Survey status chip
-            SurveyStatusChip(item = item, mc = mc)
+            // TODO: Re-enable when Survey review for games is fully implemented
+//            SurveyStatusChip(item = item, mc = mc)
         }
 
         // Trailing more-options button with dropdown
@@ -1624,13 +1690,14 @@ private fun SessionHistoryRow(
                 expanded         = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
             ) {
-                DropdownMenuItem(
-                    text    = { Text(stringResource(R.string.action_review_survey)) },
-                    onClick = {
-                        menuExpanded = false
-                        onReviewSurvey()
-                    },
-                )
+                // TODO: Re-enable when Survey review for games is fully implemented
+//                DropdownMenuItem(
+//                    text    = { Text(stringResource(R.string.action_review_survey)) },
+//                    onClick = {
+//                        menuExpanded = false
+//                        onReviewSurvey()
+//                    },
+//                )
                 DropdownMenuItem(
                     text    = { Text(stringResource(R.string.action_delete_game), color = mc.lifeNegative) },
                     onClick = {
@@ -1643,34 +1710,34 @@ private fun SessionHistoryRow(
     }
 }
 
-@Composable
-private fun SurveyStatusChip(item: GameHistoryItem, mc: MagicColors) {
-    val ty = MaterialTheme.magicTypography
-    val (label, color) = when (item.surveyStatus) {
-        SurveyStatus.PENDING   -> stringResource(R.string.survey_pending) to mc.goldMtg.copy(alpha = 0.7f)
-        SurveyStatus.PARTIAL   -> stringResource(R.string.survey_partial) to mc.goldMtg.copy(alpha = 0.5f)
-        SurveyStatus.COMPLETED -> {
-            val timestamp = item.surveyStatus.let {
-                // Show relative time if we had surveyCompletedAt; fall back to generic label
-                stringResource(R.string.survey_completed)
-            }
-            timestamp to mc.lifePositive.copy(alpha = 0.7f)
-        }
-        SurveyStatus.SKIPPED   -> stringResource(R.string.survey_skipped) to mc.textDisabled
-    }
-
-    Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = color.copy(alpha = 0.15f),
-    ) {
-        Text(
-            text     = label,
-            style    = ty.labelSmall,
-            color    = color,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
-    }
-}
+// TODO: Re-enable when Survey review for games is fully implemented
+//@Composable
+//private fun SurveyStatusChip(item: GameHistoryItem, mc: MagicColors) {
+//    val ty = MaterialTheme.magicTypography
+//    val (label, color) = when (item.surveyStatus) {
+//        SurveyStatus.PENDING   -> stringResource(R.string.survey_pending) to mc.goldMtg.copy(alpha = 0.7f)
+//        SurveyStatus.PARTIAL   -> stringResource(R.string.survey_partial) to mc.goldMtg.copy(alpha = 0.5f)
+//        SurveyStatus.COMPLETED -> {
+//            val timestamp = item.surveyStatus.let {
+//                stringResource(R.string.survey_completed)
+//            }
+//            timestamp to mc.lifePositive.copy(alpha = 0.7f)
+//        }
+//        SurveyStatus.SKIPPED   -> stringResource(R.string.survey_skipped) to mc.textDisabled
+//    }
+//
+//    Surface(
+//        shape = RoundedCornerShape(4.dp),
+//        color = color.copy(alpha = 0.15f),
+//    ) {
+//        Text(
+//            text     = label,
+//            style    = ty.labelSmall,
+//            color    = color,
+//            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+//        )
+//    }
+//}
 
 
 @Composable

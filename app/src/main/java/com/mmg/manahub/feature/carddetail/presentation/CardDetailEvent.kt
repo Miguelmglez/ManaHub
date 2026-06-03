@@ -9,4 +9,7 @@ sealed class CardDetailEvent {
         val message: String,
         val severity: ToastSeverity = ToastSeverity.SUCCESS,
     ) : CardDetailEvent()
+
+    /** Navigate to a different card printing. */
+    data class NavigateToCard(val scryfallId: String) : CardDetailEvent()
 }

@@ -1,14 +1,20 @@
 package com.mmg.manahub.feature.game.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import com.mmg.manahub.core.voice.domain.VoiceModelRepository
+import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +42,9 @@ enum class LifeControlMode { SCROLL, TAP }
 
 data class GameSettings(
     val landReminderEnabled: Boolean     = true,
+    val voiceLandReminderEnabled: Boolean = false,
+    val voiceEndTurnEnabled: Boolean = false,
+    val voiceLanguage: VoiceLanguage = VoiceLanguage.ENGLISH,
     val lifeControlMode:     LifeControlMode = LifeControlMode.SCROLL,
 )
 
@@ -54,15 +63,23 @@ data class GameSetupUiState(
 @HiltViewModel
 class GameSetupViewModel @Inject constructor(
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val voiceModelRepository: VoiceModelRepository,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(buildInitialState(GameMode.STANDARD, 2))
     val uiState: StateFlow<GameSetupUiState> = _uiState.asStateFlow()
 
+    /** Per-language voice-model state, mirrored from the repository. */
+    val voiceModelStates: StateFlow<Map<VoiceLanguage, VoiceModelState>> =
+        voiceModelRepository.modelStates
+
     init {
         viewModelScope.launch {
             val profileName = userPreferencesDataStore.playerNameFlow.first()
-            val isDefault   = profileName.isBlank() || profileName in DEFAULT_NAMES
+            val defaultPlayerName = appContext.getString(R.string.game_setup_default_player_name)
+            val defaultNames = setOf(defaultPlayerName, "Wizard", "Player 1", "Jugador 1", "Spieler 1")
+            val isDefault   = profileName.isBlank() || profileName in defaultNames
             _uiState.update { state ->
                 val configs = state.playerConfigs.toMutableList()
                 if (configs.isNotEmpty()) {
@@ -118,11 +135,62 @@ class GameSetupViewModel @Inject constructor(
     }
 
     fun toggleLandReminder() {
-        _uiState.update { it.copy(
-            gameSettings = it.gameSettings.copy(
-                landReminderEnabled = !it.gameSettings.landReminderEnabled
+        _uiState.update { state ->
+            val newLandEnabled = !state.gameSettings.landReminderEnabled
+            state.copy(
+                gameSettings = state.gameSettings.copy(
+                    landReminderEnabled = newLandEnabled,
+                    // If we disable the land reminder, we must also disable the voice land reminder
+                    voiceLandReminderEnabled = if (!newLandEnabled) false else state.gameSettings.voiceLandReminderEnabled
+                )
             )
+        }
+    }
+
+    fun toggleVoiceLandReminder() {
+        // Only allow enabling if the selected language's model is ready; turning off always works.
+        val enabling = !_uiState.value.gameSettings.voiceLandReminderEnabled
+        val selectedLanguage = _uiState.value.gameSettings.voiceLanguage
+        if (enabling && voiceModelStates.value[selectedLanguage] !is VoiceModelState.Ready) return
+        _uiState.update { state ->
+            val newVoiceEnabled = !state.gameSettings.voiceLandReminderEnabled
+            state.copy(
+                gameSettings = state.gameSettings.copy(
+                    voiceLandReminderEnabled = newVoiceEnabled,
+                    // If we enable the voice land reminder, we must also enable the visual land reminder
+                    landReminderEnabled = if (newVoiceEnabled) true else state.gameSettings.landReminderEnabled,
+                )
+            )
+        }
+    }
+
+    fun toggleVoiceEndTurn() {
+        // Only allow enabling if the selected language's model is ready; turning off always works.
+        val enabling = !_uiState.value.gameSettings.voiceEndTurnEnabled
+        val selectedLanguage = _uiState.value.gameSettings.voiceLanguage
+        if (enabling && voiceModelStates.value[selectedLanguage] !is VoiceModelState.Ready) return
+        _uiState.update { it.copy(
+            gameSettings = it.gameSettings.copy(voiceEndTurnEnabled = !it.gameSettings.voiceEndTurnEnabled)
         )}
+    }
+
+    /**
+     * Selects [language] as the active recognition language. Only succeeds if that language's
+     * model is [VoiceModelState.Ready]; otherwise the call is ignored.
+     */
+    fun setVoiceLanguage(language: VoiceLanguage) {
+        if (voiceModelStates.value[language] !is VoiceModelState.Ready) return
+        _uiState.update { it.copy(gameSettings = it.gameSettings.copy(voiceLanguage = language)) }
+    }
+
+    /** Downloads the voice model for [language]. */
+    fun downloadVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.download(language) }
+    }
+
+    /** Deletes the downloaded voice model for [language]. */
+    fun deleteVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.delete(language) }
     }
 
     fun setLifeControlMode(mode: LifeControlMode) {

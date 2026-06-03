@@ -11,6 +11,7 @@ import io.mockk.slot
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -74,6 +75,10 @@ class TournamentRepositoryImplTest {
     @Before
     fun setUp() {
         repository = TournamentRepositoryImpl(dao, UnconfinedTestDispatcher())
+        // Default match for finishMatch tests — winner (1L) is a valid participant
+        coEvery { dao.getMatchById(any()) } returns TournamentMatchEntity(
+            id = 100L, tournamentId = 1L, round = 1, playerIds = "[1,2]",
+        )
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -315,8 +320,8 @@ class TournamentRepositoryImplTest {
     }
 
     @Test
-    fun `given odd players and SWISS when createTournament then last player gets a bye`() = runTest {
-        // Arrange — 5 players: pairs (0,1), (2,3), player 4 gets a bye (no match)
+    fun `given 5 players and SWISS when createTournament then generates 2 real matches plus 1 bye match`() = runTest {
+        // Arrange — 5 players: pairs (0,1), (2,3), player 50 gets a bye (auto-finished match)
         val playerIds = listOf(10L, 20L, 30L, 40L, 50L)
         var capturedMatches: List<TournamentMatchEntity> = emptyList()
 
@@ -332,16 +337,16 @@ class TournamentRepositoryImplTest {
         repository.createTournament("T", "STANDARD", "SWISS",
             (1..5).map { "P$it" to "#FFF" }, 1, false)
 
-        // Assert: 5 players → floor(5/2) = 2 matches; player 50 has no match
-        assertEquals(2, capturedMatches.size)
-        val allMatchedIds = capturedMatches.flatMap { match ->
-            match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
-        }
-        assertTrue("Player 50 should NOT have a match (bye)", 50L !in allMatchedIds)
+        // Assert: 5 players → 2 real matches + 1 bye match = 3 total
+        assertEquals(3, capturedMatches.size)
+        val byeMatch = capturedMatches.find { it.playerIds == "[50]" }
+        assertNotNull("Bye match for player 50 must exist", byeMatch)
+        assertEquals("Bye match must be pre-finished", "FINISHED", byeMatch!!.status)
+        assertEquals("Bye match winner must be the bye recipient", 50L, byeMatch.winnerId)
     }
 
     @Test
-    fun `given 3 players and SWISS when createTournament then generates floor(3 div 2)=1 match`() = runTest {
+    fun `given 3 players and SWISS when createTournament then generates 1 real match and 1 bye match`() = runTest {
         // Arrange
         val playerIds = listOf(10L, 20L, 30L)
         var capturedMatches: List<TournamentMatchEntity> = emptyList()
@@ -358,8 +363,10 @@ class TournamentRepositoryImplTest {
         repository.createTournament("T", "STANDARD", "SWISS",
             (1..3).map { "P$it" to "#FFF" }, 1, false)
 
-        // Assert
-        assertEquals(1, capturedMatches.size)
+        // Assert: 1 real match + 1 bye
+        assertEquals(2, capturedMatches.size)
+        val byeMatch = capturedMatches.find { it.playerIds == "[30]" }
+        assertNotNull("Bye match for player 30 must exist", byeMatch)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -391,8 +398,8 @@ class TournamentRepositoryImplTest {
     }
 
     @Test
-    fun `given 5 players and SINGLE_ELIM when createTournament then last player gets a bye`() = runTest {
-        // Arrange
+    fun `given 5 players and SINGLE_ELIM when createTournament then top seeds get byes and others play`() = runTest {
+        // Arrange — 5 players → next power of 2 is 8 → 3 byes for top seeds; 2 real matches
         val playerIds = listOf(10L, 20L, 30L, 40L, 50L)
         var capturedMatches: List<TournamentMatchEntity> = emptyList()
 
@@ -408,12 +415,13 @@ class TournamentRepositoryImplTest {
         repository.createTournament("T", "STANDARD", "SINGLE_ELIM",
             (1..5).map { "P$it" to "#FFF" }, 1, false)
 
-        // Assert: floor(5/2) = 2 matches; player 50 has no match
-        assertEquals(2, capturedMatches.size)
-        val allMatchedIds = capturedMatches.flatMap { m ->
-            m.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
-        }
-        assertTrue("Player 50 must be the bye (no match)", 50L !in allMatchedIds)
+        // Assert: nextPow2(5)=8, byeCount=3 → 3 bye matches + 1 real match = 4 total
+        // Top 3 seeds (10,20,30) get auto-finished byes; 40 vs 50 is the real match
+        val byeMatches  = capturedMatches.filter { it.status == "FINISHED" && it.playerIds.trim('[', ']').split(",").size == 1 }
+        val realMatches = capturedMatches.filter { it.status == "PENDING" }
+        assertEquals("5 players → 3 byes + 1 real = 4 total", 4, capturedMatches.size)
+        assertEquals("3 bye matches expected", 3, byeMatches.size)
+        assertEquals("1 real match expected", 1, realMatches.size)
     }
 
     @Test
@@ -500,27 +508,68 @@ class TournamentRepositoryImplTest {
     }
 
     @Test
-    fun `given tie in points when calculateStandings then tiebreaker is lifeTotal descending`() = runTest {
-        // Arrange — Alice and Bob both have 1 win; Alice has higher lifeTotal
-        val alice = buildPlayer(id = 1L, name = "Alice")
-        val bob   = buildPlayer(id = 2L, name = "Bob")
+    fun `given tie in points when calculateStandings then tiebreaker is OMW percent not life total`() = runTest {
+        // Arrange: 2 players only — Alice and Bob each beat different opponents so their OMW% differs.
+        // Using 4 players to set up different opponent strength without additional 3-pt ties.
+        // Alice (1) beats Strong (3). Strong (3) beats Weak (4). Bob (2) beats Weak (4).
+        // Points: Alice=3, Bob=3, Strong=3 (wins one), Weak=0.
+        // But we only care about Alice vs Bob: Alice's OMW%(Strong=50%) > Bob's OMW%(Weak=33%).
+        val alice   = buildPlayer(id = 1L, name = "Alice")
+        val bob     = buildPlayer(id = 2L, name = "Bob")
+        val strong  = buildPlayer(id = 3L, name = "Strong")
+        val weak    = buildPlayer(id = 4L, name = "Weak")
 
-        // Alice: won with 20 life remaining; Bob: won with 5 life remaining
         val matches = listOf(
             buildFinishedMatch(100L, 1L, 1L, 3L, winnerId = 1L, "{1:20,3:0}"),
-            buildFinishedMatch(101L, 1L, 2L, 3L, winnerId = 2L, "{2:5,3:0}"),
+            buildFinishedMatch(101L, 1L, 3L, 4L, winnerId = 3L, "{3:15,4:0}"),
+            buildFinishedMatch(102L, 1L, 2L, 4L, winnerId = 2L, "{2:20,4:0}"),
         )
-        val charlie = buildPlayer(id = 3L, name = "Charlie")
 
-        coEvery { dao.getPlayers(1L) }        returns listOf(alice, bob, charlie)
+        coEvery { dao.getPlayers(1L) }        returns listOf(alice, bob, strong, weak)
         coEvery { dao.getFinishedMatches(1L) } returns matches
 
         // Act
         val standings = repository.calculateStandings(1L)
 
-        // Assert: Alice (lifeTotal=20) before Bob (lifeTotal=5)
-        assertEquals(1L, standings[0].player.id)
-        assertEquals(2L, standings[1].player.id)
+        // Assert: Alice has OMW%=50%, Bob has OMW%=33% → Alice is ranked above Bob
+        // (life total is NOT used as tiebreaker — both have equal life totals here)
+        val alicePos = standings.indexOfFirst { it.player.id == 1L }
+        val bobPos   = standings.indexOfFirst { it.player.id == 2L }
+        assertTrue("Alice must be ranked above Bob due to higher OMW%", alicePos < bobPos)
+    }
+
+    @Test
+    fun `given finished match with null winnerId when calculateStandings then it counts as draw`() = runTest {
+        // Arrange — Alice and Bob drew; both get 1 point
+        val alice = buildPlayer(id = 1L, name = "Alice")
+        val bob   = buildPlayer(id = 2L, name = "Bob")
+        val drawMatch = TournamentMatchEntity(
+            id             = 100L,
+            tournamentId   = 1L,
+            round          = 1,
+            playerIds      = "[1,2]",
+            winnerId       = null,    // null = draw
+            status         = "FINISHED",
+            finalLifeTotals = "{1:10,2:10}",
+        )
+
+        coEvery { dao.getPlayers(1L) }        returns listOf(alice, bob)
+        coEvery { dao.getFinishedMatches(1L) } returns listOf(drawMatch)
+
+        // Act
+        val standings = repository.calculateStandings(1L)
+
+        // Assert: both players have 1 draw = 1 point; no wins or losses
+        val aliceStanding = standings.find { it.player.id == 1L }!!
+        val bobStanding   = standings.find { it.player.id == 2L }!!
+        assertEquals(0, aliceStanding.wins)
+        assertEquals(0, aliceStanding.losses)
+        assertEquals(1, aliceStanding.draws)
+        assertEquals(1, aliceStanding.points)
+        assertEquals(0, bobStanding.wins)
+        assertEquals(0, bobStanding.losses)
+        assertEquals(1, bobStanding.draws)
+        assertEquals(1, bobStanding.points)
     }
 
     @Test

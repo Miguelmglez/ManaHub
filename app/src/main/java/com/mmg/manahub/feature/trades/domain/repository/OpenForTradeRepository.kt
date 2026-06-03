@@ -14,7 +14,6 @@ interface OpenForTradeRepository {
         isFoil: Boolean = false,
         condition: String = "NM",
         language: String = "en",
-        isAltArt: Boolean = false,
     ): Result<Unit>
     suspend fun removeByCollectionId(localCollectionId: String): Result<Unit>
     suspend fun removeByCollectionIdAndSync(localCollectionId: String): Result<Unit>
@@ -41,7 +40,6 @@ interface OpenForTradeRepository {
         isFoil: Boolean = false,
         condition: String = "NM",
         language: String = "en",
-        isAltArt: Boolean = false,
         userId: String,
     ): Result<Unit>
     suspend fun syncFromRemote(userId: String): Result<Unit>

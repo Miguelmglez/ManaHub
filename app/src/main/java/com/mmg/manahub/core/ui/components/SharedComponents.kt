@@ -181,24 +181,6 @@ fun FoilBadge() {
 }
 
 @Composable
-fun AltArtBadge() {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(
-        color = mc.primaryAccent.copy(alpha = 0.18f),
-        shape = MaterialTheme.shapes.extraSmall,
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.4f)),
-    ) {
-        Text(
-            text     = stringResource(R.string.carddetail_alternative_art_short),
-            style    = ty.labelSmall.copy(fontSize = 10.sp),
-            color    = mc.primaryAccent,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-        )
-    }
-}
-
-@Composable
 fun StaleBadge() {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography

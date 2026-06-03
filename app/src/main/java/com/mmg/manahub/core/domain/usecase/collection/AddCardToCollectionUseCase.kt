@@ -17,7 +17,6 @@ class AddCardToCollectionUseCase @Inject constructor(
     suspend operator fun invoke(
         scryfallId:       String,
         isFoil:           Boolean = false,
-        isAlternativeArt: Boolean = false,
         condition:        String  = "NM",
         language:         String  = "en",
         isForTrade:       Boolean = false,
@@ -29,7 +28,6 @@ class AddCardToCollectionUseCase @Inject constructor(
         userCardRepository.addOrIncrement(
             scryfallId       = scryfallId,
             isFoil           = isFoil,
-            isAlternativeArt = isAlternativeArt,
             condition        = condition,
             language         = language,
             isForTrade       = isForTrade,

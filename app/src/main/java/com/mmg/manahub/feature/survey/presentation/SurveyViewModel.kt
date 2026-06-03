@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
+import com.mmg.manahub.core.data.local.entity.SurveyCardImpactEntity
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.di.IoDispatcher
@@ -18,6 +20,8 @@ import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,14 +42,17 @@ enum class SurveyMode { COMPLETE, REVIEW }
 
 // ── Card-impact rating ────────────────────────────────────────────────────────
 
-/** The three possible ratings a player can assign to a card in the CARD_IMPACT panel. */
+/** The three possible ratings a player can assign to a card in the legacy CARD_IMPACT panel. */
 enum class CardImpactRating { KEY_CARD, AVERAGE, WEAK }
 
 // ── Game recap ────────────────────────────────────────────────────────────────
 
 /**
- * Immutable snapshot of the finished game shown at the top of the survey and in
- * the SUMMARY panel.
+ * Immutable snapshot of the finished game shown in the read-only context strip.
+ *
+ * @param opponents Ordered (playerId → name) pairs for every non-local seat. Used to
+ *   render one archetype block per opponent and to write the archetype back to the
+ *   correct seat via [SurveyViewModel.setOpponentArchetype].
  */
 data class GameRecap(
     val sessionId: Long,
@@ -55,32 +62,53 @@ data class GameRecap(
     val durationMs: Long,
     val playedAt: Long,
     val winnerName: String,
+    val playerCount: Int,
     val opponentNames: List<String>,
+    val opponents: List<Pair<Int, String>>,
     val commanderDamageWin: Boolean,
 )
 
 // ── UiState ───────────────────────────────────────────────────────────────────
 
 /**
- * Full UI state for the survey screen.
+ * Full UI state for the single-form survey screen (Phase 3).
+ *
+ * The legacy panel-based fields ([panels], [currentPanel], [cardImpactSelections],
+ * [suggestedImpactCards], [extraImpactCards]) are retained so backward-compatible
+ * persistence keeps working, but the screen no longer drives a step flow.
  */
 data class SurveyUiState(
     val sessionId: Long = 0L,
     val surveyMode: SurveyMode = SurveyMode.COMPLETE,
     val recap: GameRecap? = null,
-    val panels: List<SurveyPanel> = emptyList(),
-    val currentPanel: Int = 0,
+
+    // Generic answer map for star ratings / free-form question ids (e.g. "game_rating").
     val answers: Map<String, String> = emptyMap(),
-    val cardImpactSelections: Map<String, CardImpactRating> = emptyMap(),
-    /** Up to 3 highest-CMC non-land cards from the deck, suggested for rating. */
-    val suggestedImpactCards: List<Card> = emptyList(),
-    /** Additional cards the user has manually added to the impact list. */
-    val extraImpactCards: List<Card> = emptyList(),
-    /** Full deck card list used for the card picker. */
+
+    // ── Phase 3 structured answers ───────────────────────────────────────────
+    val resultAnswer: String? = null,           // "WIN" | "LOSE" | "DRAW"
+    val eliminationCause: String? = null,       // null until the user picks
+    val handQualityRating: Int? = null,         // 1-4 (Unkeepable/Risky/Solid/Perfect)
+    val mulligansCount: Int = 0,                // 0..N London mulligan stepper
+    val manaFlowAnswer: String? = null,         // "SCREWED"|"TIGHT"|"SMOOTH"|"FLOODED"
+    val deckPickedForSeat: Boolean = false,     // true once the local seat has a deckId
+    val commanderCarriedAnswer: String? = null, // Commander mode only
+    val sideboardSwingAnswer: String? = null,   // Bo2/Bo3 or deck has a sideboard
+    val opponentArchetypes: Map<Int, String> = emptyMap(), // playerId → archetype
+
+    // Per-card impact ratings keyed by "playerSessionId:cardId" → "MVP" | "DEAD".
+    val cardImpactRatings: Map<String, String> = emptyMap(),
+
+    val freeNotes: String = "",
+
+    // Deck association.
     val deckCards: List<Card> = emptyList(),
     val selectedDeckId: String? = null,
     val availableDecks: List<Deck> = emptyList(),
-    val freeNotes: String = "",
+    val hasSideboard: Boolean = false,
+    val localPlayerSessionId: Long = 0L,
+
+    val completionFraction: Float = 0f,         // 0f..1f answered optional sections
     val isComplete: Boolean = false,
     val isLoading: Boolean = false,
 )
@@ -88,16 +116,19 @@ data class SurveyUiState(
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 /**
- * ViewModel for the post-game survey screen.
+ * ViewModel for the single-form post-game survey screen.
  *
  * Reads session/player data from [GameSessionDao], persists answers through
- * [SurveyAnswerDao], and coordinates deck association via [DeckRepository].
- * All heavy IO runs on [Dispatchers.IO]; state updates are posted back to the
- * main thread via [MutableStateFlow.update].
+ * [SurveyAnswerDao] and per-seat card impacts through [SurveyCardImpactDao], and
+ * coordinates deck association via [DeckRepository]. Every setter mutates in-memory
+ * state immediately and schedules a debounced DRAFT autosave; the result write-back
+ * additionally corrects the recorded game outcome. All heavy IO runs on
+ * [IoDispatcher]; state updates are posted via [MutableStateFlow.update].
  */
 @HiltViewModel
 class SurveyViewModel @Inject constructor(
     private val surveyAnswerDao: SurveyAnswerDao,
+    private val surveyCardImpactDao: SurveyCardImpactDao,
     private val gameSessionDao: GameSessionDao,
     private val deckRepository: DeckRepository,
     private val cardDao: CardDao,
@@ -113,6 +144,11 @@ class SurveyViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SurveyUiState(sessionId = sessionId))
     val uiState: StateFlow<SurveyUiState> = _uiState.asStateFlow()
 
+    /** Total number of optional sections counted toward [SurveyUiState.completionFraction]. */
+    private val optionalSectionCount = 7
+
+    private var autoSaveJob: Job? = null
+
     init {
         loadSession()
     }
@@ -126,10 +162,6 @@ class SurveyViewModel @Inject constructor(
 
             val surveyMode = runCatching { SurveyMode.valueOf(modeArg) }.getOrDefault(SurveyMode.COMPLETE)
 
-            val prefs = userPreferencesRepository.preferencesFlow.first()
-            val langCode = prefs.appLanguage.code
-
-            // Load session + players from Room on IO dispatcher
             val sessionWithPlayers = withContext(ioDispatcher) {
                 gameSessionDao.getSessionById(sessionId)
             } ?: run {
@@ -140,21 +172,21 @@ class SurveyViewModel @Inject constructor(
             val session = sessionWithPlayers.session
             val players = sessionWithPlayers.players
 
-            // Determine app-user player and win status
-            val appUserName = prefs.appLanguage.let { _ ->
-                // Prefer the winner name lookup: if app user is the winner we know their name;
-                // otherwise fall back to the first non-winner player for the recap.
-                session.winnerName
-            }
-            val appUserPlayer = players.firstOrNull { it.isWinner }
-            val appUserWon = appUserPlayer != null
-            val opponentNames = players
-                .filter { !it.isWinner }
-                .map { it.playerName }
+            // Determine the app user's seat and win status from the persisted `isLocal`
+            // flag (see ADR-001). Inferring from `isWinner` always reports a win because
+            // every finished game has a winner.
+            val localPlayer = players.firstOrNull { it.isLocal }
+            val appUserWon = localPlayer?.isWinner == true
+            val winnerName = players.firstOrNull { it.isWinner }?.playerName ?: session.winnerName
+            val opponents = players
+                .filter { !it.isLocal }
+                .map { it.playerId to it.playerName }
+            val opponentNames = opponents.map { it.second }
+            val restoredArchetypes = players
+                .filter { !it.isLocal && it.archetype != null }
+                .associate { it.playerId to it.archetype!! }
 
-            val commanderDamageWin = players.any {
-                it.eliminationReason == "COMMANDER_DAMAGE"
-            }
+            val commanderDamageWin = players.any { it.eliminationReason == "COMMANDER_DAMAGE" }
 
             val recap = GameRecap(
                 sessionId = session.id,
@@ -163,214 +195,299 @@ class SurveyViewModel @Inject constructor(
                 totalTurns = session.totalTurns,
                 durationMs = session.durationMs,
                 playedAt = session.playedAt,
-                winnerName = session.winnerName,
+                winnerName = winnerName,
+                playerCount = session.playerCount,
                 opponentNames = opponentNames,
+                opponents = opponents,
                 commanderDamageWin = commanderDamageWin,
             )
 
-            // Load available decks
             val availableDecks = withContext(ioDispatcher) {
                 deckRepository.observeAllDecks().first()
             }
 
-            // Restore previously saved answers if REVIEW mode or PARTIAL session
+            // Restore previously saved answers (REVIEW mode or DRAFT session).
             val existingAnswers = withContext(ioDispatcher) {
                 surveyAnswerDao.getAnswersForSession(sessionId)
             }
+            val existingImpacts = withContext(ioDispatcher) {
+                surveyCardImpactDao.observeForSession(sessionId).first()
+            }
 
             val restoredAnswers = mutableMapOf<String, String>()
-            val restoredCardImpact = mutableMapOf<String, CardImpactRating>()
             var restoredNotes = ""
+            var restoredResult: String? = null
+            var restoredElimination: String? = null
+            var restoredHandQuality: Int? = null
+            var restoredMulligans = 0
+            var restoredManaFlow: String? = null
+            var restoredCommanderCarried: String? = null
+            var restoredSideboardSwing: String? = null
             var restoredDeckId = session.deckId
 
             existingAnswers.forEach { entity ->
                 when (entity.questionType) {
-                    "CARD_IMPACT" -> {
-                        val rating = runCatching { CardImpactRating.valueOf(entity.answer) }
-                            .getOrNull()
-                        if (entity.cardReference != null && rating != null) {
-                            restoredCardImpact[entity.cardReference] = rating
-                        }
-                    }
+                    "RESULT" -> restoredResult = entity.answer
+                    "ELIMINATION" -> restoredElimination = entity.answer
+                    "HAND" -> restoredHandQuality = entity.answer.toIntOrNull()
+                    "MULLIGAN" -> restoredMulligans = entity.answer.toIntOrNull() ?: 0
+                    "MANA" -> restoredManaFlow = entity.answer
+                    "COMMANDER_CARRIED" -> restoredCommanderCarried = entity.answer
+                    "SIDEBOARD_SWING" -> restoredSideboardSwing = entity.answer
                     "FREE_TEXT" -> restoredNotes = entity.answer
                     else -> restoredAnswers[entity.questionId] = entity.answer
                 }
             }
 
-            // Load deck cards for the selected deck; treat a deleted deck as no deck
-            val deckCards = if (restoredDeckId != null) loadDeckCards(restoredDeckId!!) else emptyList()
-            if (restoredDeckId != null && deckCards.isEmpty()) {
-                val exists = withContext(ioDispatcher) {
-                    deckRepository.observeDeckWithCards(restoredDeckId!!).first() != null
+            // Pre-fill the result from the authoritative win flag if not already saved.
+            if (restoredResult == null) {
+                restoredResult = when {
+                    appUserWon -> "WIN"
+                    isDrawSession(session.winnerId, winnerName) -> "DRAW"
+                    else -> "LOSE"
                 }
-                if (!exists) restoredDeckId = null
             }
-            val hasDeck = restoredDeckId != null
-            val suggestedCards = computeSuggestedCards(deckCards)
 
-            // Build panels
-            val panels = SurveyQuestionEngine.buildPanels(
-                won = appUserWon,
-                context = context,
-                langCode = langCode,
-                hasDeck = hasDeck,
-            )
+            // Restore per-card impacts keyed by "playerSessionId:cardId".
+            val restoredImpacts = existingImpacts.associate {
+                "${it.playerSessionId}:${it.cardId}" to it.impact
+            }
+
+            // Load deck cards; treat a deleted deck as no deck.
+            var deckCards = if (restoredDeckId != null) loadDeckCards(restoredDeckId!!) else emptyList()
+            var hasSideboard = false
+            if (restoredDeckId != null) {
+                val deckWithCards = withContext(ioDispatcher) {
+                    deckRepository.observeDeckWithCards(restoredDeckId!!).first()
+                }
+                if (deckWithCards == null) {
+                    restoredDeckId = null
+                    deckCards = emptyList()
+                } else {
+                    hasSideboard = deckWithCards.sideboard.isNotEmpty()
+                }
+            }
+            val deckPicked = restoredDeckId != null
 
             _uiState.update {
                 it.copy(
                     surveyMode = surveyMode,
                     recap = recap,
-                    panels = panels,
                     answers = restoredAnswers,
-                    cardImpactSelections = restoredCardImpact,
+                    resultAnswer = restoredResult,
+                    eliminationCause = restoredElimination,
+                    handQualityRating = restoredHandQuality,
+                    mulligansCount = restoredMulligans,
+                    manaFlowAnswer = restoredManaFlow,
+                    commanderCarriedAnswer = restoredCommanderCarried,
+                    sideboardSwingAnswer = restoredSideboardSwing,
+                    opponentArchetypes = restoredArchetypes,
+                    cardImpactRatings = restoredImpacts,
                     freeNotes = restoredNotes,
                     selectedDeckId = restoredDeckId,
+                    deckPickedForSeat = deckPicked,
                     availableDecks = availableDecks,
                     deckCards = deckCards,
-                    suggestedImpactCards = suggestedCards,
+                    hasSideboard = hasSideboard,
+                    localPlayerSessionId = localPlayer?.id ?: 0L,
                     isLoading = false,
                 )
             }
+            recomputeCompletion()
         }
     }
-
-    // ── Panel navigation ──────────────────────────────────────────────────────
-
-    /** Jumps to the panel at [index]. */
-    fun setCurrentPanel(index: Int) {
-        _uiState.update { it.copy(currentPanel = index.coerceIn(0, it.panels.lastIndex)) }
-    }
-
-    // ── Answer mutations ──────────────────────────────────────────────────────
 
     /**
-     * Records a standard answer for [questionId] and triggers an async persistence
-     * of the current state.
+     * Heuristic draw detection for a finished game: the persisted session carries a
+     * draw sentinel (winnerId = -1) or an explicit "Draw" winner name.
      */
+    private fun isDrawSession(winnerId: Int, winnerName: String): Boolean =
+        winnerId == -1 || winnerName.equals("Draw", ignoreCase = true)
+
+    // ── Setters (Phase 3) ───────────────────────────────────────────────────────
+
+    /**
+     * Records the user-corrected game result and writes it back to the persisted
+     * session/seat rows. "WIN" sets the local seat as winner and the session winner to
+     * the local player; "DRAW" writes the draw sentinel; "LOSE" only clears the local
+     * seat's winner flag (the opponent's recorded winner is left untouched).
+     */
+    fun setResult(result: String) {
+        _uiState.update { it.copy(resultAnswer = result) }
+        viewModelScope.launch(ioDispatcher) {
+            val session = gameSessionDao.getSessionById(sessionId)
+            val localPlayer = session?.players?.firstOrNull { it.isLocal }
+            when (result) {
+                "WIN" -> {
+                    if (localPlayer != null) {
+                        gameSessionDao.updateSessionResult(
+                            sessionId = sessionId,
+                            winnerId = localPlayer.playerId,
+                            winnerName = localPlayer.playerName,
+                        )
+                    }
+                    gameSessionDao.updateLocalSeatWinner(sessionId, true)
+                }
+                "LOSE" -> {
+                    gameSessionDao.updateLocalSeatWinner(sessionId, false)
+                }
+                "DRAW" -> {
+                    gameSessionDao.updateSessionResultDraw(sessionId)
+                    gameSessionDao.updateLocalSeatWinner(sessionId, false)
+                }
+            }
+        }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /** Records how the game ended (win cause or loss cause). */
+    fun setEliminationCause(cause: String) {
+        _uiState.update { it.copy(eliminationCause = cause) }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /** Records the opening-hand quality rating (1-4). */
+    fun setHandQuality(rating: Int) {
+        _uiState.update { it.copy(handQualityRating = rating) }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /** Records the number of mulligans taken (clamped to 0..6). */
+    fun setMulligan(count: Int) {
+        _uiState.update { it.copy(mulligansCount = count.coerceIn(0, 6)) }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /** Records the mana-flow answer. */
+    fun setManaFlow(answer: String) {
+        _uiState.update { it.copy(manaFlowAnswer = answer) }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /** Records the Commander-carried answer (Commander mode only). */
+    fun setCommanderCarried(answer: String) {
+        _uiState.update { it.copy(commanderCarriedAnswer = answer) }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /** Records the sideboard-swing answer. */
+    fun setSideboardSwing(answer: String) {
+        _uiState.update { it.copy(sideboardSwingAnswer = answer) }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /**
+     * Records an opponent seat's archetype and writes it straight to that seat's row
+     * so cross-game matchup stats see the classification immediately.
+     */
+    fun setOpponentArchetype(playerId: Int, archetype: String) {
+        _uiState.update { it.copy(opponentArchetypes = it.opponentArchetypes + (playerId to archetype)) }
+        viewModelScope.launch(ioDispatcher) {
+            gameSessionDao.updateSeatArchetype(sessionId, playerId, archetype)
+        }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /**
+     * Toggles the per-card impact rating for the local seat. The map is keyed by
+     * "playerSessionId:cardId" so multiple copies of the same card on different seats
+     * never collide.
+     */
+    fun setCardImpact(playerSessionId: Long, cardId: String, impact: String) {
+        val key = "$playerSessionId:$cardId"
+        _uiState.update { s ->
+            val current = s.cardImpactRatings[key]
+            // Tapping the same impact again clears it (neutral state).
+            val updated = if (current == impact) s.cardImpactRatings - key
+            else s.cardImpactRatings + (key to impact)
+            s.copy(cardImpactRatings = updated)
+        }
+        recomputeCompletion()
+        scheduleAutoSave()
+    }
+
+    /** Records a generic answer (e.g. star "game_rating"). */
     fun setAnswer(questionId: String, answer: String) {
         _uiState.update { it.copy(answers = it.answers + (questionId to answer)) }
-        autoSave()
+        recomputeCompletion()
+        scheduleAutoSave()
     }
 
-    /** Records a card-impact rating for [scryfallId]. */
-    fun setCardImpact(scryfallId: String, rating: CardImpactRating) {
-        _uiState.update {
-            it.copy(cardImpactSelections = it.cardImpactSelections + (scryfallId to rating))
-        }
-        autoSave()
-    }
-
-    /** Adds [card] to the manually selected impact cards list (deduplicates by scryfallId). */
-    fun addExtraImpactCard(card: Card) {
-        _uiState.update { state ->
-            if (state.extraImpactCards.any { it.scryfallId == card.scryfallId }) state
-            else state.copy(extraImpactCards = state.extraImpactCards + card)
-        }
-    }
-
-    /** Removes the card with [scryfallId] from both the selections map and the extra-cards list. */
-    fun removeImpactCard(scryfallId: String) {
-        _uiState.update { state ->
-            state.copy(
-                cardImpactSelections = state.cardImpactSelections - scryfallId,
-                extraImpactCards = state.extraImpactCards.filter { it.scryfallId != scryfallId },
-            )
-        }
-    }
-
-    /** Updates free-form notes and triggers auto-save. */
+    /** Updates free-form notes. */
     fun setFreeNotes(text: String) {
         _uiState.update { it.copy(freeNotes = text) }
-        autoSave()
+        recomputeCompletion()
+        scheduleAutoSave()
     }
 
     // ── Deck association ──────────────────────────────────────────────────────
 
     /**
-     * Associates [deckId] with this session. Updates the Room row, loads the deck cards,
-     * recomputes card suggestions, and rebuilds panels (adding CARD_IMPACT if first association).
+     * Associates [deckId] with this session, loads its cards, flags
+     * [SurveyUiState.deckPickedForSeat], and detects whether the deck has a sideboard.
      */
-    fun selectDeck(deckId: String?) {
+    fun setDeckForSession(deckId: String?) {
         viewModelScope.launch {
             withContext(ioDispatcher) {
                 gameSessionDao.updateSessionDeck(sessionId, deckId)
             }
-
             val deckCards = if (deckId != null) loadDeckCards(deckId) else emptyList()
-            val suggestedCards = computeSuggestedCards(deckCards)
-
-            val prefs = userPreferencesRepository.preferencesFlow.first()
-            val langCode = prefs.appLanguage.code
-            val won = _uiState.value.recap?.won ?: false
-            val hasDeck = deckId != null
-
-            val previousId = _uiState.value.panels.getOrNull(_uiState.value.currentPanel)?.id
-
-            val newPanels = SurveyQuestionEngine.buildPanels(
-                won = won,
-                context = context,
-                langCode = langCode,
-                hasDeck = hasDeck,
-            )
-
-            val newCurrentPanel = when {
-                previousId == SurveyPanelId.CARD_IMPACT && newPanels.none { it.id == SurveyPanelId.CARD_IMPACT } ->
-                    newPanels.indexOfFirst { it.id == SurveyPanelId.FUNDAMENTALS }.coerceAtLeast(0)
-                previousId != null && newPanels.any { it.id == previousId } ->
-                    newPanels.indexOfFirst { it.id == previousId }
-                else ->
-                    _uiState.value.currentPanel.coerceAtMost(newPanels.lastIndex)
-            }
+            val hasSideboard = if (deckId != null) {
+                withContext(ioDispatcher) {
+                    deckRepository.observeDeckWithCards(deckId).first()?.sideboard?.isNotEmpty() ?: false
+                }
+            } else false
 
             _uiState.update {
                 it.copy(
                     selectedDeckId = deckId,
                     deckCards = deckCards,
-                    suggestedImpactCards = suggestedCards,
-                    panels = newPanels,
-                    currentPanel = newCurrentPanel,
+                    deckPickedForSeat = deckId != null,
+                    hasSideboard = hasSideboard,
                 )
             }
+            recomputeCompletion()
+            scheduleAutoSave()
         }
     }
 
     // ── Completion actions ────────────────────────────────────────────────────
 
-    /**
-     * Saves the current progress as [SurveyStatus.PARTIAL] and signals the screen to pop.
-     * Use when the user taps "Later".
-     */
+    /** Saves the current progress as a DRAFT and signals the screen to pop ("Save & exit"). */
     fun postpone() {
+        autoSaveJob?.cancel()
         viewModelScope.launch {
-            persistAnswers(SurveyStatus.PARTIAL)
+            persistAnswers("DRAFT")
             _uiState.update { it.copy(isComplete = true) }
         }
     }
 
-    /**
-     * Saves all answers as [SurveyStatus.COMPLETED] and signals the screen to pop.
-     * Use when the user taps "Save & finish".
-     */
+    /** Saves all answers as COMPLETED and signals the screen to pop ("Submit review"). */
     fun complete() {
+        autoSaveJob?.cancel()
         viewModelScope.launch {
-            persistAnswers(SurveyStatus.COMPLETED)
+            persistAnswers("COMPLETED")
             _uiState.update { it.copy(isComplete = true) }
         }
     }
 
     /**
-     * Closes the survey without persisting any status change.
-     * Used when closing from [SurveyMode.REVIEW] — the session is already COMPLETED or
-     * PARTIAL, so no downgrade should occur.
+     * Closes the survey without persisting any status change (REVIEW mode close).
      */
     fun dismissWithoutChanges() {
         _uiState.update { it.copy(isComplete = true) }
     }
 
     /**
-     * Marks the survey as [SurveyStatus.SKIPPED] (only if currently PENDING) and signals
-     * the screen to pop. If the survey is already PARTIAL or COMPLETED, the status is left
-     * unchanged.
+     * Marks the survey as [SurveyStatus.SKIPPED] (only if currently PENDING) and pops.
      */
     fun skipAll() {
         viewModelScope.launch {
@@ -396,80 +513,97 @@ class SurveyViewModel @Inject constructor(
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    /** Triggers a non-debounced persistence of the current answers as PARTIAL. */
-    private fun autoSave() {
-        viewModelScope.launch {
-            persistAnswers(SurveyStatus.PARTIAL)
+    /** Debounced (800 ms) DRAFT persistence — cancels any pending save. */
+    private fun scheduleAutoSave() {
+        autoSaveJob?.cancel()
+        autoSaveJob = viewModelScope.launch {
+            delay(800)
+            persistAnswers("DRAFT")
+        }
+    }
+
+    /** Recomputes the optional-section completion fraction (result is excluded — always pre-filled). */
+    private fun recomputeCompletion() {
+        _uiState.update { s ->
+            var answered = 0
+            if (s.eliminationCause != null) answered++
+            if (s.handQualityRating != null) answered++
+            if (s.manaFlowAnswer != null) answered++
+            if (s.cardImpactRatings.isNotEmpty()) answered++
+            if (s.opponentArchetypes.isNotEmpty()) answered++
+            if (!s.answers["game_rating"].isNullOrBlank()) answered++
+            if (s.freeNotes.isNotBlank()) answered++
+            s.copy(completionFraction = answered.toFloat() / optionalSectionCount.toFloat())
         }
     }
 
     /**
-     * Builds [SurveyAnswerEntity] rows from the current state and writes them atomically.
+     * Builds [SurveyAnswerEntity] rows from the current state and writes them atomically,
+     * then persists per-seat card impacts to [SurveyCardImpactDao]. Updates the session's
+     * [SurveyStatus] (DRAFT → PARTIAL, COMPLETED → COMPLETED).
      *
-     * - Standard answers: one row per (questionId, answer) pair.
-     * - Card-impact answers: one row per rated card, [questionType] = "CARD_IMPACT",
-     *   [SurveyAnswerEntity.cardReference] = scryfallId.
-     * - Free-text notes: one row with [questionType] = "FREE_TEXT" (only if non-blank).
-     *
-     * Uses [SurveyAnswerDao.replaceAnswersForSession] (DELETE + INSERT transaction) so
-     * repeated calls are idempotent and never accumulate stale rows.
+     * @param status "DRAFT" while auto-saving, "COMPLETED" on submit.
      */
-    private suspend fun persistAnswers(status: SurveyStatus) {
+    private suspend fun persistAnswers(status: String) {
         val state = _uiState.value
         val now = System.currentTimeMillis()
         val deckId = state.selectedDeckId
 
         val entities = mutableListOf<SurveyAnswerEntity>()
 
-        // Standard question answers
-        state.answers.forEach { (questionId, answer) ->
-            val panel = state.panels.firstNotNullOfOrNull { p ->
-                p.questions.find { it.id == questionId }
-            }
+        fun add(questionId: String, type: String, answer: String?) {
+            if (answer.isNullOrBlank()) return
             entities += SurveyAnswerEntity(
                 sessionId = sessionId,
                 questionId = questionId,
-                questionType = panel?.type ?: "UNKNOWN",
+                questionType = type,
                 answer = answer,
                 cardReference = null,
                 deckId = deckId,
                 updatedAt = now,
+                status = status,
             )
         }
 
-        // Card-impact selections (one row per card)
-        state.cardImpactSelections.forEach { (scryfallId, rating) ->
-            entities += SurveyAnswerEntity(
+        add("result", "RESULT", state.resultAnswer)
+        add("elimination_cause", "ELIMINATION", state.eliminationCause)
+        add("hand_quality", "HAND", state.handQualityRating?.toString())
+        add("mulligans", "MULLIGAN", state.mulligansCount.toString())
+        add("mana_flow", "MANA", state.manaFlowAnswer)
+        add("commander_carried", "COMMANDER_CARRIED", state.commanderCarriedAnswer)
+        add("sideboard_swing", "SIDEBOARD_SWING", state.sideboardSwingAnswer)
+        add("free_notes", "FREE_TEXT", state.freeNotes)
+
+        // Generic answers (e.g. game_rating).
+        state.answers.forEach { (questionId, answer) ->
+            add(questionId, "GENERIC", answer)
+        }
+
+        // Build per-seat card impacts from the "playerSessionId:cardId" keyed map.
+        val impacts = state.cardImpactRatings.mapNotNull { (key, impact) ->
+            val sep = key.indexOf(':')
+            if (sep <= 0) return@mapNotNull null
+            val playerSessionId = key.substring(0, sep).toLongOrNull() ?: return@mapNotNull null
+            val cardId = key.substring(sep + 1)
+            if (cardId.isBlank()) return@mapNotNull null
+            SurveyCardImpactEntity(
                 sessionId = sessionId,
-                questionId = "card_impact",
-                questionType = "CARD_IMPACT",
-                answer = rating.name,
-                cardReference = scryfallId,
-                deckId = deckId,
-                updatedAt = now,
+                playerSessionId = playerSessionId,
+                cardId = cardId,
+                impact = impact,
             )
         }
 
-        // Free-text notes
-        if (state.freeNotes.isNotBlank()) {
-            entities += SurveyAnswerEntity(
-                sessionId = sessionId,
-                questionId = "free_notes",
-                questionType = "FREE_TEXT",
-                answer = state.freeNotes,
-                cardReference = null,
-                deckId = deckId,
-                updatedAt = now,
-            )
-        }
-
-        val completedAt = if (status == SurveyStatus.COMPLETED) now else null
+        val sessionStatus = if (status == "COMPLETED") SurveyStatus.COMPLETED else SurveyStatus.PARTIAL
+        val completedAt = if (status == "COMPLETED") now else null
 
         withContext(ioDispatcher) {
             surveyAnswerDao.replaceAnswersForSession(sessionId, entities)
+            surveyCardImpactDao.deleteForSession(sessionId)
+            if (impacts.isNotEmpty()) surveyCardImpactDao.insertAll(impacts)
             gameSessionDao.updateSurveyStatus(
                 sessionId = sessionId,
-                status = status.name,
+                status = sessionStatus.name,
                 completedAt = completedAt,
             )
         }
@@ -488,14 +622,4 @@ class SurveyViewModel @Inject constructor(
         if (scryfallIds.isEmpty()) emptyList()
         else cardDao.getByIds(scryfallIds).map { it.toDomainCard() }
     }
-
-    /**
-     * Returns up to 3 cards sorted by descending CMC, excluding lands.
-     * Used as the pre-seeded suggestions in the CARD_IMPACT panel.
-     */
-    private fun computeSuggestedCards(cards: List<Card>): List<Card> =
-        cards
-            .filter { !it.typeLine.contains("Land", ignoreCase = true) }
-            .sortedByDescending { it.cmc }
-            .take(3)
 }

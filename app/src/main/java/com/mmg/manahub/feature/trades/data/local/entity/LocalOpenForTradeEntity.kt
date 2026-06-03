@@ -41,9 +41,6 @@ data class LocalOpenForTradeEntity(
     @ColumnInfo(name = "language")
     val language: String = "en",
 
-    @ColumnInfo(name = "is_alt_art")
-    val isAltArt: Boolean = false,
-
     // 0 = pending cloud migration; 1 = migrated to Supabase after user logs in
     @ColumnInfo(name = "synced")
     val synced: Boolean = false,

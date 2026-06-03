@@ -55,7 +55,6 @@ class WishlistRepositoryImplTest {
         isFoil: Boolean? = null,
         condition: String? = null,
         language: String? = null,
-        isAltArt: Boolean? = null,
         synced: Boolean = false,
         createdAt: Long = 1_000L,
     ) = LocalWishlistEntity(
@@ -66,7 +65,6 @@ class WishlistRepositoryImplTest {
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
         synced = synced,
         createdAt = createdAt,
     )
@@ -79,7 +77,6 @@ class WishlistRepositoryImplTest {
         isFoil: Boolean = false,
         condition: String? = null,
         language: String? = null,
-        isAltArt: Boolean = false,
         createdAt: Long = 1_000L,
     ) = WishlistEntry(
         id = id,
@@ -90,7 +87,6 @@ class WishlistRepositoryImplTest {
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
         createdAt = createdAt,
     )
 
@@ -133,7 +129,6 @@ class WishlistRepositoryImplTest {
             isFoil = true,
             condition = "LP",
             language = "ja",
-            isAltArt = false,
         )
         every { dao.observeAll() } returns flowOf(listOf(entity))
 
@@ -145,7 +140,6 @@ class WishlistRepositoryImplTest {
             assertEquals(true, entry.isFoil)
             assertEquals("LP", entry.condition)
             assertEquals("ja", entry.language)
-            assertEquals(false, entry.isAltArt)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -234,7 +228,7 @@ class WishlistRepositoryImplTest {
         val existing = buildEntity(id = "existing-id", quantity = 1)
         val entry = buildEntry(cardId = existing.scryfallId)
         
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns existing
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns existing
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.update(capture(capturedEntity)) } returns Unit
 
@@ -251,7 +245,7 @@ class WishlistRepositoryImplTest {
     fun `given no existing entry with same attributes when addLocal then call insert`() = runTest {
         // Arrange
         val entry = buildEntry()
-        coEvery { dao.getByAttributes(any(), any(), any(), any(), any(), any()) } returns null
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
         coEvery { dao.insert(any()) } returns Unit
 
         // Act

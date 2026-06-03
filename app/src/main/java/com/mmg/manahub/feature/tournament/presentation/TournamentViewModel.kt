@@ -12,6 +12,10 @@ import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.game.domain.model.GameMode
+import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
+import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
+import com.mmg.manahub.feature.tournament.domain.usecase.NextRoundResult
+import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +29,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TournamentViewModel @Inject constructor(
-    private val repository:      TournamentRepository,
-    savedStateHandle:            SavedStateHandle,
+    private val repository:             TournamentRepository,
+    private val generateNextRound:      GenerateNextRoundUseCase,
+    private val calculateStandings:     CalculateStandingsUseCase,
+    private val recordMatchResultUseCase: RecordMatchResultUseCase,
+    savedStateHandle:                   SavedStateHandle,
 ) : ViewModel() {
 
     private val tournamentId: Long = checkNotNull(
@@ -34,15 +41,16 @@ class TournamentViewModel @Inject constructor(
     ) { "TournamentViewModel requires a positive tournamentId" }
 
     data class UiState(
-        val tournament:     TournamentEntity?           = null,
-        val standings:      List<TournamentStanding>    = emptyList(),
-        val matches:        List<TournamentMatchEntity>  = emptyList(),
-        val players:        List<TournamentPlayerEntity> = emptyList(),
-        val nextMatch:      TournamentMatchEntity?      = null,
-        val isFinished:     Boolean                     = false,
-        val isPaused:       Boolean                     = false,
-        val isLoading:      Boolean                     = true,
-        val isStartingMatch: Boolean                    = false,
+        val tournament:      TournamentEntity?            = null,
+        val standings:       List<TournamentStanding>     = emptyList(),
+        val matches:         List<TournamentMatchEntity>   = emptyList(),
+        val players:         List<TournamentPlayerEntity>  = emptyList(),
+        val nextMatch:       TournamentMatchEntity?        = null,
+        val activeMatch:     TournamentMatchEntity?        = null,
+        val isFinished:      Boolean                      = false,
+        val isPaused:        Boolean                      = false,
+        val isLoading:       Boolean                      = true,
+        val isStartingMatch: Boolean                      = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -55,8 +63,6 @@ class TournamentViewModel @Inject constructor(
     private fun loadTournament() {
         viewModelScope.launch {
             // One-time auto-resume on screen open — MUST NOT be inside the combine transformer.
-            // Putting startTournament inside combine creates a feedback loop: the DB write
-            // triggers a new emission which calls startTournament again, infinitely.
             val current = repository.observeTournament(tournamentId).first()
             if (current?.status == "SETUP" || current?.status == "PAUSED") {
                 runCatching { repository.startTournament(tournamentId) }
@@ -67,20 +73,22 @@ class TournamentViewModel @Inject constructor(
                 repository.observeMatches(tournamentId),
                 repository.observePlayers(tournamentId),
             ) { tournament, matches, players ->
-                val standings  = repository.calculateStandings(tournamentId)
-                val nextMatch  = matches.firstOrNull { it.status == "PENDING" }
-                val isFinished = matches.isNotEmpty() && matches.all { it.status == "FINISHED" }
-                val isPaused   = tournament?.status == "PAUSED"
+                val standings   = calculateStandings(tournamentId)
+                val nextMatch   = matches.firstOrNull { it.status == "PENDING" }
+                val activeMatch = matches.firstOrNull { it.status == "ACTIVE" }
+                val isFinished  = matches.isNotEmpty() && matches.all { it.status == "FINISHED" }
+                val isPaused    = tournament?.status == "PAUSED"
                 _uiState.update { state ->
                     state.copy(
-                        tournament = tournament,
-                        matches    = matches,
-                        players    = players,
-                        standings  = standings,
-                        nextMatch  = nextMatch,
-                        isFinished = isFinished,
-                        isPaused   = isPaused,
-                        isLoading  = false,
+                        tournament  = tournament,
+                        matches     = matches,
+                        players     = players,
+                        standings   = standings,
+                        nextMatch   = nextMatch,
+                        activeMatch = activeMatch,
+                        isFinished  = isFinished,
+                        isPaused    = isPaused,
+                        isLoading   = false,
                     )
                 }
             }.distinctUntilChanged().collect {}
@@ -139,6 +147,25 @@ class TournamentViewModel @Inject constructor(
         }
     }
 
+    /** Resumes an ACTIVE match — navigates directly to the game screen without calling startMatch again. */
+    fun resumeMatch(matchId: Long, onNavigateToGame: (matchId: Long) -> Unit) {
+        onNavigateToGame(matchId)
+    }
+
+    /** Resets an ACTIVE match back to PENDING so it can be replayed or have its result recorded manually. */
+    fun resetMatch(matchId: Long) {
+        viewModelScope.launch {
+            runCatching { repository.resetMatch(matchId) }
+                .onFailure { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("tournament_reset_match_failed: matchId=$matchId")
+                        setCustomKey("tournament_id", tournamentId)
+                        recordException(e)
+                    }
+                }
+        }
+    }
+
     /**
      * Returns (tournamentPlayerIds, playerConfigs) for a given match, ready to pass to GameViewModel.
      */
@@ -169,6 +196,21 @@ class TournamentViewModel @Inject constructor(
         recordMatchResult(matchId, winnerId, null, emptyMap())
     }
 
+    fun recordDrawManual(matchId: Long) {
+        viewModelScope.launch {
+            runCatching {
+                recordMatchResultUseCase.recordDraw(matchId, null, emptyMap())
+                refreshAfterResult()
+            }.onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("tournament_draw_save_failed: matchId=$matchId")
+                    setCustomKey("tournament_id", tournamentId)
+                    recordException(e)
+                }
+            }
+        }
+    }
+
     fun recordMatchResult(
         matchId:    Long,
         winnerId:   Long,
@@ -177,13 +219,8 @@ class TournamentViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             runCatching {
-                repository.finishMatch(matchId, winnerId, sessionId, lifeTotals)
-                val standings = repository.calculateStandings(tournamentId)
-                _uiState.update { it.copy(standings = standings) }
-                if (repository.isFinished(tournamentId)) {
-                    repository.finishTournament(tournamentId)
-                    _uiState.update { it.copy(isFinished = true) }
-                }
+                recordMatchResultUseCase.recordWin(matchId, winnerId, sessionId, lifeTotals)
+                refreshAfterResult()
             }.onFailure { e ->
                 FirebaseCrashlytics.getInstance().apply {
                     log("tournament_match_result_save_failed: matchId=$matchId winnerId=$winnerId")
@@ -191,6 +228,20 @@ class TournamentViewModel @Inject constructor(
                     recordException(e)
                 }
             }
+        }
+    }
+
+    private suspend fun refreshAfterResult() {
+        val standings = calculateStandings(tournamentId)
+        _uiState.update { it.copy(standings = standings) }
+
+        when (generateNextRound(tournamentId)) {
+            is NextRoundResult.TournamentFinished -> {
+                repository.finishTournament(tournamentId)
+                _uiState.update { it.copy(isFinished = true) }
+            }
+            is NextRoundResult.RoundGenerated -> { /* DB flows will emit new matches */ }
+            is NextRoundResult.RoundNotComplete -> { /* current round still has pending matches */ }
         }
     }
 }

@@ -126,7 +126,6 @@ class UserCardRepositoryImpl @Inject constructor(
                 isFoil = entity.isFoil,
                 condition = entity.condition,
                 language = entity.language,
-                isAlternativeArt = entity.isAlternativeArt,
                 isForTrade = entity.isForTrade,
                 updatedAt = entity.updatedAt,
                 createdAt = entity.createdAt,
@@ -157,7 +156,6 @@ class UserCardRepositoryImpl @Inject constructor(
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAlternativeArt: Boolean,
         isForTrade: Boolean,
         userId: String?,
         quantity: Int,
@@ -171,12 +169,12 @@ class UserCardRepositoryImpl @Inject constructor(
         val existing = if (!resolvedUserId.isNullOrBlank()) {
             userCardCollectionDao.getByCompositeKey(
                 resolvedUserId, scryfallId, isFoil,
-                normalizedCondition, normalizedLanguage, isAlternativeArt,
+                normalizedCondition, normalizedLanguage,
             )
         } else {
             userCardCollectionDao.getByCompositeKeyGuest(
                 scryfallId, isFoil, normalizedCondition,
-                normalizedLanguage, isAlternativeArt,
+                normalizedLanguage,
             )
         }
 
@@ -190,7 +188,6 @@ class UserCardRepositoryImpl @Inject constructor(
                     isFoil           = isFoil,
                     condition        = normalizedCondition,
                     language         = normalizedLanguage,
-                    isAlternativeArt = isAlternativeArt,
                     isForTrade       = isForTrade,
                     isDeleted        = false,
                     updatedAt        = now,
@@ -253,7 +250,6 @@ class UserCardRepositoryImpl @Inject constructor(
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAlternativeArt: Boolean,
         quantityToDeduct: Int,
     ) = withContext(ioDispatcher) {
         val now = System.currentTimeMillis()
@@ -261,7 +257,7 @@ class UserCardRepositoryImpl @Inject constructor(
         val normLanguage = language.lowercase().trim()
 
         val existing = userCardCollectionDao.getByCompositeKey(
-            userId, scryfallId, isFoil, normCondition, normLanguage, isAlternativeArt,
+            userId, scryfallId, isFoil, normCondition, normLanguage,
         ) ?: return@withContext  // Row not found — skip silently, no crash.
 
         val newQty = (existing.quantity - quantityToDeduct).coerceAtLeast(0)
@@ -284,7 +280,6 @@ class UserCardRepositoryImpl @Inject constructor(
             isFoil = userCard.isFoil,
             condition = userCard.condition,
             language = userCard.language,
-            isAlternativeArt = userCard.isAlternativeArt,
             isForTrade = userCard.isForTrade,
             updatedAt = userCard.updatedAt,
             createdAt = userCard.createdAt,

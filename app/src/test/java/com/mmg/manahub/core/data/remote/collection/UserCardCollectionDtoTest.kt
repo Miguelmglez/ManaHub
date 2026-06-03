@@ -32,7 +32,6 @@ class UserCardCollectionDtoTest {
         isFoil          = true,
         condition       = "LP",
         language        = "ja",
-        isAlternativeArt = true,
         isForTrade      = true,
         isDeleted       = isDeleted,
         updatedAt       = NOW,
@@ -47,7 +46,6 @@ class UserCardCollectionDtoTest {
         isFoil          = true,
         condition       = "LP",
         language        = "ja",
-        isAlternativeArt = true,
         isForTrade      = true,
         isDeleted       = false,
         updatedAt       = NOW,
@@ -89,11 +87,6 @@ class UserCardCollectionDtoTest {
     @Test
     fun `toEntity preserves language`() {
         assertEquals("ja", aFullDto().toEntity().language)
-    }
-
-    @Test
-    fun `toEntity preserves isAlternativeArt`() {
-        assertTrue(aFullDto().toEntity().isAlternativeArt)
     }
 
     @Test
@@ -176,7 +169,6 @@ class UserCardCollectionDtoTest {
         assertEquals(original.isFoil,          roundTripped.isFoil)
         assertEquals(original.condition,        roundTripped.condition)
         assertEquals(original.language,         roundTripped.language)
-        assertEquals(original.isAlternativeArt, roundTripped.isAlternativeArt)
         assertEquals(original.isForTrade,       roundTripped.isForTrade)
         assertEquals(original.isDeleted,        roundTripped.isDeleted)
         assertEquals(original.updatedAt,        roundTripped.updatedAt)

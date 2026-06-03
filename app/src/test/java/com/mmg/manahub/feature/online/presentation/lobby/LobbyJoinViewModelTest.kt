@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.online.presentation.lobby
 
+import android.content.Context
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
 import com.mmg.manahub.core.online.domain.model.OnlineSession
@@ -16,6 +17,7 @@ import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.every
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -62,6 +64,7 @@ class LobbyJoinViewModelTest {
     private val leaveSessionUseCase      = mockk<LeaveSessionUseCase>(relaxed = true)
     private val repository               = mockk<OnlineSessionRepository>(relaxed = true)
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val appContext               = mockk<Context>(relaxed = true)
 
     // Shared event flow reused across tests that need to emit realtime events
     private val eventFlow = MutableSharedFlow<SessionEvent>(extraBufferCapacity = 8)
@@ -141,11 +144,12 @@ class LobbyJoinViewModelTest {
         // init block calls userPreferencesDataStore.playerNameFlow.first()
         coEvery { userPreferencesDataStore.playerNameFlow } returns flowOf("")
         return LobbyJoinViewModel(
-            joinSessionUseCase    = joinSessionUseCase,
-            observeSessionUseCase = observeSessionUseCase,
-            leaveSessionUseCase   = leaveSessionUseCase,
-            repository            = repository,
+            joinSessionUseCase       = joinSessionUseCase,
+            observeSessionUseCase    = observeSessionUseCase,
+            leaveSessionUseCase      = leaveSessionUseCase,
+            repository               = repository,
             userPreferencesDataStore = userPreferencesDataStore,
+            appContext               = appContext,
         )
     }
 

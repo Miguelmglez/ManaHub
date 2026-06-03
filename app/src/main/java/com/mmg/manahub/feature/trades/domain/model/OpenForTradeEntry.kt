@@ -11,7 +11,6 @@ data class OpenForTradeEntry(
     val isFoil: Boolean,
     val condition: String,
     val language: String,
-    val isAltArt: Boolean,
     val createdAt: Long,
     val card: Card? = null,
 )

@@ -21,10 +21,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,6 +39,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -89,7 +92,10 @@ fun LoginSheet(
     val mc = MaterialTheme.magicColors
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     // Dismiss on successful authentication (sign-in/sign-up flow).
     LaunchedEffect(uiState) {
@@ -115,25 +121,42 @@ fun LoginSheet(
         },
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
-        dragHandle = { Spacer(modifier = Modifier.height(8.dp)) },
+        dragHandle = null,
     ) {
-        LoginSheetContent(
-            uiState = uiState,
-            initialTab = initialTab,
-            initialNickname = initialNickname,
-            initialAvatarUrl = initialAvatarUrl,
-            onSignIn = { email, password -> authViewModel.signInWithEmail(email, password) },
-            onSignUp = { email, password, nickname, avatarUrl ->
-                authViewModel.signUpWithEmail(email, password, nickname, avatarUrl)
-            },
-            onGoogleSignIn = { context -> authViewModel.signInWithGoogle(context) },
-            onGoogleSignUp = { context, nick, avatarUrl ->
-                authViewModel.signUpWithGoogle(context, nick, avatarUrl)
-            },
-            onResetPassword = { email -> authViewModel.resetPassword(email) },
-            onResetUiState = { authViewModel.resetUiState() },
-            onLinkGoogleIdentity = { password -> authViewModel.linkGoogleIdentity(password) },
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    authViewModel.resetUiState()
+                    onDismiss()
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
+            LoginSheetContent(
+                uiState = uiState,
+                initialTab = initialTab,
+                initialNickname = initialNickname,
+                initialAvatarUrl = initialAvatarUrl,
+                onSignIn = { email, password -> authViewModel.signInWithEmail(email, password) },
+                onSignUp = { email, password, nickname, avatarUrl ->
+                    authViewModel.signUpWithEmail(email, password, nickname, avatarUrl)
+                },
+                onGoogleSignIn = { context -> authViewModel.signInWithGoogle(context) },
+                onGoogleSignUp = { context, nick, avatarUrl ->
+                    authViewModel.signUpWithGoogle(context, nick, avatarUrl)
+                },
+                onResetPassword = { email -> authViewModel.resetPassword(email) },
+                onResetUiState = { authViewModel.resetUiState() },
+                onLinkGoogleIdentity = { password -> authViewModel.linkGoogleIdentity(password) },
+            )
+        }
     }
 }
 

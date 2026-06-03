@@ -70,7 +70,6 @@ data class UserCard(
     val scryfallId:       String,
     val quantity:         Int     = 1,
     val isFoil:           Boolean = false,
-    val isAlternativeArt: Boolean = false,
     val condition:        String  = "NM",
     val language:         String  = "en",
     val isForTrade:       Boolean = false,

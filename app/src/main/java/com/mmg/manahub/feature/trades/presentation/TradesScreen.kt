@@ -458,7 +458,6 @@ private fun WishlistEntryRow(
         typeLine = card?.typeLine,
         condition = entry.condition,
         language = entry.language,
-        isAltArt = entry.isAltArt,
         extraSupportingContent = {
             if (entry.matchAnyVariant) {
                 CopyBadge(label = "Any variant")
@@ -497,6 +496,5 @@ private fun OfferEntryRow(
         typeLine = card?.typeLine,
         condition = entry.condition,
         language = entry.language,
-        isAltArt = entry.isAltArt,
     )
 }

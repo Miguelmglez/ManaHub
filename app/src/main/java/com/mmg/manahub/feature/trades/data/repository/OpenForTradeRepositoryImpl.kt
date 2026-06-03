@@ -24,7 +24,7 @@ class OpenForTradeRepositoryImpl @Inject constructor(
     override fun observeLocal(): Flow<List<OpenForTradeEntry>> =
         dao.observeAllWithCard().map { list ->
             // Group rows that share the same card + variant attributes (foil, condition,
-            // language, altArt), summing their quantities. This mirrors the deduplication
+            // language), summing their quantities. This mirrors the deduplication
             // logic in WishlistRepositoryImpl.addLocal() but works at read-time so that
             // entries added from different collection copies (distinct localCollectionId)
             // still appear as a single aggregated row in the UI.
@@ -35,7 +35,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                         isFoil     = entry.isFoil,
                         condition  = entry.condition,
                         language   = entry.language,
-                        isAltArt   = entry.isAltArt,
                     )
                 }
                 .values
@@ -52,7 +51,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         val isFoil:     Boolean,
         val condition:  String,
         val language:   String,
-        val isAltArt:   Boolean,
     )
 
     override fun observeByScryfallId(scryfallId: String): Flow<List<OpenForTradeEntry>> =
@@ -67,7 +65,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAltArt: Boolean,
     ): Result<Unit> = runCatching {
         val existing = dao.getByCollectionId(localCollectionId)
         if (existing != null) {
@@ -78,7 +75,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                     isFoil = isFoil,
                     condition = condition,
                     language = language,
-                    isAltArt = isAltArt,
                     synced = false,
                 )
             )
@@ -92,7 +88,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                     isFoil = isFoil,
                     condition = condition,
                     language = language,
-                    isAltArt = isAltArt,
                     synced = false,
                     createdAt = System.currentTimeMillis(),
                 )
@@ -141,7 +136,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         isFoil: Boolean,
         condition: String,
         language: String,
-        isAltArt: Boolean,
         userId: String,
     ): Result<Unit> = runCatching {
         val existing = dao.getByCollectionId(localCollectionId)
@@ -151,7 +145,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                 isFoil = isFoil,
                 condition = condition,
                 language = language,
-                isAltArt = isAltArt,
                 synced = false,
             ).also { dao.upsert(it) }
         } else {
@@ -163,7 +156,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                 isFoil = isFoil,
                 condition = condition,
                 language = language,
-                isAltArt = isAltArt,
                 synced = false,
                 createdAt = System.currentTimeMillis(),
             ).also { dao.upsert(it) }
@@ -185,7 +177,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                 isFoil = dto.isFoil ?: false,
                 condition = dto.condition ?: "NM",
                 language = dto.language ?: "en",
-                isAltArt = dto.isAltArt ?: false,
                 synced = true,
                 createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilli() }
                     .getOrDefault(System.currentTimeMillis()),
@@ -210,7 +201,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        isAltArt = isAltArt,
         createdAt = createdAt,
     )
 
@@ -227,7 +217,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         isFoil = isFoil ?: false,
         condition = condition ?: "NM",
         language = language ?: "en",
-        isAltArt = isAltArt ?: false,
         createdAt = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrDefault(0L),
     )
 }

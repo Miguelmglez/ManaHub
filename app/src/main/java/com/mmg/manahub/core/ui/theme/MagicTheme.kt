@@ -102,6 +102,7 @@ fun MagicTheme(
     CompositionLocalProvider(
         LocalMagicColors     provides magicColors,
         LocalMagicTypography provides magicTypography,
+        LocalSpacing         provides Spacing(),
         LocalAppTheme        provides theme,
     ) {
         MaterialTheme(

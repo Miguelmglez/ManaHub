@@ -16,7 +16,6 @@ import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
-import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +33,6 @@ class FriendsViewModel @Inject constructor(
     private val authRepo: AuthRepository,
     private val searchUseCase: SearchUserByGameTagUseCase,
     private val sendRequestUseCase: SendFriendRequestUseCase,
-    private val shareInviteUseCase: ShareInviteUseCase,
     private val analyticsHelper: AnalyticsHelper
 ) : ViewModel() {
 
@@ -50,8 +48,8 @@ class FriendsViewModel @Inject constructor(
         val toastMessage: String? = null,
         val toastType: MagicToastType = MagicToastType.ERROR,
         val isLoggedIn: Boolean = false,
-        /** Shareable invite URL for the current user, or null if not yet loaded. */
-        val shareUrl: String? = null,
+        /** Current user's game tag (e.g. "#A3KX9Z"), or null if not yet loaded. */
+        val gameTag: String? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -63,9 +61,10 @@ class FriendsViewModel @Inject constructor(
         authRepo.sessionState
             .onEach { state ->
                 val loggedIn = state is SessionState.Authenticated
-                val userId = (state as? SessionState.Authenticated)?.user?.id
+                val authUser = (state as? SessionState.Authenticated)?.user
+                val userId = authUser?.id
                 _currentUserId.value = userId
-                _uiState.update { it.copy(isLoggedIn = loggedIn) }
+                _uiState.update { it.copy(isLoggedIn = loggedIn, gameTag = authUser?.gameTag) }
                 if (loggedIn && userId != null) loadData(userId)
             }
             .catch { }
@@ -95,27 +94,25 @@ class FriendsViewModel @Inject constructor(
             friendRepo.refreshOutgoingRequests(userId)
             _uiState.update { it.copy(isLoading = false) }
         }
-        // Fetch the share URL in a separate coroutine so it doesn't block the list loading.
-        viewModelScope.launch {
-            shareInviteUseCase(userId).onSuccess { url ->
-                _uiState.update { it.copy(shareUrl = url) }
-            }
-        }
     }
 
     /**
-     * Launches an ACTION_SEND Intent so the user can share their invite link via any app.
-     * Does nothing if the share URL is not yet available.
+     * Copies the current user's game tag (without the '#') to the clipboard.
+     * Does nothing if the game tag is not available.
      */
-    fun onShareMyLinkClicked(context: Context) {
-        val url = _uiState.value.shareUrl ?: return
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, url)
+    fun onCopyGameTagClicked(context: Context) {
+        val tag = _uiState.value.gameTag?.removePrefix("#") ?: return
+        
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Game Tag", tag)
+        clipboard.setPrimaryClip(clip)
+        
+        _uiState.update { 
+            it.copy(
+                toastMessage = context.getString(R.string.friends_gametag_copied),
+                toastType = MagicToastType.SUCCESS
+            )
         }
-        context.startActivity(
-            Intent.createChooser(intent, context.getString(R.string.friends_share_chooser_title))
-        )
     }
 
     fun onSearchQueryChange(query: String) {

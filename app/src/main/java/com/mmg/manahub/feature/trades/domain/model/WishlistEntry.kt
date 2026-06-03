@@ -12,7 +12,6 @@ data class WishlistEntry(
     val isFoil: Boolean = false,
     val condition: String?,
     val language: String?,
-    val isAltArt: Boolean = false,
     val createdAt: Long,
     val card: Card? = null,
 )

@@ -34,7 +34,7 @@ import javax.inject.Singleton
  * Additionally, in normal mode sent items also remove the corresponding [OpenForTradeRepository]
  * entry (the card is no longer in the collection so it should not remain offered for trade), and
  * received items are matched against the best-fitting wishlist entry by attributes before
- * decrementing (foil / condition / language / isAltArt), falling back to a matchAnyVariant entry
+ * decrementing (foil / condition / language), falling back to a matchAnyVariant entry
  * or any entry for that scryfallId when no exact match exists.
  */
 @Singleton
@@ -72,7 +72,6 @@ class UpdateTradeCollectionUseCase @Inject constructor(
                             isFoil           = item.isFoil ?: false,
                             condition        = item.condition?.uppercase()?.trim() ?: "NM",
                             language         = item.language?.lowercase()?.trim() ?: "en",
-                            isAlternativeArt = item.isAltArt ?: false,
                             isForTrade       = false,
                             userId           = userId,
                             quantity         = item.quantity ?: 1,
@@ -89,7 +88,6 @@ class UpdateTradeCollectionUseCase @Inject constructor(
                             isFoil           = item.isFoil ?: false,
                             condition        = item.condition?.uppercase()?.trim() ?: "NM",
                             language         = item.language?.lowercase()?.trim() ?: "en",
-                            isAlternativeArt = item.isAltArt ?: false,
                             quantityToDeduct = item.quantity ?: 1,
                         )
                     }
@@ -119,7 +117,6 @@ class UpdateTradeCollectionUseCase @Inject constructor(
                             isFoil           = item.isFoil ?: false,
                             condition        = item.condition?.uppercase()?.trim() ?: "NM",
                             language         = item.language?.lowercase()?.trim() ?: "en",
-                            isAlternativeArt = item.isAltArt ?: false,
                             isForTrade       = false,
                             userId           = userId,
                             quantity         = item.quantity ?: 1,
@@ -132,7 +129,6 @@ class UpdateTradeCollectionUseCase @Inject constructor(
                             isFoil     = item.isFoil ?: false,
                             condition  = item.condition?.uppercase()?.trim() ?: "NM",
                             language   = item.language?.lowercase()?.trim() ?: "en",
-                            isAltArt   = item.isAltArt ?: false,
                         )
                     }
                 }

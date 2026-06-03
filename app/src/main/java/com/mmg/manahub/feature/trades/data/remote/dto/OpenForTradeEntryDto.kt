@@ -14,5 +14,4 @@ data class OpenForTradeEntryDto(
     @SerialName("is_foil") val isFoil: Boolean? = null,
     val condition: String? = null,
     val language: String? = null,
-    @SerialName("is_alternative_art") val isAltArt: Boolean? = null,
 )

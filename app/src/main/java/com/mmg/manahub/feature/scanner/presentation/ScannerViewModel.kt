@@ -460,7 +460,6 @@ class ScannerViewModel @Inject constructor(
             addToCollection(
                 scryfallId = entry.card.scryfallId,
                 isFoil = entry.isFoil,
-                isAlternativeArt = false, // Scanner doesn't track alt art
                 condition = entry.condition,
                 language = entry.language,
                 quantity = entry.quantity,
@@ -489,7 +488,6 @@ class ScannerViewModel @Inject constructor(
                 isFoil         = entry.isFoil,
                 condition      = entry.condition.uppercase().trim(),
                 language       = entry.language.lowercase().trim(),
-                isAltArt       = false,
                 createdAt      = System.currentTimeMillis(),
                 card           = entry.card,
             )
@@ -526,7 +524,6 @@ class ScannerViewModel @Inject constructor(
                     isFoil         = entry.isFoil,
                     condition      = entry.condition.uppercase().trim(),
                     language       = entry.language.lowercase().trim(),
-                    isAltArt       = false,
                     createdAt      = System.currentTimeMillis(),
                     card           = entry.card,
                 )

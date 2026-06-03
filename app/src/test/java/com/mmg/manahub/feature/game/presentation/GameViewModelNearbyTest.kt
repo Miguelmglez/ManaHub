@@ -10,10 +10,14 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.NextTurnUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.RevokeDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
+import com.mmg.manahub.core.online.domain.usecase.ToggleLandPlayedUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.core.ui.theme.PlayerTheme
+import androidx.lifecycle.SavedStateHandle
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -45,6 +49,9 @@ class GameViewModelNearbyTest {
     private lateinit var revokeDefeatUseCase: RevokeDefeatUseCase
     private lateinit var leaveSessionUseCase: LeaveSessionUseCase
     private lateinit var nearbyRepo: NearbySessionRepository
+    private lateinit var updateCounterUseCase: UpdateCounterUseCase
+    private lateinit var updateCommanderDamageUseCase: UpdateCommanderDamageUseCase
+    private lateinit var toggleLandPlayedUseCase: ToggleLandPlayedUseCase
 
     private lateinit var viewModel: GameViewModel
 
@@ -62,23 +69,30 @@ class GameViewModelNearbyTest {
         revokeDefeatUseCase = mockk(relaxed = true)
         leaveSessionUseCase = mockk(relaxed = true)
         nearbyRepo = mockk(relaxed = true)
+        updateCounterUseCase = mockk(relaxed = true)
+        updateCommanderDamageUseCase = mockk(relaxed = true)
+        toggleLandPlayedUseCase = mockk(relaxed = true)
 
         val messagesFlow = MutableSharedFlow<NearbyGameMessage>()
         every { nearbyRepo.observeMessages() } returns messagesFlow
         every { nearbyRepo.observeConnectionEvents() } returns MutableSharedFlow()
 
         viewModel = GameViewModel(
-            analyticsHelper = analyticsHelper,
-            gameSessionRepo = gameSessionRepo,
-            tournamentRepo = tournamentRepo,
-            updateLifeUseCase = updateLifeUseCase,
-            advancePhaseUseCase = advancePhaseUseCase,
-            nextTurnUseCase = nextTurnUseCase,
-            observeSessionUseCase = observeSessionUseCase,
-            confirmDefeatUseCase = confirmDefeatUseCase,
-            revokeDefeatUseCase = revokeDefeatUseCase,
-            leaveSessionUseCase = leaveSessionUseCase,
-            nearbyRepo = nearbyRepo
+            savedStateHandle             = SavedStateHandle(mapOf("mode" to GameMode.STANDARD.name, "playerCount" to 2)),
+            analyticsHelper              = analyticsHelper,
+            gameSessionRepo              = gameSessionRepo,
+            tournamentRepo               = tournamentRepo,
+            updateLifeUseCase            = updateLifeUseCase,
+            advancePhaseUseCase          = advancePhaseUseCase,
+            nextTurnUseCase              = nextTurnUseCase,
+            observeSessionUseCase        = observeSessionUseCase,
+            updateCounterUseCase         = updateCounterUseCase,
+            updateCommanderDamageUseCase = updateCommanderDamageUseCase,
+            confirmDefeatUseCase         = confirmDefeatUseCase,
+            revokeDefeatUseCase          = revokeDefeatUseCase,
+            leaveSessionUseCase          = leaveSessionUseCase,
+            nearbyRepo                   = nearbyRepo,
+            toggleLandPlayedUseCase      = toggleLandPlayedUseCase,
         )
     }
 
@@ -91,8 +105,8 @@ class GameViewModelNearbyTest {
     fun `changeLife broadcasts LifeChanged message over nearbyRepo`() {
         // Given
         val configs = listOf(
-            PlayerConfig(0, "Player 1", PlayerTheme.NEON_PINK, true),
-            PlayerConfig(1, "Player 2", PlayerTheme.ARCANE_BLUE, false)
+            PlayerConfig(0, "Player 1", PlayerTheme.ALL[0], isAppUser = true),
+            PlayerConfig(1, "Player 2", PlayerTheme.ALL[1])
         )
         viewModel.initFromNearbySession("TEST12", true, 0, configs, GameMode.STANDARD)
 
@@ -106,8 +120,8 @@ class GameViewModelNearbyTest {
     @Test
     fun `advancePhase broadcasts PhaseChanged over nearbyRepo`() {
         val configs = listOf(
-            PlayerConfig(0, "P1", PlayerTheme.NEON_PINK, true),
-            PlayerConfig(1, "P2", PlayerTheme.ARCANE_BLUE, false)
+            PlayerConfig(0, "P1", PlayerTheme.ALL[0], isAppUser = true),
+            PlayerConfig(1, "P2", PlayerTheme.ALL[1])
         )
         viewModel.initFromNearbySession("TEST12", true, 0, configs, GameMode.STANDARD)
 

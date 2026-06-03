@@ -61,13 +61,12 @@ interface LocalWishlistDao {
     suspend fun updateQuantity(id: String, quantity: Int)
 
     @Query("""
-        SELECT * FROM local_wishlists 
-        WHERE scryfall_id = :scryfallId 
-          AND match_any_variant = :matchAnyVariant 
+        SELECT * FROM local_wishlists
+        WHERE scryfall_id = :scryfallId
+          AND match_any_variant = :matchAnyVariant
           AND (is_foil = :isFoil OR (is_foil IS NULL AND :isFoil IS NULL))
           AND (condition = :condition OR (condition IS NULL AND :condition IS NULL))
           AND (language = :language OR (language IS NULL AND :language IS NULL))
-          AND (is_alt_art = :isAltArt OR (is_alt_art IS NULL AND :isAltArt IS NULL))
         LIMIT 1
     """)
     suspend fun getByAttributes(
@@ -76,7 +75,6 @@ interface LocalWishlistDao {
         isFoil: Boolean?,
         condition: String?,
         language: String?,
-        isAltArt: Boolean?
     ): LocalWishlistEntity?
 
     @Delete

@@ -16,7 +16,11 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.NextTurnUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.RevokeDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
+import com.mmg.manahub.core.online.domain.usecase.ToggleLandPlayedUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
+import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -72,9 +76,13 @@ class GameViewModelOnlineTest {
     private val updateLifeUseCase     = mockk<UpdateLifeUseCase>(relaxed = true)
     private val advancePhaseUseCase   = mockk<AdvancePhaseUseCase>(relaxed = true)
     private val nextTurnUseCase       = mockk<NextTurnUseCase>(relaxed = true)
-    private val confirmDefeatUseCase  = mockk<ConfirmDefeatUseCase>(relaxed = true)
-    private val revokeDefeatUseCase   = mockk<RevokeDefeatUseCase>(relaxed = true)
-    private val leaveSessionUseCase   = mockk<LeaveSessionUseCase>(relaxed = true)
+    private val confirmDefeatUseCase           = mockk<ConfirmDefeatUseCase>(relaxed = true)
+    private val revokeDefeatUseCase            = mockk<RevokeDefeatUseCase>(relaxed = true)
+    private val leaveSessionUseCase            = mockk<LeaveSessionUseCase>(relaxed = true)
+    private val updateCounterUseCase           = mockk<UpdateCounterUseCase>(relaxed = true)
+    private val updateCommanderDamageUseCase   = mockk<UpdateCommanderDamageUseCase>(relaxed = true)
+    private val nearbyRepo                     = mockk<NearbySessionRepository>(relaxed = true)
+    private val toggleLandPlayedUseCase        = mockk<ToggleLandPlayedUseCase>(relaxed = true)
 
     // Shared event flow that tests can emit into
     private val eventFlow = MutableSharedFlow<SessionEvent>(extraBufferCapacity = 16)
@@ -169,18 +177,24 @@ class GameViewModelOnlineTest {
             Result.success(buildSnapshot())
         coEvery { gameSessionRepo.saveGameSession(any()) } returns 1L
         val handle = SavedStateHandle(mapOf("mode" to GameMode.COMMANDER.name, "playerCount" to 2))
+        every { nearbyRepo.observeMessages() } returns MutableSharedFlow()
+        every { nearbyRepo.observeConnectionEvents() } returns MutableSharedFlow()
         return GameViewModel(
-            savedStateHandle      = handle,
-            gameSessionRepo       = gameSessionRepo,
-            tournamentRepo        = tournamentRepo,
-            analyticsHelper       = analyticsHelper,
-            observeSessionUseCase = observeSessionUseCase,
-            updateLifeUseCase     = updateLifeUseCase,
-            advancePhaseUseCase   = advancePhaseUseCase,
-            nextTurnUseCase       = nextTurnUseCase,
-            confirmDefeatUseCase  = confirmDefeatUseCase,
-            revokeDefeatUseCase   = revokeDefeatUseCase,
-            leaveSessionUseCase   = leaveSessionUseCase,
+            savedStateHandle             = handle,
+            gameSessionRepo              = gameSessionRepo,
+            tournamentRepo               = tournamentRepo,
+            analyticsHelper              = analyticsHelper,
+            observeSessionUseCase        = observeSessionUseCase,
+            updateLifeUseCase            = updateLifeUseCase,
+            advancePhaseUseCase          = advancePhaseUseCase,
+            nextTurnUseCase              = nextTurnUseCase,
+            updateCounterUseCase         = updateCounterUseCase,
+            updateCommanderDamageUseCase = updateCommanderDamageUseCase,
+            confirmDefeatUseCase         = confirmDefeatUseCase,
+            revokeDefeatUseCase          = revokeDefeatUseCase,
+            leaveSessionUseCase          = leaveSessionUseCase,
+            nearbyRepo                   = nearbyRepo,
+            toggleLandPlayedUseCase      = toggleLandPlayedUseCase,
         )
     }
 
@@ -295,17 +309,21 @@ class GameViewModelOnlineTest {
         coEvery { gameSessionRepo.saveGameSession(any()) } returns 1L
         val handle = SavedStateHandle(mapOf("mode" to GameMode.STANDARD.name, "playerCount" to 2))
         val vm = GameViewModel(
-            savedStateHandle      = handle,
-            gameSessionRepo       = gameSessionRepo,
-            tournamentRepo        = tournamentRepo,
-            analyticsHelper       = analyticsHelper,
-            observeSessionUseCase = observeSessionUseCase,
-            updateLifeUseCase     = updateLifeUseCase,
-            advancePhaseUseCase   = advancePhaseUseCase,
-            nextTurnUseCase       = nextTurnUseCase,
-            confirmDefeatUseCase  = confirmDefeatUseCase,
-            revokeDefeatUseCase   = revokeDefeatUseCase,
-            leaveSessionUseCase   = leaveSessionUseCase,
+            savedStateHandle             = handle,
+            gameSessionRepo              = gameSessionRepo,
+            tournamentRepo               = tournamentRepo,
+            analyticsHelper              = analyticsHelper,
+            observeSessionUseCase        = observeSessionUseCase,
+            updateLifeUseCase            = updateLifeUseCase,
+            advancePhaseUseCase          = advancePhaseUseCase,
+            nextTurnUseCase              = nextTurnUseCase,
+            updateCounterUseCase         = updateCounterUseCase,
+            updateCommanderDamageUseCase = updateCommanderDamageUseCase,
+            confirmDefeatUseCase         = confirmDefeatUseCase,
+            revokeDefeatUseCase          = revokeDefeatUseCase,
+            leaveSessionUseCase          = leaveSessionUseCase,
+            nearbyRepo                   = nearbyRepo,
+            toggleLandPlayedUseCase      = toggleLandPlayedUseCase,
         )
 
         // Act

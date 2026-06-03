@@ -111,7 +111,16 @@ object SurveyQuestionEngine {
      * @param langCode Optional BCP-47 language code override.
      * @param hasDeck Whether the session has an associated deck; controls whether
      *   [SurveyPanelId.CARD_IMPACT] is included.
+     *
+     * @deprecated The survey screen no longer uses a panel/step flow (Phase 3 replaced it
+     *   with a single scrollable form in [com.mmg.manahub.feature.survey.presentation.SurveyScreen]).
+     *   This overload is retained only for backward compatibility with callers that still
+     *   read [SurveyPanel.questions] (e.g. the Playtest survey reuses the shared
+     *   [AnswerOption]/[SurveyChoice] types). Do not use for new survey UI.
      */
+    @Deprecated(
+        message = "Survey screen no longer uses panel-based navigation; kept for backward compatibility only.",
+    )
     fun buildPanels(
         won: Boolean,
         context: Context,
@@ -323,6 +332,7 @@ object SurveyQuestionEngine {
         message = "Use buildPanels() instead",
         replaceWith = ReplaceWith("buildPanels(won, context, langCode, hasDeck).flatMap { it.questions }"),
     )
+    @Suppress("DEPRECATION")
     fun buildQuestions(
         won: Boolean,
         context: Context,
