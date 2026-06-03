@@ -8,6 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.runBlocking
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
+import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
@@ -77,6 +78,9 @@ object DatabaseModule {
                 MIGRATION_33_34,
                 MIGRATION_34_35,
                 MIGRATION_35_36,
+                // v36 → v37 lives as a top-level `val` in Migration_36_37.kt so the
+                // instrumented MigrationTestHelper test can reference it directly.
+                MIGRATION_36_37,
             )
             .build()
 
@@ -696,4 +700,5 @@ object DatabaseModule {
     @Provides fun provideLocalOpenForTradeDao(db: MtgDatabase): LocalOpenForTradeDao = db.localOpenForTradeDao()
     @Provides fun provideTradeCollectionSyncDao(db: MtgDatabase): TradeCollectionSyncDao = db.tradeCollectionSyncDao()
     @Provides fun providePlaytestDao(db: MtgDatabase): PlaytestDao = db.playtestDao()
+    @Provides fun provideDraftSessionDao(db: MtgDatabase): DraftSessionDao = db.draftSessionDao()
 }

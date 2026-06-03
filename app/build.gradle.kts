@@ -122,6 +122,14 @@ android {
     ksp {
         arg("room.schemaLocation", "$projectDir/schemas")
     }
+
+    // Expose the exported Room schemas to instrumented tests so MigrationTestHelper
+    // can load them from androidTest assets (required by Room 2.8 MigrationTestHelper).
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDirs("$projectDir/schemas")
+        }
+    }
 }
 
 

@@ -5,10 +5,20 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl
+import com.mmg.manahub.feature.draft.data.DraftSimRepositoryImpl
+import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
+import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
+import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder
+import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
 import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApiKeyInterceptor
+import com.mmg.manahub.feature.draft.domain.engine.BoosterGenerator
+import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
+import com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder
+import com.mmg.manahub.feature.draft.domain.engine.DraftEngine
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
+import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -34,6 +44,10 @@ abstract class DraftModule {
     @Singleton
     abstract fun bindDraftRepository(impl: DraftRepositoryImpl): DraftRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindDraftSimRepository(impl: DraftSimRepositoryImpl): DraftSimRepository
+
     companion object {
 
         private const val MAX_RESPONSE_BYTES = 5L * 1024 * 1024 // 5 MB
@@ -41,6 +55,33 @@ abstract class DraftModule {
         @Provides
         @Singleton
         fun provideGson(): Gson = Gson()
+
+        // -----------------------------------------------------------------------
+        // Draft Simulator engine graph
+        // -----------------------------------------------------------------------
+
+        /** Heuristic bot drafter shared across a draft session (stateful per-seat learning). */
+        @Provides
+        @Singleton
+        fun provideBotDrafter(): BotDrafter = HeuristicBotDrafter()
+
+        /** Weighted booster generator using the default (non-seeded) RNG in production. */
+        @Provides
+        @Singleton
+        fun provideBoosterGenerator(): BoosterGenerator = WeightedBoosterGenerator()
+
+        /** Scoring-based deck builder for the final draft pool. */
+        @Provides
+        @Singleton
+        fun provideDraftDeckBuilder(): DraftDeckBuilder = ScoringDraftDeckBuilder()
+
+        /** The draft engine, wired with the booster generator and bot drafter. */
+        @Provides
+        @Singleton
+        fun provideDraftEngine(
+            boosterGenerator: BoosterGenerator,
+            botDrafter: BotDrafter,
+        ): DraftEngine = DefaultDraftEngine(boosterGenerator, botDrafter)
 
         // -----------------------------------------------------------------------
         // YouTube
