@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.draft.data
 import android.content.Context
 import coil.ImageLoader
 import coil.request.ImageRequest
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonSyntaxException
@@ -159,6 +160,7 @@ class DraftSimRepositoryImpl @Inject constructor(
 
                 DataResult.Success(draftableSet)
             } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().recordException(e)
                 DataResult.Error(DraftError.Unexpected(e.message ?: "Failed to load set").toString())
             }
         }
@@ -244,21 +246,29 @@ class DraftSimRepositoryImpl @Inject constructor(
 
     override suspend fun saveSession(state: DraftState) {
         withContext(ioDispatcher) {
-            val id = deriveSessionId(state)
-            val now = System.currentTimeMillis()
-            // Preserve the original createdAt across saves of the same session.
-            val createdAt = draftSessionDao.getById(id)?.createdAt ?: now
-            val entity = DraftSessionEntity(
-                id = id,
-                setCode = state.config.setCode,
-                mode = state.config.mode.name,
-                status = state.status.name,
-                createdAt = createdAt,
-                updatedAt = now,
-                stateSchemaVersion = CURRENT_SCHEMA_VERSION,
-                stateJson = gson.toJson(state),
-            )
-            draftSessionDao.upsert(entity)
+            try {
+                val id = deriveSessionId(state)
+                val now = System.currentTimeMillis()
+                // Preserve the original createdAt across saves of the same session.
+                val createdAt = draftSessionDao.getById(id)?.createdAt ?: now
+                val entity = DraftSessionEntity(
+                    id = id,
+                    setCode = state.config.setCode,
+                    mode = state.config.mode.name,
+                    status = state.status.name,
+                    createdAt = createdAt,
+                    updatedAt = now,
+                    stateSchemaVersion = CURRENT_SCHEMA_VERSION,
+                    stateJson = gson.toJson(state),
+                )
+                draftSessionDao.upsert(entity)
+            } catch (e: Exception) {
+                // Persisting the session is the only durable record of draft progress;
+                // record the failure as a non-fatal, then rethrow so the caller's
+                // error path still fires (the draft state is not silently lost).
+                FirebaseCrashlytics.getInstance().recordException(e)
+                throw e
+            }
         }
     }
 
@@ -296,6 +306,7 @@ class DraftSimRepositoryImpl @Inject constructor(
 
                 DataResult.Success(deckId)
             } catch (e: Exception) {
+                FirebaseCrashlytics.getInstance().recordException(e)
                 DataResult.Error(
                     DraftError.Unexpected(e.message ?: "Failed to save deck").toString(),
                 )

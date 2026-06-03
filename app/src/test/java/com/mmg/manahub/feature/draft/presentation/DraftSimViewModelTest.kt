@@ -2,7 +2,9 @@ package com.mmg.manahub.feature.draft.presentation
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftError
@@ -24,7 +26,10 @@ import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +61,7 @@ class DraftSimViewModelTest {
     private val autoPick: AutoPickUseCase = mockk()
     private val completeDraft: CompleteDraftUseCase = mockk()
     private val getDraftableSimSet: GetDraftableSimSetUseCase = mockk()
+    private val analytics: AnalyticsHelper = mockk(relaxed = true)
 
     /** Fake repository backing [ObserveDraftUseCase] with a real, controllable Flow. */
     private val fakeRepository = FakeDraftSimRepository()
@@ -64,11 +70,16 @@ class DraftSimViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // The ViewModel tags the Crashlytics session in startDraft(); stub the static
+        // getInstance() so JVM tests don't crash trying to reach the real SDK.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ── Test helpers ──────────────────────────────────────────────────────────
@@ -85,6 +96,7 @@ class DraftSimViewModelTest {
             observeDraft = observeDraft,
             completeDraft = completeDraft,
             getDraftableSimSet = getDraftableSimSet,
+            analytics = analytics,
         )
 
     private fun fakeDraftableSet(): DraftableSet = DraftableSet(
