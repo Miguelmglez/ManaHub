@@ -1,9 +1,6 @@
 package com.mmg.manahub.feature.draft.data
 
 import android.content.Context
-import coil.Coil
-import coil.ImageLoader
-import coil.request.ImageRequest
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -31,13 +28,9 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -72,18 +65,12 @@ class DraftSimRepositoryImpl @Inject constructor(
          * breaks Gson deserialisation; sessions with a different version are discarded.
          */
         const val CURRENT_SCHEMA_VERSION = 1
-
-        /** Minimum gap between Coil preload enqueues to honour Scryfall's ≤10 req/s guideline. */
-        private const val IMAGE_PREWARM_DELAY_MS = 100L
     }
 
-    /** Best-effort, fire-and-forget scope for image pre-warming. Failures are ignored. */
-    private val prewarmScope = CoroutineScope(SupervisorJob() + ioDispatcher)
-
-    // Use the app-level ImageLoader (already backed by the global OkHttpClient) rather than
-    // creating a private instance. A private instance would spawn a second OkHttpClient and
-    // connection pool, competing with Scryfall API calls and Supabase token-refresh requests.
-    private val imageLoader: ImageLoader get() = Coil.imageLoader(context)
+    // Image pre-warming was removed: loading 300+ art crops through the shared 50 MB OkHttp
+    // disk cache evicts Scryfall search JSON responses, causing subsequent card-search requests
+    // to receive bare 304s that Retrofit cannot parse. Cards are loaded on demand by Coil
+    // as they appear in the pack grid, which is the correct loading strategy for draft.
 
     // -------------------------------------------------------------------------
     // getDraftableSimSet
@@ -93,7 +80,9 @@ class DraftSimRepositoryImpl @Inject constructor(
         withContext(ioDispatcher) {
             try {
                 // 1. Resolve the set from the index and confirm it is draftable.
-                val setsResult = getDraftableSets()
+                // Always force-refresh: the 24 h Room cache may contain rows where
+                // boosterVersion is NULL (set before the migration added the column).
+                val setsResult = getDraftableSets(forceRefresh = true)
                 val set = when (setsResult) {
                     is DataResult.Success ->
                         setsResult.data.firstOrNull { it.code.equals(setCode, ignoreCase = true) }
@@ -161,9 +150,6 @@ class DraftSimRepositoryImpl @Inject constructor(
                     ratings = ratings,
                 )
 
-                // 6. Pre-warm the Coil image cache (best-effort, non-blocking).
-                prewarmImageCache(cards)
-
                 DataResult.Success(draftableSet)
             } catch (e: Exception) {
                 FirebaseCrashlytics.getInstance().recordException(e)
@@ -203,30 +189,6 @@ class DraftSimRepositoryImpl @Inject constructor(
             boosters = boosters,
             sheets = sheets,
         )
-    }
-
-    /**
-     * Pre-warms the Coil disk cache for card art crops at ≤10 req/s.
-     *
-     * Runs in a detached supervisor scope so it never blocks the caller or propagates
-     * failures into the draft flow. Each request is awaited (not just enqueued) before
-     * the next delay fires — this is the only way to enforce the rate limit, because
-     * `enqueue` is non-blocking and Coil would otherwise dispatch all requests immediately
-     * from its own dispatcher pool, saturating the network and interfering with background
-     * Supabase token-refresh requests.
-     */
-    private fun prewarmImageCache(cards: List<Card>) {
-        prewarmScope.launch {
-            for (card in cards) {
-                val url = card.imageArtCrop ?: continue
-                val request = ImageRequest.Builder(context)
-                    .data(url)
-                    .allowHardware(false)
-                    .build()
-                runCatching { imageLoader.execute(request) }  // await — enforces rate limit
-                delay(IMAGE_PREWARM_DELAY_MS)
-            }
-        }
     }
 
     // -------------------------------------------------------------------------
