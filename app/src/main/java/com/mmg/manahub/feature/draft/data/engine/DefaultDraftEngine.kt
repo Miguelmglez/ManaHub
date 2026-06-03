@@ -20,6 +20,10 @@ class DefaultDraftEngine(
 ) : DraftEngine {
 
     override fun start(set: DraftableSet, config: DraftConfig): DraftState {
+        // The bot drafter is a @Singleton with per-seat learning state that accumulates across a
+        // session. Clear it before each new draft so a fresh draft does not inherit color
+        // commitment from a previous one.
+        (botDrafter as? HeuristicBotDrafter)?.resetState()
         return when (config.mode) {
             DraftMode.DRAFT -> startDraft(set, config)
             DraftMode.SEALED -> startSealed(set, config)
@@ -56,20 +60,20 @@ class DefaultDraftEngine(
     }
 
     private fun startSealed(set: DraftableSet, config: DraftConfig): DraftState {
+        // SEALED is always a single player opening 6 packs. Force a 1-seat / 6-pack config so the
+        // booster generator does not produce empty bot seats from the incoming config.seatCount.
         val sealedConfig = config.copy(seatCount = 1, packCount = 6)
         val packs = boosterGenerator.generate(set, sealedConfig)
         val allCards = packs.flatMap { it.cards }
 
         val humanSeat = DraftSeat(index = 0, isHuman = true, pool = allCards)
-        val botSeats = (1 until config.seatCount).map { i ->
-            DraftSeat(index = i, isHuman = false)
-        }
+        // No bot seats — SEALED is single-player.
 
         return DraftState(
             config = config,
             round = 1,
             pickNumber = 1,
-            seats = listOf(humanSeat) + botSeats,
+            seats = listOf(humanSeat),
             packsInFlight = emptyMap(),
             passDirection = PassDirection.LEFT,
             status = DraftStatus.BUILDING,
@@ -109,9 +113,11 @@ class DefaultDraftEngine(
         // 3. Rotate packs
         val rotatedPacks = rotatePacks(newPacksInFlight, seatCount, state.passDirection)
 
-        // 4. Advance pick number; check if round is over
-        val anyPack = rotatedPacks.values.firstOrNull()
-        val roundOver = anyPack == null || anyPack.cards.isEmpty()
+        // 4. Advance pick number; check if round is over.
+        // Inspect ALL packs, not an arbitrary one — HashMap iteration order is not deterministic,
+        // so firstOrNull() could sample a pack that is out of sync with the rest.
+        val roundOver = rotatedPacks.isEmpty() ||
+            rotatedPacks.values.all { it.cards.isEmpty() }
 
         return if (!roundOver) {
             state.copy(

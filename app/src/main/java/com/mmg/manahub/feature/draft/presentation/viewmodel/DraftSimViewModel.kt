@@ -69,6 +69,16 @@ class DraftSimViewModel @Inject constructor(
     /** True while the app is backgrounded; pauses the pick timer. */
     private var isPaused: Boolean = false
 
+    /**
+     * Guards against concurrent picks (rapid double-tap, or timer expiry racing a manual tap).
+     * Both [onPick] and [onAutoPick] read the same [currentDraftState]; without this guard the
+     * second pick would apply against a stale state and overwrite the first one in Room.
+     */
+    private var isPickInFlight = false
+
+    /** Guards against a double-tap on "Start Draft" launching two concurrent sessions. */
+    private var isDraftStarting = false
+
     init {
         if (setCode.isNotBlank()) {
             loadSet(setCode)
@@ -112,31 +122,38 @@ class DraftSimViewModel @Inject constructor(
      * Starts a new draft with [config] and begins collecting the persisted session.
      */
     fun startDraft(config: DraftConfig) {
+        if (isDraftStarting) return
+        isDraftStarting = true
         viewModelScope.launch {
-            _uiState.value = DraftSimUiState.Loading
-            // Tag the crash session so any failure during this draft carries its parameters.
-            FirebaseCrashlytics.getInstance().apply {
-                log("draft_sim: startDraft set=${config.setCode} mode=${config.mode.name}")
-                setCustomKey("draft_set_code", config.setCode)
-                setCustomKey("draft_mode", config.mode.name)
-                setCustomKey("draft_pack_count", config.packCount)
-                setCustomKey("draft_seat_count", config.seatCount)
-            }
-            when (val result = startDraft(config.setCode, config)) {
-                is DataResult.Success -> {
-                    activeConfig = config
-                    analytics.logEvent(
-                        "draft_started",
-                        mapOf(
-                            "set_code" to config.setCode,
-                            "mode" to config.mode.name,
-                        ),
-                    )
-                    observeActiveSession()
+            try {
+                _uiState.value = DraftSimUiState.Loading
+                // Tag the crash session so any failure during this draft carries its parameters.
+                FirebaseCrashlytics.getInstance().apply {
+                    log("draft_sim: startDraft set=${config.setCode} mode=${config.mode.name}")
+                    setCustomKey("draft_set_code", config.setCode)
+                    setCustomKey("draft_mode", config.mode.name)
+                    setCustomKey("draft_pack_count", config.packCount)
+                    setCustomKey("draft_seat_count", config.seatCount)
                 }
-                is DataResult.Error -> {
-                    _uiState.value = DraftSimUiState.Error(DraftError.Unexpected(result.message))
+                when (val result = startDraft(config.setCode, config)) {
+                    is DataResult.Success -> {
+                        activeConfig = config
+                        analytics.logEvent(
+                            "draft_started",
+                            mapOf(
+                                "set_code" to config.setCode,
+                                "mode" to config.mode.name,
+                            ),
+                        )
+                        observeActiveSession()
+                    }
+                    is DataResult.Error -> {
+                        _uiState.value =
+                            DraftSimUiState.Error(DraftError.Unexpected(result.message))
+                    }
                 }
+            } finally {
+                isDraftStarting = false
             }
         }
     }
@@ -145,28 +162,42 @@ class DraftSimViewModel @Inject constructor(
 
     /** Records the human's pick for [scryfallId] in the current pack. */
     fun onPick(scryfallId: String) {
+        if (isPickInFlight) return
         val state = currentDraftState ?: return
         if (state.status != DraftStatus.DRAFTING) return
+        isPickInFlight = true
         cancelTimer()
         viewModelScope.launch {
-            when (val result = makePick(state, scryfallId)) {
-                is DataResult.Success -> Unit // observeActiveSession() drives the new UI + timer
-                is DataResult.Error ->
-                    _uiState.value = DraftSimUiState.Error(DraftError.Unexpected(result.message))
+            try {
+                when (val result = makePick(state, scryfallId)) {
+                    is DataResult.Success -> Unit // observeActiveSession() drives the new UI + timer
+                    is DataResult.Error ->
+                        _uiState.value =
+                            DraftSimUiState.Error(DraftError.Unexpected(result.message))
+                }
+            } finally {
+                isPickInFlight = false
             }
         }
     }
 
     /** Auto-picks the best card from the human's current pack (timeout / convenience action). */
     fun onAutoPick() {
+        if (isPickInFlight) return
         val state = currentDraftState ?: return
         if (state.status != DraftStatus.DRAFTING) return
+        isPickInFlight = true
         cancelTimer()
         viewModelScope.launch {
-            when (val result = autoPick(state)) {
-                is DataResult.Success -> Unit
-                is DataResult.Error ->
-                    _uiState.value = DraftSimUiState.Error(DraftError.Unexpected(result.message))
+            try {
+                when (val result = autoPick(state)) {
+                    is DataResult.Success -> Unit
+                    is DataResult.Error ->
+                        _uiState.value =
+                            DraftSimUiState.Error(DraftError.Unexpected(result.message))
+                }
+            } finally {
+                isPickInFlight = false
             }
         }
     }

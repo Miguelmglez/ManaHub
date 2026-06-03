@@ -38,6 +38,9 @@ class WeightedBoosterGenerator(
 
     private fun pickVariant(variants: List<BoosterVariant>): BoosterVariant {
         val totalWeight = variants.sumOf { it.weight }
+        // Guard against random.nextInt(0), which throws IllegalArgumentException when all
+        // variants have zero (or negative) weight. Fall back to the last variant.
+        if (totalWeight <= 0) return variants.last()
         var roll = random.nextInt(totalWeight)
         for (v in variants) {
             roll -= v.weight
@@ -56,7 +59,7 @@ class WeightedBoosterGenerator(
         val actualCount = minOf(count, sheet.cards.size)
         val selected = weightedSampleWithoutReplacement(sheet.cards, actualCount)
 
-        val result = selected.map { entry -> toDraftCard(entry, sheet.foil, set) }
+        val result = selected.mapNotNull { entry -> toDraftCard(entry, sheet.foil, set) }
 
         return if (sheet.balanceColors) balanceColors(result, sheet, set) else result
     }
@@ -70,6 +73,12 @@ class WeightedBoosterGenerator(
         repeat(count) {
             if (pool.isEmpty()) return@repeat
             val totalWeight = pool.sumOf { it.weight }
+            // Guard against random.nextInt(0): when every remaining entry has zero (or
+            // negative) weight, fall back to taking the first entry deterministically.
+            if (totalWeight <= 0) {
+                result += pool.removeAt(0)
+                return@repeat
+            }
             var roll = random.nextInt(totalWeight)
             val idx = pool.indexOfFirst { entry -> roll -= entry.weight; roll < 0 }
                 .takeIf { it >= 0 } ?: (pool.size - 1)
@@ -79,17 +88,14 @@ class WeightedBoosterGenerator(
         return result
     }
 
-    private fun toDraftCard(entry: BoosterCardEntry, foil: Boolean, set: DraftableSet): DraftCard {
-        val card = set.cards.firstOrNull { it.scryfallId == entry.id }
-            ?: return DraftCard(
-                card = set.cards.first(),
-                pickOrderRank = null,
-                tierRating = null,
-                isFoil = foil,
-            ).let {
-                // Fallback: card id not in pool; skip by returning a placeholder resolved later
-                it.copy()
-            }
+    /**
+     * Resolves a [BoosterCardEntry] to a [DraftCard], or null when the entry's id is not present
+     * in the set's card pool. Returning null (instead of substituting an arbitrary card) lets the
+     * caller drop unresolved entries and avoids both a [NoSuchElementException] on an empty pool
+     * and the silent insertion of a wrong card.
+     */
+    private fun toDraftCard(entry: BoosterCardEntry, foil: Boolean, set: DraftableSet): DraftCard? {
+        val card = set.cards.firstOrNull { it.scryfallId == entry.id } ?: return null
         val tier = set.ratings[entry.id]
         return DraftCard(
             card = card,
@@ -127,6 +133,10 @@ class WeightedBoosterGenerator(
                 .mapNotNull { entry -> set.cards.firstOrNull { it.scryfallId == entry.id } }
                 .firstOrNull { missing in it.colors }
                 ?: continue
+
+            // Never introduce a card whose scryfallId is already in the pack — duplicate keys
+            // crash the Compose LazyGrid that renders the pack.
+            if (replacement.scryfallId in result.map { it.card.scryfallId }) continue
 
             val swapIdx = result.indexOf(mostRepColor)
             if (swapIdx >= 0) {
