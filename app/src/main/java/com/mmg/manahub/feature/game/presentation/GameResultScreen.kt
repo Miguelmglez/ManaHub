@@ -82,7 +82,7 @@ fun GameResultScreen(
             item { HighlightsSection(gameResult = gameResult) }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(
+                    /*OutlinedButton(
                         onClick  = onSurvey,
                         modifier = Modifier.fillMaxWidth(),
                         colors   = ButtonDefaults.outlinedButtonColors(
@@ -94,7 +94,7 @@ fun GameResultScreen(
                             stringResource(R.string.gameresult_review_button),
                             style = MaterialTheme.magicTypography.titleMedium,
                         )
-                    }
+                    }*/
                     Row(
                         modifier              = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -110,7 +110,8 @@ fun GameResultScreen(
                                 color = mc.secondaryAccent
                                 )
                         }
-                        Button(
+                       /* TODO: Re-enable "Play Again" once rematch functionality is implemented
+                       Button(
                             onClick  = onNewGame,
                             modifier = Modifier.weight(1f),
                             colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
@@ -120,7 +121,7 @@ fun GameResultScreen(
                                 style = MaterialTheme.magicTypography.titleMedium,
                                 color = mc.background,
                             )
-                        }
+                        }*/
                     }
                 }
             }

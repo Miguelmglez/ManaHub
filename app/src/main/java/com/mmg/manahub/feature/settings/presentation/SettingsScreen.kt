@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,12 +29,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Icon
@@ -77,6 +80,8 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import com.mmg.manahub.core.voice.domain.VoiceModelState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -91,6 +96,7 @@ fun SettingsScreen(
     val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
     val pushEnabled by viewModel.pushNotificationsEnabled.collectAsStateWithLifecycle()
     val notificationPrefs by viewModel.notificationPrefs.collectAsStateWithLifecycle()
+    val voiceModelStates by viewModel.voiceModelStates.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     val activity = context as? Activity
@@ -269,6 +275,13 @@ fun SettingsScreen(
                     }
                     context.startActivity(intent)
                 },
+            )
+
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            VoiceRecognitionSection(
+                voiceModelStates = voiceModelStates,
+                onDownloadVoiceModel = viewModel::downloadVoiceModel,
+                onDeleteVoiceModel = viewModel::deleteVoiceModel,
             )
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
@@ -614,6 +627,96 @@ private fun NotificationPermissionBanner(
                     style = MaterialTheme.magicTypography.labelLarge,
                     color = mc.primaryAccent,
                 )
+            }
+        }
+    }
+}
+
+// ── Voice recognition section ───────────────────────────────────────────────────
+
+/**
+ * Lists every supported voice-recognition language with a state-appropriate trailing control:
+ * a download button, a progress bar while downloading, an "Installed" badge + delete button when
+ * ready, or a retry button on error. Stateless — all values are hoisted to the ViewModel.
+ *
+ * @param voiceModelStates Per-language model state.
+ * @param onDownloadVoiceModel Called to (re)download a language's model.
+ * @param onDeleteVoiceModel Called to remove a downloaded language's model.
+ */
+@Composable
+private fun VoiceRecognitionSection(
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
+    onDownloadVoiceModel: (VoiceLanguage) -> Unit,
+    onDeleteVoiceModel: (VoiceLanguage) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_voice_section_title),
+            style = ty.titleMedium,
+            color = mc.textPrimary,
+        )
+        Spacer(Modifier.height(4.dp))
+        VoiceLanguage.entries.forEach { language ->
+            val state = voiceModelStates[language] ?: VoiceModelState.NotDownloaded
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(text = language.displayFlag, style = ty.titleLarge)
+                Text(
+                    text = language.displayName,
+                    style = ty.bodyMedium,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+
+                when (state) {
+                    is VoiceModelState.NotDownloaded -> TextButton(onClick = { onDownloadVoiceModel(language) }) {
+                        Text(
+                            text = stringResource(R.string.voice_model_download),
+                            style = ty.labelMedium,
+                            color = mc.primaryAccent,
+                        )
+                    }
+                    is VoiceModelState.Downloading -> LinearProgressIndicator(
+                        progress = { state.progress },
+                        modifier = Modifier.width(80.dp),
+                        color = mc.primaryAccent,
+                        trackColor = mc.surfaceVariant,
+                    )
+                    is VoiceModelState.Ready -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.voice_model_installed),
+                            style = ty.labelSmall,
+                            color = mc.primaryAccent,
+                        )
+                        IconButton(onClick = { onDeleteVoiceModel(language) }) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = stringResource(R.string.voice_model_delete),
+                                tint = mc.textSecondary,
+                            )
+                        }
+                    }
+                    is VoiceModelState.Error -> TextButton(onClick = { onDownloadVoiceModel(language) }) {
+                        Text(
+                            text = stringResource(R.string.voice_model_retry),
+                            style = ty.labelMedium,
+                            color = mc.lifeNegative,
+                        )
+                    }
+                }
             }
         }
     }

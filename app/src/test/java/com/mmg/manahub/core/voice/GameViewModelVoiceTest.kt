@@ -80,7 +80,7 @@ class GameViewModelVoiceTest {
 
         override suspend fun start(
             enabledCommands: Set<VoiceCommand>,
-            enabledLanguages: Set<VoiceLanguage>,
+            language: VoiceLanguage,
         ) {
             startCalled = true
             _isListening.value = true

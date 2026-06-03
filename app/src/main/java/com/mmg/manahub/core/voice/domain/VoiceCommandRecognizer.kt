@@ -8,7 +8,7 @@ interface VoiceCommandRecognizer {
     val isListening: StateFlow<Boolean>
     suspend fun start(
         enabledCommands: Set<VoiceCommand> = setOf(VoiceCommand.PlayLand, VoiceCommand.EndTurn),
-        enabledLanguages: Set<VoiceLanguage> = VoiceLanguage.entries.toSet(),
+        language: VoiceLanguage = VoiceLanguage.ENGLISH,
     )
     fun stop()
     fun release()

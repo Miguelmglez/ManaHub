@@ -2,12 +2,13 @@ package com.mmg.manahub.core.voice.data
 
 import android.content.Context
 import android.util.Log
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -20,6 +21,13 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
+/**
+ * Default [VoiceModelRepository] backed by per-language Vosk models stored under the app's
+ * private [Context.getFilesDir].
+ *
+ * Each language is downloaded as a zip from the model host, extracted into its own directory,
+ * and validated independently. State for every language is published through [modelStates].
+ */
 @Singleton
 class VoiceModelRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -27,35 +35,39 @@ class VoiceModelRepositoryImpl @Inject constructor(
     @Named("cloudflare_base_url") private val baseUrl: String,
 ) : VoiceModelRepository {
 
-    private val modelDir = File(context.filesDir, "voice-models/en")
-
-    private val _state = MutableStateFlow<VoiceModelState>(
-        if (isModelValid()) VoiceModelState.Ready else VoiceModelState.NotDownloaded
+    private val _states = MutableStateFlow(
+        VoiceLanguage.entries.associateWith { language ->
+            if (isModelValid(modelDirFor(language))) VoiceModelState.Ready
+            else VoiceModelState.NotDownloaded
+        }
     )
+    override val modelStates: StateFlow<Map<VoiceLanguage, VoiceModelState>> = _states.asStateFlow()
 
-    override fun observeState(): Flow<VoiceModelState> = _state.asStateFlow()
+    override fun modelDir(language: VoiceLanguage): File? =
+        modelDirFor(language).takeIf { isModelValid(it) }
 
-    override fun modelDir(): File? = modelDir.takeIf { isModelValid() }
+    override suspend fun download(language: VoiceLanguage) = withContext(Dispatchers.IO) {
+        val current = _states.value[language]
+        if (current is VoiceModelState.Ready) return@withContext
+        if (current is VoiceModelState.Downloading) return@withContext
 
-    override suspend fun download() = withContext(Dispatchers.IO) {
-        if (_state.value is VoiceModelState.Ready) return@withContext
-        if (_state.value is VoiceModelState.Downloading) return@withContext
-
-        val url = "${baseUrl.trimEnd('/')}/voice/models/en.zip"
-        _state.value = VoiceModelState.Downloading(0f)
+        // Upload es.zip and de.zip to Cloudflare R2 at voice/models/ before enabling these languages in production
+        val url = "${baseUrl.trimEnd('/')}/voice/models/${language.modelFileName}"
+        val modelDir = modelDirFor(language)
+        updateState(language, VoiceModelState.Downloading(0f))
 
         try {
             val request = Request.Builder().url(url).build()
             val response = httpClient.newCall(request).execute()
 
             if (!response.isSuccessful) {
-                _state.value = VoiceModelState.Error("Download failed (HTTP ${response.code})")
+                updateState(language, VoiceModelState.Error("Download failed (HTTP ${response.code})"))
                 return@withContext
             }
 
             val body = response.body
             val totalBytes = body.contentLength().takeIf { it > 0 } ?: -1L
-            val tempZip = File(context.cacheDir, "vosk-en.zip.tmp")
+            val tempZip = File(context.cacheDir, "vosk-${language.modelDirName}.zip.tmp")
 
             body.byteStream().use { input ->
                 FileOutputStream(tempZip).use { output ->
@@ -66,7 +78,7 @@ class VoiceModelRepositoryImpl @Inject constructor(
                         output.write(buffer, 0, bytes)
                         bytesCopied += bytes
                         if (totalBytes > 0) {
-                            _state.value = VoiceModelState.Downloading(bytesCopied.toFloat() / totalBytes)
+                            updateState(language, VoiceModelState.Downloading(bytesCopied.toFloat() / totalBytes))
                         }
                         bytes = input.read(buffer)
                     }
@@ -76,17 +88,30 @@ class VoiceModelRepositoryImpl @Inject constructor(
             unzip(tempZip, modelDir)
             tempZip.delete()
 
-            if (isModelValid()) {
-                _state.value = VoiceModelState.Ready
+            if (isModelValid(modelDir)) {
+                updateState(language, VoiceModelState.Ready)
             } else {
                 modelDir.deleteRecursively()
-                _state.value = VoiceModelState.Error("Model validation failed after extraction")
+                updateState(language, VoiceModelState.Error("Model validation failed after extraction"))
             }
         } catch (e: Exception) {
-            Log.e("VoiceModelRepository", "Download failed", e)
+            Log.e("VoiceModelRepository", "Download failed for ${language.modelDirName}", e)
             modelDir.deleteRecursively()
-            _state.value = VoiceModelState.Error(e.message ?: "Unknown error")
+            updateState(language, VoiceModelState.Error(e.message ?: "Unknown error"))
         }
+    }
+
+    override suspend fun delete(language: VoiceLanguage) = withContext(Dispatchers.IO) {
+        modelDirFor(language).deleteRecursively()
+        updateState(language, VoiceModelState.NotDownloaded)
+    }
+
+    private fun modelDirFor(language: VoiceLanguage): File =
+        File(context.filesDir, "voice-models/${language.modelDirName}")
+
+    /** Atomically replaces only [language]'s entry in the published state map. */
+    private fun updateState(language: VoiceLanguage, state: VoiceModelState) {
+        _states.value = _states.value.toMutableMap().also { it[language] = state }.toMap()
     }
 
     private fun unzip(zipFile: File, destDir: File) {
@@ -111,6 +136,6 @@ class VoiceModelRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun isModelValid(): Boolean =
-        modelDir.exists() && modelDir.isDirectory && modelDir.listFiles()?.isNotEmpty() == true
+    private fun isModelValid(dir: File): Boolean =
+        dir.exists() && dir.isDirectory && dir.listFiles()?.isNotEmpty() == true
 }

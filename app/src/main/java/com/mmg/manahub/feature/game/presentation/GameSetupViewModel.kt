@@ -16,11 +16,9 @@ import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -46,7 +44,7 @@ data class GameSettings(
     val landReminderEnabled: Boolean     = true,
     val voiceLandReminderEnabled: Boolean = false,
     val voiceEndTurnEnabled: Boolean = false,
-    val voiceLanguages: Set<VoiceLanguage> = setOf(VoiceLanguage.ENGLISH),
+    val voiceLanguage: VoiceLanguage = VoiceLanguage.ENGLISH,
     val lifeControlMode:     LifeControlMode = LifeControlMode.SCROLL,
 )
 
@@ -72,8 +70,9 @@ class GameSetupViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(buildInitialState(GameMode.STANDARD, 2))
     val uiState: StateFlow<GameSetupUiState> = _uiState.asStateFlow()
 
-    val voiceModelState: StateFlow<VoiceModelState> = voiceModelRepository.observeState()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), VoiceModelState.NotDownloaded)
+    /** Per-language voice-model state, mirrored from the repository. */
+    val voiceModelStates: StateFlow<Map<VoiceLanguage, VoiceModelState>> =
+        voiceModelRepository.modelStates
 
     init {
         viewModelScope.launch {
@@ -149,9 +148,10 @@ class GameSetupViewModel @Inject constructor(
     }
 
     fun toggleVoiceLandReminder() {
-        // Only allow enabling if the model is ready; turning off always works.
+        // Only allow enabling if the selected language's model is ready; turning off always works.
         val enabling = !_uiState.value.gameSettings.voiceLandReminderEnabled
-        if (enabling && voiceModelState.value !is VoiceModelState.Ready) return
+        val selectedLanguage = _uiState.value.gameSettings.voiceLanguage
+        if (enabling && voiceModelStates.value[selectedLanguage] !is VoiceModelState.Ready) return
         _uiState.update { state ->
             val newVoiceEnabled = !state.gameSettings.voiceLandReminderEnabled
             state.copy(
@@ -165,29 +165,32 @@ class GameSetupViewModel @Inject constructor(
     }
 
     fun toggleVoiceEndTurn() {
-        // Only allow enabling if the model is ready; turning off always works.
+        // Only allow enabling if the selected language's model is ready; turning off always works.
         val enabling = !_uiState.value.gameSettings.voiceEndTurnEnabled
-        if (enabling && voiceModelState.value !is VoiceModelState.Ready) return
+        val selectedLanguage = _uiState.value.gameSettings.voiceLanguage
+        if (enabling && voiceModelStates.value[selectedLanguage] !is VoiceModelState.Ready) return
         _uiState.update { it.copy(
             gameSettings = it.gameSettings.copy(voiceEndTurnEnabled = !it.gameSettings.voiceEndTurnEnabled)
         )}
     }
 
-    fun toggleVoiceLanguage(language: VoiceLanguage) {
-        _uiState.update { state ->
-            val current = state.gameSettings.voiceLanguages
-            val updated = if (language in current) {
-                // Keep at least one language selected at all times.
-                if (current.size > 1) current - language else current
-            } else {
-                current + language
-            }
-            state.copy(gameSettings = state.gameSettings.copy(voiceLanguages = updated))
-        }
+    /**
+     * Selects [language] as the active recognition language. Only succeeds if that language's
+     * model is [VoiceModelState.Ready]; otherwise the call is ignored.
+     */
+    fun setVoiceLanguage(language: VoiceLanguage) {
+        if (voiceModelStates.value[language] !is VoiceModelState.Ready) return
+        _uiState.update { it.copy(gameSettings = it.gameSettings.copy(voiceLanguage = language)) }
     }
 
-    fun downloadVoiceModel() {
-        viewModelScope.launch { voiceModelRepository.download() }
+    /** Downloads the voice model for [language]. */
+    fun downloadVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.download(language) }
+    }
+
+    /** Deletes the downloaded voice model for [language]. */
+    fun deleteVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.delete(language) }
     }
 
     fun setLifeControlMode(mode: LifeControlMode) {

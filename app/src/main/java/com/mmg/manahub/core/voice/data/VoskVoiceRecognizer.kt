@@ -39,21 +39,22 @@ class VoskVoiceRecognizer @Inject constructor(
     private var lastCommandTimeMs = 0L
     private val cooldownMs = 2_000L
 
-    // Languages currently active for the running session — used to scope phrase matching.
+    // Language currently active for the running session — used to scope phrase matching.
+    // Stored as a Set so the CommandGrammar Set-based overloads can be reused unchanged.
     private var enabledLanguages: Set<VoiceLanguage> = emptySet()
 
     override suspend fun start(
         enabledCommands: Set<VoiceCommand>,
-        enabledLanguages: Set<VoiceLanguage>,
+        language: VoiceLanguage,
     ) {
         if (_isListening.value) return
-        val dir = modelRepository.modelDir() ?: return
+        val dir = modelRepository.modelDir(language) ?: return
 
-        this.enabledLanguages = enabledLanguages
+        this.enabledLanguages = setOf(language)
 
         try {
             val m = withContext(Dispatchers.IO) { Model(dir.absolutePath) }
-            val r = withContext(Dispatchers.IO) { Recognizer(m, 16000f, CommandGrammar.grammarJson(enabledCommands, enabledLanguages)) }
+            val r = withContext(Dispatchers.IO) { Recognizer(m, 16000f, CommandGrammar.grammarJson(enabledCommands, setOf(language))) }
             model = m
             recognizer = r
             val service = SpeechService(r, 16000f)

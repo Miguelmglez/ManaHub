@@ -343,6 +343,32 @@ Key decisions and invariants future agents must know:
 
 11. **Supabase free-tier caveat.** A free-tier project pauses after 7 days of inactivity; pg_cron jobs stop while paused. On resume, pending `notification_outbox` rows are processed on the next cron tick (delivery is delayed, not lost). Monitor delivery rate with the SQL query in migration `20260602_push_outbox_retention`.
 
+### Voice recognition (offline, Vosk — multi-language, 2026-06-03)
+
+Offline voice recognition uses the **Vosk** library with grammar-restricted models. One model is loaded per game session (single language, not multi-model).
+
+**Architecture:**
+- `core/voice/domain/VoiceLanguage` — `ENGLISH`, `SPANISH`, `GERMAN`, each carries `modelFileName` (zip name) and `modelDirName` (local dir).
+- `VoiceModelRepository.modelStates: StateFlow<Map<VoiceLanguage, VoiceModelState>>` — per-language state; missing key = `NotDownloaded`.
+- `VoiceModelRepository.download(language)` / `delete(language)` — independent per language.
+- Model dirs: `${filesDir}/voice-models/{en|es|de}/`
+- Download URL: `${CLOUDFLARE_WORKER_URL}/voice/models/{lang}.zip` → Worker fetches `voice-models/{lang}.zip` from R2 bucket `manahub-assets`.
+- `VoiceCommandRecognizer.start(commands, language: VoiceLanguage)` — single language, not `Set`.
+- `GameSettings.voiceLanguage: VoiceLanguage` — single selection (not Set); only selectable if that language's model is `Ready`.
+
+**Cloudflare R2 model keys** (bucket: `manahub-assets`):
+- `voice-models/en.zip` — Vosk small English (uploaded pre-2026-06)
+- `voice-models/es.zip` — Vosk `vosk-model-small-es-0.42` (uploaded 2026-06-03)
+- `voice-models/de.zip` — Vosk `vosk-model-small-de-0.15` (uploaded 2026-06-03)
+
+To add a new language: add enum entry to `VoiceLanguage`, add phrases to `CommandGrammar`, upload `{lang}.zip` to R2.
+
+**Key invariants:**
+- Never use `Set<VoiceLanguage>` in `VoiceCommandRecognizer.start()` — Vosk loads one `Model` per `SpeechService`; multi-model simultaneous recognition is not supported.
+- The selected language is only changeable if its model is `Ready`. Toggling voice features (land reminder, end turn) is gated on `voiceModelStates[gameSettings.voiceLanguage] is Ready`.
+- `VoiceLanguagesSheet` (ModalBottomSheet in `GameSetupScreen`) is the download/select UI. Settings screen has a mirror `VoiceRecognitionSection` for delete/download management without navigating to game setup.
+- The active language cannot be deleted from `VoiceLanguagesSheet` — the delete button is hidden when `isSelected`. This prevents a state where voice toggles are enabled but no model is available.
+
 ## UI / Jetpack Compose (ManaHub)
 
 When working on any UI, screen, Composable, or visual element, follow these non-negotiables. Full

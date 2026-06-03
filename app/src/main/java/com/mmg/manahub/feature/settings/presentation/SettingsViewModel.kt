@@ -12,6 +12,9 @@ import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import com.mmg.manahub.core.voice.domain.VoiceModelRepository
+import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,6 +44,7 @@ class SettingsViewModel @Inject constructor(
     private val userProfileDataSource: UserProfileDataSource,
     private val pushTokenRepository: PushTokenRepository,
     private val notificationPrefsRepository: NotificationPrefsRepository,
+    private val voiceModelRepository: VoiceModelRepository,
 //    private val langPref:              LanguagePreference
 ) : ViewModel() {
 
@@ -75,6 +79,11 @@ class SettingsViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = false,
             )
+
+    /** Per-language voice-model state, mirrored from the repository. */
+    val voiceModelStates: StateFlow<Map<VoiceLanguage, VoiceModelState>> =
+        voiceModelRepository.modelStates
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     init {
         userPrefsDataStore.themeFlow
@@ -254,6 +263,18 @@ class SettingsViewModel @Inject constructor(
                 notificationPrefsRepository.setEventEnabled(eventType, enabled)
             }
         }
+    }
+
+    // ── Voice recognition models ─────────────────────────────────────────────────
+
+    /** Downloads the offline voice-recognition model for [language]. */
+    fun downloadVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.download(language) }
+    }
+
+    /** Deletes the downloaded voice-recognition model for [language]. */
+    fun deleteVoiceModel(language: VoiceLanguage) {
+        viewModelScope.launch { voiceModelRepository.delete(language) }
     }
 
     /** Clears the privacy toast message after it has been displayed. */

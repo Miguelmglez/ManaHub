@@ -83,7 +83,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.data.local.entity.SurveyStatus
+// TODO: Re-enable when Survey review for games is fully implemented
+//import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.domain.model.CardValue
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.MagicSet
@@ -1351,22 +1352,22 @@ private fun GameStatsContent(
                     )
                 }
 
-                // Pending surveys banner
-                if (gs.pendingSurveys > 0) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape    = RoundedCornerShape(12.dp),
-                        colors   = CardDefaults.cardColors(containerColor = mc.goldMtg.copy(alpha = 0.15f)),
-                        border   = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)),
-                    ) {
-                        Text(
-                            text     = stringResource(R.string.stats_pending_surveys, gs.pendingSurveys),
-                            style    = ty.bodySmall,
-                            color    = mc.goldMtg,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        )
-                    }
-                }
+                // TODO: Re-enable when Survey review for games is fully implemented
+//                if (gs.pendingSurveys > 0) {
+//                    Card(
+//                        modifier = Modifier.fillMaxWidth(),
+//                        shape    = RoundedCornerShape(12.dp),
+//                        colors   = CardDefaults.cardColors(containerColor = mc.goldMtg.copy(alpha = 0.15f)),
+//                        border   = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.4f)),
+//                    ) {
+//                        Text(
+//                            text     = stringResource(R.string.stats_pending_surveys, gs.pendingSurveys),
+//                            style    = ty.bodySmall,
+//                            color    = mc.goldMtg,
+//                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+//                        )
+//                    }
+//                }
             }
         }
 
@@ -1671,8 +1672,8 @@ private fun SessionHistoryRow(
                 )
             }
 
-            // Survey status chip
-            SurveyStatusChip(item = item, mc = mc)
+            // TODO: Re-enable when Survey review for games is fully implemented
+//            SurveyStatusChip(item = item, mc = mc)
         }
 
         // Trailing more-options button with dropdown
@@ -1689,13 +1690,14 @@ private fun SessionHistoryRow(
                 expanded         = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
             ) {
-                DropdownMenuItem(
-                    text    = { Text(stringResource(R.string.action_review_survey)) },
-                    onClick = {
-                        menuExpanded = false
-                        onReviewSurvey()
-                    },
-                )
+                // TODO: Re-enable when Survey review for games is fully implemented
+//                DropdownMenuItem(
+//                    text    = { Text(stringResource(R.string.action_review_survey)) },
+//                    onClick = {
+//                        menuExpanded = false
+//                        onReviewSurvey()
+//                    },
+//                )
                 DropdownMenuItem(
                     text    = { Text(stringResource(R.string.action_delete_game), color = mc.lifeNegative) },
                     onClick = {
@@ -1708,34 +1710,34 @@ private fun SessionHistoryRow(
     }
 }
 
-@Composable
-private fun SurveyStatusChip(item: GameHistoryItem, mc: MagicColors) {
-    val ty = MaterialTheme.magicTypography
-    val (label, color) = when (item.surveyStatus) {
-        SurveyStatus.PENDING   -> stringResource(R.string.survey_pending) to mc.goldMtg.copy(alpha = 0.7f)
-        SurveyStatus.PARTIAL   -> stringResource(R.string.survey_partial) to mc.goldMtg.copy(alpha = 0.5f)
-        SurveyStatus.COMPLETED -> {
-            val timestamp = item.surveyStatus.let {
-                // Show relative time if we had surveyCompletedAt; fall back to generic label
-                stringResource(R.string.survey_completed)
-            }
-            timestamp to mc.lifePositive.copy(alpha = 0.7f)
-        }
-        SurveyStatus.SKIPPED   -> stringResource(R.string.survey_skipped) to mc.textDisabled
-    }
-
-    Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = color.copy(alpha = 0.15f),
-    ) {
-        Text(
-            text     = label,
-            style    = ty.labelSmall,
-            color    = color,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
-    }
-}
+// TODO: Re-enable when Survey review for games is fully implemented
+//@Composable
+//private fun SurveyStatusChip(item: GameHistoryItem, mc: MagicColors) {
+//    val ty = MaterialTheme.magicTypography
+//    val (label, color) = when (item.surveyStatus) {
+//        SurveyStatus.PENDING   -> stringResource(R.string.survey_pending) to mc.goldMtg.copy(alpha = 0.7f)
+//        SurveyStatus.PARTIAL   -> stringResource(R.string.survey_partial) to mc.goldMtg.copy(alpha = 0.5f)
+//        SurveyStatus.COMPLETED -> {
+//            val timestamp = item.surveyStatus.let {
+//                stringResource(R.string.survey_completed)
+//            }
+//            timestamp to mc.lifePositive.copy(alpha = 0.7f)
+//        }
+//        SurveyStatus.SKIPPED   -> stringResource(R.string.survey_skipped) to mc.textDisabled
+//    }
+//
+//    Surface(
+//        shape = RoundedCornerShape(4.dp),
+//        color = color.copy(alpha = 0.15f),
+//    ) {
+//        Text(
+//            text     = label,
+//            style    = ty.labelSmall,
+//            color    = color,
+//            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+//        )
+//    }
+//}
 
 
 @Composable

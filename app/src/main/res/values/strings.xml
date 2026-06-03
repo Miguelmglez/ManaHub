@@ -687,6 +687,16 @@
     <string name="gamesetup_voice_download_label">Download voice model (~40 MB)</string>
     <string name="gamesetup_voice_downloading_label">Downloading voice model…</string>
     <string name="gamesetup_voice_download_failed">Download failed.</string>
+    <string name="gamesetup_voice_language_row_title">Voice recognition language</string>
+    <string name="gamesetup_voice_no_model_selected">No language selected</string>
+    <string name="voice_languages_sheet_title">Voice recognition languages</string>
+    <string name="voice_model_installed">Installed</string>
+    <string name="voice_model_download">Download</string>
+    <string name="voice_model_downloading">Downloading…</string>
+    <string name="voice_model_delete">Delete</string>
+    <string name="voice_model_retry">Retry</string>
+    <string name="voice_manage_in_settings">Manage downloaded languages in Settings</string>
+    <string name="settings_voice_section_title">Voice recognition</string>
 
     <!-- ══════════════════════════════════════════
          GAME SCREEN

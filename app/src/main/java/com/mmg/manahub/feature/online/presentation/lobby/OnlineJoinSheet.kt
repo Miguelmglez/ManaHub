@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -126,7 +127,6 @@ fun OnlineJoinSheet(
         containerColor = mc.backgroundSecondary,
         contentWindowInsets = { WindowInsets(0) },
         sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
             confirmValueChange = { it != SheetValue.Hidden }
         ),
         dragHandle = null,
@@ -134,9 +134,9 @@ fun OnlineJoinSheet(
         Box(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 8.dp)
-                    .navigationBarsPadding(),
+                    .navigationBarsPadding()
+                    .imePadding(),
             ) {
                 // Header Row
                 Row(

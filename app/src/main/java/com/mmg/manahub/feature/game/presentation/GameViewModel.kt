@@ -409,7 +409,7 @@ class GameViewModel @Inject constructor(
             if (settings.voiceEndTurnEnabled) add(VoiceCommand.EndTurn)
         }
         viewModelScope.launch {
-            voiceCommandRecognizer.start(enabledCommands, settings.voiceLanguages)
+            voiceCommandRecognizer.start(enabledCommands, settings.voiceLanguage)
         }
     }
 

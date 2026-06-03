@@ -31,17 +31,22 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
@@ -138,11 +143,11 @@ fun GameSetupScreen(
     onNavigateToJoin: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val voiceModelState by viewModel.voiceModelState.collectAsStateWithLifecycle()
+    val voiceModelStates by viewModel.voiceModelStates.collectAsStateWithLifecycle()
 
     GameSetupScreenContent(
         uiState = uiState,
-        voiceModelState = voiceModelState,
+        voiceModelStates = voiceModelStates,
         onBack = onBack,
         onStartGame = onStartGame,
         onOnlineHostGameStart = onOnlineHostGameStart,
@@ -157,8 +162,9 @@ fun GameSetupScreen(
         onToggleLandReminder = viewModel::toggleLandReminder,
         onToggleVoiceLandReminder = viewModel::toggleVoiceLandReminder,
         onToggleVoiceEndTurn = viewModel::toggleVoiceEndTurn,
-        onToggleVoiceLanguage = viewModel::toggleVoiceLanguage,
+        onSetVoiceLanguage = viewModel::setVoiceLanguage,
         onDownloadVoiceModel = viewModel::downloadVoiceModel,
+        onDeleteVoiceModel = viewModel::deleteVoiceModel,
         onLifeControlModeChange = viewModel::setLifeControlMode,
     )
 }
@@ -167,7 +173,7 @@ fun GameSetupScreen(
 @Composable
 private fun GameSetupScreenContent(
     uiState: GameSetupUiState,
-    voiceModelState: VoiceModelState,
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
     onBack: () -> Unit,
     onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate, GameSettings) -> Unit,
     onOnlineHostGameStart: (sessionId: String, mode: GameMode, playerCount: Int) -> Unit,
@@ -182,8 +188,9 @@ private fun GameSetupScreenContent(
     onToggleLandReminder: () -> Unit,
     onToggleVoiceLandReminder: () -> Unit,
     onToggleVoiceEndTurn: () -> Unit,
-    onToggleVoiceLanguage: (VoiceLanguage) -> Unit,
-    onDownloadVoiceModel: () -> Unit,
+    onSetVoiceLanguage: (VoiceLanguage) -> Unit,
+    onDownloadVoiceModel: (VoiceLanguage) -> Unit,
+    onDeleteVoiceModel: (VoiceLanguage) -> Unit,
     onLifeControlModeChange: (LifeControlMode) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -196,6 +203,7 @@ private fun GameSetupScreenContent(
     var showOnlineHostSheet by remember { mutableStateOf(false) }
     var showOnlineJoinSheet by remember { mutableStateOf(false) }
     var showTournamentsSheet by remember { mutableStateOf(false) }
+    var showVoiceLanguagesSheet by remember { mutableStateOf(false) }
     var editingPlayerIndex by remember { mutableStateOf<Int?>(null) }
 
     // Auto-open join sheet when a prefilled code arrives (deep link path).
@@ -285,12 +293,11 @@ private fun GameSetupScreenContent(
                         // ── Settings ──────────────────────────────────────────────────────
                         SettingsSection(
                             gameSettings = uiState.gameSettings,
-                            voiceModelState = voiceModelState,
+                            voiceModelStates = voiceModelStates,
                             onToggleLandReminder = onToggleLandReminder,
                             onToggleVoiceLandReminder = onToggleVoiceLandReminder,
                             onToggleVoiceEndTurn = onToggleVoiceEndTurn,
-                            onToggleVoiceLanguage = onToggleVoiceLanguage,
-                            onDownloadVoiceModel = onDownloadVoiceModel,
+                            onOpenVoiceLanguages = { showVoiceLanguagesSheet = true },
                             onLifeControlModeChange = onLifeControlModeChange,
                         )
 
@@ -419,6 +426,17 @@ private fun GameSetupScreenContent(
                     onDismiss = { editingPlayerIndex = null },
                 )
             }
+        }
+
+        if (showVoiceLanguagesSheet) {
+            VoiceLanguagesSheet(
+                voiceModelStates = voiceModelStates,
+                selectedLanguage = uiState.gameSettings.voiceLanguage,
+                onSelectLanguage = onSetVoiceLanguage,
+                onDownload = onDownloadVoiceModel,
+                onDelete = onDeleteVoiceModel,
+                onDismiss = { showVoiceLanguagesSheet = false },
+            )
         }
     }
 }
@@ -556,12 +574,13 @@ private fun FriendsRoutingSheet(
                 subtitle = stringResource(R.string.gamesetup_friends_join_subtitle),
                 onClick = onJoinWithCode,
             )
+            /* TODO Re enable when the feature is fully complete
             FriendsSheetRow(
                 emoji = "🏆",
                 title = stringResource(R.string.gamesetup_friends_tournaments_title),
                 subtitle = stringResource(R.string.gamesetup_friends_tournaments_subtitle),
                 onClick = onTournaments,
-            )
+            )*/
 
             Spacer(Modifier.height(8.dp))
         }
@@ -620,12 +639,11 @@ private fun FriendsSheetRow(
 @Composable
 private fun SettingsSection(
     gameSettings: GameSettings,
-    voiceModelState: VoiceModelState,
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
     onToggleLandReminder: () -> Unit,
     onToggleVoiceLandReminder: () -> Unit,
     onToggleVoiceEndTurn: () -> Unit,
-    onToggleVoiceLanguage: (VoiceLanguage) -> Unit,
-    onDownloadVoiceModel: () -> Unit,
+    onOpenVoiceLanguages: () -> Unit,
     onLifeControlModeChange: (LifeControlMode) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -649,11 +667,10 @@ private fun SettingsSection(
             )
             VoiceControlsSection(
                 gameSettings = gameSettings,
-                voiceModelState = voiceModelState,
+                voiceModelStates = voiceModelStates,
                 onToggleLandVoice = onToggleVoiceLandReminder,
                 onToggleEndTurnVoice = onToggleVoiceEndTurn,
-                onToggleLanguage = onToggleVoiceLanguage,
-                onDownloadModel = onDownloadVoiceModel,
+                onOpenVoiceLanguages = onOpenVoiceLanguages,
             )
             LifeControlSelector(
                 selectedMode = gameSettings.lifeControlMode,
@@ -914,30 +931,35 @@ private fun TapModePreview() {
 private enum class PendingVoiceToggle { LAND, END_TURN }
 
 /**
- * Full voice-controls block: shared model-download affordance, language selector,
- * and one toggle row per voice command (Land reminder, End turn). Each toggle handles
- * the RECORD_AUDIO permission flow and exposes an info dialog listing recognized phrases.
+ * Full voice-controls block: a tappable "Voice recognition language" row (which opens the
+ * per-language management sheet) plus one toggle row per voice command (Land reminder, End turn).
+ * Each toggle handles the RECORD_AUDIO permission flow and exposes an info dialog listing the
+ * recognized phrases for the currently selected language.
+ *
+ * @param voiceModelStates Per-language model state used to gate the toggles and label the row.
+ * @param onOpenVoiceLanguages Opens the [VoiceLanguagesSheet] for downloading/selecting a language.
  */
 @Composable
 private fun VoiceControlsSection(
     gameSettings: GameSettings,
-    voiceModelState: VoiceModelState,
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
     onToggleLandVoice: () -> Unit,
     onToggleEndTurnVoice: () -> Unit,
-    onToggleLanguage: (VoiceLanguage) -> Unit,
-    onDownloadModel: () -> Unit,
+    onOpenVoiceLanguages: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val context = LocalContext.current
     var showLandInfoDialog by remember { mutableStateOf(false) }
     var showEndTurnInfoDialog by remember { mutableStateOf(false) }
     var pendingVoiceToggle by remember { mutableStateOf<PendingVoiceToggle?>(null) }
-    val isModelReady = voiceModelState is VoiceModelState.Ready
+
+    val selectedLanguage = gameSettings.voiceLanguage
+    val isModelReady = voiceModelStates[selectedLanguage] is VoiceModelState.Ready
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted && voiceModelState is VoiceModelState.Ready) {
+        if (isGranted && isModelReady) {
             when (pendingVoiceToggle) {
                 PendingVoiceToggle.LAND -> onToggleLandVoice()
                 PendingVoiceToggle.END_TURN -> onToggleEndTurnVoice()
@@ -965,99 +987,44 @@ private fun VoiceControlsSection(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Model download / progress / error affordance (shared by both toggles).
-        AnimatedVisibility(visible = !isModelReady) {
-            when (voiceModelState) {
-                is VoiceModelState.NotDownloaded -> TextButton(
-                    onClick = onDownloadModel,
-                ) {
-                    Text(
-                        text = stringResource(R.string.gamesetup_voice_download_label),
-                        style = MaterialTheme.magicTypography.labelMedium,
-                        color = mc.primaryAccent,
-                    )
-                }
-                is VoiceModelState.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = stringResource(R.string.gamesetup_voice_downloading_label),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.textSecondary,
-                    )
-                    LinearProgressIndicator(
-                        progress = { voiceModelState.progress },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = mc.primaryAccent,
-                        trackColor = mc.surfaceVariant,
-                    )
-                }
-                is VoiceModelState.Error -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.gamesetup_voice_download_failed),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.lifeNegative,
-                    )
-                    TextButton(onClick = onDownloadModel) {
-                        Text(
-                            text = stringResource(R.string.retry),
-                            style = MaterialTheme.magicTypography.labelMedium,
-                            color = mc.primaryAccent,
-                        )
-                    }
-                }
-                else -> {}
-            }
-        }
-
-        // ── Language selector ─────────────────────────────────────────
-        AnimatedVisibility(visible = isModelReady || voiceModelState !is VoiceModelState.NotDownloaded) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // ── Voice language row (opens the management sheet) ───────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onOpenVoiceLanguages)
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.RecordVoiceOver,
+                contentDescription = null,
+                tint = if (isModelReady) mc.primaryAccent else mc.textDisabled,
+                modifier = Modifier.size(24.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.gamesetup_voice_languages_title),
-                    style = MaterialTheme.magicTypography.labelSmall,
+                    text = stringResource(R.string.gamesetup_voice_language_row_title),
+                    style = MaterialTheme.magicTypography.titleMedium,
+                    color = mc.textPrimary,
+                )
+                Text(
+                    text = if (isModelReady) {
+                        "${selectedLanguage.displayFlag} ${selectedLanguage.displayName}"
+                    } else {
+                        stringResource(R.string.gamesetup_voice_no_model_selected)
+                    },
+                    style = MaterialTheme.magicTypography.bodySmall,
                     color = mc.textSecondary,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VoiceLanguage.entries.forEach { lang ->
-                        val selected = lang in gameSettings.voiceLanguages
-                        val bgColor by animateColorAsState(
-                            if (selected) mc.primaryAccent.copy(alpha = 0.18f) else mc.surface,
-                            tween(200), label = "langBg"
-                        )
-                        val borderColor by animateColorAsState(
-                            if (selected) mc.primaryAccent else mc.surfaceVariant,
-                            tween(200), label = "langBorder"
-                        )
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = { onToggleLanguage(lang) },
-                                ),
-                            color = bgColor,
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(if (selected) 1.5.dp else 0.5.dp, borderColor),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(text = lang.displayFlag, style = MaterialTheme.magicTypography.bodyMedium)
-                                Text(
-                                    text = lang.displayCode,
-                                    style = MaterialTheme.magicTypography.labelMedium,
-                                    color = if (selected) mc.primaryAccent else mc.textSecondary,
-                                )
-                            }
-                        }
-                    }
-                }
             }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(20.dp),
+            )
         }
 
         // ── Voice: Land Reminder row ──────────────────────────────────
@@ -1088,12 +1055,12 @@ private fun VoiceControlsSection(
         )
     }
 
-    // Info dialogs
+    // Info dialogs — scoped to the currently selected language.
     if (showLandInfoDialog) {
         VoicePhrasesInfoDialog(
             title = stringResource(R.string.gamesetup_voice_land_phrases_title),
             command = VoiceCommand.PlayLand,
-            enabledLanguages = gameSettings.voiceLanguages,
+            enabledLanguages = setOf(selectedLanguage),
             onDismiss = { showLandInfoDialog = false },
         )
     }
@@ -1101,9 +1068,187 @@ private fun VoiceControlsSection(
         VoicePhrasesInfoDialog(
             title = stringResource(R.string.gamesetup_voice_end_turn_phrases_title),
             command = VoiceCommand.EndTurn,
-            enabledLanguages = gameSettings.voiceLanguages,
+            enabledLanguages = setOf(selectedLanguage),
             onDismiss = { showEndTurnInfoDialog = false },
         )
+    }
+}
+
+/**
+ * Bottom sheet for managing the per-language offline voice models.
+ *
+ * Each language row exposes a state-appropriate control: download, an indeterminate-free
+ * progress bar while downloading, a selection radio + delete affordance when ready, or a
+ * retry button on error. Selecting a ready language makes it the active recognition language.
+ *
+ * @param voiceModelStates Per-language model state.
+ * @param selectedLanguage The currently active recognition language.
+ * @param onSelectLanguage Called when the user selects a ready language.
+ * @param onDownload Called to (re)download a language's model.
+ * @param onDelete Called to remove a downloaded language's model.
+ * @param onDismiss Closes the sheet.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VoiceLanguagesSheet(
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
+    selectedLanguage: VoiceLanguage,
+    onSelectLanguage: (VoiceLanguage) -> Unit,
+    onDownload: (VoiceLanguage) -> Unit,
+    onDelete: (VoiceLanguage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Header row with close button + title.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.offset(x = (-12).dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.voice_languages_sheet_title),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                )
+            }
+
+            VoiceLanguage.entries.forEachIndexed { index, language ->
+                if (index > 0) {
+                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                }
+                VoiceLanguageRow(
+                    language = language,
+                    state = voiceModelStates[language] ?: VoiceModelState.NotDownloaded,
+                    isSelected = language == selectedLanguage,
+                    onSelect = { onSelectLanguage(language) },
+                    onDownload = { onDownload(language) },
+                    onDelete = { onDelete(language) },
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.voice_manage_in_settings),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+/**
+ * A single language row inside [VoiceLanguagesSheet]: flag + name on the left, and a
+ * state-appropriate trailing control on the right.
+ */
+@Composable
+private fun VoiceLanguageRow(
+    language: VoiceLanguage,
+    state: VoiceModelState,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(text = language.displayFlag, style = ty.titleLarge)
+        Text(
+            text = language.displayName,
+            style = ty.titleMedium,
+            color = mc.textPrimary,
+            modifier = Modifier.weight(1f),
+        )
+
+        when (state) {
+            is VoiceModelState.NotDownloaded -> TextButton(onClick = onDownload) {
+                Text(
+                    text = stringResource(R.string.voice_model_download),
+                    style = ty.labelMedium,
+                    color = mc.primaryAccent,
+                )
+            }
+            is VoiceModelState.Downloading -> LinearProgressIndicator(
+                progress = { state.progress },
+                modifier = Modifier.width(80.dp),
+                color = mc.primaryAccent,
+                trackColor = mc.surfaceVariant,
+            )
+            is VoiceModelState.Ready -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                RadioButton(
+                    selected = isSelected,
+                    onClick = onSelect,
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = mc.primaryAccent,
+                        unselectedColor = mc.textDisabled,
+                    ),
+                )
+                // Disallow deleting the active language to avoid an inconsistent selection.
+                if (!isSelected) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = stringResource(R.string.voice_model_delete),
+                            tint = mc.textSecondary,
+                        )
+                    }
+                }
+            }
+            is VoiceModelState.Error -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.gamesetup_voice_download_failed),
+                    style = ty.labelSmall,
+                    color = mc.lifeNegative,
+                )
+                TextButton(onClick = onDownload) {
+                    Text(
+                        text = stringResource(R.string.voice_model_retry),
+                        style = ty.labelMedium,
+                        color = mc.primaryAccent,
+                    )
+                }
+            }
+        }
     }
 }
 

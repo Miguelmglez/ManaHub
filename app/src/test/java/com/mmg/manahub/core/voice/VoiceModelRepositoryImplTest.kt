@@ -3,6 +3,7 @@ package com.mmg.manahub.core.voice
 import android.content.Context
 import app.cash.turbine.test
 import com.mmg.manahub.core.voice.data.VoiceModelRepositoryImpl
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import io.mockk.every
 import io.mockk.mockk
@@ -29,7 +30,8 @@ import java.util.zip.ZipOutputStream
  * Unit tests for [VoiceModelRepositoryImpl].
  *
  * Uses [MockWebServer] for HTTP responses and [TemporaryFolder] for filesystem isolation.
- * The repository receives its base URL as a constructor parameter, making it fully testable.
+ * All tests operate on [VoiceLanguage.ENGLISH] — per-language behaviour is identical across
+ * all languages (same download + extraction code path, different URL segment and directory).
  *
  * GROUP 1 — Happy path: initial state and transition to Ready
  * GROUP 2 — HTTP error (404) → Error state, modelDir returns null
@@ -73,7 +75,7 @@ class VoiceModelRepositoryImplTest {
     }
 
     /**
-     * Builds a minimal valid Vosk model zip.
+     * Builds a minimal valid Vosk model zip for [VoiceLanguage.ENGLISH].
      * Vosk zips include a top-level directory; the impl strips it during extraction.
      */
     private fun buildValidModelZipBuffer(): Buffer {
@@ -103,32 +105,50 @@ class VoiceModelRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given no model on disk then initial state is NotDownloaded`() = runTest {
+    fun `given no model on disk then initial state for ENGLISH is NotDownloaded`() = runTest {
         val repo = buildRepository()
 
-        repo.observeState().test {
+        repo.modelStates.test {
             val initial = awaitItem()
             assertTrue(
-                "Fresh repository (no model on disk) must start in NotDownloaded",
-                initial is VoiceModelState.NotDownloaded,
+                "Fresh repository (no model on disk) must start ENGLISH in NotDownloaded",
+                initial[VoiceLanguage.ENGLISH] is VoiceModelState.NotDownloaded,
             )
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `given valid zip response when download called then state transitions to Ready`() = runTest {
+    fun `given no model on disk then all languages start as NotDownloaded`() = runTest {
+        val repo = buildRepository()
+
+        repo.modelStates.test {
+            val initial = awaitItem()
+            VoiceLanguage.entries.forEach { lang ->
+                assertTrue(
+                    "$lang must start in NotDownloaded when no model is on disk",
+                    initial[lang] is VoiceModelState.NotDownloaded,
+                )
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given valid zip response when download ENGLISH then state transitions to Ready`() = runTest {
         enqueueValidModelResponse()
         val repo = buildRepository()
 
-        repo.observeState().test {
-            awaitItem() // consume initial NotDownloaded
+        repo.modelStates.test {
+            awaitItem() // consume initial map
 
-            repo.download()
+            repo.download(VoiceLanguage.ENGLISH)
 
-            var last: VoiceModelState = awaitItem()
-            while (last !is VoiceModelState.Ready && last !is VoiceModelState.Error) {
-                last = awaitItem()
+            var last: VoiceModelState = VoiceModelState.NotDownloaded
+            while (true) {
+                val map = awaitItem()
+                last = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (last is VoiceModelState.Ready || last is VoiceModelState.Error) break
             }
 
             assertTrue("State must be Ready after successful download", last is VoiceModelState.Ready)
@@ -142,20 +162,46 @@ class VoiceModelRepositoryImplTest {
         val repo = buildRepository()
         val progressValues = mutableListOf<Float>()
 
-        repo.observeState().test {
-            awaitItem() // NotDownloaded
-            repo.download()
+        repo.modelStates.test {
+            awaitItem() // initial
+            repo.download(VoiceLanguage.ENGLISH)
 
-            var last: VoiceModelState = awaitItem()
-            while (last !is VoiceModelState.Ready && last !is VoiceModelState.Error) {
+            var last: VoiceModelState = VoiceModelState.NotDownloaded
+            while (true) {
+                val map = awaitItem()
+                last = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
                 if (last is VoiceModelState.Downloading) progressValues += last.progress
-                last = awaitItem()
+                if (last is VoiceModelState.Ready || last is VoiceModelState.Error) break
             }
             cancelAndIgnoreRemainingEvents()
         }
 
         progressValues.forEach { p ->
             assertTrue("Progress $p must be in [0f, 1f]", p in 0f..1f)
+        }
+    }
+
+    @Test
+    fun `given ENGLISH download does not affect SPANISH state`() = runTest {
+        enqueueValidModelResponse()
+        val repo = buildRepository()
+
+        repo.modelStates.test {
+            awaitItem()
+            repo.download(VoiceLanguage.ENGLISH)
+
+            var lastMap = emptyMap<VoiceLanguage, VoiceModelState>()
+            while (true) {
+                lastMap = awaitItem()
+                val en = lastMap[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (en is VoiceModelState.Ready || en is VoiceModelState.Error) break
+            }
+
+            assertTrue(
+                "SPANISH must remain NotDownloaded when only ENGLISH was downloaded",
+                lastMap[VoiceLanguage.SPANISH] is VoiceModelState.NotDownloaded,
+            )
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -168,13 +214,15 @@ class VoiceModelRepositoryImplTest {
         server.enqueue(MockResponse().setResponseCode(404))
         val repo = buildRepository()
 
-        repo.observeState().test {
-            awaitItem() // NotDownloaded
-            repo.download()
+        repo.modelStates.test {
+            awaitItem()
+            repo.download(VoiceLanguage.ENGLISH)
 
-            var last: VoiceModelState = awaitItem()
-            while (last !is VoiceModelState.Error && last !is VoiceModelState.Ready) {
-                last = awaitItem()
+            var last: VoiceModelState = VoiceModelState.NotDownloaded
+            while (true) {
+                val map = awaitItem()
+                last = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (last is VoiceModelState.Error || last is VoiceModelState.Ready) break
             }
             assertTrue("State must be Error after HTTP 404", last is VoiceModelState.Error)
             cancelAndIgnoreRemainingEvents()
@@ -186,11 +234,16 @@ class VoiceModelRepositoryImplTest {
         server.enqueue(MockResponse().setResponseCode(404))
         val repo = buildRepository()
 
-        repo.observeState().test {
+        repo.modelStates.test {
             awaitItem()
-            repo.download()
-            var last: VoiceModelState = awaitItem()
-            while (last !is VoiceModelState.Error && last !is VoiceModelState.Ready) { last = awaitItem() }
+            repo.download(VoiceLanguage.ENGLISH)
+
+            var last: VoiceModelState = VoiceModelState.NotDownloaded
+            while (true) {
+                val map = awaitItem()
+                last = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (last is VoiceModelState.Error || last is VoiceModelState.Ready) break
+            }
             assertTrue("final state must be Error", last is VoiceModelState.Error)
             assertTrue(
                 "Error message must contain '404'",
@@ -205,15 +258,18 @@ class VoiceModelRepositoryImplTest {
         server.enqueue(MockResponse().setResponseCode(500))
         val repo = buildRepository()
 
-        repo.observeState().test {
+        repo.modelStates.test {
             awaitItem()
-            repo.download()
-            var last: VoiceModelState = awaitItem()
-            while (last !is VoiceModelState.Error && last !is VoiceModelState.Ready) { last = awaitItem() }
+            repo.download(VoiceLanguage.ENGLISH)
+            while (true) {
+                val map = awaitItem()
+                val state = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (state is VoiceModelState.Error || state is VoiceModelState.Ready) break
+            }
             cancelAndIgnoreRemainingEvents()
         }
 
-        assertNull("modelDir must be null when download failed", repo.modelDir())
+        assertNull("modelDir must be null when download failed", repo.modelDir(VoiceLanguage.ENGLISH))
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -226,18 +282,21 @@ class VoiceModelRepositoryImplTest {
         val repo = buildRepository()
 
         // First download — reaches Ready
-        repo.observeState().test {
+        repo.modelStates.test {
             awaitItem()
-            repo.download()
-            var s: VoiceModelState = awaitItem()
-            while (s !is VoiceModelState.Ready && s !is VoiceModelState.Error) { s = awaitItem() }
+            repo.download(VoiceLanguage.ENGLISH)
+            while (true) {
+                val map = awaitItem()
+                val s = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (s is VoiceModelState.Ready || s is VoiceModelState.Error) break
+            }
             cancelAndIgnoreRemainingEvents()
         }
 
         val requestsAfterFirst = server.requestCount
 
         // Second call when already Ready — must be a no-op
-        repo.download()
+        repo.download(VoiceLanguage.ENGLISH)
 
         assertTrue(
             "download() when already Ready must not send a second HTTP request",
@@ -250,19 +309,22 @@ class VoiceModelRepositoryImplTest {
         enqueueValidModelResponse()
         val repo = buildRepository()
 
-        repo.observeState().test {
+        repo.modelStates.test {
             awaitItem()
-            repo.download()
-            var s: VoiceModelState = awaitItem()
-            while (s !is VoiceModelState.Ready && s !is VoiceModelState.Error) { s = awaitItem() }
+            repo.download(VoiceLanguage.ENGLISH)
+            while (true) {
+                val map = awaitItem()
+                val s = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (s is VoiceModelState.Ready || s is VoiceModelState.Error) break
+            }
             cancelAndIgnoreRemainingEvents()
         }
 
         // Call download again — must be a no-op; state stays Ready
-        repo.download()
+        repo.download(VoiceLanguage.ENGLISH)
 
-        repo.observeState().test {
-            val state = awaitItem()
+        repo.modelStates.test {
+            val state = awaitItem()[VoiceLanguage.ENGLISH]
             assertTrue("State must remain Ready after redundant download()", state is VoiceModelState.Ready)
             cancelAndIgnoreRemainingEvents()
         }
@@ -275,7 +337,7 @@ class VoiceModelRepositoryImplTest {
     @Test
     fun `given state is NotDownloaded then modelDir returns null`() = runTest {
         val repo = buildRepository()
-        assertNull("modelDir must be null before any download", repo.modelDir())
+        assertNull("modelDir must be null before any download", repo.modelDir(VoiceLanguage.ENGLISH))
     }
 
     @Test
@@ -283,17 +345,80 @@ class VoiceModelRepositoryImplTest {
         enqueueValidModelResponse()
         val repo = buildRepository()
 
-        repo.observeState().test {
+        repo.modelStates.test {
             awaitItem()
-            repo.download()
-            var s: VoiceModelState = awaitItem()
-            while (s !is VoiceModelState.Ready && s !is VoiceModelState.Error) { s = awaitItem() }
+            repo.download(VoiceLanguage.ENGLISH)
+            while (true) {
+                val map = awaitItem()
+                val s = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (s is VoiceModelState.Ready || s is VoiceModelState.Error) break
+            }
             cancelAndIgnoreRemainingEvents()
         }
 
-        val dir = repo.modelDir()
+        val dir = repo.modelDir(VoiceLanguage.ENGLISH)
         assertNotNull("modelDir must not be null when state is Ready", dir)
         assertTrue("modelDir must exist on disk", dir!!.exists())
         assertFalse("modelDir must not be empty after extraction", dir.listFiles().isNullOrEmpty())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 5 — delete()
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given state is Ready when delete called then state returns to NotDownloaded`() = runTest {
+        enqueueValidModelResponse()
+        val repo = buildRepository()
+
+        // Reach Ready first
+        repo.modelStates.test {
+            awaitItem()
+            repo.download(VoiceLanguage.ENGLISH)
+            while (true) {
+                val map = awaitItem()
+                val s = map[VoiceLanguage.ENGLISH] ?: VoiceModelState.NotDownloaded
+                if (s is VoiceModelState.Ready || s is VoiceModelState.Error) break
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        repo.delete(VoiceLanguage.ENGLISH)
+
+        repo.modelStates.test {
+            val state = awaitItem()[VoiceLanguage.ENGLISH]
+            assertTrue("State must be NotDownloaded after delete", state is VoiceModelState.NotDownloaded)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        assertNull("modelDir must be null after delete", repo.modelDir(VoiceLanguage.ENGLISH))
+    }
+
+    @Test
+    fun `given delete ENGLISH then SPANISH state is unaffected`() = runTest {
+        enqueueValidModelResponse()
+        val repo = buildRepository()
+
+        // Download English, then delete it
+        repo.modelStates.test {
+            awaitItem()
+            repo.download(VoiceLanguage.ENGLISH)
+            while (true) {
+                val map = awaitItem()
+                if (map[VoiceLanguage.ENGLISH] is VoiceModelState.Ready) break
+                if (map[VoiceLanguage.ENGLISH] is VoiceModelState.Error) break
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+        repo.delete(VoiceLanguage.ENGLISH)
+
+        repo.modelStates.test {
+            val map = awaitItem()
+            assertTrue(
+                "SPANISH must remain NotDownloaded when only ENGLISH was deleted",
+                map[VoiceLanguage.SPANISH] is VoiceModelState.NotDownloaded,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

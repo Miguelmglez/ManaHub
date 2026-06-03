@@ -30,6 +30,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.ui.tooling.preview.Preview
+import com.mmg.manahub.core.ui.theme.MagicTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -767,14 +770,26 @@ private fun PlayerCard(
         // Land played animation — triggers on false→true transition of [landPlayed].
         var showLandAnimation by remember(player.id) { mutableStateOf(false) }
         val landIconScale = remember(player.id) { Animatable(1f) }
+        val landRingScale = remember(player.id) { Animatable(0f) }
+        val landRingAlpha = remember(player.id) { Animatable(0f) }
 
         LaunchedEffect(landPlayed) {
             if (landPlayed) {
                 showLandAnimation = true
-                landIconScale.snapTo(0.3f)
-                landIconScale.animateTo(1.5f, spring(dampingRatio = 0.35f, stiffness = 600f))
-                landIconScale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 400f))
-                delay(900)
+                launch {
+                    landIconScale.snapTo(0.8f)
+                    landIconScale.animateTo(1.3f, spring(dampingRatio = 0.4f, stiffness = 500f))
+                    landIconScale.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 300f))
+                }
+                launch {
+                    landRingScale.snapTo(1f)
+                    landRingAlpha.snapTo(0.7f)
+                    landRingScale.animateTo(2.5f, tween(400, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    landRingAlpha.animateTo(0f, tween(400))
+                }
+                delay(500)
                 showLandAnimation = false
             }
         }
@@ -868,23 +883,44 @@ private fun PlayerCard(
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             if (gameSettings.landReminderEnabled && isActive && tier != CardTier.TINY) {
-                                val alpha by animateFloatAsState(
+                                val landIconAlpha by animateFloatAsState(
                                     targetValue = if (landPlayed) 0.25f else 1.0f,
                                     animationSpec = tween(200),
                                     label = "landAlpha",
                                 )
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_land),
-                                    contentDescription = stringResource(R.string.gamesetup_land_reminder_title),
-                                    tint = theme.accent.copy(alpha = alpha),
-                                    modifier = Modifier
-                                        .size(iconSize)
-                                        .clickable(
-                                            interactionSource = remember(player.id) { MutableInteractionSource() },
-                                            indication = null,
-                                            onClick = onLandToggle,
-                                        ),
-                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.wrapContentSize()
+                                ) {
+                                    if (showLandAnimation) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(iconSize)
+                                                .graphicsLayer {
+                                                    scaleX = landRingScale.value
+                                                    scaleY = landRingScale.value
+                                                    this.alpha = landRingAlpha.value
+                                                }
+                                                .border(1.5.dp, theme.accent, CircleShape)
+                                        )
+                                    }
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_land),
+                                        contentDescription = stringResource(R.string.gamesetup_land_reminder_title),
+                                        tint = theme.accent.copy(alpha = landIconAlpha),
+                                        modifier = Modifier
+                                            .size(iconSize)
+                                            .graphicsLayer {
+                                                scaleX = landIconScale.value
+                                                scaleY = landIconScale.value
+                                            }
+                                            .clickable(
+                                                interactionSource = remember(player.id) { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = onLandToggle,
+                                            ),
+                                    )
+                                }
                             }
                         }
 
@@ -1107,50 +1143,7 @@ private fun PlayerCard(
             }
 
             // ── Land played animation overlay ─────────────────────────────────
-            AnimatedVisibility(
-                visible = showLandAnimation,
-                enter = fadeIn(tween(100)),
-                exit = fadeOut(tween(600, delayMillis = 100)),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    theme.glow.copy(alpha = 0.60f),
-                                    Color.Transparent,
-                                )
-                            )
-                        ),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_land),
-                            contentDescription = null,
-                            tint = theme.accent,
-                            modifier = Modifier
-                                .size(if (tier == CardTier.LARGE) 52.dp else 36.dp)
-                                .graphicsLayer {
-                                    scaleX = landIconScale.value
-                                    scaleY = landIconScale.value
-                                },
-                        )
-                        if (tier != CardTier.TINY) {
-                            Text(
-                                text = stringResource(R.string.game_land_played_label),
-                                color = theme.accent,
-                                style = MaterialTheme.magicTypography.titleMedium,
-                            )
-                        }
-                    }
-                }
-            }
+            // REMOVED invasive overlay
 
             // ── Pending defeat overlay ────────────────────────────────────────
             AnimatedVisibility(
@@ -1287,44 +1280,44 @@ private fun EndTurnButton(
     theme: PlayerThemeColors,
     onClick: () -> Unit,
 ) {
-    if (tier != CardTier.TINY) {
+    val mc = MaterialTheme.magicColors
+    val infiniteTransition = rememberInfiniteTransition(label = "endTurnPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = theme.accent.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, theme.accent.copy(alpha = 0.5f)),
+        modifier = Modifier
+            .graphicsLayer {
+                scaleX = pulseScale
+                scaleY = pulseScale
+            }
+    ) {
         Box(
-            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .height(36.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(theme.accent.copy(alpha = 0.15f))
-                .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.game_end_turn),
-                style = MaterialTheme.magicTypography.labelLarge,
-                color = theme.accent,
-            )
-        }
-    } else {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(16.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(theme.accent.copy(alpha = 0.15f))
-                .border(1.dp, theme.accent.copy(alpha = 0.65f), RoundedCornerShape(5.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
+                .padding(
+                    horizontal = if (tier == CardTier.TINY) 10.dp else 16.dp,
+                    vertical = if (tier == CardTier.TINY) 6.dp else 8.dp
                 ),
+            contentAlignment = Alignment.Center
         ) {
             Text(
-                text = stringResource(R.string.game_end_turn),
-                style = MaterialTheme.magicTypography.labelMedium,
+                text = if (tier == CardTier.TINY) "END" else stringResource(R.string.game_end_turn),
+                style = when(tier) {
+                    CardTier.LARGE -> MaterialTheme.magicTypography.labelLarge
+                    CardTier.SMALL -> MaterialTheme.magicTypography.labelMedium
+                    CardTier.TINY -> MaterialTheme.magicTypography.labelSmall.copy(fontSize = 9.sp)
+                },
                 color = theme.accent,
             )
         }
