@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import com.mmg.manahub.core.data.local.converter.RoomConverters
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
+import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
@@ -17,6 +18,7 @@ import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
+import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.ManaSymbolEntity
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
@@ -76,8 +78,9 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         PlaytestSessionEntity::class,
         PlaytestCardStatEntity::class,
         PlaytestSurveyAnswerEntity::class,
+        DraftSessionEntity::class,
     ],
-    version = 36,
+    version = 37,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -99,4 +102,5 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun localOpenForTradeDao(): LocalOpenForTradeDao
     abstract fun tradeCollectionSyncDao(): TradeCollectionSyncDao
     abstract fun playtestDao(): PlaytestDao
+    abstract fun draftSessionDao(): DraftSessionDao
 }
