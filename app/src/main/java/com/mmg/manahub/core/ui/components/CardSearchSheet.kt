@@ -555,12 +555,10 @@ private fun AddCardSheetRow(
                         val isFoil = row.wishlistEntry?.isFoil == true || row.offerEntry?.isFoil == true
                         val condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
                         val language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
-                        val isAltArt = row.wishlistEntry?.isAltArt == true || row.offerEntry?.isAltArt == true
 
                         LanguageBadge(langCode = language)
                         CopyBadge(label = condition)
                         if (isFoil) FoilBadge()
-                        if (isAltArt) AltArtBadge()
                     }
                 }
             }

@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -89,8 +90,12 @@ fun SetPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { it != SheetValue.Hidden }
+        ),
         contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
@@ -98,6 +103,20 @@ fun SetPickerSheet(
                 .fillMaxHeight(0.92f)
                 .navigationBarsPadding(),
         ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
+
             // ── Header ──
             Row(
                 modifier = Modifier

@@ -23,10 +23,10 @@ import androidx.room.PrimaryKey
         Index("updated_at"),
         Index("is_deleted"),
         // Composite unique key mirrors the Supabase unique constraint so that the same
-        // physical card variant (foil, condition, language, art variant) cannot be
-        // inserted twice for the same user.
+        // physical card variant (foil, condition, language) cannot be inserted twice
+        // for the same user.
         Index(
-            value = ["user_id", "scryfall_id", "is_foil", "condition", "language", "is_alternative_art"],
+            value = ["user_id", "scryfall_id", "is_foil", "condition", "language"],
             unique = true
         ),
     ]
@@ -40,7 +40,6 @@ data class UserCardCollectionEntity(
     @ColumnInfo(name = "is_foil") val isFoil: Boolean = false,
     @ColumnInfo(name = "condition") val condition: String = "NM",          // M | NM | EX | GD | LP | PL | PO
     @ColumnInfo(name = "language") val language: String = "en",            // ISO: en | ja | de | …
-    @ColumnInfo(name = "is_alternative_art") val isAlternativeArt: Boolean = false,
     @ColumnInfo(name = "is_for_trade") val isForTrade: Boolean = false,
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,       // soft-delete flag
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),

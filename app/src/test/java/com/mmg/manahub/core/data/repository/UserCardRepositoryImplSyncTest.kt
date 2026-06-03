@@ -55,7 +55,6 @@ class UserCardRepositoryImplSyncTest {
         isFoil:           Boolean = false,
         condition:        String  = "NM",
         language:         String  = "en",
-        isAlternativeArt: Boolean = false,
         isForTrade:       Boolean = false,
         isDeleted:        Boolean = false,
         updatedAt:        Long    = 1_000L,
@@ -68,7 +67,6 @@ class UserCardRepositoryImplSyncTest {
         isFoil           = isFoil,
         condition        = condition,
         language         = language,
-        isAlternativeArt = isAlternativeArt,
         isForTrade       = isForTrade,
         isDeleted        = isDeleted,
         updatedAt        = updatedAt,
@@ -101,7 +99,6 @@ class UserCardRepositoryImplSyncTest {
             isFoil           = false,
             condition        = "NM",
             language         = "en",
-            isAlternativeArt = false,
             isForTrade       = false,
             userId           = "user-001",
         )
@@ -119,7 +116,6 @@ class UserCardRepositoryImplSyncTest {
             isFoil           = true,
             condition        = "LP",
             language         = "ja",
-            isAlternativeArt = true,
             isForTrade       = true,
             userId           = "user-001",
         )
@@ -129,7 +125,6 @@ class UserCardRepositoryImplSyncTest {
         assertTrue(entity.isFoil)
         assertEquals("LP", entity.condition)
         assertEquals("ja", entity.language)
-        assertTrue(entity.isAlternativeArt)
         assertTrue(entity.isForTrade)
         assertEquals("user-001", entity.userId)
     }
@@ -139,7 +134,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, "user-001")
 
         assertFalse(captured.captured.isDeleted)
     }
@@ -149,7 +144,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, "user-001")
 
         assertTrue(captured.captured.id.isNotBlank())
         assertEquals(36, captured.captured.id.length)   // UUID length
@@ -160,7 +155,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, null)
+        repository.addOrIncrement("card-001", false, "NM", "en", false, null)
 
         assertEquals(null, captured.captured.userId)
     }
@@ -170,7 +165,7 @@ class UserCardRepositoryImplSyncTest {
         val captured = slot<UserCardCollectionEntity>()
         every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
 
-        repository.addOrIncrement("card-001", false, "NM", "en", false, false, "user-001")
+        repository.addOrIncrement("card-001", false, "NM", "en", false, "user-001")
 
         assertEquals(1, captured.captured.quantity)
     }

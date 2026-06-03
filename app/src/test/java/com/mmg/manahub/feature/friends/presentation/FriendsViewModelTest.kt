@@ -12,7 +12,6 @@ import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
-import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -67,7 +66,6 @@ class FriendsViewModelTest {
     private val authRepo           = mockk<AuthRepository>()
     private val searchUseCase      = mockk<SearchUserByGameTagUseCase>()
     private val sendRequestUseCase = mockk<SendFriendRequestUseCase>()
-    private val shareInviteUseCase = mockk<ShareInviteUseCase>(relaxed = true)
     private val analyticsHelper    = mockk<AnalyticsHelper>(relaxed = true)
 
     // Controls sessionState emissions
@@ -115,17 +113,11 @@ class FriendsViewModelTest {
         coEvery { friendRepo.refreshRequests(any()) }         returns Result.success(Unit)
         coEvery { friendRepo.refreshOutgoingRequests(any()) } returns Result.success(Unit)
 
-        // shareInviteUseCase returns Result<String>. The relaxed mock returns a generic
-        // Result<Object> which causes a ClassCastException when onSuccess { url -> } is called.
-        // Stub explicitly to return a typed Result<String>.
-        coEvery { shareInviteUseCase(any()) } returns Result.success("https://example.com/invite/TESTCODE")
-
         viewModel = FriendsViewModel(
             friendRepo         = friendRepo,
             authRepo           = authRepo,
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
-            shareInviteUseCase = shareInviteUseCase,
             analyticsHelper    = analyticsHelper,
         )
     }
@@ -347,7 +339,6 @@ class FriendsViewModelTest {
             authRepo           = authRepo,
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
-            shareInviteUseCase = shareInviteUseCase,
             analyticsHelper    = analyticsHelper,
         )
         advanceUntilIdle()
@@ -544,7 +535,6 @@ class FriendsViewModelTest {
             authRepo           = authRepo,
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
-            shareInviteUseCase = shareInviteUseCase,
             analyticsHelper    = analyticsHelper,
         )
         advanceUntilIdle()
@@ -608,7 +598,6 @@ class FriendsViewModelTest {
             authRepo           = authRepo,
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
-            shareInviteUseCase = shareInviteUseCase,
             analyticsHelper    = analyticsHelper,
         )
         advanceUntilIdle()

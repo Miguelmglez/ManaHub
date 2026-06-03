@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +42,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -294,7 +297,6 @@ fun CreateTradeProposalScreen(
                                         isFoil       = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
                                         condition    = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
                                         language     = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                                        isAltArt     = row.wishlistEntry?.isAltArt ?: row.offerEntry?.isAltArt ?: false,
                                         userCardIdRef = row.offerEntry?.userCardId,
                                         isInCollection = row.isOwned || row.offerEntry != null,
                                     )
@@ -415,7 +417,6 @@ fun CreateTradeProposalScreen(
                                         isFoil       = row.offerEntry?.isFoil ?: false,
                                         condition    = row.offerEntry?.condition ?: "NM",
                                         language     = row.offerEntry?.language ?: "en",
-                                        isAltArt     = row.offerEntry?.isAltArt ?: false,
                                         userCardIdRef = row.offerEntry?.userCardId,
                                         isInCollection = row.offerEntry != null,
                                     )
@@ -534,7 +535,6 @@ fun CreateTradeProposalScreen(
                     isFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false,
                     condition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM",
                     language = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en",
-                    isAltArt = row.wishlistEntry?.isAltArt ?: row.offerEntry?.isAltArt ?: false,
                     userCardIdRef = row.offerEntry?.userCardId,
                     isInCollection = row.isOwned || row.offerEntry != null || row.wishlistEntry != null,
                 )
@@ -552,7 +552,6 @@ fun CreateTradeProposalScreen(
                 val resolvedIsFoil = row.wishlistEntry?.isFoil ?: row.offerEntry?.isFoil ?: false
                 val resolvedCondition = row.wishlistEntry?.condition ?: row.offerEntry?.condition ?: "NM"
                 val resolvedLanguage = row.wishlistEntry?.language ?: row.offerEntry?.language ?: "en"
-                val resolvedIsAltArt = row.wishlistEntry?.isAltArt ?: row.offerEntry?.isAltArt ?: false
                 val resolvedUserCardIdRef = row.offerEntry?.userCardId
 
                 val predicate: (TradeItemDraft) -> Boolean = { item ->
@@ -560,8 +559,7 @@ fun CreateTradeProposalScreen(
                         item.isFoil == resolvedIsFoil &&
                         item.condition == resolvedCondition &&
                         item.language == resolvedLanguage &&
-                        item.isAltArt == resolvedIsAltArt &&
-                        item.userCardIdRef == resolvedUserCardIdRef
+                            item.userCardIdRef == resolvedUserCardIdRef
                 }
 
                 when (side) {
@@ -596,13 +594,12 @@ fun CreateTradeProposalScreen(
         editingItem?.let { item ->
             AddCardSheet(
                 cardName = item.cardName,
-                onConfirm = { isFoil, isAltArt, condition, language, qty ->
+                onConfirm = { isFoil, condition, language, qty ->
                     val updated = item.copy(
                         quantity = qty,
                         isFoil = isFoil,
                         condition = condition,
                         language = language,
-                        isAltArt = isAltArt
                     )
                     if (uiState.proposerItems.any { it.id == item.id }) {
                         viewModel.updateProposerItem(updated)
@@ -716,73 +713,93 @@ private fun FriendSelector(
     }
 
     if (showSheet && !isLocked) {
+        val sheetState = rememberModalBottomSheetState(
+            confirmValueChange = { it != SheetValue.Hidden }
+        )
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
             containerColor = mc.backgroundSecondary,
             contentColor = mc.textPrimary,
-            dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled.copy(alpha = 0.4f)) }
+            dragHandle = null,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .navigationBarsPadding(),
             ) {
-                Text(
-                    text = stringResource(R.string.trades_friend_selector_sheet_title),
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    color = mc.textPrimary
-                )
+                // Header Row
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { showSheet = false },
+                        modifier = Modifier.offset(x = (-12).dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_cancel),
+                            tint = mc.textSecondary
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.trades_friend_selector_sheet_title),
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = mc.textPrimary
+                    )
 
-                when {
-                    sessionState is SessionState.Unauthenticated -> {
-                        EmptyState(
-                            title = "Log in to trade with your friends and sync your collection across devices.",
-                            actionLabel = "Log In",
-                            onAction = {
-                                showSheet = false
-                                onNavigateToLogin()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    friends.isEmpty() -> {
-                        EmptyState(
-                            title = "You don't have any friends yet. Add friends to start trading!",
-                            actionLabel = "Add Friends",
-                            onAction = {
-                                showSheet = false
-                                onNavigateToAddFriends()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    else -> {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
-                        ) {
-                            item {
-                                Surface(
-                                    onClick = {
-                                        onFriendSelected(null)
-                                        showSheet = false
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        stringResource(R.string.trades_friend_none_option),
-                                        modifier = Modifier.padding(16.dp),
-                                        style = MaterialTheme.magicTypography.bodyMedium,
-                                        color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
-                                    )
-                                }
+                    when {
+                        sessionState is SessionState.Unauthenticated -> {
+                            EmptyState(
+                                title = "Log in to trade with your friends and sync your collection across devices.",
+                                actionLabel = "Log In",
+                                onAction = {
+                                    showSheet = false
+                                    onNavigateToLogin()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        friends.isEmpty() -> {
+                            EmptyState(
+                                title = "You don't have any friends yet. Add friends to start trading!",
+                                actionLabel = "Add Friends",
+                                onAction = {
+                                    showSheet = false
+                                    onNavigateToAddFriends()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        else -> {
+                            // "None" option
+                            Surface(
+                                onClick = {
+                                    onFriendSelected(null)
+                                    showSheet = false
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    stringResource(R.string.trades_friend_none_option),
+                                    modifier = Modifier.padding(16.dp),
+                                    style = MaterialTheme.magicTypography.bodyMedium,
+                                    color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
+                                )
                             }
-                            items(friends) { friend ->
+
+                            friends.forEach { friend ->
                                 Surface(
                                     onClick = {
                                         onFriendSelected(friend)
@@ -821,7 +838,6 @@ private fun FriendSelector(
                         }
                     }
                 }
-                Spacer(Modifier.height(24.dp))
             }
         }
     }
@@ -920,7 +936,6 @@ private fun TradeItemDraftRow(
                 hasFoil       = item.isFoil,
                 condition     = item.condition.takeIf { it.isNotBlank() },
                 language      = item.language.takeIf { it.isNotBlank() },
-                isAltArt      = item.isAltArt,
                 typeLine      = item.typeLine,
                 setCode       = item.setCode,
                 setName       = item.setName,
@@ -1150,7 +1165,6 @@ private fun SuggestionCardItem(
                     hasFoil = row.offerEntry?.isFoil ?: false,
                     condition = row.offerEntry?.condition?.takeIf { it.isNotBlank() },
                     language = row.offerEntry?.language?.takeIf { it.isNotBlank() },
-                    isAltArt = row.offerEntry?.isAltArt ?: false,
                     setCode = row.card.setCode,
                     setName = row.card.setName,
                     rarity = row.card.rarity,

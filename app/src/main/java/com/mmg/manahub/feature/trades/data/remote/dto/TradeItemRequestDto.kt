@@ -12,7 +12,6 @@ data class TradeItemRequestDto(
     @SerialName("is_foil") val isFoil: Boolean? = null,
     val condition: String? = null,
     val language: String? = null,
-    @SerialName("is_alt_art") val isAltArt: Boolean? = null,
     @SerialName("card_id") val cardId: String,
     @SerialName("is_review_collection_placeholder") val isReviewCollectionPlaceholder: Boolean = false,
 )

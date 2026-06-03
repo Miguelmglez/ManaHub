@@ -1,9 +1,11 @@
 package com.mmg.manahub.feature.game.presentation
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -15,6 +17,7 @@ import com.mmg.manahub.feature.game.domain.model.EliminationReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GamePhase
 import com.mmg.manahub.feature.game.domain.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.GridSlotPosition
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.PhaseStop
@@ -32,17 +35,26 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.NextTurnUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.RevokeDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.ToggleLandPlayedUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
+import com.mmg.manahub.core.voice.domain.VoiceCommand
+import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapNotNull
@@ -108,6 +120,9 @@ class GameViewModel @Inject constructor(
     private val revokeDefeatUseCase:          RevokeDefeatUseCase,
     private val leaveSessionUseCase:          LeaveSessionUseCase,
     private val nearbyRepo:                   NearbySessionRepository,
+    private val toggleLandPlayedUseCase:      ToggleLandPlayedUseCase,
+    private val voiceCommandRecognizer:       VoiceCommandRecognizer,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -117,11 +132,16 @@ class GameViewModel @Inject constructor(
     private val initPlayerCount: Int =
         savedStateHandle.get<Int>("playerCount")?.coerceIn(2, 6) ?: 2
 
-    private val _uiState = MutableStateFlow(buildInitialState(initMode, initPlayerCount))
+    private val _uiState = MutableStateFlow(buildInitialState(initMode, initPlayerCount, appContext))
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
     private val _toolsState = MutableStateFlow(GlobalToolsState())
     val toolsState: StateFlow<GlobalToolsState> = _toolsState.asStateFlow()
+
+    val isVoiceListening: StateFlow<Boolean> = voiceCommandRecognizer.isListening
+
+    private val _voiceCommandEvents = MutableSharedFlow<VoiceCommand>(extraBufferCapacity = 1)
+    val voiceCommandEvents: Flow<VoiceCommand> = _voiceCommandEvents.asSharedFlow()
 
     private val deltaJobs = mutableMapOf<Int, Job>()
 
@@ -133,9 +153,20 @@ class GameViewModel @Inject constructor(
     private var nearbyObserveJob: Job? = null
     private val persistLifeJobs  = mutableMapOf<Int, Job>()
     private var persistPhaseJob: Job? = null
+    private var syncPollingJob: Job? = null
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
+        // Collect voice commands and route them to game actions
+        viewModelScope.launch {
+            voiceCommandRecognizer.commands.collect { command ->
+                when (command) {
+                    is VoiceCommand.PlayLand -> onVoicePlayLand()
+                    is VoiceCommand.EndTurn -> onVoiceEndTurn()
+                }
+            }
+        }
+
         // Persist each unique game result to Room as soon as it appears
         viewModelScope.launch {
             uiState
@@ -300,7 +331,7 @@ class GameViewModel @Inject constructor(
             if (nextIndex == 0) {
                 // Phase wrapped — player's turn ends, advance to next player
                 val nextId      = nextActivePlayer(s)
-                val isNewRound  = nextId == s.players.filter { !it.defeated }.firstOrNull()?.id
+                val isNewRound  = nextId == s.players.firstOrNull { !it.defeated }?.id
                 s.copy(
                     currentPhase   = nextPhase,
                     turnNumber     = if (isNewRound) s.turnNumber + 1 else s.turnNumber,
@@ -351,6 +382,41 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** Marks the active player's land as played via a voice command. Idempotent: no-op if already played. */
+    private fun onVoicePlayLand() {
+        val state = _uiState.value
+        if (!state.gameSettings.voiceLandReminderEnabled) return
+        val activeId = state.activePlayerId
+        if (activeId in state.hasPlayedLand) return
+        toggleLandPlayed(activeId)
+        viewModelScope.launch { _voiceCommandEvents.emit(VoiceCommand.PlayLand) }
+    }
+
+    /** Advances to the next turn via a voice command. No-op unless the voice end-turn setting is enabled. */
+    private fun onVoiceEndTurn() {
+        val state = _uiState.value
+        if (!state.gameSettings.voiceEndTurnEnabled) return
+        nextTurn()
+        viewModelScope.launch { _voiceCommandEvents.emit(VoiceCommand.EndTurn) }
+    }
+
+    fun startVoiceListening() {
+        val settings = _uiState.value.gameSettings
+        val isAnyEnabled = settings.voiceLandReminderEnabled || settings.voiceEndTurnEnabled
+        if (!isAnyEnabled) return
+        val enabledCommands = buildSet<VoiceCommand> {
+            if (settings.voiceLandReminderEnabled) add(VoiceCommand.PlayLand)
+            if (settings.voiceEndTurnEnabled) add(VoiceCommand.EndTurn)
+        }
+        viewModelScope.launch {
+            voiceCommandRecognizer.start(enabledCommands, settings.voiceLanguage)
+        }
+    }
+
+    fun stopVoiceListening() {
+        voiceCommandRecognizer.stop()
+    }
+
     /** Toggles whether the given player has played a land this turn. */
     fun toggleLandPlayed(playerId: Int) {
         _uiState.update { s ->
@@ -360,6 +426,13 @@ class GameViewModel @Inject constructor(
                 else
                     s.hasPlayedLand + playerId
             )
+        }
+        val played = playerId in _uiState.value.hasPlayedLand
+        val sessionId = onlineSessionId
+        if (isNearbySession && playerId == mySlotIndex) {
+            nearbyRepo.sendMessage(NearbyGameMessage.LandToggled(playerId, played))
+        } else if (sessionId != null && playerId == mySlotIndex) {
+            viewModelScope.launch { toggleLandPlayedUseCase.broadcast(sessionId, playerId, played) }
         }
     }
 
@@ -423,7 +496,10 @@ class GameViewModel @Inject constructor(
         if (isNearbySession && playerId == mySlotIndex) {
             nearbyRepo.sendMessage(NearbyGameMessage.DefeatConfirmed(playerId))
         } else if (sessionId != null && playerId == mySlotIndex) {
-            viewModelScope.launch { runCatching { confirmDefeatUseCase(sessionId, playerId) } }
+            viewModelScope.launch {
+                confirmDefeatUseCase.broadcast(sessionId, playerId)
+                runCatching { confirmDefeatUseCase(sessionId, playerId) }
+            }
         }
     }
 
@@ -601,6 +677,23 @@ class GameViewModel @Inject constructor(
 
     // ── Online session ────────────────────────────────────────────────────────
 
+    /**
+     * Builds a [GameUiState.gridAssignment] map that ensures the local player always appears in the
+     * FULL_WIDTH_BOTTOM slot. In a 2-player layout slot 0 is TOP (rotated 180°) and slot 1
+     * is BOTTOM (normal). Without this swap the host (slot 0) would be shown upside-down
+     * at the top while holding the device.
+     *
+     * Returns an empty map (identity) when no swap is needed or the layout has no BOTTOM slot.
+     */
+    private fun buildOnlineGridAssignment(layout: LayoutTemplate, mySlotIndex: Int): Map<Int, Int> {
+        if (mySlotIndex == -1) return emptyMap()
+        val bottomSlotPlayerId = layout.slots
+            .firstOrNull { it.position == GridSlotPosition.FULL_WIDTH_BOTTOM }
+            ?.playerId ?: return emptyMap()
+        if (mySlotIndex == bottomSlotPlayerId) return emptyMap()
+        return mapOf(bottomSlotPlayerId to mySlotIndex, mySlotIndex to bottomSlotPlayerId)
+    }
+
     fun initFromOnlineSession(
         sessionId:   String,
         mySlotIndex: Int,
@@ -621,7 +714,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
-                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = cfg.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = cfg.theme,
                 isAppUser = i == mySlotIndex,
@@ -633,6 +726,7 @@ class GameViewModel @Inject constructor(
             mode            = mode,
             activePlayerId  = players.first().id,
             activeLayout    = actualLayout,
+            gridAssignment  = buildOnlineGridAssignment(actualLayout, mySlotIndex),
             gameStartTime   = System.currentTimeMillis(),
             isGameRunning   = true,
             isOnlineSession = true,
@@ -646,10 +740,26 @@ class GameViewModel @Inject constructor(
             setCustomKey("online_session_id", sessionId)
         }
         connectAndObserveOnlineSession(sessionId)
+        startInGameSyncPolling(sessionId)
     }
 
     private fun connectAndObserveOnlineSession(sessionId: String) {
         onlineObserveJob = viewModelScope.launch {
+            // 1. Tear down stale lobby channel first.
+            runCatching { observeSessionUseCase.disconnect(sessionId) }
+            // 2. Create fresh game-owned subscription before the HTTP snapshot so any
+            // broadcasts during the HTTP call land in the replay buffer.
+            runCatching { observeSessionUseCase.connect(sessionId) }
+                .onFailure { throwable ->
+                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("online_game_realtime_connect_failed: ${throwable::class.simpleName}")
+                        recordException(throwable)
+                    }
+                    // Do NOT abandon — polling fallback (startInGameSyncPolling) handles sync.
+                    return@launch
+                }
+            // 3. Load initial state AFTER subscribing so broadcasts during the HTTP call are buffered.
             observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
                 val participantsBySlot = snapshot.participants.associateBy { it.slotIndex }
                 val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
@@ -676,17 +786,19 @@ class GameViewModel @Inject constructor(
                     )
                 }
             }
-            runCatching { observeSessionUseCase.connect(sessionId) }
-                .onFailure { throwable ->
-                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("online_game_realtime_connect_failed: ${throwable::class.simpleName}")
-                        recordException(throwable)
-                    }
-                    _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
-                    return@launch
+            // 4. Collect events; wrap in runCatching so a WebSocket drop is logged and
+            // does not silently cancel the job without any record.
+            runCatching {
+                observeSessionUseCase(sessionId).collect { event -> handleOnlineEvent(event) }
+            }.onFailure { throwable ->
+                if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+                FirebaseCrashlytics.getInstance().apply {
+                    log("online_game_realtime_stream_dropped: ${throwable::class.simpleName}")
+                    setCustomKey("online_session_id", sessionId)
+                    recordException(throwable)
                 }
-            observeSessionUseCase(sessionId).collect { event -> handleOnlineEvent(event) }
+                // Polling via startInGameSyncPolling continues as fallback.
+            }
         }
     }
 
@@ -705,10 +817,12 @@ class GameViewModel @Inject constructor(
             is SessionEvent.PhaseChangedReceived -> {
                 _uiState.update { s ->
                     val phase = runCatching { GamePhase.valueOf(event.newPhase) }.getOrDefault(s.currentPhase)
+                    val newTurn = event.activePlayerSlot != s.activePlayerId || event.turnNumber != s.turnNumber
                     s.copy(
                         currentPhase   = phase,
                         activePlayerId = event.activePlayerSlot,
                         turnNumber     = event.turnNumber,
+                        hasPlayedLand  = if (newTurn) emptySet() else s.hasPlayedLand,
                     )
                 }
             }
@@ -738,6 +852,26 @@ class GameViewModel @Inject constructor(
                     checkPendingDefeat()
                 }
             }
+            is SessionEvent.DefeatConfirmedReceived -> {
+                if (event.slotIndex != mySlotIndex) {
+                    _uiState.update { s ->
+                        s.copy(players = s.players.map { p ->
+                            if (p.id == event.slotIndex) p.copy(defeated = true, pendingDefeat = false, isSurviving = false)
+                            else p
+                        })
+                    }
+                    checkWinner()
+                }
+            }
+            is SessionEvent.LandToggledReceived -> {
+                if (event.slotIndex != mySlotIndex) {
+                    _uiState.update { s ->
+                        val newSet = if (event.played) s.hasPlayedLand + event.slotIndex
+                                     else s.hasPlayedLand - event.slotIndex
+                        s.copy(hasPlayedLand = newSet)
+                    }
+                }
+            }
             is SessionEvent.StateUpdated -> {
                 _uiState.update { s ->
                     s.copy(
@@ -762,12 +896,19 @@ class GameViewModel @Inject constructor(
                         })
                     }
                     checkPendingDefeat()
+                    checkWinner()
                 }
             }
             is SessionEvent.SessionStatusChanged -> {
-                if (event.status == OnlineSessionStatus.ABANDONED ||
-                    event.status == OnlineSessionStatus.FINISHED) {
-                    _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                when (event.status) {
+                    OnlineSessionStatus.ABANDONED ->
+                        _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                    OnlineSessionStatus.FINISHED ->
+                        // Normal game end: don't abandon. Player states with defeated=true
+                        // arrive via DefeatConfirmedReceived broadcast or PlayerStateUpdated CDC,
+                        // which call checkWinner() and trigger the result screen naturally.
+                        Unit
+                    else -> Unit
                 }
             }
             is SessionEvent.ParticipantUpdated -> { /* presence handled in lobby */ }
@@ -804,7 +945,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
-                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = cfg.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = cfg.theme,
                 isAppUser = i == slotIndex,
@@ -816,6 +957,7 @@ class GameViewModel @Inject constructor(
             mode            = mode,
             activePlayerId  = players.first().id,
             activeLayout    = actualLayout,
+            gridAssignment  = buildOnlineGridAssignment(actualLayout, slotIndex),
             gameStartTime   = System.currentTimeMillis(),
             isGameRunning   = true,
             isOnlineSession = true, // Reuse online flag for UI elements that assume networked game
@@ -948,6 +1090,15 @@ class GameViewModel @Inject constructor(
                     }
                 }
             }
+            is NearbyGameMessage.LandToggled -> {
+                if (message.slot != mySlotIndex) {
+                    _uiState.update { s ->
+                        val newSet = if (message.played) s.hasPlayedLand + message.slot
+                                     else s.hasPlayedLand - message.slot
+                        s.copy(hasPlayedLand = newSet)
+                    }
+                }
+            }
             is NearbyGameMessage.GameFinished -> {
                 // Resolved locally via checkWinner, but just in case:
             }
@@ -988,6 +1139,59 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Polling fallback for in-game state sync. Reads a fresh snapshot from the DB every 3 s
+     * and applies remote players' state to [_uiState]. The local player's optimistic state is
+     * never overwritten. This guarantees eventual consistency even when Supabase Realtime
+     * broadcasts fail to arrive (e.g. stale channel, network hiccup).
+     */
+    private fun startInGameSyncPolling(sessionId: String) {
+        syncPollingJob?.cancel()
+        syncPollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(3_000L)
+                val state = _uiState.value
+                if (state.winner != null || !state.isGameRunning) break
+                observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                    if (snapshot.session.status == OnlineSessionStatus.ABANDONED) {
+                        if (!_uiState.value.isOnlineSessionAbandoned) {
+                            _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
+                        }
+                        return@onSuccess
+                    }
+                    // FINISHED: fall through — update defeated states so checkWinner() can
+                    // trigger the result screen. Do NOT set isOnlineSessionAbandoned.
+                    val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
+                    _uiState.update { s ->
+                        val newTurn = snapshot.sessionState.activePlayerSlot != s.activePlayerId || snapshot.sessionState.turnNumber != s.turnNumber
+                        s.copy(
+                            players = s.players.map { p ->
+                                // Never overwrite the local player's optimistic state.
+                                if (p.id == mySlotIndex) return@map p
+                                val ps = playerStatesBySlot[p.id] ?: return@map p
+                                p.copy(
+                                    life       = ps.life,
+                                    poison     = ps.poison,
+                                    experience = ps.experience,
+                                    energy     = ps.energy,
+                                    defeated   = ps.defeated,
+                                )
+                            },
+                            currentPhase   = runCatching {
+                                GamePhase.valueOf(snapshot.sessionState.currentPhase)
+                            }.getOrDefault(s.currentPhase),
+                            activePlayerId = snapshot.sessionState.activePlayerSlot,
+                            turnNumber     = snapshot.sessionState.turnNumber,
+                            hasPlayedLand  = if (newTurn) emptySet() else s.hasPlayedLand,
+                        )
+                    }
+                    checkPendingDefeat()
+                    checkWinner()
+                }
+            }
+        }
+    }
+
     private fun schedulePersistLife(sessionId: String, slotIndex: Int, newLife: Int) {
         persistLifeJobs[slotIndex]?.cancel()
         persistLifeJobs[slotIndex] = viewModelScope.launch {
@@ -1006,10 +1210,12 @@ class GameViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        voiceCommandRecognizer.release()
         onlineObserveJob?.cancel()
         nearbyObserveJob?.cancel()
         persistLifeJobs.values.forEach { it.cancel() }
         persistPhaseJob?.cancel()
+        syncPollingJob?.cancel()
         val sessionId = onlineSessionId ?: return
         if (isNearbySession) {
             nearbyRepo.disconnect()
@@ -1126,7 +1332,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, cfg ->
             Player(
                 id        = i,
-                name      = cfg.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = cfg.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = cfg.theme,
                 isAppUser = cfg.isAppUser,
@@ -1162,7 +1368,6 @@ class GameViewModel @Inject constructor(
     private fun recordTournamentResultIfNeeded(sessionId: Long, result: GameResult) {
         val s = _uiState.value
         val matchId = s.activeTournamentMatchId ?: return
-        val tournamentId = s.activeTournamentId ?: return
 
         // Guard: if tournament player id list does not cover every game player,
         // recording the result would silently map some players to wrong tournament
@@ -1204,7 +1409,7 @@ class GameViewModel @Inject constructor(
         val players = configs.mapIndexed { i, config ->
             Player(
                 id        = i,
-                name      = config.name.ifEmpty { "Wizard ${i + 1}" },
+                name      = config.name.ifEmpty { appContext.getString(R.string.game_setup_default_player_name) + " ${i + 1}" },
                 life      = mode.startingLife,
                 theme     = config.theme,
                 isAppUser = config.isAppUser,
@@ -1233,12 +1438,24 @@ class GameViewModel @Inject constructor(
     }
 
     companion object {
-        fun buildInitialState(mode: GameMode, playerCount: Int): GameUiState {
+        fun buildInitialState(mode: GameMode, playerCount: Int): GameUiState =
+            buildInitialState(mode, playerCount, defaultName = { i -> "Player ${i + 1}" })
+
+        fun buildInitialState(mode: GameMode, playerCount: Int, context: Context): GameUiState =
+            buildInitialState(mode, playerCount, defaultName = { i ->
+                context.getString(R.string.game_setup_default_player_name) + " ${i + 1}"
+            })
+
+        private fun buildInitialState(
+            mode: GameMode,
+            playerCount: Int,
+            defaultName: (Int) -> String,
+        ): GameUiState {
             val clampedCount = playerCount.coerceIn(2, 6)
             val players = (0 until clampedCount).map { i ->
                 Player(
                     id        = i,
-                    name      = "Wizard ${i + 1}",
+                    name      = defaultName(i),
                     life      = mode.startingLife,
                     theme     = PlayerTheme.ALL[i % PlayerTheme.ALL.size],
                     isAppUser = i == 0,

@@ -108,10 +108,7 @@ class TournamentSetupViewModel @Inject constructor(
             _uiState.update { it.copy(error = "Tournament name cannot be empty") }
             return
         }
-        if (state.structure != "ROUND_ROBIN" && state.players.size % 2 != 0) {
-            _uiState.update { it.copy(error = "Swiss and Single Elimination require an even number of players") }
-            return
-        }
+        // Odd player counts are allowed for Swiss and Single Elimination — the engine assigns byes.
         _uiState.update { it.copy(isCreating = true, error = null) }
         viewModelScope.launch {
             val players = state.players.map { config ->

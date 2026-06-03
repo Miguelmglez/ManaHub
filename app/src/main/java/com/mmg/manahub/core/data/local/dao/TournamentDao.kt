@@ -80,7 +80,7 @@ abstract class TournamentDao {
     """)
     abstract suspend fun finishMatch(
         matchId:    Long,
-        winnerId:   Long,
+        winnerId:   Long?,
         sessionId:  Long?,
         lifeTotals: String,
     )
@@ -88,11 +88,20 @@ abstract class TournamentDao {
     @Query("UPDATE tournament_matches SET status = 'ACTIVE' WHERE id = :matchId")
     abstract suspend fun startMatch(matchId: Long)
 
+    @Query("UPDATE tournament_matches SET status = 'PENDING', winnerId = NULL, gameSessionId = NULL, finalLifeTotals = '' WHERE id = :matchId")
+    abstract suspend fun resetMatchToPending(matchId: Long)
+
     @Query("SELECT * FROM tournament_matches WHERE tournamentId = :tournamentId AND status = 'FINISHED'")
     abstract suspend fun getFinishedMatches(tournamentId: Long): List<TournamentMatchEntity>
 
+    @Query("SELECT * FROM tournament_matches WHERE tournamentId = :tournamentId ORDER BY scheduledOrder ASC")
+    abstract suspend fun getAllMatches(tournamentId: Long): List<TournamentMatchEntity>
+
     @Query("SELECT COUNT(*) FROM tournament_matches WHERE tournamentId = :tournamentId AND status = 'PENDING'")
     abstract suspend fun getPendingMatchCount(tournamentId: Long): Int
+
+    @Query("DELETE FROM tournaments WHERE id = :tournamentId")
+    abstract suspend fun deleteTournament(tournamentId: Long)
 
     // ── Atomic creation ───────────────────────────────────────────────────────
 

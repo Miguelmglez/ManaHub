@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -81,7 +82,7 @@ fun GameResultScreen(
             item { HighlightsSection(gameResult = gameResult) }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(
+                    /*OutlinedButton(
                         onClick  = onSurvey,
                         modifier = Modifier.fillMaxWidth(),
                         colors   = ButtonDefaults.outlinedButtonColors(
@@ -93,7 +94,7 @@ fun GameResultScreen(
                             stringResource(R.string.gameresult_review_button),
                             style = MaterialTheme.magicTypography.titleMedium,
                         )
-                    }
+                    }*/
                     Row(
                         modifier              = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -109,7 +110,8 @@ fun GameResultScreen(
                                 color = mc.secondaryAccent
                                 )
                         }
-                        Button(
+                       /* TODO: Re-enable "Play Again" once rematch functionality is implemented
+                       Button(
                             onClick  = onNewGame,
                             modifier = Modifier.weight(1f),
                             colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
@@ -119,7 +121,7 @@ fun GameResultScreen(
                                 style = MaterialTheme.magicTypography.titleMedium,
                                 color = mc.background,
                             )
-                        }
+                        }*/
                     }
                 }
             }
@@ -134,11 +136,12 @@ fun GameResultScreen(
 @Composable
 private fun VictoryHeader(gameResult: GameResult, winnerColor: Color) {
     val mc = MaterialTheme.magicColors
+    val context = LocalContext.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier            = Modifier.fillMaxWidth(),
     ) {
-        Text(text = "👑", fontSize = 48.sp, textAlign = TextAlign.Center)
+        Text(text = stringResource(R.string.game_crown_symbol), fontSize = 48.sp, textAlign = TextAlign.Center)
         Text(
             text  = stringResource(R.string.gameresult_winner_label),
             style = MaterialTheme.magicTypography.labelLarge,
@@ -160,7 +163,7 @@ private fun VictoryHeader(gameResult: GameResult, winnerColor: Color) {
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
-                text  = stringResource(R.string.gameresult_game_duration, formatDuration(gameResult.durationMs)),
+                text  = stringResource(R.string.gameresult_game_duration, formatDuration(gameResult.durationMs, context)),
                 style = MaterialTheme.magicTypography.bodyMedium,
                 color = mc.textSecondary,
             )
@@ -335,9 +338,10 @@ private fun HighlightCard(icon: String, label: String, value: String) {
 //  Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-private fun formatDuration(ms: Long): String {
+private fun formatDuration(ms: Long, context: android.content.Context): String {
     val totalSeconds = ms / 1000
     val hours   = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
-    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+    return if (hours > 0) context.getString(R.string.game_duration_format_hm, hours, minutes) 
+           else context.getString(R.string.game_duration_format_m, minutes)
 }

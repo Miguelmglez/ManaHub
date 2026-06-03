@@ -1,8 +1,10 @@
 package com.mmg.manahub.feature.online.presentation.lobby
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.online.domain.model.ActiveSession
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
@@ -19,6 +21,7 @@ import com.mmg.manahub.core.online.domain.usecase.StartSessionUseCase
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -54,6 +57,7 @@ class LobbyHostViewModel @Inject constructor(
     private val repository: OnlineSessionRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val savedStateHandle: SavedStateHandle,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     // ── UI state ──────────────────────────────────────────────────────────────
@@ -100,6 +104,8 @@ class LobbyHostViewModel @Inject constructor(
      * This scope is cancelled manually at the end of [onCleared] after the work completes.
      */
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private var gameLaunched = false
 
     init {
         // Pre-fill mode and playerCount if navigated from GameSetupScreen
@@ -249,7 +255,7 @@ class LobbyHostViewModel @Inject constructor(
                 mode = state.gameMode.name,
                 playerCount = state.playerCount,
                 layoutKey = null,
-                displayName = state.displayName.ifBlank { "Host" },
+                displayName = state.displayName.ifBlank { appContext.getString(R.string.lobby_host_default_name) },
                 themeKey = state.selectedThemeKey,
             ).fold(
                 onSuccess = { (sessionId, code) ->
@@ -307,6 +313,7 @@ class LobbyHostViewModel @Inject constructor(
 
             startSessionUseCase(sessionId).fold(
                 onSuccess = {
+                    gameLaunched = true
                     crashlytics.log("online_session_start_success: mode=${state.gameMode.name}")
                     _uiState.update { it.copy(isLoading = false) }
                     onGameStart(sessionId, state.gameMode, state.playerCount)
@@ -472,18 +479,18 @@ class LobbyHostViewModel @Inject constructor(
      * Crashlytics separately by each call site before invoking this function.
      */
     private fun mapBackendError(message: String?): String = when {
-        message == null -> "Ocurrió un error inesperado."
+        message == null -> appContext.getString(R.string.lobby_error_generic)
         "Too many failed join attempts" in message ->
-            "Demasiados intentos fallidos. Espera 5 minutos."
+            appContext.getString(R.string.lobby_error_too_many_attempts)
         "Invalid session code format" in message ->
-            "Código inválido. Debe ser 6 caracteres alfanuméricos."
+            appContext.getString(R.string.lobby_error_invalid_code)
         "Session limit reached" in message ->
-            "Ya tienes una sala activa. Ciérrala antes de crear otra."
+            appContext.getString(R.string.lobby_error_active_room)
         "Session is full" in message ->
-            "La sala ya está llena."
+            appContext.getString(R.string.lobby_error_full)
         "not in LOBBY" in message ->
-            "Sala no encontrada o ya iniciada."
-        else -> "Ocurrió un error inesperado."
+            appContext.getString(R.string.lobby_error_not_found)
+        else -> appContext.getString(R.string.lobby_error_generic)
     }
 
     override fun onCleared() {
@@ -495,8 +502,12 @@ class LobbyHostViewModel @Inject constructor(
             cleanupScope.cancel()
             return
         }
-        cleanupScope.launch {
-            observeSessionUseCase.disconnect(sessionId)
+        if (!gameLaunched) {
+            cleanupScope.launch {
+                observeSessionUseCase.disconnect(sessionId)
+                cleanupScope.cancel()
+            }
+        } else {
             cleanupScope.cancel()
         }
     }

@@ -1,50 +1,57 @@
 package com.mmg.manahub.feature.game.presentation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,95 +61,156 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.key
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
-import androidx.hilt.navigation.compose.hiltViewModel
-import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import com.mmg.manahub.core.voice.domain.CommandGrammar
+import com.mmg.manahub.core.voice.domain.VoiceCommand
+import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import com.mmg.manahub.core.voice.domain.VoiceModelState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.GameModeSelector
 import com.mmg.manahub.core.ui.components.HexGridBackground
-import com.mmg.manahub.core.ui.theme.PlayerTheme
+import com.mmg.manahub.core.ui.components.PlayerEditSheet
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
-import kotlinx.coroutines.launch
+import com.mmg.manahub.feature.online.presentation.lobby.OnlineHostSheet
+import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
+import com.mmg.manahub.feature.tournament.presentation.TournamentsSheet
 
+/**
+ * Entry point for the game setup screen.
+ *
+ * Collects ViewModel state and delegates rendering to [GameSetupScreenContent].
+ *
+ * @param viewModel The Hilt-provided [GameSetupViewModel].
+ * @param onBack Back navigation callback.
+ * @param onStartGame Called when the local game should start.
+ * @param onOnlineHostGameStart Called after online session creation succeeds (host path).
+ * @param onOnlineJoinGameStart Called after online session join succeeds (join path).
+ * @param onNavigateToTournamentSetup Called when the user wants to create a local tournament.
+ * @param onNavigateToTournamentDetail Called with a tournament ID to open an existing tournament.
+ * @param prefilledJoinCode Optional 6-digit code arriving from a deep link to auto-open the join sheet.
+ * @param onNavigateToTournament Legacy no-op callback kept for backward compatibility.
+ * @param onNavigateToOnline Legacy no-op callback kept for backward compatibility.
+ * @param onNavigateToJoin Legacy no-op callback kept for backward compatibility.
+ */
 @Composable
 fun GameSetupScreen(
     viewModel: GameSetupViewModel,
     onBack: () -> Unit,
     onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate, GameSettings) -> Unit,
-    onNavigateToTournament: () -> Unit,
+    onOnlineHostGameStart: (sessionId: String, mode: GameMode, playerCount: Int) -> Unit,
+    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
+    onNavigateToTournamentSetup: () -> Unit,
+    onNavigateToTournamentDetail: (Long) -> Unit,
+    prefilledJoinCode: String? = null,
+    // Legacy callbacks kept for backward compatibility with any remaining call sites.
+    onNavigateToTournament: () -> Unit = {},
     onNavigateToOnline: (GameMode, Int) -> Unit = { _, _ -> },
     onNavigateToJoin: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val voiceModelStates by viewModel.voiceModelStates.collectAsStateWithLifecycle()
 
     GameSetupScreenContent(
         uiState = uiState,
+        voiceModelStates = voiceModelStates,
         onBack = onBack,
         onStartGame = onStartGame,
-        onNavigateToTournament = onNavigateToTournament,
-        onNavigateToOnline = onNavigateToOnline,
-        onNavigateToJoin = onNavigateToJoin,
+        onOnlineHostGameStart = onOnlineHostGameStart,
+        onOnlineJoinGameStart = onOnlineJoinGameStart,
+        onNavigateToTournamentSetup = onNavigateToTournamentSetup,
+        onNavigateToTournamentDetail = onNavigateToTournamentDetail,
+        prefilledJoinCode = prefilledJoinCode,
         onModeChange = viewModel::onModeChange,
         onPlayerCountChange = viewModel::onPlayerCountChange,
         onUpdatePlayerName = viewModel::updatePlayerName,
         onUpdatePlayerTheme = viewModel::updatePlayerTheme,
         onToggleLandReminder = viewModel::toggleLandReminder,
+        onToggleVoiceLandReminder = viewModel::toggleVoiceLandReminder,
+        onToggleVoiceEndTurn = viewModel::toggleVoiceEndTurn,
+        onSetVoiceLanguage = viewModel::setVoiceLanguage,
+        onDownloadVoiceModel = viewModel::downloadVoiceModel,
+        onDeleteVoiceModel = viewModel::deleteVoiceModel,
         onLifeControlModeChange = viewModel::setLifeControlMode,
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GameSetupScreenContent(
     uiState: GameSetupUiState,
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
     onBack: () -> Unit,
     onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate, GameSettings) -> Unit,
-    onNavigateToTournament: () -> Unit,
-    onNavigateToOnline: (GameMode, Int) -> Unit,
-    onNavigateToJoin: () -> Unit,
+    onOnlineHostGameStart: (sessionId: String, mode: GameMode, playerCount: Int) -> Unit,
+    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
+    onNavigateToTournamentSetup: () -> Unit,
+    onNavigateToTournamentDetail: (Long) -> Unit,
+    prefilledJoinCode: String?,
     onModeChange: (GameMode) -> Unit,
     onPlayerCountChange: (Int) -> Unit,
     onUpdatePlayerName: (Int, String) -> Unit,
     onUpdatePlayerTheme: (Int, PlayerThemeColors) -> Unit,
     onToggleLandReminder: () -> Unit,
+    onToggleVoiceLandReminder: () -> Unit,
+    onToggleVoiceEndTurn: () -> Unit,
+    onSetVoiceLanguage: (VoiceLanguage) -> Unit,
+    onDownloadVoiceModel: (VoiceLanguage) -> Unit,
+    onDeleteVoiceModel: (VoiceLanguage) -> Unit,
     onLifeControlModeChange: (LifeControlMode) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
 
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        visible = true
+    LaunchedEffect(Unit) { visible = true }
+
+    // Sheet visibility state
+    var showFriendsSheet by remember { mutableStateOf(false) }
+    var showOnlineHostSheet by remember { mutableStateOf(false) }
+    var showOnlineJoinSheet by remember { mutableStateOf(false) }
+    var showTournamentsSheet by remember { mutableStateOf(false) }
+    var showVoiceLanguagesSheet by remember { mutableStateOf(false) }
+    var editingPlayerIndex by remember { mutableStateOf<Int?>(null) }
+
+    // Auto-open join sheet when a prefilled code arrives (deep link path).
+    LaunchedEffect(prefilledJoinCode) {
+        if (!prefilledJoinCode.isNullOrBlank()) {
+            showOnlineJoinSheet = true
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
@@ -155,29 +223,28 @@ private fun GameSetupScreenContent(
                 Surface(
                     color = mc.backgroundSecondary.copy(alpha = 0.9f),
                     modifier = Modifier.fillMaxWidth(),
-                    shadowElevation = 4.dp
+                    shadowElevation = 4.dp,
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
                             .padding(horizontal = 4.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.action_back),
-                                tint = mc.textSecondary
+                                tint = mc.textSecondary,
                             )
                         }
                         Text(
                             text = stringResource(R.string.gamesetup_title),
                             style = MaterialTheme.magicTypography.titleLarge,
                             color = mc.textPrimary,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
-
                     }
                 }
             },
@@ -186,7 +253,7 @@ private fun GameSetupScreenContent(
                 AnimatedVisibility(
                     visible = visible,
                     enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 8 },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     Column(
                         modifier = Modifier
@@ -200,64 +267,45 @@ private fun GameSetupScreenContent(
                         // ── Mode selector ─────────────────────────────────────────────────
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
-                                stringResource(R.string.gamesetup_mode_label),
+                                text = stringResource(R.string.gamesetup_mode_label),
                                 style = MaterialTheme.magicTypography.titleMedium,
                                 color = mc.textSecondary,
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                GameMode.entries.forEach { mode ->
-                                    ModeTile(
-                                        mode = mode,
-                                        selected = mode == uiState.selectedMode,
-                                        onClick = { onModeChange(mode) },
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                            }
+                            GameModeSelector(
+                                selectedMode = uiState.selectedMode,
+                                onModeSelected = onModeChange,
+                            )
                         }
-                        // ── Settings ──────────────────────────────────────────────────────
-                        SettingsSection(
-                            gameSettings = uiState.gameSettings,
-                            onToggleLandReminder = onToggleLandReminder,
-                            onLifeControlModeChange = onLifeControlModeChange,
-                        )
-
 
                         // ── Player count stepper ──────────────────────────────────────────
-                        PlayerCountStepper(
+                        com.mmg.manahub.core.ui.components.PlayerCountStepper(
                             playerCount = uiState.playerCount,
                             onPlayerCountChange = onPlayerCountChange,
                         )
 
-                        // ── Player config list ────────────────────────────────────────────
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            uiState.playerConfigs.forEachIndexed { index, config ->
-                                AnimatedVisibility(
-                                    visible = index < uiState.playerCount,
-                                    enter = fadeIn() + expandVertically(),
-                                    exit = fadeOut() + shrinkVertically(),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    PlayerConfigRow(
-                                        config = config,
-                                        usedThemes = uiState.playerConfigs
-                                            .filter { it.id != config.id }
-                                            .map { it.theme },
-                                        onNameChange = { name -> onUpdatePlayerName(index, name) },
-                                        onThemeChange = { theme -> onUpdatePlayerTheme(index, theme) },
-                                    )
-                                }
-                            }
-                        }
+                        // ── Player avatar strip ───────────────────────────────────────────
+                        PlayerAvatarStrip(
+                            playerConfigs = uiState.playerConfigs,
+                            playerCount = uiState.playerCount,
+                            onAvatarTap = { idx -> editingPlayerIndex = idx },
+                        )
 
-                        // ── Begin button ──────────────────────────────────────────────────
+                        // ── Settings ──────────────────────────────────────────────────────
+                        SettingsSection(
+                            gameSettings = uiState.gameSettings,
+                            voiceModelStates = voiceModelStates,
+                            onToggleLandReminder = onToggleLandReminder,
+                            onToggleVoiceLandReminder = onToggleVoiceLandReminder,
+                            onToggleVoiceEndTurn = onToggleVoiceEndTurn,
+                            onOpenVoiceLanguages = { showVoiceLanguagesSheet = true },
+                            onLifeControlModeChange = onLifeControlModeChange,
+                        )
+
+                        // ── Begin Game button ─────────────────────────────────────────────
                         val buttonScale by animateFloatAsState(
                             targetValue = if (visible) 1f else 0.9f,
                             animationSpec = tween(800, delayMillis = 400),
-                            label = "buttonScale"
+                            label = "buttonScale",
                         )
 
                         Button(
@@ -280,366 +328,328 @@ private fun GameSetupScreenContent(
                                 },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = mc.primaryAccent,
-                                contentColor = mc.background
+                                contentColor = mc.background,
                             ),
                             shape = RoundedCornerShape(12.dp),
                         ) {
                             Text(
-                                stringResource(R.string.gamesetup_begin_button).uppercase(),
+                                text = stringResource(R.string.gamesetup_begin_button).uppercase(),
                                 style = MaterialTheme.magicTypography.titleLarge,
                                 color = mc.background,
                             )
                         }
 
-                        // ── Online multiplayer ────────────────────────────────────────────
-                        Row(
-                            modifier              = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        // ── Play with friends button ──────────────────────────────────────
+                        OutlinedButton(
+                            onClick = { showFriendsSheet = true },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
                         ) {
-                            OutlinedButton(
-                                onClick   = { onNavigateToOnline(uiState.selectedMode, uiState.playerCount) },
-                                modifier  = Modifier.weight(1f).height(48.dp),
-                                shape     = RoundedCornerShape(12.dp),
-                                border    = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                            ) {
-                                Text("Create Online", style = MaterialTheme.magicTypography.labelLarge, color = mc.primaryAccent)
-                            }
-                            OutlinedButton(
-                                onClick   = onNavigateToJoin,
-                                modifier  = Modifier.weight(1f).height(48.dp),
-                                shape     = RoundedCornerShape(12.dp),
-                                border    = androidx.compose.foundation.BorderStroke(1.dp, mc.secondaryAccent.copy(alpha = 0.5f)),
-                            ) {
-                                Text("Join Game", style = MaterialTheme.magicTypography.labelLarge, color = mc.secondaryAccent)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Player count stepper
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun PlayerCountStepper(
-    playerCount: Int,
-    onPlayerCountChange: (Int) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(mc.surface.copy(alpha = 0.5f))
-            .padding(12.dp),
-    ) {
-        Text(
-            stringResource(R.string.gamesetup_players_label),
-            style = MaterialTheme.magicTypography.titleMedium,
-            color = mc.textSecondary,
-            modifier = Modifier.weight(1f).padding(start = 8.dp),
-        )
-        
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Decrement button
-            StepperButton(
-                text = "−",
-                enabled = playerCount > 2,
-                onClick = { onPlayerCountChange(playerCount - 1) }
-            )
-
-            // Current count
-            Box(
-                modifier = Modifier.widthIn(min = 40.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "$playerCount",
-                    style = MaterialTheme.magicTypography.displayMedium,
-                    color = mc.primaryAccent,
-                    textAlign = TextAlign.Center,
-                )
-            }
-
-            // Increment button
-            StepperButton(
-                text = "+",
-                enabled = playerCount < 6,
-                onClick = { onPlayerCountChange(playerCount + 1) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun StepperButton(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    val mc = MaterialTheme.magicColors
-    val bgColor by animateColorAsState(
-        if (enabled) mc.surfaceVariant else mc.surface.copy(alpha = 0.3f),
-        label = "btnBg"
-    )
-    val contentColor by animateColorAsState(
-        if (enabled) mc.textPrimary else mc.textDisabled,
-        label = "btnContent"
-    )
-
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(bgColor)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.magicTypography.titleLarge,
-            color = contentColor,
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Single player config row
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun PlayerConfigRow(
-    config: PlayerConfig,
-    usedThemes: List<PlayerThemeColors>,
-    onNameChange: (String) -> Unit,
-    onThemeChange: (PlayerThemeColors) -> Unit,
-) {
-    var showColorPicker by remember { mutableStateOf(false) }
-    val mc = MaterialTheme.magicColors
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val scope = rememberCoroutineScope()
-    
-    val borderColor by animateColorAsState(
-        if (showColorPicker) config.theme.accent else Color.Transparent,
-        label = "rowBorder"
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .graphicsLayer {
-                shadowElevation = if (showColorPicker) 12f else 2f
-                shape = RoundedCornerShape(16.dp)
-                clip = true
-            }
-            .background(mc.surface)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        // Color circle — tap to open picker
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(config.theme.accent)
-                .border(3.dp, config.theme.accent.copy(alpha = 0.3f), CircleShape)
-                .clickable { showColorPicker = true },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f))
-            )
-        }
-
-        // Name field
-        if (config.isAppUser) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = config.name.ifBlank { stringResource(R.string.game_setup_default_player_name) },
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = if (config.isDefaultName) mc.textDisabled else mc.primaryAccent,
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = mc.primaryAccent.copy(alpha = 0.15f),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.game_setup_you_badge).uppercase(),
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.primaryAccent,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-                if (config.isDefaultName) {
-                    Text(
-                        text = stringResource(R.string.game_setup_set_name_hint),
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        color = mc.textDisabled,
-                    )
-                }
-            }
-        } else {
-            BasicTextField(
-                value = config.name,
-                onValueChange = onNameChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .onFocusChanged {
-                        if (it.isFocused) {
-                            scope.launch {
-                                bringIntoViewRequester.bringIntoView()
-                            }
-                        }
-                    },
-                textStyle = MaterialTheme.magicTypography.titleMedium.copy(color = mc.textPrimary),
-                singleLine = true,
-                decorationBox = { inner ->
-                    Box {
-                        if (config.name.isEmpty()) {
                             Text(
-                                stringResource(R.string.gamesetup_player_name_hint, config.id + 1),
-                                style = MaterialTheme.magicTypography.titleMedium,
-                                color = mc.textDisabled,
+                                text = stringResource(R.string.gamesetup_play_with_friends),
+                                style = MaterialTheme.magicTypography.labelLarge,
+                                color = mc.primaryAccent,
                             )
                         }
-                        inner()
                     }
+                }
+            }
+        }
+
+        // ── Sheet layer (rendered above Scaffold, inside the outer Box) ────────────
+
+        if (showFriendsSheet) {
+            FriendsRoutingSheet(
+                onDismiss = { showFriendsSheet = false },
+                onHostOnline = { showFriendsSheet = false; showOnlineHostSheet = true },
+                onJoinWithCode = { showFriendsSheet = false; showOnlineJoinSheet = true },
+                onTournaments = { showFriendsSheet = false; showTournamentsSheet = true },
+            )
+        }
+
+        if (showOnlineHostSheet) {
+            OnlineHostSheet(
+                initialMode = uiState.selectedMode,
+                initialPlayerCount = uiState.playerCount,
+                initialDisplayName = uiState.playerConfigs.firstOrNull()?.name ?: "",
+                initialThemeKey = uiState.playerConfigs.firstOrNull()?.theme?.name ?: "Crimson",
+                onDismiss = { showOnlineHostSheet = false },
+                onGameStart = { sessionId, mode, playerCount ->
+                    showOnlineHostSheet = false
+                    onOnlineHostGameStart(sessionId, mode, playerCount)
                 },
             )
         }
-    }
 
-    if (showColorPicker) {
-        ColorPickerSheet(
-            availableThemes = PlayerTheme.ALL.filter { it !in usedThemes || it == config.theme },
-            onSelect = { theme ->
-                onThemeChange(theme)
-                showColorPicker = false
-            },
-            onDismiss = { showColorPicker = false },
+        if (showOnlineJoinSheet) {
+            OnlineJoinSheet(
+                prefilledCode = prefilledJoinCode?.takeIf { it.isNotBlank() },
+                initialDisplayName = uiState.playerConfigs.firstOrNull()?.name ?: "",
+                initialThemeKey = uiState.playerConfigs.firstOrNull()?.theme?.name ?: "Crimson",
+                onDismiss = { showOnlineJoinSheet = false },
+                onGameStart = { sessionId, slotIndex, mode, playerCount ->
+                    showOnlineJoinSheet = false
+                    onOnlineJoinGameStart(sessionId, slotIndex, mode, playerCount)
+                },
+            )
+        }
+
+        if (showTournamentsSheet) {
+            TournamentsSheet(
+                initialDisplayName = uiState.playerConfigs.firstOrNull()?.name ?: "",
+                initialThemeKey = uiState.playerConfigs.firstOrNull()?.theme?.name ?: "Crimson",
+                onDismiss = { showTournamentsSheet = false },
+                onCreateLocal = { showTournamentsSheet = false; onNavigateToTournamentSetup() },
+                onOpenTournament = { id ->
+                    showTournamentsSheet = false
+                    onNavigateToTournamentDetail(id)
+                },
+                onNavigateToTournamentList = { showTournamentsSheet = false; onNavigateToTournamentSetup() },
+                onOnlineJoinGameStart = { sessionId, slotIndex, mode, playerCount ->
+                    showTournamentsSheet = false
+                    onOnlineJoinGameStart(sessionId, slotIndex, mode, playerCount)
+                },
+            )
+        }
+
+        editingPlayerIndex?.let { idx ->
+            val config = uiState.playerConfigs.getOrNull(idx)
+            if (config != null) {
+                PlayerEditSheet(
+                    playerName = config.name,
+                    playerTheme = config.theme,
+                    isAppUser = config.isAppUser,
+                    usedThemes = uiState.playerConfigs.filter { it.id != config.id }.map { it.theme },
+                    onNameChanged = { onUpdatePlayerName(idx, it) },
+                    onThemeSelected = { theme -> onUpdatePlayerTheme(idx, theme) },
+                    onDismiss = { editingPlayerIndex = null },
+                )
+            }
+        }
+
+        if (showVoiceLanguagesSheet) {
+            VoiceLanguagesSheet(
+                voiceModelStates = voiceModelStates,
+                selectedLanguage = uiState.gameSettings.voiceLanguage,
+                onSelectLanguage = onSetVoiceLanguage,
+                onDownload = onDownloadVoiceModel,
+                onDelete = onDeleteVoiceModel,
+                onDismiss = { showVoiceLanguagesSheet = false },
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Player avatar strip
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A horizontal row of player avatar circles.
+ *
+ * Tapping an avatar opens [PlayerEditSheet] via [onAvatarTap].
+ * Only the first [playerCount] entries from [playerConfigs] are shown.
+ *
+ * @param playerConfigs Full list of player configs.
+ * @param playerCount How many entries to show.
+ * @param onAvatarTap Called with the index of the tapped avatar.
+ */
+@Composable
+private fun PlayerAvatarStrip(
+    playerConfigs: List<PlayerConfig>,
+    playerCount: Int,
+    onAvatarTap: (Int) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        itemsIndexed(playerConfigs.take(playerCount)) { idx, config ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(config.theme.accent)
+                        .clickable { onAvatarTap(idx) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Inner white highlight circle
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                    )
+                }
+                Text(
+                    text = when {
+                        config.isAppUser -> stringResource(R.string.game_setup_you_badge)
+                        config.name.isNotBlank() -> config.name.take(8)
+                        else -> stringResource(R.string.gamesetup_player_placeholder, idx + 1)
+                    },
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Friends routing sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A bottom sheet offering three entry points into the multiplayer flows:
+ * host online, join with code, or tournaments.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FriendsRoutingSheet(
+    onDismiss: () -> Unit,
+    onHostOnline: () -> Unit,
+    onJoinWithCode: () -> Unit,
+    onTournaments: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding(),
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.offset(x = (-12).dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
+            Text(
+                text = stringResource(R.string.gamesetup_play_with_friends_title),
+                style = ty.titleLarge,
+                color = mc.textPrimary,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            FriendsSheetRow(
+                emoji = "🌐",
+                title = stringResource(R.string.gamesetup_friends_host_title),
+                subtitle = stringResource(R.string.gamesetup_friends_host_subtitle),
+                onClick = onHostOnline,
+            )
+            FriendsSheetRow(
+                emoji = "🔗",
+                title = stringResource(R.string.gamesetup_friends_join_title),
+                subtitle = stringResource(R.string.gamesetup_friends_join_subtitle),
+                onClick = onJoinWithCode,
+            )
+            /* TODO Re enable when the feature is fully complete
+            FriendsSheetRow(
+                emoji = "🏆",
+                title = stringResource(R.string.gamesetup_friends_tournaments_title),
+                subtitle = stringResource(R.string.gamesetup_friends_tournaments_subtitle),
+                onClick = onTournaments,
+            )*/
+
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+/**
+ * A single tappable row within [FriendsRoutingSheet].
+ */
+@Composable
+private fun FriendsSheetRow(
+    emoji: String,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            color = mc.surfaceVariant,
+            shape = CircleShape,
+            modifier = Modifier.size(44.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(text = emoji, style = ty.titleLarge)
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = ty.titleMedium, color = mc.textPrimary)
+            Text(text = subtitle, style = ty.bodySmall, color = mc.textSecondary)
+        }
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = mc.textDisabled,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Color picker bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ColorPickerSheet(
-    availableThemes: List<PlayerThemeColors>,
-    onSelect: (PlayerThemeColors) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        contentWindowInsets = { WindowInsets(0) },
-        containerColor = mc.backgroundSecondary,
-        dragHandle = {
-            Surface(
-                modifier = Modifier.padding(top = 12.dp),
-                color = mc.textDisabled.copy(alpha = 0.4f),
-                shape = CircleShape
-            ) {
-                Box(modifier = Modifier.size(width = 32.dp, height = 4.dp))
-            }
-        }
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .navigationBarsPadding()
-        ) {
-            Text(
-                stringResource(R.string.gamesetup_choose_color),
-                style = MaterialTheme.magicTypography.titleLarge,
-                color = mc.textPrimary,
-            )
-            Spacer(Modifier.height(24.dp))
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.heightIn(max = 300.dp),
-            ) {
-                items(availableThemes) { theme ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onSelect(theme) }
-                            .padding(8.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(theme.accent)
-                                .border(2.dp, Color.White.copy(alpha = 0.2f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.1f))
-                            )
-                        }
-                        Text(
-                            text = theme.name,
-                            style = MaterialTheme.magicTypography.labelMedium,
-                            color = mc.textSecondary,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(32.dp))
-        }
-    }
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Settings section
+//  Settings section (UNCHANGED — do not modify)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SettingsSection(
     gameSettings: GameSettings,
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
     onToggleLandReminder: () -> Unit,
+    onToggleVoiceLandReminder: () -> Unit,
+    onToggleVoiceEndTurn: () -> Unit,
+    onOpenVoiceLanguages: () -> Unit,
     onLifeControlModeChange: (LifeControlMode) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            text = "Settings",
+            text = stringResource(R.string.gamesetup_settings_title),
             style = MaterialTheme.magicTypography.titleMedium,
             color = mc.textSecondary,
         )
@@ -654,6 +664,13 @@ private fun SettingsSection(
             LandReminderToggle(
                 enabled = gameSettings.landReminderEnabled,
                 onToggle = onToggleLandReminder,
+            )
+            VoiceControlsSection(
+                gameSettings = gameSettings,
+                voiceModelStates = voiceModelStates,
+                onToggleLandVoice = onToggleVoiceLandReminder,
+                onToggleEndTurnVoice = onToggleVoiceEndTurn,
+                onOpenVoiceLanguages = onOpenVoiceLanguages,
             )
             LifeControlSelector(
                 selectedMode = gameSettings.lifeControlMode,
@@ -693,7 +710,7 @@ private fun LandReminderToggle(
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Land Reminder",
+                text = stringResource(R.string.gamesetup_land_reminder_title),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
@@ -720,23 +737,22 @@ private fun LifeControlSelector(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Column {
             Text(
-                text = "Life Control",
+                text = stringResource(R.string.gamesetup_life_control_title),
                 style = MaterialTheme.magicTypography.titleMedium,
                 color = mc.textPrimary,
             )
-
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             LifeControlOptionTile(
                 mode = LifeControlMode.SCROLL,
-                label = "Swipe",
+                label = stringResource(R.string.gamesetup_life_control_swipe),
                 selected = selectedMode == LifeControlMode.SCROLL,
                 onClick = { onModeChange(LifeControlMode.SCROLL) },
                 modifier = Modifier.weight(1f),
             )
             LifeControlOptionTile(
                 mode = LifeControlMode.TAP,
-                label = "Tap",
+                label = stringResource(R.string.gamesetup_life_control_tap),
                 selected = selectedMode == LifeControlMode.TAP,
                 onClick = { onModeChange(LifeControlMode.TAP) },
                 modifier = Modifier.weight(1f),
@@ -771,11 +787,11 @@ private fun LifeControlOptionTile(
     )
     Surface(
         modifier = modifier
-            .border(2.dp, borderColor, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         color = bgColor,
         shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(if (selected) 2.dp else 1.dp, borderColor),
     ) {
         Column(
             modifier = Modifier
@@ -806,7 +822,7 @@ private fun ScrollModePreview() {
 
     LaunchedEffect(Unit) {
         val sequence = listOf(21, 20, 19, 20)
-        val goingUp  = listOf(true, false, false, true)
+        val goingUp = listOf(true, false, false, true)
         var index = 0
         while (true) {
             delay(1500L)
@@ -849,6 +865,8 @@ private fun TapModePreview() {
     val floatY = remember { Animatable(0f) }
     val floatAlpha = remember { Animatable(0f) }
 
+    val scope = rememberCoroutineScope()
+
     LaunchedEffect(Unit) {
         val sequence = listOf(19, 20, 21, 20)
         var index = 0
@@ -867,21 +885,20 @@ private fun TapModePreview() {
         numberScale.snapTo(0.82f)
         floatY.snapTo(0f)
         floatAlpha.snapTo(1f)
-        launch {
+        scope.launch {
             numberScale.animateTo(1.15f, spring(dampingRatio = 0.35f, stiffness = 700f))
             numberScale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 500f))
         }
         if (lastDelta > 0) {
-            launch {
+            scope.launch {
                 heartScale.snapTo(1f)
                 heartScale.animateTo(1.5f, spring(dampingRatio = 0.3f, stiffness = 700f))
                 heartScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
             }
         }
-        launch { floatY.animateTo(-26f, tween(700)) }
+        scope.launch { floatY.animateTo(-26f, tween(700)) }
         floatAlpha.animateTo(0f, tween(700, delayMillis = 200))
     }
-
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -910,76 +927,465 @@ private fun TapModePreview() {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Mode tile
-// ─────────────────────────────────────────────────────────────────────────────
+/** Identifies which voice toggle requested microphone permission, so the grant callback can re-dispatch. */
+private enum class PendingVoiceToggle { LAND, END_TURN }
 
+/**
+ * Full voice-controls block: a tappable "Voice recognition language" row (which opens the
+ * per-language management sheet) plus one toggle row per voice command (Land reminder, End turn).
+ * Each toggle handles the RECORD_AUDIO permission flow and exposes an info dialog listing the
+ * recognized phrases for the currently selected language.
+ *
+ * @param voiceModelStates Per-language model state used to gate the toggles and label the row.
+ * @param onOpenVoiceLanguages Opens the [VoiceLanguagesSheet] for downloading/selecting a language.
+ */
 @Composable
-private fun ModeTile(
-    mode: GameMode,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun VoiceControlsSection(
+    gameSettings: GameSettings,
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
+    onToggleLandVoice: () -> Unit,
+    onToggleEndTurnVoice: () -> Unit,
+    onOpenVoiceLanguages: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1.05f else 1f,
-        animationSpec = tween(durationMillis = 300),
-        label = "modeScale"
-    )
-    
-    val borderColor by animateColorAsState(
-        targetValue = if (selected) mc.primaryAccent else mc.surfaceVariant.copy(alpha = 0.5f),
-        animationSpec = tween(durationMillis = 300),
-        label = "borderColor"
-    )
-    
-    val bgColor by animateColorAsState(
-        targetValue = if (selected) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface,
-        animationSpec = tween(durationMillis = 300),
-        label = "bgColor"
-    )
+    val context = LocalContext.current
+    var showLandInfoDialog by remember { mutableStateOf(false) }
+    var showEndTurnInfoDialog by remember { mutableStateOf(false) }
+    var pendingVoiceToggle by remember { mutableStateOf<PendingVoiceToggle?>(null) }
 
-    val elevation by animateFloatAsState(
-        targetValue = if (selected) 8f else 0f,
-        animationSpec = tween(durationMillis = 300),
-        label = "elevation"
-    )
+    val selectedLanguage = gameSettings.voiceLanguage
+    val isModelReady = voiceModelStates[selectedLanguage] is VoiceModelState.Ready
 
-    Column(
-        modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                shadowElevation = elevation
-                shape = RoundedCornerShape(12.dp)
-                clip = true
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted && isModelReady) {
+            when (pendingVoiceToggle) {
+                PendingVoiceToggle.LAND -> onToggleLandVoice()
+                PendingVoiceToggle.END_TURN -> onToggleEndTurnVoice()
+                null -> {}
             }
-            .background(bgColor)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(12.dp),
+        }
+        pendingVoiceToggle = null
+    }
+
+    // Requests permission if needed, otherwise toggles immediately.
+    fun handleToggle(isEnabled: Boolean, which: PendingVoiceToggle, toggle: () -> Unit) {
+        if (isEnabled) {
+            toggle()
+        } else {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            if (hasPermission) {
+                toggle()
+            } else {
+                pendingVoiceToggle = which
+                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // ── Voice language row (opens the management sheet) ───────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onOpenVoiceLanguages)
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.RecordVoiceOver,
+                contentDescription = null,
+                tint = if (isModelReady) mc.primaryAccent else mc.textDisabled,
+                modifier = Modifier.size(24.dp),
             )
-            .clickable(onClick = onClick)
-            .padding(vertical = 20.dp, horizontal = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = if (mode == GameMode.COMMANDER) "⚔️" else "🔮",
-            style = MaterialTheme.magicTypography.displayMedium,
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.gamesetup_voice_language_row_title),
+                    style = MaterialTheme.magicTypography.titleMedium,
+                    color = mc.textPrimary,
+                )
+                Text(
+                    text = if (isModelReady) {
+                        "${selectedLanguage.displayFlag} ${selectedLanguage.displayName}"
+                    } else {
+                        stringResource(R.string.gamesetup_voice_no_model_selected)
+                    },
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+
+        // ── Voice: Land Reminder row ──────────────────────────────────
+        VoiceFeatureToggleRow(
+            iconResId = R.drawable.ic_land,
+            title = stringResource(R.string.gamesetup_voice_land_reminder_title),
+            subtitle = stringResource(R.string.gamesetup_voice_land_reminder_subtitle),
+            enabled = gameSettings.voiceLandReminderEnabled,
+            isModelReady = isModelReady,
+            onToggle = {
+                handleToggle(gameSettings.voiceLandReminderEnabled, PendingVoiceToggle.LAND, onToggleLandVoice)
+            },
+            onInfoClick = { showLandInfoDialog = true },
         )
-        Text(
-            text = mode.displayName,
-            style = MaterialTheme.magicTypography.titleMedium,
-            color = if (selected) mc.primaryAccent else mc.textPrimary,
-        )
-        Text(
-            text = "${mode.startingLife} life",
-            style = MaterialTheme.magicTypography.bodyMedium,
-            color = mc.textSecondary,
+
+        // ── Voice: End Turn row ───────────────────────────────────────
+        VoiceFeatureToggleRow(
+            iconResId = null,
+            iconVector = Icons.AutoMirrored.Filled.ArrowForward,
+            title = stringResource(R.string.gamesetup_voice_end_turn_title),
+            subtitle = stringResource(R.string.gamesetup_voice_end_turn_subtitle),
+            enabled = gameSettings.voiceEndTurnEnabled,
+            isModelReady = isModelReady,
+            onToggle = {
+                handleToggle(gameSettings.voiceEndTurnEnabled, PendingVoiceToggle.END_TURN, onToggleEndTurnVoice)
+            },
+            onInfoClick = { showEndTurnInfoDialog = true },
         )
     }
+
+    // Info dialogs — scoped to the currently selected language.
+    if (showLandInfoDialog) {
+        VoicePhrasesInfoDialog(
+            title = stringResource(R.string.gamesetup_voice_land_phrases_title),
+            command = VoiceCommand.PlayLand,
+            enabledLanguages = setOf(selectedLanguage),
+            onDismiss = { showLandInfoDialog = false },
+        )
+    }
+    if (showEndTurnInfoDialog) {
+        VoicePhrasesInfoDialog(
+            title = stringResource(R.string.gamesetup_voice_end_turn_phrases_title),
+            command = VoiceCommand.EndTurn,
+            enabledLanguages = setOf(selectedLanguage),
+            onDismiss = { showEndTurnInfoDialog = false },
+        )
+    }
+}
+
+/**
+ * Bottom sheet for managing the per-language offline voice models.
+ *
+ * Each language row exposes a state-appropriate control: download, an indeterminate-free
+ * progress bar while downloading, a selection radio + delete affordance when ready, or a
+ * retry button on error. Selecting a ready language makes it the active recognition language.
+ *
+ * @param voiceModelStates Per-language model state.
+ * @param selectedLanguage The currently active recognition language.
+ * @param onSelectLanguage Called when the user selects a ready language.
+ * @param onDownload Called to (re)download a language's model.
+ * @param onDelete Called to remove a downloaded language's model.
+ * @param onDismiss Closes the sheet.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VoiceLanguagesSheet(
+    voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
+    selectedLanguage: VoiceLanguage,
+    onSelectLanguage: (VoiceLanguage) -> Unit,
+    onDownload: (VoiceLanguage) -> Unit,
+    onDelete: (VoiceLanguage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Header row with close button + title.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.offset(x = (-12).dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.voice_languages_sheet_title),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                )
+            }
+
+            VoiceLanguage.entries.forEachIndexed { index, language ->
+                if (index > 0) {
+                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                }
+                VoiceLanguageRow(
+                    language = language,
+                    state = voiceModelStates[language] ?: VoiceModelState.NotDownloaded,
+                    isSelected = language == selectedLanguage,
+                    onSelect = { onSelectLanguage(language) },
+                    onDownload = { onDownload(language) },
+                    onDelete = { onDelete(language) },
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.voice_manage_in_settings),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+/**
+ * A single language row inside [VoiceLanguagesSheet]: flag + name on the left, and a
+ * state-appropriate trailing control on the right.
+ */
+@Composable
+private fun VoiceLanguageRow(
+    language: VoiceLanguage,
+    state: VoiceModelState,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(text = language.displayFlag, style = ty.titleLarge)
+        Text(
+            text = language.displayName,
+            style = ty.titleMedium,
+            color = mc.textPrimary,
+            modifier = Modifier.weight(1f),
+        )
+
+        when (state) {
+            is VoiceModelState.NotDownloaded -> TextButton(onClick = onDownload) {
+                Text(
+                    text = stringResource(R.string.voice_model_download),
+                    style = ty.labelMedium,
+                    color = mc.primaryAccent,
+                )
+            }
+            is VoiceModelState.Downloading -> LinearProgressIndicator(
+                progress = { state.progress },
+                modifier = Modifier.width(80.dp),
+                color = mc.primaryAccent,
+                trackColor = mc.surfaceVariant,
+            )
+            is VoiceModelState.Ready -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                RadioButton(
+                    selected = isSelected,
+                    onClick = onSelect,
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = mc.primaryAccent,
+                        unselectedColor = mc.textDisabled,
+                    ),
+                )
+                // Disallow deleting the active language to avoid an inconsistent selection.
+                if (!isSelected) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = stringResource(R.string.voice_model_delete),
+                            tint = mc.textSecondary,
+                        )
+                    }
+                }
+            }
+            is VoiceModelState.Error -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.gamesetup_voice_download_failed),
+                    style = ty.labelSmall,
+                    color = mc.lifeNegative,
+                )
+                TextButton(onClick = onDownload) {
+                    Text(
+                        text = stringResource(R.string.voice_model_retry),
+                        style = ty.labelMedium,
+                        color = mc.primaryAccent,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A single voice-command toggle row: leading icon (drawable or vector), title + subtitle,
+ * an info button, and a switch gated on model readiness.
+ */
+@Composable
+private fun VoiceFeatureToggleRow(
+    iconResId: Int?,
+    iconVector: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    isModelReady: Boolean,
+    onToggle: () -> Unit,
+    onInfoClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val iconTint by animateColorAsState(
+        targetValue = if (enabled) mc.primaryAccent else mc.textDisabled,
+        animationSpec = tween(300), label = "voiceIconTint",
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        when {
+            iconResId != null -> Icon(
+                painter = painterResource(iconResId),
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(24.dp),
+            )
+            iconVector != null -> Icon(
+                imageVector = iconVector,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+            Text(text = subtitle, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
+        }
+        IconButton(
+            onClick = onInfoClick,
+            modifier = Modifier.size(32.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = stringResource(R.string.action_info),
+                tint = mc.textDisabled,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Switch(
+            checked = enabled,
+            enabled = isModelReady,
+            onCheckedChange = { onToggle() },
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = mc.primaryAccent,
+                checkedThumbColor = mc.background,
+                uncheckedTrackColor = mc.surfaceVariant,
+                uncheckedThumbColor = mc.textDisabled,
+                disabledCheckedTrackColor = mc.surfaceVariant,
+                disabledUncheckedTrackColor = mc.surfaceVariant,
+            ),
+        )
+    }
+}
+
+/**
+ * Dialog listing the recognized voice phrases for a given command, grouped by enabled language.
+ */
+@Composable
+private fun VoicePhrasesInfoDialog(
+    title: String,
+    command: VoiceCommand,
+    enabledLanguages: Set<VoiceLanguage>,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val phrases = CommandGrammar.allEntries
+        .filter { it.command == command && it.language in enabledLanguages }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, color = mc.textPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (phrases.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.gamesetup_voice_no_phrases),
+                        color = mc.textSecondary,
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                    )
+                } else {
+                    VoiceLanguage.entries.filter { it in enabledLanguages }.forEach { lang ->
+                        val langPhrases = phrases.filter { it.language == lang }
+                        if (langPhrases.isNotEmpty()) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(text = lang.displayFlag, style = MaterialTheme.magicTypography.bodyMedium)
+                                Text(
+                                    text = lang.displayCode,
+                                    style = MaterialTheme.magicTypography.labelSmall,
+                                    color = mc.textSecondary,
+                                )
+                            }
+                            langPhrases.forEach { entry ->
+                                Row(
+                                    modifier = Modifier.padding(start = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("•", color = mc.primaryAccent, style = MaterialTheme.magicTypography.bodyMedium)
+                                    Text(
+                                        text = "\"${entry.phrase}\"",
+                                        color = mc.textPrimary,
+                                        style = MaterialTheme.magicTypography.bodyMedium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_ok), color = mc.primaryAccent)
+            }
+        },
+        containerColor = mc.surface,
+    )
 }

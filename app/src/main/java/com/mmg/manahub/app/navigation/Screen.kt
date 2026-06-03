@@ -53,7 +53,18 @@ sealed class Screen(val route: String) {
     }
 
     // ── Game flow (central FAB) ───────────────────────────────────────────────
-    object GameSetup  : Screen("game/setup")
+
+    /**
+     * Game setup screen. Supports an optional [joinCode] query parameter so that
+     * deep-link join flows can pre-open the join sheet without a separate lobby screen.
+     */
+    object GameSetup : Screen("game/setup?joinCode={joinCode}") {
+        /** Base route used for navigation when no join code is needed. */
+        const val baseRoute = "game/setup"
+
+        /** Builds a route that pre-fills the join sheet with [code]. */
+        fun routeWithJoinCode(code: String) = "game/setup?joinCode=$code"
+    }
     object GamePlay   : Screen("game/play/{mode}/{playerCount}") {
         fun createRoute(mode: String, playerCount: Int) = "game/play/$mode/$playerCount"
     }

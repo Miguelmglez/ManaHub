@@ -14,7 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -64,7 +67,10 @@ fun TradeSelectionSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     // Local mutable state: userCardId → trade quantity being edited
     val editQty = remember(userCards, currentTradeQty) {
@@ -80,6 +86,7 @@ fun TradeSelectionSheet(
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        dragHandle = null,
     ) {
         Column(
             modifier = Modifier
@@ -87,6 +94,25 @@ fun TradeSelectionSheet(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),
         ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel),
+                        tint = mc.textSecondary
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             // Title
             Text(
                 text = stringResource(R.string.carddetail_trade_sheet_title),
@@ -276,9 +302,6 @@ private fun CopyRow(
 
                     // Foil
                     if (userCard.isFoil) FoilBadge()
-
-                    // Alt art
-                    if (userCard.isAlternativeArt) AltArtBadge()
                 }
 
                 // Trade status line
@@ -295,7 +318,7 @@ private fun CopyRow(
             // Action button
             IconButton(
                 onClick = onAction,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(40.dp),
                 colors = IconButtonDefaults.iconButtonColors(
                     containerColor = actionColor.copy(alpha = 0.12f),
                     contentColor = actionColor,

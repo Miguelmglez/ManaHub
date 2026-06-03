@@ -414,7 +414,7 @@ class SyncManager @Inject constructor(
         for (guestRow in guestRows) {
             val userRow = collectionDao.getByCompositeKey(
                 userId, guestRow.scryfallId, guestRow.isFoil,
-                guestRow.condition, guestRow.language, guestRow.isAlternativeArt,
+                guestRow.condition, guestRow.language,
             )
             if (userRow != null) {
                 if (guestRow.updatedAt > userRow.updatedAt) {
@@ -466,7 +466,7 @@ class SyncManager @Inject constructor(
             // different (guest-generated) UUID. Find it by composite key.
             val byComposite = collectionDao.getByCompositeKey(
                 dto.userId, dto.scryfallId, dto.isFoil,
-                dto.condition, dto.language, dto.isAlternativeArt,
+                dto.condition, dto.language,
             )
             if (byComposite != null) {
                 // LWW: if the local row is strictly newer, skip this remote row entirely.
