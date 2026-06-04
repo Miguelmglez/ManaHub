@@ -1,15 +1,17 @@
 package com.mmg.manahub.feature.draft.data.engine
 
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.feature.decks.presentation.engine.DeckEntry
+import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
 import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
-import com.mmg.manahub.feature.decks.presentation.engine.MagicScorer
-import com.mmg.manahub.feature.decks.presentation.engine.SynergyScorer
 import com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder
 import com.mmg.manahub.feature.draft.domain.model.BasicLandSlot
 import com.mmg.manahub.feature.draft.domain.model.DraftCard
 import com.mmg.manahub.feature.draft.domain.model.DraftDeck
 import com.mmg.manahub.feature.draft.domain.model.DraftSeat
+import javax.inject.Inject
 import kotlin.math.roundToInt
 
 /**
@@ -18,11 +20,13 @@ import kotlin.math.roundToInt
  * Pipeline:
  * 1. Determine the seat's top-2 colors from [DraftSeat.colorCommitment] (falls back to counting
  *    card colors in the pool when no commitment was recorded, e.g. a human-only sealed pool).
- * 2. Score every non-land card in the pool with [MagicScorer] and [SynergyScorer] against those
- *    colors and take the 23 highest combined scores.
+ * 2. Score every non-land card in the pool with [DeckScorer] against those colors and take the
+ *    23 highest combined scores.
  * 3. Allocate 17 basic lands across the two colors proportionally to their commitment weights.
  */
-class ScoringDraftDeckBuilder : DraftDeckBuilder {
+class ScoringDraftDeckBuilder @Inject constructor(
+    private val deckScorer: DeckScorer,
+) : DraftDeckBuilder {
 
     override fun build(seat: DraftSeat): DraftDeck {
         val topColorWeights = resolveTopColorWeights(seat)
@@ -34,10 +38,19 @@ class ScoringDraftDeckBuilder : DraftDeckBuilder {
             it.card.typeLine.contains("Land", ignoreCase = true)
         }
 
-        val avgCmc = if (nonLands.isEmpty()) 3.0 else nonLands.sumOf { it.card.cmc } / nonLands.size
+        // Build a lightweight profile for DRAFT format with the selected colors.
+        val dummyMainboard = emptyList<DeckEntry>()
+        val profile = deckScorer.profile(
+            mainboard = dummyMainboard,
+            format = DeckFormat.DRAFT,
+            colorIdentity = selectedColors,
+            seedTags = emptyList(),
+        )
 
         val mainboard = nonLands
-            .sortedByDescending { combinedScore(it, selectedColors, avgCmc) }
+            .sortedByDescending { draftCard ->
+                deckScorer.fit(draftCard.card, profile, isOwned = true).score
+            }
             .take(MAINBOARD_SIZE)
 
         val basics = buildBasicLands(topColorWeights)
@@ -70,30 +83,6 @@ class ScoringDraftDeckBuilder : DraftDeckBuilder {
             .sortedByDescending { it.value }
             .take(MAX_DECK_COLORS)
             .associate { it.key to it.value }
-    }
-
-    // ── Card scoring ────────────────────────────────────────────────────────────
-
-    private fun combinedScore(
-        card: DraftCard,
-        selectedColors: Set<ManaColor>,
-        avgCmc: Double,
-    ): Float {
-        val magicScore = MagicScorer.score(
-            card = card.card,
-            targetTags = emptyList(),
-            selectedColors = selectedColors,
-            currentAverageCmc = avgCmc,
-            deckSize = 0,
-        ).score
-        val synergyScore = SynergyScorer.score(
-            card = card.card,
-            seedTags = emptyList(),
-            selectedColors = selectedColors,
-            mainboard = emptyList<DeckEntry>(),
-            isOwned = true,
-        ).score
-        return (magicScore + synergyScore) / 2f
     }
 
     // ── Basic lands ──────────────────────────────────────────────────────────────

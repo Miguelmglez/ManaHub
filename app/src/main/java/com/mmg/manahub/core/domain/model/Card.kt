@@ -58,6 +58,14 @@ data class Card(
     /** True when Scryfall marks this card as a "Game Changer" in its format. */
     val gameChanger: Boolean = false,
     /**
+     * EDHREC popularity rank (lower = more played). Null when Scryfall does not
+     * provide a rank for this card. Consumed by [EdhrecPowerResolver] to derive a
+     * power signal for the Deck Doctor scoring engine.
+     */
+    val edhrecRank: Int? = null,
+    /** Penny Dreadful popularity rank (lower = more played). Null when absent. */
+    val pennyRank: Int? = null,
+    /**
      * Full per-face data for double-faced cards (DFCs), meld cards, etc.
      * Null for single-faced cards.  [imageBackNormal] remains as a fast-access
      * shortcut for the most common DFC use-case (displaying the back image).

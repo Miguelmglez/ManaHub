@@ -20,10 +20,7 @@ class DefaultDraftEngine(
 ) : DraftEngine {
 
     override fun start(set: DraftableSet, config: DraftConfig): DraftState {
-        // The bot drafter is a @Singleton with per-seat learning state that accumulates across a
-        // session. Clear it before each new draft so a fresh draft does not inherit color
-        // commitment from a previous one.
-        (botDrafter as? HeuristicBotDrafter)?.resetState()
+        // The bot drafter is stateless and derives commitments dynamically from the pool.
         return when (config.mode) {
             DraftMode.DRAFT -> startDraft(set, config)
             DraftMode.SEALED -> startSealed(set, config)
@@ -184,13 +181,9 @@ class DefaultDraftEngine(
 
     override fun autoPick(state: DraftState): DraftState {
         val humanIndex = state.seats.indexOfFirst { it.isHuman }.takeIf { it >= 0 } ?: 0
+        val humanSeat = state.seats[humanIndex]
         val pack = state.packsInFlight[humanIndex] ?: return state
-        val best = pack.cards.minWithOrNull(
-            compareBy(
-                { it.pickOrderRank ?: Int.MAX_VALUE },
-                { it.card.name },
-            )
-        ) ?: return state
+        val best = botDrafter.pick(humanSeat, pack, state.round, state.pickNumber)
         return applyHumanPick(state, best.card.scryfallId)
     }
 

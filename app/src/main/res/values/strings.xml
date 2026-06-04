@@ -637,6 +637,130 @@
     <string name="deck_improve_suggestion_swap_from_sideboard">Swap %1$s from sideboard for %2$s</string>
 
     <!-- ══════════════════════════════════════════
+         DECK DOCTOR — HEALTH
+    ═══════════════════════════════════════════ -->
+    <!-- Tabs -->
+    <string name="deck_doctor_tab_health">Health</string>
+    <string name="deck_doctor_tab_cut">Cut</string>
+    <string name="deck_doctor_tab_add">Add</string>
+    <string name="deck_doctor_suggestions_coming_soon">Suggestions coming soon</string>
+
+    <!-- Sections -->
+    <string name="deck_health_section_roles">Role coverage</string>
+    <string name="deck_health_section_curve">Mana curve</string>
+    <string name="deck_health_section_warnings">Warnings</string>
+    <string name="deck_health_empty_title">No health data available for this deck.</string>
+    <string name="deck_health_error">Could not evaluate this deck.</string>
+
+    <!-- Score ring -->
+    <string name="deck_health_verdict_excellent">Excellent</string>
+    <string name="deck_health_verdict_solid">Solid</string>
+    <string name="deck_health_verdict_needs_work">Needs work</string>
+    <string name="deck_health_verdict_rough">Rough</string>
+    <string name="deck_health_score_cd">Deck health score: %1$d out of 100</string>
+
+    <!-- Mana curve -->
+    <string name="deck_health_avg_cmc">Average mana value: %1$s (lands excluded)</string>
+    <string name="deck_health_curve_cd">Mana curve of non-land cards by mana value</string>
+
+    <!-- Roles -->
+    <string name="deck_role_ramp">Ramp</string>
+    <string name="deck_role_card_advantage">Card Draw</string>
+    <string name="deck_role_spot_removal">Removal</string>
+    <string name="deck_role_board_wipe">Board Wipes</string>
+    <string name="deck_role_interaction">Interaction</string>
+    <string name="deck_role_tutor">Tutors</string>
+    <string name="deck_role_payoff">Payoffs</string>
+    <string name="deck_role_synergy">Synergy</string>
+    <string name="deck_role_threat">Threats</string>
+    <string name="deck_role_land">Lands</string>
+    <string name="deck_role_filler">Filler</string>
+
+    <!-- Warnings -->
+    <string name="deck_health_warning_too_few_lands">Too few lands: %1$d (aim for about %2$d).</string>
+    <string name="deck_health_warning_too_many_lands">Too many lands: %1$d (aim for about %2$d).</string>
+    <string name="deck_health_warning_missing_role">Missing %1$s — aim for about %2$d.</string>
+    <string name="deck_health_warning_curve_too_high">Mana curve is too high (avg %1$s). You may stumble early.</string>
+    <string name="deck_health_warning_curve_too_low">Mana curve is very low (avg %1$s). You may run out of gas.</string>
+    <string name="deck_health_warning_low_synergy">Low synergy density (%1$d%%). Cards do not pull in one direction.</string>
+
+    <!-- ══════════════════════════════════════════
+         DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
+    ═══════════════════════════════════════════ -->
+    <!-- Captions -->
+    <string name="deck_doctor_cut_caption">Ranked by lowest fit. Commander and combo cores are protected.</string>
+    <string name="deck_doctor_add_caption">Ranked by best fit, from your collection.</string>
+
+    <!-- Empty states -->
+    <string name="deck_doctor_cut_empty_title">No cut candidates — this deck looks tight.</string>
+    <string name="deck_doctor_add_empty_title">No add suggestions yet.</string>
+    <string name="deck_doctor_add_empty_subtitle">Add more cards to your collection to get suggestions that fit this deck.</string>
+
+    <!-- Row details -->
+    <string name="deck_doctor_fit_score">fit %1$.2f</string>
+    <string name="deck_doctor_price_free">Free</string>
+
+    <!-- Action button content descriptions -->
+    <string name="deck_doctor_cut_cd">Remove %1$s from deck</string>
+    <string name="deck_doctor_add_cd">Add %1$s to deck</string>
+
+    <!-- Toast confirmations -->
+    <string name="deck_doctor_toast_cut">Removed %1$s</string>
+    <string name="deck_doctor_toast_add">Added %1$s</string>
+    <string name="deck_doctor_toast_external_failed">Couldn\'t reach Scryfall — showing collection and wishlist suggestions only.</string>
+
+    <!-- Origin badges -->
+    <string name="deck_doctor_origin_wishlist">Wishlist</string>
+    <string name="deck_doctor_origin_new">New</string>
+
+    <!-- Budget filter bar (Phase 6) -->
+    <string name="deck_doctor_budget_title">Budget</string>
+    <string name="deck_doctor_budget_per_card">Max €/card</string>
+    <string name="deck_doctor_budget_total">Max total</string>
+    <string name="deck_doctor_budget_any">Any</string>
+    <string name="deck_doctor_budget_clear">Clear budget filters</string>
+    <string name="deck_doctor_budget_per_card_value">≤ %1$s €/card</string>
+    <string name="deck_doctor_budget_total_value">≤ %1$s € total</string>
+    <!-- "to buy: 12.50 € of 3 cards" -->
+    <string name="deck_doctor_budget_to_buy">To buy: %1$s € of %2$d cards</string>
+    <string name="deck_doctor_budget_all_owned">All suggestions are already in your collection — free to add.</string>
+    <string name="deck_doctor_price_eur">%1$s €</string>
+    <string name="deck_doctor_price_unknown">No price</string>
+    <!-- Quick-pick caps shown as selectable chips, in euros -->
+    <string name="deck_doctor_budget_cap_label">%1$d €</string>
+
+    <!-- Deck Magic — build from seeds (Phase 7) -->
+    <string name="deck_seeds_search_hint">Search a card to seed your deck…</string>
+    <string name="deck_seeds_results_title">Search results</string>
+    <string name="deck_seeds_picked_title">Seed cards</string>
+    <string name="deck_seeds_add_seed">Add seed card</string>
+    <string name="deck_seeds_remove_seed">Remove seed card</string>
+    <string name="deck_seeds_empty_title">No seeds yet</string>
+    <string name="deck_seeds_empty_message">Search for a card above and add it to seed your deck.</string>
+    <string name="deck_seeds_identity_title">Inferred identity</string>
+    <string name="deck_seeds_identity_colors">Color identity</string>
+    <string name="deck_seeds_identity_colorless">Colorless</string>
+    <string name="deck_seeds_identity_strategy">Strategy</string>
+    <string name="deck_seeds_identity_strategy_unknown">Not detected</string>
+    <string name="deck_seeds_skeleton_title">Deck skeleton</string>
+    <string name="deck_seeds_generate_cta">Generate deck →</string>
+    <string name="deck_seeds_generating">Generating…</string>
+
+    <!-- Score reasons -->
+    <string name="deck_reason_synergy">Synergy</string>
+    <string name="deck_reason_fills_gap">Fills: %1$s</string>
+    <string name="deck_reason_overcovered">%1$s overcovered %2$d/%3$d</string>
+    <string name="deck_reason_on_curve">On curve</string>
+    <string name="deck_reason_curve_gap">Curve gap</string>
+    <string name="deck_reason_high_power">High power</string>
+    <string name="deck_reason_game_changer">Game changer</string>
+    <string name="deck_reason_low_power">Low power</string>
+    <string name="deck_reason_off_strategy">Off strategy</string>
+    <string name="deck_reason_off_color">Off-color</string>
+    <string name="deck_reason_colorless">Colorless</string>
+    <string name="deck_reason_in_collection">In collection</string>
+
+    <!-- ══════════════════════════════════════════
          GAME SETUP SCREEN
     ═══════════════════════════════════════════ -->
     <string name="gamesetup_title">New Game</string>
@@ -1107,6 +1231,26 @@
     <string name="playtest_a_missing_draw">Card Draw</string>
     <string name="playtest_a_missing_nothing">Nothing Missing</string>
     <string name="playtest_session_expired">Playtest session data was lost (process was killed). Please go back and start a new session.</string>
+
+    <!-- Battlefield (PLAY phase) -->
+    <string name="playtest_battle_title">Battlefield</string>
+    <string name="playtest_battle_action_end_test">End Test</string>
+    <string name="playtest_battle_confirm_end_title">End this test?</string>
+    <string name="playtest_battle_confirm_end_body">Your progress won\'t be saved.</string>
+    <string name="playtest_battle_confirm_end_confirm">End Test</string>
+    <string name="playtest_battle_confirm_end_cancel">Keep Playing</string>
+    <string name="playtest_battle_zone_lands">Lands</string>
+    <string name="playtest_battle_zone_permanents">Permanents</string>
+    <string name="playtest_battle_library_cd">Library, %1$d cards remaining</string>
+    <string name="playtest_battle_graveyard_cd">Graveyard, %1$d cards</string>
+    <string name="playtest_battle_draw_card">Draw a card</string>
+    <string name="playtest_battle_library_empty">Library is empty</string>
+    <string name="playtest_save_success">Test saved successfully</string>
+    <string name="playtest_battle_hand_empty">No cards in hand</string>
+    <string name="playtest_battle_field_empty_lands">Play lands here</string>
+    <string name="playtest_battle_field_empty_permanents">Play permanents here</string>
+    <string name="playtest_battle_graveyard_label">Graveyard</string>
+    <string name="playtest_battle_hand_label">Hand</string>
 
     <!-- ══════════════════════════════════════════
          TOURNAMENT SCREEN

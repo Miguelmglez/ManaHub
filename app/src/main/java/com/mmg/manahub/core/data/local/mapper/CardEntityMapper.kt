@@ -97,6 +97,8 @@ fun CardEntity.toDomainCard(): Card = Card(
     artist = artist,
     scryfallUri = scryfallUri,
     gameChanger = gameChanger,
+    edhrecRank = edhrecRank,
+    pennyRank = pennyRank,
     isStale = isStale,
     staleReason = staleReason,
     cachedAt = cachedAt,
@@ -161,6 +163,8 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     relatedUris = relatedUris.toMapJsonString(),
     purchaseUris = purchaseUris.toMapJsonString(),
     gameChanger = gameChanger,
+    edhrecRank = edhrecRank,
+    pennyRank = pennyRank,
     cardFaces = cardFaces?.let { gson.toJson(it) },
 )
 

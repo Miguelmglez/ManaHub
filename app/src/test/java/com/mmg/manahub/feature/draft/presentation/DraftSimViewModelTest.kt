@@ -62,6 +62,7 @@ class DraftSimViewModelTest {
     private val completeDraft: CompleteDraftUseCase = mockk()
     private val getDraftableSimSet: GetDraftableSimSetUseCase = mockk()
     private val analytics: AnalyticsHelper = mockk(relaxed = true)
+    private val botDrafter: com.mmg.manahub.feature.draft.domain.engine.BotDrafter = mockk(relaxed = true)
 
     /** Fake repository backing [ObserveDraftUseCase] with a real, controllable Flow. */
     private val fakeRepository = FakeDraftSimRepository()
@@ -97,6 +98,7 @@ class DraftSimViewModelTest {
             completeDraft = completeDraft,
             getDraftableSimSet = getDraftableSimSet,
             analytics = analytics,
+            botDrafter = botDrafter,
         )
 
     private fun fakeDraftableSet(): DraftableSet = DraftableSet(

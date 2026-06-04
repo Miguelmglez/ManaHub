@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.model.DeckFormat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ import javax.inject.Inject
 class DeckBuilderEngine @Inject constructor(
     private val userCardRepo: UserCardRepository,
     private val deckRepo:     DeckRepository,
+    private val deckScorer:   DeckScorer,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DeckBuilderUiState())
@@ -132,19 +134,34 @@ class DeckBuilderEngine @Inject constructor(
         val alreadyIn = (s.mainboard + s.sideboard).map { it.card.scryfallId }.toSet()
 
         val collection = userCardRepo.observeCollection().first()
-        val suggestions = collection
-            .filter { it.card.scryfallId !in alreadyIn }
-            .map { uwc ->
-                SynergyScorer.score(
-                    card           = uwc.card,
-                    seedTags       = strategy.primaryTags,
-                    selectedColors = s.selectedColors,
-                    mainboard      = s.mainboard,
-                    isOwned        = true,
-                )
-            }
-            .filter { it.score > 0f }
-            .sortedByDescending { it.score }
+        val candidates = collection.map { it.card }
+        val ownedIds = candidates.map { it.scryfallId }.toSet()
+
+        val profile = deckScorer.profile(
+            mainboard = s.mainboard,
+            format = when (s.format) {
+                GameFormat.COMMANDER -> DeckFormat.COMMANDER
+                else -> DeckFormat.STANDARD
+            },
+            colorIdentity = s.selectedColors,
+            seedTags = strategy.primaryTags
+        )
+
+        val ranked = deckScorer.rankAdds(
+            candidates = candidates.filter { it.scryfallId !in alreadyIn },
+            profile = profile,
+            ownedIds = ownedIds,
+            limit = 50
+        )
+
+        val suggestions = ranked.map { fit ->
+            CardSuggestion(
+                card = fit.card,
+                score = fit.score,
+                reasons = fit.roles.map { it.name },
+                isOwned = fit.isOwned
+            )
+        }
 
         _state.update { it.copy(
             suggestionQueue   = suggestions,

@@ -81,6 +81,9 @@ object DatabaseModule {
                 // v36 → v37 lives as a top-level `val` in Migration_36_37.kt so the
                 // instrumented MigrationTestHelper test can reference it directly.
                 MIGRATION_36_37,
+                // v37 → v38 lives as a top-level `val` in Migration_37_38.kt (same
+                // reason). Adds nullable edhrec_rank / penny_rank to `cards`.
+                MIGRATION_37_38,
             )
             .build()
 

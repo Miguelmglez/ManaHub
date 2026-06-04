@@ -80,7 +80,7 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         PlaytestSurveyAnswerEntity::class,
         DraftSessionEntity::class,
     ],
-    version = 37,
+    version = 38,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

@@ -48,6 +48,10 @@ abstract class DraftModule {
     @Singleton
     abstract fun bindDraftSimRepository(impl: DraftSimRepositoryImpl): DraftSimRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindDraftDeckBuilder(impl: ScoringDraftDeckBuilder): DraftDeckBuilder
+
     companion object {
 
         private const val MAX_RESPONSE_BYTES = 5L * 1024 * 1024 // 5 MB
@@ -69,11 +73,6 @@ abstract class DraftModule {
         @Provides
         @Singleton
         fun provideBoosterGenerator(): BoosterGenerator = WeightedBoosterGenerator()
-
-        /** Scoring-based deck builder for the final draft pool. */
-        @Provides
-        @Singleton
-        fun provideDraftDeckBuilder(): DraftDeckBuilder = ScoringDraftDeckBuilder()
 
         /** The draft engine, wired with the booster generator and bot drafter. */
         @Provides

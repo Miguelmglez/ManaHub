@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
+import com.mmg.manahub.feature.draft.domain.model.BoosterPack
 import com.mmg.manahub.feature.draft.domain.model.DraftCard
 import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftError
@@ -46,6 +48,7 @@ class DraftSimViewModel @Inject constructor(
     private val completeDraft: CompleteDraftUseCase,
     private val getDraftableSimSet: GetDraftableSimSetUseCase,
     private val analytics: AnalyticsHelper,
+    private val botDrafter: BotDrafter,
 ) : ViewModel() {
 
     /** Set code passed via the [com.mmg.manahub.app.navigation.Screen.DraftSimSetup] route. */
@@ -269,9 +272,11 @@ class DraftSimViewModel @Inject constructor(
                     DraftStatus.SETUP -> _uiState.value = DraftSimUiState.Loading
                     DraftStatus.DRAFTING -> {
                         val pack = humanPack(state)
-                        val suggestedId = pack.minWithOrNull(
-                            compareBy({ it.pickOrderRank ?: Int.MAX_VALUE }, { it.card.name })
-                        )?.card?.scryfallId
+                        val humanSeat = state.seats.firstOrNull { it.isHuman }
+                        val suggestedId = if (humanSeat != null && pack.isNotEmpty()) {
+                            botDrafter.pick(humanSeat, BoosterPack("temp", pack), state.round, state.pickNumber).card.scryfallId
+                        } else null
+                        
                         _uiState.value = DraftSimUiState.Drafting(
                             state = state,
                             currentPack = pack,

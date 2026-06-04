@@ -36,6 +36,8 @@ data class CardDto(
     @SerializedName("related_uris")     val relatedUris:     Map<String, String>? = null,
     @SerializedName("purchase_uris")    val purchaseUris:    Map<String, String>? = null,
     @SerializedName("game_changer")     val gameChanger:     Boolean? = null,
+    @SerializedName("edhrec_rank")      val edhrecRank:      Int? = null,
+    @SerializedName("penny_rank")       val pennyRank:       Int? = null,
 )
 
 data class ImageUrisDto(

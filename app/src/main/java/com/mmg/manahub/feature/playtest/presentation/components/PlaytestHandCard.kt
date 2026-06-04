@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,6 +19,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 
 /**
@@ -50,9 +50,9 @@ fun PlaytestHandCard(
             .width(width)
             .aspectRatio(63f / 88f)
             .scale(scale)
-            .shadow(elevation = elevation, shape = RoundedCornerShape(8.dp))
-            .clip(RoundedCornerShape(8.dp))
-            .border(0.5.dp, mc.surfaceVariant, RoundedCornerShape(8.dp))
+            .shadow(elevation = elevation, shape = CardShape)
+            .clip(CardShape)
+            .border(0.5.dp, mc.surfaceVariant, CardShape)
             .background(mc.surface)
             // Tap gesture handled separately from drag — both can coexist.
             .pointerInput(card.scryfallId) {

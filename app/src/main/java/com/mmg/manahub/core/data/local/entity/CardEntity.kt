@@ -87,6 +87,21 @@ data class CardEntity(
     val gameChanger: Boolean = false,
 
     /**
+     * EDHREC popularity rank (lower = more played). Null when Scryfall does not
+     * provide a rank for this card. Nullable with NO defaultValue — absence is
+     * meaningful and must not be coerced to a sentinel value.
+     */
+    @ColumnInfo(name = "edhrec_rank")
+    val edhrecRank: Int? = null,
+
+    /**
+     * Penny Dreadful popularity rank (lower = more played). Null when Scryfall
+     * does not provide a rank for this card.
+     */
+    @ColumnInfo(name = "penny_rank")
+    val pennyRank: Int? = null,
+
+    /**
      * JSON array of CardFace objects for double-faced / multi-face cards.
      * Null for single-faced cards.
      * Schema: [{"name":"...","manaCost":"...","typeLine":"...","oracleText":"...",
