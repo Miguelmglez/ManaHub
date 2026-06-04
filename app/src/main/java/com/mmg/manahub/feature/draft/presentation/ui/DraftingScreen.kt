@@ -222,6 +222,7 @@ private fun DraftingContent(
     // The currently zoomed card (null = no zoom sheet) and pool-sheet visibility.
     var selectedCard by remember { mutableStateOf<DraftCard?>(null) }
     var showPoolSheet by remember { mutableStateOf(false) }
+    var isSuggestionVisible by remember(state.state.pickNumber, state.state.round) { mutableStateOf(false) }
 
     // Rarity-sorted pack (mythic → common, then alphabetical) for predictable scanning.
     val sortedPack = remember(state.currentPack) {
@@ -397,7 +398,7 @@ private fun DraftingContent(
                         ) {
                             DraftPackCard(
                                 draftCard = draftCard,
-                                isSuggested = draftCard.card.scryfallId == state.suggestedPickId,
+                                isSuggested = isSuggestionVisible && draftCard.card.scryfallId == state.suggestedPickId,
                                 onTap = { selectedCard = draftCard },
                             )
                         }
@@ -415,13 +416,13 @@ private fun DraftingContent(
             verticalArrangement = Arrangement.spacedBy(sp.xs)
         ) {
 
-            // Suggested pick shortcut — opens the zoom sheet for the engine's recommended card.
+            // Suggested pick shortcut — toggles the yellow border on the engine's recommended card.
             val suggestedCard = state.suggestedPickId?.let { id ->
                 sortedPack.firstOrNull { it.card.scryfallId == id }
             }
             if (suggestedCard != null) {
                 Button(
-                    onClick = { selectedCard = suggestedCard },
+                    onClick = { isSuggestionVisible = !isSuggestionVisible },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = ButtonShape,
                     colors = ButtonDefaults.buttonColors(

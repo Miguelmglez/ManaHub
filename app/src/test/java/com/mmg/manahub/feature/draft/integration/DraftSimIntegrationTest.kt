@@ -39,7 +39,8 @@ class DraftSimIntegrationTest {
     private val gen = WeightedBoosterGenerator(kotlin.random.Random(1))
     private val bot = HeuristicBotDrafter()
     private val engine = DefaultDraftEngine(gen, bot, kotlin.random.Random(1))
-    private val deckBuilder = ScoringDraftDeckBuilder()
+    private val deckScorer = com.mmg.manahub.feature.decks.presentation.engine.DeckScorer(com.mmg.manahub.feature.decks.presentation.engine.RoleClassifier())
+    private val deckBuilder = ScoringDraftDeckBuilder(deckScorer)
 
     @Test
     fun `full draft flow setup draft deckSaved`() = runTest {

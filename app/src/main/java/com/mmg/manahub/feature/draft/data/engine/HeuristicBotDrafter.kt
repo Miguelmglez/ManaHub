@@ -10,50 +10,31 @@ import com.mmg.manahub.feature.draft.domain.model.DraftSeat
  *
  * Each pick is scored as:
  * ```
- * score = ratingScore + colorBonus × phaseFactor + synergyBonus + curveBonus + opennessBonus
+ * score = ratingScore + colorBonus × phaseFactor + synergyBonus + curveBonus + offColorPenalty
  * ```
  *
- * The drafter operates in two phases derived from the accumulated color commitment of the seat:
- * - **Speculation phase** — no two colors dominate yet. Small color bonus, openness bonus active
- *   (rewards picking into colors where strong cards were passed).
- * - **Commitment phase** — the top-2 colors dominate by a clear margin. On-color cards get a strong
- *   bonus; off-color cards are implicitly penalised by receiving no bonus while committed cards do.
+ * The drafter operates in two phases derived from the seat's drafted pool:
+ * - **Speculation phase** — early in the draft or when no two colors dominate yet. Small color bonus.
+ * - **Commitment phase** — the top-2 colors dominate by a clear margin (and we have enough picks).
+ *   On-color cards get a strong bonus; off-color cards receive a penalty.
  *
- * Per-seat state ([colorCommitment] and [seenSignal]) is maintained internally keyed by
- * [DraftSeat.index]. This is intentionally stateful: a single drafter instance is used for the
- * whole draft session, so it can learn the open colors over successive picks even though the
- * [BotDrafter] contract only returns the picked card. Call [resetState] between independent drafts
- * (e.g. in tests) to clear accumulated state.
+ * This drafter is pure and stateless. It derives all its color commitments dynamically from
+ * [DraftSeat.pool], making it safe to use for suggestions on the human seat without side effects.
  */
 class HeuristicBotDrafter : BotDrafter {
 
-    /** Accumulated, per-seat learning state. Keys are single-letter color symbols. */
-    private data class SeatState(
-        val colorCommitment: Map<String, Float> = emptyMap(),
-        val seenSignal: Map<String, Float> = emptyMap(),
-    )
-
-    private val seatStates = HashMap<Int, SeatState>()
-
-    /** Clears all accumulated per-seat state. Intended for tests that reuse one instance. */
-    fun resetState() {
-        seatStates.clear()
-    }
-
     override fun pick(seat: DraftSeat, pack: BoosterPack, round: Int, pickNumber: Int): DraftCard {
-        val state = seatStates.getOrDefault(seat.index, SeatState())
-        val best = pack.cards.maxByOrNull { card -> score(card, state, seat.pool) }
+        val commitment = buildColorCommitment(seat.pool)
+        return pack.cards.maxByOrNull { card -> score(card, commitment, seat.pool) }
             ?: pack.cards.first()
-        seatStates[seat.index] = updateState(state, best, pack.cards - best)
-        return best
     }
 
     // ── Scoring ──────────────────────────────────────────────────────────────
 
-    private fun score(card: DraftCard, state: SeatState, pool: List<DraftCard>): Float {
+    private fun score(card: DraftCard, commitment: Map<String, Float>, pool: List<DraftCard>): Float {
         val rating = ratingScore(card)
-        val totalCommitment = state.colorCommitment.values.sum()
-        val speculation = isSpeculationPhase(state.colorCommitment)
+        val totalCommitment = commitment.values.sum()
+        val speculation = isSpeculationPhase(commitment, pool.size)
         val phaseFactor = if (speculation) PHASE_FACTOR_SPECULATION else PHASE_FACTOR_COMMITMENT
 
         // Normalised commitment to each of the card's colors.
@@ -61,23 +42,14 @@ class HeuristicBotDrafter : BotDrafter {
             0f
         } else {
             card.card.colors.sumOf { color ->
-                (state.colorCommitment[color] ?: 0f).toDouble() / totalCommitment
+                (commitment[color] ?: 0f).toDouble() / totalCommitment
             }.toFloat()
-        }
-
-        // Openness reward — only while still speculating about colors.
-        val opennessBonus = if (speculation) {
-            card.card.colors.sumOf { color ->
-                ((state.seenSignal[color] ?: 0f) * OPENNESS_WEIGHT).toDouble()
-            }.toFloat()
-        } else {
-            0f
         }
 
         // Off-color penalty — once committed, a card that has at least one color outside the
         // committed pair is penalised so the pool stays focused. Colorless cards (no colors) are
         // never penalised. Applied in the commitment phase only.
-        val offColorPenalty = if (!speculation && isOffColor(card, state.colorCommitment)) {
+        val offColorPenalty = if (!speculation && isOffColor(card, commitment)) {
             OFF_COLOR_PENALTY
         } else {
             0f
@@ -86,8 +58,18 @@ class HeuristicBotDrafter : BotDrafter {
         val synergyBonus = synergyBonus(card, pool)
         val curveBonus = curveBonus(card, pool)
 
-        return rating + colorBonus * phaseFactor + synergyBonus + curveBonus +
-            opennessBonus + offColorPenalty
+        return rating + colorBonus * phaseFactor + synergyBonus + curveBonus + offColorPenalty
+    }
+
+    private fun buildColorCommitment(pool: List<DraftCard>): Map<String, Float> {
+        val commitment = mutableMapOf<String, Float>()
+        for (card in pool) {
+            val weight = ratingScore(card)
+            for (color in card.card.colors) {
+                commitment[color] = (commitment[color] ?: 0f) + weight
+            }
+        }
+        return commitment
     }
 
     /** True if the card has any color outside the seat's current top-2 committed colors. */
@@ -149,48 +131,20 @@ class HeuristicBotDrafter : BotDrafter {
     // ── Phase detection ────────────────────────────────────────────────────────
 
     /**
-     * Returns true while the seat is still speculating about its colors — i.e. the top-2 colors do
-     * not dominate the rest by at least [COMMITMENT_MARGIN] of the total commitment. An empty
-     * commitment map is always speculation.
+     * Returns true while the seat is still speculating about its colors — i.e. early in the draft
+     * or the top-2 colors do not dominate the rest by at least [COMMITMENT_MARGIN].
      */
-    private fun isSpeculationPhase(commitment: Map<String, Float>): Boolean {
+    private fun isSpeculationPhase(commitment: Map<String, Float>, poolSize: Int): Boolean {
         val total = commitment.values.sum()
-        if (total <= 0f) return true
+        // Prevent hard commitment before the bot has picked enough cards to establish a real signal.
+        if (total < 4.0f || poolSize < 12) return true
+
         val sorted = commitment.values.sortedDescending()
         val topTwo = sorted.take(2).sum()
         val rest = total - topTwo
         // Margin = how much the top-2 outweigh the rest, normalised by total.
         val margin = (topTwo - rest) / total
         return margin < COMMITMENT_MARGIN
-    }
-
-    // ── State updates ────────────────────────────────────────────────────────
-
-    private fun updateState(
-        state: SeatState,
-        picked: DraftCard,
-        passed: List<DraftCard>,
-    ): SeatState {
-        val pickedWeight = ratingScore(picked)
-
-        // Commit to the colors of the picked card, weighted by its strength.
-        val newCommitment = state.colorCommitment.toMutableMap()
-        for (color in picked.card.colors) {
-            newCommitment[color] = (newCommitment[color] ?: 0f) + pickedWeight
-        }
-
-        // Record open-color signal from strong cards we are passing.
-        val newSignal = state.seenSignal.toMutableMap()
-        for (card in passed) {
-            val strength = ratingScore(card)
-            if (strength > STRONG_SIGNAL_THRESHOLD) {
-                for (color in card.card.colors) {
-                    newSignal[color] = (newSignal[color] ?: 0f) + strength * SIGNAL_DECAY
-                }
-            }
-        }
-
-        return state.copy(colorCommitment = newCommitment, seenSignal = newSignal)
     }
 
     private companion object {
@@ -202,10 +156,6 @@ class HeuristicBotDrafter : BotDrafter {
 
         /** Top-2 colors must outweigh the rest by this fraction of total commitment to commit. */
         const val COMMITMENT_MARGIN = 0.3f
-
-        const val OPENNESS_WEIGHT = 0.1f
-        const val STRONG_SIGNAL_THRESHOLD = 0.6f
-        const val SIGNAL_DECAY = 0.3f
 
         /** Subtractive penalty for off-color cards once the seat has committed to its colors. */
         const val OFF_COLOR_PENALTY = -0.35f

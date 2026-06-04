@@ -7,7 +7,11 @@ import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.feature.playtest.domain.model.BattlefieldState
 import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
+import com.mmg.manahub.feature.playtest.domain.model.PlayCard
+import com.mmg.manahub.feature.playtest.domain.model.PlayZone
+import com.mmg.manahub.feature.playtest.domain.model.PlaytestPhase
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSurveyAnswers
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
@@ -19,10 +23,13 @@ import android.util.Log
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,9 +39,18 @@ data class PlaytestHandUiState(
     val isLoading: Boolean = true,
     val setup: PlaytestSetup? = null,
     val snapshot: HandSnapshot? = null,
+    /** Current phase: MULLIGAN (hand decision) or PLAY (simulated battlefield). */
+    val phase: PlaytestPhase = PlaytestPhase.MULLIGAN,
+    /** Ephemeral battlefield state — non-null only while [phase] == PLAY. */
+    val battlefield: BattlefieldState? = null,
+    /** Whether the "End Test" confirmation dialog is visible (PLAY phase only). */
+    val showEndTestConfirm: Boolean = false,
     /** Indices (into snapshot.hand) selected for bottom-N. */
     val selectedBottomIndices: Set<Int> = emptySet(),
     val showBottomNSelector: Boolean = false,
+    // DORMANT: showSaveSheet / showSurveySheet / savedSessionId / isSaving back the
+    // save + survey flow, which is currently unreachable. Kept intact for when
+    // playtest stats tracking returns.
     val showSaveSheet: Boolean = false,
     val showSurveySheet: Boolean = false,
     val savedSessionId: Long? = null,
@@ -46,6 +62,12 @@ sealed class PlaytestHandEvent {
     object SaveSuccess : PlaytestHandEvent()
     object NavigateBack : PlaytestHandEvent()
     data class ShowError(val message: String) : PlaytestHandEvent()
+
+    /**
+     * Informational toast carrying a string-resource name (resolved on the screen so
+     * the ViewModel stays free of Android resource references).
+     */
+    data class ShowInfo(val stringResName: String) : PlaytestHandEvent()
 }
 
 @HiltViewModel
@@ -63,14 +85,37 @@ class PlaytestHandViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PlaytestHandUiState())
     val uiState: StateFlow<PlaytestHandUiState> = _uiState.asStateFlow()
 
-    private val _events = MutableStateFlow<PlaytestHandEvent?>(null)
-    val events: StateFlow<PlaytestHandEvent?> = _events.asStateFlow()
+    /**
+     * One-shot events delivered via a buffered [Channel] (NOT a StateFlow).
+     *
+     * A StateFlow would equality-collapse repeated events (two consecutive
+     * [PlaytestHandEvent.NavigateBack] = no-op, so "End Test" could fail to navigate on
+     * a second tap) and could be missed entirely if the lifecycle stops before the value
+     * is collected. A buffered Channel guarantees every emission is delivered exactly once
+     * and survives a paused collector. Collect it on the screen with a plain
+     * `LaunchedEffect(Unit) { viewModel.events.collect { ... } }`.
+     */
+    private val _events = Channel<PlaytestHandEvent>(Channel.BUFFERED)
+    val events: Flow<PlaytestHandEvent> = _events.receiveAsFlow()
 
     /** Snapshot id counter — incremented on every draw/reshuffle. */
     private var snapshotIdCounter = 0
 
-    /** Library size before the first draw (used for save mapping). Set exactly once at init. */
-    private var originalLibrarySize: Int = 0
+    /**
+     * Monotonic counter minting a unique [PlayCard.instanceId] for every physical
+     * card instance on the battlefield. NEVER reset within a session so ids stay
+     * globally unique — this is what battlefield LazyRow `key`s use to avoid the
+     * duplicate-key crash with repeated copies of the same card.
+     */
+    private var instanceIdCounter = 0L
+
+    /**
+     * Library size before the first draw (used for save mapping). Set exactly once per
+     * session. `null` is the "not yet registered" sentinel — a legitimately empty library
+     * (0 cards) is a valid recorded value and must NOT be re-registered, so 0 cannot double
+     * as "uninitialized".
+     */
+    private var originalLibrarySize: Int? = null
 
     /**
      * Epoch-millis when the session was first initialized (first draw).
@@ -153,15 +198,18 @@ class PlaytestHandViewModel @Inject constructor(
 
     /**
      * "Keep": triggered when the user decides to keep the current hand.
-     * If mulligansUsed > 0, shows the bottom-N selector first.
-     * If mulligansUsed == 0, opens the save sheet directly.
+     * If mulligansUsed > 0, shows the bottom-N selector first (which ends by calling
+     * [enterPlayPhase]). If mulligansUsed == 0, enters the PLAY phase directly.
+     *
+     * Note: this no longer opens the (now dormant) save sheet — keeping a hand starts
+     * the simulated game.
      */
     fun onKeep() {
         val snapshot = _uiState.value.snapshot ?: return
         if (snapshot.mulligansUsed > 0) {
             _uiState.update { it.copy(showBottomNSelector = true, selectedBottomIndices = emptySet()) }
         } else {
-            _uiState.update { it.copy(showSaveSheet = true) }
+            enterPlayPhase()
         }
     }
 
@@ -204,12 +252,13 @@ class PlaytestHandViewModel @Inject constructor(
         )
         _uiState.update {
             it.copy(
-                snapshot            = finalSnapshot,
-                showBottomNSelector = false,
+                snapshot              = finalSnapshot,
+                showBottomNSelector   = false,
                 selectedBottomIndices = emptySet(),
-                showSaveSheet       = true,
             )
         }
+        // Bottoming complete → start the simulated game with the final kept hand.
+        enterPlayPhase()
     }
 
     fun onDismissBottomN() {
@@ -230,6 +279,10 @@ class PlaytestHandViewModel @Inject constructor(
     }
 
     // ── Save sheet actions ────────────────────────────────────────────────────
+    // DORMANT: the entire save + survey flow below is currently unreachable.
+    // "Keep" now enters the PLAY phase instead of opening the save sheet, and
+    // "End Test" navigates back without persisting. Kept intact (not deleted) so it
+    // can be re-wired when playtest stats tracking returns.
 
     fun onDismissSaveSheet() {
         _uiState.update { it.copy(showSaveSheet = false) }
@@ -248,7 +301,7 @@ class PlaytestHandViewModel @Inject constructor(
     /** Discard — no persistence. */
     fun onDiscard() {
         _uiState.update { it.copy(showSaveSheet = false) }
-        _events.value = PlaytestHandEvent.NavigateBack
+        _events.trySend(PlaytestHandEvent.NavigateBack)
     }
 
     private fun save(openSurveyAfter: Boolean) {
@@ -259,17 +312,22 @@ class PlaytestHandViewModel @Inject constructor(
 
         _uiState.update { it.copy(isSaving = true) }
 
+        // `originalLibrarySize` is registered before the first draw; by the time a save is
+        // reachable it is always non-null. Fall back to 0 defensively if a save somehow runs
+        // before registration.
+        val librarySizeForSave = originalLibrarySize ?: 0
+
         viewModelScope.launch {
             FirebaseCrashlytics.getInstance().apply {
-                log("playtest_save_attempted: deckId=${setup.deckId} mulligansUsed=${snapshot.mulligansUsed} librarySize=$originalLibrarySize openSurveyAfter=$openSurveyAfter")
+                log("playtest_save_attempted: deckId=${setup.deckId} mulligansUsed=${snapshot.mulligansUsed} librarySize=$librarySizeForSave openSurveyAfter=$openSurveyAfter")
                 setCustomKey("playtest_mulligans_used", snapshot.mulligansUsed)
-                setCustomKey("playtest_library_size", originalLibrarySize)
+                setCustomKey("playtest_library_size", librarySizeForSave)
             }
             val sessionId = runCatching {
                 savePlaytestUseCase(
                     setup       = setup,
                     snapshot    = snapshot,
-                    librarySize = originalLibrarySize,
+                    librarySize = librarySizeForSave,
                 )
             }.onFailure { e ->
                 Log.e("PlaytestHand", "Save failed", e)
@@ -286,7 +344,7 @@ class PlaytestHandViewModel @Inject constructor(
 
             if (sessionId == null) {
                 _uiState.update { it.copy(isSaving = false) }
-                _events.value = PlaytestHandEvent.ShowError("Failed to save test")
+                _events.trySend(PlaytestHandEvent.ShowError("Failed to save test"))
                 return@launch
             }
 
@@ -300,7 +358,7 @@ class PlaytestHandViewModel @Inject constructor(
                 )
             }
             if (!openSurveyAfter) {
-                _events.value = PlaytestHandEvent.SaveSuccess
+                _events.trySend(PlaytestHandEvent.SaveSuccess)
             }
         }
     }
@@ -309,7 +367,7 @@ class PlaytestHandViewModel @Inject constructor(
 
     fun onDismissSurveySheet() {
         _uiState.update { it.copy(showSurveySheet = false) }
-        _events.value = PlaytestHandEvent.SaveSuccess
+        _events.trySend(PlaytestHandEvent.SaveSuccess)
     }
 
     fun onSurveyFinished(
@@ -339,12 +397,176 @@ class PlaytestHandViewModel @Inject constructor(
                 }
             }
             _uiState.update { it.copy(showSurveySheet = false) }
-            _events.value = PlaytestHandEvent.SaveSuccess
+            _events.trySend(PlaytestHandEvent.SaveSuccess)
         }
     }
 
-    fun onEventConsumed() {
-        _events.value = null
+    // ── PLAY phase (simulated battlefield — fully ephemeral, no DB writes) ─────
+
+    /**
+     * Transitions from MULLIGAN to PLAY. Builds the initial [BattlefieldState] from
+     * the kept hand snapshot: the hand maps to [PlayCard]s with fresh instanceIds,
+     * the library is carried over verbatim, and all field zones start empty.
+     *
+     * Idempotent: if already in the PLAY phase OR a battlefield already exists this is a
+     * no-op. The `battlefield != null` guard is deliberately redundant with the phase check
+     * — it prevents re-minting fresh instanceIds (and rebuilding the battlefield from the
+     * snapshot, discarding any in-progress field state) if a future refactor ever desyncs
+     * `phase` from `battlefield`.
+     */
+    fun enterPlayPhase() {
+        val state = _uiState.value
+        if (state.phase == PlaytestPhase.PLAY || state.battlefield != null) return
+        val snapshot = state.snapshot ?: return
+
+        val handCards = snapshot.hand.map { card ->
+            PlayCard(instanceId = ++instanceIdCounter, card = card)
+        }
+        FirebaseCrashlytics.getInstance().log(
+            "playtest_play_phase_entered: handSize=${handCards.size} libraryRemaining=${snapshot.library.size}"
+        )
+        _uiState.update {
+            it.copy(
+                phase       = PlaytestPhase.PLAY,
+                battlefield = BattlefieldState(
+                    hand       = handCards,
+                    lands      = emptyList(),
+                    permanents = emptyList(),
+                    graveyard  = emptyList(),
+                    library    = snapshot.library,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Draws the top library card into the hand. Each draw mints a new
+     * [PlayCard.instanceId]. No-op (and emits an informative toast) when the library
+     * is empty. Guards against a null battlefield.
+     */
+    fun drawCard() {
+        // Read AND write within the same atomic _uiState.update snapshot. Capturing the
+        // battlefield outside the lambda is a stale-capture bug: two rapid taps would each
+        // mint a card but both drop(1) from the SAME base library, producing deck+1 cards
+        // (a phantom duplicate that breaks card conservation).
+        var libraryWasEmpty = false
+        _uiState.update { state ->
+            val bf = state.battlefield ?: return@update state
+            if (bf.library.isEmpty()) {
+                libraryWasEmpty = true
+                return@update state
+            }
+            val newCard = PlayCard(instanceId = ++instanceIdCounter, card = bf.library.first())
+            state.copy(
+                battlefield = bf.copy(
+                    hand    = bf.hand + newCard,
+                    library = bf.library.drop(1),
+                ),
+            )
+        }
+        // Emit the toast outside the update lambda (update may run more than once).
+        if (libraryWasEmpty) {
+            _events.trySend(PlaytestHandEvent.ShowInfo("playtest_battle_library_empty"))
+        }
+    }
+
+    /**
+     * Moves the card identified by [instanceId] to [toZone], removing it from its
+     * current zone. No game rules are enforced (any card may go to any zone).
+     * Idempotent if the card already sits in [toZone]; a no-op if [instanceId] is
+     * not found in any zone.
+     */
+    fun moveCard(instanceId: Long, toZone: PlayZone) {
+        // Read AND write the same atomic snapshot to avoid stale-capture races (two rapid
+        // moves operating on the same base state would lose one of the mutations).
+        _uiState.update { state ->
+            val battlefield = state.battlefield ?: return@update state
+
+            // Locate the card and its current zone.
+            val (card, fromZone) = findCard(battlefield, instanceId) ?: return@update state
+            if (fromZone == toZone) return@update state
+
+            // Remove from origin zone.
+            val withoutCard = when (fromZone) {
+                PlayZone.HAND       -> battlefield.copy(hand = battlefield.hand.filterNot { it.instanceId == instanceId })
+                PlayZone.LANDS      -> battlefield.copy(lands = battlefield.lands.filterNot { it.instanceId == instanceId })
+                PlayZone.PERMANENTS -> battlefield.copy(permanents = battlefield.permanents.filterNot { it.instanceId == instanceId })
+                PlayZone.GRAVEYARD  -> battlefield.copy(graveyard = battlefield.graveyard.filterNot { it.instanceId == instanceId })
+            }
+
+            // Returning a card to hand untaps it; otherwise preserve tap state.
+            val moved = if (toZone == PlayZone.HAND) card.copy(isTapped = false) else card
+
+            // Add to destination zone.
+            val updated = when (toZone) {
+                PlayZone.HAND       -> withoutCard.copy(hand = withoutCard.hand + moved)
+                PlayZone.LANDS      -> withoutCard.copy(lands = withoutCard.lands + moved)
+                PlayZone.PERMANENTS -> withoutCard.copy(permanents = withoutCard.permanents + moved)
+                PlayZone.GRAVEYARD  -> withoutCard.copy(graveyard = withoutCard.graveyard + moved)
+            }
+            state.copy(battlefield = updated)
+        }
+    }
+
+    /**
+     * Toggles the tapped (rotated 90°) state of a battlefield card. Only cards on the
+     * field (lands / permanents) can be tapped; hand and graveyard cards are ignored.
+     */
+    fun toggleTap(instanceId: Long) {
+        // Read AND write the same atomic snapshot (stale-capture safety, as in moveCard).
+        _uiState.update { state ->
+            val battlefield = state.battlefield ?: return@update state
+            val (_, zone) = findCard(battlefield, instanceId) ?: return@update state
+            if (zone != PlayZone.LANDS && zone != PlayZone.PERMANENTS) return@update state
+
+            val updated = when (zone) {
+                PlayZone.LANDS -> battlefield.copy(
+                    lands = battlefield.lands.map {
+                        if (it.instanceId == instanceId) it.copy(isTapped = !it.isTapped) else it
+                    },
+                )
+                else -> battlefield.copy(
+                    permanents = battlefield.permanents.map {
+                        if (it.instanceId == instanceId) it.copy(isTapped = !it.isTapped) else it
+                    },
+                )
+            }
+            state.copy(battlefield = updated)
+        }
+    }
+
+    /** Locates a [PlayCard] across all zones, returning it with its current zone. */
+    private fun findCard(
+        battlefield: BattlefieldState,
+        instanceId: Long,
+    ): Pair<PlayCard, PlayZone>? {
+        battlefield.hand.find { it.instanceId == instanceId }?.let { return it to PlayZone.HAND }
+        battlefield.lands.find { it.instanceId == instanceId }?.let { return it to PlayZone.LANDS }
+        battlefield.permanents.find { it.instanceId == instanceId }?.let { return it to PlayZone.PERMANENTS }
+        battlefield.graveyard.find { it.instanceId == instanceId }?.let { return it to PlayZone.GRAVEYARD }
+        return null
+    }
+
+    // ── End Test confirmation (PLAY phase) ────────────────────────────────────
+
+    /** Requests ending the test — shows the confirmation dialog. */
+    fun requestEndTest() {
+        _uiState.update { it.copy(showEndTestConfirm = true) }
+    }
+
+    /** Dismisses the End Test confirmation without leaving. */
+    fun dismissEndTest() {
+        _uiState.update { it.copy(showEndTestConfirm = false) }
+    }
+
+    /**
+     * Confirms ending the test: navigates back WITHOUT persisting anything (the PLAY
+     * phase is purely ephemeral — there is nothing to save).
+     */
+    fun confirmEndTest() {
+        FirebaseCrashlytics.getInstance().log("playtest_test_ended_without_save")
+        _uiState.update { it.copy(showEndTestConfirm = false) }
+        _events.trySend(PlaytestHandEvent.NavigateBack)
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
@@ -420,7 +642,9 @@ class PlaytestHandViewModel @Inject constructor(
             }
 
             // Record library size exactly once per session (before the first draw).
-            if (originalLibrarySize == 0) {
+            // `null` (not 0) is the "not yet registered" sentinel so a legitimately empty
+            // library is recorded as 0 rather than triggering a re-registration each draw.
+            if (originalLibrarySize == null) {
                 originalLibrarySize = result.size
                 FirebaseCrashlytics.getInstance().setCustomKey("playtest_library_size", result.size)
             }

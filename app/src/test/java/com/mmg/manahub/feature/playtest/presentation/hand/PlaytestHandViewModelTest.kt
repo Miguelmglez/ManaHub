@@ -10,17 +10,22 @@ import com.mmg.manahub.core.domain.model.DeckSlot
 import com.mmg.manahub.core.domain.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
+import com.mmg.manahub.feature.playtest.domain.model.PlaytestPhase
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.feature.playtest.domain.model.PlayZone
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestSurveyUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestUseCase
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -34,7 +39,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -201,6 +205,11 @@ class PlaytestHandViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // The ViewModel logs to Crashlytics outside any runCatching block (e.g. in
+        // initWithSetup / enterPlayPhase), so the static getInstance() must be mocked
+        // or every test throws "Default FirebaseApp is not initialized".
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
         viewModel = PlaytestHandViewModel(
             deckRepository           = deckRepository,
             cardDao                  = cardDao,
@@ -216,6 +225,7 @@ class PlaytestHandViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ── Group 1: sessionStartedAt is fixed across redraws ─────────────────────
@@ -585,11 +595,14 @@ class PlaytestHandViewModelTest {
 
         coEvery { savePlaytestUseCase.invoke(any(), any(), any()) } returns 42L
 
-        viewModel.onKeep()
-        viewModel.onSaveWithoutSurvey()
-        advanceUntilIdle()
+        viewModel.events.test {
+            viewModel.onKeep()
+            viewModel.onSaveWithoutSurvey()
+            advanceUntilIdle()
 
-        assertEquals(PlaytestHandEvent.SaveSuccess, viewModel.events.value)
+            assertEquals(PlaytestHandEvent.SaveSuccess, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -600,12 +613,16 @@ class PlaytestHandViewModelTest {
 
         coEvery { savePlaytestUseCase.invoke(any(), any(), any()) } returns 42L
 
-        viewModel.onKeep()
-        viewModel.onSaveAndOpenSurvey()
-        advanceUntilIdle()
+        viewModel.events.test {
+            viewModel.onKeep()
+            viewModel.onSaveAndOpenSurvey()
+            advanceUntilIdle()
 
-        assertTrue("survey sheet must be shown after save with survey", viewModel.uiState.value.showSurveySheet)
-        assertNull("SaveSuccess must NOT be emitted until survey is dismissed", viewModel.events.value)
+            assertTrue("survey sheet must be shown after save with survey", viewModel.uiState.value.showSurveySheet)
+            // SaveSuccess must NOT be emitted until the survey is dismissed.
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     // ── Group 8: save failure emits ShowError ─────────────────────────────────
@@ -618,14 +635,353 @@ class PlaytestHandViewModelTest {
 
         coEvery { savePlaytestUseCase.invoke(any(), any(), any()) } throws RuntimeException("DB error")
 
+        viewModel.events.test {
+            viewModel.onKeep()
+            viewModel.onSaveWithoutSurvey()
+            advanceUntilIdle()
+
+            assertTrue(
+                "ShowError event must be emitted when save throws",
+                awaitItem() is PlaytestHandEvent.ShowError,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertFalse("isSaving must be reset to false after failure", viewModel.uiState.value.isSaving)
+    }
+
+    // ── Group 9: PLAY phase (battlefield) ─────────────────────────────────────
+
+    @Test
+    fun `given kept hand with 0 mulligans when onKeep then enters PLAY phase and does not save`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
         viewModel.onKeep()
+
+        val state = viewModel.uiState.value
+        assertEquals(PlaytestPhase.PLAY, state.phase)
+        assertNotNull("battlefield must be built on entering PLAY", state.battlefield)
+        assertEquals("hand carries over to the battlefield", 7, state.battlefield!!.hand.size)
+        assertFalse("Keep must not open the (dormant) save sheet", state.showSaveSheet)
+        coVerify(exactly = 0) { savePlaytestUseCase.invoke(any(), any(), any()) }
+    }
+
+    @Test
+    fun `given PLAY phase when drawCard then top library card moves to hand`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val before = viewModel.uiState.value.battlefield!!
+        val handBefore = before.hand.size
+        val libraryBefore = before.library.size
+
+        viewModel.drawCard()
+
+        val after = viewModel.uiState.value.battlefield!!
+        assertEquals(handBefore + 1, after.hand.size)
+        assertEquals(libraryBefore - 1, after.library.size)
+    }
+
+    @Test
+    fun `given each drawn card when drawCard then instanceIds are unique`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        viewModel.drawCard()
+        viewModel.drawCard()
+
+        val hand = viewModel.uiState.value.battlefield!!.hand
+        val ids = hand.map { it.instanceId }
+        assertEquals("instanceIds must be unique across the hand", ids.size, ids.toSet().size)
+    }
+
+    @Test
+    fun `given a hand card when moveCard to LANDS then it leaves hand and enters lands`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val target = viewModel.uiState.value.battlefield!!.hand.first()
+        viewModel.moveCard(target.instanceId, PlayZone.LANDS)
+
+        val bf = viewModel.uiState.value.battlefield!!
+        assertFalse("card must leave hand", bf.hand.any { it.instanceId == target.instanceId })
+        assertTrue("card must be in lands", bf.lands.any { it.instanceId == target.instanceId })
+    }
+
+    @Test
+    fun `given unknown instanceId when moveCard then battlefield is unchanged`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val before = viewModel.uiState.value.battlefield
+        viewModel.moveCard(instanceId = -999L, toZone = PlayZone.GRAVEYARD)
+
+        assertEquals("unknown instanceId must be a no-op", before, viewModel.uiState.value.battlefield)
+    }
+
+    @Test
+    fun `given PLAY phase when confirmEndTest then NavigateBack is emitted and nothing is saved`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        viewModel.requestEndTest()
+        assertTrue(viewModel.uiState.value.showEndTestConfirm)
+
+        viewModel.events.test {
+            viewModel.confirmEndTest()
+
+            assertEquals(PlaytestHandEvent.NavigateBack, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertFalse(viewModel.uiState.value.showEndTestConfirm)
+        coVerify(exactly = 0) { savePlaytestUseCase.invoke(any(), any(), any()) }
+    }
+
+    // ── Group 10: battlefield card-conservation regressions (C1) ──────────────
+
+    /**
+     * Helper: total physical cards present anywhere (hand + lands + permanents +
+     * graveyard + library). This sum is the conservation invariant — it must stay
+     * constant across any draw/move (a draw moves a card from library to hand; a move
+     * relocates a card between zones; neither creates nor destroys cards).
+     */
+    private fun PlaytestHandViewModel.totalCards(): Int {
+        val bf = uiState.value.battlefield!!
+        return bf.hand.size + bf.lands.size + bf.permanents.size + bf.graveyard.size + bf.library.size
+    }
+
+    @Test
+    fun `given PLAY phase when drawCard called twice rapidly then total cards is conserved`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val totalBefore = viewModel.totalCards()
+        val libraryBefore = viewModel.uiState.value.battlefield!!.library.size
+
+        // Two rapid draws — the stale-capture bug would mint a phantom extra card here.
+        viewModel.drawCard()
+        viewModel.drawCard()
+
+        val bf = viewModel.uiState.value.battlefield!!
+        assertEquals("total cards must be conserved across two draws", totalBefore, viewModel.totalCards())
+        assertEquals("library must drop by exactly 2", libraryBefore - 2, bf.library.size)
+        // No phantom duplicate instanceIds.
+        val ids = (bf.hand + bf.lands + bf.permanents + bf.graveyard).map { it.instanceId }
+        assertEquals("instanceIds must stay unique", ids.size, ids.toSet().size)
+    }
+
+    @Test
+    fun `given empty library when drawCard called then state is unchanged and ShowInfo is emitted`() = runTest {
+        // drawCount equal to the whole deck leaves the library empty after the opening hand.
+        stubDeckWithCards(cardCount = 7)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        assertEquals("library must be empty for this setup", 0, viewModel.uiState.value.battlefield!!.library.size)
+        val before = viewModel.uiState.value.battlefield
+
+        viewModel.events.test {
+            viewModel.drawCard()
+
+            assertTrue("empty-library draw must emit ShowInfo", awaitItem() is PlaytestHandEvent.ShowInfo)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals("empty-library draw must not mutate the battlefield", before, viewModel.uiState.value.battlefield)
+    }
+
+    @Test
+    fun `given draw until library empty then total cards is conserved and library is zero`() = runTest {
+        stubDeckWithCards(cardCount = 10)
+        viewModel.initWithSetup(makeSetup(drawCount = 3))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val totalBefore = viewModel.totalCards()
+
+        // Draw far more than the library holds; extra draws are no-ops.
+        repeat(20) { viewModel.drawCard() }
+
+        assertEquals("total cards conserved when draining the library", totalBefore, viewModel.totalCards())
+        assertEquals("library must be drained to zero", 0, viewModel.uiState.value.battlefield!!.library.size)
+    }
+
+    // ── Group 11: moveCard semantics (C1) ─────────────────────────────────────
+
+    @Test
+    fun `given a card in LANDS when moveCard to same zone then it is idempotent and preserves isTapped`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        // Put a card on the field and tap it.
+        val handCard = viewModel.uiState.value.battlefield!!.hand.first()
+        viewModel.moveCard(handCard.instanceId, PlayZone.LANDS)
+        viewModel.toggleTap(handCard.instanceId)
+
+        val landCard = viewModel.uiState.value.battlefield!!.lands.first { it.instanceId == handCard.instanceId }
+        assertTrue("card must be tapped before the same-zone move", landCard.isTapped)
+        val before = viewModel.uiState.value.battlefield
+
+        // Move to the same zone — must be a no-op and keep the tapped state.
+        viewModel.moveCard(handCard.instanceId, PlayZone.LANDS)
+
+        assertEquals("same-zone move must be idempotent", before, viewModel.uiState.value.battlefield)
+        val after = viewModel.uiState.value.battlefield!!.lands.first { it.instanceId == handCard.instanceId }
+        assertTrue("isTapped must be preserved on same-zone move", after.isTapped)
+    }
+
+    @Test
+    fun `given a tapped land when moveCard back to HAND then isTapped resets to false`() = runTest {
+        // Documented semantics: returning a card to the hand UNTAPS it (a hand card has no
+        // tapped concept; re-playing it should start untapped).
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val handCard = viewModel.uiState.value.battlefield!!.hand.first()
+        viewModel.moveCard(handCard.instanceId, PlayZone.LANDS)
+        viewModel.toggleTap(handCard.instanceId)
+        assertTrue(viewModel.uiState.value.battlefield!!.lands.first().isTapped)
+
+        viewModel.moveCard(handCard.instanceId, PlayZone.HAND)
+
+        val backInHand = viewModel.uiState.value.battlefield!!.hand.first { it.instanceId == handCard.instanceId }
+        assertFalse("returning to hand must untap the card", backInHand.isTapped)
+    }
+
+    // ── Group 12: enterPlayPhase re-entrancy (C1 idempotence) ─────────────────
+
+    @Test
+    fun `given already in PLAY phase when onKeep called again then instanceIds are not re-minted`() = runTest {
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onKeep()
+        val idsAfterFirst = viewModel.uiState.value.battlefield!!.hand.map { it.instanceId }
+
+        // Re-entering must be a no-op — same battlefield, same instanceIds.
+        viewModel.enterPlayPhase()
+        val idsAfterSecond = viewModel.uiState.value.battlefield!!.hand.map { it.instanceId }
+
+        assertEquals("enterPlayPhase must be idempotent and not re-mint ids", idsAfterFirst, idsAfterSecond)
+    }
+
+    @Test
+    fun `given a battlefield with in-progress field state when enterPlayPhase called again then the whole battlefield is preserved`() = runTest {
+        // B2: enterPlayPhase guards on BOTH phase == PLAY and battlefield != null. After the
+        // user has moved cards onto the field, a stray re-entry must NOT rebuild the
+        // battlefield from the snapshot (which would discard the field state and re-mint ids).
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        // Put a card on the field and tap it so the battlefield diverges from the snapshot.
+        val handCard = viewModel.uiState.value.battlefield!!.hand.first()
+        viewModel.moveCard(handCard.instanceId, PlayZone.LANDS)
+        viewModel.toggleTap(handCard.instanceId)
+
+        val battlefieldBefore = viewModel.uiState.value.battlefield
+
+        // A second enterPlayPhase must be a complete no-op.
+        viewModel.enterPlayPhase()
+
+        assertEquals(
+            "enterPlayPhase must preserve the exact battlefield (no rebuild) when one already exists",
+            battlefieldBefore,
+            viewModel.uiState.value.battlefield,
+        )
+    }
+
+    // ── Group 12b: originalLibrarySize nullable sentinel (B4) ─────────────────
+
+    @Test
+    fun `given a deck whose library builds 0 cards when saved then librarySize 0 is recorded not treated as uninitialized`() = runTest {
+        // B4: `originalLibrarySize` uses `null` (not 0) as the "not yet registered" sentinel.
+        // A commander-only deck legitimately builds a 0-card library (the single mainboard
+        // card IS the commander and is excluded). With the old `== 0` sentinel this 0 would be
+        // misread as "uninitialized" and re-registered on every draw. We verify the save path
+        // receives librarySize == 0, proving 0 is a valid recorded value.
+        val commander = makeCard(id = "commander-1", name = "Test Commander")
+        val slots = listOf(DeckSlot(scryfallId = "commander-1", quantity = 1))
+        val deckWithCards = DeckWithCards(
+            deck      = Deck(id = "deck-test", name = "Test Deck", format = "commander"),
+            mainboard = slots,
+            sideboard = emptyList(),
+        )
+        every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        coEvery { cardDao.getByIds(any()) } returns listOf(makeCardEntity("commander-1"))
+
+        val setup = PlaytestSetup(
+            deckId        = "deck-test",
+            deckName      = "Test Deck",
+            deckFormat    = "commander",
+            drawCount     = 0,
+            isOnThePlay   = true,
+            commanderCard = commander,
+        )
+
+        viewModel.initWithSetup(setup)
+        advanceUntilIdle()
+
+        // Redraw once to confirm the (already-registered) 0 size is NOT re-registered/desynced.
+        viewModel.onRedraw()
+        advanceUntilIdle()
+
+        val capturedLibrarySize = slot<Int>()
+        coEvery {
+            savePlaytestUseCase.invoke(any(), any(), capture(capturedLibrarySize))
+        } returns 1L
+
+        // Drive the dormant save path directly to observe the recorded librarySize.
         viewModel.onSaveWithoutSurvey()
         advanceUntilIdle()
 
-        assertTrue(
-            "ShowError event must be emitted when save throws",
-            viewModel.events.value is PlaytestHandEvent.ShowError,
+        coVerify(exactly = 1) { savePlaytestUseCase.invoke(any(), any(), any()) }
+        assertEquals(
+            "a legitimately empty library must be recorded as 0, not re-registered as uninitialized",
+            0,
+            capturedLibrarySize.captured,
         )
-        assertFalse("isSaving must be reset to false after failure", viewModel.uiState.value.isSaving)
+    }
+
+    // ── Group 13: Channel events deliver each emission exactly once (C2) ───────
+
+    @Test
+    fun `given confirmEndTest called twice then NavigateBack is delivered exactly once per call`() = runTest {
+        // With a StateFlow, the second identical NavigateBack would equality-collapse and be
+        // lost. With a buffered Channel each call delivers its own event.
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        viewModel.events.test {
+            viewModel.confirmEndTest()
+            assertEquals("first confirm must deliver NavigateBack", PlaytestHandEvent.NavigateBack, awaitItem())
+
+            // A second confirm (e.g. a double tap) must deliver a distinct event, not collapse.
+            viewModel.confirmEndTest()
+            assertEquals("second confirm must also deliver NavigateBack", PlaytestHandEvent.NavigateBack, awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

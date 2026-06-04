@@ -47,6 +47,82 @@ data class HandSnapshot(
     val startedAt: Long,
 )
 
+// ── Battlefield ("fake game") ephemeral models ────────────────────────────────
+// These models are NEVER persisted. They back the in-memory PLAY phase that runs
+// after the user keeps an opening hand. Like every playtest state, they live only
+// in the ViewModel and disappear when the test ends (explicit-save-only applies —
+// the PLAY phase performs zero DB writes).
+
+/**
+ * The phase the playtest hand screen is currently rendering.
+ *
+ * A single screen + single ViewModel drives both phases; the battlefield is
+ * conditional content selected by this value, NOT a separate nav destination.
+ *
+ * @see PlaytestHandUiState.phase
+ */
+enum class PlaytestPhase {
+    /** Mulligan decision loop (draw / redraw / mulligan / keep). */
+    MULLIGAN,
+
+    /** Simulated battlefield where cards are dragged between zones and drawn. */
+    PLAY,
+}
+
+/**
+ * The zones a [PlayCard] can occupy on the simulated battlefield.
+ *
+ * No game rules are enforced — the user may drag any card into any zone (e.g. a
+ * land into [PERMANENTS]); these are organisational buckets, not legality gates.
+ */
+enum class PlayZone {
+    /** Cards still in hand. */
+    HAND,
+
+    /** Lands played to the battlefield. */
+    LANDS,
+
+    /** Non-land permanents played to the battlefield. */
+    PERMANENTS,
+
+    /** Discarded / dead cards. */
+    GRAVEYARD,
+}
+
+/**
+ * A single physical instance of a card on the battlefield.
+ *
+ * @param instanceId Stable, unique id for this physical card instance. Assigned
+ *   from a monotonic counter in the ViewModel — NOT the scryfallId. This is what
+ *   every battlefield `LazyRow` keys by, so duplicate copies of the same card never
+ *   collide on key (the duplicate-key crash class documented for the survey LazyRow).
+ * @param card The hydrated domain card.
+ * @param isTapped Whether the card is rotated 90° (tapped). Display-only.
+ */
+data class PlayCard(
+    val instanceId: Long,
+    val card: Card,
+    val isTapped: Boolean = false,
+)
+
+/**
+ * The full ephemeral state of the simulated battlefield.
+ *
+ * @param hand Cards currently in hand (draggable to the field).
+ * @param lands Lands on the battlefield.
+ * @param permanents Non-land permanents on the battlefield.
+ * @param graveyard Discarded cards.
+ * @param library Remaining library in draw order (top = index 0). Held as plain
+ *   [Card]s; a [PlayCard] with a fresh instanceId is minted only when a card is drawn.
+ */
+data class BattlefieldState(
+    val hand: List<PlayCard>,
+    val lands: List<PlayCard>,
+    val permanents: List<PlayCard>,
+    val graveyard: List<PlayCard>,
+    val library: List<Card>,
+)
+
 /**
  * Result of the eligibility check performed by [CanPlaytestDeckUseCase].
  */

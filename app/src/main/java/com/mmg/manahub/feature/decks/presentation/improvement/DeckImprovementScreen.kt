@@ -16,12 +16,11 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,10 +28,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,12 +47,27 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.decks.presentation.engine.AnalysisPoint
-import com.mmg.manahub.feature.decks.presentation.engine.AnalysisSeverity
-import com.mmg.manahub.feature.decks.presentation.engine.ImprovementSuggestion
-import com.mmg.manahub.feature.decks.presentation.engine.SuggestionActionType
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
+import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
+import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
+import com.mmg.manahub.feature.decks.presentation.engine.CardFit
+import com.mmg.manahub.feature.decks.presentation.improvement.components.AddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetFilterBar
+import com.mmg.manahub.feature.decks.presentation.improvement.components.CutSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.improvement.components.HealthScoreRing
+import com.mmg.manahub.feature.decks.presentation.improvement.components.ManaCurveChart
+import com.mmg.manahub.feature.decks.presentation.improvement.components.RoleCoverageRow
+import com.mmg.manahub.feature.decks.presentation.improvement.components.WarningChip
+import com.mmg.manahub.feature.decks.presentation.improvement.components.key
+import com.mmg.manahub.feature.decks.presentation.improvement.components.label
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,149 +78,302 @@ fun DeckImprovementScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val toastState = rememberMagicToastState()
 
-    Scaffold(
-        containerColor      = mc.background,
-        contentWindowInsets = WindowInsets.statusBars,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.deck_improve_title), style = ty.titleLarge) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = mc.textSecondary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary)
-            )
-        }
-    ) { padding ->
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = mc.primaryAccent)
+    val cutMessage = stringResource(R.string.deck_doctor_toast_cut)
+    val addMessage = stringResource(R.string.deck_doctor_toast_add)
+    val externalFailedMessage = stringResource(R.string.deck_doctor_toast_external_failed)
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is DeckImprovementEvent.CardCut ->
+                    toastState.show(String.format(cutMessage, event.cardName), MagicToastType.SUCCESS)
+                is DeckImprovementEvent.CardAdded ->
+                    toastState.show(String.format(addMessage, event.cardName), MagicToastType.SUCCESS)
+                DeckImprovementEvent.ExternalPoolFailed ->
+                    toastState.show(externalFailedMessage, MagicToastType.ERROR)
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                uiState.report?.let { report ->
-                    if (report.strengths.isNotEmpty()) {
-                        item { SectionHeader(stringResource(R.string.deck_improve_strengths), mc.lifePositive) }
-                        items(report.strengths) { AnalysisItem(it) }
-                    }
+        }
+    }
 
-                    if (report.weaknesses.isNotEmpty()) {
-                        item { SectionHeader(stringResource(R.string.deck_improve_weaknesses), mc.lifeNegative) }
-                        items(report.weaknesses) { AnalysisItem(it) }
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor      = mc.background,
+            contentWindowInsets = WindowInsets.statusBars,
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.deck_improve_title), style = ty.titleLarge) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = mc.textSecondary)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.backgroundSecondary)
+                )
+            }
+        ) { padding ->
+            when {
+                uiState.isLoading -> {
+                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = mc.primaryAccent)
                     }
-
-                    if (report.suggestions.isNotEmpty()) {
-                        item { SectionHeader(stringResource(R.string.deck_improve_suggestions), mc.goldMtg) }
-                        items(report.suggestions, key = { it.magicCard.card.scryfallId }) { suggestion ->
-                            SuggestionItem(
-                                suggestion = suggestion,
-                                isApplied = suggestion.magicCard.card.scryfallId in uiState.appliedSuggestions,
-                                onApply = { viewModel.applySuggestion(suggestion) }
+                }
+                uiState.error != null -> {
+                    FullErrorState(
+                        message = uiState.error ?: stringResource(R.string.deck_health_error),
+                        modifier = Modifier.padding(padding),
+                    )
+                }
+                else -> {
+                    Column(Modifier.fillMaxSize().padding(padding)) {
+                        DeckDoctorTabRow(
+                            selected = uiState.selectedTab,
+                            onSelect = viewModel::onTabSelected,
+                        )
+                        when (uiState.selectedTab) {
+                            DeckDoctorTab.HEALTH -> HealthTab(health = uiState.health)
+                            DeckDoctorTab.CUT -> CutTab(
+                                cuts = uiState.cuts,
+                                onCut = { fit -> viewModel.onCut(fit.card.scryfallId, fit.card.name) },
+                            )
+                            DeckDoctorTab.ADD -> AddTab(
+                                adds = uiState.adds,
+                                budget = uiState.budget,
+                                totalCostEur = uiState.addsTotalCostEur,
+                                cardsToBuy = uiState.addsCardsToBuy,
+                                isAddsLoading = uiState.isAddsLoading,
+                                onBudgetChanged = viewModel::onBudgetChanged,
+                                onAdd = { suggestion ->
+                                    viewModel.onAdd(suggestion.fit.card.scryfallId, suggestion.fit.card.name)
+                                },
                             )
                         }
                     }
                 }
             }
         }
+        MagicToastHost(toastState)
     }
 }
 
 @Composable
-private fun SectionHeader(text: String, color: Color) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.magicTypography.labelMedium,
-        color = color,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 4.dp)
-    )
-}
-
-@Composable
-private fun AnalysisItem(point: AnalysisPoint) {
+private fun DeckDoctorTabRow(
+    selected: DeckDoctorTab,
+    onSelect: (DeckDoctorTab) -> Unit,
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val tint = when (point.severity) {
-        AnalysisSeverity.INFO -> mc.lifePositive
-        AnalysisSeverity.WARNING -> mc.goldMtg
-        AnalysisSeverity.ERROR -> mc.lifeNegative
-    }
+    val tabs = DeckDoctorTab.entries
 
-    Surface(
-        color = mc.surface,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
+    TabRow(
+        selectedTabIndex = tabs.indexOf(selected),
+        containerColor = mc.backgroundSecondary,
+        contentColor = mc.primaryAccent,
+        indicator = { positions ->
+            TabRowDefaults.SecondaryIndicator(
+                modifier = Modifier.tabIndicatorOffset(positions[tabs.indexOf(selected)]),
+                color = mc.primaryAccent,
+            )
+        },
+        modifier = Modifier.fillMaxWidth().selectableGroup(),
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).background(tint, RoundedCornerShape(4.dp)))
-            Spacer(Modifier.width(12.dp))
-            Text(stringResource(point.descriptionResId), style = ty.bodyMedium, color = mc.textPrimary)
+        tabs.forEach { tab ->
+            val isSelected = tab == selected
+            Tab(
+                selected = isSelected,
+                onClick = { onSelect(tab) },
+                selectedContentColor = mc.primaryAccent,
+                unselectedContentColor = mc.textSecondary,
+                text = {
+                    Text(
+                        text = stringResource(
+                            when (tab) {
+                                DeckDoctorTab.HEALTH -> R.string.deck_doctor_tab_health
+                                DeckDoctorTab.CUT -> R.string.deck_doctor_tab_cut
+                                DeckDoctorTab.ADD -> R.string.deck_doctor_tab_add
+                            }
+                        ),
+                        style = ty.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    )
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun SuggestionItem(
-    suggestion: ImprovementSuggestion,
-    isApplied: Boolean,
-    onApply: () -> Unit
+private fun HealthTab(health: DeckHealth?) {
+    val mc = MaterialTheme.magicColors
+
+    if (health == null) {
+        EmptyState(
+            title = stringResource(R.string.deck_health_empty_title),
+            icon = Icons.Default.AutoFixHigh,
+        )
+        return
+    }
+
+    val evaluation = health.evaluation
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(MaterialTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xl),
+    ) {
+        // Score ring
+        item {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                HealthScoreRing(score = evaluation.healthScore)
+            }
+        }
+
+        // Role coverage
+        item { HealthSectionHeader(stringResource(R.string.deck_health_section_roles), mc.primaryAccent) }
+        items(evaluation.roleCoverage, key = { it.role.name }) { coverage ->
+            RoleCoverageRow(coverage = coverage)
+        }
+
+        // Mana curve (non-lands only)
+        item { HealthSectionHeader(stringResource(R.string.deck_health_section_curve), mc.primaryAccent) }
+        item {
+            Surface(color = mc.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(MaterialTheme.spacing.md)) {
+                    Text(
+                        text = stringResource(R.string.deck_health_avg_cmc, String.format("%.1f", evaluation.avgCmc)),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                    Spacer(Modifier.padding(top = MaterialTheme.spacing.sm))
+                    ManaCurveChart(histogram = evaluation.curveHistogram)
+                }
+            }
+        }
+
+        // Warnings
+        if (evaluation.warnings.isNotEmpty()) {
+            item { HealthSectionHeader(stringResource(R.string.deck_health_section_warnings), mc.lifeNegative) }
+            items(evaluation.warnings, key = { it.key }) { warning ->
+                WarningChip(text = warning.label())
+            }
+        }
+    }
+}
+
+@Composable
+private fun CutTab(
+    cuts: List<CardFit>,
+    onCut: (CardFit) -> Unit,
+) {
+    if (cuts.isEmpty()) {
+        EmptyState(
+            title = stringResource(R.string.deck_doctor_cut_empty_title),
+            icon = Icons.Default.AutoFixHigh,
+        )
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(MaterialTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+    ) {
+        item { SuggestionsCaption(stringResource(R.string.deck_doctor_cut_caption)) }
+        items(cuts, key = { it.card.scryfallId }) { fit ->
+            CutSuggestionRow(fit = fit, onCut = { onCut(fit) })
+        }
+    }
+}
+
+@Composable
+private fun AddTab(
+    adds: List<AddSuggestion>,
+    budget: BudgetConstraints,
+    totalCostEur: Double,
+    cardsToBuy: Int,
+    isAddsLoading: Boolean,
+    onBudgetChanged: (BudgetConstraints) -> Unit,
+    onAdd: (AddSuggestion) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
 
-    Surface(
-        color = mc.surface,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(MaterialTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = when (suggestion.actionType) {
-                        SuggestionActionType.ADD_FROM_COLLECTION -> stringResource(R.string.deck_improve_suggestion_add_from_collection, suggestion.magicCard.card.name)
-                        SuggestionActionType.SWAP_FROM_SIDEBOARD -> stringResource(R.string.deck_improve_suggestion_swap_from_sideboard, suggestion.magicCard.card.name, suggestion.swapFor?.card?.name ?: "another card")
-                    },
-                    style = ty.bodyLarge,
-                    color = mc.textPrimary
-                )
-                Text(
-                    text = stringResource(suggestion.reasonResId),
-                    style = ty.labelSmall,
-                    color = mc.textSecondary
+        // Budget filter bar is always present so the user can constrain even an empty result set.
+        item("budget_bar") {
+            BudgetFilterBar(budget = budget, onBudgetChanged = onBudgetChanged)
+        }
+        item("budget_summary") {
+            BudgetSummary(totalCostEur = totalCostEur, cardsToBuy = cardsToBuy)
+        }
+
+        when {
+            isAddsLoading -> item("adds_loading") {
+                Box(
+                    Modifier.fillMaxWidth().padding(vertical = MaterialTheme.spacing.xl),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = mc.primaryAccent)
+                }
+            }
+            adds.isEmpty() -> item("adds_empty") {
+                EmptyState(
+                    title = stringResource(R.string.deck_doctor_add_empty_title),
+                    subtitle = stringResource(R.string.deck_doctor_add_empty_subtitle),
+                    icon = Icons.Default.AutoFixHigh,
                 )
             }
-
-            if (isApplied) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = mc.lifePositive)
-            } else {
-                IconButton(onClick = onApply) {
-                    val icon = when (suggestion.actionType) {
-                        SuggestionActionType.ADD_FROM_COLLECTION -> Icons.Default.Add
-                        SuggestionActionType.SWAP_FROM_SIDEBOARD -> Icons.Default.SwapHoriz
-                    }
-                    Icon(icon, contentDescription = null, tint = mc.primaryAccent)
+            else -> {
+                item("adds_caption") { SuggestionsCaption(stringResource(R.string.deck_doctor_add_caption)) }
+                items(adds, key = { it.fit.card.scryfallId }) { suggestion ->
+                    AddSuggestionRow(suggestion = suggestion, onAdd = { onAdd(suggestion) })
                 }
             }
         }
     }
 }
 
+/** "To buy: X € of Y cards" header (or an all-owned hint when nothing needs buying). */
+@Composable
+private fun BudgetSummary(totalCostEur: Double, cardsToBuy: Int) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val text = if (cardsToBuy == 0) {
+        stringResource(R.string.deck_doctor_budget_all_owned)
+    } else {
+        stringResource(
+            R.string.deck_doctor_budget_to_buy,
+            String.format("%.2f", totalCostEur),
+            cardsToBuy,
+        )
+    }
+    Text(
+        text = text,
+        style = ty.bodySmall,
+        color = mc.textSecondary,
+        modifier = Modifier.padding(vertical = MaterialTheme.spacing.xs),
+    )
+}
 
+@Composable
+private fun SuggestionsCaption(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.magicTypography.bodySmall,
+        color = MaterialTheme.magicColors.textSecondary,
+        modifier = Modifier.padding(bottom = MaterialTheme.spacing.sm),
+    )
+}
 
-
-
-
-
-
-
-
-
-
-
-
+@Composable
+private fun HealthSectionHeader(text: String, color: Color) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.magicTypography.labelMedium,
+        color = color,
+        fontWeight = FontWeight.Bold,
+    )
+}

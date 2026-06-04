@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,8 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.decks.presentation.components.SeedsContent
+import com.mmg.manahub.feature.decks.presentation.engine.DeckSkeletons
 import com.mmg.manahub.feature.decks.presentation.engine.MagicCard
 import com.mmg.manahub.feature.decks.presentation.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.presentation.engine.MagicSuggestion
@@ -54,42 +60,72 @@ fun DeckMagicScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val mc = MaterialTheme.magicColors
+    val toastState = rememberMagicToastState()
 
-    Scaffold(
-        contentWindowInsets = WindowInsets.statusBars,
-        containerColor = mc.background,
-        topBar = {
-            @OptIn(ExperimentalMaterial3Api::class)
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Deck Magic Creator", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        AnimatedContent(
-            targetState = uiState.step,
-            modifier = Modifier.padding(padding),
-            label = "StepTransition"
-        ) { step ->
-            when (step) {
-                DeckMagicStep.DASHBOARD -> DashboardContent(
-                    uiState = uiState,
-                    onDiscoveryClick = viewModel::startFromDiscovery,
-                    onStartEmpty = { viewModel.setStep(DeckMagicStep.SETUP) }
-                )
-                DeckMagicStep.SETUP -> SetupContent()
-                DeckMagicStep.BUILDING -> BuildingContent(
-                    uiState = uiState,
-                    onCardClick = onCardClick
-                )
-                DeckMagicStep.REVIEW -> Text("Review Mode")
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is DeckMagicEvent.Error -> toastState.show(event.message, MagicToastType.ERROR)
             }
         }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            contentWindowInsets = WindowInsets.statusBars,
+            containerColor = mc.background,
+            topBar = {
+                @OptIn(ExperimentalMaterial3Api::class)
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Deck Magic Creator", style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            AnimatedContent(
+                targetState = uiState.step,
+                modifier = Modifier.padding(padding),
+                label = "StepTransition"
+            ) { step ->
+                when (step) {
+                    DeckMagicStep.DASHBOARD -> DashboardContent(
+                        uiState = uiState,
+                        onDiscoveryClick = viewModel::startFromDiscovery,
+                        onStartEmpty = { viewModel.setStep(DeckMagicStep.SETUP) },
+                        onStartFromSeeds = viewModel::startFromSeeds,
+                    )
+                    DeckMagicStep.SEEDS -> SeedsContent(
+                        seedCards = uiState.seedCards,
+                        identity = uiState.inferredIdentity,
+                        skeleton = DeckSkeletons.forFormat(uiState.format.toDeckFormat()),
+                        budget = uiState.budget,
+                        query = uiState.seedQuery,
+                        searchResults = uiState.seedSearchResults,
+                        isSearching = uiState.isSearchingSeeds,
+                        canGenerate = uiState.canGenerate,
+                        isGenerating = uiState.isGenerating,
+                        onQueryChange = viewModel::onSeedQueryChange,
+                        onAddSeed = viewModel::addSeed,
+                        onRemoveSeed = viewModel::removeSeed,
+                        onBudgetChanged = viewModel::onBudgetChanged,
+                        onGenerate = viewModel::generateFromSeeds,
+                    )
+                    DeckMagicStep.SETUP -> SetupContent()
+                    DeckMagicStep.BUILDING -> BuildingContent(
+                        uiState = uiState,
+                        onCardClick = onCardClick
+                    )
+                    DeckMagicStep.REVIEW -> ReviewContent(uiState = uiState, onCardClick = onCardClick)
+                }
+            }
+        }
+
+        MagicToastHost(toastState)
     }
 }
 
@@ -97,7 +133,8 @@ fun DeckMagicScreen(
 private fun DashboardContent(
     uiState: DeckMagicUiState,
     onDiscoveryClick: (MagicDiscovery) -> Unit,
-    onStartEmpty: () -> Unit
+    onStartEmpty: () -> Unit,
+    onStartFromSeeds: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -106,6 +143,23 @@ private fun DashboardContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onStartFromSeeds,
+                colors = CardDefaults.cardColors(containerColor = mc.surface)
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Build from a seed card", style = ty.titleMedium, color = mc.textPrimary)
+                        Text("Pick one or more cards and auto-generate a deck", style = ty.bodySmall, color = mc.textSecondary)
+                    }
+                }
+            }
+        }
 
         item {
             Card(
@@ -166,6 +220,60 @@ private fun DiscoveryCard(discovery: MagicDiscovery, onClick: () -> Unit) {
 private fun SetupContent() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Setup Strategy & Colors")
+    }
+}
+
+/**
+ * REVIEW step. After a seed-based generation it renders the generated mainboard (non-land spells)
+ * plus a note that the reserved land slots are filled by the standard basic-land flow.
+ */
+@Composable
+private fun ReviewContent(
+    uiState: DeckMagicUiState,
+    onCardClick: (String) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item(key = "review_header") {
+            Column {
+                Text("Generated deck", style = ty.titleLarge, fontWeight = FontWeight.Bold, color = mc.textPrimary)
+                Text(
+                    "${uiState.mainboard.size} spells + ${uiState.reservedLandSlots} lands (added by the land step)",
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+        items(uiState.mainboard, key = { "mb_${it.card.scryfallId}" }) { magicCard ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onCardClick(magicCard.card.scryfallId) },
+                colors = CardDefaults.cardColors(containerColor = mc.surface),
+            ) {
+                Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(
+                        model = magicCard.card.imageArtCrop,
+                        contentDescription = null,
+                        modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(MaterialTheme.shapes.small),
+                        contentScale = ContentScale.Crop,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(magicCard.card.name, style = ty.bodyMedium, color = mc.textPrimary)
+                        Text(magicCard.card.typeLine, style = ty.labelSmall, color = mc.textSecondary)
+                    }
+                    if (!magicCard.isOwned) {
+                        Text("New", style = ty.labelSmall, color = mc.goldMtg)
+                    }
+                }
+            }
+        }
     }
 }
 

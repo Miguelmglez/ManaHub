@@ -66,8 +66,6 @@ class BotHarnessTest {
      * [drafter]. Returns the final pool of each seat.
      */
     private fun runDraft(drafter: BotDrafter, seed: Int): List<List<DraftCard>> {
-        if (drafter is HeuristicBotDrafter) drafter.resetState()
-
         val generator = WeightedBoosterGenerator(Random(seed.toLong()))
         val engine = DefaultDraftEngine(generator, drafter, Random(seed.toLong()))
         val set = DraftTestFixtures.fakeRatedDraftableSet()

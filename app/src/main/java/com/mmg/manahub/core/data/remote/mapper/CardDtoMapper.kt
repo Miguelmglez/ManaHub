@@ -51,6 +51,8 @@ fun CardDto.toDomain(): Card {
         relatedUris = relatedUris ?: emptyMap(),
         purchaseUris = purchaseUris ?: emptyMap(),
         gameChanger = gameChanger ?: false,
+        edhrecRank = edhrecRank,
+        pennyRank = pennyRank,
         cardFaces = cardFaces?.map { face ->
             CardFace(
                 name = face.name,
