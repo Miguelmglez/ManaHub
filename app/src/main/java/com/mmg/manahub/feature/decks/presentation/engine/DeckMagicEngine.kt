@@ -4,7 +4,8 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.UserCardWithCard
-import kotlinx.coroutines.Dispatchers
+import com.mmg.manahub.core.di.IoDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,7 +39,8 @@ data class MagicDiscovery(
  */
 @Singleton
 class DeckMagicEngine @Inject constructor(
-    private val deckScorer: DeckScorer
+    private val deckScorer: DeckScorer,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
     /**
@@ -47,7 +49,7 @@ class DeckMagicEngine @Inject constructor(
      */
     suspend fun discoverSynergies(
         collection: List<UserCardWithCard>
-    ): List<MagicDiscovery> = withContext(Dispatchers.Default) {
+    ): List<MagicDiscovery> = withContext(ioDispatcher) {
         val allTags = collection.flatMap { it.card.tags + it.card.userTags }
             .groupingBy { it }
             .eachCount()
@@ -79,7 +81,7 @@ class DeckMagicEngine @Inject constructor(
         selectedColors: Set<ManaColor>,
         mainboard: List<MagicCard>,
         format: GameFormat
-    ): List<MagicSuggestion> = withContext(Dispatchers.Default) {
+    ): List<MagicSuggestion> = withContext(ioDispatcher) {
         val mainboardEntries = mainboard.map { DeckEntry(card = it.card, quantity = it.quantity, isOwned = it.isOwned) }
         val profile = deckScorer.profile(
             mainboard = mainboardEntries,

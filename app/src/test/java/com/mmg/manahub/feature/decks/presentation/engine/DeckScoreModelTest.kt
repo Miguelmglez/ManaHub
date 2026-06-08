@@ -129,16 +129,14 @@ class DeckScoreModelTest {
     }
 
     @Test
-    fun `EdhrecPowerResolver given rank below 1 is clamped to rank 1`() {
-        // Arrange
-        val resolver = EdhrecPowerResolver(maxRank = 30_000) { 0 }  // 0 coerced to 1
+    fun `EdhrecPowerResolver given rank zero or negative treats as unknown and scores 0_35`() {
+        // rank <= 0 is bad data (not a real EDHREC rank) — treated the same as null/unknown
+        val resolver = EdhrecPowerResolver(maxRank = 30_000) { 0 }
         val c = card(id = "e5")
 
-        // Act
         val result = resolver.powerOf(c)
 
-        // Assert
-        assertTrue(result.normalized >= 0.99f)
+        assertEquals(0.35f, result.normalized, 0.001f)
     }
 
     @Test

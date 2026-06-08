@@ -87,6 +87,7 @@ class BuildDeckFromSeedsUseCase @Inject constructor(
         collection: List<Card>,
         weights: ScoreWeights = ScoreWeights(),
     ): SeedDeckResult = withContext(ioDispatcher) {
+        val seeds = seeds.distinctBy { it.scryfallId }
         val seedIds = seeds.mapTo(HashSet()) { it.scryfallId }
 
         // ── 1. Profile (seeds as if already in the deck) ─────────────────────────

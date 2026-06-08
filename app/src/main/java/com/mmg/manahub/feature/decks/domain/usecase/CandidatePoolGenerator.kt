@@ -94,12 +94,12 @@ class CandidatePoolGenerator @Inject constructor(
      */
     private fun buildQuery(
         identityFragment: String?,
-        legalFragment: String,
+        legalFragment: String?,
         roleFragment: String,
         budgetFragment: String?,
     ): String = buildList {
         identityFragment?.let { add(it) }
-        add(legalFragment)
+        legalFragment?.let { add(it) }
         add(roleFragment)
         budgetFragment?.let { add(it) }
         add(EXCLUDE_BASICS)
@@ -115,11 +115,11 @@ class CandidatePoolGenerator @Inject constructor(
         return if (symbols.isEmpty()) null else "id<=$symbols"
     }
 
-    private fun legalityFragment(profile: DeckProfile): String = when (profile.format) {
+    private fun legalityFragment(profile: DeckProfile): String? = when (profile.format) {
         com.mmg.manahub.core.domain.model.DeckFormat.COMMANDER -> "legal:commander"
         com.mmg.manahub.core.domain.model.DeckFormat.STANDARD -> "legal:standard"
-        // Draft/limited has no Scryfall legality token; fall back to a broad, always-true filter.
-        com.mmg.manahub.core.domain.model.DeckFormat.DRAFT -> "legal:commander"
+        // Draft/limited has no universal Scryfall legality token; omit the fragment entirely.
+        com.mmg.manahub.core.domain.model.DeckFormat.DRAFT -> null
     }
 
     /** Renders a numeric cap without locale decimal separators (Scryfall expects a dot). */
