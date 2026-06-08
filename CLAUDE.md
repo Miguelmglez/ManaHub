@@ -250,9 +250,24 @@ name can diverge from UserPreferences, silently zeroing win-rate). Use `observeL
   assign `filteredSets = allSets`.
 
 ### Deck Doctor
-The new `DeckScorer` engine and `DeckImprovement` capabilities evaluate deck health, suggest cuts,
-and recommend card additions from the collection and external sources (with budget filtering).
-- → memory: `project_deck_doctor_phase6`, `project_deck_doctor_general`
+All 8 phases complete (Phases 1–8 verified, build green, 209 unit tests passing). Key invariants:
+- `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
+- `generateFromSeeds()` captures inputs atomically inside `_uiState.update { }` (double-tap + stale-snapshot guards).
+- `loadAnalysis()` cancels via `analysisJob?.cancel()` before relaunching; sets `isLoading` only when `health == null`.
+- `CandidatePoolGenerator.legalityFragment()` returns `String?`; `DRAFT → null` (no legality restriction).
+- `BudgetConstraints` has an `init` block validating finite/positive values.
+- `SeedStrategy.TOKENS` test requires all 3 primary tags (TOKENS+AGGRO+TRIBAL) to beat AGGRO's tie.
+- `stubRankAdds()` in tests must `candidates.take(arg<Int>(4))` to respect the `limit` parameter.
+- → memory: `project_deck_doctor_phase6`, `project_deck_doctor_general`, `feedback_deck_doctor_audit_2026-06-08`
+
+### Home dashboard (`feature/home/`)
+Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-know:
+- **Start destination is `Screen.Home`** (not `Screen.Collection`). BottomBar is 3-slot: [Home] [⚔ FAB] [Library].
+- `HomeViewModel` uses `combine(8 flows).stateIn(WhileSubscribed(5_000))` — no new DB tables. `avatarUrlFlow` MUST be subscribed/mocked in tests (blocks `accountFlow` combine if missing).
+- Quick Start: 4 shortcuts persisted in DataStore via `UserPreferencesDataStore.observeQuickStartActions()`; partial-restore pads with defaults rather than discarding valid entries.
+- Account nudge: 5-priority system (ACTION_REQUIRED > COLLECTION_MILESTONE ≥10 > DECK_MILESTONE ≥2 > GAME_MILESTONE ≥3 > SYNC_PENDING); 48h cooldown; ACTION_REQUIRED bypasses cooldown.
+- `onBackHome`: `popUpTo(0) { inclusive = true }` (not `popUpTo(Screen.Collection.route)`) to avoid back-stack corruption on fresh install.
+- → memory: `project_home_dashboard_redesign`, `feedback_home_stateIn_test_pattern`
 
 ## Testing conventions
 
@@ -323,3 +338,13 @@ Apply to every new migration/RPC/trigger/view:
 10. `enqueue_notification` is permanently REVOKE-protected (accepts arbitrary `recipient_id`).
 
 → memory: `feedback_supabase_security_audit_2026-06-02`
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

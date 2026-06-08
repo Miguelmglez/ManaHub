@@ -256,6 +256,10 @@ $RECYCLE.BIN/
 # Agent definition files (prompt engineering — keep local or in a private repo).
 .claude/agents/
 
+# Agent workspace directories at repository root — ephemeral, never commit.
+.agents/
+.codex/
+
 # Local Claude Code settings overrides (personal, machine-specific).
 .claude/settings.local.json
 
@@ -305,6 +309,18 @@ NOTES_*.md
 #   Option B: Treat all lint warnings as must-fix; never commit a baseline.
 #             Uncomment the line below to prevent accidental baseline commits.
 # lint-baseline.xml
+
+# =============================================================================
+# SECTION 10 — GRAPHIFY KNOWLEDGE GRAPH (LOCAL ONLY)
+#
+# The graphify-out/ directory contains the local knowledge graph of the
+# codebase: graph.json (11 MB), graph.html (9 MB), GRAPH_REPORT.md (110 KB),
+# extraction cache, and community labels. This is machine-specific tooling —
+# the graph is rebuilt locally via the post-commit hook or /graphify --update.
+# Never commit these files; they are large, binary-ish, and local-only.
+# =============================================================================
+
+graphify-out/
 
 # =============================================================================
 # END OF .gitignore
