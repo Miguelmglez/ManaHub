@@ -64,7 +64,7 @@ val DeckWarning.key: String
     }
 
 /** One-decimal CMC formatting, locale-stable. */
-private fun formatCmc(value: Double): String = String.format("%.1f", value)
+private fun formatCmc(value: Double): String = String.format(java.util.Locale.US, "%.1f", value)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ScoreReason localization (Cut / Add suggestion tags)

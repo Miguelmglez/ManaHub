@@ -19,9 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CollectionsBookmark
-import androidx.compose.material.icons.filled.Newspaper
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,38 +32,42 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.app.navigation.Screen
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MagicBottomBar
-//  Custom 5-slot bottom bar with a gradient FAB in the centre slot.
+//  Custom 3-slot bottom bar with a gradient Play FAB in the centre slot.
 //
-//  Slot layout:  [Collection] [News] [⚔ PLAY FAB] [Draft] [Profile]
+//  Slot layout:  [Home] [⚔ PLAY FAB] [Library]
 //
 //  The FAB overflows the top of the bar by 8 dp.
 //  The outer Box does NOT clip, so the overflow is visible.
+//
+//  Home redesign (free-first/account-enhanced): the bar surfaces only the two
+//  always-relevant destinations plus the centered Game action. Draft, News,
+//  Profile, etc. are reachable from Home modules and the Library sub-tabs, not
+//  as permanent tabs.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
 fun MagicBottomBar(
-    currentRoute:      String?,
-    onCollectionClick: () -> Unit,
-    onNewsClick:       () -> Unit,
-    onPlayClick:       () -> Unit,
-    onDraftClick:      () -> Unit,
-    onProfileClick:    () -> Unit,
-    modifier:          Modifier = Modifier,
+    currentRoute:   String?,
+    onHomeClick:    () -> Unit,
+    onPlayClick:    () -> Unit,
+    onLibraryClick: () -> Unit,
+    modifier:       Modifier = Modifier,
 ) {
-    val colors     = MaterialTheme.magicColors
-    val typography = MaterialTheme.magicTypography
+    val colors = MaterialTheme.magicColors
 
     val barHeight = 80.dp
 
@@ -101,24 +103,16 @@ fun MagicBottomBar(
             verticalAlignment    = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            // Slot 1 — Collection
+            // Slot 1 — Home
             BottomBarTab(
-                label    = "FOLDER",
-                icon     = Icons.Default.CollectionsBookmark,
-                selected = currentRoute == Screen.Collection.route,
-                onClick  = onCollectionClick,
+                label    = "HOME",
+                icon     = Icons.Default.Home,
+                selected = currentRoute == Screen.Home.route,
+                onClick  = onHomeClick,
                 modifier = Modifier.weight(1f),
             )
 
-            // Slot 2 — Draft
-            BottomBarTab(
-                label    = "DRAFT",
-                icon     = Icons.Default.Style,
-                selected = currentRoute == Screen.Draft.route,
-                onClick  = onDraftClick,
-                modifier = Modifier.weight(1f),
-            )
-            // Slot 3 — Play FAB (overflows upward by 8 dp)
+            // Slot 2 — Play FAB (overflows upward by 8 dp)
             Box(
                 modifier         = Modifier
                     .weight(1f)
@@ -127,25 +121,16 @@ fun MagicBottomBar(
             ) {
                 PlayFab(
                     onClick  = onPlayClick,
-                    modifier = Modifier.offset(y = (-8).dp),
+                    modifier = Modifier.offset(y = -MaterialTheme.spacing.sm),
                 )
             }
 
-            // Slot 4 — News
-
+            // Slot 3 — Library (reuses the existing Collection destination)
             BottomBarTab(
-                label    = "NEWS",
-                icon     = Icons.Default.Newspaper,
-                selected = currentRoute == Screen.News.route,
-                onClick  = onNewsClick,
-                modifier = Modifier.weight(1f),
-            )
-            // Slot 5 — Profile
-            BottomBarTab(
-                label    = "PROFILE",
-                icon     = Icons.Default.Person,
-                selected = currentRoute == Screen.Profile.route,
-                onClick  = onProfileClick,
+                label    = "LIBRARY",
+                icon     = Icons.Default.CollectionsBookmark,
+                selected = currentRoute == Screen.Collection.route,
+                onClick  = onLibraryClick,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -169,6 +154,7 @@ private fun BottomBarTab(
     val contentColor  = if (selected) colors.primaryAccent else colors.textDisabled
     val interactionSource = remember { MutableInteractionSource() }
 
+    val accessibleLabel = label.lowercase().replaceFirstChar { it.uppercase() }
     Column(
         modifier = modifier
             .fillMaxHeight()
@@ -176,17 +162,18 @@ private fun BottomBarTab(
                 interactionSource = interactionSource,
                 indication        = ripple(bounded = true),
                 onClick           = onClick,
-            ),
+            )
+            .semantics(mergeDescendants = true) { contentDescription = accessibleLabel },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector        = icon,
-            contentDescription = label,
+            contentDescription = null,
             tint               = contentColor,
             modifier           = Modifier.size(24.dp),
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(MaterialTheme.spacing.xs))
         Text(
             text      = label,
             style     = typography.labelSmall,
@@ -208,6 +195,7 @@ private fun PlayFab(
     modifier: Modifier = Modifier,
 ) {
     val colors    = MaterialTheme.magicColors
+    val spacing   = MaterialTheme.spacing
     val glowColor = colors.primaryAccent.copy(alpha = 0.35f)
     val gradient  = Brush.linearGradient(
         colors = listOf(colors.primaryAccent, colors.secondaryAccent),
@@ -222,7 +210,7 @@ private fun PlayFab(
             .drawBehind {
                 drawCircle(
                     color  = glowColor,
-                    radius = size.minDimension / 2f + 10.dp.toPx(),
+                    radius = size.minDimension / 2f + spacing.sm.toPx(),
                 )
             }
             .clip(CircleShape)
@@ -237,7 +225,7 @@ private fun PlayFab(
         Icon(
             painter            = painterResource(R.drawable.ic_battle),
             contentDescription = "Play Game",
-            tint               = Color.White,
+            tint               = colors.background,
             modifier           = Modifier.size(28.dp),
         )
     }

@@ -29,6 +29,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
+import kotlin.math.roundToInt
 
 /**
  * Selectable budget-filter bar for the ADD tab.
@@ -121,7 +122,7 @@ private fun BudgetCapRow(
             items(presets, key = { it }) { cap ->
                 BudgetChip(
                     text = stringResource(R.string.deck_doctor_budget_cap_label, cap),
-                    selected = selected != null && selected.toInt() == cap,
+                    selected = selected != null && selected.roundToInt() == cap,
                     onClick = { onSelect(cap.toDouble()) },
                 )
             }

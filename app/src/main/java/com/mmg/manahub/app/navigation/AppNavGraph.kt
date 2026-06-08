@@ -62,6 +62,9 @@ import com.mmg.manahub.feature.game.presentation.GameSettings
 import com.mmg.manahub.feature.game.presentation.GameViewModel
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.game.domain.model.GameMode
+import com.mmg.manahub.feature.home.presentation.HomeAction
+import com.mmg.manahub.feature.home.presentation.HomeHeroState
+import com.mmg.manahub.feature.home.presentation.HomeScreen
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
@@ -88,14 +91,13 @@ import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Bottom-bar visibility rules
-//  Visible on the four root tabs; hidden on all detail / game / scanner flows.
+//  Visible on the two root tabs (Home + Library); hidden on all detail / game /
+//  scanner flows and on screens now reached through Home (Draft, News, Profile…).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 private val bottomBarRoutes = setOf(
+    Screen.Home.route,
     Screen.Collection.route,
-    Screen.News.route,
-    Screen.Draft.route,
-    Screen.Profile.route,
 )
 
 @Composable
@@ -185,8 +187,7 @@ fun AppNavGraph(
                 if (currentRoute in bottomBarRoutes && !isInPiP) {
                     MagicBottomBar(
                         currentRoute = currentRoute,
-                        onCollectionClick = { navController.navigateTab(Screen.Collection.route) },
-                        onNewsClick = { navController.navigateTab(Screen.News.route) },
+                        onHomeClick = { navController.navigateTab(Screen.Home.route) },
                         onPlayClick = {
                             if (hasActiveGame) {
                                 navController.navigate(
@@ -199,8 +200,7 @@ fun AppNavGraph(
                                 navController.navigate(Screen.GameSetup.baseRoute)
                             }
                         },
-                        onDraftClick = { navController.navigateTab(Screen.Draft.route) },
-                        onProfileClick = { navController.navigateTab(Screen.Profile.route) },
+                        onLibraryClick = { navController.navigateTab(Screen.Collection.route) },
                     )
                 }
             }
@@ -209,13 +209,89 @@ fun AppNavGraph(
         Box(modifier = modifier.padding(padding).fillMaxSize()) {
         NavHost(
             navController = navController,
-            startDestination = Screen.Collection.route,
+            startDestination = Screen.Home.route,
             modifier = Modifier,
             enterTransition = { fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 } },
             exitTransition = { fadeOut(tween(200)) },
             popEnterTransition = { fadeIn(tween(300)) },
             popExitTransition = { fadeOut(tween(200)) + slideOutHorizontally(tween(300)) { it / 5 } },
         ) {
+
+            // ── Home (free-first dashboard) ───────────────────────────────────
+            composable(Screen.Home.route) {
+                // The live in-memory game state is owned by the activity-scoped
+                // GameViewModel up here; pass it down rather than injecting the
+                // GameViewModel into HomeViewModel.
+                val activeGame = if (hasActiveGame) {
+                    HomeHeroState.ActiveGame(
+                        mode = gameUiState.mode.name,
+                        playerCount = gameUiState.players.size,
+                    )
+                } else null
+
+                HomeScreen(
+                    viewModel = hiltViewModel(),
+                    activeGame = activeGame,
+                    onAction = { action ->
+                        when (action) {
+                            HomeAction.StartGame -> {
+                                if (hasActiveGame) {
+                                    navController.navigate(
+                                        Screen.GamePlay.createRoute(
+                                            gameUiState.mode.name,
+                                            gameUiState.players.size,
+                                        )
+                                    ) { launchSingleTop = true }
+                                } else {
+                                    navController.navigate(Screen.GameSetup.baseRoute)
+                                }
+                            }
+                            HomeAction.ScanCard -> navController.navigate(Screen.CollectionScanner.route)
+                            HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.route)
+                            HomeAction.CreateDeck -> navController.navigate(Screen.DeckBuilder.route)
+                            HomeAction.DraftGuide -> navController.navigate(Screen.Draft.route)
+                            HomeAction.DraftSimulator -> navController.navigate(Screen.Draft.route)
+                            HomeAction.OpenLibrary -> navController.navigateTab(Screen.Collection.route)
+                            HomeAction.OpenDecks -> navController.navigateTab(Screen.Collection.route)
+                            HomeAction.OpenNews -> navController.navigate(Screen.News.route)
+                            HomeAction.OpenStats -> navController.navigate(Screen.Stats.route)
+                            HomeAction.OpenFriends -> navController.navigate(Screen.FriendsList.route)
+                            HomeAction.OpenTrades -> navController.navigateTab(Screen.Collection.route)
+                            HomeAction.OpenTournaments -> navController.navigate(Screen.TournamentList.route)
+                            HomeAction.OpenSettings -> navController.navigate(Screen.Settings.route)
+                            HomeAction.OpenProfile -> navController.navigate(Screen.Profile.route)
+                            HomeAction.PlaytestRecentDeck -> navController.navigateTab(Screen.Collection.route)
+                            HomeAction.ImproveRecentDeck -> navController.navigateTab(Screen.Collection.route)
+                            is HomeAction.ContinueItem -> {
+                                when (action.item.type) {
+                                    com.mmg.manahub.feature.home.presentation.ContinueType.GAME -> {
+                                        if (hasActiveGame) {
+                                            navController.navigate(
+                                                Screen.GamePlay.createRoute(
+                                                    gameUiState.mode.name,
+                                                    gameUiState.players.size,
+                                                )
+                                            ) { launchSingleTop = true }
+                                        }
+                                    }
+                                    com.mmg.manahub.feature.home.presentation.ContinueType.DRAFT ->
+                                        navController.navigateTab(Screen.Draft.route)
+                                    com.mmg.manahub.feature.home.presentation.ContinueType.TOURNAMENT ->
+                                        navController.navigate(Screen.TournamentList.route)
+                                    com.mmg.manahub.feature.home.presentation.ContinueType.DECK ->
+                                        navController.navigate(Screen.DeckDetail.createRoute(action.item.id))
+                                }
+                            }
+                            // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge are
+                            // handled inside HomeScreen / HomeViewModel.
+                            HomeAction.CustomizeQuickStart -> Unit
+                            is HomeAction.SaveQuickStart -> Unit
+                            HomeAction.CreateAccount -> navController.navigate(Screen.Profile.route)
+                            HomeAction.DismissAccountNudge -> Unit
+                        }
+                    },
+                )
+            }
 
             // ── Collection ────────────────────────────────────────────────────
             composable(Screen.Collection.route) {
@@ -776,15 +852,14 @@ fun AppNavGraph(
                         }
                     },
                     onBackHome = {
-                        // Finish the current game and return to setup
                         gameVm.finishGame()
-                        navController.navigate(Screen.GameSetup.baseRoute) {
-                            popUpTo(Screen.Collection.route) { inclusive = false }
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                     onAbandonGame = {
                         // Abandon temporarily: preserve game state so Play FAB can resume it
-                        navController.navigate(Screen.Collection.route) {
+                        navController.navigate(Screen.Home.route) {
                             popUpTo(0) { inclusive = true }
                         }
                     },

@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -289,7 +290,7 @@ fun WarningChip(
 
     Surface(
         color = mc.lifeNegative.copy(alpha = 0.16f),
-        shape = RoundedCornerShape(8.dp),
+        shape = ChipShape,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(

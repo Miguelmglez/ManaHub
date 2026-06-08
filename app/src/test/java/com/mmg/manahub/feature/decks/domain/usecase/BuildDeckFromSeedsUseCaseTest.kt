@@ -220,4 +220,68 @@ class BuildDeckFromSeedsUseCaseTest {
         assertTrue(result.mainboard.any { it.card.scryfallId == "seed-1" })
         assertTrue(result.mainboard.any { it.card.scryfallId == "r1" })
     }
+
+    @Test
+    fun `empty seeds list produces a valid result with reserved land slots and no exception`() =
+        runTest(dispatcher) {
+            // When no seeds are provided, the profile is built from an empty mainboard.
+            // The use case must not throw, and the land-slot reservation must still fire.
+            coEvery { candidatePool(any(), any(), any(), any()) } returns emptyList()
+
+            val emptyIdentity = InferredIdentity(
+                colorIdentity = emptySet(),
+                strategy = null,
+                seedTags = emptyList(),
+            )
+
+            val result = useCase(
+                seeds = emptyList(),
+                identity = emptyIdentity,
+                format = DeckFormat.STANDARD,
+                constraints = noNetwork,
+                collection = emptyList(),
+            )
+
+            // No seeds → nothing is force-added, so the mainboard comes solely from the picked
+            // fills (also empty here because the collection is empty too).
+            assertTrue(
+                "mainboard should be empty when seeds=[] and collection=[]",
+                result.mainboard.isEmpty(),
+            )
+            // The land-slot reservation must fall back to the format target (24 for STANDARD).
+            assertTrue(
+                "reservedLandSlots must be > 0 (skeleton ideal or format target)",
+                result.reservedLandSlots > 0,
+            )
+            assertEquals(DeckFormat.STANDARD.targetLandCount, result.reservedLandSlots)
+        }
+
+    @Test
+    fun `duplicate seed cards are deduplicated in the mainboard`() = runTest(dispatcher) {
+        // Providing the same Card object twice must not result in the same scryfallId appearing
+        // twice in the mainboard — seeds are added with a simple forEach which would normally
+        // produce duplicates without an explicit guard.
+        val duplicateSeed = card(
+            id = "dup-seed",
+            name = "Clone Seed",
+            tags = listOf(com.mmg.manahub.core.domain.model.CardTag.COUNTERSPELL),
+            colorIdentity = listOf("U"),
+        )
+        coEvery { candidatePool(any(), any(), any(), any()) } returns emptyList()
+
+        val result = useCase(
+            seeds = listOf(duplicateSeed, duplicateSeed),
+            identity = identity,
+            format = DeckFormat.STANDARD,
+            constraints = noNetwork,
+            collection = emptyList(),
+        )
+
+        val idsInMainboard = result.mainboard.map { it.card.scryfallId }
+        assertEquals(
+            "duplicate seed id must appear exactly once in the mainboard",
+            1,
+            idsInMainboard.count { it == "dup-seed" },
+        )
+    }
 }

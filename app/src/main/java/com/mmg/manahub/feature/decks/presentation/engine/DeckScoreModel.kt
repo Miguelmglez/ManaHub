@@ -74,7 +74,7 @@ class EdhrecPowerResolver(
 ) : PowerResolver {
     override fun powerOf(card: Card): CardPower {
         val rank = rankOf(card)
-        val base = if (rank == null) 0.35f // unknown rank = slightly below average
+        val base = if (rank == null || rank <= 0) 0.35f // unknown/invalid rank = slightly below average
         else {
             val r = rank.coerceIn(1, maxRank)
             (1f - (Math.log(r.toDouble()) / Math.log(maxRank.toDouble())).toFloat()).coerceIn(0f, 1f)

@@ -7,6 +7,9 @@ sealed class Screen(val route: String) {
     // ── Root ─────────────────────────────────────────────────────────────────
     object Splash : Screen("splash")
 
+    /** Free-first dashboard — the app start destination and left bottom-bar tab. */
+    object Home : Screen("home")
+
     // ── Collection (bottom tab 1) ────────────────────────────────────────────
     /** Bottom-tab root — also hosts the Cards/Decks sub-tab row. */
     object Collection : Screen("collection")

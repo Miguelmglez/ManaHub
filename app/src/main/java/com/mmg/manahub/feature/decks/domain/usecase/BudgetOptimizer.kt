@@ -16,6 +16,15 @@ data class BudgetConstraints(
     val maxTotalEur: Double? = null,
     val ownedCardsAreFree: Boolean = true,
 ) {
+    init {
+        require(maxPerCardEur == null || (maxPerCardEur.isFinite() && maxPerCardEur > 0.0)) {
+            "maxPerCardEur must be a positive finite value or null, got: $maxPerCardEur"
+        }
+        require(maxTotalEur == null || (maxTotalEur.isFinite() && maxTotalEur > 0.0)) {
+            "maxTotalEur must be a positive finite value or null, got: $maxTotalEur"
+        }
+    }
+
     /** True when neither cap is set — the optimizer becomes a pass-through. */
     val isUnconstrained: Boolean get() = maxPerCardEur == null && maxTotalEur == null
 }

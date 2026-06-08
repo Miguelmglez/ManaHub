@@ -20,12 +20,12 @@ import com.mmg.manahub.feature.decks.presentation.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.presentation.engine.MagicSuggestion
 import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -95,8 +95,8 @@ class DeckMagicViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DeckMagicUiState())
     val uiState: StateFlow<DeckMagicUiState> = _uiState.asStateFlow()
 
-    private val _events = MutableSharedFlow<DeckMagicEvent>(extraBufferCapacity = 4)
-    val events: SharedFlow<DeckMagicEvent> = _events.asSharedFlow()
+    private val _events = Channel<DeckMagicEvent>(Channel.BUFFERED)
+    val events: Flow<DeckMagicEvent> = _events.receiveAsFlow()
 
     private var seedSearchJob: Job? = null
 
@@ -107,9 +107,15 @@ class DeckMagicViewModel @Inject constructor(
     private fun loadDiscoveries() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val collection = userCardRepo.observeCollection().first()
-            val discoveries = engine.discoverSynergies(collection)
-            _uiState.update { it.copy(discoveries = discoveries, isLoading = false) }
+            runCatching {
+                val collection = userCardRepo.observeCollection().first()
+                engine.discoverSynergies(collection)
+            }.onSuccess { discoveries ->
+                _uiState.update { it.copy(discoveries = discoveries, isLoading = false) }
+            }.onFailure { t ->
+                FirebaseCrashlytics.getInstance().recordException(t)
+                _uiState.update { it.copy(isLoading = false) }
+            }
         }
     }
 
@@ -212,11 +218,15 @@ class DeckMagicViewModel @Inject constructor(
      * step is left unchanged so the user can retry.
      */
     fun generateFromSeeds() {
-        val snapshot = _uiState.value
-        if (snapshot.seedCards.isEmpty() || snapshot.isGenerating) return
+        var captured: DeckMagicUiState? = null
+        _uiState.update { s ->
+            if (s.seedCards.isEmpty() || s.isGenerating) return@update s
+            captured = s
+            s.copy(isGenerating = true, error = null)
+        }
+        val snapshot = captured ?: return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isGenerating = true, error = null) }
             val result = runCatching {
                 val collection = userCardRepo.observeCollection().first().map { it.card }
                 val identity = snapshot.inferredIdentity ?: inferDeckIdentity(snapshot.seedCards)
@@ -243,15 +253,16 @@ class DeckMagicViewModel @Inject constructor(
                 .onFailure { t ->
                     FirebaseCrashlytics.getInstance().recordException(t)
                     _uiState.update { it.copy(isGenerating = false) }
-                    _events.tryEmit(DeckMagicEvent.Error(t.message ?: "Could not generate the deck"))
+                    _events.send(DeckMagicEvent.Error(t.message ?: "Could not generate the deck"))
                 }
         }
     }
 
     private fun updateSuggestions() {
         viewModelScope.launch {
-            val s = _uiState.value
             val collection = userCardRepo.observeCollection().first()
+            // Read state after the suspend boundary so colors/mainboard/tags are fresh.
+            val s = _uiState.value
             val suggestions = engine.getSuggestions(
                 collection = collection,
                 targetTags = s.targetTags,

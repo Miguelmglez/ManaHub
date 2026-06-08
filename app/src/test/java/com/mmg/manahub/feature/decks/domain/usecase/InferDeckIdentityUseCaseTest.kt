@@ -73,13 +73,14 @@ class InferDeckIdentityUseCaseTest {
 
     @Test
     fun `userTags also contribute to strategy detection`() {
+        // All three of TOKENS's primaryTags (TOKENS, AGGRO, TRIBAL) together give TOKENS a count of 3,
+        // which beats AGGRO (count=2: AGGRO+TOKENS) and TRIBAL (count=2: TRIBAL+AGGRO).
         val seeds = listOf(
-            card(id = "a", userTags = listOf(CardTag.TOKENS)),
+            card(id = "a", userTags = listOf(CardTag.TOKENS, CardTag.AGGRO, CardTag.TRIBAL)),
         )
 
         val result = useCase(seeds)
 
-        // TOKENS is a primary tag of the TOKENS strategy.
         assertEquals(SeedStrategy.TOKENS, result.strategy)
     }
 

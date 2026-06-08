@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.decks.presentation.improvement
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -17,6 +18,7 @@ import com.mmg.manahub.feature.decks.presentation.engine.DeckProfile
 import com.mmg.manahub.feature.decks.presentation.engine.DeckEvaluation
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,6 +75,8 @@ class DeckImprovementViewModel @Inject constructor(
      */
     private var addContext: AddContext? = null
 
+    private var analysisJob: Job? = null
+
     /** Immutable snapshot of everything the ADD pipeline needs to recompute on a budget change. */
     private data class AddContext(
         val collection: List<Card>,
@@ -87,9 +91,11 @@ class DeckImprovementViewModel @Inject constructor(
     }
 
     private fun loadAnalysis() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            
+        addContext = null
+        analysisJob?.cancel()
+        analysisJob = viewModelScope.launch {
+            _uiState.update { s -> if (s.health == null) s.copy(isLoading = true) else s }
+
             val deckWithCards = deckRepository.observeDeckWithCards(deckId).first()
             if (deckWithCards == null) {
                 _uiState.update { it.copy(isLoading = false, error = "Deck not found") }
@@ -97,7 +103,11 @@ class DeckImprovementViewModel @Inject constructor(
             }
 
             val collection = userCardRepository.observeCollection().first()
-            val deckFormat = com.mmg.manahub.core.domain.model.DeckFormat.valueOf(deckWithCards.deck.format.uppercase())
+            val deckFormat = com.mmg.manahub.core.domain.model.DeckFormat.entries
+                .firstOrNull { it.name.equals(deckWithCards.deck.format, ignoreCase = true) }
+                ?: com.mmg.manahub.core.domain.model.DeckFormat.STANDARD.also {
+                    FirebaseCrashlytics.getInstance().log("Unknown deck format: '${deckWithCards.deck.format}' – defaulting to STANDARD")
+                }
             // DeckScorer-based Health evaluation. Only mainboard slots with a resolved card
             // participate; the engine ignores ownership, so isOwned is left at false here.
             val mainboardEntries = deckWithCards.mainboard.mapNotNull { slot ->
@@ -156,11 +166,10 @@ class DeckImprovementViewModel @Inject constructor(
      * falls back to collection + wishlist, so this never crashes — it only emits a warning toast when
      * the external pool comes back empty due to an error. Safe to call repeatedly (budget changes).
      */
-    private fun recomputeAdds() {
+    private fun recomputeAdds(constraints: BudgetConstraints = _uiState.value.budget) {
         val context = addContext ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isAddsLoading = true) }
-            val constraints = _uiState.value.budget
             val selection = runCatching {
                 suggestAddsWithBudgetUseCase(
                     collection = context.collection,
@@ -193,7 +202,7 @@ class DeckImprovementViewModel @Inject constructor(
     /** Updates the budget filters and recomputes the ADD suggestions (no full re-analysis). */
     fun onBudgetChanged(budget: BudgetConstraints) {
         _uiState.update { it.copy(budget = budget) }
-        recomputeAdds()
+        recomputeAdds(budget)
     }
 
     /** Resolves a Scryfall id to a full [Card], or null when it is not available. */

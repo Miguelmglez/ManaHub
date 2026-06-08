@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
@@ -28,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -108,7 +108,7 @@ fun CutSuggestionRow(
 
     Surface(
         color = mc.surface,
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
@@ -175,7 +175,7 @@ fun AddSuggestionRow(
 
     Surface(
         color = mc.surface,
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
@@ -258,6 +258,6 @@ private fun AddOrigin.tone(): SuggestionTagTone = when (this) {
 private fun AddSuggestion.priceLabel(): String = when {
     fit.isOwned -> stringResource(R.string.deck_doctor_price_free)
     fit.card.priceEur != null ->
-        stringResource(R.string.deck_doctor_price_eur, String.format("%.2f", fit.card.priceEur))
+        stringResource(R.string.deck_doctor_price_eur, String.format(java.util.Locale.US, "%.2f", fit.card.priceEur))
     else -> stringResource(R.string.deck_doctor_price_unknown)
 }

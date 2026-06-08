@@ -20,6 +20,7 @@ import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
+import com.mmg.manahub.feature.home.presentation.QuickStartAction
 import com.mmg.manahub.core.util.PriceFormatter.isEuropeanLocale
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -45,6 +46,15 @@ private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_thresho
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
 private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
+
+// ── Home dashboard ──────────────────────────────────────────────────────────
+/** Comma-separated list of QuickStartAction.persistedId values; order matters. */
+private val KEY_QUICK_START_ORDER     = stringPreferencesKey("quick_start_order")
+/** Epoch millis of the last account-nudge dismissal (cooldown anchor). */
+private val KEY_ACCOUNT_NUDGE_DISMISSED_AT = longPreferencesKey("account_nudge_dismissed_at")
+
+/** How long the account nudge stays suppressed after a dismissal. */
+private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hours
 
 // ── Feature flags ─────────────────────────────────────────────────────────
 private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
@@ -342,5 +352,66 @@ class UserPreferencesDataStore @Inject constructor(
             }
         }
     }
+
+    // ── Home dashboard: Quick Start customization ──────────────────────────────
+    //
+    // Persisted as an ORDERED comma-separated string of persistedIds (not a
+    // StringSet, which is unordered). On read, unknown/removed ids are dropped;
+    // if fewer than four valid actions survive, we fall back to the defaults so
+    // the grid always has exactly four useful shortcuts.
+
+    /** Emits the user's ordered Quick Start actions.
+     *
+     * Valid ids from the stored string are preserved in order; unknown ids (e.g. from a
+     * rolled-back app version) are dropped. If the result has fewer than 4 actions, it
+     * is padded with items from [QuickStartAction.defaults] (in defaults order, skipping
+     * duplicates) so the grid always shows exactly 4 shortcuts. */
+    fun observeQuickStartActions(): Flow<List<QuickStartAction>> =
+        context.userPrefsDataStore.data
+            .map { prefs ->
+                val raw = prefs[KEY_QUICK_START_ORDER]
+                val parsed = raw
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    ?.mapNotNull { QuickStartAction.fromPersistedId(it) }
+                    ?: emptyList()
+                if (parsed.size >= 4) {
+                    parsed
+                } else {
+                    val result = parsed.toMutableList()
+                    for (default in QuickStartAction.defaults) {
+                        if (result.size >= 4) break
+                        if (default !in result) result.add(default)
+                    }
+                    result
+                }
+            }
+            .catch { emit(QuickStartAction.defaults) }
+
+    /** Persists the chosen Quick Start actions as an ordered persistedId string. */
+    suspend fun saveQuickStartActions(actions: List<QuickStartAction>) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[KEY_QUICK_START_ORDER] = actions.joinToString(",") { it.persistedId }
+        }
+    }
+
+    // ── Home dashboard: account nudge dismissal cooldown ───────────────────────
+
+    /** Records the current time as the most recent account-nudge dismissal. */
+    suspend fun dismissAccountNudge() {
+        context.userPrefsDataStore.edit {
+            it[KEY_ACCOUNT_NUDGE_DISMISSED_AT] = System.currentTimeMillis()
+        }
+    }
+
+    /** Emits true while the account nudge is still within its 48-hour cooldown. */
+    fun isNudgeCoolingDown(): Flow<Boolean> =
+        context.userPrefsDataStore.data
+            .map { prefs ->
+                val dismissedAt = prefs[KEY_ACCOUNT_NUDGE_DISMISSED_AT] ?: 0L
+                System.currentTimeMillis() - dismissedAt < ACCOUNT_NUDGE_COOLDOWN_MS
+            }
+            .catch { emit(false) }
 
 }

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -52,6 +51,7 @@ import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -237,10 +237,10 @@ private fun HealthTab(health: DeckHealth?) {
         // Mana curve (non-lands only)
         item { HealthSectionHeader(stringResource(R.string.deck_health_section_curve), mc.primaryAccent) }
         item {
-            Surface(color = mc.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Surface(color = mc.surface, shape = CardShape, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(MaterialTheme.spacing.md)) {
                     Text(
-                        text = stringResource(R.string.deck_health_avg_cmc, String.format("%.1f", evaluation.avgCmc)),
+                        text = stringResource(R.string.deck_health_avg_cmc, String.format(java.util.Locale.US, "%.1f", evaluation.avgCmc)),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textSecondary,
                     )
@@ -346,7 +346,7 @@ private fun BudgetSummary(totalCostEur: Double, cardsToBuy: Int) {
     } else {
         stringResource(
             R.string.deck_doctor_budget_to_buy,
-            String.format("%.2f", totalCostEur),
+            String.format(java.util.Locale.US, "%.2f", totalCostEur),
             cardsToBuy,
         )
     }
