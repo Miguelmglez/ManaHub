@@ -87,34 +87,46 @@ object GameChangerAnalyzer {
 object StrategyAnalyzer {
 
     /**
-     * Scans oracle / printed text against [TagDictionary] patterns in EN, ES, DE.
-     * Each entry contributes its `baseConfidence` (with a small bump per extra
-     * matched pattern) when at least one of its language pattern groups hits.
+     * Scryfall oracle text embeds parenthesized reminder text (e.g. deathtouch's
+     * "(Any amount of damage this deals to a creature is enough to destroy it.)").
+     * Reminder text is a false-positive source for substring matching, so we strip
+     * it before analysis. Precompiled once — this runs on the @DefaultDispatcher
+     * for whole-collection refreshes.
+     */
+    private val reminderTextRegex = Regex("\\([^)]*\\)")
+
+    /**
+     * Scans the English [Card.oracleText] against [TagDictionary] detection rules.
+     *
+     * The text is normalized once per card (lowercased → reminder text stripped →
+     * the card's own name(s) replaced with "~" so self-referential templating can
+     * be matched). Each entry whose rules match contributes a confidence equal to
+     * the highest matched-rule confidence, +0.03 per additional matched rule,
+     * coerced to ≤ 0.99 (multi-evidence bump).
      */
     fun analyze(card: Card): List<SuggestedTag> {
-        val texts: List<Pair<String, String>> = buildList {
-            card.oracleText?.takeIf { it.isNotBlank() }
-                ?.let { add("en" to it.lowercase()) }
-            card.printedText?.takeIf { it.isNotBlank() }
-                ?.let { add(card.lang.lowercase() to it.lowercase()) }
-        }
-        if (texts.isEmpty()) return emptyList()
+        val oracle = card.oracleText?.takeIf { it.isNotBlank() } ?: return emptyList()
+
+        val text = normalize(oracle, card.name)
+        val typeLineLower = card.typeLine.lowercase()
 
         val results = mutableListOf<SuggestedTag>()
 
         TagDictionary.all().forEach { entry ->
-            if (entry.patterns.isEmpty() || entry.baseConfidence <= 0f) return@forEach
+            if (entry.rules.isEmpty() || entry.baseConfidence <= 0f) return@forEach
 
-            // Count how many language pattern groups produced at least one match.
-            var matchedGroups = 0
-            texts.forEach { (lang, text) ->
-                val patterns = entry.patterns[lang].orEmpty()
-                if (patterns.any { p -> text.contains(p) }) matchedGroups++
+            var matchedCount = 0
+            var maxConfidence = 0f
+            entry.rules.forEach { rule ->
+                if (matches(rule, text, typeLineLower)) {
+                    matchedCount++
+                    val ruleConfidence = rule.confidence ?: entry.baseConfidence
+                    if (ruleConfidence > maxConfidence) maxConfidence = ruleConfidence
+                }
             }
 
-            if (matchedGroups > 0) {
-                val confidence = (entry.baseConfidence + 0.03f * (matchedGroups - 1))
-                    .coerceIn(0f, 0.99f)
+            if (matchedCount > 0) {
+                val confidence = (maxConfidence + 0.03f * (matchedCount - 1)).coerceIn(0f, 0.99f)
                 results += SuggestedTag(
                     tag        = CardTag(entry.key, entry.category),
                     confidence = confidence,
@@ -123,12 +135,31 @@ object StrategyAnalyzer {
             }
         }
 
-        // Hot fix: Basic lands should not be tagged as "ramp"
-        if (card.typeLine.contains("Basic Land", ignoreCase = true) ||
-            card.typeLine.contains("Basic Snow Land", ignoreCase = true)) {
-            results.removeAll { it.tag.key == "ramp" }
-        }
-
         return results
+    }
+
+    /**
+     * Lowercase → strip parenthesized reminder text → replace the card's own
+     * name (and each face name for split/MDFC cards joined by " // ") with "~".
+     */
+    private fun normalize(oracleText: String, cardName: String): String {
+        var text = oracleText.lowercase()
+        text = reminderTextRegex.replace(text, "")
+        val names = cardName.split(" // ")
+            .map { it.trim().lowercase() }
+            .filter { it.isNotEmpty() }
+            .sortedByDescending { it.length } // replace the longest face first
+        names.forEach { name -> text = text.replace(name, "~") }
+        return text
+    }
+
+    /** True when [rule] matches the normalized [text] and lowercase [typeLine]. */
+    private fun matches(rule: DetectionRule, text: String, typeLine: String): Boolean {
+        if (rule.allOf.any { !text.contains(it) }) return false
+        if (rule.anyOf.isNotEmpty() && rule.anyOf.none { text.contains(it) }) return false
+        if (rule.noneOf.any { text.contains(it) }) return false
+        if (rule.typeLineAnyOf.isNotEmpty() && rule.typeLineAnyOf.none { typeLine.contains(it) }) return false
+        if (rule.typeLineNoneOf.any { typeLine.contains(it) }) return false
+        return true
     }
 }

@@ -273,6 +273,17 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   (rank 0 must not score 1.0f). Suggested-pick scoring runs on `@DefaultDispatcher`, not Main.
 - → memory: `project_draftsim_redesign`, `feedback_draftsim_audit_2026-06-11`, `feedback_draft_booster_land_slot`
 
+### Card tagging engine (core/tagging)
+- **Analysis is English-only**: `StrategyAnalyzer` scans ONLY `card.oracleText` (no `printedText`/
+  `lang`); non-English printings are resolved to English upstream first. Labels stay a
+  `Map<String,String>` but only "en" is populated.
+- Detection uses `DetectionRule(allOf/anyOf/noneOf + typeLineAnyOf/typeLineNoneOf, confidence?)` —
+  use `allOf` for compound phrases, NEVER loosely OR'd word fragments. Reminder text (parens) is
+  stripped and the card's own name is replaced with `~` before matching.
+- **Tag keys are persisted user data — NEVER rename an existing key.** User overrides use the
+  rule-line syntax: terms joined by ` + ` are ANDed, `!term` excludes.
+- → memory: `project_tagging_engine_v2`
+
 ### Incomplete / quirks
 - **DeckMagic**: `SETUP`/`REVIEW` steps are placeholder stubs — wired into nav but not production-ready.
 - **SetPickerViewModel**: `clearFilters()` calls `applyFilters()` to respect `restrictedSets` — do not
