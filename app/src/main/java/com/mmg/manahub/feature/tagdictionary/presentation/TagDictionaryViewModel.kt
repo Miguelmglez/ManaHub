@@ -18,14 +18,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class TagDictionaryRow(
-    val key:        String,
-    val category:   TagCategory,
-    val labelEn:    String,
-    val labelEs:    String,
-    val labelDe:    String,
-    val patternsEn: List<String>,
-    val patternsEs: List<String>,
-    val patternsDe: List<String>,
+    val key:      String,
+    val category: TagCategory,
+    val labelEn:  String,
+    /** Detection rules rendered in the user override line syntax (see [TagDictionary.parseRuleLine]). */
+    val rules:    List<String>,
 )
 
 data class TagDictionaryUiState(
@@ -93,16 +90,8 @@ class TagDictionaryViewModel @Inject constructor(
                 TagOverride(
                     key      = row.key,
                     category = row.category,
-                    labels   = mapOf(
-                        "en" to row.labelEn,
-                        "es" to row.labelEs,
-                        "de" to row.labelDe,
-                    ).filterValues { it.isNotBlank() },
-                    patterns = mapOf(
-                        "en" to row.patternsEn,
-                        "es" to row.patternsEs,
-                        "de" to row.patternsDe,
-                    ).filterValues { it.isNotEmpty() },
+                    labels   = mapOf("en" to row.labelEn).filterValues { it.isNotBlank() },
+                    patterns = row.rules.filter { it.isNotBlank() },
                 )
             )
             refreshRows()
@@ -131,14 +120,11 @@ class TagDictionaryViewModel @Inject constructor(
             .sortedBy { it.key }
             .map { e ->
                 TagDictionaryRow(
-                    key        = e.key,
-                    category   = e.category,
-                    labelEn    = e.labels["en"].orEmpty(),
-                    labelEs    = e.labels["es"].orEmpty(),
-                    labelDe    = e.labels["de"].orEmpty(),
-                    patternsEn = e.patterns["en"].orEmpty(),
-                    patternsEs = e.patterns["es"].orEmpty(),
-                    patternsDe = e.patterns["de"].orEmpty(),
+                    key      = e.key,
+                    category = e.category,
+                    labelEn  = e.labels["en"].orEmpty(),
+                    rules    = e.rules.map { rule -> TagDictionary.renderRuleLine(rule) }
+                        .filter { it.isNotBlank() },
                 )
             }
         _state.update { it.copy(rows = rows) }

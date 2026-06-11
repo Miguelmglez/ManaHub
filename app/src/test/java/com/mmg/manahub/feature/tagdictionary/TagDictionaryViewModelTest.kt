@@ -57,23 +57,15 @@ class TagDictionaryViewModelTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun buildRow(
-        key:        String     = "flying",
-        category:   TagCategory = TagCategory.KEYWORD,
-        labelEn:    String     = "Flying",
-        labelEs:    String     = "Volar",
-        labelDe:    String     = "Fliegend",
-        patternsEn: List<String> = emptyList(),
-        patternsEs: List<String> = emptyList(),
-        patternsDe: List<String> = emptyList(),
+        key:      String       = "flying",
+        category: TagCategory  = TagCategory.KEYWORD,
+        labelEn:  String       = "Flying",
+        rules:    List<String> = emptyList(),
     ) = TagDictionaryRow(
-        key        = key,
-        category   = category,
-        labelEn    = labelEn,
-        labelEs    = labelEs,
-        labelDe    = labelDe,
-        patternsEn = patternsEn,
-        patternsEs = patternsEs,
-        patternsDe = patternsDe,
+        key      = key,
+        category = category,
+        labelEn  = labelEn,
+        rules    = rules,
     )
 
     private fun buildViewModel(): TagDictionaryViewModel {
@@ -208,8 +200,7 @@ class TagDictionaryViewModelTest {
         val row = buildRow(
             key     = "flying",
             labelEn = "Flying",
-            labelEs = "Volar",
-            labelDe = "Fliegend",
+            rules   = listOf("gain + life + !gain control"),
         )
         coEvery { dictionaryRepo.upsert(any()) } returns Unit
 
@@ -217,14 +208,14 @@ class TagDictionaryViewModelTest {
         viewModel.saveOverride(row)
         advanceUntilIdle()
 
-        // Assert
+        // Assert: English-only label, rule lines forwarded as-is.
         coVerify {
             dictionaryRepo.upsert(
                 match { override ->
                     override.key == "flying" &&
                     override.labels["en"] == "Flying" &&
-                    override.labels["es"] == "Volar" &&
-                    override.labels["de"] == "Fliegend"
+                    override.labels["es"] == null &&
+                    override.patterns == listOf("gain + life + !gain control")
                 }
             )
         }
