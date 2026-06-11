@@ -8,6 +8,8 @@ import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.Rarity
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
 import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -74,12 +76,23 @@ class ProfileViewModelTest {
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
     private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
+    private val gamificationRepository   = mockk<GamificationRepository>(relaxed = true)
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Wizard")
     private val avatarUrlFlow     = MutableStateFlow<String?>(null)
     private val preferencesFlow   = MutableStateFlow(TestFixtures.buildPreferences())
     private val sessionStateFlow  = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+    private val gamificationEnabledFlow = MutableStateFlow(true)
+    private val progressionFlow   = MutableStateFlow(
+        PlayerProgression(
+            totalXp = 0L,
+            level = 1,
+            xpIntoLevel = 0L,
+            xpForNextLevel = 100L,
+            updatedAt = java.time.Instant.EPOCH,
+        )
+    )
 
     private lateinit var viewModel: ProfileViewModel
 
@@ -127,7 +140,9 @@ class ProfileViewModelTest {
         every { userPreferencesDataStore.playerNameFlow }  returns playerNameFlow
         every { userPreferencesDataStore.avatarUrlFlow }   returns avatarUrlFlow
         every { userPreferencesDataStore.preferencesFlow } returns preferencesFlow
+        every { userPreferencesDataStore.gamificationEnabledFlow } returns gamificationEnabledFlow
         every { authRepository.sessionState }              returns sessionStateFlow
+        every { gamificationRepository.observeProgression() } returns progressionFlow
 
         every { statsRepo.observeCollectionStats(any()) }   returns flowOf(collectionStats)
         every { gameSessionRepo.observeTotalGames() }       returns flowOf(totalGames)
@@ -164,6 +179,7 @@ class ProfileViewModelTest {
         userPreferencesDataStore = userPreferencesDataStore,
         friendRepository         = friendRepository,
         authRepository           = authRepository,
+        gamificationRepository   = gamificationRepository,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -567,5 +583,51 @@ class ProfileViewModelTest {
         advanceUntilIdle()
 
         assertEquals("M", viewModel.uiState.value.mostValuableColor)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 7 — gamification progression + master toggle (ADR-002, Phase 0)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given progression flow emits when ViewModel initializes then uiState exposes the progression`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        progressionFlow.value = PlayerProgression(
+            totalXp = 250L,
+            level = 3,
+            xpIntoLevel = 40L,
+            xpForNextLevel = 120L,
+            updatedAt = java.time.Instant.EPOCH,
+        )
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertEquals(3, viewModel.uiState.value.progression?.level)
+        assertEquals(40L, viewModel.uiState.value.progression?.xpIntoLevel)
+    }
+
+    @Test
+    fun `given gamification disabled in DataStore when ViewModel initializes then gamificationEnabled is false`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        gamificationEnabledFlow.value = false
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertEquals(false, viewModel.uiState.value.gamificationEnabled)
+    }
+
+    @Test
+    fun `given default mocks when ViewModel initializes then gamificationEnabled defaults to true`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert: master toggle is ON by default (ADR-002 opt-out-first-class)
+        assertEquals(true, viewModel.uiState.value.gamificationEnabled)
     }
 }

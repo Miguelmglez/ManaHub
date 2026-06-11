@@ -17,6 +17,7 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -133,6 +134,7 @@ class SurveyViewModel @Inject constructor(
     private val deckRepository: DeckRepository,
     private val cardDao: CardDao,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val completeSurvey: CompleteSurveyUseCase,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     savedStateHandle: SavedStateHandle,
@@ -475,6 +477,9 @@ class SurveyViewModel @Inject constructor(
         autoSaveJob?.cancel()
         viewModelScope.launch {
             persistAnswers("COMPLETED")
+            // Raise the progression event only after the COMPLETED write succeeds. The
+            // event is idempotent (key survey:{sessionId}), so re-completing is a no-op.
+            completeSurvey(sessionId)
             _uiState.update { it.copy(isComplete = true) }
         }
     }

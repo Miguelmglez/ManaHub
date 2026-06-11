@@ -263,6 +263,7 @@ fun ProfileScreen(
                     name = uiState.playerName,
                     avatarUrl = uiState.avatarUrl,
                     gameTag = (sessionState as? SessionState.Authenticated)?.user?.gameTag,
+                    progression = uiState.progression.takeIf { uiState.gamificationEnabled },
                     onEditClick = { showProfileEdit = true },
                 )
             }
@@ -373,6 +374,12 @@ private fun ProfileHeroSection(
     avatarUrl: String?,
     /** Server-generated game tag (e.g. "#A3KX9Z"). Displayed as a badge next to the name. */
     gameTag: String? = null,
+    /**
+     * Gamification progression for the read-only XP ring (ADR-002, Phase 0). When null the ring
+     * and level chip are not drawn — the caller passes null while gamification is disabled or the
+     * progression flow has not yet emitted.
+     */
+    progression: com.mmg.manahub.core.gamification.domain.model.PlayerProgression? = null,
     onEditClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -487,6 +494,31 @@ private fun ProfileHeroSection(
                     )
                 }
             }
+        }
+
+        // Read-only XP ring + level chip (ADR-002, Phase 0). Overlaid top-end of the hero.
+        // Only drawn when gamification is enabled AND progression has emitted (caller passes null
+        // otherwise, so the hero renders with no ring as a neutral fallback).
+        if (progression != null) {
+            val span = progression.xpForNextLevel
+            val ringProgress = if (span > 0L) {
+                progression.xpIntoLevel.toFloat() / span.toFloat()
+            } else {
+                0f
+            }
+            ProfileLevelRing(
+                level = progression.level,
+                progress = ringProgress,
+                contentDescription = stringResource(
+                    R.string.profile_level_ring_a11y,
+                    progression.level,
+                    progression.xpIntoLevel,
+                    progression.xpForNextLevel,
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp),
+            )
         }
     }
 }

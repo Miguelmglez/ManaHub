@@ -1449,6 +1449,13 @@
     <string name="settings_push_open_system_settings">Notification settings</string>
     <string name="settings_push_open_system_settings_subtitle">Open the system notification settings for ManaHub</string>
     <string name="settings_push_permission_rationale">Enable notifications to receive trade and friend updates</string>
+
+    <!-- Gamification settings -->
+    <string name="settings_section_gamification">Gamification</string>
+    <string name="settings_gamification_master">Gamification</string>
+    <string name="settings_gamification_master_subtitle">Show XP, levels, achievements and quests</string>
+    <!-- Gamification hero ring accessibility label: %1$d level, %2$d XP into level, %3$d XP for next level -->
+    <string name="profile_level_ring_a11y">Level %1$d, %2$d of %3$d XP</string>
     <string name="settings_push_allow">Allow</string>
     <string name="settings_push_open_settings">Open settings</string>
 
