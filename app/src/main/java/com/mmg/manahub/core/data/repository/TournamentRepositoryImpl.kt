@@ -7,16 +7,20 @@ import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class TournamentRepositoryImpl @Inject constructor(
     private val dao: TournamentDao,
+    private val progressionEventBus: ProgressionEventBus,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : TournamentRepository {
 
@@ -252,6 +256,24 @@ class TournamentRepositoryImpl @Inject constructor(
 
     override suspend fun finishTournament(tournamentId: Long) = withContext(ioDispatcher) {
         dao.finishTournament(tournamentId, System.currentTimeMillis())
+
+        // Emit after the finish commit (ADR-002 §1). `type` is the tournament structure.
+        //
+        // isLocalWinner: tournaments have NO per-seat "local"/"app user" flag (unlike
+        // game sessions' PlayerSessionEntity.isLocal). There is therefore no reliable way
+        // to know whether the app's user won — name matching is forbidden (see memory
+        // feedback_survey_winloss_isLocal). We pass false so the base "tournament completed"
+        // XP still grants, but the "tournament won" bonus does not. Wiring the won-bonus
+        // requires a local-seat concept on tournaments (schema + setup UI) and is deferred.
+        val tournament = dao.getTournamentById(tournamentId)
+        progressionEventBus.emit(
+            ProgressionEvent.TournamentCompleted(
+                tournamentId = tournamentId,
+                type = tournament?.structure ?: "UNKNOWN",
+                isLocalWinner = false,
+                occurredAt = Instant.now(),
+            )
+        )
     }
 
     override suspend fun isFinished(tournamentId: Long): Boolean = withContext(ioDispatcher) {

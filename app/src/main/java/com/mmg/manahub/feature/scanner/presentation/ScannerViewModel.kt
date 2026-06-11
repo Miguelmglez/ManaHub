@@ -8,7 +8,8 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
+import com.mmg.manahub.core.domain.usecase.collection.ScannedCardCommit
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
@@ -60,7 +61,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ScannerViewModel @Inject constructor(
     private val cardRepository: CardRepository,
-    private val addToCollection: AddCardToCollectionUseCase,
+    private val commitScannedCards: CommitScannedCardsUseCase,
     private val addToWishlist: AddToWishlistUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
@@ -454,16 +455,21 @@ class ScannerViewModel @Inject constructor(
     //  Individual Actions (Collection & Wishlist)
     // ─────────────────────────────────────────────────────────────────────────
 
+    /** Maps a UI [ScannedCard] to the domain-layer commit shape. */
+    private fun ScannedCard.toCommit(): ScannedCardCommit = ScannedCardCommit(
+        scryfallId = card.scryfallId,
+        isFoil     = isFoil,
+        condition  = condition,
+        language   = language,
+        quantity   = quantity,
+    )
+
     /** Adds a single queue entry to the user's collection. */
     fun onAddEntryToCollection(entry: ScannedCard) {
         viewModelScope.launch {
-            addToCollection(
-                scryfallId = entry.card.scryfallId,
-                isFoil = entry.isFoil,
-                condition = entry.condition,
-                language = entry.language,
-                quantity = entry.quantity,
-            )
+            // Route through the scanner commit use case so this counts as a scan
+            // (CardScanned XP) rather than a manual add — and is never double-counted.
+            commitScannedCards(listOf(entry.toCommit()))
             analyticsHelper.logEvent(
                 "scanner_entry_to_collection",
                 mapOf("card_id" to entry.card.scryfallId)
@@ -799,16 +805,8 @@ class ScannerViewModel @Inject constructor(
         if (cards.isEmpty()) return
 
         viewModelScope.launch {
-            cards.forEach { entry ->
-                repeat(entry.quantity) {
-                    addToCollection(
-                        scryfallId = entry.card.scryfallId,
-                        isFoil = entry.isFoil,
-                        condition = entry.condition,
-                        language = entry.language,
-                    )
-                }
-            }
+            // One batched commit → one CardScanned event (no per-card manual XP).
+            commitScannedCards(cards.map { it.toCommit() })
             analyticsHelper.logEvent(
                 "scanner_add_all",
                 mapOf("count" to cards.size.toString()),

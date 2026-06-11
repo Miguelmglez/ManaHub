@@ -342,6 +342,23 @@ types in `HomeWidgetType` (each carries `persistedId`, `defaultTitleRes`, `suppo
 - Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + edit pencil (Edit↔Done) + avatar.
 - → memory: `project_home_widget_board`
 
+### Gamification (`core/gamification/`, multi-phase — Phase 0 complete 2026-06-11)
+Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine. **Local-first** (works 100%
+offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/ADR-002-gamification.md`
+— **read it + the memory files before any gamification work.** Must-know:
+- **Features never call the engine.** They emit a `ProgressionEvent` on `ProgressionEventBus` at the
+  canonical write path (repository/use-case, after a successful commit — never a ViewModel/composable);
+  the engine collects the bus in `ManaHubApp.onCreate` and processes on `@DefaultDispatcher`.
+- **Every XP grant is idempotent via an `xp_transactions` ledger** keyed by a UNIQUE `idempotency_key`;
+  `grantXpAtomically` updates `player_progression` ONLY when the ledger insert succeeded (rowId != -1).
+  Caps are enforced by querying the ledger for the current local day/week, never an in-memory counter.
+- **Win/loss in `GameFinished.isLocalWin` derives from `player_sessions.is_local = 1`**, never name
+  matching (see `feedback_survey_winloss_isLocal`). ALL XP values/caps live in one `XpConfig`.
+- Room **v39** added 6 tables (additive `MIGRATION_38_39`). `app/schemas/` is gitignored (39.json not
+  committed). Master carries 140 pre-existing test failures — compare PRs against that baseline.
+- Out of scope for v1: token shop, leaderboards, Lottie, push, seasonal track (extension points reserved).
+- → memory: `project_gamification_phase0`, `feedback_gamification_xp_idempotency`
+
 ## Testing conventions
 
 - Unit tests: MockK (`io.mockk`) + Turbine (`app.cash.turbine`). Instrumented Room tests: in-memory DB

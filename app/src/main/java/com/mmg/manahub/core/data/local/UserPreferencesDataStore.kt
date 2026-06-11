@@ -70,6 +70,8 @@ private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hour
 
 // ── Feature flags ─────────────────────────────────────────────────────────
 private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
+/** Master gamification switch (XP, levels, achievements, quests). Default: enabled. */
+private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
 
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
 
@@ -310,6 +312,20 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun savePushNotificationsEnabled(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_PUSH_NOTIFICATIONS_ENABLED] = enabled }
+    }
+
+    /**
+     * Master gamification switch. Default: true (ON). When false, all gamification UI
+     * (XP, levels, achievements, quests) is hidden — the engine keeps recording progress
+     * silently so re-enabling restores the user's true state (ADR-002 §"opt-out first-class").
+     */
+    val gamificationEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: true }
+        .catch { emit(true) }
+
+    /** Persists the master gamification switch. */
+    suspend fun setGamificationEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_ENABLED] = enabled }
     }
 
     // ── Privacy settings ──────────────────────────────────────────────────────

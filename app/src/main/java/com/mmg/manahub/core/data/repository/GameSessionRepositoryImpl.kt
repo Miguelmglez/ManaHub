@@ -10,8 +10,11 @@ import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.game.domain.model.GameResult
 import kotlinx.coroutines.CoroutineDispatcher
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -21,6 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class GameSessionRepositoryImpl @Inject constructor(
     private val dao: GameSessionDao,
+    private val progressionEventBus: ProgressionEventBus,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : GameSessionRepository {
 
@@ -51,7 +55,27 @@ class GameSessionRepositoryImpl @Inject constructor(
                 isLocal                 = pr.player.isAppUser,
             )
         }
-        dao.insertSessionWithPlayers(sessionEntity, playerEntities)
+        val sessionId = dao.insertSessionWithPlayers(sessionEntity, playerEntities)
+
+        // Emit the progression event AFTER the commit succeeds (ADR-002 §1).
+        // isLocalWin derives from the seat with isLocal = true (isAppUser), never from
+        // name matching — the stored seat name can diverge from UserPreferences and
+        // would silently zero win-rate (see memory feedback_survey_winloss_isLocal).
+        val localPlayerEntity = playerEntities.firstOrNull { it.isLocal }
+        progressionEventBus.emit(
+            ProgressionEvent.GameFinished(
+                sessionId      = sessionId,
+                isLocalWin     = localPlayerEntity?.isWinner == true,
+                mode           = result.gameMode.name,
+                playerCount    = playerEntities.size,
+                durationMs     = result.durationMs,
+                winTurn        = result.totalTurns.takeIf { it > 0 },
+                localFinalLife = localPlayerEntity?.finalLife,
+                occurredAt     = Instant.now(),
+            )
+        )
+
+        sessionId
     }
 
     override suspend fun getSessionById(sessionId: Long): GameSessionWithPlayers? =

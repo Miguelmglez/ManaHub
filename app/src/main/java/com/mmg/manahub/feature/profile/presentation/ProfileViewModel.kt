@@ -12,6 +12,8 @@ import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.Rarity
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
 import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -54,6 +56,7 @@ class ProfileViewModel @Inject constructor(
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val friendRepository: FriendRepository,
     private val authRepository: AuthRepository,
+    private val gamificationRepository: GamificationRepository,
 ) : ViewModel() {
 
     data class UiState(
@@ -89,6 +92,11 @@ class ProfileViewModel @Inject constructor(
         // Friends
         val friendCount: Int = 0,
         val pendingFriendCount: Int = 0,
+        // Gamification (ADR-002, Phase 0) — read-only hero ring + level
+        /** Null until the progression flow first emits; the migration seeds a level-1 row. */
+        val progression: PlayerProgression? = null,
+        /** Master gamification switch; when false the hero ring + level chip are hidden. */
+        val gamificationEnabled: Boolean = true,
     ) {
         val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
     }
@@ -113,6 +121,17 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
+
+        // ── Gamification (ADR-002, Phase 0) ─────────────────────────────────────
+        gamificationRepository.observeProgression()
+            .onEach { progression -> _uiState.update { it.copy(progression = progression) } }
+            .catch { /* ignore — hero falls back to no ring */ }
+            .launchIn(viewModelScope)
+
+        userPreferencesDataStore.gamificationEnabledFlow
+            .onEach { enabled -> _uiState.update { it.copy(gamificationEnabled = enabled) } }
+            .catch { /* ignore — default keeps gamification visible */ }
+            .launchIn(viewModelScope)
 
         // ── Collection stats ──────────────────────────────────────────────────
         userPreferencesDataStore.preferencesFlow

@@ -13,6 +13,19 @@ import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithC
  * owns the push/pull cycle. This repository is responsible only for local CRUD
  * and exposing observable streams to the UI layer.
  */
+/**
+ * Result of [UserCardRepository.addOrIncrement], describing whether the operation created a
+ * brand-new unique collection row or incremented an already-present one. Used by the
+ * gamification layer to weight "new unique card" XP differently from "additional copy" XP.
+ */
+enum class AddOutcome {
+    /** A new (or restored soft-deleted) unique row was inserted. */
+    CREATED_NEW,
+
+    /** An existing row's quantity was incremented. */
+    INCREMENTED_EXISTING,
+}
+
 interface UserCardRepository {
 
     // ── Observables ───────────────────────────────────────────────────────────
@@ -52,6 +65,12 @@ interface UserCardRepository {
      *
      * The row's [updatedAt] is set to [System.currentTimeMillis] so the next
      * sync push picks it up automatically.
+     *
+     * @return [AddOutcome.CREATED_NEW] when a brand-new (or previously soft-deleted)
+     *   unique row was created, [AddOutcome.INCREMENTED_EXISTING] when an existing
+     *   row's quantity was bumped. Callers that only care about the side effect may
+     *   ignore the result. This distinction lets the gamification layer split
+     *   "new unique card" from "additional copy" XP without re-querying the row.
      */
     suspend fun addOrIncrement(
         scryfallId: String,
@@ -61,7 +80,7 @@ interface UserCardRepository {
         isForTrade: Boolean,
         userId: String?,
         quantity: Int = 1,
-    )
+    ): AddOutcome
 
     /**
      * Updates the trade flag and quantity for an existing row.

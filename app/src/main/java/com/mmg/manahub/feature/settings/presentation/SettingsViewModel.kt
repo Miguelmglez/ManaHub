@@ -80,6 +80,15 @@ class SettingsViewModel @Inject constructor(
                 initialValue = false,
             )
 
+    /** Master gamification switch backed by the local DataStore. Default: enabled. */
+    val gamificationEnabled: StateFlow<Boolean> =
+        userPrefsDataStore.gamificationEnabledFlow
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = true,
+            )
+
     /** Per-language voice-model state, mirrored from the repository. */
     val voiceModelStates: StateFlow<Map<VoiceLanguage, VoiceModelState>> =
         voiceModelRepository.modelStates
@@ -236,6 +245,15 @@ class SettingsViewModel @Inject constructor(
      */
     fun setPushNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch { userPrefsDataStore.savePushNotificationsEnabled(enabled) }
+    }
+
+    /**
+     * Toggles the master gamification preference in the local DataStore.
+     *
+     * @param enabled `true` to show all gamification UI, `false` to hide it.
+     */
+    fun setGamificationEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPrefsDataStore.setGamificationEnabled(enabled) }
     }
 
     /**

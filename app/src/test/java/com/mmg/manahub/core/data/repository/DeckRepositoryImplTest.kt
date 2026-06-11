@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.dao.DeckDao
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
@@ -40,6 +41,7 @@ class DeckRepositoryImplTest {
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val deckDao = mockk<DeckDao>(relaxed = true)
+    private val progressionEventBus = mockk<ProgressionEventBus>(relaxed = true)
     private lateinit var repository: DeckRepositoryImpl
 
     // ── Constants ─────────────────────────────────────────────────────────────
@@ -100,8 +102,9 @@ class DeckRepositoryImplTest {
     @Before
     fun setUp() {
         repository = DeckRepositoryImpl(
-            deckDao      = deckDao,
-            ioDispatcher = UnconfinedTestDispatcher(),
+            deckDao             = deckDao,
+            progressionEventBus = progressionEventBus,
+            ioDispatcher        = UnconfinedTestDispatcher(),
         )
     }
 

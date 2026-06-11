@@ -10,6 +10,7 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
@@ -84,6 +85,9 @@ object DatabaseModule {
                 // v37 → v38 lives as a top-level `val` in Migration_37_38.kt (same
                 // reason). Adds nullable edhrec_rank / penny_rank to `cards`.
                 MIGRATION_37_38,
+                // v38 → v39 lives as a top-level `val` in Migration_38_39.kt (same
+                // reason). Additive: creates the 6 gamification tables (ADR-002 §8).
+                MIGRATION_38_39,
             )
             .build()
 
@@ -704,4 +708,5 @@ object DatabaseModule {
     @Provides fun provideTradeCollectionSyncDao(db: MtgDatabase): TradeCollectionSyncDao = db.tradeCollectionSyncDao()
     @Provides fun providePlaytestDao(db: MtgDatabase): PlaytestDao = db.playtestDao()
     @Provides fun provideDraftSessionDao(db: MtgDatabase): DraftSessionDao = db.draftSessionDao()
+    @Provides fun provideGamificationDao(db: MtgDatabase): GamificationDao = db.gamificationDao()
 }
