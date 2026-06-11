@@ -273,7 +273,7 @@ private fun JoinThemeSelectorRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(horizontal = 4.dp),
     ) {
-        items(PlayerTheme.ALL) { theme ->
+        items(PlayerTheme.ALL, key = { it.name }) { theme ->
             val isSelected = theme.name == selectedKey
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

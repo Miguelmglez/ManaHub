@@ -214,9 +214,10 @@ a correctness dependency. Must-know:
   `FINISHED` must NOT set `isOnlineSessionAbandoned` (only `ABANDONED` does). Lobby skips disconnect when
   `gameLaunched`; `GameViewModel` owns the final disconnect. Local player always in BOTTOM slot.
 - Connect order in game: disconnect stale → connect → snapshot → collect.
+- **Guest access**: `LobbyHostViewModel` and `LobbyJoinViewModel` auto-sign-in anonymously (`authRepository.signInAnonymously()`) if `sessionState.value is Unauthenticated` before the first RPC call. Anonymous users have `AuthUser.isAnonymous = true` (read from Supabase `appMetadata["is_anonymous"]`). `isAuthenticatedFlow` in `HomeViewModel` excludes anonymous users — they never see account-gated features. All 15 session RPCs are GRANT'd to both `authenticated` and `anon` roles. Never call `upsertUserProfile` for anonymous users — they have no `user_profiles` row.
 - → memory: `project_online_sessions`, `feedback_online_lobby_snapshot`, `feedback_online_game_sync`,
   `feedback_online_lobby_bugs_2026-05-28`, `feedback_online_ingame_sync_bugs_2026-05-28`,
-  `project_gamesetup_hub_refactor`
+  `project_gamesetup_hub_refactor`, `project_online_guest_support`
 
 ### Push notifications
 Outbox pattern: write → trigger `fn_notify_*` → `enqueue_notification` → `notification_outbox` →
@@ -244,6 +245,45 @@ name can diverge from UserPreferences, silently zeroing win-rate). Use `observeL
 `GetDeckGameStatsUseCase`.
 - → memory: `feedback_survey_winloss_isLocal`, `project_per_seat_stats_model`
 
+### Draft Simulator (`feature/draft/`, NOT live — rebuild in progress)
+Content (tier list, guide, booster, engine) is generated offline and served by the Cloudflare
+`manahub-draft-api` Worker from R2. Must-know:
+- **Content pipeline is Python** at `scripts/draftsim_py/` (replaces the old Node `.mjs`). Generate one
+  set at a time; **always ask the user for the Draftsim URLs per set** (guide + pick-order) — old sets
+  break the canonical URL pattern, so never auto-derive them.
+- **Booster = MTGJSON `play` collation.** Keep MTGJSON sheet names verbatim (the generic
+  `WeightedBoosterGenerator` matches `variant.contents` keys to `sheets[name]`). Never collapse names —
+  matching `"foil"` before `"land"` misfiles `foilLand`/`nonFoilLand` as foil and **deletes the land slot**.
+  Booster sheet ids are oracle-collapse-remapped onto the app pool (`set:<code> lang:en unique:cards`) so
+  everything resolves on-device with no app change; external sheets (`specialGuest`) are dropped and their
+  slot re-homed to `common`.
+- **Bot/suggested-pick engine must be archetype-based, not 2-color commitment** (the old
+  `HeuristicBotDrafter` forces a 2-color pool and breaks 3+ color sets like TDM's wedges). Target: a
+  data-driven `engine.json` per set + a generic `ArchetypeAwareBotDrafter`, with `HeuristicBotDrafter` as
+  fallback when a set has no engine.json. The suggested pick uses the SAME engine as the bots.
+- The draft engine (rotation/packs/rounds) is already generic on `DraftConfig.seatCount` (selector 2–10,
+  default 8); SEALED forces 1 seat / 6 packs.
+- **Robustness invariants (audit 2026-06-11):** `BotDrafter.pick` must `require(pack.cards.isNotEmpty())`
+  (never crash on empty); `DefaultDraftEngine.autoPick` guards the empty human pack → returns state
+  unchanged. `parseEngineConfig` SANITISES all engine.json floats (the Worker JSON is untrusted):
+  non-finite weight → default, negative → `coerceAtLeast(0f)`, `rating` only trusted when finite & in
+  `0f..1f`, negative/NaN `archetypeWeights` filtered out — a NaN breaks `maxWithOrNull`'s comparator and a
+  negative weight anti-picks the committed lane. `getEngineConfig` must NOT hold `engineCacheMutex` across
+  the network fetch (lock→check→release→fetch→re-lock→store). `DraftRatingNormalizer` guards `rank > 0`
+  (rank 0 must not score 1.0f). Suggested-pick scoring runs on `@DefaultDispatcher`, not Main.
+- → memory: `project_draftsim_redesign`, `feedback_draftsim_audit_2026-06-11`, `feedback_draft_booster_land_slot`
+
+### Card tagging engine (core/tagging)
+- **Analysis is English-only**: `StrategyAnalyzer` scans ONLY `card.oracleText` (no `printedText`/
+  `lang`); non-English printings are resolved to English upstream first. Labels stay a
+  `Map<String,String>` but only "en" is populated.
+- Detection uses `DetectionRule(allOf/anyOf/noneOf + typeLineAnyOf/typeLineNoneOf, confidence?)` —
+  use `allOf` for compound phrases, NEVER loosely OR'd word fragments. Reminder text (parens) is
+  stripped and the card's own name is replaced with `~` before matching.
+- **Tag keys are persisted user data — NEVER rename an existing key.** User overrides use the
+  rule-line syntax: terms joined by ` + ` are ANDed, `!term` excludes.
+- → memory: `project_tagging_engine_v2`
+
 ### Incomplete / quirks
 - **DeckMagic**: `SETUP`/`REVIEW` steps are placeholder stubs — wired into nav but not production-ready.
 - **SetPickerViewModel**: `clearFilters()` calls `applyFilters()` to respect `restrictedSets` — do not
@@ -269,6 +309,39 @@ Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-
 - `onBackHome`: `popUpTo(0) { inclusive = true }` (not `popUpTo(Screen.Collection.route)`) to avoid back-stack corruption on fresh install.
 - → memory: `project_home_dashboard_redesign`, `feedback_home_stateIn_test_pattern`
 
+### Home widget board (`feature/home/`, 3 phases complete 2026-06-09)
+The dashboard is a **fully customizable widget board** (`LazyVerticalGrid` of 2 cols). ~40 widget
+types in `HomeWidgetType` (each carries `persistedId`, `defaultTitleRes`, `supportedSizes`,
+`category`, `audience`, `isAlwaysPresent`). Layout = ordered `List<WidgetInstance>(type,size)`. Must-know:
+- **Layout persists in DataStore only** (`home_widget_layout` = ordered `"persistedId:SIZE"` tokens;
+  unknown id/size tokens are silently skipped on decode; empty → auth-appropriate default). No new
+  Room tables. `homeLayoutFlow(default)` takes the default as a param so the DataStore stays unaware
+  of auth; the VM picks `defaultLayoutSignedIn/Out` via `isAuthenticatedFlow.flatMapLatest`.
+- **Edit mode is transient** (`editModeFlow`, never persisted; resets each session). All layout
+  reducers (`add/remove/move/resize/reset`) read the latest layout from `uiState.value.layout`,
+  produce a new list, and `saveHomeLayout` immediately — DataStore re-emits as the single source of
+  truth (no separate in-memory copy to drift). `CONTEXT_HERO.isAlwaysPresent` → cannot be removed.
+  `ResizeWidget` rejects sizes not in `type.supportedSizes`.
+- **Drag-to-reorder ghost lifts from the item's registered top-left + finger delta** (NOT the
+  Playtest `centerInRoot` pattern, which snaps to center and jumps on corner-press). Container
+  registers bounds via `onGloballyPositioned{boundsInRoot()}`; the dragged item is `alpha(0)`; a
+  floating ghost at `zIndex(Float.MAX_VALUE)` is positioned at `bounds.topLeft + dragDelta`. On drag,
+  `findTargetIndex(ghostCenter,...)` hit-tests and emits `MoveWidget`, then resets `dragDelta` to 0.
+- **ViewModel combine arity**: slices are bundled (`CoreSnapshot`, `DataBundle{board,stats,discover,
+  social}`) and folded with typed (non-vararg) `combine` overloads to avoid `Array<Any?>` erasure.
+  `performanceFlow` MUST be declared before `statsSnapshotFlow` (property init order). Every data flow
+  is `.catch{emit(empty/null)}`-isolated so one source failing never collapses the board.
+- **Phase 2 data** derives from existing repos (win rate/best deck/nemesis/heatmap/matchups from
+  `GameSessionRepository`, colors/rarity from `CollectionStats`, sets from `DraftRepository`). **Phase
+  3 is stubbed**: `CommunityStatsRepository` (interface + `CommunityStatsRepositoryStub`→`flowOf(null)`
+  bound in `CommunityModule`); trade/wishlist flows are `flowOf(null)` with TODOs. Account-gated
+  widgets render `AccountGatedPlaceholder` (→ `CreateAccount`) when `!isAuthenticated`.
+- `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` adds bounds/edit overlay; all
+  widgets share `WidgetShell` (surface+CardShape+min height S=96/M=132/L=220dp). No `success`/`error`
+  tokens exist — win=`lifePositive`, loss=`lifeNegative`. Community null→spinner, empty→empty body.
+- Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + edit pencil (Edit↔Done) + avatar.
+- → memory: `project_home_widget_board`
+
 ## Testing conventions
 
 - Unit tests: MockK (`io.mockk`) + Turbine (`app.cash.turbine`). Instrumented Room tests: in-memory DB
@@ -283,9 +356,14 @@ Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-
 
 ## Agent learning protocol
 
-When an agent identifies a bug or required fix in Android/Kotlin code, it MUST **delegate writing the
-fix to the `android-kotlin-architect` agent** (passing file path + line, the exact problem, the proposed
-solution logic, and any CLAUDE.md constraints) rather than implementing it directly.
+**All Android/Kotlin (`.kt`) work goes through the `android-kotlin-architect` agent** — net-new feature
+code included, not only bug fixes. The main agent must not edit `.kt` files directly; delegate (passing
+file path + line, the exact problem/feature, the proposed solution logic, and any CLAUDE.md constraints).
+Non-Kotlin work (Python `scripts/draftsim_py/`, Worker JS, Gradle, docs, memory) is handled directly.
+→ memory: `feedback_delegate_kotlin_to_architect`
+
+When an agent identifies a bug or required fix in Android/Kotlin code, it MUST likewise **delegate the
+fix to the `android-kotlin-architect` agent** rather than implementing it directly.
 
 After any bug fix, security finding, or architectural/design decision, the agent MUST:
 1. **Record the learning in memory first** — write/update a memory file (`feedback_<topic>.md` for fixes,

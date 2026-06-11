@@ -1,6 +1,6 @@
 {
-  "index_version": "3",
-  "last_updated": "2026-06-03",
+  "index_version": "4",
+  "last_updated": "2026-06-11",
   "sets": [
     {
       "code": "sos",
@@ -80,7 +80,8 @@
       "content_versions": {
         "guide": "April 18, 2025",
         "tier_list": "2026-05-16",
-        "booster": "2026-06-03"
+        "booster": "2026-06-11",
+        "engine": "2026-06-11"
       }
     },
     {

@@ -1797,7 +1797,7 @@ private fun CountersPanel(
                 color = mc.textSecondary,
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(CounterIconKey.ALL) { key ->
+                items(CounterIconKey.ALL, key = { it }) { key ->
                     val isSelected = key == selectedIconKey
                     Box(
                         contentAlignment = Alignment.Center,

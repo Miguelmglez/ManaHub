@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -194,7 +195,8 @@ private fun SharedListContent(
             contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(result.items) { itemMap ->
+            // Each item is a Map<String,String> with no stable unique field; index key is appropriate.
+            itemsIndexed(result.items) { idx, itemMap ->
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = mc.surface,

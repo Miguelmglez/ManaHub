@@ -10,6 +10,7 @@ import com.mmg.manahub.feature.draft.domain.model.DraftSeat
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet
+import com.mmg.manahub.feature.draft.domain.model.EngineConfig
 import com.mmg.manahub.feature.draft.domain.model.PassDirection
 import kotlin.random.Random
 
@@ -78,7 +79,7 @@ class DefaultDraftEngine(
         )
     }
 
-    override fun applyHumanPick(state: DraftState, scryfallId: String): DraftState {
+    override fun applyHumanPick(state: DraftState, scryfallId: String, engine: EngineConfig?): DraftState {
         val seatCount = state.seats.size
         val humanIndex = state.seats.indexOfFirst { it.isHuman }.takeIf { it >= 0 } ?: 0
 
@@ -102,7 +103,7 @@ class DefaultDraftEngine(
             if (i == humanIndex) continue
             val pack = newPacksInFlight[i] ?: continue
             if (pack.cards.isEmpty()) continue
-            val botPick = botDrafter.pick(newSeats[i], pack, state.round, state.pickNumber)
+            val botPick = botDrafter.pick(newSeats[i], pack, state.round, state.pickNumber, engine)
             newPacksInFlight[i] = pack.copy(cards = pack.cards - botPick)
             newSeats[i] = newSeats[i].copy(pool = newSeats[i].pool + botPick)
         }
@@ -179,12 +180,16 @@ class DefaultDraftEngine(
         }
     }
 
-    override fun autoPick(state: DraftState): DraftState {
+    override fun autoPick(state: DraftState, engine: EngineConfig?): DraftState {
         val humanIndex = state.seats.indexOfFirst { it.isHuman }.takeIf { it >= 0 } ?: 0
         val humanSeat = state.seats[humanIndex]
         val pack = state.packsInFlight[humanIndex] ?: return state
-        val best = botDrafter.pick(humanSeat, pack, state.round, state.pickNumber)
-        return applyHumanPick(state, best.card.scryfallId)
+        // Never call the drafter with an empty pack — it would throw. An empty in-flight pack means
+        // there is nothing to pick this beat, so leave the state unchanged.
+        if (pack.cards.isEmpty()) return state
+        // The human seat carries no diversity prior, so this suggestion is neutral.
+        val best = botDrafter.pick(humanSeat, pack, state.round, state.pickNumber, engine)
+        return applyHumanPick(state, best.card.scryfallId, engine)
     }
 
     override fun isComplete(state: DraftState): Boolean =

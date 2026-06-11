@@ -58,7 +58,7 @@ class DraftSimIntegrationTest {
             val humanPack = state.packsInFlight[0] ?: break
             val card = humanPack.cards.firstOrNull() ?: break
             state = withContext(Dispatchers.Default) {
-                engine.applyHumanPick(state, card.card.scryfallId)
+                engine.applyHumanPick(state, card.card.scryfallId, engine = null)
             }
             fakeRepo.saveSession(state)
         }
@@ -106,6 +106,10 @@ private class FakeDraftSimRepository : DraftSimRepository {
 
     override suspend fun getDraftableSimSet(setCode: String): DataResult<DraftableSet> =
         DataResult.Success(DraftTestFixtures.fakeDraftableSet())
+
+    override suspend fun getEngineConfig(
+        setCode: String,
+    ): com.mmg.manahub.feature.draft.domain.model.EngineConfig? = null
 
     override fun observeActiveSession(): Flow<DraftState?> = sessionFlow
 

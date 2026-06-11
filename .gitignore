@@ -291,6 +291,13 @@ TASK_*.md
 tools/collation/output/
 NOTES_*.md
 
+# Python draft pipeline (scripts/draftsim_py): generated artifacts + intermediate
+# downloads are uploaded to R2 out-of-band and must not be committed.
+scripts/draftsim_py/output/
+scripts/draftsim_py/.cache/
+scripts/draftsim_py/__pycache__/
+scripts/draftsim_py/**/__pycache__/
+
 
 # =============================================================================
 # SECTION 9 — MISCELLANEOUS GENERATED FILES
@@ -369,3 +376,14 @@ graphify-out/
 /.claude/skills/compose-ui/references/components.md
 /.claude/skills/compose-ui/references/design-system.md
 /.claude/skills/compose-ui/references/dos-and-donts.md
+/scripts/draftsim_py/draftsim_pipeline/http.py
+/scripts/draftsim_py/manahub_draft.py
+/scripts/draftsim_py/draftsim_pipeline/mtgjson.py
+/scripts/draftsim_py/README.md
+/scripts/draftsim_py/requirements.txt
+/scripts/draftsim_py/draftsim_pipeline/scryfall.py
+/scripts/draftsim_py/GENERATING_A_SET.md
+/scripts/draftsim_py/draftsim_pipeline/engine.py
+/scripts/draftsim_py/draftsim_pipeline/config.py
+/scripts/draftsim_py/draftsim_pipeline/__init__.py
+/scripts/draftsim_py/draftsim_pipeline/worker.py

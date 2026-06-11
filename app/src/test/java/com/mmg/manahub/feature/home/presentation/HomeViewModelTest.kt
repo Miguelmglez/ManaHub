@@ -5,10 +5,13 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
@@ -18,15 +21,22 @@ import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.model.PassDirection
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
-import com.mmg.manahub.feature.news.domain.model.NewsItem
+import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
+import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -67,6 +77,9 @@ class HomeViewModelTest {
         MutableStateFlow<List<com.mmg.manahub.core.data.local.entity.TournamentEntity>>(emptyList())
     private val deckSummariesFlow = MutableStateFlow<List<DeckSummary>>(emptyList())
 
+    /** Backing store for the persisted layout — saveHomeLayout writes here so reads round-trip. */
+    private val savedLayoutTokens = MutableStateFlow<String?>(null)
+
     private val userPrefsDataStore: UserPreferencesDataStore = mockk(relaxed = true)
     private val statsRepository: StatsRepository = mockk(relaxed = true)
     private val deckRepository: DeckRepository = mockk(relaxed = true)
@@ -75,6 +88,11 @@ class HomeViewModelTest {
     private val tournamentRepository: TournamentRepository = mockk(relaxed = true)
     private val authRepository: AuthRepository = mockk(relaxed = true)
     private val getNewsFeedUseCase: GetNewsFeedUseCase = mockk(relaxed = true)
+    private val refreshNewsFeedUseCase: RefreshNewsFeedUseCase = mockk(relaxed = true)
+    private val communityStatsRepository: CommunityStatsRepository = mockk(relaxed = true)
+    private val draftRepository: DraftRepository = mockk(relaxed = true)
+    private val cardRepository: com.mmg.manahub.core.domain.repository.CardRepository = mockk(relaxed = true)
+    private val wishlistRepository: WishlistRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -92,6 +110,7 @@ class HomeViewModelTest {
         every { userPrefsDataStore.preferredCurrencyFlow } returns flowOf(PreferredCurrency.USD)
         every { userPrefsDataStore.playerNameFlow } returns flowOf("Wizard")
         every { userPrefsDataStore.observeQuickStartActions() } returns flowOf(QuickStartAction.defaults)
+        every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(emptySet())
         every { userPrefsDataStore.isNudgeCoolingDown() } returns isCoolingDownFlow
         every { userPrefsDataStore.avatarUrlFlow } returns flowOf(null)
         every { statsRepository.observeCollectionStats(any()) } returns
@@ -101,6 +120,51 @@ class HomeViewModelTest {
         every { draftSimRepository.observeActiveSession() } returns activeDraftFlow
         every { tournamentRepository.observeTournaments() } returns tournamentsFlow
         every { getNewsFeedUseCase() } returns flowOf(emptyList())
+        coEvery { refreshNewsFeedUseCase() } returns Result.success(Unit)
+
+        // Phase 2 stats flows.
+        every { gameSessionRepository.observeLocalWins() } returns flowOf(0)
+        every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(emptyList())
+        every { gameSessionRepository.observeDeckStats() } returns flowOf(emptyList())
+        every { gameSessionRepository.observeMostFrequentElimination() } returns flowOf(null)
+        every { gameSessionRepository.observeAvgWinTurn(any()) } returns flowOf(null)
+        every { gameSessionRepository.observeAvgLifeOnWin() } returns flowOf(null)
+        every { gameSessionRepository.observeAvgLifeOnLoss() } returns flowOf(null)
+
+        // Phase 3 stubs.
+        every { communityStatsRepository.observeCommunityStats() } returns flowOf(null)
+        coEvery { draftRepository.getDraftableSets(any()) } returns DataResult.Success(emptyList())
+        // Discover widget random-card fetch: default to an empty result.
+        coEvery { cardRepository.searchCards(any(), any()) } returns DataResult.Success(emptyList())
+
+        // Wishlist default: empty.
+        every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
+
+        // Layout round-trip: homeLayoutFlow decodes the saved tokens (or the supplied
+        // default when none are saved); saveHomeLayout writes the tokens.
+        every { userPrefsDataStore.homeLayoutFlow(any()) } answers {
+            val default = firstArg<List<WidgetInstance>>()
+            savedLayoutTokens.map { tokens -> decodeLayout(tokens, default) }
+        }
+        val layoutSlot = slot<List<WidgetInstance>>()
+        coEvery { userPrefsDataStore.saveHomeLayout(capture(layoutSlot)) } answers {
+            savedLayoutTokens.value = layoutSlot.captured.joinToString(",") { "${it.type.persistedId}:${it.size.name}" }
+        }
+    }
+
+    /** Mirrors UserPreferencesDataStore decode: unknown ids/sizes are skipped; empty → default. */
+    private fun decodeLayout(tokens: String?, default: List<WidgetInstance>): List<WidgetInstance> {
+        val parsed = tokens
+            ?.split(",")
+            ?.mapNotNull { token ->
+                val parts = token.trim().split(":")
+                if (parts.size != 2) return@mapNotNull null
+                val type = HomeWidgetType.fromPersistedId(parts[0].trim()) ?: return@mapNotNull null
+                val size = WidgetSize.entries.firstOrNull { it.name == parts[1].trim() } ?: return@mapNotNull null
+                WidgetInstance(type, size)
+            }
+            ?: emptyList()
+        return parsed.ifEmpty { default }
     }
 
     private fun buildViewModel(): HomeViewModel = HomeViewModel(
@@ -112,6 +176,12 @@ class HomeViewModelTest {
         tournamentRepository = tournamentRepository,
         authRepository = authRepository,
         getNewsFeedUseCase = getNewsFeedUseCase,
+        refreshNewsFeedUseCase = refreshNewsFeedUseCase,
+        cardRepository = cardRepository,
+        communityStatsRepository = communityStatsRepository,
+        draftRepository = draftRepository,
+        wishlistRepository = wishlistRepository,
+        getAccountNudgeUseCase = GetAccountNudgeUseCase(),
     )
 
     private fun emptyCollectionStats() = CollectionStats(
@@ -179,7 +249,7 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        assertEquals(HomeHeroState.Welcome, vm.state.value.hero)
+        assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
     }
 
     // ── Account nudge — milestone triggers ────────────────────────────────────
@@ -458,6 +528,10 @@ class HomeViewModelTest {
             activeDraftFlow.value = null
             totalGamesFlow.value = 5
             every { userPrefsDataStore.playerNameFlow } returns flowOf("Miguel")
+            // Skip all first steps so the hero resolves to Summary instead of Welcome
+            every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(
+                ALL_FIRST_STEPS.map { it.id }.toSet()
+            )
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -479,7 +553,7 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        assertEquals(HomeHeroState.Welcome, vm.state.value.hero)
+        assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
     }
 
     @Test
@@ -492,152 +566,26 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            assertEquals(HomeHeroState.Welcome, vm.state.value.hero)
-        }
-
-    // ── continueItems ─────────────────────────────────────────────────────────
-
-    @Test
-    fun `continueItems contains DRAFT entry when draft is active and DRAFTING`() =
-        runTest(testDispatcher) {
-            activeDraftFlow.value = draftingState(setCode = "MKM")
-
-            val vm = buildViewModel()
-            backgroundScope.launch { vm.state.collect {} }
-            advanceUntilIdle()
-
-            assertTrue(vm.state.value.continueItems.any { it.type == ContinueType.DRAFT })
-        }
-
-    @Test
-    fun `continueItems DRAFT entry subtitle contains pack and pick numbers`() =
-        runTest(testDispatcher) {
-            activeDraftFlow.value = draftingState().copy(round = 2, pickNumber = 5)
-
-            val vm = buildViewModel()
-            backgroundScope.launch { vm.state.collect {} }
-            advanceUntilIdle()
-
-            val draftItem = vm.state.value.continueItems.first { it.type == ContinueType.DRAFT }
-            assertTrue(
-                "Subtitle should mention pack/pick: '${draftItem.subtitle}'",
-                draftItem.subtitle.contains("2") && draftItem.subtitle.contains("5"),
-            )
-        }
-
-    @Test
-    fun `continueItems contains TOURNAMENT entry when activeTournaments greater than 0`() =
-        runTest(testDispatcher) {
-            tournamentsFlow.value = listOf(tournamentEntity(status = "ACTIVE"))
-
-            val vm = buildViewModel()
-            backgroundScope.launch { vm.state.collect {} }
-            advanceUntilIdle()
-
-            assertTrue(vm.state.value.continueItems.any { it.type == ContinueType.TOURNAMENT })
-        }
-
-    @Test
-    fun `continueItems does not contain TOURNAMENT entry when all tournaments are FINISHED`() =
-        runTest(testDispatcher) {
-            tournamentsFlow.value = listOf(tournamentEntity(status = "FINISHED"))
-
-            val vm = buildViewModel()
-            backgroundScope.launch { vm.state.collect {} }
-            advanceUntilIdle()
-
-            assertFalse(vm.state.value.continueItems.any { it.type == ContinueType.TOURNAMENT })
-        }
-
-    @Test
-    fun `continueItems contains DECK entry from first deck summary`() = runTest(testDispatcher) {
-        deckSummariesFlow.value = listOf(
-            deckSummary(id = "deck-1", name = "Control Blue", cardCount = 60),
-            deckSummary(id = "deck-2", name = "Aggro Red", cardCount = 40),
-        )
-
-        val vm = buildViewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        advanceUntilIdle()
-
-        val deckItem = vm.state.value.continueItems.firstOrNull { it.type == ContinueType.DECK }
-        assertNotNull(deckItem)
-        assertEquals("Control Blue", deckItem!!.label)
-        assertEquals("deck-1", deckItem.id)
-    }
-
-    @Test
-    fun `continueItems does not contain DECK entry when deck list is empty`() =
-        runTest(testDispatcher) {
-            deckSummariesFlow.value = emptyList()
-
-            val vm = buildViewModel()
-            backgroundScope.launch { vm.state.collect {} }
-            advanceUntilIdle()
-
-            assertFalse(vm.state.value.continueItems.any { it.type == ContinueType.DECK })
-        }
-
-    @Test
-    fun `continueItems DECK subtitle shows card count`() = runTest(testDispatcher) {
-        deckSummariesFlow.value = listOf(deckSummary(cardCount = 75))
-
-        val vm = buildViewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        advanceUntilIdle()
-
-        val deckItem = vm.state.value.continueItems.first { it.type == ContinueType.DECK }
-        assertTrue(
-            "Subtitle should contain card count: '${deckItem.subtitle}'",
-            deckItem.subtitle.contains("75"),
-        )
-    }
-
-    @Test
-    fun `TOURNAMENT subtitle says 1 in progress when exactly 1 active tournament`() =
-        runTest(testDispatcher) {
-            tournamentsFlow.value = listOf(tournamentEntity(status = "ACTIVE"))
-
-            val vm = buildViewModel()
-            backgroundScope.launch { vm.state.collect {} }
-            advanceUntilIdle()
-
-            val t = vm.state.value.continueItems.first { it.type == ContinueType.TOURNAMENT }
-            assertEquals("1 in progress", t.subtitle)
-        }
-
-    @Test
-    fun `TOURNAMENT subtitle shows count when multiple active tournaments`() =
-        runTest(testDispatcher) {
-            tournamentsFlow.value = listOf(
-                tournamentEntity(id = 1L, status = "ACTIVE"),
-                tournamentEntity(id = 2L, status = "SETUP"),
-            )
-
-            val vm = buildViewModel()
-            backgroundScope.launch { vm.state.collect {} }
-            advanceUntilIdle()
-
-            val t = vm.state.value.continueItems.first { it.type == ContinueType.TOURNAMENT }
-            assertEquals("2 in progress", t.subtitle)
+            assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
         }
 
     // ── recentNews ────────────────────────────────────────────────────────────
 
     @Test
-    fun `recentNews is capped at 3 items when feed has more`() = runTest(testDispatcher) {
-        val feed = (1..10).map { newsArticle(it.toString()) }
+    fun `recentNews is capped at MAX_NEWS items when feed has more`() = runTest(testDispatcher) {
+        // Feed has more items than MAX_NEWS (10); result must be exactly MAX_NEWS.
+        val feed = (1..HomeViewModel.MAX_NEWS + 5).map { newsArticle(it.toString()) }
         every { getNewsFeedUseCase() } returns flowOf(feed)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        assertEquals(3, vm.state.value.recentNews.size)
+        assertEquals(HomeViewModel.MAX_NEWS, vm.state.value.recentNews!!.size)
     }
 
     @Test
-    fun `recentNews contains fewer than 3 items when feed has fewer`() = runTest(testDispatcher) {
+    fun `recentNews contains fewer than MAX_NEWS items when feed has fewer`() = runTest(testDispatcher) {
         val feed = listOf(newsArticle("1"), newsArticle("2"))
         every { getNewsFeedUseCase() } returns flowOf(feed)
 
@@ -645,7 +593,7 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        assertEquals(2, vm.state.value.recentNews.size)
+        assertEquals(2, vm.state.value.recentNews!!.size)
     }
 
     @Test
@@ -656,7 +604,7 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        assertTrue(vm.state.value.recentNews.isEmpty())
+        assertTrue(vm.state.value.recentNews?.isEmpty() != false)
     }
 
     @Test
@@ -674,7 +622,7 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            val item = vm.state.value.recentNews.first()
+            val item = vm.state.value.recentNews!!.first()
             assertEquals("news-42", item.id)
             assertEquals("New Set Spoilers", item.title)
             assertEquals("https://example.com/img.jpg", item.imageUrl)
@@ -731,11 +679,16 @@ class HomeViewModelTest {
     fun `state updates reactively when totalGames flow changes`() = runTest(testDispatcher) {
         totalGamesFlow.value = 0
         activeDraftFlow.value = null
+        // Skip all first steps so the hero resolves to Welcome(empty) then Summary
+        // once totalGames > 0 — without this the Welcome carousel would persist.
+        every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(
+            ALL_FIRST_STEPS.map { it.id }.toSet()
+        )
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
-        assertEquals(HomeHeroState.Welcome, vm.state.value.hero)
+        assertTrue(vm.state.value.hero is HomeHeroState.Welcome)
 
         totalGamesFlow.value = 1
         advanceUntilIdle()
@@ -775,5 +728,381 @@ class HomeViewModelTest {
             assertFalse(emission.isLoading)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── Widget board: default layouts ─────────────────────────────────────────
+
+    @Test
+    fun `default layout signed-out is used when unauthenticated and nothing saved`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Unauthenticated
+            savedLayoutTokens.value = null
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val layout = vm.state.value.layout
+            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+            // The signed-out default surfaces discovery widgets, not signed-in hubs.
+            assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
+            assertTrue(layout.any { it.type == HomeWidgetType.CARD_OF_THE_DAY })
+            assertFalse(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+        }
+
+    @Test
+    fun `default layout signed-in is used when authenticated and nothing saved`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            savedLayoutTokens.value = null
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val layout = vm.state.value.layout
+            assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+            assertTrue(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+            assertTrue(layout.any { it.type == HomeWidgetType.COLLECTION_STATS_HUB })
+        }
+
+    // ── Widget board: mutations ────────────────────────────────────────────────
+
+    @Test
+    fun `AddWidget appends the widget and persists`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+
+        vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
+        advanceUntilIdle()
+
+        assertEquals(HomeWidgetType.GAME_STATS_HUB, vm.state.value.layout.last().type)
+        coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    @Test
+    fun `AddWidget is a no-op when the widget already exists`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        val before = vm.state.value.layout.count { it.type == HomeWidgetType.GAME_STATS_HUB }
+
+        vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
+        advanceUntilIdle()
+
+        assertEquals(before, vm.state.value.layout.count { it.type == HomeWidgetType.GAME_STATS_HUB })
+        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    @Test
+    fun `RemoveWidget removes a removable widget`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+
+        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.GAME_STATS_HUB))
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+        coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    @Test
+    fun `RemoveWidget cannot remove the always-present CONTEXT_HERO`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.CONTEXT_HERO))
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.CONTEXT_HERO })
+        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    @Test
+    fun `MoveWidget reorders correctly`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        val firstNonHero = vm.state.value.layout[1].type
+
+        // Move index 1 to index 3.
+        vm.onAction(HomeAction.MoveWidget(1, 3))
+        advanceUntilIdle()
+
+        assertEquals(firstNonHero, vm.state.value.layout[3].type)
+        coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    @Test
+    fun `MoveWidget is a no-op when from equals to`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        val before = vm.state.value.layout
+
+        vm.onAction(HomeAction.MoveWidget(2, 2))
+        advanceUntilIdle()
+
+        assertEquals(before, vm.state.value.layout)
+        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    // ── Persistence round-trip ────────────────────────────────────────────────
+
+    @Test
+    fun `saved layout round-trips through decode`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        savedLayoutTokens.value = "context_hero:MEDIUM,game_stats_hub:MEDIUM"
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+                WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
+            ),
+            vm.state.value.layout,
+        )
+    }
+
+    @Test
+    fun `unknown persistedId is skipped on decode`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        savedLayoutTokens.value = "context_hero:MEDIUM,bogus_widget:SMALL,game_stats_hub:MEDIUM"
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val ids = vm.state.value.layout.map { it.type }
+        assertEquals(listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.GAME_STATS_HUB), ids)
+    }
+
+    @Test
+    fun `unknown size name is skipped on decode`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        savedLayoutTokens.value = "context_hero:HUGE,game_stats_hub:MEDIUM"
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        // The HUGE token is dropped; only game_stats_hub survives.
+        assertEquals(
+            listOf(WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM)),
+            vm.state.value.layout,
+        )
+    }
+
+    // ── Account-gating ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `community stats flow is subscribed and surfaced (null while stubbed)`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertNull(vm.state.value.communityStats)
+        }
+
+    @Test
+    fun `news flow crashing does not crash the board`() = runTest(testDispatcher) {
+        every { getNewsFeedUseCase() } returns kotlinx.coroutines.flow.flow { throw RuntimeException("boom") }
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        // The board still resolves: layout present, news empty (catch emits emptyList).
+        assertTrue(vm.state.value.recentNews?.isEmpty() != false)
+        assertTrue(vm.state.value.layout.isNotEmpty())
+    }
+
+    // ── MoveWidget out-of-bounds ──────────────────────────────────────────────
+
+    @Test
+    fun `MoveWidget with negative from index is a no-op`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        val before = vm.state.value.layout
+
+        vm.onAction(HomeAction.MoveWidget(-1, 0))
+        advanceUntilIdle()
+
+        assertEquals(before, vm.state.value.layout)
+        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    @Test
+    fun `MoveWidget with to index beyond last is a no-op`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        val before = vm.state.value.layout
+        val outOfBounds = before.size
+
+        vm.onAction(HomeAction.MoveWidget(0, outOfBounds))
+        advanceUntilIdle()
+
+        assertEquals(before, vm.state.value.layout)
+        coVerify(exactly = 0) { userPrefsDataStore.saveHomeLayout(any()) }
+    }
+
+    // ── AddWidget default size ────────────────────────────────────────────────
+
+    @Test
+    fun `AddWidget uses MEDIUM as default size when the widget supports it`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
+        advanceUntilIdle()
+
+        val added = vm.state.value.layout.first { it.type == HomeWidgetType.GAME_STATS_HUB }
+        assertEquals(WidgetSize.MEDIUM, added.size)
+    }
+
+    // ── Decode fallback ───────────────────────────────────────────────────────
+
+    @Test
+    fun `all-invalid decode tokens fall back to auth-appropriate default`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        savedLayoutTokens.value = "bogus:HUGE,another:INVALID"
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val layout = vm.state.value.layout
+        assertTrue(layout.isNotEmpty())
+        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+    }
+
+    // ── ResetLayout produces correct auth-appropriate default ─────────────────
+
+    @Test
+    fun `ResetLayout persists the signed-out default when unauthenticated`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.QUICK_ACTIONS))
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.ResetLayout)
+        advanceUntilIdle()
+
+        val layout = vm.state.value.layout
+        assertEquals(HomeWidgetType.CONTEXT_HERO, layout.first().type)
+        assertFalse(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+        assertTrue(layout.any { it.type == HomeWidgetType.LATEST_SETS })
+    }
+
+    @Test
+    fun `ResetLayout persists the signed-in default when authenticated`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.GAME_STATS_HUB))
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.ResetLayout)
+        advanceUntilIdle()
+
+        val layout = vm.state.value.layout
+        assertTrue(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+        assertTrue(layout.any { it.type == HomeWidgetType.COLLECTION_STATS_HUB })
+    }
+
+    // ── Wishlist stats ────────────────────────────────────────────────────────
+
+    @Test
+    fun `wishlistStats cards reflects cards from wishlistRepository when authenticated`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        val entry = WishlistEntry(
+            id = "w1", userId = "u1", cardId = "c1", quantity = 1,
+            matchAnyVariant = false, isFoil = false, condition = "NM", language = "en",
+            createdAt = 123L,
+            card = com.mmg.manahub.core.domain.model.Card(
+                scryfallId = "c1", name = "Black Lotus", printedName = null,
+                manaCost = "{0}", cmc = 0.0, colors = emptyList(), colorIdentity = emptyList(),
+                typeLine = "Artifact", printedTypeLine = null, oracleText = null,
+                printedText = null, keywords = emptyList(), power = null,
+                toughness = null, loyalty = null, setCode = "LEA",
+                setName = "Limited Edition Alpha", collectorNumber = "1",
+                rarity = "mythic", releasedAt = "1993-08-05",
+                frameEffects = emptyList(), promoTypes = emptyList(), lang = "en",
+                imageNormal = "https://example.com/lotus.jpg",
+                imageArtCrop = "https://example.com/lotus_art.jpg",
+                imageBackNormal = null, priceUsd = 100000.0, priceUsdFoil = null,
+                priceEur = 90000.0, priceEurFoil = null,
+                legalityStandard = "not_legal", legalityPioneer = "not_legal",
+                legalityModern = "not_legal", legalityCommander = "banned",
+                flavorText = null, artist = "Christopher Rush", scryfallUri = "",
+                tags = emptyList(), userTags = emptyList(), suggestedTags = emptyList(),
+                relatedUris = emptyMap(), purchaseUris = emptyMap()
+            )
+        )
+        every { wishlistRepository.observeLocal() } returns flowOf(listOf(entry))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val stats = vm.state.value.wishlistStats
+        assertNotNull(stats)
+        assertEquals(1, stats!!.count)
+        assertEquals(1, stats.cards.size)
+        assertEquals("c1", stats.cards.first().id)
+        assertEquals("Black Lotus", stats.cards.first().name)
+        assertEquals("https://example.com/lotus_art.jpg", stats.cards.first().imageUrl)
+    }
+
+    @Test
+    fun `wishlistStats is null when unauthenticated`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        val entry = WishlistEntry(
+            id = "w1", userId = "u1", cardId = "c1", quantity = 1,
+            matchAnyVariant = false, isFoil = false, condition = "NM", language = "en",
+            createdAt = 123L, card = null
+        )
+        every { wishlistRepository.observeLocal() } returns flowOf(listOf(entry))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.wishlistStats)
     }
 }

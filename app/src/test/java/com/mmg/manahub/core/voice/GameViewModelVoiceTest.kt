@@ -23,6 +23,7 @@ import com.mmg.manahub.core.voice.domain.VoiceCommand
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
 import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.feature.game.domain.model.GameMode
+import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
 import com.mmg.manahub.feature.game.presentation.GameSettings
 import com.mmg.manahub.feature.game.presentation.GameViewModel
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
@@ -130,9 +131,10 @@ class GameViewModelVoiceTest {
             revokeDefeatUseCase          = revokeDefeatUseCase,
             leaveSessionUseCase          = leaveSessionUseCase,
             nearbyRepo                   = nearbyRepo,
-            toggleLandPlayedUseCase      = toggleLandPlayedUseCase,
-            voiceCommandRecognizer       = fakeRecognizer,
-            appContext                   = appContext,
+            toggleLandPlayedUseCase           = toggleLandPlayedUseCase,
+            voiceCommandRecognizer            = fakeRecognizer,
+            evaluatePlayerEliminationUseCase  = EvaluatePlayerEliminationUseCase(),
+            appContext                        = appContext,
         )
         val configs = listOf(
             PlayerConfig(0, "Mage", PlayerTheme.ALL[0], isAppUser = true),

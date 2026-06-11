@@ -5,7 +5,7 @@ import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
 import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
 import com.mmg.manahub.feature.draft.domain.model.BoosterSheet
 import com.mmg.manahub.feature.draft.domain.model.BoosterVariant
-import com.mmg.manahub.feature.draft.domain.model.DraftSet
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet
 import com.mmg.manahub.feature.draft.domain.model.TierCard
 
@@ -69,25 +69,58 @@ internal object DraftTestFixtures {
     }
 
     /**
-     * A richer draftable set for the bot harness. Identical pool/sheet structure to
-     * [fakeDraftableSet], but rates ALL 200 cards with a spread of pick-order ranks and varied
-     * rarities so a power-aware drafter can meaningfully out-pick a rarity-only baseline.
+     * A draftable set engineered specifically for [BotHarnessTest]. Used by NO other test, so its
+     * shape can be tuned for two independent behavioural assertions without affecting the booster /
+     * engine tests (which use [fakeDraftableSet]).
      *
-     * Rank assignment: each card's rank is `1 + (scryfallId index) modulo-mapped` so that ranks
-     * span 1..200, decoupled from rarity. This guarantees the highest-rarity card is NOT always the
-     * highest-rated card — exactly the gap the heuristic should exploit over RaredraftBot.
+     * The fixture is designed so that a *correct* drafter exhibits two observable behaviours that a
+     * naive one does not:
+     *
+     * 1. **Power separation (`heuristicBuildsStrongerSeat0PoolThanRaredraft`).** A small "premium"
+     *    tier of 20 cards (4 per colour) carries strong [TierCard.pickOrderRank] values (1..20);
+     *    the other 180 cards carry NO rating entry and so score the identical neutral floor (0.30).
+     *    Crucially every premium is a COMMON, so the strongest cards are NOT the highest-rarity ones.
+     *    A power-aware drafter (heuristic) snaps up the premium commons; a rarity-only drafter
+     *    (RaredraftBot) chases rares/mythics that sit on the flat floor, so its pool is measurably
+     *    weaker. Rank is therefore deliberately *decoupled* from rarity.
+     *
+     * 2. **Colour commitment (`botsAreAtLeast80PercentIn1or2Colors`).** Two design choices give the
+     *    heuristic enough signal to genuinely commit to ≤2 colours:
+     *    - **A deep, tied floor.** The 180 unrated cards (90% of the set) share the exact same rating
+     *      (0.30). When ratings tie, the heuristic's colour bonus becomes the deciding factor, so
+     *      each pick is pulled toward the seat's already-leading colours — a snowball that drives the
+     *      seat past the commitment margin and triggers the off-colour penalty.
+     *    - **Uniform CMC (= 3) and a single card type (Creature).** This removes the curve/synergy
+     *      tie-breakers (which key off CMC) so they cannot fight the colour snowball during the
+     *      speculation phase. With a wide *spread* of unique ratings the colour signal is drowned
+     *      out and the bot never commits (the historical failure mode); a tied floor restores it.
+     *
+     * Colours remain mono-coloured and cycle W,U,B,R,G (40 cards per colour) exactly as
+     * [HeuristicBotDrafter] reads them from [Card.colors].
      */
     fun fakeRatedDraftableSet(): DraftableSet {
         val cards = (1..200).map { i ->
-            // Vary rarity so RaredraftBot has something to chase, decoupled from pick order.
+            val color = COLORS[(i - 1) % 5]
+            // Vary rarity so RaredraftBot has something to chase. Decoupled from rating: see below.
             val rarity = when (i % 8) {
                 0 -> "mythic"
                 1, 2 -> "rare"
                 3, 4 -> "uncommon"
                 else -> "common"
             }
-            fakeCard(i).copy(rarity = rarity)
+            // Fix CMC = 3 (neither the ≤2 nor the ≥5 curve band) so curve/synergy bonuses are a
+            // constant across every candidate and cannot override the colour snowball.
+            fakeCard(i).copy(
+                rarity = rarity,
+                colors = listOf(color),
+                colorIdentity = listOf(color),
+                cmc = 3.0,
+                typeLine = "Creature",
+            )
         }
+
+        // Sheets keep the same 100/50/50 split and balanceColors so every pack offers all 5 colours
+        // (a realistic, harder test for colour commitment than single-colour packs).
         val commonEntries = cards.take(100).map { BoosterCardEntry(it.scryfallId, 1) }
         val uncommonEntries = cards.drop(100).take(50).map { BoosterCardEntry(it.scryfallId, 1) }
         val rareEntries = cards.drop(150).take(50).map { BoosterCardEntry(it.scryfallId, 1) }
@@ -100,23 +133,41 @@ internal object DraftTestFixtures {
                 "rareMythic" to BoosterSheet(foil = false, balanceColors = false, cards = rareEntries),
             ),
         )
-        // Rate every card. Rank is a deterministic permutation of 1..200 unrelated to rarity,
-        // so high rarity != high rank.
-        val ratings = cards.mapIndexed { idx, c ->
-            val rank = ((idx * 73) % 200) + 1 // 73 is coprime with 200 -> bijection over 1..200
-            val tier = when {
-                rank <= 20 -> "S"
-                rank <= 60 -> "A"
-                rank <= 110 -> "B"
-                rank <= 160 -> "C"
-                else -> "D"
-            }
-            c.scryfallId to TierCard(
+
+        // Pick the premium cards: [PREMIUM_PER_COLOR] per colour, chosen from each colour's COMMONS
+        // so they are exactly the cards a rarity-only drafter passes over. This is what makes power
+        // and rarity diverge — the strongest cards are commons, while the chased rares sit on the
+        // flat floor.
+        val premiumIds: List<String> = COLORS.flatMap { color ->
+            cards.asSequence()
+                .filter { it.colors.firstOrNull() == color && it.rarity == "common" }
+                .take(PREMIUM_PER_COLOR)
+                .map { it.scryfallId }
+                .toList()
+        }
+        // Assign each premium a unique strong rank (1..premiumIds.size), interleaved by colour so no
+        // single colour owns the very top — this lets different seats seed into different colour
+        // pairs instead of the whole 8-seat pod fighting over one pair.
+        val premiumRankById: Map<String, Int> =
+            premiumIds.mapIndexed { idx, id -> id to (idx + 1) }.toMap()
+
+        // ONLY premium cards get a rating entry. Floor cards are deliberately absent: with no
+        // TierCard, WeightedBoosterGenerator sets their DraftCard.pickOrderRank/tierRating to null,
+        // so DraftRatingNormalizer scores every floor card the identical neutral 0.30 — the exact
+        // tie the colour snowball needs. (TierCard.pickOrderRank is non-null, so a floor entry could
+        // not represent "no rank" anyway.)
+        val ratings = premiumRankById.entries.associate { (id, rank) ->
+            val c = cards.first { it.scryfallId == id }
+            id to TierCard(
                 c.name, c.scryfallId, c.colors.first(), c.colors, c.rarity,
-                rank, tier, "", "", "", "Creature",
+                rank, "S", "", "", "", "Creature",
             )
-        }.toMap()
+        }
+
         val set = DraftSet("TST", "TST", "Test Set", "2025-01-01", "", "v1", "v1", "v1")
         return DraftableSet(set, cards, config, ratings)
     }
+
+    /** Premium (ranked) commons per colour in [fakeRatedDraftableSet]; the rest are the tied floor. */
+    private const val PREMIUM_PER_COLOR = 4
 }

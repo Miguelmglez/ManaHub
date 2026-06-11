@@ -19,7 +19,7 @@ import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
 import com.mmg.manahub.feature.draft.domain.model.ArchetypeGuide
 import com.mmg.manahub.feature.draft.domain.model.ArchetypeKeyCard
-import com.mmg.manahub.feature.draft.domain.model.DraftSet
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.MechanicExamples
 import com.mmg.manahub.feature.draft.domain.model.MechanicGuide

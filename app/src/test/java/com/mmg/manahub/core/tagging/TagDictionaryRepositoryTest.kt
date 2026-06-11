@@ -93,7 +93,7 @@ class TagDictionaryRepositoryTest {
             key      = "custom_key",
             category = TagCategory.STRATEGY,
             labels   = mapOf("en" to "Custom Label"),
-            patterns = mapOf("en" to listOf("custom pattern")),
+            patterns = listOf("custom pattern"),
         )
 
         // Act
@@ -115,7 +115,7 @@ class TagDictionaryRepositoryTest {
             key      = "flying",
             category = TagCategory.KEYWORD,
             labels   = mapOf("en" to "Flying v1"),
-            patterns = emptyMap(),
+            patterns = emptyList(),
         )
         repo.upsert(original)
 
@@ -124,7 +124,7 @@ class TagDictionaryRepositoryTest {
             key      = "flying",
             category = TagCategory.KEYWORD,
             labels   = mapOf("en" to "Flying v2", "es" to "Volar"),
-            patterns = emptyMap(),
+            patterns = emptyList(),
         )
         repo.upsert(updated)
 
@@ -144,8 +144,8 @@ class TagDictionaryRepositoryTest {
     @Test
     fun `given existing override when delete with matching key then override is removed`() = runTest {
         // Arrange
-        repo.upsert(TagOverride(key = "flying", labels = mapOf("en" to "Flying"), patterns = emptyMap()))
-        repo.upsert(TagOverride(key = "trample", labels = mapOf("en" to "Trample"), patterns = emptyMap()))
+        repo.upsert(TagOverride(key = "flying", labels = mapOf("en" to "Flying"), patterns = emptyList()))
+        repo.upsert(TagOverride(key = "trample", labels = mapOf("en" to "Trample"), patterns = emptyList()))
 
         // Act
         repo.delete("flying")
@@ -162,7 +162,7 @@ class TagDictionaryRepositoryTest {
     @Test
     fun `given non-existent key when delete then no crash and list is unchanged`() = runTest {
         // Arrange
-        repo.upsert(TagOverride(key = "flying", labels = mapOf("en" to "Flying"), patterns = emptyMap()))
+        repo.upsert(TagOverride(key = "flying", labels = mapOf("en" to "Flying"), patterns = emptyList()))
 
         // Act — delete a key that was never inserted
         repo.delete("nonexistent_key")
@@ -191,9 +191,9 @@ class TagDictionaryRepositoryTest {
     @Test
     fun `given multiple overrides when resetAll then all overrides are cleared`() = runTest {
         // Arrange
-        repo.upsert(TagOverride(key = "flying",  labels = mapOf("en" to "Flying"),  patterns = emptyMap()))
-        repo.upsert(TagOverride(key = "trample", labels = mapOf("en" to "Trample"), patterns = emptyMap()))
-        repo.upsert(TagOverride(key = "haste",   labels = mapOf("en" to "Haste"),   patterns = emptyMap()))
+        repo.upsert(TagOverride(key = "flying",  labels = mapOf("en" to "Flying"),  patterns = emptyList()))
+        repo.upsert(TagOverride(key = "trample", labels = mapOf("en" to "Trample"), patterns = emptyList()))
+        repo.upsert(TagOverride(key = "haste",   labels = mapOf("en" to "Haste"),   patterns = emptyList()))
 
         // Act
         repo.resetAll()
@@ -247,7 +247,7 @@ class TagDictionaryRepositoryTest {
             assertTrue(first.isEmpty())
 
             // Act: simulate a DataStore update
-            repo.upsert(TagOverride(key = "burn", labels = mapOf("en" to "Burn"), patterns = emptyMap()))
+            repo.upsert(TagOverride(key = "burn", labels = mapOf("en" to "Burn"), patterns = emptyList()))
 
             // Second emission: contains the new override
             val second = awaitItem()
@@ -302,6 +302,51 @@ class TagDictionaryRepositoryTest {
         }
     }
 
+    @Test
+    fun `given new-shape JSON with array patterns when overridesFlow emits then rule lines are decoded`() = runTest {
+        // Arrange — canonical new shape: patterns is an array of rule-line strings.
+        savedJsonFlow.value =
+            """[{"key":"lifegain","category":"STRATEGY","labels":{"en":"Lifegain"},"patterns":["gain + life + !gain control"]}]"""
+
+        repo.overridesFlow.test {
+            val list = awaitItem()
+            assertEquals(1, list.size)
+            assertEquals("lifegain", list.first().key)
+            assertEquals(listOf("gain + life + !gain control"), list.first().patterns)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given legacy JSON with map patterns and es-de labels when decoded then only en is kept and re-persisted in new shape`() = runTest {
+        // Arrange — legacy shape: map-shaped patterns + es/de labels.
+        val legacy =
+            """[{"key":"removal","category":"ROLE","labels":{"en":"Removal","es":"Remoción","de":"Entfernung"},"patterns":{"en":["destroy target"],"es":["destruye"],"de":["zerstöre"]}}]"""
+        savedJsonFlow.value = legacy
+
+        // Act — decode keeps en-only.
+        repo.overridesFlow.test {
+            val list = awaitItem()
+            assertEquals(1, list.size)
+            val ov = list.first()
+            assertEquals("Removal", ov.labels["en"])
+            assertEquals(null, ov.labels["es"])
+            assertEquals(null, ov.labels["de"])
+            // The legacy "en" pattern list survives as a single rule line.
+            assertEquals(listOf("destroy target"), ov.patterns)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Act — loadAndApply performs the one-time silent migration to the new shape.
+        repo.loadAndApply()
+
+        // Assert — the persisted JSON is now the new array shape with no es/de.
+        val migrated = savedJsonFlow.value
+        assertTrue("patterns must be an array now", migrated.contains("[\"destroy target\"]"))
+        assertFalse("es label must be dropped", migrated.contains("Remoción"))
+        assertFalse("de label must be dropped", migrated.contains("Entfernung"))
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 6 — Concurrent upsert: mutex correctness (regression guard)
     //
@@ -316,8 +361,8 @@ class TagDictionaryRepositoryTest {
     @Test
     fun `given two concurrent upsert calls then both overrides are persisted without data loss`() = runTest {
         // Arrange
-        val overrideA = TagOverride(key = "flying",  labels = mapOf("en" to "Flying"),  patterns = emptyMap())
-        val overrideB = TagOverride(key = "trample", labels = mapOf("en" to "Trample"), patterns = emptyMap())
+        val overrideA = TagOverride(key = "flying",  labels = mapOf("en" to "Flying"),  patterns = emptyList())
+        val overrideB = TagOverride(key = "trample", labels = mapOf("en" to "Trample"), patterns = emptyList())
 
         // Act — launch both upserts concurrently
         val jobA = async { repo.upsert(overrideA) }
@@ -342,10 +387,10 @@ class TagDictionaryRepositoryTest {
     @Test
     fun `given concurrent upsert and delete when run simultaneously then final state is consistent`() = runTest {
         // Arrange — seed one existing override
-        repo.upsert(TagOverride(key = "flying", labels = mapOf("en" to "Flying"), patterns = emptyMap()))
+        repo.upsert(TagOverride(key = "flying", labels = mapOf("en" to "Flying"), patterns = emptyList()))
 
         // Act — concurrently add a new key and delete the existing one
-        val upsertJob = async { repo.upsert(TagOverride(key = "haste", labels = mapOf("en" to "Haste"), patterns = emptyMap())) }
+        val upsertJob = async { repo.upsert(TagOverride(key = "haste", labels = mapOf("en" to "Haste"), patterns = emptyList())) }
         val deleteJob = async { repo.delete("flying") }
         upsertJob.await()
         deleteJob.await()

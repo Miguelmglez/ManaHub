@@ -14,6 +14,7 @@ import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import com.mmg.manahub.core.online.domain.usecase.JoinSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -64,6 +65,7 @@ class LobbyJoinViewModelTest {
     private val leaveSessionUseCase      = mockk<LeaveSessionUseCase>(relaxed = true)
     private val repository               = mockk<OnlineSessionRepository>(relaxed = true)
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
+    private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val appContext               = mockk<Context>(relaxed = true)
 
     // Shared event flow reused across tests that need to emit realtime events
@@ -149,6 +151,7 @@ class LobbyJoinViewModelTest {
             leaveSessionUseCase      = leaveSessionUseCase,
             repository               = repository,
             userPreferencesDataStore = userPreferencesDataStore,
+            authRepository           = authRepository,
             appContext               = appContext,
         )
     }

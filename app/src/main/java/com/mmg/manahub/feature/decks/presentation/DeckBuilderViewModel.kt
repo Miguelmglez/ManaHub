@@ -144,7 +144,7 @@ class DeckMagicDetailViewModel @Inject constructor(
     val playerNameFlow: StateFlow<String> = userPrefsStore.playerNameFlow
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.Eagerly,
+            started = SharingStarted.WhileSubscribed(5_000),
             initialValue = "",
         )
 

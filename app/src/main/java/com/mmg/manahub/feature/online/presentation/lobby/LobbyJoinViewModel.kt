@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.feature.auth.domain.model.AuthResult
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
 import com.mmg.manahub.core.online.domain.model.ParticipantStatus
@@ -47,6 +50,7 @@ class LobbyJoinViewModel @Inject constructor(
     private val leaveSessionUseCase: LeaveSessionUseCase,
     private val repository: OnlineSessionRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val authRepository: AuthRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -161,6 +165,18 @@ class LobbyJoinViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+
+            // Ensure a Supabase session exists; sign in anonymously for guests.
+            if (authRepository.sessionState.value is SessionState.Unauthenticated) {
+                val anonResult = authRepository.signInAnonymously()
+                if (anonResult is AuthResult.Error) {
+                    val msg = anonResult.error.toString()
+                    crashlytics.log("online_session_anon_signin_failed: $msg")
+                    _uiState.update { it.copy(isLoading = false, error = mapBackendError(msg)) }
+                    return@launch
+                }
+            }
+
             crashlytics.log("online_session_join_started: code_length=${state.codeInput.length}")
 
             joinSessionUseCase(

@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.draft.domain.repository
 
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.feature.draft.domain.model.DraftSet
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.SetDraftGuide
 import com.mmg.manahub.feature.draft.domain.model.SetTierList

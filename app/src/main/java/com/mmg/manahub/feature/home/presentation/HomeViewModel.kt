@@ -3,9 +3,14 @@ package com.mmg.manahub.feature.home.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow
 import com.mmg.manahub.core.domain.model.CollectionStats
+import com.mmg.manahub.core.domain.model.CommunityStats
 import com.mmg.manahub.core.domain.model.DeckSummary
+import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.model.Rarity
+import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
@@ -13,37 +18,50 @@ import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
+import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
+import com.mmg.manahub.R
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+// Step ID constants are top-level in FirstStepItem.kt (same package — no import needed).
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import com.mmg.manahub.feature.news.domain.model.NewsItem as DomainNewsItem
 
 /**
- * Drives the free-first Home dashboard.
+ * Drives the customizable Home widget board.
  *
  * It composes existing repository flows (stats, decks, games, draft, tournaments,
- * news, auth, preferences) into a single [HomeUiState]. It introduces no new
- * network calls for startup and no new persistence tables.
+ * news, auth, preferences) into a single [HomeUiState]. The dashboard layout is a
+ * persisted, reorderable list of [WidgetInstance]s; edit mode is transient
+ * per-session and never persisted.
+ *
+ * No new Room tables and no startup-only network calls are introduced. Phase 2/3
+ * data slices are derived from existing repositories where available and degrade
+ * to empty/null where a backend source does not exist yet.
  *
  * The live in-memory active-game state is NOT injected here (the GameViewModel is
  * activity-scoped); [com.mmg.manahub.app.navigation.AppNavGraph] passes it into the
- * screen instead. This ViewModel therefore derives the hero from draft/summary
- * data, and the screen overrides the hero with an active game when one is running.
+ * screen instead.
  */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -55,15 +73,41 @@ class HomeViewModel @Inject constructor(
     private val draftSimRepository: DraftSimRepository,
     private val tournamentRepository: TournamentRepository,
     private val authRepository: AuthRepository,
+    private val cardRepository: com.mmg.manahub.core.domain.repository.CardRepository,
     private val getNewsFeedUseCase: GetNewsFeedUseCase,
+    private val refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
+    private val communityStatsRepository: CommunityStatsRepository,
+    private val draftRepository: DraftRepository,
+    private val wishlistRepository: WishlistRepository,
+    private val getAccountNudgeUseCase: GetAccountNudgeUseCase,
 ) : ViewModel() {
 
     /**
      * Externally-triggered ACTION_REQUIRED nudge (highest priority). Set when the
-     * user attempts an account-gated action (e.g. Friends/Trades) while signed out.
-     * Cleared on dismissal or successful authentication.
+     * user attempts an account-gated action while signed out. Cleared on dismissal
+     * or successful authentication.
      */
     private val actionRequiredMessage = MutableStateFlow<String?>(null)
+
+    /**
+     * Holds the random Scryfall cards fetched for the Discover/Card-of-the-day widgets.
+     * Populated lazily by [fetchRandomCardsIfNeeded]; empty until the first fetch
+     * succeeds, at which point [discoverSnapshotFlow] re-emits with the new cards.
+     */
+    private val discoverCardsFlow = MutableStateFlow<List<DiscoverCard>>(emptyList())
+
+    // ── First Steps carousel ──────────────────────────────────────────────────
+
+    /** Emits the set of step IDs the user has explicitly skipped. */
+    private val skippedFirstStepsFlow: Flow<Set<String>> =
+        userPrefsDataStore.observeSkippedFirstSteps()
+
+    // ── Authentication ────────────────────────────────────────────────────────
+
+    private val isAuthenticatedFlow: StateFlow<Boolean> =
+        authRepository.sessionState
+            .map { it is SessionState.Authenticated && !it.user.isAnonymous }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     // ── Derived source flows ────────────────────────────────────────────────────
 
@@ -76,17 +120,167 @@ class HomeViewModel @Inject constructor(
             statsRepository.observeCollectionStats(currency)
         }
 
-    // Shared hot flow: catches any DB/mapping error so a news failure never terminates uiState,
-    // and shares the single DAO subscription across reconnects (WhileSubscribed keeps it alive
-    // for the same 5-second window as the top-level combine).
-    private val recentNewsFlow: StateFlow<List<NewsItem>> =
+    private val recentNewsFlow: StateFlow<List<NewsItem>?> =
         getNewsFeedUseCase()
-            .map { items -> items.take(MAX_NEWS).map { it.toHomeNewsItem() } }
+            .map<List<NewsItem>, List<NewsItem>?> { items ->
+                items.take(MAX_NEWS)
+            }
+            .catch { emit(emptyList()) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * The persisted layout. The default is auth-dependent, so this re-resolves
+     * whenever auth state flips. Edit-mode is overlaid downstream, not here.
+     */
+    private val layoutFlow: Flow<List<WidgetInstance>> =
+        isAuthenticatedFlow.flatMapLatest { authed ->
+            userPrefsDataStore.homeLayoutFlow(defaultLayoutFor(authed))
+        }
+
+    // ── Stats / discover / social snapshots (catch-isolated) ────────────────────
+
+    /**
+     * Shared session history [StateFlow]. Declared before [performanceFlow] and
+     * [statsSnapshotFlow] (property init order) so both consumers can reference it
+     * without subscribing to the same Room live-query twice.
+     */
+    private val historyFlow: StateFlow<List<LocalSessionHistoryRow>> =
+        gameSessionRepository.observeLocalSessionHistory(HISTORY_LIMIT)
             .catch { emit(emptyList()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val performanceFlow: Flow<PerformanceDetails> = combine(
+        gameSessionRepository.observeAvgWinTurn(GLOBAL_SEAT).catch { emit(null) },
+        gameSessionRepository.observeAvgLifeOnWin().catch { emit(null) },
+        gameSessionRepository.observeAvgLifeOnLoss().catch { emit(null) },
+        historyFlow,
+    ) { avgWinTurn, avgLifeWin, avgLifeLoss, history ->
+        PerformanceDetails(
+            avgWinTurn = avgWinTurn,
+            avgLifeOnWin = avgLifeWin,
+            avgLifeOnLoss = avgLifeLoss,
+            longestGameMs = history.maxOfOrNull { it.durationMs },
+            mostGamesInOneDay = history
+                .groupBy { it.playedAt / DAY_MS }
+                .maxOfOrNull { it.value.size } ?: 0,
+        )
+    }
+
+    private val statsSnapshotFlow: Flow<StatsSnapshot> = combine(
+        gameSessionRepository.observeLocalWins().catch { emit(0) },
+        historyFlow,
+        gameSessionRepository.observeDeckStats().catch { emit(emptyList()) },
+        gameSessionRepository.observeMostFrequentElimination().catch { emit(null) },
+        performanceFlow,
+    ) { wins, history, deckStats, nemesis, performance ->
+        StatsSnapshot(
+            localWins = wins,
+            history = history,
+            deckStats = deckStats,
+            nemesis = nemesis,
+            performance = performance,
+        )
+    }
+
+    /**
+     * Latest draftable sets feed the spotlight/sets widgets.
+     *
+     * Converted to a [StateFlow] via [stateIn] so it never completes. A cold [flow] that emits
+     * once and completes would terminate the downstream [combine] block, silently freezing
+     * [uiState] after its first emission.
+     */
+    private val latestSetsFlow: StateFlow<List<DraftSet>> =
+        flow {
+            // Latest sets are cached locally by DraftRepository; failure degrades to empty.
+            val sets = runCatching {
+                when (val result = draftRepository.getDraftableSets()) {
+                    is com.mmg.manahub.core.domain.model.DataResult.Success -> result.data.take(LATEST_SETS_LIMIT)
+                    else -> emptyList()
+                }
+            }.getOrDefault(emptyList())
+            emit(sets)
+        }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Discover slice: latest sets plus the random Scryfall cards for the Discover and
+     * Card-of-the-day widgets. The card-of-the-day is the first random card, kept stable
+     * for the session once [discoverCardsFlow] is populated.
+     */
+    private val discoverSnapshotFlow: Flow<DiscoverSnapshot> =
+        combine(latestSetsFlow, discoverCardsFlow) { sets, cards ->
+            DiscoverSnapshot(
+                latestSets = sets,
+                discoverCards = cards,
+                cardOfTheDay = cards.firstOrNull(),
+            )
+        }
+
+    /** Social/community slice. Community stats are stubbed; trade summary not wired yet. */
+    private val socialSnapshotFlow: Flow<SocialSnapshot> =
+        isAuthenticatedFlow.flatMapLatest { authed ->
+            combine(
+                communityStatsRepository.observeCommunityStats().catch { emit(null) },
+                tradeSummaryFlow(authed),
+                activeTournamentFlow(authed),
+                wishlistFlow(authed),
+            ) { community, trade, tournament, wishlist ->
+                SocialSnapshot(
+                    community = community,
+                    tradeSummary = trade,
+                    activeTournament = tournament,
+                    wishlist = wishlist,
+                )
+            }
+        }
+
+    // TODO(home-trades): wire to TradesRepository pending-proposal count once exposed as a Flow.
+    private fun tradeSummaryFlow(authed: Boolean): Flow<TradeSummary?> = flowOf(null)
+
+    // Tournaments are local, so this is available regardless of auth state.
+    private fun activeTournamentFlow(authed: Boolean): Flow<TournamentSummary?> =
+        tournamentRepository.observeTournaments()
+            .map { tournaments -> tournaments.firstActiveSummary() }
+            .catch { emit(null) }
+
+    // TODO(home-wishlist): wire to WishlistRepository count/value once exposed as a Flow.
+    private fun wishlistFlow(authed: Boolean): Flow<WishlistStats?> =
+        if (!authed) flowOf(null)
+        else combine(
+            wishlistRepository.observeLocal(),
+            currencyFlow,
+        ) { entries, currency ->
+            if (entries.isEmpty()) return@combine WishlistStats(0, "", emptySet())
+
+            val totalValueUsd = entries.sumOf { (it.card?.priceUsd ?: 0.0) * it.quantity }
+            val totalValueEur = entries.sumOf { (it.card?.priceEur ?: 0.0) * it.quantity }
+
+            WishlistStats(
+                count = entries.sumOf { it.quantity },
+                estimatedValueDisplay = PriceFormatter.formatFromScryfall(
+                    priceUsd = totalValueUsd,
+                    priceEur = totalValueEur,
+                    preferredCurrency = currency,
+                ),
+                cards = entries
+                    .distinctBy { it.cardId }
+                    .take(WISHLIST_PREVIEW_LIMIT)
+                    .mapNotNull { entry ->
+                        val card = entry.card ?: return@mapNotNull null
+                        DiscoverCard(
+                            id = card.scryfallId,
+                            scryfallId = card.scryfallId,
+                            name = card.name,
+                            imageUrl = card.imageNormal,
+                            typeLine = card.typeLine,
+                        )
+                    }.toSet()
+            )
+        }.map<WishlistStats, WishlistStats?> { it }
+        .catch { emit(null) }
+
     private val uiState: StateFlow<HomeUiState> = run {
-        // combine() caps at a handful of args, so group inputs into intermediate flows.
         val libraryFlow = combine(
             collectionStatsFlow,
             deckRepository.observeAllDeckSummaries(),
@@ -113,35 +307,62 @@ class HomeViewModel @Inject constructor(
             actionRequiredMessage,
             userPrefsDataStore.avatarUrlFlow,
         ) { session, coolingDown, actionRequired, avatarUrl ->
+            val user = (session as? SessionState.Authenticated)?.user
             AccountSnapshot(
-                isAuthenticated = session is SessionState.Authenticated,
+                isAuthenticated = session is SessionState.Authenticated && !session.user.isAnonymous,
                 isCoolingDown = coolingDown,
                 actionRequiredMessage = actionRequired,
-                avatarUrl = avatarUrl,
+                avatarUrl = avatarUrl ?: user?.avatarUrl,
+                nickname = user?.nickname,
             )
         }
 
-        // Combine the five non-news inputs (all distinct types → typed 5-arg overload),
-        // then fold in the news flow with a 2-arg combine. This avoids the vararg
-        // combine, which would erase the element types to Array<Any?>.
         val coreFlow = combine(
             libraryFlow,
             activityFlow,
             accountFlow,
             userPrefsDataStore.observeQuickStartActions(),
             userPrefsDataStore.playerNameFlow,
-        ) { library, activity, account, quickStart, playerName ->
-            CoreSnapshot(library, activity, account, quickStart, playerName)
+            skippedFirstStepsFlow,
+        ) { args ->
+            // combine(6 flows) uses the vararg overload — destructure manually.
+            @Suppress("UNCHECKED_CAST")
+            val library    = args[0] as LibrarySnapshot
+            @Suppress("UNCHECKED_CAST")
+            val activity   = args[1] as ActivitySnapshot
+            @Suppress("UNCHECKED_CAST")
+            val account    = args[2] as AccountSnapshot
+            @Suppress("UNCHECKED_CAST")
+            val quickStart = args[3] as List<QuickStartAction>
+            @Suppress("UNCHECKED_CAST")
+            val playerName = args[4] as String
+            @Suppress("UNCHECKED_CAST")
+            val skipped    = args[5] as Set<String>
+
+            val effectivePlayerName = account.nickname ?: playerName
+            CoreSnapshot(library, activity, account, quickStart, effectivePlayerName, skipped)
         }
 
-        combine(coreFlow, recentNewsFlow) { core, news ->
+        // Bundle the Phase 2/3 data slices into one typed combine, then fold that
+        // bundle into the core slice. Using only the typed (non-vararg) combine
+        // overloads keeps element types intact (no Array<Any?> erasure / casts).
+        val dataFlow = combine(
+            layoutFlow,
+            statsSnapshotFlow,
+            discoverSnapshotFlow,
+            socialSnapshotFlow,
+        ) { layout, stats, discover, social ->
+            DataBundle(layout = layout, stats = stats, discover = discover, social = social)
+        }
+
+        combine(coreFlow, recentNewsFlow, dataFlow) { core, news, data ->
             buildUiState(
-                library = core.library,
-                activity = core.activity,
-                account = core.account,
-                quickStart = core.quickStart,
-                playerName = core.playerName,
+                core = core,
                 news = news,
+                layout = data.layout,
+                stats = data.stats,
+                discover = data.discover,
+                social = data.social,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -154,185 +375,374 @@ class HomeViewModel @Inject constructor(
     val state: StateFlow<HomeUiState> get() = uiState
 
     init {
-        // Clear any pending account-required nudge once the user is authenticated.
         authRepository.sessionState
             .onEach { session ->
                 if (session is SessionState.Authenticated) actionRequiredMessage.value = null
             }
             .launchIn(viewModelScope)
+        // Trigger a background news refresh so the widget has data even on first open,
+        // before the user has ever visited the News tab. The freshness check inside
+        // refreshAll() (1-hour window) prevents redundant network calls.
+        viewModelScope.launch { runCatching { refreshNewsFeedUseCase() } }
+        // Populate the Discover / Card-of-the-day widgets with random Scryfall cards.
+        fetchRandomCardsIfNeeded()
+    }
+
+    /**
+     * Lazily fetches a batch of random Scryfall cards for the Discover and
+     * Card-of-the-day widgets. No-op once [discoverCardsFlow] already holds cards,
+     * so the card-of-the-day stays stable for the session and re-fetches are avoided.
+     *
+     * Rate limiting is handled inside [CardRepository] (every Scryfall call is wrapped
+     * in [com.mmg.manahub.core.network.ScryfallRequestQueue]), so no extra guard is
+     * needed here. Failures degrade silently to an empty list.
+     */
+    private fun fetchRandomCardsIfNeeded() {
+        if (discoverCardsFlow.value.isNotEmpty()) return
+        viewModelScope.launch {
+            val result = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1) }
+                .getOrNull()
+            val cards = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
+                ?.data
+                ?.take(DISCOVER_CARD_COUNT)
+                ?.map { card ->
+                    DiscoverCard(
+                        id = card.scryfallId,
+                        scryfallId = card.scryfallId,
+                        name = card.name,
+                        imageUrl = card.imageArtCrop ?: card.imageNormal,
+                        typeLine = card.typeLine,
+                    )
+                }
+                .orEmpty()
+            if (cards.isNotEmpty()) discoverCardsFlow.value = cards
+        }
     }
 
     // ── Public intents ──────────────────────────────────────────────────────────
 
+    /** Routes a board-mutating [HomeAction]; navigation actions are handled by the caller. */
+    fun onAction(action: HomeAction) {
+        when (action) {
+            is HomeAction.MoveWidget -> moveWidget(action.from, action.to)
+            is HomeAction.UpdateLayout -> persistLayout(action.layout)
+            is HomeAction.AddWidget -> addWidget(action.type)
+            is HomeAction.RemoveWidget -> removeWidget(action.type)
+            HomeAction.ResetLayout -> resetLayout()
+            is HomeAction.SkipFirstStep -> skipFirstStep(action.stepId)
+            HomeAction.RateApp -> Unit // no-op; UI handles the store deep link
+            else -> Unit // navigation intents are resolved by AppNavGraph
+        }
+    }
+
     /** Persists a newly chosen set of exactly four Quick Start actions. */
     fun saveQuickStartActions(actions: List<QuickStartAction>) {
-        viewModelScope.launch {
-            userPrefsDataStore.saveQuickStartActions(actions)
-        }
+        viewModelScope.launch { userPrefsDataStore.saveQuickStartActions(actions) }
+    }
+
+    /**
+     * Persists [stepId] as skipped. The DataStore re-emits [skippedFirstStepsFlow],
+     * which causes [buildVisibleSteps] to drop this step from the carousel on the
+     * next [uiState] emission.
+     */
+    fun skipFirstStep(stepId: String) {
+        viewModelScope.launch { userPrefsDataStore.skipFirstStep(stepId) }
     }
 
     /** Dismisses the current account nudge, starting its 48-hour cooldown. */
     fun dismissAccountNudge() {
         actionRequiredMessage.value = null
-        viewModelScope.launch {
-            userPrefsDataStore.dismissAccountNudge()
-        }
+        viewModelScope.launch { userPrefsDataStore.dismissAccountNudge() }
     }
 
-    /**
-     * Raises a high-priority ACTION_REQUIRED nudge. Call when the user taps an
-     * account-gated entry point (Friends/Trades) while unauthenticated.
-     */
+    /** Raises a high-priority ACTION_REQUIRED nudge. */
     fun triggerActionRequiredNudge(message: String) {
         actionRequiredMessage.value = message
+    }
+
+    // ── Layout mutations ──────────────────────────────────────────────────────
+    //
+    // Each reducer reads the latest layout from uiState (the single source of truth),
+    // produces a new list, and immediately persists it. DataStore then re-emits and
+    // the new layout flows back into uiState — there is no separate in-memory copy
+    // to drift out of sync.
+
+    private fun moveWidget(from: Int, to: Int) {
+        val current = uiState.value.layout
+        if (from == to) return
+        if (from !in current.indices || to !in current.indices) return
+        val mutable = current.toMutableList()
+        val item = mutable.removeAt(from)
+        mutable.add(to, item)
+        persistLayout(mutable)
+    }
+
+    private fun addWidget(type: HomeWidgetType) {
+        val current = uiState.value.layout
+        if (current.any { it.type == type }) return
+        val size = type.defaultSize()
+        persistLayout(current + WidgetInstance(type, size))
+    }
+
+    private fun removeWidget(type: HomeWidgetType) {
+        if (type.isAlwaysPresent) return
+        persistLayout(uiState.value.layout.filterNot { it.type == type })
+    }
+
+    private fun resetLayout() {
+        persistLayout(defaultLayoutFor(isAuthenticatedFlow.value))
+    }
+
+    private fun persistLayout(layout: List<WidgetInstance>) {
+        viewModelScope.launch { userPrefsDataStore.saveHomeLayout(layout) }
     }
 
     // ── Reduction ─────────────────────────────────────────────────────────────
 
     private fun buildUiState(
-        library: LibrarySnapshot,
-        activity: ActivitySnapshot,
-        account: AccountSnapshot,
-        quickStart: List<QuickStartAction>,
-        playerName: String,
-        news: List<NewsItem>,
+        core: CoreSnapshot,
+        news: List<NewsItem>?,
+        layout: List<WidgetInstance>,
+        stats: StatsSnapshot,
+        discover: DiscoverSnapshot,
+        social: SocialSnapshot,
     ): HomeUiState {
-        val stats = library.stats
-        val deckCount = library.decks.size
+        val collectionStats = core.library.stats
+        val deckCount = core.library.decks.size
 
         val libraryStats = LibraryStats(
-            uniqueCards = stats.uniqueCards,
+            totalCards = collectionStats.totalCards,
+            uniqueCards = collectionStats.uniqueCards,
             deckCount = deckCount,
             estimatedValueDisplay = PriceFormatter.formatFromScryfall(
-                priceUsd = stats.totalValueUsd,
-                priceEur = stats.totalValueEur,
-                preferredCurrency = library.currency,
+                priceUsd = collectionStats.totalValueUsd,
+                priceEur = collectionStats.totalValueEur,
+                preferredCurrency = core.library.currency,
             ),
         )
 
-        val hero = resolveHero(activity, playerName)
-        val continueItems = buildContinueItems(activity, library.decks)
-        val nudge = resolveNudge(account, stats, deckCount, activity.totalGames)
+        val cardCount = collectionStats.uniqueCards
+        val deckCountForSteps = deckCount
+        val friendCount = 0 // Phase 3: communityStats friend count not yet exposed as a Flow.
+        val isProfileComplete = !core.account.avatarUrl.isNullOrBlank()
+            && core.playerName != "Wizard"
+            && core.playerName.isNotBlank()
+
+        val visibleSteps = buildVisibleSteps(
+            isAuthenticated = core.account.isAuthenticated,
+            cardCount = cardCount,
+            deckCount = deckCountForSteps,
+            friendCount = friendCount,
+            isProfileComplete = isProfileComplete,
+            skipped = core.skippedFirstSteps,
+        )
+
+        val hero = resolveHero(core.activity, core.playerName, visibleSteps)
+        val nudge = resolveNudge(core.account, collectionStats, deckCount, core.activity.totalGames)
 
         return HomeUiState(
             isLoading = false,
             hero = hero,
-            quickStartActions = quickStart,
-            continueItems = continueItems,
+            quickStartActions = core.quickStart,
             libraryStats = libraryStats,
             recentNews = news,
             accountNudge = nudge,
-            isAuthenticated = account.isAuthenticated,
-            avatarUrl = account.avatarUrl,
+            isAuthenticated = core.account.isAuthenticated,
+            playerName = core.playerName,
+            avatarUrl = core.account.avatarUrl,
+            // Board
+            layout = layout,
+            // Phase 2
+            lastGameRecap = stats.history.firstOrNull()?.toRecap(),
+            playStreak = stats.history.toPlayStreak(),
+            winRate = toWinRate(stats),
+            bestDeck = toBestDeck(stats),
+            nemesis = toNemesis(stats),
+            performanceDetails = stats.performance,
+            collectionByColor = collectionStats.byColor.toColorMap(),
+            collectionByRarity = collectionStats.byRarity.toRarityMap(),
+            discoverCards = discover.discoverCards,
+            cardOfTheDay = discover.cardOfTheDay,
+            latestSets = discover.latestSets,
+            wishlistStats = social.wishlist,
+            decks = core.library.decks,
+            // Phase 3
+            communityStats = social.community,
+            tradeSummary = social.tradeSummary,
+            activeTournamentSummary = social.activeTournament,
+        )
+    }
+
+    // ── Stats → widget model mappers (members so they can see StatsSnapshot) ────
+
+    private fun toWinRate(stats: StatsSnapshot): WinRateStats? {
+        val total = stats.history.size
+        if (total == 0) return null
+        return WinRateStats(
+            wins = stats.localWins,
+            totalGames = total,
+            recentResults = stats.history.take(WIN_SPARK_COUNT).map { it.localIsWinner },
+        )
+    }
+
+    private fun toBestDeck(stats: StatsSnapshot): BestDeckStats? {
+        val best = stats.deckStats
+            .filter { it.totalGames > 0 && !it.deckName.isNullOrBlank() }
+            .maxByOrNull { row ->
+                // Rank by win rate, breaking ties by total games played.
+                (row.wins.toDouble() / row.totalGames) * 1000 + row.totalGames
+            } ?: return null
+        return BestDeckStats(
+            deckId = best.deckId,
+            deckName = best.deckName ?: "",
+            wins = best.wins,
+            losses = (best.totalGames - best.wins).coerceAtLeast(0),
+        )
+    }
+
+    private fun toNemesis(stats: StatsSnapshot): NemesisStats? {
+        val elimination = stats.nemesis ?: return null
+        val totalLosses = stats.history.count { !it.localIsWinner }
+        return NemesisStats(
+            archetype = elimination.eliminationReason,
+            count = elimination.count,
+            totalLosses = totalLosses,
         )
     }
 
     /**
-     * Hero priority (active game is layered on at the screen level since it lives
-     * in the activity-scoped GameViewModel): active draft > returning summary >
-     * welcome.
+     * Filters [ALL_FIRST_STEPS] down to the steps that:
+     *   1. Have not been skipped by the user ([skipped] set), and
+     *   2. Meet their show condition based on the current app state.
+     *
+     * The output list preserves the canonical order defined in [ALL_FIRST_STEPS].
+     *
+     * @param isAuthenticated Whether the user is signed in (non-anonymous).
+     * @param cardCount       Number of unique cards in the local collection.
+     * @param deckCount       Number of decks the user has created.
+     * @param friendCount     Number of accepted friends; default 0 when not yet loaded.
+     * @param isProfileComplete True when avatar + non-default name are set.
+     * @param skipped         Set of step IDs the user has already skipped.
      */
-    private fun resolveHero(activity: ActivitySnapshot, playerName: String): HomeHeroState {
-        val draft = activity.activeDraft
-        if (draft != null && draft.status == DraftStatus.DRAFTING) {
-            return HomeHeroState.ActiveDraft(setName = draft.config.setCode.uppercase())
-        }
-        return if (activity.totalGames > 0 && playerName.isNotBlank()) {
-            HomeHeroState.Summary(playerName = playerName, totalGames = activity.totalGames)
-        } else if (activity.totalGames > 0) {
-            HomeHeroState.Summary(playerName = "Wizard", totalGames = activity.totalGames)
-        } else {
-            HomeHeroState.Welcome
-        }
-    }
-
-    private fun buildContinueItems(
-        activity: ActivitySnapshot,
-        decks: List<DeckSummary>,
-    ): List<ContinueItem> = buildList {
-        activity.activeDraft?.let { draft ->
-            if (draft.status == DraftStatus.DRAFTING) {
-                add(
-                    ContinueItem(
-                        id = draft.config.setCode,
-                        label = "Continue draft",
-                        subtitle = "Pack ${draft.round}, pick ${draft.pickNumber}",
-                        type = ContinueType.DRAFT,
-                    )
-                )
-            }
-        }
-        if (activity.activeTournaments > 0) {
-            add(
-                ContinueItem(
-                    id = "tournaments",
-                    label = "Resume tournament",
-                    subtitle = if (activity.activeTournaments == 1) {
-                        "1 in progress"
-                    } else {
-                        "${activity.activeTournaments} in progress"
-                    },
-                    type = ContinueType.TOURNAMENT,
-                )
-            )
-        }
-        decks.firstOrNull()?.let { deck ->
-            add(
-                ContinueItem(
-                    id = deck.id,
-                    label = deck.name,
-                    subtitle = "${deck.cardCount} cards",
-                    type = ContinueType.DECK,
-                )
-            )
+    private fun buildVisibleSteps(
+        isAuthenticated: Boolean,
+        cardCount: Int,
+        deckCount: Int,
+        friendCount: Int,
+        isProfileComplete: Boolean,
+        skipped: Set<String>,
+    ): List<FirstStepItem> = ALL_FIRST_STEPS.filter { step ->
+        if (step.id in skipped) return@filter false
+        when (step.id) {
+            STEP_FIRST_ADD_CARD        -> cardCount == 0
+            STEP_FIRST_SCAN_CARD       -> true
+            STEP_FIRST_CREATE_ACCOUNT  -> !isAuthenticated
+            STEP_FIRST_CREATE_DECK     -> deckCount == 0
+            STEP_FIRST_PLAYTEST_DECK   -> deckCount > 0
+            STEP_FIRST_ADD_FRIEND      -> isAuthenticated
+            STEP_FIRST_REVIEW_FRIEND   -> isAuthenticated && friendCount > 0
+            STEP_FIRST_PLAY_GAME       -> true
+            STEP_FIRST_COLLECTION_STATS -> cardCount > 0
+            STEP_FIRST_DRAFT_GUIDE     -> true
+            STEP_FIRST_NEWS            -> true
+            STEP_FIRST_CREATE_TRADE    -> isAuthenticated && friendCount > 0 && cardCount > 0
+            STEP_FIRST_ADD_WISHLIST    -> true
+            STEP_FIRST_OPEN_FOR_TRADE  -> cardCount > 0
+            STEP_FIRST_PREFERENCES     -> true
+            STEP_FIRST_COMPLETE_PROFILE -> isAuthenticated && !isProfileComplete
+            STEP_FIRST_RATE_APP        -> true
+            else                       -> false
         }
     }
 
     /**
-     * Selects the single active account nudge by priority. Returns null when the
-     * user is authenticated, the cooldown is active, or no trigger fires.
+     * Resolves the hero state following the priority order:
+     *   ActiveGame (injected by caller) > ActiveDraft > Welcome(steps non-empty)
+     *   > Summary > Welcome(empty = completion card).
+     *
+     * [visibleSteps] drives the Welcome branch: when non-empty the carousel is shown;
+     * when empty and the user has played games the Summary is preferred; when empty and
+     * no games have been played we fall back to the Welcome completion card.
      */
+    private fun resolveHero(
+        activity: ActivitySnapshot,
+        playerName: String,
+        visibleSteps: List<FirstStepItem>,
+    ): HomeHeroState {
+        val draft = activity.activeDraft
+        if (draft != null && draft.status == DraftStatus.DRAFTING) {
+            return HomeHeroState.ActiveDraft(setName = draft.config.setCode.uppercase())
+        }
+        // Show the First Steps carousel whenever the user still has things to discover.
+        if (visibleSteps.isNotEmpty()) {
+            return HomeHeroState.Welcome(steps = visibleSteps)
+        }
+        // All steps done: prefer the Summary if the user has any games tracked.
+        return if (activity.totalGames > 0) {
+            val name = if (playerName.isNotBlank()) playerName else "Wizard"
+            HomeHeroState.Summary(playerName = name, totalGames = activity.totalGames)
+        } else {
+            // No games and no pending steps: show the completion card.
+            HomeHeroState.Welcome(steps = emptyList())
+        }
+    }
+
     private fun resolveNudge(
         account: AccountSnapshot,
         stats: CollectionStats,
         deckCount: Int,
         totalGames: Int,
     ): AccountNudge? {
-        if (account.isAuthenticated) return null
+        val trigger = getAccountNudgeUseCase(
+            isAuthenticated = account.isAuthenticated,
+            isCoolingDown = account.isCoolingDown,
+            actionRequired = account.actionRequiredMessage,
+            uniqueCards = stats.uniqueCards,
+            deckCount = deckCount,
+            totalGames = totalGames,
+        ) ?: return null
 
-        // 1. ACTION_REQUIRED bypasses the cooldown — the user just hit a hard wall.
-        account.actionRequiredMessage?.let {
-            return AccountNudge(message = it, trigger = NudgeTrigger.ACTION_REQUIRED)
+        return when (trigger) {
+            NudgeTrigger.ACTION_REQUIRED ->
+                AccountNudge(message = account.actionRequiredMessage, trigger = trigger)
+            NudgeTrigger.COLLECTION_MILESTONE ->
+                AccountNudge(messageRes = R.string.home_nudge_collection, trigger = trigger)
+            NudgeTrigger.DECK_MILESTONE ->
+                AccountNudge(messageRes = R.string.home_nudge_decks, trigger = trigger)
+            NudgeTrigger.GAME_MILESTONE ->
+                AccountNudge(messageRes = R.string.home_nudge_games, trigger = trigger)
+            NudgeTrigger.SYNC_PENDING ->
+                AccountNudge(messageRes = R.string.home_nudge_games, trigger = trigger)
         }
-
-        if (account.isCoolingDown) return null
-
-        // 2. SYNC_PENDING — no local "unsynced changes" signal is exposed yet.
-        // TODO(home): surface a SYNC_PENDING nudge once a pending-changes flow exists.
-
-        // 3. COLLECTION_MILESTONE
-        if (stats.uniqueCards >= COLLECTION_MILESTONE) {
-            return AccountNudge(
-                message = "Back up your collection so it's safe across devices.",
-                trigger = NudgeTrigger.COLLECTION_MILESTONE,
-            )
-        }
-        // 4. DECK_MILESTONE
-        if (deckCount >= DECK_MILESTONE) {
-            return AccountNudge(
-                message = "Sync your decks to keep them on every device.",
-                trigger = NudgeTrigger.DECK_MILESTONE,
-            )
-        }
-        // 5. GAME_MILESTONE
-        if (totalGames >= GAME_MILESTONE) {
-            return AccountNudge(
-                message = "Keep your match history across devices.",
-                trigger = NudgeTrigger.GAME_MILESTONE,
-            )
-        }
-        return null
     }
+
+    // ── Default layouts ──────────────────────────────────────────────────────
+
+    private fun defaultLayoutFor(authenticated: Boolean): List<WidgetInstance> =
+        if (authenticated) defaultLayoutSignedIn else defaultLayoutSignedOut
+
+    private val defaultLayoutSignedOut = listOf(
+        WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.DISCOVER_CARDS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.LATEST_SETS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.MTG_NEWS, WidgetSize.MEDIUM),
+    )
+
+    private val defaultLayoutSignedIn = listOf(
+        WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.YOUR_DECKS_SHELF, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.SOCIAL_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.TRADES_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.MTG_NEWS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.LATEST_SETS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
+    )
 
     // ── Internal snapshots ──────────────────────────────────────────────────────
 
@@ -342,6 +752,8 @@ class HomeViewModel @Inject constructor(
         val account: AccountSnapshot,
         val quickStart: List<QuickStartAction>,
         val playerName: String,
+        /** Step IDs the user has explicitly skipped in the First Steps carousel. */
+        val skippedFirstSteps: Set<String> = emptySet(),
     )
 
     private data class LibrarySnapshot(
@@ -361,16 +773,121 @@ class HomeViewModel @Inject constructor(
         val isCoolingDown: Boolean,
         val actionRequiredMessage: String?,
         val avatarUrl: String? = null,
+        val nickname: String? = null,
     )
 
-    private companion object {
-        const val MAX_NEWS = 3
-        const val COLLECTION_MILESTONE = 10
-        const val DECK_MILESTONE = 2
-        const val GAME_MILESTONE = 3
+    private data class DataBundle(
+        val layout: List<WidgetInstance>,
+        val stats: StatsSnapshot,
+        val discover: DiscoverSnapshot,
+        val social: SocialSnapshot,
+    )
+
+    private data class StatsSnapshot(
+        val localWins: Int,
+        val history: List<LocalSessionHistoryRow>,
+        val deckStats: List<com.mmg.manahub.core.data.local.dao.DeckStatsRow>,
+        val nemesis: com.mmg.manahub.core.data.local.dao.EliminationCount?,
+        val performance: PerformanceDetails,
+    )
+
+    private data class DiscoverSnapshot(
+        val latestSets: List<DraftSet>,
+        val discoverCards: List<DiscoverCard> = emptyList(),
+        val cardOfTheDay: DiscoverCard? = null,
+    )
+
+    private data class SocialSnapshot(
+        val community: CommunityStats?,
+        val tradeSummary: TradeSummary?,
+        val activeTournament: TournamentSummary?,
+        val wishlist: WishlistStats?,
+    )
+
+    companion object {
+        /** Maximum number of news items shown on the Home dashboard widget. */
+        const val MAX_NEWS = 10
+
+        private const val HISTORY_LIMIT = 60
+        private const val LATEST_SETS_LIMIT = 8
+        private const val WIN_SPARK_COUNT = 5
+        private const val DAY_MS = 24L * 60L * 60L * 1000L
+        private const val GLOBAL_SEAT = "Wizard"
+
+        /** Scryfall query used to surface random cards in the Discover widget. */
+        private const val DISCOVER_RANDOM_QUERY = "order:random"
+
+        /** Number of random cards fetched for the Discover widget. */
+        private const val DISCOVER_CARD_COUNT = 10
+
+        private const val WISHLIST_PREVIEW_LIMIT = 10
     }
 }
 
-/** Maps the rich domain news model into the compact Home wrapper. */
-private fun DomainNewsItem.toHomeNewsItem(): NewsItem =
-    NewsItem(id = id, title = title, imageUrl = imageUrl)
+// ─────────────────────────────────────────────────────────────────────────────
+//  Mapping helpers (top-level, pure)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Mapping helper removed — Home now uses rich NewsItem directly.
+
+private fun LocalSessionHistoryRow.toRecap(): LastGameRecap = LastGameRecap(
+    won = localIsWinner,
+    deckName = localDeckName,
+    mode = mode,
+    durationMs = durationMs,
+    opponentCount = 0, // opponent count is not exposed by the history row
+)
+
+/** Streak from most-recent-first history: counts the leading run of wins; longest run anywhere. */
+private fun List<LocalSessionHistoryRow>.toPlayStreak(): PlayStreak? {
+    if (isEmpty()) return null
+    val current = takeWhile { it.localIsWinner }.size
+    var longest = 0
+    var run = 0
+    for (row in this) {
+        if (row.localIsWinner) {
+            run++
+            longest = maxOf(longest, run)
+        } else {
+            run = 0
+        }
+    }
+    return PlayStreak(current = current, longest = longest, isWinStreak = true)
+}
+
+/** Stable WUBRG-ordered string keys for the collection-by-color widget. */
+private fun Map<MtgColor, Int>.toColorMap(): Map<String, Int> =
+    buildMap {
+        // Preserve WUBRG order; include colorless (token 'C').
+        listOf(MtgColor.W, MtgColor.U, MtgColor.B, MtgColor.R, MtgColor.G).forEach { color ->
+            put(color.name, this@toColorMap[color] ?: 0)
+        }
+        put("C", this@toColorMap[MtgColor.COLORLESS] ?: 0)
+    }
+
+/** Rarity counts keyed by canonical rarity name for the collection-by-rarity widget. */
+private fun Map<Rarity, Int>.toRarityMap(): Map<String, Int> =
+    buildMap {
+        listOf(Rarity.COMMON, Rarity.UNCOMMON, Rarity.RARE, Rarity.MYTHIC).forEach { rarity ->
+            put(rarity.name, this@toRarityMap[rarity] ?: 0)
+        }
+    }
+
+/** Resolves the first active/setup tournament into a compact summary, or null. */
+private fun List<com.mmg.manahub.core.data.local.entity.TournamentEntity>.firstActiveSummary(): TournamentSummary? {
+    val active = firstOrNull { it.status == "ACTIVE" || it.status == "SETUP" } ?: return null
+    return TournamentSummary(
+        tournamentId = active.id,
+        name = active.name,
+        round = 0, // current round is not denormalised on the entity
+        standing = null,
+    )
+}
+
+/** The size used when a widget is added from the gallery: MEDIUM if supported, else its first size. */
+private fun HomeWidgetType.defaultSize(): WidgetSize =
+    when {
+        WidgetSize.MEDIUM in supportedSizes -> WidgetSize.MEDIUM
+        WidgetSize.SMALL in supportedSizes -> WidgetSize.SMALL
+        else -> supportedSizes.first()
+    }

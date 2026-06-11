@@ -13,6 +13,9 @@ package com.mmg.manahub.feature.auth.domain.model
  *   The Supabase trigger [handle_new_user] creates the profile row with this field set to FALSE
  *   for every new auth.users entry (including Google OAuth). It is set to TRUE only after the
  *   user explicitly completes sign-up via the [complete_user_profile] RPC.
+ * @param isAnonymous True when this session was created via anonymous sign-in (Supabase anonymous
+ *   auth). Anonymous users do not have a [user_profiles] row and cannot access account-gated
+ *   features.
  */
 data class AuthUser(
     val id: String,
@@ -22,4 +25,5 @@ data class AuthUser(
     val avatarUrl: String?,
     val provider: String,
     val profileCompleted: Boolean = false,
+    val isAnonymous: Boolean = false,
 )

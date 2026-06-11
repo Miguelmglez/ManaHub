@@ -1862,7 +1862,7 @@ private fun CustomTagCreatorSection(
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(allCategories) { cat ->
+                items(allCategories, key = { it }) { cat ->
                     FilterChip(
                         selected = cat == selectedCategoryKey,
                         onClick = { onCategorySelected(cat) },

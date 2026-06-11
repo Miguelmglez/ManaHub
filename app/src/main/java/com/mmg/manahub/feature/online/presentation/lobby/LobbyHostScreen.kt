@@ -539,7 +539,7 @@ private fun GameModeSelector(
     ty: MagicTypography,
 ) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(GameMode.entries) { mode ->
+        items(GameMode.entries, key = { it.name }) { mode ->
             FilterChip(
                 selected = selectedMode == mode,
                 onClick = { onModeSelected(mode) },
@@ -895,7 +895,7 @@ private fun HostThemeSelector(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(horizontal = 4.dp),
     ) {
-        items(PlayerTheme.ALL) { theme ->
+        items(PlayerTheme.ALL, key = { it.name }) { theme ->
             val isSelected = theme.name == selectedKey
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

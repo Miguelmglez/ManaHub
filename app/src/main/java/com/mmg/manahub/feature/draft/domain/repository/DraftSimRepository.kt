@@ -4,6 +4,7 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.feature.draft.domain.model.DraftResult
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet
+import com.mmg.manahub.feature.draft.domain.model.EngineConfig
 import kotlinx.coroutines.flow.Flow
 
 interface DraftSimRepository {
@@ -14,6 +15,13 @@ interface DraftSimRepository {
      * Also pre-warms Coil image cache for the set's cards (respects ≤10 req/s Scryfall limit).
      */
     suspend fun getDraftableSimSet(setCode: String): DataResult<DraftableSet>
+
+    /**
+     * Loads the set's archetype decision engine (`engine.json`), or null when the set has
+     * none (the bot then falls back to the heuristic drafter). Result is cached in memory —
+     * including the null/absent case — so repeated bot picks never re-hit the network.
+     */
+    suspend fun getEngineConfig(setCode: String): EngineConfig?
 
     /** Emits the in-progress [DraftState] for the active session, or null if none. */
     fun observeActiveSession(): Flow<DraftState?>
