@@ -46,7 +46,7 @@ fun CardListItem(
     modifier: Modifier = Modifier,) {
     CardListItem(
         name = item.card.name,
-        imageUrl = item.card.imageArtCrop ?: item.card.imageNormal,
+        imageUrl = item.card.imageNormal,
         priceUsd = if (item.hasFoil) item.card.priceUsdFoil else item.card.priceUsd,
         priceEur = if (item.hasFoil) item.card.priceEurFoil else item.card.priceEur,
         quantityText = "×${item.totalQuantity}",

@@ -3,9 +3,11 @@ package com.mmg.manahub.feature.draft.di
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl
 import com.mmg.manahub.feature.draft.data.DraftSimRepositoryImpl
+import com.mmg.manahub.feature.draft.data.engine.ArchetypeAwareBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder
@@ -25,7 +27,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.serialization.json.Json
 import okhttp3.Cache
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -64,10 +68,14 @@ abstract class DraftModule {
         // Draft Simulator engine graph
         // -----------------------------------------------------------------------
 
-        /** Heuristic bot drafter shared across a draft session (stateful per-seat learning). */
+        /**
+         * The archetype-aware bot drafter, composed with the heuristic drafter as its fallback for
+         * sets without an engine.json. Stateless and shared across draft sessions.
+         */
         @Provides
         @Singleton
-        fun provideBotDrafter(): BotDrafter = HeuristicBotDrafter()
+        fun provideBotDrafter(): BotDrafter =
+            ArchetypeAwareBotDrafter(fallback = HeuristicBotDrafter())
 
         /** Weighted booster generator using the default (non-seeded) RNG in production. */
         @Provides
@@ -98,10 +106,12 @@ abstract class DraftModule {
             val youtubeClient = client.newBuilder()
                 .addInterceptor(YouTubeApiKeyInterceptor(BuildConfig.YOUTUBE_API_KEY))
                 .build()
+            // YouTubeDto is @Serializable — uses kotlinx.serialization converter.
+            val youtubeJson = Json { ignoreUnknownKeys = true }
             return Retrofit.Builder()
                 .baseUrl("https://www.googleapis.com/youtube/v3/")
                 .client(youtubeClient)
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(youtubeJson.asConverterFactory("application/json".toMediaType()))
                 .build()
         }
 

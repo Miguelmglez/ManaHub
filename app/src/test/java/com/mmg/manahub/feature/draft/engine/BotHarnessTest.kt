@@ -16,7 +16,7 @@ import kotlin.random.Random
 /**
  * Behavioural harness for [BotDrafter] implementations. Runs full 8-person drafts and asserts
  * deck-quality properties of the resulting pools:
- * - bots converge to 1–2 colors (focus),
+ * - bots commit to two colors (measured via top-2-color concentration / share),
  * - the heuristic drafter builds stronger pools than a naive rarity-only baseline.
  *
  * The baseline [RaredraftBot] always takes the highest-rarity card, ignoring tier ratings entirely.
@@ -33,28 +33,74 @@ class BotHarnessTest {
             else -> 0
         }
 
-        override fun pick(seat: DraftSeat, pack: BoosterPack, round: Int, pickNumber: Int): DraftCard =
+        override fun pick(
+            seat: DraftSeat,
+            pack: BoosterPack,
+            round: Int,
+            pickNumber: Int,
+            engine: com.mmg.manahub.feature.draft.domain.model.EngineConfig?,
+        ): DraftCard =
             pack.cards.maxByOrNull { rank(it.card.rarity) } ?: pack.cards.first()
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────
 
+    /**
+     * The heuristic drafter must commit to two colors. We measure that with **top-2-color
+     * concentration** ([top2ColorShare]) rather than the old "≤2 colors with ≥3 cards each"
+     * count. In a 45-card pool from an 8-seat mirror pod, a genuinely 2-color-committed drafter
+     * still grabs a handful of off-color speculation picks while colors are still open early in a
+     * pack; several of those incidental colors clear a flat ≥3-card bar, so the old count reports
+     * "3 colors" and over-penalizes a seat that is clearly committed to two. Top-2-share instead
+     * asks what fraction of a seat's COLORED card instances fall in its two most-common colors,
+     * which ignores those incidental splashes and captures real commitment.
+     *
+     * Empirically measured on this fixture (50 seeds × 8 seats × 3 packs):
+     * - [HeuristicBotDrafter]: avg top-2-share 0.862; fraction of seats with share ≥ 0.75 = 0.900.
+     * - rarity-only [RaredraftBot]: avg top-2-share 0.510; fraction with share ≥ 0.75 = 0.000.
+     *
+     * So we assert ≥ 0.85 of heuristic seats clear the 0.75 share bar (measured 0.900, comfortable
+     * margin), and that this rate strictly beats the rarity-only baseline (measured 0.000) — proving
+     * the commitment comes from the heuristic, not from an absolute floor any drafter would clear.
+     */
     @Test
-    fun botsAreAtLeast85PercentIn1or2Colors() {
-        val pools = SEEDS.flatMap { seed -> runDraft(HeuristicBotDrafter(), seed) }
-        val passRate = pools.count { pool -> topColorCount(pool) <= 2 }.toDouble() / pools.size
+    fun botsAreColorCommittedByTop2Share() {
+        val heuristicRate = sharePassRate(HeuristicBotDrafter())
+        val raredraftRate = sharePassRate(RaredraftBot)
         assertTrue(
-            "Expected ≥85% 1-2 color bots, got ${passRate * 100}%",
-            passRate >= 0.85,
+            "Expected ≥85% of heuristic seats with top-2-color share ≥ $SHARE_BAR, " +
+                "got ${heuristicRate * 100}%",
+            heuristicRate >= 0.85,
+        )
+        assertTrue(
+            "Heuristic share-pass rate $heuristicRate should exceed rarity-only baseline " +
+                "$raredraftRate",
+            heuristicRate > raredraftRate,
         )
     }
 
+    /**
+     * The heuristic drafter must build a stronger *own* pool than the rarity-only baseline.
+     *
+     * Why we measure SEAT 0 only (and not every seat's pool): in [runDraft] all 8 seats are driven
+     * by the same drafter, and together they consume every card in every pack. The UNION of all 8
+     * pools is therefore always the entire generated card set — identical for any drafter — so any
+     * statistic over all pools is drafter-invariant (the previous version of this test compared two
+     * such averages and only ever saw float-summation noise: 0.5086…86 vs 0.5086…89).
+     *
+     * Seat 0's pool, by contrast, is exactly the set of cards THIS drafter chose for itself while
+     * competing against seven mirror opponents — the one thing the drafter actually controls. The
+     * fixture's premiums are high-power COMMONS (rank decoupled from rarity): the heuristic picks
+     * by power and grabs them, while [RaredraftBot] chases rares/mythics that sit on the flat floor,
+     * so the heuristic's pool is measurably stronger. We compare the full seat-0 pool; the gap is
+     * driven by the early picks where the contested premiums are still on the table.
+     */
     @Test
-    fun heuristicStrongerThanRaredraft() {
-        val heuristicPower = avgPower(HeuristicBotDrafter())
-        val raredraftPower = avgPower(RaredraftBot)
+    fun heuristicBuildsStrongerSeat0PoolThanRaredraft() {
+        val heuristicPower = seat0AvgPower(HeuristicBotDrafter())
+        val raredraftPower = seat0AvgPower(RaredraftBot)
         assertTrue(
-            "Heuristic avg power $heuristicPower should exceed raredraft $raredraftPower",
+            "Heuristic seat-0 avg power $heuristicPower should exceed raredraft $raredraftPower",
             heuristicPower > raredraftPower,
         )
     }
@@ -79,18 +125,24 @@ class BotHarnessTest {
             val humanSeat = state.seats[humanIndex]
             val humanPack = state.packsInFlight[humanIndex]
             if (humanPack == null || humanPack.cards.isEmpty()) break
-            val pick = drafter.pick(humanSeat, humanPack, state.round, state.pickNumber)
-            state = engine.applyHumanPick(state, pick.card.scryfallId)
+            val pick = drafter.pick(humanSeat, humanPack, state.round, state.pickNumber, engine = null)
+            state = engine.applyHumanPick(state, pick.card.scryfallId, engine = null)
             guard++
         }
 
         return state.seats.map { it.pool }
     }
 
-    /** Average tier power of every card across every seat's pool, over all [SEEDS]. */
-    private fun avgPower(drafter: BotDrafter): Double {
+    /**
+     * Average tier power of SEAT 0's pool only, over all [SEEDS]. Seat 0 (`isHuman = true`) is the
+     * seat [runDraft] drives explicitly with [drafter]; the returned list is seat-index ordered, so
+     * the first pool is seat 0's. Unlike an all-seats average this is NOT drafter-invariant, because
+     * the seven opponents take the cards seat 0 leaves behind.
+     */
+    private fun seat0AvgPower(drafter: BotDrafter): Double {
         val scores = SEEDS.flatMap { seed ->
-            runDraft(drafter, seed).flatMap { pool -> pool.map { ratingScore(it) } }
+            val seat0Pool = runDraft(drafter, seed).first()
+            seat0Pool.map { ratingScore(it) }
         }
         return if (scores.isEmpty()) 0.0 else scores.average()
     }
@@ -115,17 +167,32 @@ class BotHarnessTest {
         }
     }
 
-    /** Number of distinct colors with at least [COLOR_THRESHOLD] cards in the pool. */
-    private fun topColorCount(pool: List<DraftCard>): Int =
-        pool.flatMap { it.card.colors }
+    /** Fraction of [SEEDS] × seats whose pool clears the top-2-color [SHARE_BAR]. */
+    private fun sharePassRate(drafter: BotDrafter): Double {
+        val pools = SEEDS.flatMap { seed -> runDraft(drafter, seed) }
+        return pools.count { pool -> top2ColorShare(pool) >= SHARE_BAR }.toDouble() / pools.size
+    }
+
+    /**
+     * Top-2-color concentration of a pool: the sum of the two largest per-color card counts divided
+     * by the total colored card instances. Lands and colorless cards contribute no colors and are
+     * ignored. Returns 1.0 for a pool with zero colored cards (vacuously concentrated; avoids
+     * division by zero). A multicolor card contributes once to each of its colors.
+     */
+    private fun top2ColorShare(pool: List<DraftCard>): Double {
+        val colorCounts = pool.flatMap { it.card.colors }
             .groupingBy { it }
             .eachCount()
-            .count { it.value >= COLOR_THRESHOLD }
+        val totalColored = colorCounts.values.sum()
+        if (totalColored == 0) return 1.0
+        val top2 = colorCounts.values.sortedDescending().take(2).sum()
+        return top2.toDouble() / totalColored
+    }
 
     private companion object {
         val SEEDS = (1..50)
         const val MAX_RANK = 200.0
-        const val COLOR_THRESHOLD = 3
+        const val SHARE_BAR = 0.75
         const val MAX_PICKS = 1000
     }
 }

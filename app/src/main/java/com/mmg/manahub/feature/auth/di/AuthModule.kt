@@ -14,7 +14,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.auth.Auth
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -41,9 +40,8 @@ abstract class AuthModule {
          *   or anon key as fallback when unauthenticated)
          * - `Content-Type: application/json` and `Accept: application/json`
          *
-         * [runBlocking] is intentional here: OkHttp interceptors run on IO threads,
-         * so blocking the IO thread to retrieve the session token is acceptable and
-         * avoids callback complexity in the interceptor chain.
+         * [Auth.currentSessionOrNull] reads in-memory state from [Auth.sessionStatus] — it is
+         * a plain (non-suspend) function, so no blocking or coroutine bridge is needed here.
          */
         @Provides
         @Singleton
@@ -51,9 +49,7 @@ abstract class AuthModule {
         fun provideSupabaseOkHttpClient(supabaseAuth: Auth): OkHttpClient {
             return OkHttpClient.Builder()
                 .addInterceptor { chain ->
-                    val accessToken = runBlocking {
-                        supabaseAuth.currentSessionOrNull()?.accessToken
-                    }
+                    val accessToken = supabaseAuth.currentSessionOrNull()?.accessToken
                     chain.proceed(
                         chain.request().newBuilder()
                             .header("apikey", BuildConfig.SUPABASE_ANON_KEY)

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.news.domain.model
+package com.mmg.manahub.core.domain.model.news
 
 enum class SourceType {
     ARTICLE,

@@ -120,9 +120,7 @@ fun TagDictionaryScreen(
                 if (state.query.isBlank()) state.rows
                 else state.rows.filter { row ->
                     val q = state.query.trim().lowercase()
-                    row.key.contains(q) ||
-                            row.labelEn.lowercase().contains(q) ||
-                            row.labelEs.lowercase().contains(q)
+                    row.key.contains(q) || row.labelEn.lowercase().contains(q)
                 }
             }
 
@@ -216,12 +214,11 @@ private fun DictionaryRow(
                 text  = stringResource(
                     R.string.tagdictionary_row_labels,
                     row.labelEn.ifBlank { "—" },
-                    //row.labelEs.ifBlank { "—" }
                 ),
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )
-            val patternCount = row.patternsEn.size + row.patternsEs.size + row.patternsDe.size
+            val patternCount = row.rules.size
             if (patternCount > 0) {
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -255,9 +252,7 @@ private fun EditEntryDialog(
     onSave: (TagDictionaryRow) -> Unit,
 ) {
     var labelEn by remember { mutableStateOf(initial.labelEn) }
-    //var labelEs by remember { mutableStateOf(initial.labelEs) }
-    var patternsEn by remember { mutableStateOf(initial.patternsEn.joinToString("\n")) }
-    var patternsEs by remember { mutableStateOf(initial.patternsEs.joinToString("\n")) }
+    var rulesText by remember { mutableStateOf(initial.rules.joinToString("\n")) }
 
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -270,26 +265,32 @@ private fun EditEntryDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(stringResource(R.string.tagdictionary_labels_section), style = ty.labelMedium)
-                OutlinedTextField(value = labelEn, onValueChange = { labelEn = it }, label = { Text("EN") }, singleLine = true)
-            //    OutlinedTextField(value = labelEs, onValueChange = { labelEs = it }, label = { Text("ES") }, singleLine = true)
+                OutlinedTextField(
+                    value = labelEn,
+                    onValueChange = { labelEn = it },
+                    label = { Text("EN") },
+                    singleLine = true,
+                )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     stringResource(R.string.tagdictionary_patterns_hint),
                     style = ty.labelSmall,
                     color = mc.textSecondary,
                 )
-                OutlinedTextField(value = patternsEn, onValueChange = { patternsEn = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_en_label)) }, minLines = 2)
-              //  OutlinedTextField(value = patternsEs, onValueChange = { patternsEs = it }, label = { Text(stringResource(R.string.tagdictionary_patterns_es_label)) }, minLines = 2)
+                OutlinedTextField(
+                    value = rulesText,
+                    onValueChange = { rulesText = it },
+                    label = { Text(stringResource(R.string.tagdictionary_patterns_en_label)) },
+                    minLines = 2,
+                )
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 onSave(
                     initial.copy(
-                        labelEn    = labelEn.trim(),
-                      //  labelEs    = labelEs.trim(),
-                        patternsEn = patternsEn.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
-                     //   patternsEs = patternsEs.lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
+                        labelEn = labelEn.trim(),
+                        rules   = rulesText.lines().map { it.trim() }.filter { it.isNotEmpty() },
                     )
                 )
             }) { Text(stringResource(R.string.action_save)) }

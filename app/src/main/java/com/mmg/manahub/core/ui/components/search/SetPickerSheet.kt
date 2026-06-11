@@ -203,7 +203,7 @@ fun SetPickerSheet(
                         },
                     )
                 }
-                items(PLAYABLE_SET_TYPES.toList()) { type ->
+                items(PLAYABLE_SET_TYPES.toList(), key = { it.name }) { type ->
                     FilterChip(
                         selected = uiState.selectedTypes.contains(type),
                         onClick = { viewModel.toggleTypeFilter(type) },

@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** MTG card thumbnails, player life-counter cards, collection grid items. */
-val CardCornerRadius         = 18.dp
+val CardCornerRadius         = 12.dp
 
 /** Filter chips, badges, quantity indicators, mana pip containers. */
 val ChipCornerRadius         = 8.dp

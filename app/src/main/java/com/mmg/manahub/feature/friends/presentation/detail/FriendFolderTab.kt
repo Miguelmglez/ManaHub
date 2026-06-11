@@ -168,7 +168,7 @@ fun FriendFolderTab(
                         ) { card ->
                             CardListItem(
                                 name = card.name,
-                                imageUrl = card.imageArtCrop ?: card.imageNormal,
+                                imageUrl = card.imageNormal,
                                 priceUsd = if (card.isFoil) card.priceUsdFoil ?: card.priceUsd else card.priceUsd,
                                 priceEur = if (card.isFoil) card.priceEurFoil ?: card.priceEur else card.priceEur,
                                 onClick = { onCardClick(card.scryfallId) },

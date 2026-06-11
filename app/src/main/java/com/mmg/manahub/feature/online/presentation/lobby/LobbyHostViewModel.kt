@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.feature.auth.domain.model.AuthResult
+import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.core.online.domain.model.ActiveSession
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
@@ -57,6 +60,7 @@ class LobbyHostViewModel @Inject constructor(
     private val repository: OnlineSessionRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val savedStateHandle: SavedStateHandle,
+    private val authRepository: AuthRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -247,6 +251,18 @@ class LobbyHostViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+
+            // Ensure a Supabase session exists; sign in anonymously for guests.
+            if (authRepository.sessionState.value is SessionState.Unauthenticated) {
+                val anonResult = authRepository.signInAnonymously()
+                if (anonResult is AuthResult.Error) {
+                    val msg = anonResult.error.toString()
+                    crashlytics.log("online_session_anon_signin_failed: $msg")
+                    _uiState.update { it.copy(isLoading = false, error = mapBackendError(msg)) }
+                    return@launch
+                }
+            }
+
             crashlytics.log("online_session_create_started: mode=${state.gameMode.name} player_count=${state.playerCount}")
             crashlytics.setCustomKey("online_session_game_mode", state.gameMode.name)
             crashlytics.setCustomKey("online_session_player_count", state.playerCount)

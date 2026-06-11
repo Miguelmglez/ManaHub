@@ -31,7 +31,6 @@ sealed class Screen(val route: String) {
     object DeckImprovement : Screen("collection/decks/{deckId}/improvement") {
         fun createRoute(deckId: String) = "collection/decks/$deckId/improvement"
     }
-    object Synergy : Screen("collection/decks/synergy")
 
     // ── Stats (bottom tab 2) ─────────────────────────────────────────────────
     object Stats    : Screen("stats")

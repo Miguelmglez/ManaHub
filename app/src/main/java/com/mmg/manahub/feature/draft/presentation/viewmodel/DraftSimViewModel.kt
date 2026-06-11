@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
@@ -13,6 +14,7 @@ import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftError
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
+import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
@@ -20,6 +22,7 @@ import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -49,6 +53,8 @@ class DraftSimViewModel @Inject constructor(
     private val getDraftableSimSet: GetDraftableSimSetUseCase,
     private val analytics: AnalyticsHelper,
     private val botDrafter: BotDrafter,
+    private val draftSimRepository: DraftSimRepository,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     /** Set code passed via the [com.mmg.manahub.app.navigation.Screen.DraftSimSetup] route. */
@@ -274,9 +280,24 @@ class DraftSimViewModel @Inject constructor(
                         val pack = humanPack(state)
                         val humanSeat = state.seats.firstOrNull { it.isHuman }
                         val suggestedId = if (humanSeat != null && pack.isNotEmpty()) {
-                            botDrafter.pick(humanSeat, BoosterPack("temp", pack), state.round, state.pickNumber).card.scryfallId
+                            // Suggested pick MUST use the same engine/drafter as the bots so the hint
+                            // matches how a bot would actually draft. Best-effort load: null → fallback.
+                            // The human seat carries no diversity prior, so the suggestion is neutral.
+                            // The engine load (network/cache) and the scoring are CPU/IO-bound, so run
+                            // them off the Main collector thread to keep the UI responsive.
+                            withContext(defaultDispatcher) {
+                                val engineConfig =
+                                    draftSimRepository.getEngineConfig(state.config.setCode)
+                                botDrafter.pick(
+                                    humanSeat,
+                                    BoosterPack("temp", pack),
+                                    state.round,
+                                    state.pickNumber,
+                                    engineConfig,
+                                ).card.scryfallId
+                            }
                         } else null
-                        
+
                         _uiState.value = DraftSimUiState.Drafting(
                             state = state,
                             currentPack = pack,

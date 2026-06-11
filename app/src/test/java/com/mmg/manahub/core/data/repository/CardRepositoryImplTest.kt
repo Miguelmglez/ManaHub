@@ -6,6 +6,7 @@ import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
@@ -37,9 +38,11 @@ class CardRepositoryImplTest {
 
     private val cardDao               = mockk<CardDao>(relaxed = true)
     private val userCardCollectionDao = mockk<UserCardCollectionDao>(relaxed = true)
-    private val remote        = mockk<ScryfallRemoteDataSource>()
-    private val suggestTags   = mockk<SuggestTagsUseCase>()
-    private val userPrefs     = mockk<UserPreferencesDataStore>()
+    private val remote    = mockk<ScryfallRemoteDataSource>()
+    private val userPrefs = mockk<UserPreferencesDataStore>()
+
+    // Pure use-cases — construct real instances to avoid fragile mock setup.
+    private val computeCardTags = ComputeCardTagsUseCase(SuggestTagsUseCase())
 
     private lateinit var repository: CardRepositoryImpl
 
@@ -47,12 +50,9 @@ class CardRepositoryImplTest {
 
     @Before
     fun setUp() {
-        // SuggestTagsUseCase is pure so we can return an empty result safely.
-        every { suggestTags.invoke(any(), any(), any()) } returns SuggestTagsUseCase.Result(
-            confirmed = emptyList(),
-            suggested = emptyList(),
-        )
-        // DataStore flows used inside computeTagsForCache
+        val testDispatcher = UnconfinedTestDispatcher()
+
+        // DataStore flows used inside the repository's tag-computation path.
         every { userPrefs.tagAutoThresholdFlow }    returns flowOf(SuggestTagsUseCase.DEFAULT_AUTO_THRESHOLD)
         every { userPrefs.tagSuggestThresholdFlow } returns flowOf(SuggestTagsUseCase.DEFAULT_SUGGEST_THRESHOLD)
 
@@ -60,9 +60,10 @@ class CardRepositoryImplTest {
             cardDao               = cardDao,
             userCardCollectionDao = userCardCollectionDao,
             remote                = remote,
-            suggestTags           = suggestTags,
+            computeCardTags       = computeCardTags,
             userPrefs             = userPrefs,
-            ioDispatcher          = UnconfinedTestDispatcher(),
+            ioDispatcher          = testDispatcher,
+            defaultDispatcher     = testDispatcher,
         )
     }
 

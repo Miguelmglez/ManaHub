@@ -10,13 +10,14 @@ import com.mmg.manahub.core.data.local.mapper.toSuggestedTagsJson
 import com.mmg.manahub.core.data.local.mapper.toTagList
 import com.mmg.manahub.core.data.local.mapper.toTagsJson
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.model.SuggestedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
+import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -30,12 +31,13 @@ import javax.inject.Singleton
 
 @Singleton
 class CardRepositoryImpl @Inject constructor(
-    private val cardDao:              CardDao,
+    private val cardDao:               CardDao,
     private val userCardCollectionDao: UserCardCollectionDao,
-    private val remote:         ScryfallRemoteDataSource,
-    private val suggestTags:    SuggestTagsUseCase,
-    private val userPrefs:      UserPreferencesDataStore,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val remote:                ScryfallRemoteDataSource,
+    private val computeCardTags:       ComputeCardTagsUseCase,
+    private val userPrefs:             UserPreferencesDataStore,
+    @IoDispatcher    private val ioDispatcher:      CoroutineDispatcher,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : CardRepository {
 
     override suspend fun searchCardByName(query: String): DataResult<Card> =
@@ -55,7 +57,10 @@ class CardRepositoryImpl @Inject constructor(
             val result = remote.searchCards(query, page)
             if (result.isSuccess) {
                 val cards = result.getOrThrow()
-                cardDao.upsertAll(cards.map { entityWithComputedTags(it) })
+                // Single batch DB read for existing cache entries; tag computation on defaultDispatcher.
+                val cachedMap = cardDao.getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
+                val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
+                cardDao.upsertAll(entities)
                 DataResult.Success(cards)
             } else {
                 DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
@@ -81,15 +86,50 @@ class CardRepositoryImpl @Inject constructor(
             else DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
         }
 
+    /**
+     * Builds a [CardEntity] with auto-computed tags for a single card.
+     *
+     * Reads the cached entity once (for existing user tags), then offloads
+     * tag computation to [defaultDispatcher] (CPU-bound regex work in [StrategyAnalyzer]).
+     */
     private suspend fun entityWithComputedTags(card: Card) = run {
         val existing = cardDao.getById(card.scryfallId)
-        val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
+        val (tagsJson, suggestedJson) = computeTagsForCacheOnDefault(card, existing?.tags)
         card.toEntityCard().copy(
             tags = tagsJson,
             userTags = existing?.userTags ?: "[]",
             suggestedTags = suggestedJson,
         )
     }
+
+    /**
+     * Builds a batch of [CardEntity] objects with computed tags, using a single [cardDao.getByIds]
+     * call for all cache lookups instead of N individual [cardDao.getById] calls.
+     *
+     * Tag computation is offloaded to [defaultDispatcher].
+     */
+    private suspend fun entitiesWithComputedTagsBatch(
+        cards: List<Card>,
+        cachedMap: Map<String, com.mmg.manahub.core.data.local.entity.CardEntity>,
+    ): List<com.mmg.manahub.core.data.local.entity.CardEntity> =
+        withContext(defaultDispatcher) {
+            val auto    = userPrefs.tagAutoThresholdFlow.first()
+            val suggest = userPrefs.tagSuggestThresholdFlow.first()
+            cards.map { card ->
+                val existing = cachedMap[card.scryfallId]
+                val result = computeCardTags(
+                    card             = card,
+                    existingTagsJson = existing?.tags,
+                    autoThreshold    = auto,
+                    suggestThreshold = suggest,
+                )
+                card.toEntityCard().copy(
+                    tags          = result.confirmedTags.toTagsJson(),
+                    userTags      = existing?.userTags ?: "[]",
+                    suggestedTags = result.suggestedTags.toSuggestedTagsJson(),
+                )
+            }
+        }
 
     override suspend fun getCardByExactName(name: String): Result<Card> =
         withContext(ioDispatcher) { remote.getCardByExactName(name) }
@@ -108,7 +148,8 @@ class CardRepositoryImpl @Inject constructor(
                 val card = result.getOrThrow()
 
                 // Preserve any user edits to confirmed tags; otherwise auto-tag.
-                val (tagsJson, suggestedJson) = computeTagsForCache(card, cached?.tags)
+                // Offloaded to defaultDispatcher inside computeTagsForCacheOnDefault.
+                val (tagsJson, suggestedJson) = computeTagsForCacheOnDefault(card, cached?.tags)
 
                 cardDao.upsert(
                     card.toEntityCard().copy(
@@ -155,15 +196,8 @@ class CardRepositoryImpl @Inject constructor(
 
             // Build all entities first (reads only), then write in a single upsertAll
             // transaction instead of N individual upsert() calls.
-            val entities = cards.map { card ->
-                val existing = cachedMap[card.scryfallId]
-                val (tagsJson, suggestedJson) = computeTagsForCache(card, existing?.tags)
-                card.toEntityCard().copy(
-                    tags          = tagsJson,
-                    userTags      = existing?.userTags ?: "[]",
-                    suggestedTags = suggestedJson,
-                )
-            }
+            // Tag computation is offloaded to defaultDispatcher inside the batch helper.
+            val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
             cardDao.upsertAll(entities)
 
             // Clear stale flag for every card we successfully refreshed.
@@ -205,12 +239,22 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun warmCacheForIds(scryfallIds: List<String>) = withContext(ioDispatcher) {
         if (scryfallIds.isEmpty()) return@withContext
-        val missing = scryfallIds.filterNot { cardDao.getById(it) != null }
+
+        // Single DB read for all IDs instead of N individual getById() calls.
+        val alreadyCached = cardDao.getByIds(scryfallIds).map { it.scryfallId }.toSet()
+        val missing = scryfallIds.filterNot { it in alreadyCached }
         if (missing.isEmpty()) return@withContext
+
         missing.chunked(75).forEach { chunk ->
             remote.getCardsBatch(chunk)
                 .onSuccess { cards ->
-                    cards.forEach { card -> runCatching { cardDao.upsert(entityWithComputedTags(card)) } }
+                    // Build a lookup map from the chunk's cached entities (may be empty for
+                    // brand-new cards) to preserve any existing userTags.
+                    val cachedMap = cardDao.getByIds(chunk).associateBy { it.scryfallId }
+                    runCatching {
+                        val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
+                        cardDao.upsertAll(entities)
+                    }
                 }
             // Failures are intentionally swallowed — callers fall back to individual getCardById
         }
@@ -255,29 +299,24 @@ class CardRepositoryImpl @Inject constructor(
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /**
-     * Compute the JSON to persist for `tags` and `suggested_tags`.
+     * Computes the JSON pair (tagsJson, suggestedTagsJson) for a single card.
      *
-     * If the cached entity already has user-confirmed tags, we keep them and
-     * only re-run the engine to refresh suggestions. Otherwise we run the
-     * engine and use its split for both columns.
+     * Delegates to [ComputeCardTagsUseCase] and offloads the CPU-bound regex work
+     * in [StrategyAnalyzer] to [defaultDispatcher].
      */
-    private suspend fun computeTagsForCache(
+    private suspend fun computeTagsForCacheOnDefault(
         card: Card,
         existingTagsJson: String?,
-    ): Pair<String, String> {
+    ): Pair<String, String> = withContext(defaultDispatcher) {
         val auto    = userPrefs.tagAutoThresholdFlow.first()
         val suggest = userPrefs.tagSuggestThresholdFlow.first()
-        val result  = suggestTags(card, autoThreshold = auto, suggestThreshold = suggest)
-
-        val keepExisting = !existingTagsJson.isNullOrBlank() && existingTagsJson != "[]"
-        val confirmed = if (keepExisting) {
-            // Merge: keep user choices but add any newly-confirmed engine tags
-            // that aren't already there (e.g. dictionary just learned them).
-            (existingTagsJson!!.toTagList() + result.confirmed).distinct()
-        } else {
-            result.confirmed
-        }
-        return confirmed.toTagsJson() to result.suggested.toSuggestedTagsJson()
+        val result  = computeCardTags(
+            card             = card,
+            existingTagsJson = existingTagsJson,
+            autoThreshold    = auto,
+            suggestThreshold = suggest,
+        )
+        result.confirmedTags.toTagsJson() to result.suggestedTags.toSuggestedTagsJson()
     }
 
     private fun buildStaleReason(e: Throwable?): String {

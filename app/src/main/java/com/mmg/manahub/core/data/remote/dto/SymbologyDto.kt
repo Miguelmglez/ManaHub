@@ -1,16 +1,19 @@
 package com.mmg.manahub.core.data.remote.dto
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class SymbologyListDto(
-    @SerializedName("data") val data: List<CardSymbolDto>,
+    @SerialName("data") val data: List<CardSymbolDto>,
 )
 
+@Serializable
 data class CardSymbolDto(
-    @SerializedName("symbol")      val symbol:      String,
-    @SerializedName("description") val description: String,
-    @SerializedName("svg_uri")     val svgUri:      String,
-    @SerializedName("hybrid")      val hybrid:      Boolean = false,
-    @SerializedName("phyrexian")   val phyrexian:   Boolean = false,
-    @SerializedName("funny")       val funny:       Boolean = false,
+    @SerialName("symbol")      val symbol:      String,
+    @SerialName("description") val description: String,
+    @SerialName("svg_uri")     val svgUri:      String,
+    @SerialName("hybrid")      val hybrid:      Boolean = false,
+    @SerialName("phyrexian")   val phyrexian:   Boolean = false,
+    @SerialName("funny")       val funny:       Boolean = false,
 )

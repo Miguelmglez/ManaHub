@@ -42,6 +42,7 @@ import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
 import com.mmg.manahub.core.voice.domain.VoiceCommand
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
 import com.mmg.manahub.core.voice.domain.VoiceLanguage
+import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
@@ -120,8 +121,9 @@ class GameViewModel @Inject constructor(
     private val revokeDefeatUseCase:          RevokeDefeatUseCase,
     private val leaveSessionUseCase:          LeaveSessionUseCase,
     private val nearbyRepo:                   NearbySessionRepository,
-    private val toggleLandPlayedUseCase:      ToggleLandPlayedUseCase,
-    private val voiceCommandRecognizer:       VoiceCommandRecognizer,
+    private val toggleLandPlayedUseCase:           ToggleLandPlayedUseCase,
+    private val voiceCommandRecognizer:            VoiceCommandRecognizer,
+    private val evaluatePlayerEliminationUseCase:  EvaluatePlayerEliminationUseCase,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -468,7 +470,7 @@ class GameViewModel @Inject constructor(
     fun checkPendingDefeat() {
         _uiState.update { s ->
             s.copy(players = s.players.map { p ->
-                val meetsCondition = shouldEliminate(p, s.mode)
+                val meetsCondition = evaluatePlayerEliminationUseCase(p, s.mode)
                 when {
                     p.defeated -> p
                     // If already pending, clear it if they are no longer meeting the condition (e.g. gained life)
@@ -1471,11 +1473,5 @@ class GameViewModel @Inject constructor(
             )
         }
 
-        fun shouldEliminate(p: Player, mode: GameMode): Boolean {
-            if (p.life <= 0) return true
-            if (p.poison >= 10) return true
-            if (mode == GameMode.COMMANDER && p.commanderDamage.values.any { it >= 21 }) return true
-            return false
-        }
     }
 }

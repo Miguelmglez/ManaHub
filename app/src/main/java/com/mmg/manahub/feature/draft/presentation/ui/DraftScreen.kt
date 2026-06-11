@@ -49,13 +49,13 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.DraftSetCard
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.draft.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -165,85 +165,5 @@ fun DraftScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun DraftSetCard(
-    set: DraftSet,
-    onClick: () -> Unit,
-) {
-    val colors = MaterialTheme.magicColors
-    val typography = MaterialTheme.magicTypography
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = colors.surface,
-        tonalElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(set.iconSvgUri)
-                    .decoderFactory(SvgDecoder.Factory())
-                    .crossfade(true)
-                    .build(),
-                contentDescription = set.name,
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit,
-                colorFilter = ColorFilter.tint(colors.textPrimary),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = set.name,
-                style = typography.labelLarge,
-                color = colors.textPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 40.dp),
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = formatReleaseDate(set.releasedAt),
-                    style = typography.labelSmall,
-                    color = colors.textSecondary,
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(colors.primaryAccent.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                ) {
-                    Text(
-                        text = set.code.uppercase(),
-                        style = typography.labelSmall,
-                        color = colors.primaryAccent,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun formatReleaseDate(dateStr: String): String {
-    return try {
-        val date = LocalDate.parse(dateStr)
-        date.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH))
-    } catch (_: Exception) {
-        dateStr
     }
 }

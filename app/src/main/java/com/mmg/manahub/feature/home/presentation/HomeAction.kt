@@ -28,9 +28,6 @@ sealed interface HomeAction {
     object PlaytestRecentDeck : HomeAction
     object ImproveRecentDeck : HomeAction
 
-    /** Resume a specific Continue item. */
-    data class ContinueItem(val item: com.mmg.manahub.feature.home.presentation.ContinueItem) : HomeAction
-
     /** Open the Quick Start customization sheet (handled inside HomeScreen). */
     object CustomizeQuickStart : HomeAction
 
@@ -39,4 +36,37 @@ sealed interface HomeAction {
 
     object CreateAccount : HomeAction
     object DismissAccountNudge : HomeAction
+
+    /**
+     * Marks a first-step carousel slide as skipped by the user.
+     * Persisted in DataStore via [HomeViewModel.skipFirstStep].
+     *
+     * @param stepId The [FirstStepItem.id] of the step to skip.
+     */
+    data class SkipFirstStep(val stepId: String) : HomeAction
+
+    // ── Widget board ────────────────────────────────────────────────────────────
+    object OpenWidgetGallery : HomeAction
+    data class MoveWidget(val from: Int, val to: Int) : HomeAction
+    data class UpdateLayout(val layout: List<WidgetInstance>) : HomeAction
+    data class AddWidget(val type: HomeWidgetType) : HomeAction
+    data class RemoveWidget(val type: HomeWidgetType) : HomeAction
+    object ResetLayout : HomeAction
+
+    /** Opens the platform store listing so the user can rate the app (UI resolves the deep link). */
+    object RateApp : HomeAction
+
+    // ── Per-widget navigation intents (resolved by AppNavGraph) ─────────────────
+    object OpenDraftSimulator : HomeAction
+    object OpenDraftGuide : HomeAction
+    object OpenWishlist : HomeAction
+    object OpenAchievements : HomeAction
+    data class OpenCardDetail(val scryfallId: String) : HomeAction
+    data class OpenDeck(val deckId: String) : HomeAction
+
+    /** Open a specific news article or video URL in the system browser. */
+    data class OpenNewsUrl(val url: String) : HomeAction
+
+    /** Open the full draft guide detail for a specific set. */
+    data class OpenDraftSetDetail(val set: com.mmg.manahub.core.domain.model.DraftSet) : HomeAction
 }

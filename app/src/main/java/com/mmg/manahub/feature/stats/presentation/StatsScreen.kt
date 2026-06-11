@@ -754,21 +754,45 @@ private fun HallOfFameSection(
 
 @Composable
 private fun DistributionsSection(stats: CollectionStats, mc: MagicColors) {
+    val context = LocalContext.current
+    val whiteName = stringResource(R.string.stats_color_white)
+    val blueName = stringResource(R.string.stats_color_blue)
+    val blackName = stringResource(R.string.stats_color_black)
+    val redName = stringResource(R.string.stats_color_red)
+    val greenName = stringResource(R.string.stats_color_green)
+    val colorlessName = stringResource(R.string.stats_color_colorless)
+
+    val colorData = remember(stats.byColor, whiteName, blueName, blackName, redName, greenName, colorlessName) {
+        stats.byColor.entries.associate { (color, count) ->
+            val name = when (color) {
+                MtgColor.W -> whiteName
+                MtgColor.U -> blueName
+                MtgColor.B -> blackName
+                MtgColor.R -> redName
+                MtgColor.G -> greenName
+                MtgColor.COLORLESS -> colorlessName
+                else -> context.getString(R.string.stats_color_unknown)
+            }
+            name to count
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
         CircularDistributionSection(
             title = stringResource(R.string.stats_dist_color),
-            data = stats.byColor.entries.associate { it.key.toDisplayName() to it.value },
+            data = colorData,
             colorMapper = { label ->
                 when (label) {
-                    "White", "Blanco", "Weiß" -> Color(0xFFF9FAFA)
-                    "Blue", "Azul", "Blau" -> Color(0xFF0E68AB)
-                    "Black", "Negro", "Schwarz" -> Color(0xFF150B00)
-                    "Red", "Rojo", "Rot" -> Color(0xFFD3202A)
-                    "Green", "Verde", "Grün" -> Color(0xFF00733E)
-                    "Colorless", "Incoloro", "Farblos" -> Color(0xFF90ADBB)
+                    whiteName -> Color(0xFFF9FAFA)
+                    blueName -> Color(0xFF0E68AB)
+                    blackName -> Color(0xFF150B00)
+                    redName -> Color(0xFFD3202A)
+                    greenName -> Color(0xFF00733E)
+                    colorlessName -> Color(0xFF90ADBB)
                     else -> mc.primaryAccent
                 }
-            }
+            },
+            isColor = true
         )
         CircularDistributionSection(
             title = stringResource(R.string.stats_dist_type),
@@ -1044,7 +1068,8 @@ private fun SetStatsSection(
 private fun CircularDistributionSection(
     title: String,
     data: Map<String, Int>,
-    colorMapper: (String) -> Color
+    colorMapper: (String) -> Color,
+    isColor: Boolean = false,
 ) {
     if (data.isEmpty()) return
     val total = data.values.sum().toFloat().coerceAtLeast(1f)
@@ -1180,23 +1205,32 @@ private fun CircularDistributionSection(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    val whiteName = stringResource(R.string.stats_color_white)
+                    val blueName = stringResource(R.string.stats_color_blue)
+                    val blackName = stringResource(R.string.stats_color_black)
+                    val redName = stringResource(R.string.stats_color_red)
+                    val greenName = stringResource(R.string.stats_color_green)
+                    val colorlessName = stringResource(R.string.stats_color_colorless)
+
                     data.entries.sortedByDescending { it.value }.forEach { (label, count) ->
                         val percentage = (count / total * 100).toInt()
-                        val colorCode = when (label) {
-                            "White", "Blanco", "Weiß" -> "W"
-                            "Blue", "Azul", "Blau" -> "U"
-                            "Black", "Negro", "Schwarz" -> "B"
-                            "Red", "Rojo", "Rot" -> "R"
-                            "Green", "Verde", "Grün" -> "G"
-                            "Colorless", "Incoloro", "Farblos" -> "C"
-                            else -> null
-                        }
+                        val colorCode = if (isColor) {
+                            when (label) {
+                                whiteName -> "W"
+                                blueName -> "U"
+                                blackName -> "B"
+                                redName -> "R"
+                                greenName -> "G"
+                                colorlessName -> "C"
+                                else -> null
+                            }
+                        } else null
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            if (title.contains(stringResource(R.string.stats_color_white).take(2), ignoreCase = true) && colorCode != null) {
+                            if (colorCode != null) {
                                 ManaSymbolImage(token = colorCode, size = 18.dp)
                             } else {
                                 Box(
@@ -1740,13 +1774,12 @@ private fun SessionHistoryRow(
 //}
 
 
-@Composable
-fun MtgColor.toDisplayName(): String = when (this) {
-    MtgColor.W          -> stringResource(R.string.stats_color_white)
-    MtgColor.U          -> stringResource(R.string.stats_color_blue)
-    MtgColor.B          -> stringResource(R.string.stats_color_black)
-    MtgColor.R          -> stringResource(R.string.stats_color_red)
-    MtgColor.G          -> stringResource(R.string.stats_color_green)
-    MtgColor.COLORLESS  -> stringResource(R.string.stats_color_colorless)
-    else                -> stringResource(R.string.stats_color_unknown)
+fun MtgColor.toDisplayNameRes(): Int = when (this) {
+    MtgColor.W          -> R.string.stats_color_white
+    MtgColor.U          -> R.string.stats_color_blue
+    MtgColor.B          -> R.string.stats_color_black
+    MtgColor.R          -> R.string.stats_color_red
+    MtgColor.G          -> R.string.stats_color_green
+    MtgColor.COLORLESS  -> R.string.stats_color_colorless
+    else                -> R.string.stats_color_unknown
 }

@@ -52,7 +52,8 @@ export default {
     //   /draft/{setCode}/guide.json
     //   /draft/{setCode}/tier-list.json
     //   /draft/{setCode}/booster.json
-    const match = path.match(/^\/draft\/(sets-index\.json|[a-z]{2,6}\/(guide|tier-list|booster)\.json)$/);
+    //   /draft/{setCode}/engine.json
+    const match = path.match(/^\/draft\/(sets-index\.json|[a-z]{2,6}\/(guide|tier-list|booster|engine)\.json)$/);
     if (!match) {
       return new Response(JSON.stringify({ error: 'Not Found' }), {
         status: 404,

@@ -153,7 +153,7 @@ dependencies {
     implementation(libs.splashscreen)
     implementation(libs.foundation)
     implementation(libs.material3)
-    implementation(libs.tv.material)
+    // tv.material removed — no usages found in the codebase (verified 2026-06-10)
     implementation(libs.emojis)
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
@@ -175,8 +175,10 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.retrofit)
-    implementation(libs.retrofit.gson)
+    implementation(libs.retrofit.gson)  // Kept for DraftModule (Cloudflare/YouTube manual JSON parsing)
     implementation(libs.okhttp.logging)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.retrofit.kotlinx.serialization.converter)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
@@ -220,7 +222,7 @@ dependencies {
     ksp(libs.hilt.work.compiler)
     implementation(libs.browser)
     implementation(libs.guava)
-    implementation(libs.security.crypto)
+
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.messaging)
@@ -234,4 +236,7 @@ dependencies {
 
     // Vosk — offline grammar-restricted voice recognition
     implementation(libs.vosk.android)
+
+    // Stable collection types for Compose recomposition stability
+    implementation(libs.kotlinx.collections.immutable)
 }
