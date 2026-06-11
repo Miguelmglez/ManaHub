@@ -25,4 +25,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ManaHub"
 include(":app")
- 
+include(":baseline-profile")

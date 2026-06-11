@@ -18,14 +18,14 @@ enum class GameFormat(
     val deckSize: Int,
     val sideboardSize: Int,
 ) {
-    STANDARD ("Standard",  60, 15),
-    PIONEER  ("Pioneer",   60, 15),
-    MODERN   ("Modern",    60, 15),
-    COMMANDER("Commander", 99,  0),
-    LEGACY   ("Legacy",    60, 15),
-    VINTAGE  ("Vintage",   60, 15),
-    PAUPER   ("Pauper",    60, 15),
-    CASUAL   ("Casual",    60, 15),
+    STANDARD ("Standard",  60, 25),
+    PIONEER  ("Pioneer",   60, 25),
+    MODERN   ("Modern",    60, 25),
+    COMMANDER("Commander", 99,  25),
+    LEGACY   ("Legacy",    60, 25),
+    VINTAGE  ("Vintage",   60, 25),
+    PAUPER   ("Pauper",    60, 25),
+    CASUAL   ("Casual",    60, 25),
 }
 
 enum class ManaColor(val symbol: String, val displayName: String) {

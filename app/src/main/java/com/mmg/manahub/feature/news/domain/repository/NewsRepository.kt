@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.news.domain.repository
 
 import com.mmg.manahub.feature.news.domain.model.ContentSource
-import com.mmg.manahub.feature.news.domain.model.NewsItem
-import com.mmg.manahub.feature.news.domain.model.SourceType
+import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.domain.model.news.SourceType
 import kotlinx.coroutines.flow.Flow
 
 interface NewsRepository {

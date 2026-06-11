@@ -6,6 +6,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
@@ -304,7 +306,6 @@ private fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     var camera by remember { mutableStateOf<Camera?>(null) }
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
@@ -362,6 +363,57 @@ private fun CameraPreview(
         )
     }
 
+    // Bind the camera asynchronously so we never block the main thread waiting for
+    // ProcessCameraProvider. The effect keys on both [lifecycleOwner] and [previewViewRef]:
+    // it will not run until AndroidView.factory has assigned a non-null PreviewView, and
+    // it re-runs on configuration change (new lifecycleOwner) so use cases are re-bound.
+    LaunchedEffect(lifecycleOwner, previewViewRef) {
+        val pv = previewViewRef ?: return@LaunchedEffect
+
+        // Suspend without blocking the main thread until the provider is ready.
+        val cameraProvider = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            val future = ProcessCameraProvider.getInstance(context)
+            future.addListener(
+                { cont.resumeWith(runCatching { future.get() }) },
+                androidx.core.content.ContextCompat.getMainExecutor(context),
+            )
+        }
+
+        // ResolutionSelector replaces the deprecated setTargetResolution API (CameraX 1.3+).
+        // FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER lets CameraX pick the nearest
+        // available resolution when 720×1280 is not supported by the sensor.
+        val resolutionSelector = ResolutionSelector.Builder()
+            .setResolutionStrategy(
+                ResolutionStrategy(
+                    android.util.Size(720, 1280),
+                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                )
+            )
+            .build()
+
+        val preview = Preview.Builder().build().also {
+            it.setSurfaceProvider(pv.surfaceProvider)
+        }
+        val imageAnalysis = ImageAnalysis.Builder()
+            .setResolutionSelector(resolutionSelector)
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+            .also { analysis ->
+                analysis.setAnalyzer(analysisExecutor, frameMetadataAnalyzer)
+            }
+
+        runCatching {
+            cameraProvider.unbindAll()
+            camera = cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                preview,
+                imageAnalysis,
+            )
+            onFlashAvailability(camera?.cameraInfo?.hasFlashUnit() ?: false)
+        }
+    }
+
     LaunchedEffect(isFlashOn) {
         camera?.cameraControl?.enableTorch(isFlashOn)
     }
@@ -369,34 +421,12 @@ private fun CameraPreview(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { ctx ->
+                // The PreviewView is created immediately; camera binding happens in
+                // the LaunchedEffect above once ProcessCameraProvider is ready.
                 PreviewView(ctx).apply {
                     implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                 }.also { pv ->
                     previewViewRef = pv
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(pv.surfaceProvider)
-                    }
-                    val imageAnalysis = ImageAnalysis.Builder()
-                        .setTargetResolution(android.util.Size(720, 1280))
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
-                        .also { analysis ->
-                            analysis.setAnalyzer(
-                                analysisExecutor,
-                                frameMetadataAnalyzer,
-                            )
-                        }
-                    try {
-                        cameraProvider.unbindAll()
-                        camera = cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            imageAnalysis,
-                        )
-                        onFlashAvailability(camera?.cameraInfo?.hasFlashUnit() ?: false)
-                    } catch (_: Exception) {}
                 }
             },
             modifier = Modifier.fillMaxSize(),

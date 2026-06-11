@@ -37,6 +37,7 @@ data class SetDraftDetailUiState(
     val isTierListLoading: Boolean = false,
     val tierListError: String? = null,
     val tierListColorFilter: Set<String> = emptySet(),
+    val tierListSearchQuery: String = "",
     // Videos (loaded in background, shown in Guide tab)
     val videos: List<DraftVideo> = emptyList(),
     val isVideosLoading: Boolean = false,
@@ -163,5 +164,9 @@ class SetDraftDetailViewModel @Inject constructor(
             }
             state.copy(tierListColorFilter = newFilter)
         }
+    }
+
+    fun onSearchQueryChanged(query: String) {
+        _uiState.update { it.copy(tierListSearchQuery = query) }
     }
 }

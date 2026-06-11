@@ -186,7 +186,7 @@ private fun FilterRow(
         contentPadding        = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(HistoryFilter.entries) { filter ->
+        items(HistoryFilter.entries, key = { it.name }) { filter ->
             FilterChip(
                 selected = filter == selected,
                 onClick  = { onSelect(filter) },

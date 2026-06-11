@@ -1157,7 +1157,7 @@ private fun SuggestionCardItem(
             ) {
                 CardListItem(
                     name = row.card.name,
-                    imageUrl = row.card.imageArtCrop ?: row.card.imageNormal,
+                    imageUrl = row.card.imageNormal,
                     priceUsd = null,
                     priceEur = null,
                     onClick = onClick,

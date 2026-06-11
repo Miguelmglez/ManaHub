@@ -2,7 +2,7 @@ package com.mmg.manahub.core.di
 
 import android.content.Context
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.auth.EncryptedSessionManager
+import com.mmg.manahub.core.auth.SecureSessionManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,7 +33,7 @@ object SupabaseModule {
                 autoLoadFromStorage = true
                 scheme = "manahub"
                 host = "auth"
-                sessionManager = EncryptedSessionManager(context)
+                sessionManager = SecureSessionManager(context)
             }
             install(Postgrest)
             install(Realtime)

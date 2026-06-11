@@ -352,7 +352,7 @@ fun CardSearchSheet(
 
                 when {
                     showWishlistTab && selectedTab == 0 -> {
-                        items(wishlistResults) { row ->
+                        items(wishlistResults, key = { it.uniqueKey }) { row ->
                             AddCardSheetRow(
                                 row = row,
                                 isCommanderMode = isCommanderMode,
@@ -375,7 +375,7 @@ fun CardSearchSheet(
                                     modifier = Modifier.padding(vertical = 8.dp)
                                 )
                             }
-                            items(offerResults) { row ->
+                            items(offerResults, key = { "offer_${it.uniqueKey}" }) { row ->
                                 AddCardSheetRow(
                                     row = row,
                                     isCommanderMode = isCommanderMode,

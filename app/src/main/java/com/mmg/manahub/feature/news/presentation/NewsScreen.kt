@@ -54,8 +54,8 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.news.domain.model.NewsItem
-import com.mmg.manahub.feature.news.domain.model.SourceType
+import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.feature.news.presentation.components.ArticleCard
 import com.mmg.manahub.feature.news.presentation.components.NewsFilterSheet
 import com.mmg.manahub.feature.news.presentation.components.ShimmerNewsItem

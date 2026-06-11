@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.feature.draft.domain.model.DraftSet
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

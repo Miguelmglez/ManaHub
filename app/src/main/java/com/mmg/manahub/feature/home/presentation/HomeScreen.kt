@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.home.presentation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,36 +16,30 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CollectionsBookmark
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Healing
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueryStats
-import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -56,37 +52,44 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
+import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import java.util.Calendar
+import java.util.Locale
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Home dashboard — free-first, account-enhanced entry screen.
+//  Home dashboard — fully customizable widget board.
 //
-//  Stateful entry point: observes the ViewModel, hosts the Quick Start sheet, and
-//  delegates every navigation intent to [onAction]. All sub-composables below are
-//  stateless and reusable.
+//  Stateful entry: observes the ViewModel, hosts the Quick Start sheet, the widget
+//  gallery, and the reset dialog, and owns the transient drag-and-drop state. All
+//  widget rendering lives in HomeWidgets.kt; this file owns layout + interaction.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -98,14 +101,11 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
+    var showGallerySheet by remember { mutableStateOf(false) }
 
     // The active game lives in the activity-scoped GameViewModel and is passed in
     // from AppNavGraph; it always wins the hero slot when present.
-    val effectiveState = if (activeGame != null) {
-        uiState.copy(hero = activeGame)
-    } else {
-        uiState
-    }
+    val effectiveState = if (activeGame != null) uiState.copy(hero = activeGame) else uiState
 
     HomeScreen(
         uiState = effectiveState,
@@ -117,6 +117,16 @@ fun HomeScreen(
                     showCustomizeSheet = false
                 }
                 HomeAction.DismissAccountNudge -> viewModel.dismissAccountNudge()
+                is HomeAction.SkipFirstStep -> viewModel.onAction(action)
+                HomeAction.OpenWidgetGallery -> showGallerySheet = true
+                // Board mutations are handled in the ViewModel.
+                is HomeAction.MoveWidget,
+                is HomeAction.AddWidget,
+                is HomeAction.RemoveWidget,
+                HomeAction.ResetLayout,
+                -> viewModel.onAction(action)
+                // RateApp needs an Activity context to launch the store; resolve it upstream.
+                HomeAction.RateApp -> onAction(action)
                 else -> onAction(action)
             }
         },
@@ -134,10 +144,26 @@ fun HomeScreen(
             onDismiss = { showCustomizeSheet = false },
         )
     }
+
+    if (showGallerySheet) {
+        WidgetGallerySheet(
+            currentLayout = uiState.layout,
+            isAuthenticated = uiState.isAuthenticated,
+            onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
+            onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
+            onMoveWidget = { from, to -> viewModel.onAction(HomeAction.MoveWidget(from, to)) },
+            onUpdateLayout = { layout -> viewModel.onAction(HomeAction.UpdateLayout(layout)) },
+            onCreateAccount = {
+                showGallerySheet = false
+                onAction(HomeAction.CreateAccount)
+            },
+            onDismiss = { showGallerySheet = false },
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Stateless root
+//  Stateless root + drag controller
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -146,104 +172,115 @@ fun HomeScreen(
     onAction: (HomeAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    // Bounds registry kept for parity with the widget container API (the gallery owns
+    // reordering now; the board itself is static).
+    val itemBounds = remember { mutableStateMapOf<String, Rect>() }
 
     Box(modifier = modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
 
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
-            contentPadding = PaddingValues(bottom = spacing.xxl + navBarBottom),
-            verticalArrangement = Arrangement.spacedBy(spacing.xl),
+            contentPadding = PaddingValues(
+                start = spacing.lg,
+                end = spacing.lg,
+                top = spacing.md,
+                bottom = spacing.xxl + navBarBottom,
+            ),
+            verticalArrangement = Arrangement.spacedBy(spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            item(key = "topbar") {
+            item(key = "topbar", span = { GridItemSpan(maxLineSpan) }) {
                 HomeTopBar(
-                    avatarUrl = uiState.avatarUrl,
+                    uiState = uiState,
                     onAvatarClick = { onAction(HomeAction.OpenProfile) },
                 )
             }
 
-            item(key = "hero") {
-                ContextHeroCard(
-                    hero = uiState.hero,
-                    onCtaClick = { onAction(heroCta(uiState.hero)) },
-                    modifier = Modifier.padding(horizontal = spacing.lg),
+            // Every widget is MEDIUM (full width) after the consolidation.
+            items(
+                items = uiState.layout,
+                key = { it.type.persistedId },
+                span = { GridItemSpan(maxLineSpan) },
+            ) { widget ->
+                HomeWidgetContainer(
+                    widget = widget,
+                    uiState = uiState,
+                    onRegisterBounds = { id, rect -> itemBounds[id] = rect },
+                    onAction = onAction,
+                    modifier = Modifier.animateItem(),
                 )
             }
 
-            item(key = "quick_start") {
-                QuickStartGrid(
-                    actions = uiState.quickStartActions,
-                    onActionClick = { onAction(it.toHomeAction()) },
-                    onCustomizeClick = { onAction(HomeAction.CustomizeQuickStart) },
-                    modifier = Modifier.padding(horizontal = spacing.lg),
-                )
-            }
-
-            if (uiState.continueItems.isNotEmpty()) {
-                item(key = "continue") {
-                    ContinueSection(
-                        items = uiState.continueItems,
-                        onItemClick = { onAction(HomeAction.ContinueItem(it)) },
-                    )
-                }
-            }
-
-            item(key = "library") {
-                LibrarySummaryCard(
-                    stats = uiState.libraryStats,
-                    onLibraryClick = { onAction(HomeAction.OpenLibrary) },
-                    onScanClick = { onAction(HomeAction.ScanCard) },
-                    modifier = Modifier.padding(horizontal = spacing.lg),
-                )
-            }
-
-            item(key = "improve") {
-                ImproveYourGameSection(
-                    onPlaytestClick = { onAction(HomeAction.PlaytestRecentDeck) },
-                    onDraftGuideClick = { onAction(HomeAction.DraftGuide) },
-                    onDeckImprovementClick = { onAction(HomeAction.ImproveRecentDeck) },
-                    onTournamentClick = { onAction(HomeAction.OpenTournaments) },
-                )
-            }
-
-            if (uiState.recentNews.isNotEmpty()) {
-                item(key = "latest") {
-                    LatestSection(
-                        news = uiState.recentNews,
-                        onNewsItemClick = { onAction(HomeAction.OpenNews) },
-                        onSeeAllClick = { onAction(HomeAction.OpenNews) },
+            if (uiState.layout.isEmpty() && !uiState.isLoading) {
+                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                    EmptyState(
+                        title = stringResource(R.string.home_empty_title),
+                        subtitle = stringResource(R.string.home_empty_message),
+                        actionLabel = stringResource(R.string.home_add_widgets),
+                        onAction = { onAction(HomeAction.OpenWidgetGallery) },
                     )
                 }
             }
 
             uiState.accountNudge?.let { nudge ->
-                item(key = "nudge") {
+                item(key = "nudge", span = { GridItemSpan(maxLineSpan) }) {
                     AccountNudgeCard(
                         nudge = nudge,
                         onCreateAccount = { onAction(HomeAction.CreateAccount) },
                         onDismiss = { onAction(HomeAction.DismissAccountNudge) },
-                        modifier = Modifier.padding(horizontal = spacing.lg),
                     )
                 }
+            }
+
+            // Entry point to the widget gallery (add / remove / reorder) at the bottom.
+            item(key = "edit_widgets_btn", span = { GridItemSpan(maxLineSpan) }) {
+                EditWidgetsButton(onClick = { onAction(HomeAction.OpenWidgetGallery) })
             }
         }
     }
 }
 
+@Composable
+private fun EditWidgetsButton(onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(ButtonShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = spacing.lg, vertical = spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(Icons.Default.Widgets, contentDescription = null, tint = mc.textSecondary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(spacing.sm))
+        Text(
+            text = stringResource(R.string.home_edit_widgets),
+            style = ty.labelMedium,
+            color = mc.textSecondary,
+        )
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-//  Top bar
+//  Top bar — greeting + avatar + edit toggle
 // ─────────────────────────────────────────────────────────────────────────────
 
 private val HomeTopBarHeight = 56.dp
 
 @Composable
-fun HomeTopBar(
-    avatarUrl: String?,
+private fun HomeTopBar(
+    uiState: HomeUiState,
     onAvatarClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -251,225 +288,139 @@ fun HomeTopBar(
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
+    val playerName = uiState.playerName
+    val greeting = greetingText(uiState.isAuthenticated, playerName)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(HomeTopBarHeight)
-            .padding(horizontal = spacing.lg),
+            .height(HomeTopBarHeight + 24.dp)
+            .padding(horizontal = spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "ManaHub",
-            style = ty.titleLarge,
-            color = mc.textPrimary,
-        )
-        Spacer(Modifier.weight(1f))
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onAvatarClick)
-                .semantics { contentDescription = "Open profile" },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (!avatarUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = avatarUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = null,
-                    tint = mc.textPrimary,
-                    modifier = Modifier.size(28.dp),
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Context hero
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun ContextHeroCard(
-    hero: HomeHeroState,
-    onCtaClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    val (title, subtitle, ctaLabel) = heroCopy(hero)
-    val gradient = Brush.linearGradient(
-        listOf(
-            mc.primaryAccent.copy(alpha = 0.22f),
-            mc.secondaryAccent.copy(alpha = 0.16f),
-        ),
-    )
-
-    Surface(
-        color = mc.surface,
-        shape = CardShape,
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(gradient)
-                .padding(spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Text(text = title, style = ty.titleLarge, color = mc.textPrimary)
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = subtitle,
-                style = ty.bodyMedium,
-                color = mc.textSecondary,
-            )
-            Spacer(Modifier.height(spacing.sm))
-            if (hero !is HomeHeroState.Loading) {
-                PrimaryCtaButton(label = ctaLabel, onClick = onCtaClick)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PrimaryCtaButton(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        color = mc.primaryAccent,
-        shape = ButtonShape,
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .clip(ButtonShape)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.xl, vertical = spacing.md),
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = mc.background,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(text = label, style = ty.labelLarge, color = mc.background)
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Quick Start grid (2×2)
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun QuickStartGrid(
-    actions: List<QuickStartAction>,
-    onActionClick: (QuickStartAction) -> Unit,
-    onCustomizeClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val spacing = MaterialTheme.spacing
-    val visible = actions.take(4)
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.md),
-    ) {
-        SectionHeader(
-            title = "Quick start",
-            trailingIcon = Icons.Default.Edit,
-            trailingContentDescription = "Customize quick start",
-            onTrailingClick = onCustomizeClick,
-        )
-        // Two rows of two. The list is always exactly four in practice (the
-        // DataStore flow guarantees it), but we chunk defensively.
-        visible.chunked(2).forEach { rowActions ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(spacing.md),
-            ) {
-                rowActions.forEach { action ->
-                    QuickStartButton(
-                        action = action,
-                        onClick = { onActionClick(action) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                // Pad an odd final row so the lone button keeps its half-width.
-                if (rowActions.size == 1) {
-                    Spacer(Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickStartButton(
-    action: QuickStartAction,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        color = mc.surface,
-        shape = CardShape,
-        modifier = modifier
-            .heightIn(min = 72.dp)
-            .clip(CardShape)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(ChipShape)
-                    .background(mc.primaryAccent.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = action.icon,
-                    contentDescription = null,
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Text(
-                text = action.label,
-                style = ty.labelMedium,
+                text = greeting,
+                style = ty.displayMedium.copy(fontWeight = FontWeight.Bold),
                 color = mc.textPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        
+        Surface(
+            modifier = Modifier
+                .size(56.dp)
+                .coloredShadow(
+                    color = mc.primaryAccent.copy(alpha = 0.25f),
+                    borderRadius = 28.dp,
+                    blurRadius = 16.dp
+                )
+                .clip(CircleShape)
+                .border(BorderStroke(2.dp, mc.primaryAccent.copy(alpha = 0.5f)), CircleShape)
+                .clickable(onClick = onAvatarClick)
+                .semantics { contentDescription = "Open profile" },
+            color = mc.surface,
+            shape = CircleShape,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (!uiState.avatarUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = uiState.avatarUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        tint = mc.primaryAccent,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun greetingText(isAuthenticated: Boolean, name: String?): String {
+    if (name.isNullOrBlank()) return stringResource(R.string.home_greeting_signed_out)
+    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    return when {
+        hour < 12 -> stringResource(R.string.home_greeting_morning, name)
+        hour < 17 -> stringResource(R.string.home_greeting_afternoon, name)
+        else -> stringResource(R.string.home_greeting_evening, name)
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Quick Start customization sheet
+//  Account nudge (reused by the board)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun AccountNudgeCard(
+    nudge: AccountNudge,
+    onCreateAccount: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Surface(color = mc.surface, shape = CardShape, modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.md),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(22.dp))
+                Text("Protect & connect", style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.weight(1f))
+            }
+            Text(
+                text = nudge.message ?: stringResource(nudge.messageRes),
+                style = ty.bodyMedium,
+                color = mc.textSecondary,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+                Surface(
+                    color = mc.primaryAccent,
+                    shape = ButtonShape,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .clip(ButtonShape)
+                        .clickable(onClick = onCreateAccount),
+                ) {
+                    Box(modifier = Modifier.padding(vertical = spacing.md), contentAlignment = Alignment.Center) {
+                        Text("Create free account", style = ty.labelMedium, color = mc.background, maxLines = 1)
+                    }
+                }
+                Surface(
+                    color = mc.surfaceVariant,
+                    shape = ButtonShape,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .widthIn(min = 48.dp)
+                        .clip(ButtonShape)
+                        .clickable(onClick = onDismiss),
+                ) {
+                    Box(modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md), contentAlignment = Alignment.Center) {
+                        Text("Maybe later", style = ty.labelMedium, color = mc.textSecondary, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Quick Start customization sheet (unchanged behavior; kept here)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -485,7 +436,6 @@ fun QuickStartCustomizeSheet(
     val spacing = MaterialTheme.spacing
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Local editable selection — order preserved (selection index = display order).
     val selection = remember {
         mutableStateListOf<QuickStartAction>().apply { addAll(selectedActions.take(4)) }
     }
@@ -503,18 +453,13 @@ fun QuickStartCustomizeSheet(
                 .padding(bottom = spacing.xl),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            Text(
-                text = "Pick 4 shortcuts",
-                style = ty.titleLarge,
-                color = mc.textPrimary,
-            )
+            Text(text = "Pick 4 shortcuts", style = ty.titleLarge, color = mc.textPrimary)
             Text(
                 text = "Selected ${selection.size} of 4. Tap to add or remove.",
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )
 
-            // FlowRow-free chip layout: wrap manually in rows of two for predictability.
             allActions.chunked(2).forEach { rowActions ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -525,19 +470,11 @@ fun QuickStartCustomizeSheet(
                         FilterChip(
                             selected = isSelected,
                             onClick = {
-                                if (isSelected) {
-                                    selection.remove(action)
-                                } else if (selection.size < 4) {
-                                    selection.add(action)
-                                }
+                                if (isSelected) selection.remove(action)
+                                else if (selection.size < 4) selection.add(action)
                             },
                             label = {
-                                Text(
-                                    text = action.label,
-                                    style = ty.labelMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                                Text(action.label, style = ty.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             },
                             leadingIcon = {
                                 Icon(
@@ -553,9 +490,7 @@ fun QuickStartCustomizeSheet(
                                 selectedLeadingIconColor = mc.primaryAccent,
                                 labelColor = mc.textSecondary,
                             ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 48.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         )
                     }
                     if (rowActions.size == 1) Spacer(Modifier.weight(1f))
@@ -572,10 +507,7 @@ fun QuickStartCustomizeSheet(
                     .clip(ButtonShape)
                     .clickable(enabled = canSave) { onSave(selection.toList()) },
             ) {
-                Box(
-                    modifier = Modifier.padding(vertical = spacing.md),
-                    contentAlignment = Alignment.Center,
-                ) {
+                Box(modifier = Modifier.padding(vertical = spacing.md), contentAlignment = Alignment.Center) {
                     Text(
                         text = "Save",
                         style = ty.labelLarge,
@@ -588,534 +520,10 @@ fun QuickStartCustomizeSheet(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Continue section
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun ContinueSection(
-    items: List<ContinueItem>,
-    onItemClick: (ContinueItem) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val spacing = MaterialTheme.spacing
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.md),
-    ) {
-        SectionHeader(
-            title = "Continue",
-            modifier = Modifier.padding(horizontal = spacing.lg),
-        )
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            items(items, key = { "${it.type}:${it.id}" }) { item ->
-                ContinueCard(item = item, onClick = { onItemClick(item) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun ContinueCard(
-    item: ContinueItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        color = mc.surface,
-        shape = CardShape,
-        modifier = modifier
-            .width(220.dp)
-            .heightIn(min = 88.dp)
-            .clip(CardShape)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(ChipShape)
-                    .background(mc.secondaryAccent.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = item.type.icon,
-                    contentDescription = null,
-                    tint = mc.secondaryAccent,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.label,
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = item.subtitle,
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Library summary
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun LibrarySummaryCard(
-    stats: LibraryStats?,
-    onLibraryClick: () -> Unit,
-    onScanClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    val isEmpty = stats == null || (stats.uniqueCards == 0 && stats.deckCount == 0)
-
-    Surface(
-        color = mc.surface,
-        shape = CardShape,
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .clickable(onClick = if (isEmpty) onScanClick else onLibraryClick)
-            .semantics(mergeDescendants = true) {},
-    ) {
-        Column(
-            modifier = Modifier.padding(spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Your library",
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = mc.textSecondary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-
-            if (isEmpty) {
-                Text(
-                    text = "Scan your first card to start building your collection.",
-                    style = ty.bodyMedium,
-                    color = mc.textSecondary,
-                )
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xl)) {
-                    LibraryStatColumn(value = "${stats?.uniqueCards ?: 0}", label = "Cards")
-                    LibraryStatColumn(value = "${stats.deckCount}", label = "Decks")
-                    LibraryStatColumn(value = stats.estimatedValueDisplay, label = "Value")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LibraryStatColumn(value: String, label: String) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Column(horizontalAlignment = Alignment.Start) {
-        Text(text = value, style = ty.titleLarge, color = mc.primaryAccent, maxLines = 1)
-        Text(text = label, style = ty.labelSmall, color = mc.textSecondary)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Improve your game
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun ImproveYourGameSection(
-    onPlaytestClick: () -> Unit,
-    onDraftGuideClick: () -> Unit,
-    onDeckImprovementClick: () -> Unit,
-    onTournamentClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val spacing = MaterialTheme.spacing
-
-    val chips = remember(onPlaytestClick, onDraftGuideClick, onDeckImprovementClick, onTournamentClick) {
-        listOf(
-            ImproveChip("Playtest", Icons.Default.Science, onPlaytestClick),
-            ImproveChip("Draft guide", Icons.Default.MenuBook, onDraftGuideClick),
-            ImproveChip("Tune deck", Icons.Default.Healing, onDeckImprovementClick),
-            ImproveChip("Tournament", Icons.Default.EmojiEvents, onTournamentClick),
-        )
-    }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.md),
-    ) {
-        SectionHeader(
-            title = "Improve your game",
-            modifier = Modifier.padding(horizontal = spacing.lg),
-        )
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            items(chips, key = { it.label }) { chip ->
-                ActionChip(label = chip.label, icon = chip.icon, onClick = chip.onClick)
-            }
-        }
-    }
-}
-
-private data class ImproveChip(
-    val label: String,
-    val icon: ImageVector,
-    val onClick: () -> Unit,
-)
-
-@Composable
-private fun ActionChip(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        color = mc.surface,
-        shape = ChipShape,
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .clip(ChipShape)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(text = label, style = ty.labelMedium, color = mc.textPrimary, maxLines = 1)
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Latest (news)
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun LatestSection(
-    news: List<NewsItem>,
-    onNewsItemClick: (NewsItem) -> Unit,
-    onSeeAllClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val spacing = MaterialTheme.spacing
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.md),
-    ) {
-        SectionHeader(
-            title = "Latest",
-            trailingText = "See all",
-            onTrailingClick = onSeeAllClick,
-            modifier = Modifier.padding(horizontal = spacing.lg),
-        )
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            items(news, key = { it.id }) { item ->
-                NewsCard(item = item, onClick = { onNewsItemClick(item) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun NewsCard(
-    item: NewsItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        color = mc.surface,
-        shape = CardShape,
-        modifier = modifier
-            .width(240.dp)
-            .heightIn(min = 88.dp)
-            .clip(CardShape)
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {},
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .background(mc.surfaceVariant),
-            ) {
-                if (item.imageUrl != null) {
-                    AsyncImage(
-                        model = item.imageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Newspaper,
-                        contentDescription = null,
-                        tint = mc.textDisabled,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(32.dp),
-                    )
-                }
-            }
-            Text(
-                text = item.title,
-                style = ty.bodyMedium,
-                color = mc.textPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(spacing.md),
-            )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Account nudge
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun AccountNudgeCard(
-    nudge: AccountNudge,
-    onCreateAccount: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        color = mc.surface,
-        shape = CardShape,
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.size(22.dp),
-                )
-                Text(
-                    text = "Protect & connect",
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Text(text = nudge.message, style = ty.bodyMedium, color = mc.textSecondary)
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                Surface(
-                    color = mc.primaryAccent,
-                    shape = ButtonShape,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .clip(ButtonShape)
-                        .clickable(onClick = onCreateAccount),
-                ) {
-                    Box(
-                        modifier = Modifier.padding(vertical = spacing.md),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "Create free account",
-                            style = ty.labelMedium,
-                            color = mc.background,
-                            maxLines = 1,
-                        )
-                    }
-                }
-                Surface(
-                    color = mc.surfaceVariant,
-                    shape = ButtonShape,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .widthIn(min = 48.dp)
-                        .clip(ButtonShape)
-                        .clickable(onClick = onDismiss),
-                ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "Maybe later",
-                            style = ty.labelMedium,
-                            color = mc.textSecondary,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Shared bits
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun SectionHeader(
-    title: String,
-    modifier: Modifier = Modifier,
-    trailingText: String? = null,
-    trailingIcon: ImageVector? = null,
-    trailingContentDescription: String? = null,
-    onTrailingClick: (() -> Unit)? = null,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title.uppercase(),
-            style = ty.labelLarge,
-            color = mc.primaryAccent,
-            modifier = Modifier.weight(1f),
-        )
-        if (onTrailingClick != null) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onTrailingClick)
-                    .then(
-                        if (trailingContentDescription != null) {
-                            Modifier.semantics { contentDescription = trailingContentDescription }
-                        } else Modifier
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    trailingText != null -> Text(
-                        text = trailingText,
-                        style = ty.labelMedium,
-                        color = mc.secondaryAccent,
-                    )
-                    trailingIcon != null -> Icon(
-                        imageVector = trailingIcon,
-                        contentDescription = null,
-                        tint = mc.secondaryAccent,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  Display helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Title / subtitle / CTA copy for each hero state. */
-private fun heroCopy(hero: HomeHeroState): Triple<String, String, String> = when (hero) {
-    is HomeHeroState.ActiveGame ->
-        Triple(
-            "Game in progress",
-            "${hero.mode} · ${hero.playerCount} players",
-            "Resume game",
-        )
-    is HomeHeroState.ActiveDraft ->
-        Triple(
-            "Draft in progress",
-            "Set ${hero.setName} · pick up where you left off",
-            "Resume draft",
-        )
-    is HomeHeroState.Summary ->
-        Triple(
-            "Welcome back, ${hero.playerName}",
-            if (hero.totalGames == 1) "1 game tracked" else "${hero.totalGames} games tracked",
-            "Start a game",
-        )
-    HomeHeroState.Loading ->
-        Triple("Loading…", "Getting your dashboard ready", "Start a game")
-    HomeHeroState.Welcome ->
-        Triple(
-            "Welcome to ManaHub",
-            "Track games, scan cards, and build decks — no account needed.",
-            "Start a game",
-        )
-}
-
-/** The CTA intent emitted by the hero button per state. */
-private fun heroCta(hero: HomeHeroState): HomeAction = when (hero) {
-    is HomeHeroState.ActiveGame -> HomeAction.StartGame
-    is HomeHeroState.ActiveDraft -> HomeAction.DraftSimulator
-    is HomeHeroState.Summary -> HomeAction.StartGame
-    HomeHeroState.Loading -> HomeAction.StartGame
-    HomeHeroState.Welcome -> HomeAction.StartGame
-}
-
-/** Human label for a Quick Start action. */
+/** Human label for a Quick Start action (used by the customization sheet). */
 private val QuickStartAction.label: String
     get() = when (this) {
         QuickStartAction.START_GAME -> "Start game"
@@ -1134,48 +542,21 @@ private val QuickStartAction.label: String
         QuickStartAction.SETTINGS -> "Settings"
     }
 
-/** Icon for a Quick Start action. */
-private val QuickStartAction.icon: ImageVector
+/** Icon for a Quick Start action (used by the customization sheet). */
+private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVector
     get() = when (this) {
         QuickStartAction.START_GAME -> Icons.Default.PlayArrow
-        QuickStartAction.SCAN_CARD -> Icons.Default.Bolt
+        QuickStartAction.SCAN_CARD -> Icons.Default.AutoAwesome
         QuickStartAction.CREATE_DECK -> Icons.Default.Style
         QuickStartAction.DRAFT_GUIDE -> Icons.Default.MenuBook
         QuickStartAction.DRAFT_SIMULATOR -> Icons.Default.AutoAwesome
-        QuickStartAction.SEARCH_CARD -> Icons.Default.Search
-        QuickStartAction.LIBRARY -> Icons.Default.CollectionsBookmark
+        QuickStartAction.SEARCH_CARD -> Icons.Default.AutoAwesome
+        QuickStartAction.LIBRARY -> Icons.Default.Style
         QuickStartAction.DECKS -> Icons.Default.Style
-        QuickStartAction.NEWS -> Icons.Default.Newspaper
-        QuickStartAction.STATS -> Icons.Default.QueryStats
+        QuickStartAction.NEWS -> Icons.AutoMirrored.Filled.ArrowForward
+        QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
         QuickStartAction.TOURNAMENTS -> Icons.Default.EmojiEvents
-        QuickStartAction.SETTINGS -> Icons.Default.Settings
-    }
-
-/** Maps a Quick Start action onto its navigation intent. */
-private fun QuickStartAction.toHomeAction(): HomeAction = when (this) {
-    QuickStartAction.START_GAME -> HomeAction.StartGame
-    QuickStartAction.SCAN_CARD -> HomeAction.ScanCard
-    QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
-    QuickStartAction.DRAFT_GUIDE -> HomeAction.DraftGuide
-    QuickStartAction.DRAFT_SIMULATOR -> HomeAction.DraftSimulator
-    QuickStartAction.SEARCH_CARD -> HomeAction.SearchCard
-    QuickStartAction.LIBRARY -> HomeAction.OpenLibrary
-    QuickStartAction.DECKS -> HomeAction.OpenDecks
-    QuickStartAction.NEWS -> HomeAction.OpenNews
-    QuickStartAction.STATS -> HomeAction.OpenStats
-    QuickStartAction.FRIENDS -> HomeAction.OpenFriends
-    QuickStartAction.TRADES -> HomeAction.OpenTrades
-    QuickStartAction.TOURNAMENTS -> HomeAction.OpenTournaments
-    QuickStartAction.SETTINGS -> HomeAction.OpenSettings
-}
-
-/** Icon for a Continue item type. */
-private val ContinueType.icon: ImageVector
-    get() = when (this) {
-        ContinueType.GAME -> Icons.Default.PlayArrow
-        ContinueType.DRAFT -> Icons.Default.AutoAwesome
-        ContinueType.TOURNAMENT -> Icons.Default.EmojiEvents
-        ContinueType.DECK -> Icons.Default.Style
+        QuickStartAction.SETTINGS -> Icons.Default.AutoAwesome
     }

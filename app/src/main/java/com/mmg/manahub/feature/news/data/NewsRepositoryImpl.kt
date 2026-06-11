@@ -11,8 +11,8 @@ import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
 import com.mmg.manahub.feature.news.domain.model.ContentSource
-import com.mmg.manahub.feature.news.domain.model.NewsItem
-import com.mmg.manahub.feature.news.domain.model.SourceType
+import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.feature.news.domain.repository.NewsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

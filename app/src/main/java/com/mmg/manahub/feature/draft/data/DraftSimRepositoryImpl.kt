@@ -13,11 +13,16 @@ import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
 import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
 import com.mmg.manahub.feature.draft.data.remote.dto.BoosterConfigDto
+import com.mmg.manahub.feature.draft.data.remote.dto.EngineConfigDto
 import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
 import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
 import com.mmg.manahub.feature.draft.domain.model.BoosterSheet
 import com.mmg.manahub.feature.draft.domain.model.BoosterVariant
 import com.mmg.manahub.feature.draft.domain.model.DraftError
+import com.mmg.manahub.feature.draft.domain.model.EngineArchetype
+import com.mmg.manahub.feature.draft.domain.model.EngineCardSignals
+import com.mmg.manahub.feature.draft.domain.model.EngineConfig
+import com.mmg.manahub.feature.draft.domain.model.EngineParams
 import com.mmg.manahub.feature.draft.domain.model.DraftResult
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet
@@ -31,6 +36,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -66,6 +73,15 @@ class DraftSimRepositoryImpl @Inject constructor(
          */
         const val CURRENT_SCHEMA_VERSION = 1
     }
+
+    /**
+     * In-memory cache of parsed engine configs, keyed by lowercase set code. The value is
+     * nullable so a set with no engine.json caches its absence (avoids re-fetching a 404 on
+     * every bot pick). Guarded by [engineCacheMutex]; `containsKey` distinguishes
+     * "not yet loaded" from "loaded, absent".
+     */
+    private val engineConfigCache = mutableMapOf<String, EngineConfig?>()
+    private val engineCacheMutex = Mutex()
 
     // Image pre-warming was removed: loading 300+ art crops through the shared 50 MB OkHttp
     // disk cache evicts Scryfall search JSON responses, causing subsequent card-search requests
@@ -156,6 +172,127 @@ class DraftSimRepositoryImpl @Inject constructor(
                 DataResult.Error(DraftError.Unexpected(e.message ?: "Failed to load set").toString())
             }
         }
+
+    // -------------------------------------------------------------------------
+    // getEngineConfig
+    // -------------------------------------------------------------------------
+
+    override suspend fun getEngineConfig(setCode: String): EngineConfig? =
+        withContext(ioDispatcher) {
+            val code = setCode.lowercase()
+
+            // Fast path: under the lock, return the cached value (including a cached null/absent)
+            // if we already loaded this code. The lock is held only for the map lookup, never
+            // across the network call below.
+            engineCacheMutex.withLock {
+                if (engineConfigCache.containsKey(code)) {
+                    return@withContext engineConfigCache[code]
+                }
+            }
+
+            // Slow path: fetch + parse WITHOUT holding the lock, so concurrent requests for
+            // different set codes never block each other. A set without an engine.json (404 / any
+            // error) is a normal, expected case → null, cached below so the bot falls back to the
+            // heuristic without re-fetching. A duplicate concurrent fetch of the SAME code is
+            // acceptable (idempotent); whichever result is stored first wins.
+            val config = try {
+                parseEngineConfig(cloudflareApi.getSetEngine(code), code)
+            } catch (e: Exception) {
+                null
+            }
+
+            // Re-acquire the lock to store. If another coroutine populated this code while we were
+            // fetching, prefer the existing entry (getOrPut semantics) so the result is stable.
+            engineCacheMutex.withLock {
+                if (engineConfigCache.containsKey(code)) {
+                    engineConfigCache[code]
+                } else {
+                    engineConfigCache[code] = config
+                    config
+                }
+            }
+        }
+
+    /**
+     * Maps the Worker's engine.json [JsonObject] to the domain [EngineConfig].
+     * Missing/null fields fall back to [EngineParams] defaults and empty collections so a
+     * partially-formed config still drives the bot rather than crashing it.
+     */
+    private fun parseEngineConfig(json: JsonObject, setCode: String): EngineConfig {
+        val dto = gson.fromJson(json, EngineConfigDto::class.java)
+            ?: throw JsonSyntaxException("Empty engine.json for $setCode")
+
+        val defaults = EngineParams()
+        // Sanitise every weight from untrusted/malformed engine.json: a non-finite (NaN/Infinity)
+        // value breaks `maxWithOrNull`'s comparator (inconsistent ordering → non-deterministic
+        // picks), and a negative weight inverts the scoring term it multiplies. Non-finite → the
+        // default; otherwise clamp to the valid floor. Thresholds/counts are clamped, not defaulted.
+        val params = dto.params?.let { p ->
+            EngineParams(
+                ratingWeight = sanitizeWeight(p.ratingWeight, defaults.ratingWeight),
+                synergyWeight = sanitizeWeight(p.synergyWeight, defaults.synergyWeight),
+                opennessWeight = sanitizeWeight(p.opennessWeight, defaults.opennessWeight),
+                fixingBonus = sanitizeWeight(p.fixingBonus, defaults.fixingBonus),
+                curveWeight = sanitizeWeight(p.curveWeight, defaults.curveWeight),
+                commitmentThreshold = sanitizeWeight(
+                    p.commitmentThreshold,
+                    defaults.commitmentThreshold,
+                ),
+                speculationPicks = (p.speculationPicks ?: defaults.speculationPicks)
+                    .coerceAtLeast(0),
+            )
+        } ?: defaults
+
+        val archetypes = dto.archetypes.orEmpty().mapNotNull { a ->
+            val id = a.id ?: return@mapNotNull null
+            EngineArchetype(
+                id = id,
+                name = a.name ?: id,
+                colors = a.colors.orEmpty(),
+                tier = a.tier ?: 99,
+                // A non-finite or negative openness would poison the openness term; default to 1.0f.
+                opennessBase = (a.opennessBase ?: 1.0f).let {
+                    if (it.isFinite() && it >= 0f) it else 1.0f
+                },
+                keyCardIds = a.keyCardIds.orEmpty(),
+            )
+        }
+
+        val cards = dto.cards.orEmpty().mapNotNull { (id, signals) ->
+            if (id.isBlank()) return@mapNotNull null
+            id to EngineCardSignals(
+                // Keep only finite, non-negative archetype weights; a negative weight would let a
+                // card anti-pick the committed archetype, a NaN/Infinity weight would break scoring.
+                archetypeWeights = signals.archetypeWeights.orEmpty()
+                    .filterValues { it.isFinite() && it >= 0f },
+                // A rating override is only trusted when it is finite and in [0, 1]; otherwise null
+                // so the bot falls back to DraftRatingNormalizer.
+                rating = signals.rating?.takeIf { it.isFinite() && it in 0f..1f },
+                fixing = signals.fixing ?: false,
+                removal = signals.removal ?: false,
+                evasion = signals.evasion ?: false,
+                bomb = signals.bomb ?: false,
+            )
+        }.toMap()
+
+        return EngineConfig(
+            setCode = dto.setCode ?: setCode,
+            schemaVersion = dto.schemaVersion ?: 1,
+            lastUpdated = dto.lastUpdated.orEmpty(),
+            params = params,
+            archetypes = archetypes,
+            cards = cards,
+        )
+    }
+
+    /**
+     * Sanitises a parsed scoring weight: a null or non-finite ([Float.NaN]/±Infinity) value falls
+     * back to [default]; otherwise the value is clamped to `>= 0f` (negative weights invert the
+     * scoring term they multiply and must never reach the bot). Centralised so every [EngineParams]
+     * weight is sanitised identically.
+     */
+    private fun sanitizeWeight(value: Float?, default: Float): Float =
+        if (value == null || !value.isFinite()) default else value.coerceAtLeast(0f)
 
     /**
      * Maps the Worker's booster.json [JsonObject] to the domain [BoosterConfig].

@@ -180,7 +180,7 @@ private fun DashboardContent(
                 Text("Based on your collection's strongest synergies", style = ty.bodyMedium, color = mc.textSecondary)
             }
 
-            items(uiState.discoveries) { discovery ->
+            items(uiState.discoveries, key = { it.label }) { discovery ->
                 DiscoveryCard(discovery = discovery, onClick = { onDiscoveryClick(discovery) })
             }
         }
@@ -201,7 +201,7 @@ private fun DiscoveryCard(discovery: MagicDiscovery, onClick: () -> Unit) {
             Text(discovery.description, style = ty.bodySmall, color = mc.textSecondary)
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(discovery.cards.take(6)) { magicCard ->
+                items(discovery.cards.take(6), key = { it.card.scryfallId }) { magicCard ->
                     AsyncImage(
                         model = magicCard.card.imageArtCrop,
                         contentDescription = null,
@@ -292,7 +292,7 @@ private fun BuildingContent(
 
         Text("Suggestions", style = ty.labelMedium, color = mc.textPrimary)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(uiState.currentSuggestions) { suggestion ->
+            items(uiState.currentSuggestions, key = { it.magicCard.card.scryfallId }) { suggestion ->
                 SuggestionItem(
                     suggestion = suggestion,
                     onClick = { onCardClick(suggestion.magicCard.card.scryfallId) }

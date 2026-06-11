@@ -96,4 +96,13 @@ interface AuthRepository {
      * Pass null to remove the avatar.
      */
     suspend fun updateAvatarUrl(avatarUrl: String?): AuthResult<Unit>
+
+    /**
+     * Signs in anonymously via Supabase anonymous auth.
+     *
+     * Creates a temporary session without requiring any credentials. The resulting [AuthUser]
+     * will have [AuthUser.isAnonymous] set to true and will not have a [user_profiles] row.
+     * Used to allow guests to host or join online sessions without a full account.
+     */
+    suspend fun signInAnonymously(): AuthResult<Unit>
 }
