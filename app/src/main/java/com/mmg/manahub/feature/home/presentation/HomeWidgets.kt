@@ -9,7 +9,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,7 +16,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -38,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -105,6 +104,7 @@ import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.DraftSetCard
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -654,7 +654,6 @@ private fun QuickActionsWidget(actions: List<QuickStartAction>, onAction: (HomeA
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QuickActionTile(
     action: QuickStartAction,
@@ -801,7 +800,6 @@ private fun <T> AutoSlideHub(
 /** A single hub slide: an optional leading badge, a big value, and supporting copy. */
 @Composable
 private fun HubSlide(content: @Composable ColumnScopeMarker.() -> Unit) {
-    val spacing = MaterialTheme.spacing
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -845,6 +843,7 @@ private fun GameStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> U
             slides = slides,
             emptyContent = { WidgetEmptyBody(stringResourceSafe(R.string.home_win_rate_empty)) },
             slideContent = { slide -> GameStatsSlideContent(slide, onAction) },
+            showDots = false,
         )
     }
 }
@@ -859,13 +858,33 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
             val stats = slide.stats
             val color = if (stats.percentage >= 50) mc.lifePositive else mc.lifeNegative
             HubSlide {
-                StatKPI(
-                    value = "${stats.percentage}%",
-                    label = stringResourceSafe(R.string.home_win_rate_record, stats.wins, stats.totalGames),
-                    color = color,
-                    icon = Icons.Default.TrendingUp,
-                    onClick = { onAction(HomeAction.OpenStats) }
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onAction(HomeAction.OpenStats) }
+                        .padding(spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.lg)
+                ) {
+                    AnimatedWinRateRing(
+                        percentage = stats.percentage,
+                        color = color,
+                        modifier = Modifier.size(80.dp)
+                    )
+                    Column {
+                        Text(
+                            text = stringResourceSafe(R.string.home_win_rate_record, stats.wins, stats.totalGames),
+                            style = ty.labelSmall,
+                            color = mc.textSecondary,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "WIN RATE",
+                            style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = mc.textPrimary
+                        )
+                    }
+                }
             }
         }
         is GameStatsSlide.BestDeck -> {
@@ -873,26 +892,48 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
             HubSlide {
                 ClickableBox(onClick = { stats.deckId?.let { onAction(HomeAction.OpenDeck(it)) } ?: onAction(HomeAction.OpenDecks) }) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(spacing.sm),
                         horizontalArrangement = Arrangement.spacedBy(spacing.md),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            color = mc.lifePositive.copy(alpha = 0.15f)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Star, contentDescription = null, tint = mc.lifePositive, modifier = Modifier.size(24.dp))
+                        Box(contentAlignment = Alignment.Center) {
+                            val infiniteTransition = rememberInfiniteTransition(label = "best-deck-glow")
+                            val glowScale by infiniteTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = 1.4f,
+                                animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
+                                label = "glow"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .graphicsLayer(scaleX = glowScale, scaleY = glowScale)
+                                    .clip(CircleShape)
+                                    .background(mc.lifePositive.copy(alpha = 0.1f))
+                            )
+                            Surface(
+                                modifier = Modifier.size(48.dp),
+                                shape = CircleShape,
+                                color = mc.lifePositive.copy(alpha = 0.2f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Star, contentDescription = null, tint = mc.lifePositive, modifier = Modifier.size(24.dp))
+                                }
                             }
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(stats.deckName, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                text = "BEST PERFORMER",
+                                style = ty.labelSmall,
+                                color = mc.lifePositive,
+                                letterSpacing = 1.sp
+                            )
+                            Text(stats.deckName, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                                 Text(
                                     text = stringResourceSafe(R.string.home_win_rate_percent, stats.winRate),
-                                    style = ty.labelLarge,
-                                    color = mc.lifePositive,
+                                    style = ty.labelMedium,
+                                    color = mc.textPrimary,
                                 )
                                 ColorIdentityDots(stats.colorIdentity)
                             }
@@ -906,21 +947,28 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
             HubSlide {
                 ClickableBox(onClick = { onAction(HomeAction.OpenStats) }) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(spacing.sm),
                         horizontalArrangement = Arrangement.spacedBy(spacing.md),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            color = mc.lifeNegative.copy(alpha = 0.15f)
+                            modifier = Modifier.size(56.dp),
+                            shape = CardShape,
+                            color = mc.lifeNegative.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.2f))
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Whatshot, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Default.Whatshot, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(32.dp))
                             }
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(stats.archetype, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                text = "CURRENT NEMESIS",
+                                style = ty.labelSmall,
+                                color = mc.lifeNegative,
+                                letterSpacing = 1.sp
+                            )
+                            Text(stats.archetype, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 text = stringResourceSafe(R.string.home_nemesis_count, stats.count, stats.percentage),
                                 style = ty.labelSmall,
@@ -936,11 +984,20 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
             HubSlide {
                 ClickableBox(onClick = { onAction(HomeAction.OpenStats) }) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.fillMaxWidth().padding(spacing.md),
+                        horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        StatSmallKPI(d.avgWinTurn?.let { "T${it.toInt()}" } ?: "—", stringResourceSafe(R.string.home_performance_win_turn), Icons.Default.TrendingUp)
-                        StatSmallKPI(d.avgLifeOnWin?.toInt()?.toString() ?: "—", stringResourceSafe(R.string.home_performance_life_win), Icons.Default.Insights)
+                        AnimatedStatKPI(
+                            value = d.avgWinTurn?.toInt()?.toString() ?: "—",
+                            prefix = "T",
+                            label = stringResourceSafe(R.string.home_performance_win_turn),
+                            icon = Icons.AutoMirrored.Filled.TrendingUp
+                        )
+                        AnimatedStatKPI(
+                            value = d.avgLifeOnWin?.toInt()?.toString() ?: "—",
+                            label = stringResourceSafe(R.string.home_performance_life_win),
+                            icon = Icons.Default.Insights
+                        )
                     }
                 }
             }
@@ -948,11 +1005,12 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
         is GameStatsSlide.Streak -> {
             val streak = slide.streak
             HubSlide {
+                val color = if (streak.current > 0) mc.lifeNegative else mc.primaryAccent
                 StatKPI(
                     value = (if (streak.current > 0) streak.current else slide.totalGames).toString(),
                     label = if (streak.current > 0) stringResourceSafe(R.string.home_streak_current, streak.current) else stringResourceSafe(R.string.home_win_rate_games, slide.totalGames),
-                    color = mc.primaryAccent,
-                    icon = Icons.Default.LocalFireDepartment,
+                    color = color,
+                    icon = if (streak.current > 0) Icons.Default.LocalFireDepartment else Icons.Default.SportsEsports,
                     onClick = { onAction(HomeAction.StartGame) }
                 )
             }
@@ -962,26 +1020,143 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
             HubSlide {
                 ClickableBox(onClick = { onAction(HomeAction.StartGame) }) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(spacing.sm),
                         horizontalArrangement = Arrangement.spacedBy(spacing.md),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ResultDot(recap.won)
+                        AnimatedResultPulse(recap.won)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
+                                text = "LATEST BATTLE",
+                                style = ty.labelSmall,
+                                color = mc.textSecondary,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
                                 text = recap.deckName ?: recap.mode,
-                                style = ty.titleMedium,
+                                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = mc.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text("${recap.mode} · ${formatDuration(recap.durationMs)}", style = ty.labelSmall, color = mc.textSecondary)
                         }
-                        Icon(Icons.Default.History, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.History, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(20.dp))
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AnimatedWinRateRing(
+    percentage: Int,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val progress = remember { Animatable(0f) }
+    
+    LaunchedEffect(percentage) {
+        progress.animateTo(
+            targetValue = percentage / 100f,
+            animationSpec = tween(1200, easing = FastOutSlowInEasing)
+        )
+    }
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 8.dp.toPx()
+            drawCircle(
+                color = color.copy(alpha = 0.1f),
+                style = Stroke(width = strokeWidth)
+            )
+            drawArc(
+                color = color,
+                startAngle = -90f,
+                sweepAngle = 360f * progress.value,
+                useCenter = false,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "${(progress.value * 100).toInt()}%",
+                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = mc.textPrimary
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedStatKPI(
+    value: String,
+    label: String,
+    icon: ImageVector,
+    prefix: String = ""
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(spacing.xs)
+    ) {
+        Surface(
+            modifier = Modifier.size(40.dp),
+            shape = CircleShape,
+            color = mc.primaryAccent.copy(alpha = 0.1f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "$prefix$value",
+                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = mc.textPrimary
+            )
+            Text(
+                text = label.uppercase(),
+                style = ty.labelSmall.copy(fontSize = 9.sp),
+                color = mc.textSecondary,
+                letterSpacing = 0.5.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedResultPulse(won: Boolean) {
+    val mc = MaterialTheme.magicColors
+    val color = if (won) mc.lifePositive else mc.lifeNegative
+    
+    val infiniteTransition = rememberInfiniteTransition(label = "result-pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
+        label = "pulse"
+    )
+    
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(color.copy(alpha = alpha))
+        )
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
     }
 }
 
@@ -1018,7 +1193,6 @@ private fun CollectionStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction
 @Composable
 private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction) -> Unit) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     when (slide) {
         is CollectionSlide.Snapshot -> {
@@ -1069,7 +1243,7 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
 
             HubSlide {
                 ClickableBox(onClick = { onAction(HomeAction.OpenLibrary) }) {
-                    CompactCircularDistribution(
+                    CircularDistribution(
                         data = slide.byColor.entries
                             .associate { (code, count) ->
                                 val label = when (code) {
@@ -1094,7 +1268,8 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
                                 else -> mc.primaryAccent
                             }
                         },
-                        isColor = true
+                        isColor = true,
+                        isCompact = true
                     )
                 }
             }
@@ -1107,7 +1282,7 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
 
             HubSlide {
                 ClickableBox(onClick = { onAction(HomeAction.OpenLibrary) }) {
-                    CompactCircularDistribution(
+                    CircularDistribution(
                         data = slide.byRarity.entries.associate { entry ->
                             val label = when (entry.key) {
                                 "MYTHIC" -> rarityMythic
@@ -1126,184 +1301,8 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
                                 rarityMythic -> Color(0xFFE8A030)
                                 else -> Color(0xFF9B6EFF)
                             }
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun CompactCircularDistribution(
-    data: Map<String, Int>,
-    colorMapper: (String) -> Color,
-    isColor: Boolean = false,
-) {
-    if (data.isEmpty()) return
-    val total = data.values.sum().toFloat().coerceAtLeast(1f)
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    
-    val animationProgress = remember { Animatable(0f) }
-    LaunchedEffect(data) {
-        animationProgress.snapTo(0f)
-        animationProgress.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
-        )
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        // The Ring Chart
-        Box(modifier = Modifier.size(80.dp), contentAlignment = Alignment.Center) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeWidth = 10.dp.toPx()
-                val ringSize = size.minDimension - strokeWidth
-                val topLeftOffset = androidx.compose.ui.geometry.Offset(
-                    (size.width - ringSize) / 2,
-                    (size.height - ringSize) / 2
-                )
-                val arcSize = androidx.compose.ui.geometry.Size(ringSize, ringSize)
-                val center = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
-
-                var startAngle = -90f
-                val sortedData = data.entries.sortedByDescending { it.value }
-                
-                // Draw Background Segments (Alpha)
-                sortedData.forEach { (label, count) ->
-                    val sweepAngle = (count / total) * 360f * animationProgress.value
-                    if (sweepAngle <= 0f) return@forEach
-                    val baseColor = colorMapper(label)
-                    drawArc(
-                        color = baseColor.copy(alpha = 0.75f),
-                        startAngle = startAngle,
-                        sweepAngle = sweepAngle,
-                        useCenter = false,
-                        topLeft = topLeftOffset,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidth)
-                    )
-                    startAngle += sweepAngle
-                }
-                
-                // Draw Strokes and Dividers (Solid)
-                startAngle = -90f
-                sortedData.forEach { (label, count) ->
-                    val sweepAngle = (count / total) * 360f * animationProgress.value
-                    if (sweepAngle <= 0f) return@forEach
-                    val baseColor = colorMapper(label)
-                    
-                    // 1. Outer Stroke (0.5dp)
-                    val outerSizeValue = ringSize + strokeWidth
-                    drawArc(
-                        color = baseColor,
-                        startAngle = startAngle,
-                        sweepAngle = sweepAngle,
-                        useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(
-                            (center.x - outerSizeValue / 2),
-                            (center.y - outerSizeValue / 2)
-                        ),
-                        size = androidx.compose.ui.geometry.Size(outerSizeValue, outerSizeValue),
-                        style = Stroke(width = 0.5.dp.toPx())
-                    )
-
-                    // 2. Inner Stroke (0.5dp)
-                    val innerSizeValue = ringSize - strokeWidth
-                    drawArc(
-                        color = baseColor,
-                        startAngle = startAngle,
-                        sweepAngle = sweepAngle,
-                        useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(
-                            (center.x - innerSizeValue / 2),
-                            (center.y - innerSizeValue / 2)
-                        ),
-                        size = androidx.compose.ui.geometry.Size(innerSizeValue, innerSizeValue),
-                        style = Stroke(width = 0.5.dp.toPx())
-                    )
-
-                    // 3. Radial Separator
-                    val startAngleRad = (startAngle * PI / 180f)
-                    val innerR = innerSizeValue / 2
-                    val outerR = outerSizeValue / 2
-                    
-                    drawLine(
-                        color = mc.surface,
-                        start = androidx.compose.ui.geometry.Offset(
-                            center.x + innerR * cos(startAngleRad).toFloat(),
-                            center.y + innerR * sin(startAngleRad).toFloat()
-                        ),
-                        end = androidx.compose.ui.geometry.Offset(
-                            center.x + outerR * cos(startAngleRad).toFloat(),
-                            center.y + outerR * sin(startAngleRad).toFloat()
-                        ),
-                        strokeWidth = 0.5.dp.toPx()
-                    )
-
-                    startAngle += sweepAngle
-                }
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "${total.toInt()}",
-                    style = ty.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = mc.textPrimary
-                )
-            }
-        }
-
-        Spacer(Modifier.width(spacing.md))
-
-        // Legend
-        Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            data.entries.sortedByDescending { it.value }.take(6).forEach { (label, count) ->
-                val percentage = (count / total * 100).toInt()
-                val colorCode = if (isColor) {
-                    when (label) {
-                        stringResourceSafe(R.string.stats_color_white) -> "W"
-                        stringResourceSafe(R.string.stats_color_blue) -> "U"
-                        stringResourceSafe(R.string.stats_color_black) -> "B"
-                        stringResourceSafe(R.string.stats_color_red) -> "R"
-                        stringResourceSafe(R.string.stats_color_green) -> "G"
-                        stringResourceSafe(R.string.stats_color_colorless) -> "C"
-                        else -> null
-                    }
-                } else null
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (colorCode != null) {
-                        ManaSymbolImage(token = colorCode, size = 14.dp)
-                    } else {
-                        Box(
-                            modifier = Modifier.size(8.dp).clip(CircleShape).background(colorMapper(label))
-                        )
-                    }
-                    
-                    Text(
-                        text = label,
-                        style = ty.labelSmall,
-                        color = mc.textPrimary,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "$percentage%",
-                        style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = mc.textPrimary
+                        },
+                        isCompact = true
                     )
                 }
             }
@@ -1778,7 +1777,7 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
         is SocialSlide.MostWishlisted -> HubSlide {
             ClickableBox(onClick = { onAction(HomeAction.OpenStats) }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.Default.TrendingUp, mc.primaryAccent)
+                    HubBadge(Icons.AutoMirrored.Filled.TrendingUp, mc.primaryAccent)
                     Column {
                         Text(stringResourceSafe(R.string.widget_title_most_wishlisted), style = ty.titleMedium, color = mc.textPrimary)
                         slide.entries.take(1).forEach { entry ->
@@ -1946,22 +1945,6 @@ private fun StatKPI(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun StatSmallKPI(
-    value: String,
-    label: String,
-    icon: ImageVector,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(spacing.xxs)) {
-        Icon(icon, contentDescription = null, tint = mc.primaryAccent.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
-        Text(value, style = ty.titleMedium.copy(fontWeight = FontWeight.Bold), color = mc.textPrimary)
-        Text(label.uppercase(), style = ty.labelSmall.copy(fontSize = 9.sp), color = mc.textSecondary, letterSpacing = 0.5.sp)
     }
 }
 
