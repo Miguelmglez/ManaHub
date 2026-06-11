@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.stats.presentation
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -95,6 +94,7 @@ import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.ManaCurveChart
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -1063,7 +1063,6 @@ private fun SetStatsSection(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CircularDistributionSection(
     title: String,
@@ -1072,17 +1071,7 @@ private fun CircularDistributionSection(
     isColor: Boolean = false,
 ) {
     if (data.isEmpty()) return
-    val total = data.values.sum().toFloat().coerceAtLeast(1f)
     val mc = MaterialTheme.magicColors
-    
-    val animationProgress = remember { Animatable(0f) }
-    LaunchedEffect(data) {
-        animationProgress.snapTo(0f)
-        animationProgress.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
-        )
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
@@ -1091,170 +1080,12 @@ private fun CircularDistributionSection(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = mc.surface),
         ) {
-            Row(
-                modifier = Modifier.padding(20.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                // The Ring Chart
-                Box(modifier = Modifier.size(120.dp), contentAlignment = Alignment.Center) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val strokeWidth = 16.dp.toPx()
-                        val ringSize = size.minDimension - strokeWidth
-                        val topLeftOffset = androidx.compose.ui.geometry.Offset(
-                            (size.width - ringSize) / 2,
-                            (size.height - ringSize) / 2
-                        )
-                        val arcSize = androidx.compose.ui.geometry.Size(ringSize, ringSize)
-                        val center = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
-
-                        var startAngle = -90f
-                        val sortedData = data.entries.sortedByDescending { it.value }
-                        
-                        // Draw Background Segments (Alpha)
-                        sortedData.forEach { (label, count) ->
-                            val sweepAngle = (count / total) * 360f * animationProgress.value
-                            if (sweepAngle <= 0f) return@forEach
-                            val baseColor = colorMapper(label)
-                            drawArc(
-                                color = baseColor.copy(alpha = 0.75f),
-                                startAngle = startAngle,
-                                sweepAngle = sweepAngle,
-                                useCenter = false,
-                                topLeft = topLeftOffset,
-                                size = arcSize,
-                                style = Stroke(width = strokeWidth)
-                            )
-                            startAngle += sweepAngle
-                        }
-                        
-                        // Draw Strokes and Dividers (Solid)
-                        startAngle = -90f
-                        sortedData.forEach { (label, count) ->
-                            val sweepAngle = (count / total) * 360f * animationProgress.value
-                            if (sweepAngle <= 0f) return@forEach
-                            val baseColor = colorMapper(label)
-                            
-                            // 1. Outer Stroke (1dp)
-                            val outerSizeValue = ringSize + strokeWidth
-                            drawArc(
-                                color = baseColor,
-                                startAngle = startAngle,
-                                sweepAngle = sweepAngle,
-                                useCenter = false,
-                                topLeft = androidx.compose.ui.geometry.Offset(
-                                    (center.x - outerSizeValue / 2),
-                                    (center.y - outerSizeValue / 2)
-                                ),
-                                size = androidx.compose.ui.geometry.Size(outerSizeValue, outerSizeValue),
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-
-                            // 2. Inner Stroke (1dp)
-                            val innerSizeValue = ringSize - strokeWidth
-                            drawArc(
-                                color = baseColor,
-                                startAngle = startAngle,
-                                sweepAngle = sweepAngle,
-                                useCenter = false,
-                                topLeft = androidx.compose.ui.geometry.Offset(
-                                    (center.x - innerSizeValue / 2),
-                                    (center.y - innerSizeValue / 2)
-                                ),
-                                size = androidx.compose.ui.geometry.Size(innerSizeValue, innerSizeValue),
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-
-                            // 3. Radial Separator
-                            val startAngleRad = (startAngle * PI / 180f)
-                            val innerR = innerSizeValue / 2
-                            val outerR = outerSizeValue / 2
-                            
-                            drawLine(
-                                color = mc.surface,
-                                start = androidx.compose.ui.geometry.Offset(
-                                    center.x + innerR * cos(startAngleRad).toFloat(),
-                                    center.y + innerR * sin(startAngleRad).toFloat()
-                                ),
-                                end = androidx.compose.ui.geometry.Offset(
-                                    center.x + outerR * cos(startAngleRad).toFloat(),
-                                    center.y + outerR * sin(startAngleRad).toFloat()
-                                ),
-                                strokeWidth = 1.dp.toPx()
-                            )
-
-                            startAngle += sweepAngle
-                        }
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "${total.toInt()}",
-                            style = MaterialTheme.magicTypography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp),
-                            color = mc.textPrimary
-                        )
-                        Text(
-                            text = stringResource(R.string.stats_label_total),
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.textSecondary
-                        )
-                    }
-                }
-
-                // Legend
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    val whiteName = stringResource(R.string.stats_color_white)
-                    val blueName = stringResource(R.string.stats_color_blue)
-                    val blackName = stringResource(R.string.stats_color_black)
-                    val redName = stringResource(R.string.stats_color_red)
-                    val greenName = stringResource(R.string.stats_color_green)
-                    val colorlessName = stringResource(R.string.stats_color_colorless)
-
-                    data.entries.sortedByDescending { it.value }.forEach { (label, count) ->
-                        val percentage = (count / total * 100).toInt()
-                        val colorCode = if (isColor) {
-                            when (label) {
-                                whiteName -> "W"
-                                blueName -> "U"
-                                blackName -> "B"
-                                redName -> "R"
-                                greenName -> "G"
-                                colorlessName -> "C"
-                                else -> null
-                            }
-                        } else null
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            if (colorCode != null) {
-                                ManaSymbolImage(token = colorCode, size = 18.dp)
-                            } else {
-                                Box(
-                                    modifier = Modifier.size(10.dp).clip(CircleShape).background(colorMapper(label))
-                                )
-                            }
-                            
-                            Text(
-                                text = label,
-                                style = MaterialTheme.magicTypography.labelMedium,
-                                color = mc.textPrimary,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "$percentage%",
-                                style = MaterialTheme.magicTypography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = mc.textPrimary
-                            )
-                        }
-                    }
-                }
-            }
+            CircularDistribution(
+                data = data,
+                colorMapper = colorMapper,
+                isColor = isColor,
+                modifier = Modifier.padding(20.dp)
+            )
         }
     }
 }
