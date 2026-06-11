@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.presentation.improvement
 
+import androidx.compose.runtime.Stable
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
@@ -8,6 +9,8 @@ import com.mmg.manahub.feature.decks.presentation.engine.CardFit
 /** Top-level tabs of the Deck Doctor screen. */
 enum class DeckDoctorTab { HEALTH, CUT, ADD }
 
+/** Deck Doctor UI state. [Stable] because mutations go through [copy] and StateFlow. */
+@Stable
 data class DeckImprovementUiState(
     val deckName: String = "",
     /** Read-only Health evaluation from the scoring engine. Null until computed. */

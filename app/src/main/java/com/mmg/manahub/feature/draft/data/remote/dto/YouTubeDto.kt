@@ -1,35 +1,42 @@
 package com.mmg.manahub.feature.draft.data.remote.dto
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class YouTubeSearchResponse(
-    @SerializedName("items") val items: List<YouTubeVideoDto>,
+    @SerialName("items") val items: List<YouTubeVideoDto>,
 )
 
+@Serializable
 data class YouTubeVideoDto(
-    @SerializedName("id") val id: YouTubeVideoId,
-    @SerializedName("snippet") val snippet: YouTubeSnippet,
+    @SerialName("id") val id: YouTubeVideoId,
+    @SerialName("snippet") val snippet: YouTubeSnippet,
 )
 
+@Serializable
 data class YouTubeVideoId(
-    @SerializedName("videoId") val videoId: String,
+    @SerialName("videoId") val videoId: String,
 )
 
+@Serializable
 data class YouTubeSnippet(
-    @SerializedName("title") val title: String,
-    @SerializedName("description") val description: String,
-    @SerializedName("thumbnails") val thumbnails: YouTubeThumbnails,
-    @SerializedName("channelTitle") val channelTitle: String,
-    @SerializedName("publishedAt") val publishedAt: String,
+    @SerialName("title") val title: String,
+    @SerialName("description") val description: String,
+    @SerialName("thumbnails") val thumbnails: YouTubeThumbnails,
+    @SerialName("channelTitle") val channelTitle: String,
+    @SerialName("publishedAt") val publishedAt: String,
 )
 
+@Serializable
 data class YouTubeThumbnails(
-    @SerializedName("medium") val medium: YouTubeThumbnail?,
-    @SerializedName("high") val high: YouTubeThumbnail?,
+    @SerialName("medium") val medium: YouTubeThumbnail? = null,
+    @SerialName("high") val high: YouTubeThumbnail? = null,
 )
 
+@Serializable
 data class YouTubeThumbnail(
-    @SerializedName("url") val url: String,
-    @SerializedName("width") val width: Int?,
-    @SerializedName("height") val height: Int?,
+    @SerialName("url") val url: String,
+    @SerialName("width") val width: Int? = null,
+    @SerialName("height") val height: Int? = null,
 )

@@ -4,6 +4,7 @@ import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
 import com.mmg.manahub.feature.draft.domain.model.BoosterPack
 import com.mmg.manahub.feature.draft.domain.model.DraftCard
 import com.mmg.manahub.feature.draft.domain.model.DraftSeat
+import com.mmg.manahub.feature.draft.domain.model.EngineConfig
 
 /**
  * Heuristic two-phase bot drafter.
@@ -23,7 +24,18 @@ import com.mmg.manahub.feature.draft.domain.model.DraftSeat
  */
 class HeuristicBotDrafter : BotDrafter {
 
-    override fun pick(seat: DraftSeat, pack: BoosterPack, round: Int, pickNumber: Int): DraftCard {
+    override fun pick(
+        seat: DraftSeat,
+        pack: BoosterPack,
+        round: Int,
+        pickNumber: Int,
+        engine: EngineConfig?,
+    ): DraftCard {
+        // A pick can never be made from an empty pack; fail fast rather than crash on the
+        // `?: pack.cards.first()` fallback below (which would throw NoSuchElementException).
+        require(pack.cards.isNotEmpty()) { "HeuristicBotDrafter.pick called with an empty pack" }
+        // The heuristic drafter intentionally ignores [engine]; it is the colour-commitment fallback
+        // used when a set has no engine.json.
         val commitment = buildColorCommitment(seat.pool)
         return pack.cards.maxByOrNull { card -> score(card, commitment, seat.pool) }
             ?: pack.cards.first()
@@ -85,25 +97,8 @@ class HeuristicBotDrafter : BotDrafter {
         return card.card.colors.any { it !in committed }
     }
 
-    /**
-     * Normalised tier rating in `[0, 1]`. Prefers [DraftCard.pickOrderRank] (lower rank = stronger);
-     * falls back to a coarse mapping of [DraftCard.tierRating] when no rank is available.
-     */
-    private fun ratingScore(card: DraftCard): Float {
-        val rank = card.pickOrderRank
-        if (rank != null) {
-            return (1.0f - (rank - 1).toFloat() / MAX_RANK).coerceIn(0f, 1f)
-        }
-        return when (card.tierRating?.uppercase()) {
-            "S" -> 0.90f
-            "A" -> 0.75f
-            "B" -> 0.55f
-            "C" -> 0.35f
-            "D" -> 0.20f
-            "F" -> 0.05f
-            else -> 0.30f
-        }
-    }
+    /** Normalised tier rating in `[0, 1]`; shared with [ArchetypeAwareBotDrafter]. */
+    private fun ratingScore(card: DraftCard): Float = DraftRatingNormalizer.ratingScore(card)
 
     private fun synergyBonus(card: DraftCard, pool: List<DraftCard>): Float {
         var bonus = 0f
@@ -148,9 +143,6 @@ class HeuristicBotDrafter : BotDrafter {
     }
 
     private companion object {
-        /** Safe ceiling for pick-order ranks when normalising to `[0, 1]`. */
-        const val MAX_RANK = 200f
-
         const val PHASE_FACTOR_SPECULATION = 0.2f
         const val PHASE_FACTOR_COMMITMENT = 0.6f
 

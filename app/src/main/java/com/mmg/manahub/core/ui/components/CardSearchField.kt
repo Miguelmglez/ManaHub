@@ -147,7 +147,7 @@ fun CardSearchField(
                     shadowElevation = 8.dp,
                 ) {
                     LazyColumn {
-                        items(results) { card ->
+                        items(results, key = { it.scryfallId }) { card ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

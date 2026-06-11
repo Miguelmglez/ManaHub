@@ -3,8 +3,8 @@ package com.mmg.manahub.feature.news.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.feature.news.domain.model.ContentSource
-import com.mmg.manahub.feature.news.domain.model.NewsItem
-import com.mmg.manahub.feature.news.domain.model.SourceType
+import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
@@ -86,7 +86,7 @@ class NewsViewModel @Inject constructor(
 
         NewsUiState(
             items             = items,
-            isLoading         = _isInitialLoad.value && (items.isEmpty() || refreshing),
+            isLoading         = _isInitialLoad.value && items.isEmpty(),
             isRefreshing      = refreshing && !_isInitialLoad.value,
             searchQuery       = _searchQuery.value,
             filterTypes       = filterTypes,

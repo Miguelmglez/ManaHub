@@ -130,26 +130,122 @@ class CardOcrAnalyzer {
 
     private fun isCardTypeLine(text: String): Boolean {
         val types = setOf(
+            // English card types and common sub-types
             "Creature", "Instant", "Sorcery", "Enchantment",
             "Artifact", "Planeswalker", "Land", "Battle",
             "Legendary", "Basic", "Snow", "Token",
             "Human", "Wizard", "Warrior", "Dragon",
             "Elf", "Goblin", "Zombie", "Angel", "Demon",
+
+            // Spanish card types (ES localised cards)
+            "Criatura",        // Creature
+            "Instantáneo",     // Instant
+            "Conjuro",         // Sorcery
+            "Encantamiento",   // Enchantment
+            "Artefacto",       // Artifact
+            "Planeswalker",    // same in ES
+            "Tierra",          // Land
+            "Batalla",         // Battle
+            "Legendario",      // Legendary
+            "Básica",          // Basic (land)
+            "Ficha",           // Token
+            "Humano",          // Human
+            "Mago",            // Wizard (ES)
+            "Guerrero",        // Warrior (ES)
+            "Dragón",          // Dragon (ES)
+            "Elfo",            // Elf (ES)
+            "Trasgo",          // Goblin (ES)
+            "Zombi",           // Zombie (ES)
+            "Ángel",           // Angel (ES)
+            "Demonio",         // Demon (ES)
+
+            // German card types (DE localised cards)
+            "Kreatur",         // Creature
+            "Spontanzauber",   // Instant
+            "Hexerei",         // Sorcery
+            "Verzauberung",    // Enchantment
+            "Artefakt",        // Artifact
+            "Planeswalker",    // same in DE
+            "Land",            // same in DE
+            "Schlacht",        // Battle
+            "Legendär",        // Legendary
+            "Normales",        // Basic (land prefix)
+            "Spielstein",      // Token
+            "Mensch",          // Human (DE)
+            "Magier",          // Wizard (DE)
+            "Krieger",         // Warrior (DE)
+            "Drache",          // Dragon (DE)
+            "Elf",             // Elf (DE — same as EN)
+            "Goblin",          // Goblin (DE — same as EN)
+            "Zombie",          // Zombie (DE — same as EN)
+            "Engel",           // Angel (DE)
+            "Dämon",           // Demon (DE)
         )
         return types.any { text.contains(it, ignoreCase = true) }
     }
 
     private fun isRulesText(text: String): Boolean {
         val phraseKeywords = setOf(
+            // English rules-text phrases
             "when ", "whenever ", "at the beginning",
             "draw a card", "you may", "each player", "all creatures",
             "at the end", "at the start",
+
+            // Spanish rules-text phrases (ES localised cards)
+            "cuando ",         // when / whenever
+            "al comienzo",     // at the beginning
+            "roba una carta",  // draw a card
+            "puedes ",         // you may
+            "cada jugador",    // each player
+            "todas las criaturas", // all creatures
+            "al final",        // at the end
+
+            // German rules-text phrases (DE localised cards)
+            "wenn ",           // when / whenever
+            "zu beginn",       // at the beginning
+            "ziehe eine karte",// draw a card
+            "du kannst",       // you may
+            "jeder spieler",   // each player
+            "alle kreaturen",  // all creatures
+            "am ende",         // at the end
         )
         val singleWordKeywords = setOf(
+            // English keywords
             "flying", "haste", "trample", "lifelink",
             "deathtouch", "vigilance", "reach", "flash",
             "target", "damage", "destroy", "exile",
             "tap", "untap", "counter",
+
+            // Spanish keywords (ES localised cards)
+            "volar",           // flying (ES)
+            "prisa",           // haste (ES)
+            "arrollar",        // trample (ES)
+            "vinculo vital",   // lifelink (ES)
+            "toque mortal",    // deathtouch (ES)
+            "vigilancia",      // vigilance (ES)
+            "alcance",         // reach (ES)
+            "destello",        // flash (ES)
+            "objetivo",        // target (ES)
+            "daño",            // damage (ES)
+            "destruir",        // destroy (ES)
+            "exiliar",         // exile (ES)
+            "girar",           // tap (ES)
+            "enderezar",       // untap (ES)
+
+            // German keywords (DE localised cards)
+            "flugfähigkeit",   // flying (DE)
+            "eile",            // haste (DE)
+            "trampeln",        // trample (DE)
+            "lebensband",      // lifelink (DE)
+            "todesberührung",  // deathtouch (DE)
+            "wachsamkeit",     // vigilance (DE)
+            "reichweite",      // reach (DE)
+            "blitz",           // flash (DE)
+            "ziel",            // target (DE)
+            "schaden",         // damage (DE)
+            "zerstören",       // destroy (DE)
+            "verbannen",       // exile (DE)
+            "tap",             // tap (DE — same as EN)
         )
         val lower = text.lowercase().trim()
         if (phraseKeywords.any { lower.contains(it) }) return true

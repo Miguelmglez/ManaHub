@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.news.domain.model.NewsItem
+import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.util.TimeAgoFormatter
 
 @Composable

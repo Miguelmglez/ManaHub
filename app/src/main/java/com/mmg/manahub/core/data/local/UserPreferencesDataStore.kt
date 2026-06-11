@@ -20,7 +20,10 @@ import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.ui.theme.AppTheme
+import com.mmg.manahub.feature.home.presentation.HomeWidgetType
 import com.mmg.manahub.feature.home.presentation.QuickStartAction
+import com.mmg.manahub.feature.home.presentation.WidgetInstance
+import com.mmg.manahub.feature.home.presentation.WidgetSize
 import com.mmg.manahub.core.util.PriceFormatter.isEuropeanLocale
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -52,6 +55,15 @@ private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mod
 private val KEY_QUICK_START_ORDER     = stringPreferencesKey("quick_start_order")
 /** Epoch millis of the last account-nudge dismissal (cooldown anchor). */
 private val KEY_ACCOUNT_NUDGE_DISMISSED_AT = longPreferencesKey("account_nudge_dismissed_at")
+/** Ordered "persistedId:SIZE_NAME" tokens joined by "," describing the dashboard layout. */
+private val KEY_HOME_LAYOUT = stringPreferencesKey("home_widget_layout")
+/** Whether the customization coach-mark has been dismissed. */
+private val KEY_HOME_COACHMARK_SEEN = booleanPreferencesKey("home_coachmark_seen")
+/**
+ * Comma-separated set of step IDs that the user has explicitly skipped from the
+ * First Steps carousel. Order is not significant; duplicates are not produced.
+ */
+private val KEY_FIRST_STEPS_SKIPPED = stringPreferencesKey("home_first_steps_skipped")
 
 /** How long the account nudge stays suppressed after a dismissal. */
 private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hours
@@ -413,5 +425,98 @@ class UserPreferencesDataStore @Inject constructor(
                 System.currentTimeMillis() - dismissedAt < ACCOUNT_NUDGE_COOLDOWN_MS
             }
             .catch { emit(false) }
+
+    // ── Home widget layout ────────────────────────────────────────────────────
+    //
+    // The dashboard layout is serialised as ordered "persistedId:SIZE_NAME" tokens
+    // joined by ",". Unknown/removed widget ids and unknown size names are silently
+    // skipped on decode, so the encoding is forward- and backward-compatible: an
+    // older app reading a newer layout simply drops widget types it doesn't know.
+    // An empty decode result falls back to the supplied default layout.
+
+    /**
+     * Emits the user's persisted dashboard layout, or [defaultLayout] when nothing
+     * is stored or every stored token is unrecognisable.
+     *
+     * @param defaultLayout the auth-appropriate default, supplied by the caller so
+     *  this DataStore stays unaware of which default applies.
+     */
+    fun homeLayoutFlow(defaultLayout: List<WidgetInstance>): Flow<List<WidgetInstance>> =
+        context.userPrefsDataStore.data
+            .map { prefs ->
+                val raw = prefs[KEY_HOME_LAYOUT]
+                val parsed = raw
+                    ?.split(",")
+                    ?.mapNotNull { token -> decodeWidgetToken(token) }
+                    ?: emptyList()
+                // Deduplicate by persistedId: a corrupt stored string could produce two
+                // WidgetInstances with the same key, crashing the LazyVerticalGrid.
+                parsed.distinctBy { it.type.persistedId }.ifEmpty { defaultLayout }
+            }
+            .catch { emit(defaultLayout) }
+
+    /** Persists [layout] as an ordered "persistedId:SIZE_NAME" token string. */
+    suspend fun saveHomeLayout(layout: List<WidgetInstance>) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[KEY_HOME_LAYOUT] = layout.joinToString(",") { instance ->
+                "${instance.type.persistedId}:${instance.size.name}"
+            }
+        }
+    }
+
+    /** Emits whether the customization coach-mark has already been shown. */
+    val homeCoachmarkSeenFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { it[KEY_HOME_COACHMARK_SEEN] ?: false }
+        .catch { emit(false) }
+
+    /** Marks the customization coach-mark as seen so it never shows again. */
+    suspend fun markHomeCoachmarkSeen() {
+        context.userPrefsDataStore.edit { it[KEY_HOME_COACHMARK_SEEN] = true }
+    }
+
+    /** Decodes a single "persistedId:SIZE_NAME" token, or null when either half is unknown. */
+    private fun decodeWidgetToken(token: String): WidgetInstance? {
+        val parts = token.trim().split(":")
+        if (parts.size != 2) return null
+        val type = HomeWidgetType.fromPersistedId(parts[0].trim()) ?: return null
+        val size = WidgetSize.entries.firstOrNull { it.name == parts[1].trim() } ?: return null
+        return WidgetInstance(type = type, size = size)
+    }
+
+    // ── Home dashboard: First Steps carousel ─────────────────────────────────
+    //
+    // Skipped step IDs are stored as a comma-separated string (same pattern as
+    // KEY_QUICK_START_ORDER). Using a plain String rather than StringSet preserves
+    // compatibility and keeps encoding consistent with other Home keys in this file.
+
+    /**
+     * Emits the set of step IDs the user has explicitly skipped in the First Steps
+     * carousel. An empty set means no steps have been skipped yet.
+     */
+    fun observeSkippedFirstSteps(): Flow<Set<String>> =
+        context.userPrefsDataStore.data
+            .map { prefs ->
+                prefs[KEY_FIRST_STEPS_SKIPPED]
+                    ?.split(",")
+                    ?.filter { it.isNotBlank() }
+                    ?.toSet()
+                    ?: emptySet()
+            }
+            .catch { emit(emptySet()) }
+
+    /**
+     * Persists [stepId] as skipped. Idempotent: adding an already-present id is a no-op.
+     */
+    suspend fun skipFirstStep(stepId: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            val current = prefs[KEY_FIRST_STEPS_SKIPPED]
+                ?.split(",")
+                ?.filter { it.isNotBlank() }
+                ?.toMutableSet()
+                ?: mutableSetOf()
+            current.add(stepId)
+            prefs[KEY_FIRST_STEPS_SKIPPED] = current.joinToString(",")
+        }
+    }
 
 }

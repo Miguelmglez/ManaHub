@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.domain.model
 
 /**
  * Domain model representing a Magic: The Gathering set available for draft.

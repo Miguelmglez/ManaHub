@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.stats.presentation
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.domain.model.CollectionStats
@@ -22,6 +24,7 @@ enum class StatsTab { COLLECTION, GAMES }
  * @param mostFrequentLoss Most common elimination reason, null when no data.
  * @param pendingSurveys Count of sessions with PENDING or PARTIAL survey status.
  */
+@Immutable
 data class GameStats(
     val totalGames: Int,
     val wins: Int,
@@ -38,6 +41,7 @@ data class GameStats(
  * @param isWin True when [winnerName] matches the app user's player name.
  * @param deckName Resolved deck name from [deckId]; null when no deck associated.
  */
+@Immutable
 data class GameHistoryItem(
     val sessionId: Long,
     val playedAt: Long,
@@ -55,6 +59,7 @@ data class GameHistoryItem(
  *
  * @param winrate Fraction in [0f, 1f].
  */
+@Immutable
 data class DeckPerformance(
     val deckId: String,
     val deckName: String,
@@ -63,6 +68,8 @@ data class DeckPerformance(
     val winrate: Float,
 )
 
+/** The stats UI state. [Stable] because all field changes go through [copy] and StateFlow. */
+@Stable
 data class StatsUiState(
     // ── Collection tab ────────────────────────────────────────────────────────
     val selectedColor:       MtgColor?        = null,

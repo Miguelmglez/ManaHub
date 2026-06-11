@@ -71,6 +71,18 @@ import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 /** Valid pick-timer presets (seconds). The first entry (0) means "no timer". */
 private val TIMER_PRESETS = listOf(0, 15, 30, 60)
 
+/** Allowed draft pod sizes: 2–10 seats (one human + the rest bots). */
+private const val MIN_PLAYERS = 2
+private const val MAX_PLAYERS = 10
+private const val DEFAULT_PLAYERS = 8
+
+/**
+ * Size of the small inline info icon in the player-count selector. Sits between the spacing tokens
+ * `sp.lg` (16dp) and `sp.xl` (24dp); a named constant keeps it readable as a non-touch decorative
+ * glyph without forcing it onto the spacing scale.
+ */
+private val PlayerInfoIconSize = 18.dp
+
 /**
  * Configuration screen for a draft simulation: mode selection and an optional pick timer.
  * Transitions to the drafting screen via [onNavigateToDrafting] once a draft is started.
@@ -89,6 +101,7 @@ fun DraftSetupScreen(
     val toastState = rememberMagicToastState()
 
     var timerIndex by remember { mutableStateOf(0) }
+    var playerCount by remember { mutableStateOf(DEFAULT_PLAYERS) }
 
     // Navigate to drafting once a draft begins.
     LaunchedEffect(state) {
@@ -152,6 +165,8 @@ fun DraftSetupScreen(
                     ) {
                         SetupForm(
                             setName = s.setName,
+                            playerCount = playerCount,
+                            onPlayerCountChanged = { playerCount = it },
                             timerIndex = timerIndex,
                             onTimerChanged = { timerIndex = it },
                             onStart = {
@@ -160,7 +175,7 @@ fun DraftSetupScreen(
                                     DraftConfig(
                                         setCode = s.setCode,
                                         mode = DraftMode.DRAFT,
-                                        seatCount = 8,
+                                        seatCount = playerCount,
                                         packCount = 3,
                                         pickTimerSeconds = pickTimer,
                                     )
@@ -191,6 +206,8 @@ private fun LoadingContent() {
 @Composable
 private fun SetupForm(
     setName: String,
+    playerCount: Int,
+    onPlayerCountChanged: (Int) -> Unit,
     timerIndex: Int,
     onTimerChanged: (Int) -> Unit,
     onStart: () -> Unit,
@@ -212,30 +229,55 @@ private fun SetupForm(
             color = mc.textSecondary,
         )
 
-        // Seat info
-        Surface(
-            shape = CardShape,
-            color = mc.surface,
-            tonalElevation = 1.dp,
-            modifier = Modifier.fillMaxWidth()
+        // Players
+        SectionLabel(stringResource(R.string.draft_sim_players_label))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(mc.surface, CardShape)
+                .padding(sp.md)
         ) {
-            Row(
-                modifier = Modifier.padding(sp.md),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(sp.sm)
-            ) {
-                Icon(
-                    Icons.Default.Info,
-                    contentDescription = null,
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.size(20.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Slider(
+                    value = playerCount.toFloat(),
+                    onValueChange = { onPlayerCountChanged(it.toInt()) },
+                    valueRange = MIN_PLAYERS.toFloat()..MAX_PLAYERS.toFloat(),
+                    steps = (MAX_PLAYERS - MIN_PLAYERS) - 1,
+                    colors = SliderDefaults.colors(
+                        thumbColor = mc.primaryAccent,
+                        activeTrackColor = mc.primaryAccent,
+                        inactiveTrackColor = mc.surfaceVariant,
+                    ),
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "8 Players (7 Bots)",
-                    style = ty.bodyMedium,
-                    color = mc.textPrimary,
-                )
+                Spacer(Modifier.width(sp.md))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = mc.primaryAccent,
+                        modifier = Modifier.size(PlayerInfoIconSize),
+                    )
+                    Spacer(Modifier.width(sp.xs))
+                    Text(
+                        text = playerCount.toString(),
+                        style = ty.labelLarge,
+                        color = mc.textPrimary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(sp.xl),
+                    )
+                }
             }
+            Text(
+                text = stringResource(
+                    R.string.draft_sim_players_count,
+                    playerCount,
+                    playerCount - 1,
+                ),
+                style = ty.labelSmall,
+                color = mc.textSecondary,
+                modifier = Modifier.padding(start = sp.xs),
+            )
         }
 
         // Timer

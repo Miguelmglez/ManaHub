@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -86,6 +87,9 @@ class AuthRepositoryImpl @Inject constructor(
         .map { status -> status.toSessionState() }
         .flatMapLatest { state ->
             if (state !is SessionState.Authenticated) {
+                flowOf(state)
+            } else if (state.user.isAnonymous) {
+                // Anonymous users have no user_profiles row — skip profile fetch and upsert.
                 flowOf(state)
             } else {
                 flow {
@@ -464,6 +468,13 @@ class AuthRepositoryImpl @Inject constructor(
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
 
+    override suspend fun signInAnonymously(): AuthResult<Unit> = withContext(ioDispatcher) {
+        runCatching {
+            supabaseAuth.signInAnonymously()
+            AuthResult.Success(Unit)
+        }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+    }
+
     override suspend fun signOut(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
             supabaseAuth.signOut()
@@ -588,6 +599,8 @@ class AuthRepositoryImpl @Inject constructor(
             avatarUrl
         }
 
+        val isAnonymous = userInfo.appMetadata?.get("is_anonymous")?.jsonPrimitive?.booleanOrNull == true
+
         return AuthUser(
             id = userInfo.id,
             email = userInfo.email,
@@ -599,6 +612,7 @@ class AuthRepositoryImpl @Inject constructor(
             // It is only set to true after enrichment from the user_profiles row via
             // the get_profile_by_user_id RPC or the complete_user_profile RPC.
             profileCompleted = false,
+            isAnonymous = isAnonymous,
         )
     }
 

@@ -10,7 +10,7 @@ import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftError
 import com.mmg.manahub.feature.draft.domain.model.DraftMode
 import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import com.mmg.manahub.feature.draft.domain.model.DraftSet
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet
@@ -99,6 +99,8 @@ class DraftSimViewModelTest {
             getDraftableSimSet = getDraftableSimSet,
             analytics = analytics,
             botDrafter = botDrafter,
+            draftSimRepository = fakeRepository,
+            defaultDispatcher = testDispatcher,
         )
 
     private fun fakeDraftableSet(): DraftableSet = DraftableSet(
@@ -136,8 +138,12 @@ class DraftSimViewModelTest {
     }
 
     @Test
-    fun `loadSet error emits OfflineNoCache`() = runTest(testDispatcher) {
-        coEvery { getDraftableSimSet("tst") } returns DataResult.Error("network down")
+    fun `loadSet error maps known DraftError token to its case`() = runTest(testDispatcher) {
+        // The repository serializes DraftError via .toString(); the ViewModel's parseDraftError
+        // reverses that mapping. Feeding the serialized OfflineNoCache token must round-trip back
+        // to the OfflineNoCache case (the exact contract parseDraftError implements).
+        coEvery { getDraftableSimSet("tst") } returns
+            DataResult.Error(DraftError.OfflineNoCache.toString())
 
         val viewModel = buildViewModel(setCode = "tst")
         advanceUntilIdle()
@@ -145,6 +151,20 @@ class DraftSimViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state is DraftSimUiState.Error)
         assertEquals(DraftError.OfflineNoCache, (state as DraftSimUiState.Error).error)
+    }
+
+    @Test
+    fun `loadSet error with unrecognized message emits Unexpected`() = runTest(testDispatcher) {
+        // A raw message containing none of the known DraftError tokens must fall through to
+        // Unexpected, preserving the original message for diagnostics.
+        coEvery { getDraftableSimSet("tst") } returns DataResult.Error("network down")
+
+        val viewModel = buildViewModel(setCode = "tst")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is DraftSimUiState.Error)
+        assertEquals(DraftError.Unexpected("network down"), (state as DraftSimUiState.Error).error)
     }
 
     @Test
@@ -225,6 +245,10 @@ class DraftSimViewModelTest {
 
         override suspend fun getDraftableSimSet(setCode: String): DataResult<DraftableSet> =
             DataResult.Error("not used")
+
+        override suspend fun getEngineConfig(
+            setCode: String,
+        ): com.mmg.manahub.feature.draft.domain.model.EngineConfig? = null
 
         override fun observeActiveSession() = sessionFlow
 

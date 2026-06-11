@@ -1,19 +1,22 @@
 package com.mmg.manahub.core.data.remote.dto
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class ScryfallSetDto(
-    @SerializedName("id")           val id: String,
-    @SerializedName("code")         val code: String,
-    @SerializedName("name")         val name: String,
-    @SerializedName("set_type")     val setType: String,
-    @SerializedName("released_at")  val releasedAt: String?,
-    @SerializedName("card_count")   val cardCount: Int,
-    @SerializedName("icon_svg_uri") val iconSvgUri: String,
-    @SerializedName("scryfall_uri") val scryfallUri: String = "",
-    @SerializedName("digital")      val digital: Boolean = false,
+    @SerialName("id")           val id: String,
+    @SerialName("code")         val code: String,
+    @SerialName("name")         val name: String,
+    @SerialName("set_type")     val setType: String,
+    @SerialName("released_at")  val releasedAt: String? = null,
+    @SerialName("card_count")   val cardCount: Int,
+    @SerialName("icon_svg_uri") val iconSvgUri: String,
+    @SerialName("scryfall_uri") val scryfallUri: String = "",
+    @SerialName("digital")      val digital: Boolean = false,
 )
 
+@Serializable
 data class ScryfallSetsResponseDto(
-    @SerializedName("data") val data: List<ScryfallSetDto>,
+    @SerialName("data") val data: List<ScryfallSetDto>,
 )

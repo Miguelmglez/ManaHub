@@ -1,5 +1,7 @@
 package com.mmg.manahub.app.navigation
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -262,32 +264,55 @@ fun AppNavGraph(
                             HomeAction.OpenProfile -> navController.navigate(Screen.Profile.route)
                             HomeAction.PlaytestRecentDeck -> navController.navigateTab(Screen.Collection.route)
                             HomeAction.ImproveRecentDeck -> navController.navigateTab(Screen.Collection.route)
-                            is HomeAction.ContinueItem -> {
-                                when (action.item.type) {
-                                    com.mmg.manahub.feature.home.presentation.ContinueType.GAME -> {
-                                        if (hasActiveGame) {
-                                            navController.navigate(
-                                                Screen.GamePlay.createRoute(
-                                                    gameUiState.mode.name,
-                                                    gameUiState.players.size,
-                                                )
-                                            ) { launchSingleTop = true }
-                                        }
-                                    }
-                                    com.mmg.manahub.feature.home.presentation.ContinueType.DRAFT ->
-                                        navController.navigateTab(Screen.Draft.route)
-                                    com.mmg.manahub.feature.home.presentation.ContinueType.TOURNAMENT ->
-                                        navController.navigate(Screen.TournamentList.route)
-                                    com.mmg.manahub.feature.home.presentation.ContinueType.DECK ->
-                                        navController.navigate(Screen.DeckDetail.createRoute(action.item.id))
-                                }
-                            }
-                            // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge are
+                            // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge, RateApp are
                             // handled inside HomeScreen / HomeViewModel.
                             HomeAction.CustomizeQuickStart -> Unit
+                            HomeAction.RateApp -> Unit
                             is HomeAction.SaveQuickStart -> Unit
                             HomeAction.CreateAccount -> navController.navigate(Screen.Profile.route)
                             HomeAction.DismissAccountNudge -> Unit
+
+                            // ── Widget-board navigation ─────────────────────────
+                            HomeAction.OpenDraftSimulator -> navController.navigate(Screen.Draft.route)
+                            HomeAction.OpenDraftGuide -> navController.navigate(Screen.Draft.route)
+                            HomeAction.OpenWishlist -> navController.navigateTab(Screen.Collection.route)
+                            HomeAction.OpenAchievements -> navController.navigate(Screen.Stats.route)
+                            is HomeAction.OpenCardDetail -> navController.navigate(
+                                Screen.CollectionCardDetail.createRoute(action.scryfallId)
+                            )
+                            is HomeAction.OpenDeck ->
+                                navController.navigate(Screen.DeckDetail.createRoute(action.deckId))
+                            is HomeAction.OpenNewsUrl -> {
+                                val url = action.url.trim()
+                                if (url.isNotEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
+                                    runCatching {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                    }.onFailure {
+                                        android.util.Log.w("AppNavGraph", "Could not open news URL: $url", it)
+                                    }
+                                } else {
+                                    android.util.Log.w("AppNavGraph", "Rejected news URL with invalid/empty scheme: '$url'")
+                                }
+                            }
+                            is HomeAction.OpenDraftSetDetail -> navController.navigate(
+                                Screen.DraftSetDetail.createRoute(
+                                    setCode = action.set.code,
+                                    setName = action.set.name,
+                                    setIconUri = action.set.iconSvgUri,
+                                    setReleasedAt = action.set.releasedAt,
+                                )
+                            )
+
+                            // ── Widget board: handled in HomeScreen/VM ───────────
+                            HomeAction.OpenWidgetGallery,
+                            HomeAction.ResetLayout,
+                            is HomeAction.MoveWidget,
+                            is HomeAction.AddWidget,
+                            is HomeAction.RemoveWidget,
+                            is HomeAction.UpdateLayout,
+                            is HomeAction.SkipFirstStep,
+                            -> Unit
                         }
                     },
                 )
@@ -386,10 +411,6 @@ fun AppNavGraph(
             }
 
             composable(Screen.DeckBuilder.route) {
-                DeckMagicScreen()
-            }
-
-            composable(Screen.Synergy.route) {
                 DeckMagicScreen()
             }
 

@@ -1,103 +1,113 @@
 package com.mmg.manahub.core.data.remote.dto
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class CardDto(
-    @SerializedName("id")               val id:              String,
-    @SerializedName("name")             val name:            String,
-    @SerializedName("printed_name")     val printedName:     String?,
-    @SerializedName("lang")             val lang:            String,
-    @SerializedName("mana_cost")        val manaCost:        String?,
-    @SerializedName("cmc")              val cmc:             Double,
-    @SerializedName("colors")           val colors:          List<String>?,
-    @SerializedName("color_identity")   val colorIdentity:   List<String>,
-    @SerializedName("type_line")        val typeLine:        String,
-    @SerializedName("printed_type_line")     val printedTypeLine:String?,
-    @SerializedName("oracle_text")      val oracleText:      String?,
-    @SerializedName("printed_text")     val printedText:      String?,
-    @SerializedName("keywords")         val keywords:        List<String>,
-    @SerializedName("power")            val power:           String?,
-    @SerializedName("toughness")        val toughness:       String?,
-    @SerializedName("loyalty")          val loyalty:         String?,
-    @SerializedName("set")              val setCode:         String,
-    @SerializedName("set_name")         val setName:         String,
-    @SerializedName("collector_number") val collectorNumber: String,
-    @SerializedName("rarity")           val rarity:          String,
-    @SerializedName("released_at")      val releasedAt:      String,
-    @SerializedName("frame_effects")    val frameEffects:    List<String>? = null,
-    @SerializedName("promo_types")      val promoTypes:      List<String>? = null,
-    @SerializedName("image_uris")       val imageUris:       ImageUrisDto?,
-    @SerializedName("card_faces")       val cardFaces:       List<CardFaceDto>?,
-    @SerializedName("prices")           val prices:          PricesDto,
-    @SerializedName("legalities")       val legalities:      LegalitiesDto,
-    @SerializedName("scryfall_uri")     val scryfallUri:     String,
-    @SerializedName("flavor_text")      val flavorText:      String?,
-    @SerializedName("artist")           val artist:          String?,
-    @SerializedName("related_uris")     val relatedUris:     Map<String, String>? = null,
-    @SerializedName("purchase_uris")    val purchaseUris:    Map<String, String>? = null,
-    @SerializedName("game_changer")     val gameChanger:     Boolean? = null,
-    @SerializedName("edhrec_rank")      val edhrecRank:      Int? = null,
-    @SerializedName("penny_rank")       val pennyRank:       Int? = null,
+    @SerialName("id")               val id:              String,
+    @SerialName("name")             val name:            String,
+    @SerialName("printed_name")     val printedName:     String?      = null,
+    @SerialName("lang")             val lang:            String,
+    @SerialName("mana_cost")        val manaCost:        String?      = null,
+    @SerialName("cmc")              val cmc:             Double,
+    @SerialName("colors")           val colors:          List<String>? = null,
+    @SerialName("color_identity")   val colorIdentity:   List<String>,
+    @SerialName("type_line")        val typeLine:        String,
+    @SerialName("printed_type_line")val printedTypeLine: String?      = null,
+    @SerialName("oracle_text")      val oracleText:      String?      = null,
+    @SerialName("printed_text")     val printedText:     String?      = null,
+    @SerialName("keywords")         val keywords:        List<String>,
+    @SerialName("power")            val power:           String?      = null,
+    @SerialName("toughness")        val toughness:       String?      = null,
+    @SerialName("loyalty")          val loyalty:         String?      = null,
+    @SerialName("set")              val setCode:         String,
+    @SerialName("set_name")         val setName:         String,
+    @SerialName("collector_number") val collectorNumber: String,
+    @SerialName("rarity")           val rarity:          String,
+    @SerialName("released_at")      val releasedAt:      String,
+    @SerialName("frame_effects")    val frameEffects:    List<String>? = null,
+    @SerialName("promo_types")      val promoTypes:      List<String>? = null,
+    @SerialName("image_uris")       val imageUris:       ImageUrisDto? = null,
+    @SerialName("card_faces")       val cardFaces:       List<CardFaceDto>? = null,
+    @SerialName("prices")           val prices:          PricesDto,
+    @SerialName("legalities")       val legalities:      LegalitiesDto,
+    @SerialName("scryfall_uri")     val scryfallUri:     String,
+    @SerialName("flavor_text")      val flavorText:      String?      = null,
+    @SerialName("artist")           val artist:          String?      = null,
+    @SerialName("related_uris")     val relatedUris:     Map<String, String>? = null,
+    @SerialName("purchase_uris")    val purchaseUris:    Map<String, String>? = null,
+    @SerialName("game_changer")     val gameChanger:     Boolean?     = null,
+    @SerialName("edhrec_rank")      val edhrecRank:      Int?         = null,
+    @SerialName("penny_rank")       val pennyRank:       Int?         = null,
 )
 
+@Serializable
 data class ImageUrisDto(
-    @SerializedName("small")    val small:   String?,
-    @SerializedName("normal")   val normal:  String?,
-    @SerializedName("large")    val large:   String?,
-    @SerializedName("png")      val png:     String?,
-    @SerializedName("art_crop") val artCrop: String?,
+    @SerialName("small")    val small:   String? = null,
+    @SerialName("normal")   val normal:  String? = null,
+    @SerialName("large")    val large:   String? = null,
+    @SerialName("png")      val png:     String? = null,
+    @SerialName("art_crop") val artCrop: String? = null,
 )
 
+@Serializable
 data class CardFaceDto(
-    @SerializedName("name")        val name:       String,
-    @SerializedName("mana_cost")   val manaCost:   String?,
-    @SerializedName("type_line")   val typeLine:   String?,
-    @SerializedName("oracle_text") val oracleText: String?,
-    @SerializedName("power")       val power:      String?,
-    @SerializedName("toughness")   val toughness:  String?,
-    @SerializedName("loyalty")     val loyalty:    String? = null,
-    @SerializedName("defense")     val defense:    String? = null,
-    @SerializedName("flavor_text") val flavorText: String? = null,
-    @SerializedName("image_uris")  val imageUris:  ImageUrisDto?,
+    @SerialName("name")        val name:       String,
+    @SerialName("mana_cost")   val manaCost:   String?  = null,
+    @SerialName("type_line")   val typeLine:   String?  = null,
+    @SerialName("oracle_text") val oracleText: String?  = null,
+    @SerialName("power")       val power:      String?  = null,
+    @SerialName("toughness")   val toughness:  String?  = null,
+    @SerialName("loyalty")     val loyalty:    String?  = null,
+    @SerialName("defense")     val defense:    String?  = null,
+    @SerialName("flavor_text") val flavorText: String?  = null,
+    @SerialName("image_uris")  val imageUris:  ImageUrisDto? = null,
 )
 
+@Serializable
 data class PricesDto(
-    @SerializedName("usd")      val usd:     String?,
-    @SerializedName("usd_foil") val usdFoil: String?,
-    @SerializedName("eur")      val eur:     String?,
-    @SerializedName("eur_foil") val eurFoil: String?,
-    @SerializedName("tix")      val tix:     String?,
+    @SerialName("usd")      val usd:     String? = null,
+    @SerialName("usd_foil") val usdFoil: String? = null,
+    @SerialName("eur")      val eur:     String? = null,
+    @SerialName("eur_foil") val eurFoil: String? = null,
+    @SerialName("tix")      val tix:     String? = null,
 )
 
+@Serializable
 data class LegalitiesDto(
-    @SerializedName("standard")  val standard:  String,
-    @SerializedName("pioneer")   val pioneer:   String,
-    @SerializedName("modern")    val modern:    String,
-    @SerializedName("legacy")    val legacy:    String,
-    @SerializedName("vintage")   val vintage:   String,
-    @SerializedName("commander") val commander: String,
-    @SerializedName("pauper")    val pauper:    String,
+    @SerialName("standard")  val standard:  String,
+    @SerialName("pioneer")   val pioneer:   String,
+    @SerialName("modern")    val modern:    String,
+    @SerialName("legacy")    val legacy:    String,
+    @SerialName("vintage")   val vintage:   String,
+    @SerialName("commander") val commander: String,
+    @SerialName("pauper")    val pauper:    String,
 )
 
+@Serializable
 data class SearchResultDto(
-    @SerializedName("total_cards") val totalCards: Int,
-    @SerializedName("has_more")    val hasMore:    Boolean,
-    @SerializedName("next_page")   val nextPage:   String?,
-    @SerializedName("data")        val data:       List<CardDto>,
+    @SerialName("total_cards") val totalCards: Int,
+    @SerialName("has_more")    val hasMore:    Boolean,
+    @SerialName("next_page")   val nextPage:   String? = null,
+    @SerialName("data")        val data:       List<CardDto>,
 )
 
+@Serializable
 data class CardCollectionRequestDto(
-    @SerializedName("identifiers") val identifiers: List<CardIdentifierDto>
+    @SerialName("identifiers") val identifiers: List<CardIdentifierDto>
 )
 
+@Serializable
 data class CardIdentifierDto(
-    @SerializedName("id")               val id:              String? = null,
-    @SerializedName("name")             val name:            String? = null,
-    @SerializedName("set")              val set:             String? = null,
-    @SerializedName("collector_number") val collectorNumber: String? = null,
+    @SerialName("id")               val id:              String? = null,
+    @SerialName("name")             val name:            String? = null,
+    @SerialName("set")              val set:             String? = null,
+    @SerialName("collector_number") val collectorNumber: String? = null,
 )
 
+@Serializable
 data class CardCollectionResponseDto(
-    @SerializedName("data")      val data:     List<CardDto>,
-    @SerializedName("not_found") val notFound: List<CardIdentifierDto>,
+    @SerialName("data")      val data:     List<CardDto>,
+    @SerialName("not_found") val notFound: List<CardIdentifierDto>,
 )

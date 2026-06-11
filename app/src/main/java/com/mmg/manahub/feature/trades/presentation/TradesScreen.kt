@@ -444,7 +444,7 @@ private fun WishlistEntryRow(
 
     CardListItem(
         name = card?.name ?: entry.cardId,
-        imageUrl = card?.imageArtCrop ?: card?.imageNormal,
+        imageUrl =  card?.imageNormal,
         priceUsd = if (entry.isFoil == true) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil == true) card?.priceEurFoil else card?.priceEur,
         quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
@@ -482,7 +482,7 @@ private fun OfferEntryRow(
 
     CardListItem(
         name = card?.name ?: entry.scryfallId,
-        imageUrl = card?.imageArtCrop ?: card?.imageNormal,
+        imageUrl = card?.imageNormal,
         priceUsd = if (entry.isFoil) card?.priceUsdFoil else card?.priceUsd,
         priceEur = if (entry.isFoil) card?.priceEurFoil else card?.priceEur,
         quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,

@@ -49,4 +49,15 @@ interface CloudflareContentApi {
      */
     @GET("draft/{setCode}/booster.json")
     suspend fun getSetBooster(@Path("setCode") setCode: String): JsonObject
+
+    /**
+     * Fetches the raw `engine.json` describing the set's archetype decision engine
+     * (per-card archetype weights + role flags + scoring params). Optional per set —
+     * sets without one fall back to the heuristic bot drafter. Parsed in
+     * [com.mmg.manahub.feature.draft.data.DraftSimRepositoryImpl].
+     *
+     * @param setCode Lowercase set code (e.g. "tdm").
+     */
+    @GET("draft/{setCode}/engine.json")
+    suspend fun getSetEngine(@Path("setCode") setCode: String): JsonObject
 }

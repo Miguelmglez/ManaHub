@@ -329,18 +329,6 @@
     <string name="scanner_permission_grant">Grant permission</string>
 
     <!-- ══════════════════════════════════════════
-         SYNERGY SCREEN
-    ═══════════════════════════════════════════ -->
-    <string name="synergy_title">Synergies &amp; decks</string>
-    <string name="synergy_suggested_decks">Suggested decks</string>
-    <string name="synergy_groups">Synergy groups</string>
-    <string name="synergy_empty_title">Add more cards to see synergies</string>
-    <string name="synergy_empty_subtitle">You need at least 10 cards</string>
-    <string name="synergy_score_percent">%1$d%%</string>
-    <string name="synergy_deck_info">%1$d cards · %2$s</string>
-    <string name="synergy_more_cards">+%1$d</string>
-
-    <!-- ══════════════════════════════════════════
          STATS SCREEN
     ═══════════════════════════════════════════ -->
     <string name="stats_title">Statistics</string>
@@ -1711,6 +1699,7 @@
     <string name="draft_tier_list_not_available">Tier list not available for this set yet</string>
     <string name="draft_tier_updated">Last updated: %1$s</string>
     <string name="draft_filter_by_color">Filter by color</string>
+    <string name="draft_search_cards_hint">Search cards by name…</string>
     <string name="draft_filter_by_rarity">Filter by rarity</string>
     <string name="draft_sort_by">Sort by</string>
     <string name="draft_sort_price">Price</string>
@@ -1757,7 +1746,8 @@
     <string name="draft_sim_error_offline">No connection and no cached data.</string>
     <string name="draft_sim_setup_description">Simulate a draft of %1$s</string>
     <string name="draft_sim_mode_label">Mode</string>
-    <string name="draft_sim_players_label">8 players (7 bots)</string>
+    <string name="draft_sim_players_label">Players</string>
+    <string name="draft_sim_players_count">%1$d players (%2$d bots)</string>
     <string name="draft_sim_timer_label">Pick timer</string>
     <string name="draft_sim_timer_off">Off</string>
     <string name="draft_sim_timer_seconds">%1$ds</string>
@@ -2235,5 +2225,253 @@
     <string name="lobby_host_default_name">Host</string>
     <string name="lobby_player_default_name">Player</string>
     <string name="lobby_existing_session_abandon">Abandon &amp; create new</string>
+
+    <!-- Home widget board -->
+    <string name="home_greeting_morning">Good morning, %s</string>
+    <string name="home_greeting_afternoon">Good afternoon, %s</string>
+    <string name="home_greeting_evening">Good evening, %s</string>
+    <string name="home_greeting_signed_out">Welcome to ManaHub</string>
+    <string name="home_greeting_subtitle_auth">Your journey continues</string>
+    <string name="home_edit_start">Customize dashboard</string>
+    <string name="home_customize_actions">Customize</string>
+    <string name="home_edit_done">Done editing</string>
+    <string name="home_empty_title">Your dashboard is empty</string>
+    <string name="home_empty_message">Add widgets to personalize your home screen.</string>
+    <string name="home_add_widgets">Add widgets</string>
+    <string name="home_coachmark_hint">Tap the pencil to customize your dashboard</string>
+    <string name="home_coachmark_got_it">Got it</string>
+    <string name="home_reset_layout">Reset to default</string>
+    <string name="home_reset_layout_confirm">Your layout will be reset to the default. This cannot be undone.</string>
+    <string name="home_reset_toast">Layout reset</string>
+    <string name="home_widget_gallery_title">Add widgets</string>
+    <string name="home_widget_gallery_search">Search widgets</string>
+    <string name="home_widget_gallery_done">Done</string>
+    <string name="home_widget_gallery_empty">No widgets match your search.</string>
+    <string name="home_gallery_section_current">Current layout</string>
+    <string name="home_gallery_section_add">Add widgets</string>
+    <string name="home_widget_added">Added</string>
+    <string name="home_widget_add">Add</string>
+    <string name="home_widget_remove">Remove</string>
+    <string name="home_widget_resize">Resize</string>
+    <string name="home_widget_drag_handle">Drag to reorder</string>
+    <string name="home_widget_move_up">Move up</string>
+    <string name="home_widget_move_down">Move down</string>
+    <string name="home_account_gated_lock">Sign in to unlock</string>
+    <string name="home_account_gated_cta">Create free account</string>
+    <string name="home_widget_size_small">S</string>
+    <string name="home_widget_size_medium">M</string>
+    <string name="home_widget_size_large">L</string>
+
+    <!-- Home widget generic states -->
+    <string name="home_widget_loading">Loading…</string>
+    <string name="home_widget_empty">Nothing to show yet</string>
+    <string name="home_widget_view_more">View more</string>
+
+    <!-- Home widget content labels -->
+    <string name="home_win_rate_label">Win rate</string>
+    <string name="home_win_rate_games">%1$d games</string>
+    <string name="home_win_rate_empty">Play games to see your win rate.</string>
+    <string name="home_win_rate_percent">%1$d%%</string>
+    <string name="home_win_rate_record">%1$d wins / %2$d games</string>
+    <string name="home_collection_decks_label">Decks</string>
+    <string name="home_social_friends_title">Friends activity</string>
+    <string name="home_best_deck_record">%1$d–%2$d</string>
+    <string name="home_best_deck_empty">No deck results yet.</string>
+    <string name="home_nemesis_empty">No losses tracked yet.</string>
+    <string name="home_nemesis_count">%1$d losses (%2$d%%)</string>
+    <string name="home_last_game_win">Win</string>
+    <string name="home_last_game_loss">Loss</string>
+    <string name="home_last_game_empty">No games tracked yet.</string>
+    <string name="home_streak_current">%1$d in a row</string>
+    <string name="home_streak_longest">Best: %1$d</string>
+    <string name="home_streak_empty">No streak yet.</string>
+    <string name="home_performance_win_turn">Avg. win turn</string>
+    <string name="home_performance_life_win">Avg. life on win</string>
+    <string name="home_performance_longest">Longest game</string>
+    <string name="home_performance_busiest">Busiest day</string>
+    <string name="home_performance_games_unit">%1$d games</string>
+    <string name="home_heatmap_empty">No activity yet.</string>
+    <string name="home_matchups_empty">No matchup data yet.</string>
+    <string name="home_matchups_header_archetype">Deck</string>
+    <string name="home_matchups_header_record">W/L</string>
+    <string name="home_matchups_header_rate">Rate</string>
+    <string name="home_records_empty">No records yet.</string>
+    <string name="home_achievements_count">%1$d earned</string>
+    <string name="home_achievements_empty">Earn achievements by playing.</string>
+    <string name="home_library_value_label">Estimated value</string>
+    <string name="home_library_view_breakdown">View breakdown</string>
+    <string name="home_collection_color_empty">Add cards to see your colors.</string>
+    <string name="home_collection_rarity_empty">Add cards to see rarities.</string>
+    <string name="home_rarity_common">Common</string>
+    <string name="home_rarity_uncommon">Uncommon</string>
+    <string name="home_rarity_rare">Rare</string>
+    <string name="home_rarity_mythic">Mythic</string>
+    <string name="home_recent_additions_empty">No recent additions.</string>
+    <string name="home_decks_empty">Build a deck to get started.</string>
+    <string name="home_decks_playtest">Playtest</string>
+    <string name="home_wishlist_count">%1$d cards</string>
+    <string name="home_wishlist_empty">Your wishlist is empty.</string>
+    <string name="home_discover_empty">Discover cards coming soon.</string>
+    <string name="home_card_of_day_empty">No card today.</string>
+    <string name="home_latest_sets_empty">No sets available offline.</string>
+    <string name="home_latest_sets_guide">Guide</string>
+    <string name="home_latest_sets_simulate">Simulate</string>
+    <string name="home_draft_guide_empty">No featured set right now.</string>
+    <string name="home_video_empty">No video available.</string>
+    <string name="home_news_empty">No news right now.</string>
+    <string name="home_news_see_all">See all</string>
+    <string name="home_improve_playtest">Playtest</string>
+    <string name="home_improve_draft_guide">Draft guide</string>
+    <string name="home_improve_tune_deck">Tune deck</string>
+    <string name="home_improve_tournament">Tournament</string>
+    <string name="home_friends_empty">No friend activity yet.</string>
+    <string name="home_trade_inbox_count">%1$d pending</string>
+    <string name="home_trade_inbox_empty">No pending trades.</string>
+    <string name="home_trade_suggestions_empty">No suggestions yet.</string>
+    <string name="home_open_for_trade_empty">Nothing open for trade.</string>
+    <string name="home_online_join_count">%1$d active</string>
+    <string name="home_online_join_button">Join a game</string>
+    <string name="home_tournament_round">Round %1$d</string>
+    <string name="home_tournament_standing">Standing: #%1$d</string>
+    <string name="home_tournament_empty">No active tournament.</string>
+    <string name="home_community_empty">Community stats coming soon.</string>
+
+    <!-- Rules tips (rotated by day) -->
+    <string name="home_rules_tip_label">Did you know?</string>
+
+    <!-- Widget titles -->
+    <string name="widget_title_context_hero">Today</string>
+    <string name="widget_title_quick_actions">Quick actions</string>
+    <string name="widget_title_continue">Continue</string>
+    <string name="widget_title_last_game">Last game</string>
+    <string name="widget_title_play_streak">Play streak</string>
+    <string name="widget_title_library_snapshot">Your library</string>
+    <string name="widget_title_win_rate">Win rate</string>
+    <string name="widget_title_win_rate_by_format">Win rate by format</string>
+    <string name="widget_title_best_deck">Best deck</string>
+    <string name="widget_title_nemesis">Your nemesis</string>
+    <string name="widget_title_performance">Performance</string>
+    <string name="widget_title_heatmap">Activity</string>
+    <string name="widget_title_matchups">Archetype matchups</string>
+    <string name="widget_title_records">Personal records</string>
+    <string name="widget_title_achievements">Achievements</string>
+    <string name="widget_title_collection_color">Collection by color</string>
+    <string name="widget_title_collection_rarity">Collection by rarity</string>
+    <string name="widget_title_recent_additions">Recent additions</string>
+    <string name="widget_title_decks_shelf">Your decks</string>
+    <string name="widget_title_game_stats_hub">Game Stats</string>
+    <string name="widget_title_collection_stats_hub">My Collection</string>
+    <string name="widget_title_social_hub">Community</string>
+    <string name="widget_title_trades_hub">Trades</string>
+    <string name="home_edit_widgets">Edit Widgets</string>
+    <string name="widget_title_wishlist">Wishlist</string>
+    <string name="widget_title_discover">Discover cards</string>
+    <string name="widget_title_card_of_day">Card of the day</string>
+    <string name="widget_title_latest_sets">Latest sets</string>
+    <string name="widget_title_draft_guide">Draft guide spotlight</string>
+    <string name="widget_title_video">Video spotlight</string>
+    <string name="widget_title_news">MTG news</string>
+    <string name="widget_title_rules_tip">Rules tip</string>
+    <string name="widget_title_friends_activity">Friends activity</string>
+    <string name="widget_title_trade_inbox">Trade inbox</string>
+    <string name="widget_title_trade_suggestions">Trade suggestions</string>
+    <string name="widget_title_open_for_trade">Open for trade</string>
+    <string name="widget_title_online_join">Online sessions</string>
+    <string name="widget_title_tournament">Active tournament</string>
+    <string name="widget_title_community_commanders">Top commanders</string>
+    <string name="widget_title_community_meta">Community meta</string>
+    <string name="widget_title_most_wishlisted">Most wishlisted</string>
+    <string name="widget_title_community_milestones">Community milestones</string>
+    <string name="widget_title_improve_game">Improve your game</string>
+
+    <!-- Home: account nudge messages -->
+    <string name="home_nudge_collection">Back up your collection so it\'s safe across devices.</string>
+    <string name="home_nudge_decks">Sync your decks to keep them on every device.</string>
+    <string name="home_nudge_games">Keep your match history across devices.</string>
+
+    <!-- Home: continue items -->
+    <string name="home_continue_draft_label">Continue draft</string>
+    <string name="home_continue_draft_subtitle">Pack %1$d, pick %2$d</string>
+    <string name="home_continue_tournament_label">Resume tournament</string>
+    <string name="home_continue_tournament_subtitle_one">1 in progress</string>
+    <string name="home_continue_tournament_subtitle_many">%1$d in progress</string>
+    <string name="home_continue_deck_subtitle">%1$d cards</string>
+
+    <!-- ══════════════════════════════════════════
+         FIRST STEPS CAROUSEL (Home hero widget)
+    ═══════════════════════════════════════════ -->
+    <string name="first_steps_section_label">Get Started</string>
+    <string name="first_steps_cta_label">Let\'s go</string>
+    <string name="first_step_skip">Skip</string>
+    <string name="first_steps_all_done_title">You\'re all set!</string>
+    <string name="first_steps_all_done_subtitle">Explore more from the dashboard.</string>
+
+    <!-- Step: add first card -->
+    <string name="first_step_add_card_title">Add your first card</string>
+    <string name="first_step_add_card_subtitle">Start building your collection by adding a card to your library.</string>
+
+    <!-- Step: scan a card -->
+    <string name="first_step_scan_card_title">Scan a card</string>
+    <string name="first_step_scan_card_subtitle">Use your camera to instantly identify and add cards to your collection.</string>
+
+    <!-- Step: create account -->
+    <string name="first_step_create_account_title">Create a free account</string>
+    <string name="first_step_create_account_subtitle">Back up your collection, track stats, and connect with other players.</string>
+
+    <!-- Step: create first deck -->
+    <string name="first_step_create_deck_title">Build your first deck</string>
+    <string name="first_step_create_deck_subtitle">Create a deck from the cards in your collection and start playing.</string>
+
+    <!-- Step: playtest a deck -->
+    <string name="first_step_playtest_deck_title">Playtest your deck</string>
+    <string name="first_step_playtest_deck_subtitle">Try out your deck in a test session to see how it performs before your next game.</string>
+
+    <!-- Step: add a friend -->
+    <string name="first_step_add_friend_title">Add a friend</string>
+    <string name="first_step_add_friend_subtitle">Connect with other players to trade cards and track game history together.</string>
+
+    <!-- Step: review a friend's profile -->
+    <string name="first_step_review_friend_title">Check out a friend</string>
+    <string name="first_step_review_friend_subtitle">See what decks your friends are playing and what cards they have for trade.</string>
+
+    <!-- Step: play your first game -->
+    <string name="first_step_play_game_title">Play your first game</string>
+    <string name="first_step_play_game_subtitle">Start a game session and let ManaHub track your life totals, turns, and outcomes.</string>
+
+    <!-- Step: explore collection stats -->
+    <string name="first_step_collection_stats_title">Explore your stats</string>
+    <string name="first_step_collection_stats_subtitle">See your win rate, best deck, and play history at a glance.</string>
+
+    <!-- Step: read the draft guide -->
+    <string name="first_step_draft_guide_title">Read the draft guide</string>
+    <string name="first_step_draft_guide_subtitle">Learn card ratings and pick strategies for the latest MTG sets.</string>
+
+    <!-- Step: check the news -->
+    <string name="first_step_news_title">Check the latest news</string>
+    <string name="first_step_news_subtitle">Stay up to date with MTG spoilers, set releases, and community highlights.</string>
+
+    <!-- Step: create a trade -->
+    <string name="first_step_create_trade_title">Start a trade</string>
+    <string name="first_step_create_trade_subtitle">Propose a trade with a friend to swap cards from your collections.</string>
+
+    <!-- Step: add cards to wishlist -->
+    <string name="first_step_add_wishlist_title">Build your wishlist</string>
+    <string name="first_step_add_wishlist_subtitle">Save the cards you want so you never forget what you\'re looking for.</string>
+
+    <!-- Step: mark cards open for trade -->
+    <string name="first_step_open_for_trade_title">Mark cards for trade</string>
+    <string name="first_step_open_for_trade_subtitle">Let friends know which cards in your collection you\'re willing to trade away.</string>
+
+    <!-- Step: explore preferences -->
+    <string name="first_step_preferences_title">Customize your experience</string>
+    <string name="first_step_preferences_subtitle">Set your preferred theme, currency, and app language in Settings.</string>
+
+    <!-- Step: complete your profile -->
+    <string name="first_step_complete_profile_title">Complete your profile</string>
+    <string name="first_step_complete_profile_subtitle">Add an avatar and a player name so others can recognize you in trade and game history.</string>
+
+    <!-- Step: rate the app -->
+    <string name="first_step_rate_app_title">Enjoying ManaHub?</string>
+    <string name="first_step_rate_app_subtitle">Leave a review on the store to help other players discover the app.</string>
 
 </resources>

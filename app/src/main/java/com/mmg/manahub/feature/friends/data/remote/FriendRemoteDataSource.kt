@@ -22,15 +22,15 @@ class FriendRemoteDataSource @Inject constructor(
                 val profiles = service
                     .getProfilesByIds(idFilter = "in.(${otherIds.joinToString(",")})")
                     .associateBy { it.id }
-                friendships.mapNotNull { fs ->
+                friendships.map { fs ->
                     val otherId = if (fs.userId1 == currentUserId) fs.userId2 else fs.userId1
-                    val profile = profiles[otherId] ?: return@mapNotNull null
+                    val profile = profiles[otherId]
                     FriendWithProfile(
                         id = fs.id,
                         friendUserId = otherId,
-                        nickname = profile.nickname ?: otherId,
-                        gameTag = profile.gameTag ?: "",
-                        avatarUrl = profile.avatarUrl,
+                        nickname = profile?.nickname ?: "Unknown",
+                        gameTag = profile?.gameTag ?: "",
+                        avatarUrl = profile?.avatarUrl,
                     )
                 }
             }
@@ -45,14 +45,14 @@ class FriendRemoteDataSource @Inject constructor(
                 val profiles = service
                     .getProfilesByIds(idFilter = "in.(${senderIds.joinToString(",")})")
                     .associateBy { it.id }
-                requests.mapNotNull { fs ->
-                    val profile = profiles[fs.userId1] ?: return@mapNotNull null
+                requests.map { fs ->
+                    val profile = profiles[fs.userId1]
                     FriendRequestWithProfile(
                         id = fs.id,
                         fromUserId = fs.userId1,
-                        fromNickname = profile.nickname ?: fs.userId1,
-                        fromGameTag = profile.gameTag ?: "",
-                        fromAvatarUrl = profile.avatarUrl,
+                        fromNickname = profile?.nickname ?: "Unknown",
+                        fromGameTag = profile?.gameTag ?: "",
+                        fromAvatarUrl = profile?.avatarUrl,
                         createdAt = 0L,
                     )
                 }
@@ -229,14 +229,14 @@ class FriendRemoteDataSource @Inject constructor(
                 val profiles = service
                     .getProfilesByIds(idFilter = "in.(${receiverIds.joinToString(",")})")
                     .associateBy { it.id }
-                requests.mapNotNull { fs ->
-                    val profile = profiles[fs.userId2] ?: return@mapNotNull null
+                requests.map { fs ->
+                    val profile = profiles[fs.userId2]
                     OutgoingRequestWithProfile(
                         id = fs.id,
                         toUserId = fs.userId2,
-                        toNickname = profile.nickname ?: fs.userId2,
-                        toGameTag = profile.gameTag ?: "",
-                        toAvatarUrl = profile.avatarUrl,
+                        toNickname = profile?.nickname ?: "Unknown",
+                        toGameTag = profile?.gameTag ?: "",
+                        toAvatarUrl = profile?.avatarUrl,
                         createdAt = 0L,
                     )
                 }

@@ -148,7 +148,7 @@ fun PlayerEditSheet(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.heightIn(max = 300.dp),
             ) {
-                items(availableThemes) { theme ->
+                items(availableThemes, key = { it.name }) { theme ->
                     val isSelected = theme == playerTheme
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
