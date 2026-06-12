@@ -342,7 +342,7 @@ types in `HomeWidgetType` (each carries `persistedId`, `defaultTitleRes`, `suppo
 - Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + edit pencil (Edit↔Done) + avatar.
 - → memory: `project_home_widget_board`
 
-### Gamification (`core/gamification/`, multi-phase — Phase 0 complete 2026-06-11)
+### Gamification (`core/gamification/`, multi-phase — Phase 0 + Phase 1 complete)
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine. **Local-first** (works 100%
 offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/ADR-002-gamification.md`
 — **read it + the memory files before any gamification work.** Must-know:
@@ -357,7 +357,27 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
 - Room **v39** added 6 tables (additive `MIGRATION_38_39`). `app/schemas/` is gitignored (39.json not
   committed). Master carries 140 pre-existing test failures — compare PRs against that baseline.
 - Out of scope for v1: token shop, leaderboards, Lottie, push, seasonal track (extension points reserved).
-- → memory: `project_gamification_phase0`, `feedback_gamification_xp_idempotency`
+- **Achievements (Phase 1):** the catalog (`domain/catalog/AchievementCatalog`, ~40 `AchievementDef`)
+  is the source of truth, indexed by event class (`defsByEventType`) so an event evaluates only its
+  registered defs. `AchievementEvaluator` NEVER overwrites an existing `unlocked_at`; `celebrated_at`
+  is the separate celebration gate (backfill sets it = `unlocked_at` to suppress; live unlocks leave it
+  null). Tier XP grants through the ledger key `achievement:{id}:tier:{n}` (idempotent). 15 migrated ids
+  are STABLE PKs — never rename. Family A = local Room aggregate (retroactive + one-shot backfill flagged
+  by DataStore `gamificationBackfillDone`); Family B = COUNTER for streaks + remote-backed social/
+  tournament (no backfill). `GamificationStatsDao` is a read-only snapshot DAO (no entities → no schema
+  change). `GamificationRepository.observeAchievements()` feeds the UI; the old
+  `CheckAchievementsUseCase` + `core.domain.model.Achievement` were DELETED and `ProfileViewModel`
+  rewired. `engine.outcomes: SharedFlow<ProcessedOutcome>` lets the UI correlate by `GameFinished.sessionId`.
+- **Achievements UI (Phase 1):** Profile gained a tab row (Overview + Achievements only — Quests/Rewards
+  are Phase 2/3); secret achievements render masked "???" until unlocked; `Screen.Profile` gained an
+  optional `?tab=` arg for deep-linking. The unlock **celebration** overlay is hosted GLOBALLY in
+  `MainActivity`'s root `Box` (Canvas particle burst, NO assets), queued sequentially off the DB
+  (`celebrated_at IS NULL`) — toggle-off leaves unlocks pending (not marked), never shows. `GameResultScreen`
+  shows a progression strip correlated by `lastSessionId` (the Room id, NOT the online session id). All
+  gamification UI renders nothing when the master toggle is off.
+- → memory: `project_gamification_phase0`, `project_gamification_phase1`,
+  `project_gamification_phase1_chunkB_ui`, `feedback_gamification_xp_idempotency`,
+  `feedback_achievement_unlockedat_persistence`, `feedback_gamification_celebration_ui`
 
 ## Testing conventions
 

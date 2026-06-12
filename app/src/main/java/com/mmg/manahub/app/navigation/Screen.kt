@@ -38,7 +38,18 @@ sealed class Screen(val route: String) {
     object TagDictionary : Screen("settings/tag_dictionary")
 
     // ── Profile (bottom tab 4) ───────────────────────────────────────────────
-    object Profile : Screen("profile")
+    /**
+     * Profile screen. Optional [tab] query parameter selects the initial tab
+     * (`overview` | `achievements`) so Home widgets can deep-link to a specific tab (Phase 2).
+     * The plain [route] (no query) defaults to the Overview tab.
+     */
+    object Profile : Screen("profile?tab={tab}") {
+        /** Base route for the bottom-tab destination (no tab argument → Overview). */
+        const val baseRoute = "profile"
+
+        /** Builds a route that opens [tab] (e.g. "achievements"). */
+        fun routeWithTab(tab: String) = "profile?tab=$tab"
+    }
     object FriendsList : Screen("profile/friends")
 
     /**

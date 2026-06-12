@@ -24,7 +24,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -35,8 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.game.domain.model.EliminationReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GameResult
@@ -49,6 +55,12 @@ fun GameResultScreen(
     onNewGame:  () -> Unit,
     onBackHome: () -> Unit,
     onSurvey:   () -> Unit = {},
+    /**
+     * Room session id of the game just saved (`GameViewModel.uiState.lastSessionId`). Used to
+     * correlate the gamification progression outcome for THIS game. Null/0 while the save is still
+     * in flight — the strip simply does not appear until the id is known.
+     */
+    sessionId: Long? = null,
 ) {
     val mc          = MaterialTheme.magicColors
     val winnerTheme = gameResult.winner.theme
@@ -80,6 +92,9 @@ fun GameResultScreen(
             item { VictoryHeader(gameResult = gameResult, winnerColor = winnerTheme.accent) }
             item { StandingsSection(gameResult = gameResult) }
             item { HighlightsSection(gameResult = gameResult) }
+            if (sessionId != null && sessionId > 0L) {
+                item { GameProgressionStrip(sessionId = sessionId) }
+            }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     /*OutlinedButton(
@@ -329,6 +344,141 @@ private fun HighlightCard(icon: String, label: String, value: String) {
                     style = MaterialTheme.magicTypography.bodyMedium,
                     color = mc.textPrimary,
                 )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Progression strip (ADR-002 §8.3 — gamification Phase 1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Compact progression strip for the game [sessionId]: the XP breakdown (one line per source), the
+ * total XP gained, an optional level-up, and achievement-unlock chips. Driven by
+ * [GameResultStripViewModel], which correlates the gamification outcome by session id.
+ *
+ * The outcome arrives a moment after the screen mounts (the engine processes `GameFinished`
+ * asynchronously), so this renders nothing until it does — the result screen is never blocked. When
+ * gamification is disabled, the outcome never arrives and the strip stays hidden.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GameProgressionStrip(
+    sessionId: Long,
+    viewModel: GameResultStripViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
+) {
+    androidx.compose.runtime.LaunchedEffect(sessionId) { viewModel.observe(sessionId) }
+    val outcome by viewModel.outcome.collectAsStateWithLifecycle()
+
+    androidx.compose.animation.AnimatedVisibility(
+        visible = outcome != null,
+        enter = androidx.compose.animation.fadeIn() +
+            androidx.compose.animation.expandVertically(),
+    ) {
+        val shown = outcome ?: return@AnimatedVisibility
+        val mc = MaterialTheme.magicColors
+
+        Surface(shape = CardShape, color = mc.surface) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(MaterialTheme.spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.progression_strip_title),
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.goldMtg,
+                    )
+                    if (shown.leveledUp && shown.newLevel != null) {
+                        Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.20f)) {
+                            Text(
+                                text = stringResource(R.string.progression_strip_level_up, shown.newLevel),
+                                style = MaterialTheme.magicTypography.labelMedium,
+                                color = mc.primaryAccent,
+                                modifier = Modifier.padding(
+                                    horizontal = MaterialTheme.spacing.sm,
+                                    vertical = MaterialTheme.spacing.xxs,
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                // XP breakdown — one line per source bucket.
+                shown.breakdown.forEach { line ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = line.label,
+                            style = MaterialTheme.magicTypography.bodyMedium,
+                            color = mc.textSecondary,
+                        )
+                        Text(
+                            text = stringResource(R.string.progression_strip_line_xp, line.amount),
+                            style = MaterialTheme.magicTypography.bodyMedium,
+                            color = mc.lifePositive,
+                        )
+                    }
+                }
+
+                // Total XP gained this game.
+                if (shown.xpGranted > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.progression_strip_total_label),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textPrimary,
+                        )
+                        Text(
+                            text = stringResource(R.string.progression_strip_total_xp, shown.xpGranted),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.lifePositive,
+                        )
+                    }
+                }
+
+                // Achievement-unlock chips.
+                if (shown.achievementUnlocks.isNotEmpty()) {
+                    androidx.compose.foundation.layout.FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                    ) {
+                        shown.achievementUnlocks.forEach { unlock ->
+                            Surface(
+                                shape = ChipShape,
+                                color = mc.goldMtg.copy(alpha = 0.16f),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(
+                                        horizontal = MaterialTheme.spacing.md,
+                                        vertical = MaterialTheme.spacing.xs,
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(text = unlock.emoji, style = MaterialTheme.magicTypography.bodyMedium)
+                                    Text(
+                                        text = stringResource(unlock.titleRes),
+                                        style = MaterialTheme.magicTypography.labelMedium,
+                                        color = mc.textPrimary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

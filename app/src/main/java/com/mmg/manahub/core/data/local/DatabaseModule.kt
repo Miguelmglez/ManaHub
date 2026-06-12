@@ -11,6 +11,7 @@ import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.GamificationDao
+import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
@@ -709,4 +710,5 @@ object DatabaseModule {
     @Provides fun providePlaytestDao(db: MtgDatabase): PlaytestDao = db.playtestDao()
     @Provides fun provideDraftSessionDao(db: MtgDatabase): DraftSessionDao = db.draftSessionDao()
     @Provides fun provideGamificationDao(db: MtgDatabase): GamificationDao = db.gamificationDao()
+    @Provides fun provideGamificationStatsDao(db: MtgDatabase): GamificationStatsDao = db.gamificationStatsDao()
 }

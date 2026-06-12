@@ -40,6 +40,7 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.feature.gamification.presentation.GamificationCelebrationHost
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -180,6 +181,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         AppNavGraph(isInPiP = isInPiP)
+                        // Global achievement-unlock celebration overlay (ADR-002, Phase 1). Hosted
+                        // here so a celebration plays above any screen; suppressed when the master
+                        // gamification toggle is off (handled inside the host's ViewModel).
+                        GamificationCelebrationHost()
                         MagicToastHost(
                             state = updateToastState,
                             modifier = Modifier

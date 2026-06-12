@@ -72,6 +72,8 @@ private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hour
 private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
 /** Master gamification switch (XP, levels, achievements, quests). Default: enabled. */
 private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
+/** One-shot flag: true once the Family-A achievement backfill has run (ADR-002 §4). Default: false. */
+private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
 
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
 
@@ -326,6 +328,23 @@ class UserPreferencesDataStore @Inject constructor(
     /** Persists the master gamification switch. */
     suspend fun setGamificationEnabled(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_ENABLED] = enabled }
+    }
+
+    /**
+     * One-shot guard for the Family-A achievement backfill (ADR-002 §4). Emits false until the
+     * backfill has run, then true forever — so retroactive unlocks are computed exactly once.
+     */
+    val gamificationBackfillDoneFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_GAMIFICATION_BACKFILL_DONE] ?: false }
+        .catch { emit(false) }
+
+    /** Reads the backfill-done flag once (snapshot), for the app-start orchestrator. */
+    suspend fun isGamificationBackfillDone(): Boolean =
+        context.userPrefsDataStore.data.map { it[KEY_GAMIFICATION_BACKFILL_DONE] ?: false }.first()
+
+    /** Marks the Family-A achievement backfill as complete (never re-runs after this). */
+    suspend fun setGamificationBackfillDone() {
+        context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_BACKFILL_DONE] = true }
     }
 
     // ── Privacy settings ──────────────────────────────────────────────────────
