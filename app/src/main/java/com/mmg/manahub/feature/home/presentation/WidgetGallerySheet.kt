@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -85,6 +86,7 @@ import com.mmg.manahub.core.ui.theme.spacing
 fun WidgetGallerySheet(
     currentLayout: List<WidgetInstance>,
     isAuthenticated: Boolean,
+    gamificationEnabled: Boolean,
     onAddWidget: (HomeWidgetType) -> Unit,
     onRemoveWidget: (HomeWidgetType) -> Unit,
     onMoveWidget: (from: Int, to: Int) -> Unit,
@@ -233,6 +235,7 @@ fun WidgetGallerySheet(
                             isAdded = isAdded,
                             isFixed = isFixed,
                             isLocked = type.audience == WidgetAudience.ACCOUNT_GATED && !isAuthenticated,
+                            isGamificationDisabled = type.isGamification && !gamificationEnabled,
                             isDragging = isDraggingItem || isDraggingInBlock,
                             modifier = Modifier
                                 .then(if (isDraggingItem || isDraggingInBlock) Modifier else Modifier.animateItem())
@@ -354,6 +357,7 @@ private fun CatalogRow(
     isAdded: Boolean,
     isFixed: Boolean,
     isLocked: Boolean,
+    isGamificationDisabled: Boolean = false,
     isDragging: Boolean,
     modifier: Modifier = Modifier,
     onAdd: () -> Unit,
@@ -432,6 +436,13 @@ private fun CatalogRow(
             }
 
             when {
+                // Gamification off: the widget cannot be added/shown — render a disabled note.
+                isGamificationDisabled -> Text(
+                    text = stringResource(R.string.home_gamification_disabled),
+                    style = ty.labelSmall,
+                    color = mc.textDisabled,
+                    modifier = Modifier.padding(end = spacing.sm),
+                )
                 isFixed -> Text(
                     text = "FIXED",
                     style = ty.labelSmall,
@@ -519,9 +530,13 @@ private val WidgetCategory.icon: androidx.compose.ui.graphics.vector.ImageVector
 
 /** Short English description shown under each widget title in the gallery. */
 private val HomeWidgetType.description: String
+    @Composable
+    @ReadOnlyComposable
     get() = when (this) {
         HomeWidgetType.CONTEXT_HERO -> "Your most relevant next action"
         HomeWidgetType.QUICK_ACTIONS -> "One-tap shortcuts"
+        HomeWidgetType.PROGRESSION_HUB -> stringResource(R.string.home_widget_desc_progression_hub)
+        HomeWidgetType.QUESTS_HUB -> stringResource(R.string.home_widget_desc_quests_hub)
         HomeWidgetType.GAME_STATS_HUB -> "Win rate, best deck and nemesis"
         HomeWidgetType.COLLECTION_STATS_HUB -> "Cards, decks, value and color split"
         HomeWidgetType.YOUR_DECKS_SHELF -> "Quick access to your decks"

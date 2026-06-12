@@ -148,6 +148,10 @@ class XpGranter @Inject constructor(
         is ProgressionEvent.AppOpenedToday -> singleLine(
             XpSourceCategory.DAILY_OPEN, XpConfig.dailyFirstOpen, "Daily check-in", event.localDate
         )
+
+        // FeatureExplored grants no XP — it only advances exploration quests (no ledger row). Mapping
+        // to null keeps the ledger clean and the `when` exhaustive (mirrors DeckSaved).
+        is ProgressionEvent.FeatureExplored -> null
     }
 
     private fun singleLine(

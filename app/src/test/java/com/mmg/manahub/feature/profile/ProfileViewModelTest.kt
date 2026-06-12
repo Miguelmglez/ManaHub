@@ -10,13 +10,21 @@ import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
+import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
+import com.mmg.manahub.core.gamification.domain.QuestPeriod
+import com.mmg.manahub.core.gamification.domain.QuestWeightClass
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import app.cash.turbine.test
 import com.mmg.manahub.feature.profile.presentation.PlayStyle
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel
 import com.mmg.manahub.util.TestFixtures
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -32,6 +40,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -91,8 +100,28 @@ class ProfileViewModelTest {
         )
     )
     private val achievementsFlow = MutableStateFlow<List<AchievementUiModel>>(emptyList())
+    private val questBoardFlow = MutableStateFlow(QuestBoard.empty)
+    private val streakFlow = MutableStateFlow(StreakUiModel(current = 0, longest = 0, freezeTokens = 0))
 
     private lateinit var viewModel: ProfileViewModel
+
+    private fun quest(
+        instanceId: String,
+        status: String = "ACTIVE",
+        xpReward: Int = 50,
+    ) = QuestUiModel(
+        instanceId = instanceId,
+        templateId = "tmpl_$instanceId",
+        titleRes = 0,
+        descRes = 0,
+        emoji = "⚔",
+        period = QuestPeriod.DAILY,
+        weightClass = QuestWeightClass.ACCESSIBLE,
+        progress = 0,
+        target = 1,
+        status = status,
+        xpReward = xpReward,
+    )
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -142,6 +171,8 @@ class ProfileViewModelTest {
         every { authRepository.sessionState }              returns sessionStateFlow
         every { gamificationRepository.observeProgression() } returns progressionFlow
         every { gamificationRepository.observeAchievements() } returns achievementsFlow
+        every { gamificationRepository.observeActiveQuests() } returns questBoardFlow
+        every { gamificationRepository.observeDailyActivityStreak() } returns streakFlow
 
         every { statsRepo.observeCollectionStats(any()) }   returns flowOf(collectionStats)
         every { gameSessionRepo.observeTotalGames() }       returns flowOf(totalGames)
@@ -631,5 +662,93 @@ class ProfileViewModelTest {
 
         // Assert: master toggle is ON by default (ADR-002 opt-out-first-class)
         assertEquals(true, viewModel.uiState.value.gamificationEnabled)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — quests + streak + claim (gamification Phase 2)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given quest board emits when ViewModel initializes then uiState exposes the board`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        questBoardFlow.value = QuestBoard(
+            daily = listOf(quest("d1"), quest("d2", status = "COMPLETED")),
+            weekly = listOf(quest("w1")),
+        )
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertEquals(2, viewModel.uiState.value.questBoard.daily.size)
+        assertEquals(1, viewModel.uiState.value.questBoard.weekly.size)
+    }
+
+    @Test
+    fun `given streak flow emits when ViewModel initializes then uiState exposes the streak`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        streakFlow.value = StreakUiModel(current = 5, longest = 9, freezeTokens = 2)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertEquals(5, viewModel.uiState.value.streak.current)
+        assertEquals(2, viewModel.uiState.value.streak.freezeTokens)
+    }
+
+    @Test
+    fun `given a claimable quest when claimQuest succeeds then a QuestClaimed event is emitted`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        coEvery { gamificationRepository.claimQuest("q1") } returns
+            ClaimResult.Claimed(xpAwarded = 50, newLevel = 2, leveledUp = false)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Act + Assert: Turbine subscribes to the one-shot Channel before the action fires.
+        viewModel.events.test {
+            viewModel.claimQuest("q1")
+            advanceUntilIdle()
+            val event = awaitItem()
+            assertTrue(event is ProfileViewModel.Event.QuestClaimed)
+            assertEquals(50, (event as ProfileViewModel.Event.QuestClaimed).xpAwarded)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { gamificationRepository.claimQuest("q1") }
+    }
+
+    @Test
+    fun `given a non-completed quest when claimQuest returns NotCompleted then QuestClaimFailed is emitted`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        coEvery { gamificationRepository.claimQuest("q2") } returns ClaimResult.NotCompleted
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Act + Assert
+        viewModel.events.test {
+            viewModel.claimQuest("q2")
+            advanceUntilIdle()
+            assertTrue(awaitItem() is ProfileViewModel.Event.QuestClaimFailed)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given claimQuest throws then QuestClaimFailed is emitted (no crash)`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        coEvery { gamificationRepository.claimQuest("q3") } throws RuntimeException("boom")
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Act + Assert: the failure is swallowed and surfaced as a failed-claim event.
+        viewModel.events.test {
+            viewModel.claimQuest("q3")
+            advanceUntilIdle()
+            assertTrue(awaitItem() is ProfileViewModel.Event.QuestClaimFailed)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

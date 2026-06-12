@@ -40,7 +40,7 @@ sealed class Screen(val route: String) {
     // ── Profile (bottom tab 4) ───────────────────────────────────────────────
     /**
      * Profile screen. Optional [tab] query parameter selects the initial tab
-     * (`overview` | `achievements`) so Home widgets can deep-link to a specific tab (Phase 2).
+     * (`overview` | `achievements` | `quests`) so Home widgets can deep-link to a specific tab (Phase 2).
      * The plain [route] (no query) defaults to the Overview tab.
      */
     object Profile : Screen("profile?tab={tab}") {

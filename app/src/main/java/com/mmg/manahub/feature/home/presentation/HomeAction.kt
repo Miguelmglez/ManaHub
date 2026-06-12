@@ -61,6 +61,9 @@ sealed interface HomeAction {
     object OpenDraftGuide : HomeAction
     object OpenWishlist : HomeAction
     object OpenAchievements : HomeAction
+
+    /** Opens the Profile screen on the Quests tab (gamification Phase 2). */
+    object OpenProfileQuests : HomeAction
     data class OpenCardDetail(val scryfallId: String) : HomeAction
     data class OpenDeck(val deckId: String) : HomeAction
 

@@ -278,6 +278,8 @@ fun AppNavGraph(
                             HomeAction.OpenDraftGuide -> navController.navigate(Screen.Draft.route)
                             HomeAction.OpenWishlist -> navController.navigateTab(Screen.Collection.route)
                             HomeAction.OpenAchievements -> navController.navigate(Screen.Stats.route)
+                            HomeAction.OpenProfileQuests ->
+                                navController.navigate(Screen.Profile.routeWithTab("quests"))
                             is HomeAction.OpenCardDetail -> navController.navigate(
                                 Screen.CollectionCardDetail.createRoute(action.scryfallId)
                             )
@@ -559,9 +561,11 @@ fun AppNavGraph(
                     },
                 ),
             ) { backStackEntry ->
-                // Optional deep-link tab argument: "achievements" → Achievements tab, else Overview.
+                // Optional deep-link tab argument: "achievements" → Achievements tab,
+                // "quests" → Quests tab, else Overview.
                 val initialTab = when (backStackEntry.arguments?.getString("tab")?.lowercase()) {
                     "achievements" -> ProfileTab.ACHIEVEMENTS
+                    "quests" -> ProfileTab.QUESTS
                     else -> ProfileTab.OVERVIEW
                 }
                 ProfileScreen(

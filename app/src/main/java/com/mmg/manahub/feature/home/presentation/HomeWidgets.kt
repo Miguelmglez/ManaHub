@@ -86,9 +86,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -144,13 +147,18 @@ private val MediumMinHeight: Dp = 160.dp
 private fun WidgetShell(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
     content: @Composable ColumnScopeMarker.() -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     val clickModifier = if (onClick != null) {
         Modifier
             .clip(CardShape)
-            .clickable(onClick = onClick)
+            .clickable(
+                onClickLabel = onClickLabel,
+                role = Role.Button,
+                onClick = onClick,
+            )
     } else {
         Modifier
     }
@@ -275,6 +283,10 @@ fun HomeWidgetHost(
     onAction: (HomeAction) -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
+    // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
+    // in the persisted layout (so they reappear if re-enabled) but are not shown.
+    if (widget.type.isGamification && !uiState.gamificationEnabled) return
+
     Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
         if (widget.type != HomeWidgetType.CONTEXT_HERO) {
             WidgetSectionHeader(
@@ -300,6 +312,8 @@ fun HomeWidgetHost(
         when (widget.type) {
             HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
             HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(uiState.quickStartActions, onAction)
+            HomeWidgetType.PROGRESSION_HUB -> ProgressionHubWidget(uiState.gamification, onAction)
+            HomeWidgetType.QUESTS_HUB -> QuestsHubWidget(uiState.gamification, onAction)
             HomeWidgetType.GAME_STATS_HUB -> GameStatsHubWidget(uiState, onAction)
             HomeWidgetType.COLLECTION_STATS_HUB -> CollectionStatsHubWidget(uiState, onAction)
             HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
@@ -332,6 +346,13 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
                 onSkip = { stepId -> onAction(HomeAction.SkipFirstStep(stepId)) },
             )
         }
+        return
+    }
+
+    // Quests-ready suggestion uses string resources, so it is rendered here (the generic copy
+    // helpers below are not @Composable). Highest priority — opens the Profile Quests tab.
+    if (hero is HomeHeroState.QuestsReady) {
+        QuestsReadyHero(count = hero.count, onAction = onAction)
         return
     }
 
@@ -623,6 +644,293 @@ internal fun FirstStepsCompletedCard() {
             )
             Spacer(Modifier.height(spacing.sm))
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Quests-ready hero (gamification Phase 2) — highest-priority CONTEXT_HERO suggestion
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun QuestsReadyHero(count: Int, onAction: (HomeAction) -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Surface(
+        color = mc.surface.copy(alpha = 0.6f),
+        shape = CardShape,
+        border = BorderStroke(1.dp, mc.lifePositive.copy(alpha = 0.3f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .coloredShadow(
+                color = mc.lifePositive.copy(alpha = 0.15f),
+                borderRadius = 18.dp,
+                blurRadius = 24.dp,
+            ),
+    ) {
+        Column(
+            modifier = Modifier.padding(spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = mc.lifePositive,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = stringResourceSafe(R.string.home_hero_quests_ready_label).uppercase(),
+                    style = ty.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = mc.lifePositive,
+                    maxLines = 1,
+                )
+            }
+            Text(
+                text = stringResourceSafe(R.string.home_hero_quests_ready_title, count),
+                style = ty.displayMedium,
+                color = mc.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResourceSafe(R.string.home_hero_quests_ready_subtitle),
+                style = ty.bodyMedium,
+                color = mc.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(spacing.xs))
+            PillButton(
+                label = stringResourceSafe(R.string.home_hero_quests_ready_cta),
+                icon = Icons.Default.EmojiEvents,
+                onClick = { onAction(HomeAction.OpenProfileQuests) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PROGRESSION_HUB (gamification Phase 2) — level + XP bar + streak + daily quests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun ProgressionHubWidget(gamification: HomeGamification?, onAction: (HomeAction) -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    if (gamification == null) {
+        WidgetShell { WidgetLoading() }
+        return
+    }
+
+    WidgetShell(
+        onClick = { onAction(HomeAction.OpenProfileQuests) },
+        onClickLabel = stringResource(R.string.home_progression_open_a11y),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Level badge.
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(mc.primaryAccent.copy(alpha = 0.15f))
+                    .clearAndSetSemantics {},
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "${gamification.level}",
+                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = mc.primaryAccent,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+            ) {
+                Text(
+                    text = stringResourceSafe(R.string.home_progression_level, gamification.level),
+                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                )
+                HomeProgressBar(
+                    progress = gamification.levelProgress,
+                    fillColor = mc.primaryAccent,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Streak chip.
+            val streakActive = gamification.streak > 0
+            Surface(
+                shape = ChipShape,
+                color = (if (streakActive) mc.lifePositive else mc.textDisabled).copy(alpha = 0.15f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocalFireDepartment,
+                        contentDescription = null,
+                        tint = if (streakActive) mc.lifePositive else mc.textDisabled,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = stringResourceSafe(R.string.home_progression_streak, gamification.streak),
+                        style = ty.labelSmall,
+                        color = mc.textPrimary,
+                    )
+                }
+            }
+            // Daily-quest completion.
+            Text(
+                text = stringResourceSafe(
+                    R.string.home_progression_daily_done,
+                    gamification.dailyDone,
+                    gamification.dailyTotal,
+                ),
+                style = ty.labelSmall,
+                color = mc.textSecondary,
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  QUESTS_HUB (gamification Phase 2) — top quests with inline progress; claimable stands out
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun QuestsHubWidget(gamification: HomeGamification?, onAction: (HomeAction) -> Unit) {
+    val spacing = MaterialTheme.spacing
+
+    if (gamification == null) {
+        WidgetShell { WidgetLoading() }
+        return
+    }
+
+    WidgetShell(
+        onClick = { onAction(HomeAction.OpenProfileQuests) },
+        onClickLabel = stringResource(R.string.home_quests_open_a11y),
+    ) {
+        if (gamification.topQuests.isEmpty()) {
+            WidgetEmptyBody(stringResourceSafe(R.string.home_quests_empty))
+            return@WidgetShell
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            gamification.topQuests.forEach { quest ->
+                HomeQuestRow(quest = quest)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeQuestRow(quest: HomeQuest) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    // Claimable quests are visually distinct: a lifePositive border + a "ready" badge.
+    Surface(
+        shape = ChipShape,
+        color = if (quest.isClaimable) mc.lifePositive.copy(alpha = 0.10f) else mc.surface.copy(alpha = 0.4f),
+        border = if (quest.isClaimable) BorderStroke(1.dp, mc.lifePositive.copy(alpha = 0.5f)) else null,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = quest.emoji, style = ty.bodyMedium)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+            ) {
+                Text(
+                    text = stringResourceSafe(quest.titleRes),
+                    style = ty.labelMedium,
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                HomeProgressBar(
+                    progress = quest.progressFraction,
+                    fillColor = if (quest.isClaimable) mc.lifePositive else mc.primaryAccent,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (quest.isClaimable) {
+                Text(
+                    text = stringResourceSafe(R.string.home_quests_claimable),
+                    style = ty.labelSmall,
+                    color = mc.lifePositive,
+                    maxLines = 1,
+                )
+            } else {
+                Text(
+                    text = "${quest.progress.coerceAtMost(quest.target)}/${quest.target}",
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A thin determinate progress bar for the Home gamification widgets. Track uses a theme-agnostic
+ * low-alpha foreground (NOT surfaceVariant — invisible on HallowedPrint); the fill is computed in the
+ * layout pass so it tracks the measured width exactly.
+ */
+@Composable
+private fun HomeProgressBar(
+    progress: Float,
+    fillColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val target = progress.coerceIn(0f, 1f)
+    Box(
+        modifier = modifier
+            .height(6.dp) // intentional: thin bar
+            .clip(CircleShape)
+            .background(mc.textDisabled.copy(alpha = 0.25f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .height(6.dp) // intentional: thin bar
+                .clip(CircleShape)
+                .background(fillColor)
+                .layout { measurable, constraints ->
+                    val width = (constraints.maxWidth * target).toInt().coerceAtLeast(0)
+                    val placeable = measurable.measure(
+                        constraints.copy(minWidth = width, maxWidth = width),
+                    )
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                },
+        )
     }
 }
 
@@ -2049,6 +2357,8 @@ private fun heroSectionLabel(hero: HomeHeroState): String = when (hero) {
     is HomeHeroState.ActiveDraft -> "DRAFT IN PROGRESS"
     is HomeHeroState.Summary -> "WELCOME BACK"
     is HomeHeroState.Welcome -> "GET STARTED" // handled by FirstStepsCarousel; kept for exhaustiveness
+    // QuestsReady is rendered by QuestsReadyHero before this is called; kept for exhaustiveness.
+    is HomeHeroState.QuestsReady -> "REWARDS READY"
     HomeHeroState.Loading -> "LOADING"
 }
 
@@ -2063,6 +2373,8 @@ private fun heroWidgetCopy(hero: HomeHeroState): Triple<String, String, String> 
     HomeHeroState.Loading -> Triple("Loading…", "Getting your dashboard ready", "Start a game")
     // Welcome is rendered by FirstStepsCarousel/FirstStepsCompletedCard before this is called.
     is HomeHeroState.Welcome -> Triple("Welcome to ManaHub", "Track games, scan cards, and build decks.", "Start a game")
+    // QuestsReady is rendered by QuestsReadyHero before this is called; kept for exhaustiveness.
+    is HomeHeroState.QuestsReady -> Triple("Rewards ready", "Claim your completed quests.", "Claim rewards")
 }
 
 private fun heroWidgetCta(hero: HomeHeroState): HomeAction = when (hero) {

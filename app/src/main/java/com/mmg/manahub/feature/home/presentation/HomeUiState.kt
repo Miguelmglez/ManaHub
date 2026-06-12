@@ -51,7 +51,57 @@ data class HomeUiState(
     val communityStats: com.mmg.manahub.core.domain.model.CommunityStats? = null,
     val tradeSummary: TradeSummary? = null,
     val activeTournamentSummary: TournamentSummary? = null,
+
+    // ── Gamification (Phase 2) ──────────────────────────────────────────────────
+    /** Master toggle. When false every gamification surface (widgets + hero suggestion) is hidden. */
+    val gamificationEnabled: Boolean = true,
+    /** Level / XP / streak / quest summary for the Home gamification widgets; null until loaded. */
+    val gamification: HomeGamification? = null,
 )
+
+/**
+ * Compact gamification snapshot for the Home dashboard widgets (Phase 2).
+ *
+ * Derived from the gamification repository's progression, quest board, and streak flows. All quest
+ * counts are across daily + weekly.
+ *
+ * @param level current player level.
+ * @param xpIntoLevel XP earned into the current level.
+ * @param xpForNextLevel XP span of the current level (0 → bar reads empty).
+ * @param streak current daily-activity streak.
+ * @param dailyDone completed daily quests today.
+ * @param dailyTotal total daily quests today.
+ * @param claimableCount completed-but-unclaimed quests across daily + weekly.
+ * @param topQuests up to 3 in-progress/claimable quests for the Quests widget (claimable first).
+ */
+data class HomeGamification(
+    val level: Int,
+    val xpIntoLevel: Long,
+    val xpForNextLevel: Long,
+    val streak: Int,
+    val dailyDone: Int,
+    val dailyTotal: Int,
+    val claimableCount: Int,
+    val topQuests: List<HomeQuest>,
+) {
+    /** Progress into the current level, clamped to [0f, 1f]. */
+    val levelProgress: Float
+        get() = if (xpForNextLevel <= 0L) 0f
+        else (xpIntoLevel.toFloat() / xpForNextLevel).coerceIn(0f, 1f)
+}
+
+/** A single quest preview row for the Home Quests widget. */
+data class HomeQuest(
+    val instanceId: String,
+    @StringRes val titleRes: Int,
+    val emoji: String,
+    val progress: Int,
+    val target: Int,
+    val isClaimable: Boolean,
+) {
+    val progressFraction: Float
+        get() = if (target <= 0) 0f else (progress.toFloat() / target).coerceIn(0f, 1f)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Phase 2 / Phase 3 widget data models
@@ -175,6 +225,12 @@ sealed interface HomeHeroState {
 
     /** A draft simulation is in progress. */
     data class ActiveDraft(val setName: String) : HomeHeroState
+
+    /**
+     * One or more completed quests are waiting to be claimed (gamification Phase 2). Highest
+     * priority when applicable and gamification is enabled; tapping opens the Profile Quests tab.
+     */
+    data class QuestsReady(val count: Int) : HomeHeroState
 
     /** Returning-user summary with their name and lifetime game count. */
     data class Summary(val playerName: String, val totalGames: Int) : HomeHeroState

@@ -2,6 +2,9 @@ package com.mmg.manahub.core.gamification.domain.repository
 
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -39,4 +42,24 @@ interface GamificationRepository {
      * [observePendingCelebrations]. Called after the overlay finished (or was skipped) for [id].
      */
     suspend fun markCelebrated(id: String)
+
+    /**
+     * Observes the current period's quest board (Phase 2): today's daily quests + this week's weekly
+     * quests, joined with their catalog metadata. The current period keys are recomputed at collection
+     * time from the device clock/zone, so the board reflects the day/week the collector is observing
+     * in. EXPIRED instances are excluded; ACTIVE / COMPLETED / CLAIMED are included.
+     */
+    fun observeActiveQuests(): Flow<QuestBoard>
+
+    /**
+     * Observes the daily-activity streak (Phase 2). Emits a zeroed default
+     * (`current = 0, longest = 0, freezeTokens = MAX_FREEZE_TOKENS`) until the streak row exists.
+     */
+    fun observeDailyActivityStreak(): Flow<StreakUiModel>
+
+    /**
+     * Claims a COMPLETED quest's XP reward (Phase 2). Delegates to the idempotent claim use case;
+     * a double-claim never double-grants. Returns the outcome for the UI to surface.
+     */
+    suspend fun claimQuest(instanceId: String): ClaimResult
 }
