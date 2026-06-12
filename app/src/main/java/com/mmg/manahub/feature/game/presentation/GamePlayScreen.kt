@@ -429,6 +429,7 @@ private fun GamePlayContent(
                     onNewGame = { onResetGame(); onNewGame() },
                     onBackHome = onBackHome,
                     onSurvey = { onSurvey(uiState.lastSessionId ?: 0L) },
+                    sessionId = uiState.lastSessionId,
                 )
             }
         }

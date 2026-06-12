@@ -194,3 +194,29 @@ Puzzle feature. Leave clean extension points (e.g. `QuestInstanceEntity.tokenRew
     `!/docs/adr/**` negations so ADRs are actually committed (caught by the security gate).
   - Build: `assembleDebug` green; +26 new unit tests pass; 140 pre-existing master failures unchanged
     (zero regressions, verified against the master baseline).
+- **2026-06-12 (Phase 1 — Achievements):** absorbed/replaced the old stateless achievement system.
+  - `AchievementCatalog` = 40 `AchievementDef`s, indexed `defsByEventType` (event evaluates only its
+    registered defs). 7-value `AchievementCategory` (COLLECTION/GAMES/DECKS/SURVEYS/TOURNAMENTS/SOCIAL/
+    DEDICATION). The 15 legacy ids kept as STABLE string PKs; new tiered lines added under new ids
+    (never collapsed an existing id). 2 secrets.
+  - `AchievementEvaluator` (was a stub) persists progress and NEVER overwrites an existing `unlocked_at`
+    (fixes the documented NOW-on-recompute bug); `celebrated_at` is the separate celebration gate. Tier
+    XP grants once via ledger key `achievement:{id}:tier:{n}`. Family A = local Room aggregate via a new
+    read-only `GamificationStatsDao` (wins use `is_local=1`, never name matching), supports retroactive
+    unlocks + a one-shot backfill flagged by DataStore `gamificationBackfillDone` (backfill sets
+    `celebrated_at = unlocked_at` to suppress celebration). Family B = counters (streaks, still stubbed
+    until Phase 2) + remote-backed social/tournament.
+  - DELETED `CheckAchievementsUseCase` + `core.domain.model.Achievement`; `ProfileViewModel` rewired to
+    `GamificationRepository.observeAchievements()`. `ProgressionOutcome` gained `achievementUnlocks`;
+    `engine.outcomes: SharedFlow<ProcessedOutcome>` lets the UI correlate by `GameFinished.sessionId`.
+  - UI: Profile tab row (Overview + Achievements only this phase); secret achievements masked "???";
+    `Screen.Profile` gained `?tab=`. Unlock celebration overlay hosted GLOBALLY in `MainActivity` root
+    Box (Canvas particle burst, no assets), queued off `celebrated_at IS NULL`, skippable + `BackHandler`.
+    GameResult progression strip correlated by `lastSessionId` (Room id, not online session id). All
+    gamification UI hidden when the master toggle is off.
+  - Design review applied: shape/spacing tokens, light-theme (HallowedPrint) contrast fixes
+    (`surfaceVariant` track → `textDisabled.copy(0.25f)`; small `goldMtg` label → `textPrimary`).
+  - Build: `assembleDebug` green; +35 new unit tests pass; 140 master baseline failures unchanged
+    (zero regressions). Security gate PASS.
+  - Carried forward: tournament "won" achievement won't unlock until `isLocalWinner` is fixed; streak
+    achievements won't advance until Phase 2 fills `StreakTracker`.

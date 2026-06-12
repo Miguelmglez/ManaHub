@@ -68,4 +68,24 @@ object XpConfig {
     // ── Daily open ───────────────────────────────────────────────────────────────
     /** XP for the first app open of a local day. */
     const val dailyFirstOpen: Int = 10
+
+    // ── Achievement tier rewards ──────────────────────────────────────────────────
+    //
+    // Per-tier XP for an unlocked achievement tier, granted ONCE via the ledger key
+    // `achievement:{id}:tier:{n}`. The catalog ([AchievementCatalog]) assigns one of these to each
+    // tier by difficulty band so all reward magnitudes stay tunable in this one object (ADR-002 §6).
+    /** Tier-1 (entry) achievement reward. */
+    const val achievementTier1: Int = 50
+
+    /** Tier-2 (intermediate) achievement reward. */
+    const val achievementTier2: Int = 150
+
+    /** Tier-3 (mastery) achievement reward. */
+    const val achievementTier3: Int = 400
+
+    /** Reward for a one-off (single-tier) achievement of notable difficulty. */
+    const val achievementOneShot: Int = 100
+
+    /** Reward for a secret achievement unlock. */
+    const val achievementSecret: Int = 200
 }

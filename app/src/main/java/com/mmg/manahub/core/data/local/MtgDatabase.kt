@@ -9,6 +9,7 @@ import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.GamificationDao
+import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
@@ -118,4 +119,10 @@ abstract class MtgDatabase : RoomDatabase() {
     abstract fun playtestDao(): PlaytestDao
     abstract fun draftSessionDao(): DraftSessionDao
     abstract fun gamificationDao(): GamificationDao
+
+    /**
+     * Read-only snapshot DAO over existing tables (collection/games/decks/surveys) for Family-A
+     * achievement resolvers + backfill. Adds no entities → no schema change (ADR-002, Phase 1).
+     */
+    abstract fun gamificationStatsDao(): GamificationStatsDao
 }

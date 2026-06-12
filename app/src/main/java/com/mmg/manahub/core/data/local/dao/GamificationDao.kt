@@ -138,6 +138,38 @@ abstract class GamificationDao {
     @Query("SELECT * FROM achievement_progress")
     abstract fun observeAchievements(): Flow<List<AchievementProgressEntity>>
 
+    /**
+     * Observes achievements that have been unlocked but NOT yet celebrated, oldest unlock first.
+     *
+     * Drives Chunk B's celebration queue (ADR-002, Phase 1): a row is pending when its real unlock
+     * is stamped (`unlocked_at IS NOT NULL`) but the unlock celebration has not been shown
+     * (`celebrated_at IS NULL`). Backfilled (retroactive) unlocks set `celebrated_at = unlocked_at`,
+     * so they never appear here — the celebration is correctly suppressed for "you already had this".
+     * Ordering by `unlocked_at` guarantees the queue plays unlocks in chronological order.
+     */
+    @Query(
+        """
+        SELECT * FROM achievement_progress
+        WHERE unlocked_at IS NOT NULL AND celebrated_at IS NULL
+        ORDER BY unlocked_at ASC
+        """
+    )
+    abstract fun observePendingCelebrations(): Flow<List<AchievementProgressEntity>>
+
+    /**
+     * Marks a single achievement's unlock as celebrated by stamping `celebrated_at`.
+     *
+     * Idempotent at the queue level: once stamped, the row drops out of
+     * [observePendingCelebrations]. Called after the celebration overlay has shown (or been skipped)
+     * for that achievement. Never clears `unlocked_at` (the real first-unlock time is immutable —
+     * memory `feedback_achievement_unlockedat_persistence`).
+     *
+     * @param id the achievement's stable catalog id.
+     * @param celebratedAt epoch-millis to stamp.
+     */
+    @Query("UPDATE achievement_progress SET celebrated_at = :celebratedAt WHERE achievement_id = :id")
+    abstract suspend fun markCelebrated(id: String, celebratedAt: Long)
+
     // ── Quests ───────────────────────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
