@@ -28,6 +28,7 @@ data class XpLineItem(
  * @param newLevel the level AFTER the grant, or null if no grant happened.
  * @param leveledUp true if the grant crossed at least one level boundary.
  * @param achievementUnlocks tiers unlocked while processing this event (empty when none).
+ * @param questProgress quest instances advanced while processing this event (empty when none).
  */
 data class ProgressionOutcome(
     val xpGranted: Int,
@@ -35,14 +36,22 @@ data class ProgressionOutcome(
     val newLevel: Int?,
     val leveledUp: Boolean,
     val achievementUnlocks: List<AchievementUnlock> = emptyList(),
+    val questProgress: List<QuestProgressDelta> = emptyList(),
 ) {
-    /** True if this outcome carries anything the UI should surface (XP, a level-up, or an unlock). */
+    /**
+     * True if this outcome carries anything the UI should surface (XP, a level-up, an unlock, or quest
+     * progress).
+     */
     val hasAnything: Boolean
-        get() = xpGranted > 0 || leveledUp || achievementUnlocks.isNotEmpty()
+        get() = xpGranted > 0 || leveledUp || achievementUnlocks.isNotEmpty() || questProgress.isNotEmpty()
 
     /** Returns a copy with [unlocks] folded into [achievementUnlocks]. */
     fun withAchievementUnlocks(unlocks: List<AchievementUnlock>): ProgressionOutcome =
         if (unlocks.isEmpty()) this else copy(achievementUnlocks = achievementUnlocks + unlocks)
+
+    /** Returns a copy with [progress] folded into [questProgress]. */
+    fun withQuestProgress(progress: List<QuestProgressDelta>): ProgressionOutcome =
+        if (progress.isEmpty()) this else copy(questProgress = questProgress + progress)
 
     companion object {
         /** A no-op outcome: nothing was granted (duplicate event, capped out, or unmapped event). */
@@ -52,6 +61,7 @@ data class ProgressionOutcome(
             newLevel = null,
             leveledUp = false,
             achievementUnlocks = emptyList(),
+            questProgress = emptyList(),
         )
     }
 }

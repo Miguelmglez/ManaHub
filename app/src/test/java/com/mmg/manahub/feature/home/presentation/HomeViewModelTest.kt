@@ -11,6 +11,13 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
+import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
+import com.mmg.manahub.core.gamification.domain.QuestPeriod
+import com.mmg.manahub.core.gamification.domain.QuestWeightClass
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import com.mmg.manahub.feature.auth.domain.model.SessionState
@@ -77,6 +84,17 @@ class HomeViewModelTest {
         MutableStateFlow<List<com.mmg.manahub.core.data.local.entity.TournamentEntity>>(emptyList())
     private val deckSummariesFlow = MutableStateFlow<List<DeckSummary>>(emptyList())
 
+    // Gamification (Phase 2) flows.
+    private val gamificationEnabledFlow = MutableStateFlow(true)
+    private val progressionFlow = MutableStateFlow(
+        PlayerProgression(
+            totalXp = 0L, level = 1, xpIntoLevel = 0L, xpForNextLevel = 100L,
+            updatedAt = java.time.Instant.EPOCH,
+        ),
+    )
+    private val questBoardFlow = MutableStateFlow(QuestBoard.empty)
+    private val streakFlow = MutableStateFlow(StreakUiModel(current = 0, longest = 0, freezeTokens = 0))
+
     /** Backing store for the persisted layout — saveHomeLayout writes here so reads round-trip. */
     private val savedLayoutTokens = MutableStateFlow<String?>(null)
 
@@ -93,6 +111,7 @@ class HomeViewModelTest {
     private val draftRepository: DraftRepository = mockk(relaxed = true)
     private val cardRepository: com.mmg.manahub.core.domain.repository.CardRepository = mockk(relaxed = true)
     private val wishlistRepository: WishlistRepository = mockk(relaxed = true)
+    private val gamificationRepository: GamificationRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -140,6 +159,12 @@ class HomeViewModelTest {
         // Wishlist default: empty.
         every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
 
+        // Gamification (Phase 2): enabled with empty board / zeroed streak / level 1.
+        every { userPrefsDataStore.gamificationEnabledFlow } returns gamificationEnabledFlow
+        every { gamificationRepository.observeProgression() } returns progressionFlow
+        every { gamificationRepository.observeActiveQuests() } returns questBoardFlow
+        every { gamificationRepository.observeDailyActivityStreak() } returns streakFlow
+
         // Layout round-trip: homeLayoutFlow decodes the saved tokens (or the supplied
         // default when none are saved); saveHomeLayout writes the tokens.
         every { userPrefsDataStore.homeLayoutFlow(any()) } answers {
@@ -182,6 +207,29 @@ class HomeViewModelTest {
         draftRepository = draftRepository,
         wishlistRepository = wishlistRepository,
         getAccountNudgeUseCase = GetAccountNudgeUseCase(),
+        gamificationRepository = gamificationRepository,
+    )
+
+    /** Builds a quest UI model for tests (titleRes/descRes are irrelevant for VM logic). */
+    private fun quest(
+        instanceId: String,
+        period: QuestPeriod = QuestPeriod.DAILY,
+        progress: Int = 0,
+        target: Int = 1,
+        status: String = "ACTIVE",
+        xpReward: Int = 50,
+    ) = QuestUiModel(
+        instanceId = instanceId,
+        templateId = "tmpl_$instanceId",
+        titleRes = 0,
+        descRes = 0,
+        emoji = "⚔",
+        period = period,
+        weightClass = QuestWeightClass.ACCESSIBLE,
+        progress = progress,
+        target = target,
+        status = status,
+        xpReward = xpReward,
     )
 
     private fun emptyCollectionStats() = CollectionStats(
@@ -1104,5 +1152,142 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertNull(vm.state.value.wishlistStats)
+    }
+
+    // ── Gamification widgets + CONTEXT_HERO claim suggestion (Phase 2) ─────────
+
+    @Test
+    fun `given gamification enabled then gamification snapshot is populated`() = runTest(testDispatcher) {
+        progressionFlow.value = PlayerProgression(
+            totalXp = 250L, level = 4, xpIntoLevel = 40L, xpForNextLevel = 120L,
+            updatedAt = java.time.Instant.EPOCH,
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val g = vm.state.value.gamification
+        assertNotNull(g)
+        assertEquals(4, g!!.level)
+        assertTrue(vm.state.value.gamificationEnabled)
+    }
+
+    @Test
+    fun `given gamification disabled then snapshot is null and toggle is false`() = runTest(testDispatcher) {
+        gamificationEnabledFlow.value = false
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.gamificationEnabled)
+        assertNull(vm.state.value.gamification)
+    }
+
+    @Test
+    fun `daily quest counts map completed and claimable quests as done`() = runTest(testDispatcher) {
+        questBoardFlow.value = QuestBoard(
+            daily = listOf(
+                quest("d1", status = "CLAIMED"),       // done (claimed)
+                quest("d2", status = "COMPLETED"),     // done (claimable)
+                quest("d3", status = "ACTIVE"),        // not done
+            ),
+            weekly = emptyList(),
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val g = vm.state.value.gamification!!
+        assertEquals(3, g.dailyTotal)
+        assertEquals(2, g.dailyDone)
+    }
+
+    @Test
+    fun `top quests preview puts claimable first and caps at three`() = runTest(testDispatcher) {
+        questBoardFlow.value = QuestBoard(
+            daily = listOf(
+                quest("d1", status = "ACTIVE"),
+                quest("d2", status = "COMPLETED"),     // claimable
+                quest("d3", status = "ACTIVE"),
+                quest("d4", status = "ACTIVE"),
+            ),
+            weekly = listOf(quest("w1", period = QuestPeriod.WEEKLY, status = "ACTIVE")),
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val preview = vm.state.value.gamification!!.topQuests
+        assertEquals(3, preview.size)
+        assertEquals("d2", preview.first().instanceId) // claimable first
+        assertTrue(preview.first().isClaimable)
+    }
+
+    @Test
+    fun `new default layouts include the progression and quests widgets`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val types = vm.state.value.layout.map { it.type }
+        assertTrue(HomeWidgetType.PROGRESSION_HUB in types)
+        assertTrue(HomeWidgetType.QUESTS_HUB in types)
+    }
+
+    @Test
+    fun `hero is QuestsReady with the claimable count when quests are completed and gamification enabled`() =
+        runTest(testDispatcher) {
+            // Two completed (claimable) quests; an active draft is also running but QuestsReady wins.
+            activeDraftFlow.value = draftingState(setCode = "MKM")
+            questBoardFlow.value = QuestBoard(
+                daily = listOf(quest("d1", status = "COMPLETED"), quest("d2", status = "COMPLETED")),
+                weekly = emptyList(),
+            )
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val hero = vm.state.value.hero
+            assertTrue("Expected QuestsReady but was $hero", hero is HomeHeroState.QuestsReady)
+            assertEquals(2, (hero as HomeHeroState.QuestsReady).count)
+        }
+
+    @Test
+    fun `hero is NOT QuestsReady when gamification is disabled even with claimable quests`() =
+        runTest(testDispatcher) {
+            gamificationEnabledFlow.value = false
+            activeDraftFlow.value = draftingState(setCode = "MKM")
+            questBoardFlow.value = QuestBoard(
+                daily = listOf(quest("d1", status = "COMPLETED")),
+                weekly = emptyList(),
+            )
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.hero is HomeHeroState.ActiveDraft)
+        }
+
+    @Test
+    fun `hero is not QuestsReady when there are no claimable quests`() = runTest(testDispatcher) {
+        questBoardFlow.value = QuestBoard(
+            daily = listOf(quest("d1", status = "ACTIVE")),
+            weekly = emptyList(),
+        )
+        totalGamesFlow.value = 0
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.hero is HomeHeroState.QuestsReady)
     }
 }

@@ -149,6 +149,7 @@ fun HomeScreen(
         WidgetGallerySheet(
             currentLayout = uiState.layout,
             isAuthenticated = uiState.isAuthenticated,
+            gamificationEnabled = uiState.gamificationEnabled,
             onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
             onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
             onMoveWidget = { from, to -> viewModel.onAction(HomeAction.MoveWidget(from, to)) },

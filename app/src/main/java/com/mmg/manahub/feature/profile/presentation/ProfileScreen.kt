@@ -78,7 +78,10 @@ import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -91,8 +94,8 @@ import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** Tabs shown under the Profile hero (Phase 1 ships only these two; Quests/Rewards arrive later). */
-enum class ProfileTab { OVERVIEW, ACHIEVEMENTS }
+/** Tabs shown under the Profile hero (Phase 2 adds Quests; Rewards arrives in Phase 3). */
+enum class ProfileTab { OVERVIEW, ACHIEVEMENTS, QUESTS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -213,6 +216,25 @@ fun ProfileScreen(
         }
     }
 
+    // Quest-claim feedback. The one-shot Channel is collected here and surfaced via MagicToast.
+    val toastState = rememberMagicToastState()
+    val claimSuccessTemplate = stringResource(R.string.quests_claim_success)
+    val claimFailedMessage = stringResource(R.string.quests_claim_failed)
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ProfileViewModel.Event.QuestClaimed ->
+                    toastState.show(
+                        message = String.format(claimSuccessTemplate, event.xpAwarded),
+                        type = MagicToastType.SUCCESS,
+                    )
+                ProfileViewModel.Event.QuestClaimFailed ->
+                    toastState.show(message = claimFailedMessage, type = MagicToastType.ERROR)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = mc.background,
         contentWindowInsets = WindowInsets(0),
@@ -302,6 +324,18 @@ fun ProfileScreen(
                     )
                 }
 
+                uiState.gamificationEnabled && selectedTab == ProfileTab.QUESTS -> {
+                    QuestsTab(
+                        board = uiState.questBoard,
+                        streak = uiState.streak,
+                        onClaim = viewModel::claimQuest,
+                        contentPadding = bottomInset,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 8.dp),
+                    )
+                }
+
                 else -> {
                     OverviewTabContent(
                         uiState = uiState,
@@ -347,6 +381,8 @@ fun ProfileScreen(
             }
         }
     }
+        MagicToastHost(toastState)
+    }
 }
 
 // ── Tab row ─────────────────────────────────────────────────────────────────────
@@ -381,6 +417,7 @@ private fun ProfileTabRow(
             val labelRes = when (tab) {
                 ProfileTab.OVERVIEW -> R.string.profile_tab_overview
                 ProfileTab.ACHIEVEMENTS -> R.string.profile_tab_achievements
+                ProfileTab.QUESTS -> R.string.profile_tab_quests
             }
             val selected = tab == selectedTab
             Tab(

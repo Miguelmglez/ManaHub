@@ -14,10 +14,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -475,6 +479,45 @@ private fun GameProgressionStrip(
                                         color = mc.textPrimary,
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // Quest-progress ticks — one compact row per quest advanced by this game.
+                // A check glyph (lifePositive) marks a quest that just completed.
+                if (shown.questProgress.isNotEmpty()) {
+                    shown.questProgress.forEach { delta ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(text = delta.emoji, style = MaterialTheme.magicTypography.bodyMedium)
+                            Text(
+                                text = stringResource(delta.titleRes),
+                                style = MaterialTheme.magicTypography.bodyMedium,
+                                color = mc.textSecondary,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = stringResource(
+                                    R.string.quests_progress_value,
+                                    delta.newProgress.coerceAtMost(delta.target),
+                                    delta.target,
+                                ),
+                                style = MaterialTheme.magicTypography.labelMedium,
+                                color = if (delta.justCompleted) mc.lifePositive else mc.textSecondary,
+                            )
+                            if (delta.justCompleted) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = mc.lifePositive,
+                                    modifier = Modifier.size(16.dp),
+                                )
                             }
                         }
                     }

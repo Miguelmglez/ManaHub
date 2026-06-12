@@ -193,6 +193,26 @@ abstract class GamificationDao {
     @Query("SELECT * FROM quest_instances WHERE status = :status")
     abstract fun observeQuestsByStatus(status: String): Flow<List<QuestInstanceEntity>>
 
+    /**
+     * One-shot (non-Flow) read of every instance for [periodKey]. Used by the reconciler to decide
+     * whether the current period already has instances and to look up the previous period's template
+     * ids for the no-repeat rule.
+     */
+    @Query("SELECT * FROM quest_instances WHERE period_key = :periodKey")
+    abstract suspend fun getQuestsForPeriod(periodKey: String): List<QuestInstanceEntity>
+
+    /** Count of instances generated for [periodKey] (reconciler "is this period already generated?"). */
+    @Query("SELECT COUNT(*) FROM quest_instances WHERE period_key = :periodKey")
+    abstract suspend fun countQuestsForPeriod(periodKey: String): Int
+
+    /**
+     * Instances whose expiry has passed and that are still ACTIVE or COMPLETED (i.e. not yet rolled
+     * over). The reconciler EXPIREs the ACTIVE ones and auto-claims the COMPLETED ones so earned XP is
+     * never lost. CLAIMED/EXPIRED rows are deliberately excluded (nothing left to do).
+     */
+    @Query("SELECT * FROM quest_instances WHERE expires_at < :nowMillis AND status IN ('ACTIVE','COMPLETED')")
+    abstract suspend fun getStaleQuests(nowMillis: Long): List<QuestInstanceEntity>
+
     // ── Streaks ──────────────────────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

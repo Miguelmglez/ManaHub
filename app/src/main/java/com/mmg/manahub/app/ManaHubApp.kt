@@ -17,7 +17,9 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
 import com.mmg.manahub.core.gamification.engine.AchievementBackfill
+import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
@@ -48,6 +50,7 @@ class ManaHubApp : Application() {
     @Inject lateinit var gamificationEngine: GamificationEngine
     @Inject lateinit var progressionEventBus: ProgressionEventBus
     @Inject lateinit var achievementBackfill: AchievementBackfill
+    @Inject lateinit var questReconciler: QuestReconciler
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
@@ -103,8 +106,15 @@ class ManaHubApp : Application() {
             }
         }
 
+        // Roll quests over on app start (local-first: runs regardless of auth). Idempotent — settles
+        // any stale instances and generates the current period if missing. Failures swallowed.
+        appScope.launch {
+            runCatching { questReconciler.reconcile() }
+        }
+
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
         CollectionStatsSyncWorker.scheduleDailySync(workManager)
+        QuestRotationWorker.scheduleDaily(workManager)
 
         // COMMENTED OUT — Cloudflare R2 embedding DB download replaced by ML Kit OCR
         // embeddingDatabaseUpdater.scheduleUpdateCheck()
