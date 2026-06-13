@@ -43,6 +43,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -52,6 +56,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +91,9 @@ import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import java.util.Locale
 import kotlin.math.roundToInt
 
+/** Tabs shown under the Profile hero (Phase 1 ships only these two; Quests/Rewards arrive later). */
+enum class ProfileTab { OVERVIEW, ACHIEVEMENTS }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -94,6 +102,8 @@ fun ProfileScreen(
     onSettingsClick: () -> Unit,
     onStatsClick: () -> Unit,
     onFriendsClick: () -> Unit,
+    /** Initial tab to open on (deep-linked from Home widgets in Phase 2). Default = Overview. */
+    initialTab: ProfileTab = ProfileTab.OVERVIEW,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
@@ -250,117 +260,235 @@ fun ProfileScreen(
         },
     ) { padding ->
         val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        LazyColumn(
+
+        // Tab selection lives in the screen (transient UI state). When gamification is OFF the tab
+        // row is hidden entirely and only the Overview content is shown — gamification disappears.
+        var selectedTab by rememberSaveable(uiState.gamificationEnabled) {
+            mutableStateOf(if (uiState.gamificationEnabled) initialTab else ProfileTab.OVERVIEW)
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(bottom = 32.dp + navBarBottom),
         ) {
+            // ── Hero (always visible, above the tab row) ──────────────────────
+            ProfileHeroSection(
+                name = uiState.playerName,
+                avatarUrl = uiState.avatarUrl,
+                gameTag = (sessionState as? SessionState.Authenticated)?.user?.gameTag,
+                progression = uiState.progression.takeIf { uiState.gamificationEnabled },
+                onEditClick = { showProfileEdit = true },
+            )
 
-            // ── Hero ──────────────────────────────────────────────────────────
-            item {
-                ProfileHeroSection(
-                    name = uiState.playerName,
-                    avatarUrl = uiState.avatarUrl,
-                    gameTag = (sessionState as? SessionState.Authenticated)?.user?.gameTag,
-                    onEditClick = { showProfileEdit = true },
+            // ── Tab row (only when gamification is enabled) ───────────────────
+            if (uiState.gamificationEnabled) {
+                ProfileTabRow(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it },
                 )
             }
 
-            // ── Friends ───────────────────────────────────────────────────────
-            if (sessionState is SessionState.Authenticated){
-                item {
-                    FriendsSummaryRow(
-                        friendCount = uiState.friendCount,
-                        pendingCount = uiState.pendingFriendCount,
-                        onClick = onFriendsClick,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            // ── Tab content ───────────────────────────────────────────────────
+            val bottomInset = PaddingValues(bottom = 32.dp + navBarBottom)
+            when {
+                uiState.gamificationEnabled && selectedTab == ProfileTab.ACHIEVEMENTS -> {
+                    AchievementsTab(
+                        achievements = uiState.achievements,
+                        contentPadding = bottomInset,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 8.dp),
                     )
                 }
-            }
 
-            // ── KPI grid ──────────────────────────────────────────────────────
-            item {
-                ProfileKpiSection(
-                    uiState = uiState,
-                    favouriteColor = uiState.favouriteColor,
-                    mostValuableColor = uiState.mostValuableColor,
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .clickable { onStatsClick() },
-                )
-            }
-
-            // ── Collection summary ────────────────────────────────────────────
-            uiState.collectionStats?.let { stats ->
-                item {
-                    CollectionSummarySection(
-                        stats = stats,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        viewModel = viewModel
-                    )
-                }
-            }
-
-            // ── App Update ────────────────────────────────────────────────────
-            if (updateAvailable) {
-                item {
-                    AppUpdateRow(
-                        onClick = {
+                else -> {
+                    OverviewTabContent(
+                        uiState = uiState,
+                        sessionState = sessionState,
+                        viewModel = viewModel,
+                        contentPadding = bottomInset,
+                        updateAvailable = updateAvailable,
+                        onFriendsClick = onFriendsClick,
+                        onStatsClick = onStatsClick,
+                        onUpdateClick = {
                             appUpdateInfo?.let { info ->
                                 activity?.let {
                                     appUpdateManager.startUpdateFlowForResult(
                                         info,
                                         com.google.android.play.core.install.model.AppUpdateType.FLEXIBLE,
                                         it,
-                                        500
+                                        500,
                                     )
                                 }
                             }
                         },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        onRateClick = {
+                            val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
+                            val request = reviewManager.requestReviewFlow()
+                            request.addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    val reviewInfo = task.result
+                                    activity?.let { reviewManager.launchReviewFlow(it, reviewInfo) }
+                                } else {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                                    }
+                                }
+                            }
+                        },
+                        onFeedbackClick = { showFeedbackSheet = true },
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
+        }
+    }
+}
 
-            // ── Rate the app ──────────────────────────────────────────────────
+// ── Tab row ─────────────────────────────────────────────────────────────────────
+
+/**
+ * The Profile tab selector (Overview / Achievements). Shown only when gamification is enabled.
+ * Stateless: selection is hoisted to the screen. Uses MagicTheme tokens and exposes selected-state
+ * semantics; each tab is a full-height (≥48dp) row.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileTabRow(
+    selectedTab: ProfileTab,
+    onTabSelected: (ProfileTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    TabRow(
+        selectedTabIndex = selectedTab.ordinal,
+        modifier = modifier.fillMaxWidth(),
+        containerColor = mc.background,
+        contentColor = mc.primaryAccent,
+        indicator = { positions ->
+            TabRowDefaults.SecondaryIndicator(
+                modifier = Modifier.tabIndicatorOffset(positions[selectedTab.ordinal]),
+                color = mc.primaryAccent,
+            )
+        },
+        divider = {},
+    ) {
+        ProfileTab.entries.forEach { tab ->
+            val labelRes = when (tab) {
+                ProfileTab.OVERVIEW -> R.string.profile_tab_overview
+                ProfileTab.ACHIEVEMENTS -> R.string.profile_tab_achievements
+            }
+            val selected = tab == selectedTab
+            Tab(
+                selected = selected,
+                onClick = { onTabSelected(tab) },
+                modifier = Modifier.height(48.dp),
+                selectedContentColor = mc.primaryAccent,
+                unselectedContentColor = mc.textSecondary,
+            ) {
+                Text(
+                    text = stringResource(labelRes),
+                    style = MaterialTheme.magicTypography.labelLarge,
+                )
+            }
+        }
+    }
+}
+
+// ── Overview tab content ─────────────────────────────────────────────────────────
+
+/**
+ * The Overview tab — the original Profile body (friends, KPIs, collection summary, update/rate/
+ * feedback rows, footer), moved verbatim into a tab. Account-gated rows behave exactly as before.
+ * Stateless wrapper: state + actions are hoisted from the screen.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OverviewTabContent(
+    uiState: ProfileViewModel.UiState,
+    sessionState: SessionState,
+    viewModel: ProfileViewModel,
+    contentPadding: PaddingValues,
+    updateAvailable: Boolean,
+    onFriendsClick: () -> Unit,
+    onStatsClick: () -> Unit,
+    onUpdateClick: () -> Unit,
+    onRateClick: () -> Unit,
+    onFeedbackClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = contentPadding,
+    ) {
+        // ── Friends ───────────────────────────────────────────────────────
+        if (sessionState is SessionState.Authenticated) {
             item {
-                RateAppRow(
-                    onClick = {
-                        val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
-                        val request = reviewManager.requestReviewFlow()
-                        request.addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                val reviewInfo = task.result
-                                activity?.let {
-                                    reviewManager.launchReviewFlow(it, reviewInfo)
-                                }
-                            } else {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
-                                }
-                            }
-                        }
-                    },
+                FriendsSummaryRow(
+                    friendCount = uiState.friendCount,
+                    pendingCount = uiState.pendingFriendCount,
+                    onClick = onFriendsClick,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
+        }
 
-            // ── Send feedback ─────────────────────────────────────────────────
+        // ── KPI grid ──────────────────────────────────────────────────────
+        item {
+            ProfileKpiSection(
+                uiState = uiState,
+                favouriteColor = uiState.favouriteColor,
+                mostValuableColor = uiState.mostValuableColor,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .clickable { onStatsClick() },
+            )
+        }
+
+        // ── Collection summary ────────────────────────────────────────────
+        uiState.collectionStats?.let { stats ->
             item {
-                SendFeedbackRow(
-                    onClick = { showFeedbackSheet = true },
+                CollectionSummarySection(
+                    stats = stats,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    viewModel = viewModel,
+                )
+            }
+        }
+
+        // ── App Update ────────────────────────────────────────────────────
+        if (updateAvailable) {
+            item {
+                AppUpdateRow(
+                    onClick = onUpdateClick,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
+        }
 
-            // ── Footer ────────────────────────────────────────────────────────
-            item {
-                AppInfoFooter(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
+        // ── Rate the app ──────────────────────────────────────────────────
+        item {
+            RateAppRow(
+                onClick = onRateClick,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
+        // ── Send feedback ─────────────────────────────────────────────────
+        item {
+            SendFeedbackRow(
+                onClick = onFeedbackClick,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
+        // ── Footer ────────────────────────────────────────────────────────
+        item {
+            AppInfoFooter(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
     }
 }
@@ -373,6 +501,12 @@ private fun ProfileHeroSection(
     avatarUrl: String?,
     /** Server-generated game tag (e.g. "#A3KX9Z"). Displayed as a badge next to the name. */
     gameTag: String? = null,
+    /**
+     * Gamification progression for the read-only XP ring (ADR-002, Phase 0). When null the ring
+     * and level chip are not drawn — the caller passes null while gamification is disabled or the
+     * progression flow has not yet emitted.
+     */
+    progression: com.mmg.manahub.core.gamification.domain.model.PlayerProgression? = null,
     onEditClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -487,6 +621,31 @@ private fun ProfileHeroSection(
                     )
                 }
             }
+        }
+
+        // Read-only XP ring + level chip (ADR-002, Phase 0). Overlaid top-end of the hero.
+        // Only drawn when gamification is enabled AND progression has emitted (caller passes null
+        // otherwise, so the hero renders with no ring as a neutral fallback).
+        if (progression != null) {
+            val span = progression.xpForNextLevel
+            val ringProgress = if (span > 0L) {
+                progression.xpIntoLevel.toFloat() / span.toFloat()
+            } else {
+                0f
+            }
+            ProfileLevelRing(
+                level = progression.level,
+                progress = ringProgress,
+                contentDescription = stringResource(
+                    R.string.profile_level_ring_a11y,
+                    progression.level,
+                    progression.xpIntoLevel,
+                    progression.xpForNextLevel,
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp),
+            )
         }
     }
 }

@@ -95,6 +95,7 @@ fun SettingsScreen(
     val mc = MaterialTheme.magicColors
     val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
     val pushEnabled by viewModel.pushNotificationsEnabled.collectAsStateWithLifecycle()
+    val gamificationEnabled by viewModel.gamificationEnabled.collectAsStateWithLifecycle()
     val notificationPrefs by viewModel.notificationPrefs.collectAsStateWithLifecycle()
     val voiceModelStates by viewModel.voiceModelStates.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
@@ -275,6 +276,12 @@ fun SettingsScreen(
                     }
                     context.startActivity(intent)
                 },
+            )
+
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            GamificationSection(
+                enabled = gamificationEnabled,
+                onEnabledChange = viewModel::setGamificationEnabled,
             )
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
@@ -629,6 +636,41 @@ private fun NotificationPermissionBanner(
                 )
             }
         }
+    }
+}
+
+// ── Gamification section ────────────────────────────────────────────────────────
+
+/**
+ * Master gamification toggle. A single switch row that controls whether all gamification
+ * UI (XP, levels, achievements, quests) is shown. Default is ON; turning it off hides the
+ * Profile XP ring and (in later phases) the achievements/quests tabs. The engine keeps
+ * recording progress silently, so re-enabling restores the user's true state.
+ *
+ * Stateless — the value and change handler are hoisted to the ViewModel.
+ */
+@Composable
+private fun GamificationSection(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_section_gamification),
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = mc.textPrimary,
+        )
+        Spacer(Modifier.height(4.dp))
+        SettingsToggleItem(
+            title = stringResource(R.string.settings_gamification_master),
+            subtitle = stringResource(R.string.settings_gamification_master_subtitle),
+            checked = enabled,
+            onCheckedChange = onEnabledChange,
+        )
     }
 }
 

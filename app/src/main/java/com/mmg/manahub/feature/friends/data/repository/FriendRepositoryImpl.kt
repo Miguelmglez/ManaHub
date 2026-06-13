@@ -21,15 +21,19 @@ import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import retrofit2.HttpException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 import javax.inject.Inject
 
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 
 class FriendRepositoryImpl @Inject constructor(
     private val dao: FriendDao,
     private val remote: FriendRemoteDataSource,
     private val cardRepo: CardRepository,
+    private val progressionEventBus: ProgressionEventBus,
 ) : FriendRepository {
 
     override fun observeFriends(): Flow<List<Friend>> =
@@ -71,6 +75,15 @@ class FriendRepositoryImpl @Inject constructor(
             if (result.isSuccess) {
                 dao.deleteRequest(friendshipId)
                 refreshFriends(currentUserId)
+                // Emit after the friendship is confirmed ACCEPTED (ADR-002 §1). The
+                // friendshipId is a stable per-friendship id, so the idempotency key
+                // friend:{friendshipId} dedupes retries; the weekly cap limits farming.
+                progressionEventBus.emit(
+                    ProgressionEvent.FriendAdded(
+                        friendId = friendshipId,
+                        occurredAt = Instant.now(),
+                    )
+                )
             }
         }
 

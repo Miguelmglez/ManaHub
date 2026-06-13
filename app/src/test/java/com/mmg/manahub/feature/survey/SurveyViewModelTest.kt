@@ -19,6 +19,7 @@ import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.survey.presentation.SurveyMode
 import com.mmg.manahub.feature.survey.presentation.SurveyViewModel
 import io.mockk.coEvery
@@ -55,6 +56,7 @@ class SurveyViewModelTest {
     private lateinit var deckRepository: DeckRepository
     private lateinit var cardDao: CardDao
     private lateinit var prefsRepository: UserPreferencesRepository
+    private lateinit var completeSurvey: CompleteSurveyUseCase
     private lateinit var context: Context
 
     private val dispatcher = UnconfinedTestDispatcher()
@@ -69,6 +71,7 @@ class SurveyViewModelTest {
         deckRepository = mockk()
         cardDao = mockk()
         prefsRepository = mockk()
+        completeSurvey = mockk(relaxed = true)
         context = mockk(relaxed = true)
 
         every { context.getString(any()) } returns "stub"
@@ -287,6 +290,7 @@ class SurveyViewModelTest {
             deckRepository = deckRepository,
             cardDao = cardDao,
             userPreferencesRepository = prefsRepository,
+            completeSurvey = completeSurvey,
             context = context,
             ioDispatcher = dispatcher,
             savedStateHandle = SavedStateHandle(mapOf("sessionId" to sessionId, "mode" to "REVIEW")),
@@ -319,6 +323,7 @@ class SurveyViewModelTest {
         deckRepository = deckRepository,
         cardDao = cardDao,
         userPreferencesRepository = prefsRepository,
+        completeSurvey = completeSurvey,
         context = context,
         ioDispatcher = dispatcher,
         savedStateHandle = SavedStateHandle(mapOf("sessionId" to sessionId, "mode" to "COMPLETE")),

@@ -14,6 +14,7 @@ import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.domain.repository.AddOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
@@ -159,7 +160,7 @@ class UserCardRepositoryImpl @Inject constructor(
         isForTrade: Boolean,
         userId: String?,
         quantity: Int,
-    ) = withContext(ioDispatcher) {
+    ): AddOutcome = withContext(ioDispatcher) {
         val now = System.currentTimeMillis()
         val resolvedUserId = userId ?: authRepository.getCurrentUser()?.id
         val normalizedCondition = condition.uppercase().trim()
@@ -179,40 +180,49 @@ class UserCardRepositoryImpl @Inject constructor(
         }
 
         when {
-            existing == null -> userCardCollectionDao.upsert(
-                UserCardCollectionEntity(
-                    id               = UUID.randomUUID().toString(),
-                    userId           = resolvedUserId,
-                    scryfallId       = scryfallId,
-                    quantity         = quantity,
-                    isFoil           = isFoil,
-                    condition        = normalizedCondition,
-                    language         = normalizedLanguage,
-                    isForTrade       = isForTrade,
-                    isDeleted        = false,
-                    updatedAt        = now,
-                    createdAt        = now,
+            existing == null -> {
+                userCardCollectionDao.upsert(
+                    UserCardCollectionEntity(
+                        id               = UUID.randomUUID().toString(),
+                        userId           = resolvedUserId,
+                        scryfallId       = scryfallId,
+                        quantity         = quantity,
+                        isFoil           = isFoil,
+                        condition        = normalizedCondition,
+                        language         = normalizedLanguage,
+                        isForTrade       = isForTrade,
+                        isDeleted        = false,
+                        updatedAt        = now,
+                        createdAt        = now,
+                    )
                 )
-            )
-            existing.isDeleted -> userCardCollectionDao.upsert(
-                // Restore the same row (same UUID) so no duplicate is created.
-                // Quantity resets to the incoming value — the card was gone before.
-                existing.copy(
-                    quantity   = quantity,
-                    isDeleted  = false,
-                    isForTrade = isForTrade,
-                    updatedAt  = now,
+                AddOutcome.CREATED_NEW
+            }
+            existing.isDeleted -> {
+                userCardCollectionDao.upsert(
+                    // Restore the same row (same UUID) so no duplicate is created.
+                    // Quantity resets to the incoming value — the card was gone before.
+                    existing.copy(
+                        quantity   = quantity,
+                        isDeleted  = false,
+                        isForTrade = isForTrade,
+                        updatedAt  = now,
+                    )
                 )
-            )
-            else -> userCardCollectionDao.upsert(
-                existing.copy(
-                    quantity   = existing.quantity + quantity,
-                    isForTrade = isForTrade || existing.isForTrade,
-                    updatedAt  = now,
+                // A previously soft-deleted card returning counts as a new unique add.
+                AddOutcome.CREATED_NEW
+            }
+            else -> {
+                userCardCollectionDao.upsert(
+                    existing.copy(
+                        quantity   = existing.quantity + quantity,
+                        isForTrade = isForTrade || existing.isForTrade,
+                        updatedAt  = now,
+                    )
                 )
-            )
+                AddOutcome.INCREMENTED_EXISTING
+            }
         }
-        Unit
     }
 
     override suspend fun updateAttributes(

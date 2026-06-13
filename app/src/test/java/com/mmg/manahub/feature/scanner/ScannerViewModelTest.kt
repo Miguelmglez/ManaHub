@@ -3,17 +3,14 @@ package com.mmg.manahub.feature.scanner
 import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.scanner.data.EmbeddingDatabase
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
 import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
-import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,9 +48,9 @@ import org.junit.Test
  *
  * NOTE: [SoundManager] and [AnalyticsHelper] are relaxed mocks — their side-effects
  * (audio playback, Firebase calls) are suppressed in unit tests.
- * [AddCardToCollectionUseCase] is a suspend operator fun — stubbed with coEvery.
- * [EmbeddingDatabase] is used as a relaxed mock (the ViewModel exposes it as a val;
- * the scanner does not invoke it during recognition result processing).
+ * [CommitScannedCardsUseCase] is a relaxed mock — the recognition-result tests here only
+ * queue cards into the scan session; collection commits (which invoke it) are exercised
+ * elsewhere.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScannerViewModelTest {
@@ -68,7 +65,7 @@ class ScannerViewModelTest {
     // ── Mocks ──────────────────────────────────────────────────────────────────
 
     private val cardRepository: CardRepository = mockk(relaxed = true)
-    private val addToCollection: AddCardToCollectionUseCase = mockk()
+    private val commitScannedCards: CommitScannedCardsUseCase = mockk(relaxed = true)
     private val addToWishlist: AddToWishlistUseCase = mockk()
     private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
     private val soundManager: SoundManager = mockk(relaxed = true)
@@ -116,7 +113,7 @@ class ScannerViewModelTest {
         Dispatchers.setMain(testDispatcher)
         viewModel = ScannerViewModel(
             cardRepository = cardRepository,
-            addToCollection = addToCollection,
+            commitScannedCards = commitScannedCards,
             addToWishlist = addToWishlist,
             analyticsHelper = analyticsHelper,
             soundManager = soundManager,
@@ -196,15 +193,6 @@ class ScannerViewModelTest {
     @Test
     fun onRecognitionResult_stabilityBuffer_requiresThreeConsecutive_forBorderlineMatch() = runTest {
         // Arrange — Quick Mode ON, similarity=0.85 (below high-confidence 0.90) → needs 3 frames
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
-
         // Act — only 2 frames at borderline similarity: should NOT confirm yet
         repeatIdentified(2, identified(similarity = 0.85f))
         advanceUntilIdle()
@@ -229,15 +217,6 @@ class ScannerViewModelTest {
     @Test
     fun onRecognitionResult_stabilityBuffer_confirmsImmediately_forHighConfidenceMatch() = runTest {
         // Arrange — Quick Mode ON, similarity=0.95 (above high-confidence 0.90) → needs 1 frame
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
-
         // Act — single frame with high-confidence similarity
         viewModel.onRecognitionResult(identified(similarity = 0.95f))
         advanceUntilIdle()
@@ -253,15 +232,6 @@ class ScannerViewModelTest {
     @Test
     fun onRecognitionResult_identified_quickMode_addsToSession() = runTest {
         // Arrange
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
-
         // Act — 3 consecutive borderline frames to satisfy the full stability buffer
         repeatIdentified(3, identified(similarity = 0.85f))
         advanceUntilIdle()
@@ -279,15 +249,6 @@ class ScannerViewModelTest {
     @Test
     fun onRecognitionResult_antiDuplicate_blocksWithin800ms() = runTest {
         // Arrange
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
-
         // Act — first successful add (3 frames)
         repeatIdentified(3)
         advanceUntilIdle()
@@ -319,15 +280,6 @@ class ScannerViewModelTest {
         // Arrange — lock to a different set than the card's setCode ("lea")
         viewModel.onSetLockSelected("khm")
 
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
-
         // Act — 3 frames with a card from set "lea" but lock is "khm"
         repeatIdentified(3)
         advanceUntilIdle()
@@ -343,15 +295,6 @@ class ScannerViewModelTest {
     fun onRecognitionResult_setLock_match_addsCard() = runTest {
         // Arrange — lock matches the card's setCode
         viewModel.onSetLockSelected("lea")
-
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
 
         // Act
         repeatIdentified(3)
@@ -373,15 +316,6 @@ class ScannerViewModelTest {
         // Arrange — Quick Mode ON, selectedLanguage = "ja", card.lang = "en"
         // The language filter only triggers when selectedLanguage != "en"
         viewModel.onLanguageSelected("ja")
-
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
 
         // Act — 3 frames to satisfy stability buffer
         repeatIdentified(3)
@@ -539,15 +473,6 @@ class ScannerViewModelTest {
     @Test
     fun onToastDismissed_clearsToastMessage() = runTest {
         // Arrange — trigger a successful add to produce a toast
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
-
         repeatIdentified(3)
         advanceUntilIdle()
         assertNotNull(viewModel.uiState.value.toastMessage)
@@ -562,15 +487,6 @@ class ScannerViewModelTest {
     @Test
     fun onClearSession_emptiesSessionAndResetsGuard() = runTest {
         // Arrange — add a card first
-        coEvery {
-            addToCollection(
-                scryfallId = any(),
-                isFoil = any(),
-                condition = any(),
-                language = any(),
-            )
-        } returns DataResult.Success(Unit)
-
         repeatIdentified(3)
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())

@@ -13,10 +13,13 @@ import com.mmg.manahub.core.domain.model.DeckSlot
 import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.domain.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,6 +39,7 @@ import javax.inject.Singleton
 @Singleton
 class DeckRepositoryImpl @Inject constructor(
     private val deckDao: DeckDao,
+    private val progressionEventBus: ProgressionEventBus,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : DeckRepository {
 
@@ -98,6 +102,15 @@ class DeckRepositoryImpl @Inject constructor(
                 createdAt = now,
             )
         )
+        // Emit after the create commit (ADR-002 §1). Idempotency key deck_created:{id}
+        // makes the one-time create grant safe under retries.
+        progressionEventBus.emit(
+            ProgressionEvent.DeckCreated(
+                deckId = id,
+                format = format,
+                occurredAt = Instant.now(),
+            )
+        )
         id
     }
 
@@ -112,6 +125,16 @@ class DeckRepositoryImpl @Inject constructor(
             isDeleted = false,
             updatedAt = System.currentTimeMillis(),
         ))
+        // DeckSaved grants no XP in v1 (XpGranter maps it to null); the event is retained
+        // for Phase 1/2 quest progress. updateDeck only touches metadata, so the precise
+        // card count is not available here without a DAO read — pass 0 (informational only).
+        progressionEventBus.emit(
+            ProgressionEvent.DeckSaved(
+                deckId = deck.id,
+                cardCount = 0,
+                occurredAt = Instant.now(),
+            )
+        )
     }
 
     override suspend fun deleteDeck(deckId: String) = withContext(ioDispatcher) {

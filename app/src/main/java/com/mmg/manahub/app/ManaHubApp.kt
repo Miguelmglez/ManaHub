@@ -13,6 +13,11 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.gamification.domain.GamificationEngine
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.gamification.engine.AchievementBackfill
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
@@ -27,6 +32,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
+import java.time.Instant
+import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -38,6 +45,10 @@ class ManaHubApp : Application() {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var pushTokenRepository: PushTokenRepository
     @Inject lateinit var okHttpClient: OkHttpClient
+    @Inject lateinit var gamificationEngine: GamificationEngine
+    @Inject lateinit var progressionEventBus: ProgressionEventBus
+    @Inject lateinit var achievementBackfill: AchievementBackfill
+    @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -62,6 +73,34 @@ class ManaHubApp : Application() {
         appScope.launch {
             runCatching { syncManaSymbols() }
             runCatching { tagDictionaryRepo.loadAndApply() }
+        }
+
+        // Start the gamification engine collecting the progression bus (idempotent), then
+        // emit the daily-open event. The engine's ledger (key app_open:{localDate}) dedupes
+        // multiple cold starts the same day, so a plain emit on every launch is correct.
+        gamificationEngine.start(appScope)
+
+        // One-shot Family-A achievement backfill (ADR-002 §4): retroactively unlock achievements the
+        // user already qualifies for, suppressing celebrations. Guarded by a DataStore flag so it runs
+        // exactly once after the v39 migration. Failures are swallowed — never block app start.
+        appScope.launch {
+            runCatching {
+                if (!userPreferencesDataStore.isGamificationBackfillDone()) {
+                    achievementBackfill.run()
+                    userPreferencesDataStore.setGamificationBackfillDone()
+                }
+            }
+        }
+
+        appScope.launch {
+            runCatching {
+                progressionEventBus.emit(
+                    ProgressionEvent.AppOpenedToday(
+                        localDate = LocalDate.now().toString(),
+                        occurredAt = Instant.now(),
+                    )
+                )
+            }
         }
 
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
