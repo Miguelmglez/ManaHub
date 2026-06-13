@@ -251,3 +251,39 @@ Puzzle feature. Leave clean extension points (e.g. `QuestInstanceEntity.tokenRew
     ~99 new Phase-2 tests pass. Security gate PASS (UUID device-id, PII-free events, no new backend surface).
   - Carried forward: Phase 1's tournament "won" limitation persists. Phase 3 = unlockables/cosmetics; Phase 4
     = Supabase sync (quests excluded by design, §11).
+- **2026-06-13 (Phase 3 — Unlockables & cosmetics):** realised §10 (100% procedural, zero image/animation
+  assets). NO new Room schema — `EntitlementEntity` + its DAO methods already shipped in v39 (Phase 0). The 12
+  themes stay FREE; no theme unlockable was added (grandfathering held).
+  - **`UnlockableCatalog`** = 21 `Unlockable`s (source of truth): 8 titles (4 PlayStyle via `LevelAtLeast`
+    since PlayStyle is derived not an achievement; 4 achievement-gated), 4 avatar frames (L5/10/20/35), 3
+    level-ring styles, 7 badges (incl. WUBRG mana). Pure data table — color is `CosmeticColorToken` enum refs
+    (resolved to `MaterialTheme.magicColors` at draw time, so cosmetics adapt to all 12 themes), never raw
+    Color/hex. `UnlockableId.value` strings are persisted PKs + Phase-4 sync keys — never rename. `UnlockRule`
+    sealed (`LevelAtLeast` | `AchievementUnlocked`, referencing only real `AchievementCatalog` ids).
+    `AchievementDef.unlocks` left empty (unlock modeled one-way in the cosmetic catalog).
+  - **`EntitlementGranter`** (engine): on each event (after streakTracker, `runCatching`-isolated) grants
+    rules satisfied by the new level + just-unlocked achievements, idempotent via `insertEntitlementIfAbsent`.
+    **`reconcileAll()`** (full-state evaluation, idempotent) runs once per launch from `ManaHubApp.onCreate`
+    after the achievement backfill → retroactive cosmetics for existing players. Entitlements merge as a union
+    in Phase 4 (§11).
+  - **Equip flow** = DataStore only (`gamification_equipped_{title,badges,frame,ring}`, badges capped ≤3;
+    null/empty clears). `GamificationRepository.equip*` is GUARDED by `hasEntitlement` (equipping an unowned id
+    is a silent no-op). `observeRewards()`/`observeEquippedCosmetics()` added for the UI.
+  - **Procedural renderers** (Compose Canvas, `CosmeticRenderers.kt`): gradient-Brush titles, badge emblems
+    (CIRCLE/SHIELD/HEX + glyph; black-mana badge uses contrast outline not flat fill), avatar rings, level-ring
+    restyles. **FOIL = AGSL `RuntimeShader` on API ≥33 with a sweepGradient `Brush` fallback below** (minSdk
+    29; the < 33 path never loads the AGSL class); shader is `remember`-ed once with a `uResolution`-normalized
+    coord (size/density-independent), only uniforms update per frame.
+  - **Rewards tab** (4th Profile tab): single `LazyVerticalGrid` with full-span section headers (no nested
+    same-axis scroll), stable keys = unlockable id, owned/locked/equipped states + unlock hints. Profile hero
+    overlays equipped title/≤3 badges/avatar-frame/ring — purely additive (hero unchanged when nothing
+    equipped or gamification off).
+  - **Level-up celebration** reuses the Phase-1 global overlay host. `current` became
+    `StateFlow<CelebrationItem?>` (`Achievement` | `LevelUp`); achievements take priority; level-up is driven
+    by a DataStore `lastCelebratedLevel` (sentinel -1 suppresses + silent-seeds to current level in VM init,
+    so existing players get no spurious burst). New `LevelUpOverlay` (ring-burst variant).
+  - Build: `assembleDebug` green; +25 new unit tests pass; **1569 tests / 140 failed = unchanged master
+    baseline (zero regressions)**. Design review: 1 P0 (raw `MaterialTheme.typography`) + 6 P1s all fixed.
+    Security gate PASS (local-only — no backend/credentials; equip keys are UI prefs; strings.xml benign).
+  - Carried forward: tournament "won" still blocked. Phase 4 = Supabase sync (entitlements/progression/
+    achievements/streaks; quests excluded by design).

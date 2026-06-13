@@ -10,9 +10,13 @@ import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.RewardUiModel
+import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
@@ -104,6 +108,11 @@ class ProfileViewModel @Inject constructor(
         val questBoard: QuestBoard = QuestBoard.empty,
         /** Daily-activity streak (count + freeze tokens). */
         val streak: StreakUiModel = StreakUiModel(current = 0, longest = 0, freezeTokens = 0),
+        // Rewards / cosmetics (gamification Phase 3) — drive the Rewards tab + hero overlays.
+        /** Every cosmetic grouped by kind, flagged owned/equipped. Empty until the first emission. */
+        val rewardsBoard: RewardsBoard = RewardsBoard.EMPTY,
+        /** The player's currently-equipped cosmetics (title/badges/frame/ring). */
+        val equipped: EquippedCosmetics = EquippedCosmetics.NONE,
     ) {
         val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
     }
@@ -115,6 +124,9 @@ class ProfileViewModel @Inject constructor(
 
         /** A quest claim could not be completed (already claimed, not completed, or not found). */
         data object QuestClaimFailed : Event
+
+        /** The player tried to equip a 4th badge; the cap is [EquippedCosmetics.MAX_EQUIPPED_BADGES]. */
+        data class BadgeCapReached(val maxBadges: Int) : Event
     }
 
     private val _uiState = MutableStateFlow(UiState())
@@ -172,6 +184,17 @@ class ProfileViewModel @Inject constructor(
         gamificationRepository.observeDailyActivityStreak()
             .onEach { streak -> _uiState.update { it.copy(streak = streak) } }
             .catch { /* ignore — streak header falls back to a zeroed value */ }
+            .launchIn(viewModelScope)
+
+        // ── Rewards / cosmetics (ADR-002, Phase 3) ──────────────────────────────
+        gamificationRepository.observeRewards()
+            .onEach { board -> _uiState.update { it.copy(rewardsBoard = board) } }
+            .catch { /* ignore — Rewards tab falls back to its empty state */ }
+            .launchIn(viewModelScope)
+
+        gamificationRepository.observeEquippedCosmetics()
+            .onEach { equipped -> _uiState.update { it.copy(equipped = equipped) } }
+            .catch { /* ignore — hero falls back to no equipped cosmetics */ }
             .launchIn(viewModelScope)
 
         // ── Collection stats ──────────────────────────────────────────────────
@@ -362,6 +385,70 @@ class ProfileViewModel @Inject constructor(
                 -> Event.QuestClaimFailed
             }
             _events.send(event)
+        }
+    }
+
+    // ── Rewards / cosmetics actions (gamification Phase 3) ──────────────────────
+
+    /**
+     * Equips [reward], routing by its [RewardUiModel.kind]. Single-slot kinds (TITLE / AVATAR_FRAME /
+     * LEVEL_RING_STYLE) replace the current selection. BADGE is multi-slot, capped at
+     * [EquippedCosmetics.MAX_EQUIPPED_BADGES]: when the cap is already reached the equip is rejected and
+     * a [Event.BadgeCapReached] one-shot is emitted (the user must unequip a badge first). Unowned
+     * cosmetics are additionally guarded at the repository layer, so a race can never equip an
+     * unearned item.
+     */
+    fun onEquip(reward: RewardUiModel) {
+        when (reward.kind) {
+            UnlockableKind.TITLE -> viewModelScope.launch {
+                runCatching { gamificationRepository.equipTitle(reward.id) }
+            }
+
+            UnlockableKind.AVATAR_FRAME -> viewModelScope.launch {
+                runCatching { gamificationRepository.equipAvatarFrame(reward.id) }
+            }
+
+            UnlockableKind.LEVEL_RING_STYLE -> viewModelScope.launch {
+                runCatching { gamificationRepository.equipLevelRingStyle(reward.id) }
+            }
+
+            UnlockableKind.BADGE -> {
+                val current = _uiState.value.equipped.badgeIds
+                if (reward.id in current) return // already equipped — no-op
+                if (current.size >= EquippedCosmetics.MAX_EQUIPPED_BADGES) {
+                    viewModelScope.launch {
+                        _events.send(Event.BadgeCapReached(EquippedCosmetics.MAX_EQUIPPED_BADGES))
+                    }
+                    return
+                }
+                val next = current + reward.id
+                viewModelScope.launch { runCatching { gamificationRepository.equipBadges(next) } }
+            }
+        }
+    }
+
+    /**
+     * Unequips [reward], routing by kind. Single-slot kinds clear the slot (pass null); BADGE removes
+     * only [reward] from the equipped list, preserving the others.
+     */
+    fun onUnequip(reward: RewardUiModel) {
+        when (reward.kind) {
+            UnlockableKind.TITLE -> viewModelScope.launch {
+                runCatching { gamificationRepository.equipTitle(null) }
+            }
+
+            UnlockableKind.AVATAR_FRAME -> viewModelScope.launch {
+                runCatching { gamificationRepository.equipAvatarFrame(null) }
+            }
+
+            UnlockableKind.LEVEL_RING_STYLE -> viewModelScope.launch {
+                runCatching { gamificationRepository.equipLevelRingStyle(null) }
+            }
+
+            UnlockableKind.BADGE -> {
+                val next = _uiState.value.equipped.badgeIds.filterNot { it == reward.id }
+                viewModelScope.launch { runCatching { gamificationRepository.equipBadges(next) } }
+            }
         }
     }
 

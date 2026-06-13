@@ -9,9 +9,11 @@ import com.mmg.manahub.core.domain.model.Rarity
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
+import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.QuestPeriod
 import com.mmg.manahub.core.gamification.domain.QuestWeightClass
@@ -102,6 +104,8 @@ class ProfileViewModelTest {
     private val achievementsFlow = MutableStateFlow<List<AchievementUiModel>>(emptyList())
     private val questBoardFlow = MutableStateFlow(QuestBoard.empty)
     private val streakFlow = MutableStateFlow(StreakUiModel(current = 0, longest = 0, freezeTokens = 0))
+    private val rewardsBoardFlow = MutableStateFlow(RewardsBoard.EMPTY)
+    private val equippedCosmeticsFlow = MutableStateFlow(EquippedCosmetics.NONE)
 
     private lateinit var viewModel: ProfileViewModel
 
@@ -173,6 +177,8 @@ class ProfileViewModelTest {
         every { gamificationRepository.observeAchievements() } returns achievementsFlow
         every { gamificationRepository.observeActiveQuests() } returns questBoardFlow
         every { gamificationRepository.observeDailyActivityStreak() } returns streakFlow
+        every { gamificationRepository.observeRewards() } returns rewardsBoardFlow
+        every { gamificationRepository.observeEquippedCosmetics() } returns equippedCosmeticsFlow
 
         every { statsRepo.observeCollectionStats(any()) }   returns flowOf(collectionStats)
         every { gameSessionRepo.observeTotalGames() }       returns flowOf(totalGames)

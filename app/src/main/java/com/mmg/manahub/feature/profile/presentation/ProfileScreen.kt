@@ -65,7 +65,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,11 +94,14 @@ import com.mmg.manahub.feature.auth.presentation.AccountSection
 import com.mmg.manahub.feature.auth.presentation.AuthUiState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
+import com.mmg.manahub.feature.gamification.presentation.AvatarFrameRing
+import com.mmg.manahub.feature.gamification.presentation.BadgeEmblem
+import com.mmg.manahub.feature.gamification.presentation.TitleText
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** Tabs shown under the Profile hero (Phase 2 adds Quests; Rewards arrives in Phase 3). */
-enum class ProfileTab { OVERVIEW, ACHIEVEMENTS, QUESTS }
+/** Tabs shown under the Profile hero (Phase 2 adds Quests; Phase 3 adds Rewards). */
+enum class ProfileTab { OVERVIEW, ACHIEVEMENTS, QUESTS, REWARDS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,6 +226,7 @@ fun ProfileScreen(
     val toastState = rememberMagicToastState()
     val claimSuccessTemplate = stringResource(R.string.quests_claim_success)
     val claimFailedMessage = stringResource(R.string.quests_claim_failed)
+    val badgeCapTemplate = stringResource(R.string.reward_badge_cap_reached)
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -230,6 +237,11 @@ fun ProfileScreen(
                     )
                 ProfileViewModel.Event.QuestClaimFailed ->
                     toastState.show(message = claimFailedMessage, type = MagicToastType.ERROR)
+                is ProfileViewModel.Event.BadgeCapReached ->
+                    toastState.show(
+                        message = String.format(badgeCapTemplate, event.maxBadges),
+                        type = MagicToastType.INFO,
+                    )
             }
         }
     }
@@ -300,6 +312,9 @@ fun ProfileScreen(
                 avatarUrl = uiState.avatarUrl,
                 gameTag = (sessionState as? SessionState.Authenticated)?.user?.gameTag,
                 progression = uiState.progression.takeIf { uiState.gamificationEnabled },
+                // Equipped cosmetics are purely additive overlays; pass NONE when gamification is off
+                // so the hero renders byte-for-byte as before.
+                equipped = if (uiState.gamificationEnabled) uiState.equipped else com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.NONE,
                 onEditClick = { showProfileEdit = true },
             )
 
@@ -329,6 +344,18 @@ fun ProfileScreen(
                         board = uiState.questBoard,
                         streak = uiState.streak,
                         onClaim = viewModel::claimQuest,
+                        contentPadding = bottomInset,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 8.dp),
+                    )
+                }
+
+                uiState.gamificationEnabled && selectedTab == ProfileTab.REWARDS -> {
+                    RewardsTab(
+                        board = uiState.rewardsBoard,
+                        onEquip = viewModel::onEquip,
+                        onUnequip = viewModel::onUnequip,
                         contentPadding = bottomInset,
                         modifier = Modifier
                             .fillMaxSize()
@@ -418,6 +445,7 @@ private fun ProfileTabRow(
                 ProfileTab.OVERVIEW -> R.string.profile_tab_overview
                 ProfileTab.ACHIEVEMENTS -> R.string.profile_tab_achievements
                 ProfileTab.QUESTS -> R.string.profile_tab_quests
+                ProfileTab.REWARDS -> R.string.profile_tab_rewards
             }
             val selected = tab == selectedTab
             Tab(
@@ -544,9 +572,30 @@ private fun ProfileHeroSection(
      * progression flow has not yet emitted.
      */
     progression: com.mmg.manahub.core.gamification.domain.model.PlayerProgression? = null,
+    /**
+     * The player's equipped cosmetics (Phase 3). All four overlays are purely additive: when this is
+     * [com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.NONE] the hero renders exactly
+     * as it did pre-Phase-3. The caller passes NONE while gamification is disabled.
+     */
+    equipped: com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics =
+        com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.NONE,
     onEditClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+
+    // Resolve the equipped cosmetics against the static catalog (ownership is guarded at equip time).
+    val equippedTitle = remember(equipped.titleId) {
+        equipped.titleId?.let { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
+    }
+    val equippedBadges = remember(equipped.badgeIds) {
+        equipped.badgeIds.mapNotNull { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
+    }
+    val equippedFrame = remember(equipped.avatarFrameId) {
+        equipped.avatarFrameId?.let { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
+    }
+    val equippedRing = remember(equipped.levelRingStyleId) {
+        equipped.levelRingStyleId?.let { com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.byId(it) }
+    }
 
     // State to track the image's aspect ratio (defaults to 16:9)
     var imageRatio by remember(avatarUrl) { mutableFloatStateOf(1.77f) }
@@ -621,7 +670,34 @@ private fun ProfileHeroSection(
         )
 
 
-        // Name + game tag badge — bottom
+        // Equipped avatar frame (Phase 3) — drawn AROUND the avatar as a full-bounds overlay so the
+        // existing aspect-ratio layout is untouched. Decorative; no semantics.
+        if (equippedFrame != null) {
+            AvatarFrameRing(
+                renderSpec = equippedFrame.renderSpec,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        // Accessibility summary for the equipped cosmetics (name + title + badge count). The visual
+        // title/badges are decorative, so without this a screen reader would only hear "edit profile"
+        // from the clickable hero Box. Built here (composable context) and merged onto the name Column.
+        val resolvedName = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) }
+        val badgeCount = equippedBadges.size
+            .coerceAtMost(com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.MAX_EQUIPPED_BADGES)
+        val equippedTitleName = equippedTitle?.let { stringResource(it.displayNameRes) }
+        val badgesEquippedText = if (badgeCount > 0) {
+            pluralStringResource(R.plurals.profile_hero_badges_equipped, badgeCount, badgeCount)
+        } else {
+            null
+        }
+        val equippedCosmeticsA11y = buildString {
+            append(resolvedName)
+            equippedTitleName?.let { append(", "); append(it) }
+            badgesEquippedText?.let { append(", "); append(it) }
+        }
+
+        // Name (+ equipped title under it) + badges + game tag badge — bottom.
         Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -630,16 +706,53 @@ private fun ProfileHeroSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) },
-                style = MaterialTheme.magicTypography.titleLarge.copy(
-                    fontSize = 26.sp,
-                    color = Color.White
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = equippedCosmeticsA11y
+                    },
+            ) {
+                Text(
+                    text = resolvedName,
+                    style = MaterialTheme.magicTypography.titleLarge.copy(
+                        fontSize = 26.sp,
+                        color = Color.White
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                // Equipped title (Phase 3) — styled text under the nickname. Null → nothing.
+                if (equippedTitle != null) {
+                    TitleText(
+                        renderSpec = equippedTitle.renderSpec,
+                        text = stringResource(equippedTitle.displayNameRes),
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+
+                // Equipped badges (Phase 3) — up to 3 small emblems near the name.
+                if (equippedBadges.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Defensively clamp to the equip cap so an over-filled list can never render
+                        // more than the allowed number of badges in the hero.
+                        equippedBadges
+                            .take(com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.MAX_EQUIPPED_BADGES)
+                            .forEach { badge ->
+                                BadgeEmblem(
+                                    renderSpec = badge.renderSpec,
+                                    size = 22.dp,
+                                )
+                            }
+                    }
+                }
+            }
 
             // Game tag badge — displayed only when the user is authenticated and has a tag.
             if (gameTag != null) {
@@ -679,6 +792,9 @@ private fun ProfileHeroSection(
                     progression.xpIntoLevel,
                     progression.xpForNextLevel,
                 ),
+                // Equipped level-ring style (Phase 3). Null → SOLID (today's primaryAccent arc).
+                ringStyle = equippedRing?.renderSpec?.ringStyle,
+                ringRenderSpec = equippedRing?.renderSpec,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(12.dp),

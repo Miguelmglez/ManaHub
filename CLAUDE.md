@@ -388,8 +388,25 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
   (local-first, any auth) and the periodic `QuestRotationWorker`. `StreakTracker` (`daily_activity`,
   `AppOpenedToday`): max 2 freeze tokens, a gap consumes tokens to preserve the streak (never punishes), regen
   +1 per 7-day multiple. Home `PROGRESSION_HUB`/`QUESTS_HUB` widgets + `CONTEXT_HERO` "N ready to claim".
+- **Unlockables & cosmetics (Phase 3, complete):** 100% procedural (ZERO image/animation assets), local-only,
+  no new Room schema (`EntitlementEntity` shipped in v39). `UnlockableCatalog` (21 items) is the source of
+  truth — a **pure data table**; color is `CosmeticColorToken` enum refs resolved to `MaterialTheme.magicColors`
+  at draw time (never raw Color → adapts to all 12 themes). `UnlockableId.value` = stable persisted PK +
+  Phase-4 sync key, **never rename**. `UnlockRule` (`LevelAtLeast`|`AchievementUnlocked`) references only real
+  `AchievementCatalog` ids. **The 12 themes stay FREE — never add a theme unlockable** (grandfathering).
+  `EntitlementGranter` grants on level-up + achievement unlock (idempotent via `insertEntitlementIfAbsent`),
+  hooked after streakTracker; `reconcileAll()` (full-state catch-up) runs once per launch from
+  `ManaHubApp.onCreate` for retroactive cosmetics. Equip = DataStore only; `equip*` repo methods are **guarded
+  by `hasEntitlement`** (unowned id → silent no-op; badges ≤3). Renderers are Compose Canvas; **FOIL = AGSL
+  `RuntimeShader` API ≥33 with a sweepGradient fallback below** (minSdk 29; < 33 path never loads the AGSL
+  class; shader `remember`-ed once + `uResolution`-normalized). Rewards tab = single `LazyVerticalGrid`
+  (full-span headers, no nested scroll, keys = unlockable id). Hero overlays equipped cosmetics **purely
+  additively**. Level-up celebration reuses the global host: `current` is `StateFlow<CelebrationItem?>`
+  (`Achievement`>`LevelUp`); level-up driven by DataStore `lastCelebratedLevel` (sentinel -1 suppresses +
+  silent-seeds in VM init → no spurious burst for existing players). Glyph/text use `magicTypography` —
+  **never `MaterialTheme.typography`** (banned).
 - → memory: `project_gamification_phase0`, `project_gamification_phase1`,
-  `project_gamification_phase1_chunkB_ui`, `project_gamification_phase2`,
+  `project_gamification_phase1_chunkB_ui`, `project_gamification_phase2`, `project_gamification_phase3`,
   `feedback_gamification_xp_idempotency`, `feedback_achievement_unlockedat_persistence`,
   `feedback_gamification_celebration_ui`
 

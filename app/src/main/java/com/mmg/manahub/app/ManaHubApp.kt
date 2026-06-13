@@ -19,6 +19,7 @@ import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
 import com.mmg.manahub.core.gamification.engine.AchievementBackfill
+import com.mmg.manahub.core.gamification.engine.EntitlementGranter
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
@@ -51,6 +52,7 @@ class ManaHubApp : Application() {
     @Inject lateinit var progressionEventBus: ProgressionEventBus
     @Inject lateinit var achievementBackfill: AchievementBackfill
     @Inject lateinit var questReconciler: QuestReconciler
+    @Inject lateinit var entitlementGranter: EntitlementGranter
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
@@ -93,6 +95,12 @@ class ManaHubApp : Application() {
                     userPreferencesDataStore.setGamificationBackfillDone()
                 }
             }
+            // Retroactive cosmetic catch-up (ADR-002 §10): grant entitlements the player already
+            // qualifies for (current level + all unlocked achievements, incl. any just backfilled).
+            // Idempotent — only inserts missing rows — so it is safe on every launch. Runs AFTER the
+            // backfill block above so backfilled achievement unlocks are visible to it. Failures
+            // swallowed; never block app start.
+            runCatching { entitlementGranter.reconcileAll() }
         }
 
         appScope.launch {

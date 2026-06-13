@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -74,6 +75,13 @@ fun GamificationCelebrationHost(
 ) {
     val current by viewModel.current.collectAsStateWithLifecycle()
 
+    // A stable key per distinct celebration so the snapshot below survives the exit transition.
+    val key = when (val c = current) {
+        is GamificationCelebrationViewModel.CelebrationItem.Achievement -> "ach:${c.model.id}"
+        is GamificationCelebrationViewModel.CelebrationItem.LevelUp -> "lvl:${c.level}"
+        null -> null
+    }
+
     // Render above all content. AnimatedVisibility scrim fade frames the overlay's enter/exit.
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedVisibility(
@@ -82,11 +90,144 @@ fun GamificationCelebrationHost(
             exit = fadeOut(tween(220)),
         ) {
             // Snapshot the item so it survives the exit transition after current becomes null.
-            val shown = remember(current?.id) { current }
-            if (shown != null) {
-                CelebrationOverlay(
-                    achievement = shown,
-                    onDismiss = { viewModel.onCelebrationShown(shown.id) },
+            val shown = remember(key) { current }
+            when (shown) {
+                is GamificationCelebrationViewModel.CelebrationItem.Achievement ->
+                    CelebrationOverlay(
+                        achievement = shown.model,
+                        onDismiss = { viewModel.onCelebrationShown(shown.model.id) },
+                    )
+
+                is GamificationCelebrationViewModel.CelebrationItem.LevelUp ->
+                    LevelUpOverlay(
+                        level = shown.level,
+                        onDismiss = { viewModel.onLevelUpShown(shown.level) },
+                    )
+
+                null -> Unit
+            }
+        }
+    }
+}
+
+/**
+ * Full-screen LEVEL-UP celebration (ADR-002, Phase 3): the same scrim + procedural particle burst as
+ * the achievement overlay, but a RING-BURST variant — an expanding ring stroke with the new level
+ * number, drawn in gold/lifePositive accents. Reuses the particle generator; asset-free. Skippable by
+ * tap or system Back.
+ *
+ * @param level the newly-reached level.
+ * @param onDismiss invoked on tap/back (the VM advances the celebrated baseline).
+ */
+@Composable
+private fun LevelUpOverlay(
+    level: Int,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+
+    val a11y = stringResource(R.string.reward_level_up_a11y, level)
+    val dismissLabel = stringResource(R.string.reward_level_up_dismiss_action)
+
+    BackHandler { onDismiss() }
+
+    // Card scales in; the ring + particle burst progress 0→1 once.
+    val cardScale = remember { androidx.compose.animation.core.Animatable(0.6f) }
+    val burst = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(level) {
+        cardScale.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
+    }
+    LaunchedEffect(level) {
+        burst.animateTo(1f, tween(durationMillis = 1000, easing = LinearEasing))
+    }
+
+    val particles = remember(level) { generateParticles("level_up_$level") }
+    val accent = mc.lifePositive
+    val gold = mc.goldMtg
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(Float.MAX_VALUE)
+            .background(Color.Black.copy(alpha = 0.72f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            )
+            .semantics {
+                contentDescription = a11y
+                role = Role.Button
+                onClick(label = dismissLabel) { onDismiss(); true }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        // Ring burst + particle burst behind the level number.
+        Box(
+            modifier = Modifier
+                .size(280.dp) // intentional: fixed burst diameter
+                .drawBehind {
+                    val progress = burst.value
+                    val maxRadius = size.minDimension * 0.5f
+
+                    // Expanding gold ring stroke (the "ring-burst" hero element).
+                    val ringRadius = maxRadius * (0.35f + progress * 0.6f)
+                    val ringAlpha = (1f - progress).coerceIn(0f, 1f)
+                    drawCircle(
+                        color = gold.copy(alpha = ringAlpha),
+                        radius = ringRadius,
+                        center = center,
+                        style = Stroke(width = 6.dp.toPx() * (1f - progress * 0.4f)),
+                    )
+
+                    // Reused particle ring.
+                    particles.forEach { p ->
+                        val dist = maxRadius * progress * p.distanceFactor
+                        val cx = center.x + cos(p.angle) * dist
+                        val cy = center.y + sin(p.angle) * dist
+                        val alpha = (1f - progress).coerceIn(0f, 1f)
+                        val radius = p.radiusPx * (1f - progress * 0.4f)
+                        drawCircle(
+                            color = (if (p.gold) gold else accent).copy(alpha = alpha),
+                            radius = radius,
+                            center = Offset(cx, cy),
+                        )
+                    }
+                },
+        )
+
+        // Level-up card.
+        Surface(
+            shape = CardShape,
+            color = mc.surface,
+            modifier = Modifier
+                .padding(MaterialTheme.spacing.xl)
+                .scale(cardScale.value)
+                .graphicsLayer { alpha = cardScale.value.coerceIn(0f, 1f) },
+        ) {
+            Column(
+                modifier = Modifier.padding(MaterialTheme.spacing.xl),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+            ) {
+                Text(text = "✦", style = MaterialTheme.magicTypography.displayLarge, color = gold)
+                Text(
+                    text = stringResource(R.string.reward_level_up_title, level),
+                    style = MaterialTheme.magicTypography.titleLarge,
+                    color = mc.textPrimary,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = stringResource(R.string.reward_level_up_subtitle),
+                    style = MaterialTheme.magicTypography.bodyMedium,
+                    color = accent,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = stringResource(R.string.celebration_tap_to_dismiss),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = mc.textSecondary,
+                    modifier = Modifier.padding(top = MaterialTheme.spacing.sm),
                 )
             }
         }
@@ -214,7 +355,9 @@ private fun CelebrationOverlay(
                             achievement.maxTier,
                         ),
                         style = MaterialTheme.magicTypography.labelMedium,
-                        color = gold,
+                        // Small gold text is borderline-AA on the light theme (HallowedPrint, ~4.0:1);
+                        // use textSecondary for this small tier indicator. Large gold accents are unchanged.
+                        color = mc.textSecondary,
                     )
                 }
                 if (xpReward > 0) {

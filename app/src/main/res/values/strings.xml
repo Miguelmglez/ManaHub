@@ -1295,6 +1295,10 @@
          PROFILE SCREEN
     ═══════════════════════════════════════════ -->
     <string name="profile_title">Profile</string>
+    <plurals name="profile_hero_badges_equipped">
+        <item quantity="one">%1$d badge equipped</item>
+        <item quantity="other">%1$d badges equipped</item>
+    </plurals>
     <string name="profile_section_themes">Visual Theme</string>
     <string name="profile_name_hint">Your name…</string>
     <string name="profile_name_edit_description">Edit name</string>
@@ -2676,5 +2680,74 @@
     <string name="quest_weekly_complete_tournament_desc">Finish a tournament this week.</string>
     <string name="quest_weekly_multiplayer_game_title">Pod People</string>
     <string name="quest_weekly_multiplayer_game_desc">Play a game with 4 or more players this week.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Gamification Phase 3 — Unlockable cosmetics (titles, frames, rings, badges) -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Title cosmetics: PlayStyle archetypes (level-gated) -->
+    <string name="reward_title_aggressor">Aggressor</string>
+    <string name="reward_title_strategist">Strategist</string>
+    <string name="reward_title_midrange">Midrange</string>
+    <string name="reward_title_balanced">Balanced</string>
+
+    <!-- Title cosmetics: achievement-line -->
+    <string name="reward_title_collector">Collector</string>
+    <string name="reward_title_deck_architect">Deck Architect</string>
+    <string name="reward_title_tournament_champion">Tournament Champion</string>
+    <string name="reward_title_survey_sage">Survey Sage</string>
+
+    <!-- Avatar frame cosmetics (level-gated material ramp) -->
+    <string name="reward_frame_bronze">Bronze Frame</string>
+    <string name="reward_frame_silver">Silver Frame</string>
+    <string name="reward_frame_gold">Gold Frame</string>
+    <string name="reward_frame_foil">Foil Frame</string>
+
+    <!-- Level-ring style cosmetics (level-gated) -->
+    <string name="reward_ring_gradient_sweep">Gradient Ring</string>
+    <string name="reward_ring_metallic">Metallic Ring</string>
+    <string name="reward_ring_foil">Foil Ring</string>
+
+    <!-- Badge cosmetics: achievement-tied milestones -->
+    <string name="reward_badge_first_win">First Win</string>
+    <string name="reward_badge_veteran">Veteran</string>
+
+    <!-- Badge cosmetics: WUBRG mana (level-gated) -->
+    <string name="reward_badge_mana_w">White Mana</string>
+    <string name="reward_badge_mana_u">Blue Mana</string>
+    <string name="reward_badge_mana_b">Black Mana</string>
+    <string name="reward_badge_mana_r">Red Mana</string>
+    <string name="reward_badge_mana_g">Green Mana</string>
+
+    <!-- Unlock hints (Chunk B formats with the rule's argument) -->
+    <string name="reward_unlock_hint_level">Reach level %1$d</string>
+    <string name="reward_unlock_hint_achievement">Unlock the %1$s achievement</string>
+    <string name="reward_unlock_hint_generic">Keep playing to unlock</string>
+
+    <!-- Rewards tab headers / actions (Chunk B) -->
+    <string name="reward_section_titles">Titles</string>
+    <string name="reward_section_badges">Badges</string>
+    <string name="reward_section_frames">Avatar Frames</string>
+    <string name="reward_section_rings">Level Rings</string>
+    <string name="reward_count_summary">%1$d / %2$d unlocked</string>
+    <string name="reward_action_equip">Equip</string>
+    <string name="reward_action_unequip">Unequip</string>
+    <string name="reward_locked">Locked</string>
+    <string name="reward_equipped">Equipped</string>
+
+    <!-- Level-up celebration (Chunk B) -->
+    <string name="reward_level_up_title">Level %1$d!</string>
+    <string name="reward_level_up_subtitle">You reached a new level.</string>
+    <string name="reward_level_up_a11y">Level up. You reached level %1$d. Tap to dismiss.</string>
+    <string name="reward_level_up_dismiss_action">Dismiss</string>
+
+    <!-- Rewards tab (Chunk B) — additional UI strings -->
+    <string name="profile_tab_rewards">Rewards</string>
+    <string name="rewards_empty_title">No rewards yet</string>
+    <string name="rewards_empty_desc">Earn cosmetics by leveling up and unlocking achievements.</string>
+    <string name="reward_badge_cap_reached">You can equip up to %1$d badges. Unequip one first.</string>
+    <string name="reward_cell_a11y_equipped">%1$s, equipped. Tap to unequip.</string>
+    <string name="reward_cell_a11y_owned">%1$s, owned. Tap to equip.</string>
+    <string name="reward_cell_a11y_locked">%1$s, locked. %2$s.</string>
 
 </resources>
