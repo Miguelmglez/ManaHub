@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.gamification.domain.model.AchievementCategory
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.feature.gamification.presentation.GamificationCelebrationViewModel
 import io.mockk.Runs
@@ -22,8 +23,10 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
 
 /**
  * Unit tests for [GamificationCelebrationViewModel] (ADR-002, Phase 1, Chunk B).
@@ -41,12 +44,27 @@ class GamificationCelebrationViewModelTest {
 
     private val pendingFlow = MutableStateFlow<List<AchievementUiModel>>(emptyList())
     private val enabledFlow = MutableStateFlow(true)
+    private val progressionFlow = MutableStateFlow(progression(level = 1))
+    private val lastCelebratedFlow = MutableStateFlow(-1)
+
+    private fun progression(level: Int) = PlayerProgression(
+        totalXp = 0L,
+        level = level,
+        xpIntoLevel = 0L,
+        xpForNextLevel = 100L,
+        updatedAt = Instant.EPOCH,
+    )
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { repository.observePendingCelebrations() } returns pendingFlow
+        every { repository.observeProgression() } returns progressionFlow
         every { dataStore.gamificationEnabledFlow } returns enabledFlow
+        every { dataStore.lastCelebratedLevelFlow } returns lastCelebratedFlow
+        // Default: baseline already initialised so the init{} seed is a no-op in most tests.
+        coEvery { dataStore.getLastCelebratedLevel() } returns 1
+        coEvery { dataStore.setLastCelebratedLevel(any()) } just Runs
         coEvery { repository.markCelebrated(any()) } just Runs
     }
 
@@ -71,13 +89,16 @@ class GamificationCelebrationViewModelTest {
 
     private fun buildViewModel() = GamificationCelebrationViewModel(repository, dataStore)
 
+    private fun achievementId(item: GamificationCelebrationViewModel.CelebrationItem?): String? =
+        (item as? GamificationCelebrationViewModel.CelebrationItem.Achievement)?.model?.id
+
     @Test
     fun `given pending celebrations when observed then exposes the oldest first`() = runTest {
         pendingFlow.value = listOf(model("FIRST_WIN", 100L), model("COLLECTOR_1", 200L))
         val vm = buildViewModel()
 
         vm.current.test {
-            assertEquals("FIRST_WIN", awaitItem()?.id)
+            assertEquals("FIRST_WIN", achievementId(awaitItem()))
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -121,11 +142,11 @@ class GamificationCelebrationViewModelTest {
         val vm = buildViewModel()
 
         vm.current.test {
-            assertEquals("FIRST_WIN", awaitItem()?.id)
+            assertEquals("FIRST_WIN", achievementId(awaitItem()))
             // Simulate the DB dropping the celebrated row → the flow re-emits without it.
             vm.onCelebrationShown("FIRST_WIN")
             pendingFlow.value = listOf(model("COLLECTOR_1", 200L))
-            assertEquals("COLLECTOR_1", awaitItem()?.id)
+            assertEquals("COLLECTOR_1", achievementId(awaitItem()))
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 1) { repository.markCelebrated("FIRST_WIN") }
@@ -144,5 +165,83 @@ class GamificationCelebrationViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 0) { repository.markCelebrated(any()) }
+    }
+
+    // ── Level-up (Phase 3) ──────────────────────────────────────────────────────
+
+    @Test
+    fun `given baseline below current level when observed then a level-up is due`() = runTest {
+        // Baseline initialised at 1, player is now level 3 → next due level is 2.
+        lastCelebratedFlow.value = 1
+        progressionFlow.value = progression(level = 3)
+        val vm = buildViewModel()
+
+        vm.current.test {
+            val item = awaitItem()
+            assertTrue(item is GamificationCelebrationViewModel.CelebrationItem.LevelUp)
+            assertEquals(2, (item as GamificationCelebrationViewModel.CelebrationItem.LevelUp).level)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given uninitialised baseline (-1) when observed then level-up is suppressed`() = runTest {
+        // Sentinel -1 must NOT celebrate, even though level (5) > -1.
+        lastCelebratedFlow.value = -1
+        progressionFlow.value = progression(level = 5)
+        val vm = buildViewModel()
+
+        vm.current.test {
+            assertNull(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given a pending achievement and a due level-up when observed then achievement wins`() = runTest {
+        lastCelebratedFlow.value = 1
+        progressionFlow.value = progression(level = 3)
+        pendingFlow.value = listOf(model("FIRST_WIN", 100L))
+        val vm = buildViewModel()
+
+        vm.current.test {
+            assertEquals("FIRST_WIN", achievementId(awaitItem()))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given a level-up shown when onLevelUpShown then baseline is advanced`() = runTest {
+        lastCelebratedFlow.value = 1
+        progressionFlow.value = progression(level = 3)
+        val vm = buildViewModel()
+
+        vm.onLevelUpShown(2)
+
+        coVerify(exactly = 1) { dataStore.setLastCelebratedLevel(2) }
+    }
+
+    @Test
+    fun `given uninitialised baseline when ViewModel inits then it seeds the baseline to the current level`() = runTest {
+        // init{} seed path: getLastCelebratedLevel() == -1 → set to the current progression level.
+        coEvery { dataStore.getLastCelebratedLevel() } returns -1
+        progressionFlow.value = progression(level = 4)
+
+        buildViewModel()
+
+        coVerify(exactly = 1) { dataStore.setLastCelebratedLevel(4) }
+    }
+
+    @Test
+    fun `given gamification disabled when level-up would be due then current is null`() = runTest {
+        enabledFlow.value = false
+        lastCelebratedFlow.value = 1
+        progressionFlow.value = progression(level = 5)
+        val vm = buildViewModel()
+
+        vm.current.test {
+            assertNull(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
