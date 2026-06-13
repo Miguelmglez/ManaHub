@@ -65,8 +65,13 @@ class SyncPreferencesStore @Inject constructor(
      */
     suspend fun clearAllWatermarks() {
         context.userPrefsDataStore.edit { prefs ->
+            // Includes the gamification watermarks (gam_sync_ms_* / gam_pushed_ledger_id_*): if Room is
+            // wiped the local ledger is gone, so a stale "already pushed up to id N" or "synced up to T"
+            // watermark must NOT survive — otherwise the next sync would skip re-pulling the account's
+            // history and never re-push the (now re-created) local rows.
+            val prefixes = listOf("sync_millis_", "gam_sync_ms_", "gam_pushed_ledger_id_")
             val keysToRemove = prefs.asMap().keys
-                .filter { it.name.startsWith("sync_millis_") }
+                .filter { key -> prefixes.any { key.name.startsWith(it) } }
             @Suppress("UNCHECKED_CAST")
             keysToRemove.forEach { prefs.remove(it as Preferences.Key<Any>) }
         }
@@ -109,4 +114,63 @@ class SyncPreferencesStore @Inject constructor(
     }
 
     private fun statsMilliKey(userId: String) = longPreferencesKey("stats_sync_ms_$userId")
+
+    // ── Gamification sync (Phase 4) ──────────────────────────────────────────
+
+    /**
+     * Returns the gamification PULL watermark for [userId] as epoch millis. Returns 0L if
+     * gamification has never synced, forcing a full pull (and the `id`-based push covers all local
+     * ledger rows). Used by
+     * [com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager].
+     */
+    suspend fun getGamificationSyncMillis(userId: String): Long =
+        context.userPrefsDataStore.data
+            .map { prefs -> prefs[gamSyncMilliKey(userId)] ?: 0L }
+            .first()
+
+    /** Records [millis] as the gamification PULL watermark for [userId]. */
+    suspend fun saveGamificationSyncMillis(userId: String, millis: Long) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[gamSyncMilliKey(userId)] = millis
+        }
+    }
+
+    /**
+     * Returns the highest local XP-ledger autoincrement `id` already pushed for [userId].
+     * Returns 0L if nothing has been pushed (so the first push sends every local row, since ledger
+     * ids start at 1). This is the strictly-increasing PUSH watermark — never an epoch-millis value.
+     */
+    suspend fun getGamificationPushedLedgerId(userId: String): Long =
+        context.userPrefsDataStore.data
+            .map { prefs -> prefs[gamPushedLedgerIdKey(userId)] ?: 0L }
+            .first()
+
+    /** Records [ledgerId] as the highest local XP-ledger `id` already pushed for [userId]. */
+    suspend fun saveGamificationPushedLedgerId(userId: String, ledgerId: Long) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[gamPushedLedgerIdKey(userId)] = ledgerId
+        }
+    }
+
+    /**
+     * Clears BOTH gamification watermarks for [userId], forcing a full push + pull on the next sync.
+     *
+     * Called by
+     * [com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager.reconcileOnSignIn] so an
+     * anonymous/guest's local progress merges INTO the account: the push re-sends every local ledger
+     * row and the pull re-fetches the account's full history. Monotonic server-side merges
+     * (GREATEST/earliest/union) make this idempotent — no XP is double-counted (ledger UNIQUE key) and
+     * no state is lost.
+     */
+    suspend fun clearGamificationWatermarks(userId: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(gamSyncMilliKey(userId))
+            prefs.remove(gamPushedLedgerIdKey(userId))
+        }
+    }
+
+    private fun gamSyncMilliKey(userId: String) = longPreferencesKey("gam_sync_ms_$userId")
+
+    private fun gamPushedLedgerIdKey(userId: String) =
+        longPreferencesKey("gam_pushed_ledger_id_$userId")
 }
