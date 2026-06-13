@@ -19,6 +19,7 @@ import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.feature.home.presentation.HomeWidgetType
 import com.mmg.manahub.feature.home.presentation.QuickStartAction
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.Companion.MAX_EQUIPPED_BADGES
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -76,6 +78,24 @@ private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabl
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
 /** Per-install random id seeding deterministic quest generation for guests (ADR-002 §9). Not ANDROID_ID. */
 private val KEY_GAMIFICATION_DEVICE_ID = stringPreferencesKey("gamification_device_id")
+
+// ── Gamification: equipped cosmetics (Phase 3, ADR-002 §10) ───────────────────
+/** Equipped TITLE unlockable id (single); absent = none. */
+private val KEY_EQUIPPED_TITLE = stringPreferencesKey("gamification_equipped_title")
+/** Equipped BADGE unlockable ids (≤3), stored comma-separated in display order. */
+private val KEY_EQUIPPED_BADGES = stringPreferencesKey("gamification_equipped_badges")
+/** Equipped AVATAR_FRAME unlockable id (single); absent = none. */
+private val KEY_EQUIPPED_AVATAR_FRAME = stringPreferencesKey("gamification_equipped_frame")
+/** Equipped LEVEL_RING_STYLE unlockable id (single); absent = none. */
+private val KEY_EQUIPPED_RING_STYLE = stringPreferencesKey("gamification_equipped_ring")
+/**
+ * Last player level for which the level-up celebration was shown (Phase 3). Sentinel
+ * [LAST_CELEBRATED_LEVEL_UNINITIALIZED] means "never observed" — Chunk B seeds it to the current level
+ * WITHOUT celebrating on first observation, so existing players don't get a spurious burst.
+ */
+private val KEY_LAST_CELEBRATED_LEVEL = intPreferencesKey("gamification_last_celebrated_level")
+/** Sentinel meaning the level-up celebration baseline was never set (seed-without-celebrating). */
+private const val LAST_CELEBRATED_LEVEL_UNINITIALIZED = -1
 
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
 
@@ -371,6 +391,112 @@ class UserPreferencesDataStore @Inject constructor(
             .map { it[KEY_GAMIFICATION_DEVICE_ID] ?: generated }
             .first()
     }
+
+    // ── Gamification: equipped cosmetics (Phase 3, ADR-002 §10) ────────────────
+    //
+    // Equipped selection is a PRESENTATION choice persisted here (ownership lives in the
+    // `entitlements` Room table). Singles are nullable strings; badges are an ORDERED comma-separated
+    // list capped at MAX_EQUIPPED_BADGES on both read and write. Setting null/empty clears a slot.
+    // The repository layer GUARDS equips against ownership; this DataStore only stores the choice.
+
+    /** Sentinel for "the level-up celebration baseline has never been initialized" (see Phase-3 contract). */
+    val lastCelebratedLevelUninitialized: Int get() = LAST_CELEBRATED_LEVEL_UNINITIALIZED
+
+    /** Equipped TITLE id, or null when none is equipped. */
+    val equippedTitleIdFlow: Flow<String?> = context.userPrefsDataStore.data
+        .map { it[KEY_EQUIPPED_TITLE] }
+        .catch { emit(null) }
+
+    /** Equipped AVATAR_FRAME id, or null when none is equipped. */
+    val equippedAvatarFrameIdFlow: Flow<String?> = context.userPrefsDataStore.data
+        .map { it[KEY_EQUIPPED_AVATAR_FRAME] }
+        .catch { emit(null) }
+
+    /** Equipped LEVEL_RING_STYLE id, or null when none is equipped. */
+    val equippedLevelRingStyleIdFlow: Flow<String?> = context.userPrefsDataStore.data
+        .map { it[KEY_EQUIPPED_RING_STYLE] }
+        .catch { emit(null) }
+
+    /** Equipped BADGE ids in order (size 0..[MAX_EQUIPPED_BADGES]); blanks skipped, capped on read. */
+    val equippedBadgeIdsFlow: Flow<List<String>> = context.userPrefsDataStore.data
+        .map { prefs -> decodeBadgeIds(prefs[KEY_EQUIPPED_BADGES]) }
+        .catch { emit(emptyList()) }
+
+    /**
+     * The full equipped-cosmetics selection (Phase 3). Chunk B's Profile hero renders the equipped
+     * title/badges/frame/ring from this. Each underlying slot is independently `.catch`-isolated.
+     */
+    val equippedCosmeticsFlow: Flow<EquippedCosmetics> = context.userPrefsDataStore.data
+        .map { prefs ->
+            EquippedCosmetics(
+                titleId = prefs[KEY_EQUIPPED_TITLE],
+                badgeIds = decodeBadgeIds(prefs[KEY_EQUIPPED_BADGES]),
+                avatarFrameId = prefs[KEY_EQUIPPED_AVATAR_FRAME],
+                levelRingStyleId = prefs[KEY_EQUIPPED_RING_STYLE],
+            )
+        }
+        .catch { emit(EquippedCosmetics.NONE) }
+
+    /** Equips [id] as the title, or clears the slot when [id] is null/blank. */
+    suspend fun setEquippedTitle(id: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (id.isNullOrBlank()) prefs.remove(KEY_EQUIPPED_TITLE) else prefs[KEY_EQUIPPED_TITLE] = id
+        }
+    }
+
+    /** Equips [id] as the avatar frame, or clears the slot when [id] is null/blank. */
+    suspend fun setEquippedAvatarFrame(id: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (id.isNullOrBlank()) prefs.remove(KEY_EQUIPPED_AVATAR_FRAME)
+            else prefs[KEY_EQUIPPED_AVATAR_FRAME] = id
+        }
+    }
+
+    /** Equips [id] as the level-ring style, or clears the slot when [id] is null/blank. */
+    suspend fun setEquippedLevelRingStyle(id: String?) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (id.isNullOrBlank()) prefs.remove(KEY_EQUIPPED_RING_STYLE)
+            else prefs[KEY_EQUIPPED_RING_STYLE] = id
+        }
+    }
+
+    /**
+     * Sets the equipped badges to [ids], blanks dropped and capped at [MAX_EQUIPPED_BADGES]. An empty
+     * result clears the slot.
+     */
+    suspend fun setEquippedBadges(ids: List<String>) {
+        val sanitized = ids.map { it.trim() }.filter { it.isNotEmpty() }.take(MAX_EQUIPPED_BADGES)
+        context.userPrefsDataStore.edit { prefs ->
+            if (sanitized.isEmpty()) prefs.remove(KEY_EQUIPPED_BADGES)
+            else prefs[KEY_EQUIPPED_BADGES] = sanitized.joinToString(",")
+        }
+    }
+
+    /**
+     * Emits the last level for which the level-up celebration was shown, or
+     * [LAST_CELEBRATED_LEVEL_UNINITIALIZED] when never observed (Phase 3 celebration contract).
+     */
+    val lastCelebratedLevelFlow: Flow<Int> = context.userPrefsDataStore.data
+        .map { it[KEY_LAST_CELEBRATED_LEVEL] ?: LAST_CELEBRATED_LEVEL_UNINITIALIZED }
+        .catch { emit(LAST_CELEBRATED_LEVEL_UNINITIALIZED) }
+
+    /** One-shot snapshot read of [lastCelebratedLevelFlow] (for the celebration host's seed check). */
+    suspend fun getLastCelebratedLevel(): Int = context.userPrefsDataStore.data
+        .map { it[KEY_LAST_CELEBRATED_LEVEL] ?: LAST_CELEBRATED_LEVEL_UNINITIALIZED }
+        .first()
+
+    /** Persists [level] as the most recently celebrated level-up baseline. */
+    suspend fun setLastCelebratedLevel(level: Int) {
+        context.userPrefsDataStore.edit { it[KEY_LAST_CELEBRATED_LEVEL] = level }
+    }
+
+    /** Decodes the comma-separated badge string: trim, drop blanks, cap at [MAX_EQUIPPED_BADGES]. */
+    private fun decodeBadgeIds(raw: String?): List<String> =
+        raw?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.take(MAX_EQUIPPED_BADGES)
+            ?: emptyList()
 
     // ── Privacy settings ──────────────────────────────────────────────────────
     //

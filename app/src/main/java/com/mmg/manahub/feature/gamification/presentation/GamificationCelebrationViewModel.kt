@@ -11,45 +11,72 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Drives the global achievement-unlock celebration queue (ADR-002, Phase 1, Chunk B).
+ * Drives the global celebration queue (ADR-002, Phase 1 + Phase 3, Chunk B).
  *
- * The DB is the source of truth for the queue: rows with `unlocked_at` set but `celebrated_at` null
- * are pending (see [GamificationRepository.observePendingCelebrations]). This means an unlock that
- * happened off-screen is still celebrated the next time the host is visible. The queue plays
- * SEQUENTIALLY — only the FIRST pending item is exposed as [current]; after the overlay finishes (or
- * is skipped) the host calls [onCelebrationShown], which stamps `celebrated_at` and the next pending
- * item naturally surfaces as the flow re-emits.
+ * Two celebration kinds share the one global host: achievement unlocks (Phase 1) and level-ups
+ * (Phase 3). [current] exposes a [CelebrationItem] (or null). ACHIEVEMENTS TAKE PRIORITY: while any
+ * achievement unlock is pending (`unlocked_at` set, `celebrated_at` null — see
+ * [GamificationRepository.observePendingCelebrations]) the host shows that; only when the achievement
+ * queue is empty does a due level-up surface.
+ *
+ * ### Level-up queue
+ * A level-up is "due" when the player's current level exceeds the last celebrated level. The baseline
+ * is persisted in DataStore ([UserPreferencesDataStore.lastCelebratedLevelFlow]) with a sentinel of -1
+ * meaning "uninitialized". The combine SUPPRESSES level-ups while the baseline is -1 (so existing
+ * players never get a spurious burst); [init] separately seeds the baseline to the current level the
+ * first time it sees -1. After a level-up is shown, [onLevelUpShown] advances the baseline by one due
+ * level, so a multi-level jump surfaces each level in turn.
  *
  * ### Master toggle
- * When gamification is disabled, [current] is forced to null and [onCelebrationShown] is a no-op —
- * pending unlocks are NOT marked, so they remain queued and will celebrate if the user re-enables
- * gamification later. (Backfilled retroactive unlocks already have `celebrated_at` set, so they never
- * enter the queue at all — no special-casing during backfill.)
+ * When gamification is disabled, [current] is forced to null and the dismiss handlers are no-ops —
+ * nothing is consumed, so pending celebrations remain queued for if the user re-enables gamification.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class GamificationCelebrationViewModel @Inject constructor(
     private val repository: GamificationRepository,
-    userPreferencesDataStore: UserPreferencesDataStore,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : ViewModel() {
 
     /**
-     * The single celebration currently being shown (the oldest pending unlock), or null when the
-     * queue is empty OR gamification is disabled. The host renders the overlay iff this is non-null.
+     * The single celebration currently being shown, or null when nothing is due OR gamification is
+     * disabled. The host renders the matching overlay.
      */
-    val current: StateFlow<AchievementUiModel?> =
+    sealed interface CelebrationItem {
+        /** An achievement unlock celebration (Phase 1). */
+        data class Achievement(val model: AchievementUiModel) : CelebrationItem
+
+        /** A level-up celebration for [level] (Phase 3). */
+        data class LevelUp(val level: Int) : CelebrationItem
+    }
+
+    /**
+     * The current celebration to show (achievement unlock OR a due level-up), or null. Achievements
+     * win ties. Level-ups are suppressed while the last-celebrated baseline is the -1 sentinel.
+     */
+    val current: StateFlow<CelebrationItem?> =
         combine(
             repository.observePendingCelebrations().catch { emit(emptyList()) },
+            repository.observeProgression().map { it.level }.catch { emit(1) },
+            userPreferencesDataStore.lastCelebratedLevelFlow.catch { emit(-1) },
             userPreferencesDataStore.gamificationEnabledFlow.catch { emit(true) },
-        ) { pending, enabled ->
-            // Disabled → suppress entirely (do not consume the queue). Else show the oldest.
-            if (!enabled) null else pending.firstOrNull()
+        ) { pending, currentLevel, lastCelebrated, enabled ->
+            when {
+                !enabled -> null
+                // Achievements take priority over level-ups.
+                pending.isNotEmpty() -> CelebrationItem.Achievement(pending.first())
+                // Only celebrate level-ups once the baseline is initialised (>= 0) AND we've advanced.
+                lastCelebrated >= 0 && currentLevel > lastCelebrated ->
+                    CelebrationItem.LevelUp(lastCelebrated + 1)
+                else -> null
+            }
         }
             .catch { emit(null) }
             .stateIn(
@@ -58,16 +85,39 @@ class GamificationCelebrationViewModel @Inject constructor(
                 initialValue = null,
             )
 
+    init {
+        // One-shot silent seed: if the baseline was never initialised (-1), set it to the player's
+        // current level so EXISTING players don't get a spurious level-up burst on first run. Done
+        // OUTSIDE the combine (no side effects in a transform).
+        viewModelScope.launch {
+            runCatching {
+                if (userPreferencesDataStore.getLastCelebratedLevel() == -1) {
+                    val currentLevel = repository.observeProgression().first().level
+                    userPreferencesDataStore.setLastCelebratedLevel(currentLevel)
+                }
+            }
+        }
+    }
+
     /**
-     * Marks [id] as celebrated so it drops out of the queue and the next pending item surfaces.
-     * Called by the host after the overlay finished playing or was dismissed by tap.
-     *
-     * Safe to call even if the item is no longer current (idempotent at the DB level). When
-     * gamification is disabled the host never shows the overlay, so this is not reached in that case.
+     * Marks an achievement [id] as celebrated so it drops out of [observePendingCelebrations]. Called
+     * by the host after the achievement overlay finished (or was dismissed). Idempotent at the DB
+     * level. When gamification is disabled the host never shows the overlay, so this is not reached.
      */
     fun onCelebrationShown(id: String) {
         viewModelScope.launch {
             runCatching { repository.markCelebrated(id) }
+        }
+    }
+
+    /**
+     * Advances the level-up baseline to [level] after that level-up was shown, so it drops out and the
+     * NEXT due level (on a multi-level jump) surfaces. Called by the host after the level-up overlay
+     * was dismissed.
+     */
+    fun onLevelUpShown(level: Int) {
+        viewModelScope.launch {
+            runCatching { userPreferencesDataStore.setLastCelebratedLevel(level) }
         }
     }
 }

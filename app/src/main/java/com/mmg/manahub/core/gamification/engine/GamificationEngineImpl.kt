@@ -39,6 +39,7 @@ class GamificationEngineImpl @Inject constructor(
     private val achievementEvaluator: AchievementEvaluator,
     private val questEvaluator: QuestEvaluator,
     private val streakTracker: StreakTracker,
+    private val entitlementGranter: EntitlementGranter,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : GamificationEngine {
 
@@ -74,6 +75,12 @@ class GamificationEngineImpl @Inject constructor(
             val combined = xpOutcome
                 .withAchievementUnlocks(unlocks)
                 .withQuestProgress(questDeltas)
+
+            // Grant any newly-satisfied cosmetic entitlements (level-up / achievement unlock). A pure
+            // side effect for now — the Rewards tab reads entitlements reactively and the level-up
+            // celebration is DataStore-driven (lastCelebratedLevel). Per-event isolated so a failure
+            // here never tears down progression for the event.
+            runCatching { entitlementGranter.grant(combined) }
 
             // Only publish outcomes that carry something the UI should surface.
             if (combined.hasAnything) {
