@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.decks.presentation.engine.DeckRole
 import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
 import com.mmg.manahub.feature.decks.presentation.engine.DeckWarning
@@ -11,7 +13,9 @@ import com.mmg.manahub.feature.decks.presentation.engine.card
 import com.mmg.manahub.feature.decks.presentation.engine.entry
 import com.mmg.manahub.feature.decks.presentation.engine.fixedPower
 import com.mmg.manahub.feature.decks.presentation.engine.landCard
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -28,7 +32,8 @@ class EvaluateDeckUseCaseTest {
 
     private val dispatcher = StandardTestDispatcher()
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.6f))
-    private val useCase = EvaluateDeckUseCase(scorer, dispatcher)
+    private val eventBus = ProgressionEventBus()
+    private val useCase = EvaluateDeckUseCase(scorer, eventBus, dispatcher)
 
     @Test
     fun `derives color identity from mainboard cards`() = runTest(dispatcher) {
@@ -99,5 +104,20 @@ class EvaluateDeckUseCaseTest {
 
         assertEquals(37, result.evaluation.landCount)
         assertTrue(result.evaluation.healthScore in 0..100)
+    }
+
+    @Test
+    fun `a successful evaluation emits a deck_doctor FeatureExplored event`() = runTest(dispatcher) {
+        val emitted = mutableListOf<ProgressionEvent>()
+        val collector = backgroundScope.launch { eventBus.events.collect { emitted.add(it) } }
+        runCurrent() // let the collector subscribe before the use case emits
+
+        useCase(listOf(entry(card(id = "c1"))), DeckFormat.COMMANDER)
+        runCurrent()
+
+        val explore = emitted.filterIsInstance<ProgressionEvent.FeatureExplored>()
+        assertEquals(1, explore.size)
+        assertEquals("deck_doctor", explore.single().featureKey)
+        collector.cancel()
     }
 }

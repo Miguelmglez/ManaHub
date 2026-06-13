@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.gamification.domain.event
 
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * A domain event emitted on the canonical write path of a user action that may grant
@@ -144,5 +145,25 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "app_open:$localDate"
+    }
+
+    /**
+     * A feature was explored/used (Phase 2 — drives EXPLORATION quests only).
+     *
+     * Grants ZERO XP: the ledger is intentionally NOT written for this event (see
+     * [com.mmg.manahub.core.gamification.engine.XpGranter] — it maps to `null`). Its only effect is to
+     * advance exploration quests. The [idempotencyKey] is per-local-day so re-exploring the same feature
+     * multiple times in one day advances the quest at most once (the explore quest target is 1). The
+     * key embeds the system-zone local date of [occurredAt]; PII-free ([featureKey] is a stable
+     * code-side slug like `"deck_doctor"`, never user content).
+     *
+     * @param featureKey stable, code-side feature slug (e.g. `"deck_doctor"`).
+     */
+    data class FeatureExplored(
+        val featureKey: String,
+        override val occurredAt: Instant,
+    ) : ProgressionEvent {
+        override val idempotencyKey: String
+            get() = "explore:$featureKey:${occurredAt.atZone(ZoneId.systemDefault()).toLocalDate()}"
     }
 }

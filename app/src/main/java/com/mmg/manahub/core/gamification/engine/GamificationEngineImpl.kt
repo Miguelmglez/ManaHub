@@ -63,11 +63,17 @@ class GamificationEngineImpl @Inject constructor(
             val unlocks = runCatching { achievementEvaluator.process(event) }
                 .getOrDefault(emptyList())
 
-            // Quest / streak evaluators are Phase-2 stubs — wiring complete, bodies later.
-            runCatching { questEvaluator.process(event) }
+            // Quest evaluation advances active quest instances; its deltas are folded into the outcome
+            // so the UI can surface "+1 toward <quest>" / "Quest complete!".
+            val questDeltas = runCatching { questEvaluator.process(event) }
+                .getOrDefault(emptyList())
+
+            // Streak tracking is a side effect (no UI payload in this chunk) — fire-and-forget.
             runCatching { streakTracker.process(event) }
 
-            val combined = xpOutcome.withAchievementUnlocks(unlocks)
+            val combined = xpOutcome
+                .withAchievementUnlocks(unlocks)
+                .withQuestProgress(questDeltas)
 
             // Only publish outcomes that carry something the UI should surface.
             if (combined.hasAnything) {

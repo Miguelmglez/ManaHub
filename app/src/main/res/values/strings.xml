@@ -2582,4 +2582,99 @@
     <!-- Achievement unlock chip, e.g. "Tier 2". -->
     <string name="progression_strip_tier_chip">Tier %1$d</string>
 
+    <!-- ── Quests (Phase 2) ─────────────────────────────────────────────────── -->
+    <!-- Daily quests -->
+    <string name="quest_daily_play_game_title">Take a Seat</string>
+    <string name="quest_daily_play_game_desc">Play a game today.</string>
+    <string name="quest_daily_win_game_title">Daily Victory</string>
+    <string name="quest_daily_win_game_desc">Win a game today.</string>
+    <string name="quest_daily_complete_survey_title">Quick Recap</string>
+    <string name="quest_daily_complete_survey_desc">Complete a post-game survey.</string>
+    <string name="quest_daily_add_cards_title">Stock Up</string>
+    <string name="quest_daily_add_cards_desc">Add 3 cards to your collection.</string>
+    <string name="quest_daily_scan_cards_title">Scan Patrol</string>
+    <string name="quest_daily_scan_cards_desc">Scan 2 cards.</string>
+    <string name="quest_daily_build_deck_title">Tinkerer</string>
+    <string name="quest_daily_build_deck_desc">Create or save a deck.</string>
+    <string name="quest_daily_explore_deck_doctor_title">Doctor\'s Visit</string>
+    <string name="quest_daily_explore_deck_doctor_desc">Run a deck through Deck Doctor.</string>
+
+    <!-- ── Quests tab + Home quest widgets (Phase 2, Chunk B UI) ─────────────── -->
+    <!-- Profile Quests tab label. -->
+    <string name="profile_tab_quests">Quests</string>
+    <!-- Section headers inside the Quests tab. -->
+    <string name="quests_section_daily">Daily quests</string>
+    <string name="quests_section_weekly">Weekly quests</string>
+    <!-- Streak header. -->
+    <string name="quests_streak_title">Activity streak</string>
+    <!-- Current streak count, e.g. "5-day streak". -->
+    <string name="quests_streak_days">%1$d-day streak</string>
+    <!-- Shown when the streak is zero. -->
+    <string name="quests_streak_none">Play today to start a streak</string>
+    <!-- Freeze-token indicator (positively framed). %1$d = token count. -->
+    <string name="quests_streak_freezes">%1$d freezes</string>
+    <!-- Positive explanation of what freezes do (never punitive). -->
+    <string name="quests_streak_freeze_hint">Freezes protect your streak on days you can\'t play.</string>
+    <!-- Progress text on a quest row, e.g. "2/3". -->
+    <string name="quests_progress_value">%1$d/%2$d</string>
+    <!-- Claim button on a completed, unclaimed quest. -->
+    <string name="quests_claim">Claim</string>
+    <!-- Claimed state badge once the reward is taken. -->
+    <string name="quests_claimed">Claimed</string>
+    <!-- XP reward label on a quest row, e.g. "+50 XP". -->
+    <string name="quests_reward_xp">+%1$d XP</string>
+    <!-- Toast shown after a successful claim, e.g. "+50 XP — Quest claimed". -->
+    <string name="quests_claim_success">+%1$d XP — Quest claimed</string>
+    <!-- Toast shown when a claim could not be completed. -->
+    <string name="quests_claim_failed">Couldn\'t claim that quest. Try again.</string>
+    <!-- Empty state when no quests have been generated yet. -->
+    <string name="quests_empty_title">No quests right now</string>
+    <string name="quests_empty_desc">Daily and weekly quests appear here. Check back soon for new challenges.</string>
+    <!-- Content description for a quest row. -->
+    <string name="quests_row_a11y">%1$s, %2$d of %3$d, reward %4$d XP</string>
+    <!-- Accessibility click label for the Claim button, names the quest being claimed. -->
+    <string name="quests_claim_a11y">Claim reward for %1$s</string>
+
+    <!-- Home quest/progression widgets. -->
+    <string name="widget_title_progression_hub">Your progress</string>
+    <string name="widget_title_quests_hub">Quests</string>
+    <!-- Today's daily-quest completion, e.g. "1/3 daily done". -->
+    <string name="home_progression_daily_done">%1$d/%2$d daily done</string>
+    <!-- Level chip, e.g. "Lv 4". -->
+    <string name="home_progression_level">Lv %1$d</string>
+    <!-- Streak chip on the progression widget, e.g. "5". -->
+    <string name="home_progression_streak">%1$d day streak</string>
+    <!-- Quests widget empty body. -->
+    <string name="home_quests_empty">No active quests right now.</string>
+    <!-- Badge on a claimable quest in the Home widget. -->
+    <string name="home_quests_claimable">Ready to claim</string>
+    <!-- Accessibility click label for the progression hub widget. -->
+    <string name="home_progression_open_a11y">Open quests and progression</string>
+    <!-- Accessibility click label for the quests hub widget. -->
+    <string name="home_quests_open_a11y">Open quests</string>
+    <!-- Widget gallery descriptions for gamification widgets. -->
+    <string name="home_widget_desc_progression_hub">Level, XP, streak and daily quests</string>
+    <string name="home_widget_desc_quests_hub">Your active quests at a glance</string>
+    <!-- CONTEXT_HERO suggestion when quests are ready to claim. -->
+    <string name="home_hero_quests_ready_label">Rewards ready</string>
+    <string name="home_hero_quests_ready_title">%1$d ready to claim</string>
+    <string name="home_hero_quests_ready_subtitle">You have completed quests waiting for their reward.</string>
+    <string name="home_hero_quests_ready_cta">Claim rewards</string>
+    <!-- Placeholder shown in the gallery for quest widgets while gamification is off. -->
+    <string name="home_gamification_disabled">Gamification is disabled</string>
+
+    <!-- Weekly quests -->
+    <string name="quest_weekly_win_games_title">On a Roll</string>
+    <string name="quest_weekly_win_games_desc">Win 5 games this week.</string>
+    <string name="quest_weekly_play_games_title">Regular Player</string>
+    <string name="quest_weekly_play_games_desc">Play 7 games this week.</string>
+    <string name="quest_weekly_complete_surveys_title">Analyst</string>
+    <string name="quest_weekly_complete_surveys_desc">Complete 3 post-game surveys this week.</string>
+    <string name="quest_weekly_add_cards_title">Collector\'s Week</string>
+    <string name="quest_weekly_add_cards_desc">Add 20 cards to your collection this week.</string>
+    <string name="quest_weekly_complete_tournament_title">Main Event</string>
+    <string name="quest_weekly_complete_tournament_desc">Finish a tournament this week.</string>
+    <string name="quest_weekly_multiplayer_game_title">Pod People</string>
+    <string name="quest_weekly_multiplayer_game_desc">Play a game with 4 or more players this week.</string>
+
 </resources>

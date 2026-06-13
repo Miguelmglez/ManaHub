@@ -4,9 +4,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Feed
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TipsAndUpdates
@@ -53,6 +55,23 @@ enum class HomeWidgetType(
         category = WidgetCategory.ACTIVITY,
         audience = WidgetAudience.ALL,
         icon = Icons.Default.TipsAndUpdates,
+    ),
+    // ── Gamification (Phase 2) — hidden entirely when the master toggle is off ───
+    PROGRESSION_HUB(
+        persistedId = "progression_hub",
+        defaultTitleRes = R.string.widget_title_progression_hub,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.ACTIVITY,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.MilitaryTech,
+    ),
+    QUESTS_HUB(
+        persistedId = "quests_hub",
+        defaultTitleRes = R.string.widget_title_quests_hub,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.ACTIVITY,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.Flag,
     ),
 
     // ── Stats ───────────────────────────────────────────────────────────────────
@@ -150,6 +169,10 @@ enum class HomeWidgetType(
         audience = WidgetAudience.ACCOUNT_GATED,
         icon = Icons.Default.SwapHoriz,
     );
+
+    /** True for widgets that belong to the gamification system (hidden when the toggle is off). */
+    val isGamification: Boolean
+        get() = this == PROGRESSION_HUB || this == QUESTS_HUB
 
     companion object {
         /** Resolves a persisted id back to its type, or null if unknown/removed. */

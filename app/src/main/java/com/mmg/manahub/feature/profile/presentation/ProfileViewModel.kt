@@ -12,13 +12,18 @@ import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.settings.presentation.PreferencesState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +33,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -93,12 +99,31 @@ class ProfileViewModel @Inject constructor(
         val progression: PlayerProgression? = null,
         /** Master gamification switch; when false the hero ring + level chip are hidden. */
         val gamificationEnabled: Boolean = true,
+        // Quests (gamification Phase 2) — drive the Quests tab.
+        /** Active daily + weekly quest board. Empty until the first emission. */
+        val questBoard: QuestBoard = QuestBoard.empty,
+        /** Daily-activity streak (count + freeze tokens). */
+        val streak: StreakUiModel = StreakUiModel(current = 0, longest = 0, freezeTokens = 0),
     ) {
         val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
     }
 
+    /** One-shot side effects for the Profile screen (e.g. quest-claim toasts). */
+    sealed interface Event {
+        /** A quest reward was successfully claimed; [xpAwarded] XP was granted. */
+        data class QuestClaimed(val xpAwarded: Int) : Event
+
+        /** A quest claim could not be completed (already claimed, not completed, or not found). */
+        data object QuestClaimFailed : Event
+    }
+
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    // Buffered Channel (not a nullable StateFlow): a StateFlow would equality-collapse repeated
+    // identical claim results and drop events while the lifecycle is paused.
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
 
     private val _prefsState = MutableStateFlow(PreferencesState())
     val prefsState: StateFlow<PreferencesState> = _prefsState.asStateFlow()
@@ -136,6 +161,17 @@ class ProfileViewModel @Inject constructor(
         userPreferencesDataStore.gamificationEnabledFlow
             .onEach { enabled -> _uiState.update { it.copy(gamificationEnabled = enabled) } }
             .catch { /* ignore — default keeps gamification visible */ }
+            .launchIn(viewModelScope)
+
+        // ── Quests (ADR-002, Phase 2) ───────────────────────────────────────────
+        gamificationRepository.observeActiveQuests()
+            .onEach { board -> _uiState.update { it.copy(questBoard = board) } }
+            .catch { /* ignore — Quests tab falls back to its empty state */ }
+            .launchIn(viewModelScope)
+
+        gamificationRepository.observeDailyActivityStreak()
+            .onEach { streak -> _uiState.update { it.copy(streak = streak) } }
+            .catch { /* ignore — streak header falls back to a zeroed value */ }
             .launchIn(viewModelScope)
 
         // ── Collection stats ──────────────────────────────────────────────────
@@ -307,6 +343,27 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+
+    /**
+     * Claims a completed quest's XP reward (gamification Phase 2). Delegates to the idempotent
+     * repository path and emits a one-shot [Event] for the UI to surface as a toast. The reactive
+     * [observeActiveQuests] flow re-emits with the CLAIMED status, so no optimistic UI mutation is
+     * needed here.
+     */
+    fun claimQuest(instanceId: String) {
+        viewModelScope.launch {
+            val result = runCatching { gamificationRepository.claimQuest(instanceId) }
+                .getOrElse { ClaimResult.NotFound }
+            val event = when (result) {
+                is ClaimResult.Claimed -> Event.QuestClaimed(result.xpAwarded)
+                ClaimResult.AlreadyClaimed,
+                ClaimResult.NotCompleted,
+                ClaimResult.NotFound,
+                -> Event.QuestClaimFailed
+            }
+            _events.send(event)
+        }
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
