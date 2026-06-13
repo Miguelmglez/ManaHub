@@ -4,6 +4,7 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -26,8 +27,9 @@ class AddCardToCollectionUseCaseTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val cardRepository     = mockk<CardRepository>()
-    private val userCardRepository = mockk<UserCardRepository>(relaxed = true)
+    private val cardRepository      = mockk<CardRepository>()
+    private val userCardRepository  = mockk<UserCardRepository>(relaxed = true)
+    private val progressionEventBus = mockk<ProgressionEventBus>(relaxed = true)
 
     private lateinit var useCase: AddCardToCollectionUseCase
 
@@ -36,8 +38,9 @@ class AddCardToCollectionUseCaseTest {
     @Before
     fun setUp() {
         useCase = AddCardToCollectionUseCase(
-            cardRepository     = cardRepository,
-            userCardRepository = userCardRepository,
+            cardRepository      = cardRepository,
+            userCardRepository  = userCardRepository,
+            progressionEventBus = progressionEventBus,
         )
     }
 

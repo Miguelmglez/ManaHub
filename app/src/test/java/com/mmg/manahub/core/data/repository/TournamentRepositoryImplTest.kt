@@ -4,6 +4,7 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -36,6 +37,7 @@ class TournamentRepositoryImplTest {
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
     private val dao = mockk<TournamentDao>(relaxed = true)
+    private val progressionEventBus = mockk<ProgressionEventBus>(relaxed = true)
     private lateinit var repository: TournamentRepositoryImpl
 
     // ── Fixture helpers ───────────────────────────────────────────────────────
@@ -74,7 +76,7 @@ class TournamentRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = TournamentRepositoryImpl(dao, UnconfinedTestDispatcher())
+        repository = TournamentRepositoryImpl(dao, progressionEventBus, UnconfinedTestDispatcher())
         // Default match for finishMatch tests — winner (1L) is a valid participant
         coEvery { dao.getMatchById(any()) } returns TournamentMatchEntity(
             id = 100L, tournamentId = 1L, round = 1, playerIds = "[1,2]",

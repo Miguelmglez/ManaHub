@@ -6,14 +6,13 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.DeckStatsRow
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
-import com.mmg.manahub.core.domain.model.Achievement
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.Rarity
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
-import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
+import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
@@ -50,10 +49,10 @@ class ProfileViewModel @Inject constructor(
     private val statsRepo: StatsRepository,
     private val gameSessionRepo: GameSessionRepository,
     private val surveyAnswerDao: SurveyAnswerDao,
-    private val checkAchievementsUseCase: CheckAchievementsUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val friendRepository: FriendRepository,
     private val authRepository: AuthRepository,
+    private val gamificationRepository: GamificationRepository,
 ) : ViewModel() {
 
     data class UiState(
@@ -83,12 +82,17 @@ class ProfileViewModel @Inject constructor(
         // Decks + sessions
         val deckStats: List<DeckStatsRow> = emptyList(),
         val recentSessions: List<GameSessionWithPlayers> = emptyList(),
-        // Achievements
-        val achievements: List<Achievement> = emptyList(),
+        // Achievements (gamification Phase 1 — rich model from the catalog + persisted progress)
+        val achievements: List<AchievementUiModel> = emptyList(),
         val preferredCurrency: com.mmg.manahub.core.domain.model.PreferredCurrency = com.mmg.manahub.core.domain.model.PreferredCurrency.USD,
         // Friends
         val friendCount: Int = 0,
         val pendingFriendCount: Int = 0,
+        // Gamification (ADR-002, Phase 0) — read-only hero ring + level
+        /** Null until the progression flow first emits; the migration seeds a level-1 row. */
+        val progression: PlayerProgression? = null,
+        /** Master gamification switch; when false the hero ring + level chip are hidden. */
+        val gamificationEnabled: Boolean = true,
     ) {
         val winRate: Float get() = if (totalGames > 0) totalWins.toFloat() / totalGames else 0f
     }
@@ -113,6 +117,26 @@ class ProfileViewModel @Inject constructor(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
+
+        // ── Gamification (ADR-002, Phase 0) ─────────────────────────────────────
+        gamificationRepository.observeProgression()
+            .onEach { progression -> _uiState.update { it.copy(progression = progression) } }
+            .catch { /* ignore — hero falls back to no ring */ }
+            .launchIn(viewModelScope)
+
+        // ── Achievements (ADR-002, Phase 1) ─────────────────────────────────────
+        // Single source of truth: the gamification repo joins the catalog with persisted progress.
+        // Replaces the old CheckAchievementsUseCase + NOW-merge workaround (unlockedAt is now a real,
+        // persisted epoch-millis stamped once by the evaluator/backfill).
+        gamificationRepository.observeAchievements()
+            .onEach { achievements -> _uiState.update { it.copy(achievements = achievements) } }
+            .catch { /* ignore — achievements section stays empty */ }
+            .launchIn(viewModelScope)
+
+        userPreferencesDataStore.gamificationEnabledFlow
+            .onEach { enabled -> _uiState.update { it.copy(gamificationEnabled = enabled) } }
+            .catch { /* ignore — default keeps gamification visible */ }
+            .launchIn(viewModelScope)
 
         // ── Collection stats ──────────────────────────────────────────────────
         userPreferencesDataStore.preferencesFlow
@@ -263,33 +287,6 @@ class ProfileViewModel @Inject constructor(
                 _uiState.update { it.copy(playStyle = detectPlayStyle(avgWinTurn, favoriteElim)) }
             }
             .launchIn(viewModelScope)
-
-        // ── Derived: achievements ─────────────────────────────────────────────
-        // Note: CheckAchievementsUseCase stamps unlocked achievements with NOW,
-        // so we suppress re-invocation by comparing only the inputs (currency +
-        // stats), not the output list which changes every millisecond.
-        _uiState
-            .map { s -> s.preferredCurrency to buildAchievementStats(s) }
-            .distinctUntilChanged()
-            .onEach { (currency, stats) ->
-                val newAchievements = checkAchievementsUseCase(stats, currency)
-                _uiState.update { current ->
-                    // Preserve existing unlockedAt timestamps for achievements that
-                    // were already unlocked — only stamp NOW for newly-unlocked ones.
-                    val existingById = current.achievements.associateBy { it.id }
-                    val merged = newAchievements.map { achievement ->
-                        val existing = existingById[achievement.id]
-                        if (achievement.isUnlocked && existing?.isUnlocked == true) {
-                            // Already unlocked — keep the original timestamp.
-                            achievement.copy(unlockedAt = existing.unlockedAt)
-                        } else {
-                            achievement
-                        }
-                    }
-                    current.copy(achievements = merged)
-                }
-            }
-            .launchIn(viewModelScope)
     }
 
     // ── Public actions ────────────────────────────────────────────────────────
@@ -339,23 +336,4 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    private fun buildAchievementStats(s: UiState): AchievementStats {
-        val byRarity = s.collectionStats?.byRarity ?: emptyMap()
-        val byColor = s.collectionStats?.byColor ?: emptyMap()
-        return AchievementStats(
-            totalGames = s.totalGames,
-            totalWins = s.totalWins,
-            winStreak = s.currentStreak,
-            totalCards = s.collectionStats?.totalCards ?: 0,
-            hasMythic = (byRarity[Rarity.MYTHIC] ?: 0) > 0,
-            deckCount = s.collectionStats?.totalDecks ?: 0,
-            surveyCount = s.surveyCount,
-            maxCardValue = s.collectionStats?.mostValuableCards?.firstOrNull()?.priceUsd ?: 0.0,
-            avgWinTurn = s.avgWinTurn,
-            favoriteElimination = s.mostFrequentElimination,
-            distinctColorCount = byColor.entries.count { (color) ->
-                color != MtgColor.COLORLESS
-            },
-        )
-    }
 }

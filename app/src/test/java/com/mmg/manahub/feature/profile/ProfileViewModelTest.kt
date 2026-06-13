@@ -8,8 +8,9 @@ import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.Rarity
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.core.domain.usecase.achievements.AchievementStats
-import com.mmg.manahub.core.domain.usecase.achievements.CheckAchievementsUseCase
+import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
@@ -19,7 +20,6 @@ import com.mmg.manahub.util.TestFixtures
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,15 +46,15 @@ import org.junit.Test
  * - detectPlayStyle: avgWinTurn > 12 → CONTROL
  * - detectPlayStyle: default → BALANCED
  * - winRate computed property: 10 games 4 wins → 0.4f; 0 games → 0.0f
- * - buildAchievementStats with null collectionStats → defaults to 0
+ * - achievements: observeAchievements() flow drives UiState.achievements
  * - computeFavouriteColor: skips COLORLESS entries
  * - computeMostValuableColor: multi-color → "M"; empty identity → "C"; single → that color
  *
  * DESIGN NOTES:
  * - ProfileViewModel has a complex init{} with many flow subscriptions.
  *   We wire all flows via mocks so the ViewModel constructs cleanly.
- * - detectPlayStyle and buildAchievementStats are private helpers; we test
- *   them indirectly by controlling the uiState values they read from.
+ * - detectPlayStyle is a private helper; we test it indirectly by controlling
+ *   the uiState values it reads from.
  * - computeFavouriteColor / computeMostValuableColor are tested via the
  *   collectionStats observation path in init{}.
  */
@@ -70,16 +70,27 @@ class ProfileViewModelTest {
     private val statsRepo                = mockk<StatsRepository>()
     private val gameSessionRepo          = mockk<GameSessionRepository>()
     private val surveyAnswerDao          = mockk<SurveyAnswerDao>()
-    private val checkAchievementsUseCase = mockk<CheckAchievementsUseCase>()
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
     private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
+    private val gamificationRepository   = mockk<GamificationRepository>(relaxed = true)
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Wizard")
     private val avatarUrlFlow     = MutableStateFlow<String?>(null)
     private val preferencesFlow   = MutableStateFlow(TestFixtures.buildPreferences())
     private val sessionStateFlow  = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
+    private val gamificationEnabledFlow = MutableStateFlow(true)
+    private val progressionFlow   = MutableStateFlow(
+        PlayerProgression(
+            totalXp = 0L,
+            level = 1,
+            xpIntoLevel = 0L,
+            xpForNextLevel = 100L,
+            updatedAt = java.time.Instant.EPOCH,
+        )
+    )
+    private val achievementsFlow = MutableStateFlow<List<AchievementUiModel>>(emptyList())
 
     private lateinit var viewModel: ProfileViewModel
 
@@ -127,7 +138,10 @@ class ProfileViewModelTest {
         every { userPreferencesDataStore.playerNameFlow }  returns playerNameFlow
         every { userPreferencesDataStore.avatarUrlFlow }   returns avatarUrlFlow
         every { userPreferencesDataStore.preferencesFlow } returns preferencesFlow
+        every { userPreferencesDataStore.gamificationEnabledFlow } returns gamificationEnabledFlow
         every { authRepository.sessionState }              returns sessionStateFlow
+        every { gamificationRepository.observeProgression() } returns progressionFlow
+        every { gamificationRepository.observeAchievements() } returns achievementsFlow
 
         every { statsRepo.observeCollectionStats(any()) }   returns flowOf(collectionStats)
         every { gameSessionRepo.observeTotalGames() }       returns flowOf(totalGames)
@@ -152,18 +166,16 @@ class ProfileViewModelTest {
 
         every { friendRepository.observeFriendCount() }     returns flowOf(0)
         every { friendRepository.observePendingCount() }    returns flowOf(0)
-
-        every { checkAchievementsUseCase(any(), any()) } returns emptyList()
     }
 
     private fun buildViewModel(): ProfileViewModel = ProfileViewModel(
         statsRepo                = statsRepo,
         gameSessionRepo          = gameSessionRepo,
         surveyAnswerDao          = surveyAnswerDao,
-        checkAchievementsUseCase = checkAchievementsUseCase,
         userPreferencesDataStore = userPreferencesDataStore,
         friendRepository         = friendRepository,
         authRepository           = authRepository,
+        gamificationRepository   = gamificationRepository,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -366,66 +378,72 @@ class ProfileViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — buildAchievementStats with null collectionStats
+    //  GROUP 4 — achievements come from observeAchievements() (gamification Phase 1)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given null collectionStats when checkAchievementsUseCase is called then AchievementStats defaults totalCards to 0`() = runTest {
-        // Arrange: flow never emits, so collectionStats stays null
-        every { statsRepo.observeCollectionStats(any()) } returns kotlinx.coroutines.flow.flow {
-            throw RuntimeException("Stats unavailable")
-        }
+    fun `given empty achievements flow when ViewModel initializes then achievements is empty`() = runTest {
+        // Arrange: default flow emits emptyList()
         wireDefaultMocks()
-        // Override statsRepo.observeCollectionStats AFTER wireDefaultMocks sets it up
-        every { statsRepo.observeCollectionStats(any()) } returns kotlinx.coroutines.flow.flow {
-            throw RuntimeException("Stats unavailable")
-        }
-
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        // Assert: achievements were computed with 0 totalCards (default for null stats)
-        verify {
-            checkAchievementsUseCase(
-                match { stats: AchievementStats -> stats.totalCards == 0 },
-                any()
-            )
-        }
+        // Assert
+        assertEquals(emptyList<AchievementUiModel>(), viewModel.uiState.value.achievements)
     }
 
     @Test
-    fun `given collectionStats with 100 cards when buildAchievementStats then AchievementStats totalCards is 100`() = runTest {
+    fun `given achievements flow emits models when ViewModel initializes then uiState exposes them`() = runTest {
         // Arrange
-        val stats = buildEmptyCollectionStats().copy(totalCards = 100)
-        wireDefaultMocks(collectionStats = stats)
+        wireDefaultMocks()
+        achievementsFlow.value = listOf(
+            AchievementUiModel(
+                id = "FIRST_WIN",
+                category = com.mmg.manahub.core.gamification.domain.model.AchievementCategory.GAMES,
+                titleRes = 0,
+                descRes = 0,
+                emoji = "⚔️",
+                tierThresholds = listOf(1),
+                currentValue = 1,
+                tierReached = 1,
+                maxTier = 1,
+                unlockedAt = 123L,
+                isSecret = false,
+            )
+        )
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        // Assert: achievements computed with correct card count
-        verify {
-            checkAchievementsUseCase(
-                match { achievementStats: AchievementStats -> achievementStats.totalCards == 100 },
-                any()
-            )
-        }
+        // Assert: the flow drives UiState.achievements; the unlocked stamp is the real persisted value.
+        assertEquals(1, viewModel.uiState.value.achievements.size)
+        assertEquals("FIRST_WIN", viewModel.uiState.value.achievements.first().id)
+        assertEquals(123L, viewModel.uiState.value.achievements.first().unlockedAt)
     }
 
     @Test
-    fun `given null collectionStats when buildAchievementStats then hasMythic defaults to false`() = runTest {
-        // Arrange: null collectionStats → byRarity is empty → hasMythic = false
+    fun `given a secret locked achievement when ViewModel initializes then it is masked`() = runTest {
+        // Arrange: secret + still locked → isMasked == true
         wireDefaultMocks()
-        every { statsRepo.observeCollectionStats(any()) } returns kotlinx.coroutines.flow.flow {
-            throw RuntimeException("Stats unavailable")
-        }
+        achievementsFlow.value = listOf(
+            AchievementUiModel(
+                id = "SECRET_ONE_LIFE_WIN",
+                category = com.mmg.manahub.core.gamification.domain.model.AchievementCategory.GAMES,
+                titleRes = 0,
+                descRes = 0,
+                emoji = "💀",
+                tierThresholds = listOf(1),
+                currentValue = 0,
+                tierReached = 0,
+                maxTier = 1,
+                unlockedAt = null,
+                isSecret = true,
+            )
+        )
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        verify {
-            checkAchievementsUseCase(
-                match { stats: AchievementStats -> !stats.hasMythic },
-                any()
-            )
-        }
+        // Assert
+        assertEquals(true, viewModel.uiState.value.achievements.first().isMasked)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -567,5 +585,51 @@ class ProfileViewModelTest {
         advanceUntilIdle()
 
         assertEquals("M", viewModel.uiState.value.mostValuableColor)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 7 — gamification progression + master toggle (ADR-002, Phase 0)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given progression flow emits when ViewModel initializes then uiState exposes the progression`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        progressionFlow.value = PlayerProgression(
+            totalXp = 250L,
+            level = 3,
+            xpIntoLevel = 40L,
+            xpForNextLevel = 120L,
+            updatedAt = java.time.Instant.EPOCH,
+        )
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertEquals(3, viewModel.uiState.value.progression?.level)
+        assertEquals(40L, viewModel.uiState.value.progression?.xpIntoLevel)
+    }
+
+    @Test
+    fun `given gamification disabled in DataStore when ViewModel initializes then gamificationEnabled is false`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        gamificationEnabledFlow.value = false
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertEquals(false, viewModel.uiState.value.gamificationEnabled)
+    }
+
+    @Test
+    fun `given default mocks when ViewModel initializes then gamificationEnabled defaults to true`() = runTest {
+        // Arrange
+        wireDefaultMocks()
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // Assert: master toggle is ON by default (ADR-002 opt-out-first-class)
+        assertEquals(true, viewModel.uiState.value.gamificationEnabled)
     }
 }

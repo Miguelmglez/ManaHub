@@ -371,6 +371,9 @@ graphify-out/
 /supabase/.temp/cli-latest
 /docs/*
 !/docs/PUSH_NOTIFICATIONS_TODO.md
+# Architecture Decision Records are committed (see comment near docs/*_TODO.md rules).
+!/docs/adr/
+!/docs/adr/**
 /.claude/skills/compose-ui/SKILL.md
 /.claude/skills/compose-ui/references/visual-loop-setup.md
 /.claude/skills/compose-ui/references/components.md

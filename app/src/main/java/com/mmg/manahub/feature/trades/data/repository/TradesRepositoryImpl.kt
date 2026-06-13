@@ -9,6 +9,8 @@ import com.mmg.manahub.feature.trades.data.remote.dto.TradeProposalDto
 import com.mmg.manahub.feature.trades.domain.model.TradeItem
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.model.TradeStatus
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +24,7 @@ import javax.inject.Singleton
 class TradesRepositoryImpl @Inject constructor(
     private val remote: TradesRemoteDataSource,
     private val cardDao: CardDao,
+    private val progressionEventBus: ProgressionEventBus,
 ) : TradesRepository {
 
     private val cache = MutableStateFlow<List<TradeProposal>>(emptyList())
@@ -105,7 +108,19 @@ class TradesRepositoryImpl @Inject constructor(
     ): Result<String> = remote.counterProposal(parentProposalId, items, reviewFlags)
 
     override suspend fun acceptProposal(proposalId: String): Result<Unit> =
-        remote.acceptProposal(proposalId)
+        remote.acceptProposal(proposalId).also { result ->
+            // Emit only after a successful accept (ADR-002 §1). Idempotency key
+            // trade:{proposalId} means a second accept (e.g. the counterparty's device,
+            // or a retry) grants XP at most once per proposal.
+            if (result.isSuccess) {
+                progressionEventBus.emit(
+                    ProgressionEvent.TradeCompleted(
+                        tradeId = proposalId,
+                        occurredAt = Instant.now(),
+                    )
+                )
+            }
+        }
 
     override suspend fun revokeAcceptance(proposalId: String): Result<Unit> =
         remote.revokeAcceptance(proposalId)

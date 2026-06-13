@@ -74,6 +74,7 @@ import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
+import com.mmg.manahub.feature.profile.presentation.ProfileTab
 import com.mmg.manahub.feature.scanner.presentation.ScannerScreen
 import com.mmg.manahub.feature.settings.presentation.SettingsScreen
 import com.mmg.manahub.feature.stats.presentation.StatsScreen
@@ -159,7 +160,7 @@ fun AppNavGraph(
                 }
                 InviteDispatcherViewModel.UiEvent.NavigateAway -> {
                     // Navigate to Profile, removing the invite screen from the back stack.
-                    navController.navigate(Screen.Profile.route) {
+                    navController.navigate(Screen.Profile.baseRoute) {
                         popUpTo(Screen.FriendsInvite.route) { inclusive = true }
                     }
                 }
@@ -261,7 +262,7 @@ fun AppNavGraph(
                             HomeAction.OpenTrades -> navController.navigateTab(Screen.Collection.route)
                             HomeAction.OpenTournaments -> navController.navigate(Screen.TournamentList.route)
                             HomeAction.OpenSettings -> navController.navigate(Screen.Settings.route)
-                            HomeAction.OpenProfile -> navController.navigate(Screen.Profile.route)
+                            HomeAction.OpenProfile -> navController.navigate(Screen.Profile.baseRoute)
                             HomeAction.PlaytestRecentDeck -> navController.navigateTab(Screen.Collection.route)
                             HomeAction.ImproveRecentDeck -> navController.navigateTab(Screen.Collection.route)
                             // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge, RateApp are
@@ -269,7 +270,7 @@ fun AppNavGraph(
                             HomeAction.CustomizeQuickStart -> Unit
                             HomeAction.RateApp -> Unit
                             is HomeAction.SaveQuickStart -> Unit
-                            HomeAction.CreateAccount -> navController.navigate(Screen.Profile.route)
+                            HomeAction.CreateAccount -> navController.navigate(Screen.Profile.baseRoute)
                             HomeAction.DismissAccountNudge -> Unit
 
                             // ── Widget-board navigation ─────────────────────────
@@ -548,11 +549,26 @@ fun AppNavGraph(
             }
 
             // ── Profile ───────────────────────────────────────────────────────
-            composable(Screen.Profile.route) {
+            composable(
+                route = Screen.Profile.route,
+                arguments = listOf(
+                    navArgument("tab") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { backStackEntry ->
+                // Optional deep-link tab argument: "achievements" → Achievements tab, else Overview.
+                val initialTab = when (backStackEntry.arguments?.getString("tab")?.lowercase()) {
+                    "achievements" -> ProfileTab.ACHIEVEMENTS
+                    else -> ProfileTab.OVERVIEW
+                }
                 ProfileScreen(
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStatsClick = { navController.navigate(Screen.Stats.route) },
                     onFriendsClick = { navController.navigate(Screen.FriendsList.route) },
+                    initialTab = initialTab,
                 )
             }
 
@@ -603,7 +619,7 @@ fun AppNavGraph(
                 InviteDispatcherScreen(
                     code = code,
                     onNavigateAway = {
-                        navController.navigate(Screen.Profile.route) {
+                        navController.navigate(Screen.Profile.baseRoute) {
                             popUpTo(Screen.FriendsInvite.route) { inclusive = true }
                         }
                     },
@@ -650,7 +666,7 @@ fun AppNavGraph(
                         }
                     },
                     onNavigateToLogin = {
-                        navController.navigate(Screen.Profile.route)
+                        navController.navigate(Screen.Profile.baseRoute)
                     },
                     onNavigateToAddFriends = {
                         navController.navigate(Screen.FriendsList.route)
