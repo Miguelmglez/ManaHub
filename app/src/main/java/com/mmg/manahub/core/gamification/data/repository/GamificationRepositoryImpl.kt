@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.gamification.data.repository
 
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
 import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity
@@ -12,10 +13,16 @@ import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementDef
 import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.QuestTemplate
+import com.mmg.manahub.core.gamification.domain.catalog.Unlockable
+import com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog
+import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
+import com.mmg.manahub.core.gamification.domain.model.RewardUiModel
+import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
@@ -45,6 +52,7 @@ class GamificationRepositoryImpl @Inject constructor(
     private val clock: Clock,
     private val zoneId: ZoneId,
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : GamificationRepository {
 
     override fun observeProgression(): Flow<PlayerProgression> =
@@ -97,6 +105,76 @@ class GamificationRepositoryImpl @Inject constructor(
 
     override suspend fun claimQuest(instanceId: String): ClaimResult =
         claimQuestRewardUseCase(instanceId)
+
+    // ── Rewards / cosmetics (Phase 3) ─────────────────────────────────────────
+
+    override fun observeRewards(): Flow<RewardsBoard> =
+        // Drive off the catalog (source of truth) joined with ownership (entitlements) + equipped
+        // selection, so locked items still render. Catalog grouping/order is stable across emissions.
+        combine(
+            dao.observeEntitlements(),
+            userPreferencesDataStore.equippedCosmeticsFlow,
+        ) { entitlements, equipped ->
+            val ownedIds = entitlements.mapTo(HashSet()) { it.unlockableId }
+            val byKind = UnlockableCatalog.byKind.mapValues { (_, items) ->
+                items.map { it.toRewardUiModel(owned = it.id.value in ownedIds, equipped = equipped) }
+            }
+            RewardsBoard(byKind = byKind)
+        }
+
+    override fun observeEquippedCosmetics(): Flow<EquippedCosmetics> =
+        userPreferencesDataStore.equippedCosmeticsFlow
+
+    override suspend fun equipTitle(id: String?) {
+        // Clearing is always allowed; equipping requires ownership (silent no-op otherwise).
+        if (id == null) {
+            userPreferencesDataStore.setEquippedTitle(null)
+        } else if (dao.hasEntitlement(id)) {
+            userPreferencesDataStore.setEquippedTitle(id)
+        }
+    }
+
+    override suspend fun equipAvatarFrame(id: String?) {
+        if (id == null) {
+            userPreferencesDataStore.setEquippedAvatarFrame(null)
+        } else if (dao.hasEntitlement(id)) {
+            userPreferencesDataStore.setEquippedAvatarFrame(id)
+        }
+    }
+
+    override suspend fun equipLevelRingStyle(id: String?) {
+        if (id == null) {
+            userPreferencesDataStore.setEquippedLevelRingStyle(null)
+        } else if (dao.hasEntitlement(id)) {
+            userPreferencesDataStore.setEquippedLevelRingStyle(id)
+        }
+    }
+
+    override suspend fun equipBadges(ids: List<String>) {
+        // Keep only owned ids (preserving order); the DataStore enforces the ≤3 cap on write.
+        val owned = ids.filter { dao.hasEntitlement(it) }
+        userPreferencesDataStore.setEquippedBadges(owned)
+    }
+
+    /** Joins a catalog [Unlockable] with ownership + equipped state into a Rewards UI model. */
+    private fun Unlockable.toRewardUiModel(owned: Boolean, equipped: EquippedCosmetics): RewardUiModel =
+        RewardUiModel(
+            id = id.value,
+            kind = kind,
+            displayNameRes = displayNameRes,
+            renderSpec = renderSpec,
+            isOwned = owned,
+            isEquipped = isEquipped(equipped),
+            unlockRule = unlockRule,
+        )
+
+    /** True when this unlockable is the one currently equipped in its kind's slot. */
+    private fun Unlockable.isEquipped(equipped: EquippedCosmetics): Boolean = when (kind) {
+        UnlockableKind.TITLE -> equipped.titleId == id.value
+        UnlockableKind.AVATAR_FRAME -> equipped.avatarFrameId == id.value
+        UnlockableKind.LEVEL_RING_STYLE -> equipped.levelRingStyleId == id.value
+        UnlockableKind.BADGE -> id.value in equipped.badgeIds
+    }
 
     /**
      * Maps the period's instance rows to UI models, joining each with its catalog template metadata.

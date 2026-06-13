@@ -25,8 +25,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.mmg.manahub.core.gamification.domain.catalog.RenderSpec
+import com.mmg.manahub.core.gamification.domain.catalog.RingStyle
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.gamification.presentation.rememberRingStyleBrush
 
 /**
  * A small, read-only XP progress ring with a level number chip, sized for overlay on the
@@ -39,6 +42,11 @@ import com.mmg.manahub.core.ui.theme.magicTypography
  * @param level the player's current level, drawn in the centre chip.
  * @param progress fraction of the current level completed, in `0f..1f` (clamped defensively).
  * @param contentDescription the merged a11y label for the whole badge.
+ * @param ringStyle optional equipped level-ring style (Phase 3). When null or
+ *   [RingStyle.SOLID] the progress arc keeps its original flat `primaryAccent` look (the read-only
+ *   Phase-0 ring is unchanged when nothing is equipped); other styles restyle the arc with a brush.
+ * @param ringRenderSpec the equipped ring cosmetic's render spec (tokens for the brush); ignored when
+ *   [ringStyle] is null/SOLID.
  * @param diameter the outer diameter of the ring badge.
  * @param strokeWidth the thickness of the progress ring.
  */
@@ -48,6 +56,8 @@ fun ProfileLevelRing(
     progress: Float,
     contentDescription: String,
     modifier: Modifier = Modifier,
+    ringStyle: RingStyle? = null,
+    ringRenderSpec: RenderSpec? = null,
     diameter: Dp = 56.dp,
     strokeWidth: Dp = 5.dp,
 ) {
@@ -62,6 +72,8 @@ fun ProfileLevelRing(
 
     val trackColor = mc.surfaceVariant
     val progressColor = mc.primaryAccent
+    // Equipped ring-style brush (Phase 3). Null → fall back to the flat primaryAccent arc (unchanged).
+    val styledBrush = rememberRingStyleBrush(ringStyle, ringRenderSpec)
 
     Box(
         modifier = modifier
@@ -86,17 +98,30 @@ fun ProfileLevelRing(
                 size = arcSize,
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
-            // Progress arc, starting at 12 o'clock and sweeping clockwise.
+            // Progress arc, starting at 12 o'clock and sweeping clockwise. Uses the equipped ring
+            // brush when one is set; otherwise the flat primaryAccent color (original behavior).
             if (animatedProgress > 0f) {
-                drawArc(
-                    color = progressColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * animatedProgress,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                )
+                if (styledBrush != null) {
+                    drawArc(
+                        brush = styledBrush,
+                        startAngle = -90f,
+                        sweepAngle = 360f * animatedProgress,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    )
+                } else {
+                    drawArc(
+                        color = progressColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * animatedProgress,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    )
+                }
             }
         }
 

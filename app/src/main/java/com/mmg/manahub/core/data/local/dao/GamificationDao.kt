@@ -139,6 +139,18 @@ abstract class GamificationDao {
     abstract fun observeAchievements(): Flow<List<AchievementProgressEntity>>
 
     /**
+     * Stable ids of every achievement that is currently unlocked (`unlocked_at IS NOT NULL`).
+     *
+     * One-shot snapshot used by the Phase-3
+     * [com.mmg.manahub.core.gamification.engine.EntitlementGranter] to evaluate
+     * [com.mmg.manahub.core.gamification.domain.catalog.UnlockRule.AchievementUnlocked] rules during
+     * the retroactive `reconcileAll()` catch-up (so a player who already unlocked an achievement gets
+     * its cosmetic). Per-event grants use the just-unlocked ids from the outcome instead.
+     */
+    @Query("SELECT achievement_id FROM achievement_progress WHERE unlocked_at IS NOT NULL")
+    abstract suspend fun getUnlockedAchievementIds(): List<String>
+
+    /**
      * Observes achievements that have been unlocked but NOT yet celebrated, oldest unlock first.
      *
      * Drives Chunk B's celebration queue (ADR-002, Phase 1): a row is pending when its real unlock
