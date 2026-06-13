@@ -1,21 +1,127 @@
 package com.mmg.manahub.core.gamification.engine
 
+import com.mmg.manahub.core.data.local.dao.GamificationDao
+import com.mmg.manahub.core.data.local.entity.StreakEntity
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Advances streak counters for an event (Phase 2).
+ * Advances the daily-activity streak on [ProgressionEvent.AppOpenedToday] (ADR-002 §Context, Phase 2).
  *
- * STUB for Phase 0: the engine wiring calls [process] but it is a no-op until Phase 2 adds
- * streak logic + freeze tokens (streaks never punish — ADR-002 §Context).
+ * Streaks use FREEZE TOKENS, never punishment: a single missed day (or several, if enough tokens are
+ * banked) consumes tokens to PRESERVE the streak instead of resetting it. Tokens regenerate as the user
+ * sustains activity (one per completed 7-day run, capped at [MAX_FREEZE_TOKENS]). The streak count never
+ * drops below 1 and tokens never go negative or above the cap.
+ *
+ * The decision logic is the PURE [advance] function (existing row + today → new row) so the full matrix
+ * is unit-testable without Room or a clock. [process] is the thin IO shell.
  */
 @Singleton
-class StreakTracker @Inject constructor() {
+class StreakTracker @Inject constructor(
+    private val dao: GamificationDao,
+    private val clock: Clock,
+    private val zoneId: ZoneId,
+) {
 
-    /** No-op until Phase 2 (streak counters + freeze tokens). */
+    /**
+     * On [ProgressionEvent.AppOpenedToday], advances the `daily_activity` streak for today's local date.
+     * All other events are ignored.
+     */
     suspend fun process(event: ProgressionEvent) {
-        // TODO(Phase 2): advance StreakEntity counters on AppOpenedToday / GameFinished, honour
-        //  freeze tokens, and never decrement below the floor.
+        if (event !is ProgressionEvent.AppOpenedToday) return
+        val today = clock.instant().atZone(zoneId).toLocalDate()
+        val existing = dao.getStreak(TYPE_DAILY_ACTIVITY)
+        dao.upsertStreak(advance(existing, today))
+    }
+
+    /**
+     * Pure streak transition. Given the [existing] row (null if never seeded) and [today], returns the
+     * new row. Freeze-token rules (cap [MAX_FREEZE_TOKENS]):
+     *
+     * - First ever (null): current = 1, longest = 1, tokens = [MAX_FREEZE_TOKENS].
+     * - Same day (today == lastActiveDate): no-op (returns [existing] unchanged).
+     * - Next day (gap 0 missed days): current + 1; tokens regenerate +1 (capped) only when the new
+     *   current is a multiple of 7 (a full active week completed).
+     * - Gap of N >= 1 missed days: if tokens >= N, consume N and continue the streak (current + 1);
+     *   else reset current to 1, tokens unchanged (never negative).
+     *
+     * [type] defaults to [TYPE_DAILY_ACTIVITY] so the produced row carries the correct PK.
+     */
+    fun advance(existing: StreakEntity?, today: LocalDate, type: String = TYPE_DAILY_ACTIVITY): StreakEntity {
+        if (existing == null) {
+            return StreakEntity(
+                type = type,
+                current = 1,
+                longest = 1,
+                lastActiveDate = today.toString(),
+                freezeTokens = MAX_FREEZE_TOKENS,
+            )
+        }
+
+        val lastDate = runCatching { LocalDate.parse(existing.lastActiveDate) }.getOrNull()
+        // Corrupt/empty stored date → treat as a fresh start today (defensive; never crash the engine).
+            ?: return existing.copy(
+                current = existing.current.coerceAtLeast(1),
+                longest = existing.longest.coerceAtLeast(existing.current.coerceAtLeast(1)),
+                lastActiveDate = today.toString(),
+                freezeTokens = existing.freezeTokens.coerceIn(0, MAX_FREEZE_TOKENS),
+            )
+
+        val dayDelta = ChronoUnit.DAYS.between(lastDate, today)
+
+        return when {
+            // Same day (or a clock that moved backwards) — no change.
+            dayDelta <= 0L -> existing
+
+            // Consecutive day: extend the streak; maybe regenerate a freeze token.
+            dayDelta == 1L -> {
+                val newCurrent = existing.current.coerceAtLeast(0) + 1
+                val regen = if (newCurrent % WEEK_LENGTH == 0) 1 else 0
+                existing.copy(
+                    current = newCurrent,
+                    longest = maxOf(existing.longest, newCurrent),
+                    lastActiveDate = today.toString(),
+                    freezeTokens = (existing.freezeTokens + regen).coerceIn(0, MAX_FREEZE_TOKENS),
+                )
+            }
+
+            // A gap: today is lastActiveDate + (N + 1) days, so N missed days = dayDelta - 1.
+            else -> {
+                val missed = (dayDelta - 1L).toInt()
+                if (existing.freezeTokens >= missed) {
+                    // Freeze covers the gap: preserve and extend the streak.
+                    val newCurrent = existing.current.coerceAtLeast(0) + 1
+                    existing.copy(
+                        current = newCurrent,
+                        longest = maxOf(existing.longest, newCurrent),
+                        lastActiveDate = today.toString(),
+                        freezeTokens = (existing.freezeTokens - missed).coerceIn(0, MAX_FREEZE_TOKENS),
+                    )
+                } else {
+                    // Not enough tokens: reset to a fresh 1-day streak (tokens unchanged, never negative).
+                    existing.copy(
+                        current = 1,
+                        longest = existing.longest.coerceAtLeast(1),
+                        lastActiveDate = today.toString(),
+                        freezeTokens = existing.freezeTokens.coerceIn(0, MAX_FREEZE_TOKENS),
+                    )
+                }
+            }
+        }
+    }
+
+    companion object {
+        /** The single streak type tracked in this chunk. */
+        const val TYPE_DAILY_ACTIVITY = "daily_activity"
+
+        /** Maximum freeze tokens a streak can bank. */
+        const val MAX_FREEZE_TOKENS = 2
+
+        private const val WEEK_LENGTH = 7
     }
 }

@@ -74,6 +74,8 @@ private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notific
 private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
 /** One-shot flag: true once the Family-A achievement backfill has run (ADR-002 §4). Default: false. */
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
+/** Per-install random id seeding deterministic quest generation for guests (ADR-002 §9). Not ANDROID_ID. */
+private val KEY_GAMIFICATION_DEVICE_ID = stringPreferencesKey("gamification_device_id")
 
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
 
@@ -345,6 +347,29 @@ class UserPreferencesDataStore @Inject constructor(
     /** Marks the Family-A achievement backfill as complete (never re-runs after this). */
     suspend fun setGamificationBackfillDone() {
         context.userPrefsDataStore.edit { it[KEY_GAMIFICATION_BACKFILL_DONE] = true }
+    }
+
+    /**
+     * Returns a stable, per-install device id used to seed deterministic quest generation for guests
+     * (ADR-002 §9). Generated once (a random [java.util.UUID]) and persisted; NOT `ANDROID_ID` (which is
+     * tied to the device/account and is a privacy concern). For signed-in users the authenticated user
+     * id is used instead — this is only the guest fallback.
+     */
+    suspend fun getOrCreateGamificationDeviceId(): String {
+        val existing = context.userPrefsDataStore.data
+            .map { it[KEY_GAMIFICATION_DEVICE_ID] }
+            .first()
+        if (existing != null) return existing
+
+        val generated = java.util.UUID.randomUUID().toString()
+        context.userPrefsDataStore.edit { prefs ->
+            // Re-check inside the edit transaction to avoid two concurrent callers minting two ids.
+            val current = prefs[KEY_GAMIFICATION_DEVICE_ID]
+            if (current == null) prefs[KEY_GAMIFICATION_DEVICE_ID] = generated
+        }
+        return context.userPrefsDataStore.data
+            .map { it[KEY_GAMIFICATION_DEVICE_ID] ?: generated }
+            .first()
     }
 
     // ── Privacy settings ──────────────────────────────────────────────────────

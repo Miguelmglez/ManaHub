@@ -375,9 +375,23 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
   (`celebrated_at IS NULL`) — toggle-off leaves unlocks pending (not marked), never shows. `GameResultScreen`
   shows a progression strip correlated by `lastSessionId` (the Room id, NOT the online session id). All
   gamification UI renders nothing when the master toggle is off.
+- **Quests & streaks (Phase 2, complete):** no new Room schema (`quest_instances`/`streaks` shipped in v39).
+  **Quests are NOT synced** (deterministically regenerable; only claimed XP flows through the ledger). The
+  `QuestCatalog` is the source of truth (event-indexed `templatesByEventType`); **template ids are stable PK
+  fragments** (`QuestInstanceEntity.id = "{templateId}:{periodKey}"`) — never rename. **All quests are pure
+  monotonic INT counters** (no distinct/derived quests). Selection is **deterministic**: `fnv1a64("$stableId|
+  $periodKey")` seeds `Random` (**NEVER `String.hashCode()`**) → pick 3 with ≥2 ACCESSIBLE + ≤1 EXPLORATION,
+  no-repeat-yesterday; `stableId` = auth userId (anonymous = signed-in) else a persisted random-UUID device id
+  (**not `ANDROID_ID`**); weekly key = ISO **week-based-year** (`IsoFields`, not `WeekFields.of(Locale)`).
+  **Claim is idempotent** via ledger key `quest_claim:{instanceId}` + `grantXpAtomically`; auto-claims on
+  expiry. `QuestReconciler` (settle stale + generate missing, idempotent) runs from BOTH `ManaHubApp.onCreate`
+  (local-first, any auth) and the periodic `QuestRotationWorker`. `StreakTracker` (`daily_activity`,
+  `AppOpenedToday`): max 2 freeze tokens, a gap consumes tokens to preserve the streak (never punishes), regen
+  +1 per 7-day multiple. Home `PROGRESSION_HUB`/`QUESTS_HUB` widgets + `CONTEXT_HERO` "N ready to claim".
 - → memory: `project_gamification_phase0`, `project_gamification_phase1`,
-  `project_gamification_phase1_chunkB_ui`, `feedback_gamification_xp_idempotency`,
-  `feedback_achievement_unlockedat_persistence`, `feedback_gamification_celebration_ui`
+  `project_gamification_phase1_chunkB_ui`, `project_gamification_phase2`,
+  `feedback_gamification_xp_idempotency`, `feedback_achievement_unlockedat_persistence`,
+  `feedback_gamification_celebration_ui`
 
 ## Testing conventions
 

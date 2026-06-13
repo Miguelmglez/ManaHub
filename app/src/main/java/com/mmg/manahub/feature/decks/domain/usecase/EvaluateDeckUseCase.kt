@@ -4,6 +4,8 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.decks.presentation.engine.DeckEntry
 import com.mmg.manahub.feature.decks.presentation.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.presentation.engine.DeckProfile
@@ -11,6 +13,7 @@ import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
 import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import javax.inject.Inject
 
 /**
@@ -28,8 +31,14 @@ import javax.inject.Inject
  */
 class EvaluateDeckUseCase @Inject constructor(
     private val deckScorer: DeckScorer,
+    private val progressionEventBus: ProgressionEventBus,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
+
+    /** Stable, code-side slug identifying the Deck Doctor feature for exploration quests. */
+    private companion object {
+        const val FEATURE_DECK_DOCTOR = "deck_doctor"
+    }
 
     /**
      * @param mainboard the non-sideboard deck entries, each with a resolved [Card].
@@ -55,6 +64,18 @@ class EvaluateDeckUseCase @Inject constructor(
 
         val nonLand = mainboard.filterNot { BasicLandCalculator.isLand(it.card) }
         val evaluation = deckScorer.evaluate(profile, nonLand)
+
+        // Canonical Deck Doctor "analysis produced" choke point: a successful evaluation is the single
+        // domain event for the EXPLORATION quest (`daily_explore_deck_doctor`). Emitted here (not the
+        // ViewModel) per ADR-002 §1; the per-day idempotency key (FeatureExplored) means re-running on
+        // a cut/add the same day advances the quest at most once. The emit grants 0 XP (no ledger row);
+        // it is fire-and-forget on the bus and never affects the returned analysis.
+        progressionEventBus.emit(
+            ProgressionEvent.FeatureExplored(
+                featureKey = FEATURE_DECK_DOCTOR,
+                occurredAt = Instant.now(),
+            )
+        )
 
         DeckHealth(evaluation = evaluation, profile = profile)
     }

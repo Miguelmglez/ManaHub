@@ -220,3 +220,34 @@ Puzzle feature. Leave clean extension points (e.g. `QuestInstanceEntity.tokenRew
     (zero regressions). Security gate PASS.
   - Carried forward: tournament "won" achievement won't unlock until `isLocalWinner` is fixed; streak
     achievements won't advance until Phase 2 fills `StreakTracker`.
+- **2026-06-12 (Phase 2 — Quests & streaks):** filled the `QuestEvaluator` + `StreakTracker` stubs; no new
+  Room schema (`quest_instances`/`streaks` already shipped in v39). Quests are NOT synced (only claimed XP
+  via the ledger).
+  - **`QuestCatalog`** (event-indexed `templatesByEventType`): 7 dailies / 6 weeklies; `QuestTemplate.advance:
+    (event)->Int`. **All quests are pure monotonic INT counters** — the spec's "play games in 2 different
+    modes" weekly was DROPPED (distinct-mode needs side-state the int-progress entity lacks) and replaced with
+    `weekly_play_games` (target 7). Template ids are stable PK fragments (`id = "{templateId}:{periodKey}"`) —
+    never renamed.
+  - **Deterministic seeded generation** (§9 realised): `QuestGenerator` uses explicit `fnv1a64("$stableId|
+    $periodKey")` (NEVER `String.hashCode()`) to seed `kotlin.random.Random`; selects exactly 3 with ≥2
+    ACCESSIBLE + ≤1 EXPLORATION, de-prioritising the previous period's templates. `stableId` = auth userId
+    (anonymous Supabase users count as signed-in) else a persisted random-UUID device id (NOT `ANDROID_ID`).
+    Weekly `periodKey` = ISO **week-based-year** (`IsoFields`), not `WeekFields.of(Locale)`.
+  - **Idempotent claim** via ledger key `quest_claim:{instanceId}` + `grantXpAtomically` (`XpSourceCategory.
+    QUEST`); COMPLETED→CLAIMED; auto-claim on expiry. **`QuestReconciler`** (settle stale + generate missing,
+    idempotent) runs from BOTH `ManaHubApp.onCreate` (local-first, any auth) and the periodic
+    `QuestRotationWorker` (1-day, initial delay to next local midnight, KEEP). `QuestEvaluator` returns
+    `QuestProgressDelta`s folded into `ProgressionOutcome.questProgress` (new field) → `engine.outcomes` for
+    the GameResult strip.
+  - **`StreakTracker`** (`daily_activity`, reacts to `AppOpenedToday`): pure `advance(existing, today)`; max 2
+    freeze tokens; a gap consumes N tokens to preserve the streak (else resets to 1), regen +1 per 7-day
+    multiple; never punishes. New event `ProgressionEvent.FeatureExplored(featureKey)` (0 XP) emitted from the
+    Deck Doctor analysis path for the exploration daily.
+  - UI: Profile **Quests tab** (streak header + claim), Home `PROGRESSION_HUB` + `QUESTS_HUB` (default-added
+    for both audiences; gallery "disabled" placeholder when toggle off), `CONTEXT_HERO` top-priority
+    "N quests ready to claim", GameResult quest ticks. All gamification UI hidden when the master toggle is
+    off. Design review applied (Claim/widget `Role.Button` + labels, level-badge `clearAndSetSemantics`).
+  - Build: `assembleDebug` green; **1544 tests / 140 failed = unchanged master baseline (zero regressions)**,
+    ~99 new Phase-2 tests pass. Security gate PASS (UUID device-id, PII-free events, no new backend surface).
+  - Carried forward: Phase 1's tournament "won" limitation persists. Phase 3 = unlockables/cosmetics; Phase 4
+    = Supabase sync (quests excluded by design, §11).

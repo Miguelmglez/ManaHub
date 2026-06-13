@@ -15,6 +15,11 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
+import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
@@ -80,6 +85,7 @@ class HomeViewModel @Inject constructor(
     private val draftRepository: DraftRepository,
     private val wishlistRepository: WishlistRepository,
     private val getAccountNudgeUseCase: GetAccountNudgeUseCase,
+    private val gamificationRepository: GamificationRepository,
 ) : ViewModel() {
 
     /**
@@ -235,6 +241,30 @@ class HomeViewModel @Inject constructor(
             }
         }
 
+    /**
+     * Gamification slice (Phase 2): level/XP, streak, and quest summary for the Home widgets +
+     * CONTEXT_HERO claim suggestion. Gated by the master toggle — when disabled the snapshot is null
+     * so every gamification surface disappears. Each source is catch-isolated so a single failure
+     * degrades to a null snapshot rather than collapsing the board.
+     */
+    private val gamificationSnapshotFlow: Flow<GamificationSnapshot> =
+        userPrefsDataStore.gamificationEnabledFlow.flatMapLatest { enabled ->
+            if (!enabled) {
+                flowOf(GamificationSnapshot(enabled = false, data = null))
+            } else {
+                combine(
+                    gamificationRepository.observeProgression().catch { emit(DEFAULT_PROGRESSION) },
+                    gamificationRepository.observeActiveQuests().catch { emit(QuestBoard.empty) },
+                    gamificationRepository.observeDailyActivityStreak().catch { emit(DEFAULT_STREAK) },
+                ) { progression, board, streak ->
+                    GamificationSnapshot(
+                        enabled = true,
+                        data = toHomeGamification(progression, board, streak),
+                    )
+                }.catch { emit(GamificationSnapshot(enabled = true, data = null)) }
+            }
+        }
+
     // TODO(home-trades): wire to TradesRepository pending-proposal count once exposed as a Flow.
     private fun tradeSummaryFlow(authed: Boolean): Flow<TradeSummary?> = flowOf(null)
 
@@ -351,8 +381,15 @@ class HomeViewModel @Inject constructor(
             statsSnapshotFlow,
             discoverSnapshotFlow,
             socialSnapshotFlow,
-        ) { layout, stats, discover, social ->
-            DataBundle(layout = layout, stats = stats, discover = discover, social = social)
+            gamificationSnapshotFlow,
+        ) { layout, stats, discover, social, gamification ->
+            DataBundle(
+                layout = layout,
+                stats = stats,
+                discover = discover,
+                social = social,
+                gamification = gamification,
+            )
         }
 
         combine(coreFlow, recentNewsFlow, dataFlow) { core, news, data ->
@@ -363,6 +400,7 @@ class HomeViewModel @Inject constructor(
                 stats = data.stats,
                 discover = data.discover,
                 social = data.social,
+                gamification = data.gamification,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -506,6 +544,7 @@ class HomeViewModel @Inject constructor(
         stats: StatsSnapshot,
         discover: DiscoverSnapshot,
         social: SocialSnapshot,
+        gamification: GamificationSnapshot,
     ): HomeUiState {
         val collectionStats = core.library.stats
         val deckCount = core.library.decks.size
@@ -537,7 +576,7 @@ class HomeViewModel @Inject constructor(
             skipped = core.skippedFirstSteps,
         )
 
-        val hero = resolveHero(core.activity, core.playerName, visibleSteps)
+        val hero = resolveHero(core.activity, core.playerName, visibleSteps, gamification)
         val nudge = resolveNudge(core.account, collectionStats, deckCount, core.activity.totalGames)
 
         return HomeUiState(
@@ -570,6 +609,9 @@ class HomeViewModel @Inject constructor(
             communityStats = social.community,
             tradeSummary = social.tradeSummary,
             activeTournamentSummary = social.activeTournament,
+            // Gamification (Phase 2)
+            gamificationEnabled = gamification.enabled,
+            gamification = gamification.data,
         )
     }
 
@@ -607,6 +649,30 @@ class HomeViewModel @Inject constructor(
             archetype = elimination.eliminationReason,
             count = elimination.count,
             totalLosses = totalLosses,
+        )
+    }
+
+    /** Folds progression + quest board + streak into the compact Home gamification snapshot. */
+    private fun toHomeGamification(
+        progression: PlayerProgression,
+        board: QuestBoard,
+        streak: StreakUiModel,
+    ): HomeGamification {
+        val all = board.daily + board.weekly
+        val claimable = all.filter { it.isClaimable }
+        // Preview = claimable first, then in-progress (not yet claimed). Cap at 3.
+        val preview = (claimable + all.filterNot { it.isClaimable || it.isClaimed })
+            .take(HOME_QUEST_PREVIEW_LIMIT)
+            .map { it.toHomeQuest() }
+        return HomeGamification(
+            level = progression.level,
+            xpIntoLevel = progression.xpIntoLevel,
+            xpForNextLevel = progression.xpForNextLevel,
+            streak = streak.current,
+            dailyDone = board.daily.count { it.isClaimed || it.isClaimable },
+            dailyTotal = board.daily.size,
+            claimableCount = claimable.size,
+            topQuests = preview,
         )
     }
 
@@ -668,7 +734,13 @@ class HomeViewModel @Inject constructor(
         activity: ActivitySnapshot,
         playerName: String,
         visibleSteps: List<FirstStepItem>,
+        gamification: GamificationSnapshot,
     ): HomeHeroState {
+        // Highest priority (when gamification is enabled): completed quests waiting to be claimed.
+        val claimable = gamification.data?.claimableCount ?: 0
+        if (gamification.enabled && claimable > 0) {
+            return HomeHeroState.QuestsReady(count = claimable)
+        }
         val draft = activity.activeDraft
         if (draft != null && draft.status == DraftStatus.DRAFTING) {
             return HomeHeroState.ActiveDraft(setName = draft.config.setCode.uppercase())
@@ -724,6 +796,8 @@ class HomeViewModel @Inject constructor(
     private val defaultLayoutSignedOut = listOf(
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.PROGRESSION_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.QUESTS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.DISCOVER_CARDS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
@@ -734,6 +808,8 @@ class HomeViewModel @Inject constructor(
     private val defaultLayoutSignedIn = listOf(
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.PROGRESSION_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.QUESTS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.YOUR_DECKS_SHELF, WidgetSize.MEDIUM),
@@ -781,6 +857,16 @@ class HomeViewModel @Inject constructor(
         val stats: StatsSnapshot,
         val discover: DiscoverSnapshot,
         val social: SocialSnapshot,
+        val gamification: GamificationSnapshot,
+    )
+
+    /**
+     * Gamification slice wrapper. [enabled] mirrors the master toggle; [data] is null when disabled
+     * or when the underlying flows have not produced a snapshot yet.
+     */
+    private data class GamificationSnapshot(
+        val enabled: Boolean,
+        val data: HomeGamification?,
     )
 
     private data class StatsSnapshot(
@@ -821,8 +907,33 @@ class HomeViewModel @Inject constructor(
         private const val DISCOVER_CARD_COUNT = 10
 
         private const val WISHLIST_PREVIEW_LIMIT = 10
+
+        /** Max quests previewed in the Home Quests widget. */
+        private const val HOME_QUEST_PREVIEW_LIMIT = 3
+
+        /** Level-1 default progression used when the progression flow errors. */
+        private val DEFAULT_PROGRESSION = PlayerProgression(
+            totalXp = 0L,
+            level = 1,
+            xpIntoLevel = 0L,
+            xpForNextLevel = 0L,
+            updatedAt = java.time.Instant.EPOCH,
+        )
+
+        /** Zeroed streak used when the streak flow errors. */
+        private val DEFAULT_STREAK = StreakUiModel(current = 0, longest = 0, freezeTokens = 0)
     }
 }
+
+/** Projects a [QuestUiModel] down to the compact [HomeQuest] preview model. */
+private fun QuestUiModel.toHomeQuest(): HomeQuest = HomeQuest(
+    instanceId = instanceId,
+    titleRes = titleRes,
+    emoji = emoji,
+    progress = progress,
+    target = target,
+    isClaimable = isClaimable,
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Mapping helpers (top-level, pure)

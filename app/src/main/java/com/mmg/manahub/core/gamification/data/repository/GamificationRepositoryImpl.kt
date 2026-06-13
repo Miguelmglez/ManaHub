@@ -3,16 +3,32 @@ package com.mmg.manahub.core.gamification.data.repository
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
 import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity
+import com.mmg.manahub.core.data.local.entity.QuestInstanceEntity
+import com.mmg.manahub.core.data.local.entity.StreakEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
+import com.mmg.manahub.core.gamification.domain.QuestPeriod
+import com.mmg.manahub.core.gamification.domain.QuestPeriodKeys
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementDef
+import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog
+import com.mmg.manahub.core.gamification.domain.catalog.QuestTemplate
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
+import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
+import com.mmg.manahub.core.gamification.engine.StreakTracker
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,6 +43,8 @@ import javax.inject.Singleton
 class GamificationRepositoryImpl @Inject constructor(
     private val dao: GamificationDao,
     private val clock: Clock,
+    private val zoneId: ZoneId,
+    private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
 ) : GamificationRepository {
 
     override fun observeProgression(): Flow<PlayerProgression> =
@@ -51,6 +69,73 @@ class GamificationRepositoryImpl @Inject constructor(
     override suspend fun markCelebrated(id: String) {
         dao.markCelebrated(id = id, celebratedAt = clock.millis())
     }
+
+    override fun observeActiveQuests(): Flow<QuestBoard> =
+        // Recompute the current period keys at collection time (cold `flow`), then observe the daily +
+        // weekly instance flows for those keys and join them with the catalog into a [QuestBoard].
+        flow {
+            val today = clock.instant().atZone(zoneId).toLocalDate()
+            val dailyKey = QuestPeriodKeys.dailyKey(today)
+            val weeklyKey = QuestPeriodKeys.weeklyKey(today)
+            emitAll(
+                combine(
+                    dao.observeQuestsForPeriod(dailyKey),
+                    dao.observeQuestsForPeriod(weeklyKey),
+                ) { dailyRows, weeklyRows ->
+                    QuestBoard(
+                        daily = dailyRows.toUiModels(QuestPeriod.DAILY),
+                        weekly = weeklyRows.toUiModels(QuestPeriod.WEEKLY),
+                    )
+                }
+            )
+        }
+
+    override fun observeDailyActivityStreak(): Flow<StreakUiModel> =
+        dao.observeStreaks().map { rows ->
+            rows.firstOrNull { it.type == StreakTracker.TYPE_DAILY_ACTIVITY }.toUiModel()
+        }
+
+    override suspend fun claimQuest(instanceId: String): ClaimResult =
+        claimQuestRewardUseCase(instanceId)
+
+    /**
+     * Maps the period's instance rows to UI models, joining each with its catalog template metadata.
+     * EXPIRED instances are dropped (not part of the active board); a row whose template was removed
+     * from the catalog is skipped rather than crashing. Result ordered by [QuestCatalog.forPeriod] so
+     * the board is stable across emissions regardless of DB row order.
+     */
+    private fun List<QuestInstanceEntity>.toUiModels(period: QuestPeriod): List<QuestUiModel> {
+        val byTemplateId = associateBy { it.templateId }
+        return QuestCatalog.forPeriod(period).mapNotNull { template ->
+            val row = byTemplateId[template.id] ?: return@mapNotNull null
+            if (row.status == STATUS_EXPIRED) return@mapNotNull null
+            row.toUiModel(template)
+        }
+    }
+
+    /** Joins a quest instance row with its catalog template into the UI model. */
+    private fun QuestInstanceEntity.toUiModel(template: QuestTemplate): QuestUiModel =
+        QuestUiModel(
+            instanceId = id,
+            templateId = templateId,
+            titleRes = template.titleRes,
+            descRes = template.descRes,
+            emoji = template.emoji,
+            period = template.period,
+            weightClass = template.weightClass,
+            progress = progress,
+            target = target,
+            status = status,
+            xpReward = xpReward,
+        )
+
+    /** Maps the daily-activity streak row (or null) to its UI model, defaulting to a zeroed streak. */
+    private fun StreakEntity?.toUiModel(): StreakUiModel =
+        StreakUiModel(
+            current = this?.current ?: 0,
+            longest = this?.longest ?: 0,
+            freezeTokens = this?.freezeTokens ?: StreakTracker.MAX_FREEZE_TOKENS,
+        )
 
     /** Joins a catalog def with its (possibly absent) persisted progress row into the UI model. */
     private fun AchievementDef.toUiModel(progress: AchievementProgressEntity?): AchievementUiModel =
@@ -78,5 +163,9 @@ class GamificationRepositoryImpl @Inject constructor(
             xpForNextLevel = needed,
             updatedAt = Instant.ofEpochMilli(this?.updatedAt ?: 0L),
         )
+    }
+
+    private companion object {
+        const val STATUS_EXPIRED = "EXPIRED"
     }
 }
