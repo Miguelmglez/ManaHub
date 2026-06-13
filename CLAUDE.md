@@ -405,10 +405,25 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
   (`Achievement`>`LevelUp`); level-up driven by DataStore `lastCelebratedLevel` (sentinel -1 suppresses +
   silent-seeds in VM init → no spurious burst for existing players). Glyph/text use `magicTypography` —
   **never `MaterialTheme.typography`** (banned).
+- **Backend & sync (Phase 4, complete):** bidirectional Room↔Supabase sync that is **MONOTONIC — never
+  last-write-wins** (unlike the collection/deck LWW `SyncManager`). **Quests are NOT synced.** 5 Supabase
+  mirror tables (`player_progression`/`xp_transactions`/`achievement_progress`/`entitlements`/`streaks`,
+  owner-only RLS, `xp_transactions` PK `(user_id, idempotency_key)`) + 9 SECURITY-INVOKER RPCs (set-union
+  ledger + recompute progression; GREATEST counters; earliest-non-null unlock; union entitlements; latest-date
+  streak). **REVOKE EXECUTE FROM PUBLIC *and* anon** then GRANT authenticated+service_role (this project grants
+  anon separately). The **SQL `level_for_total_xp` hardcodes the L1..100 reach-thresholds from the client
+  formula** (zero float divergence) and **MUST stay in sync with `LevelCurve.kt`** (parity in
+  `LevelCurveParityTest`). Android: **NO Room schema change** — ledger push uses a DataStore id-watermark
+  (`getMaxLedgerId()`), the 3 small tables are pushed in FULL each cycle (safe under monotonic merge); pull
+  recomputes local progression from the ledger sum (direct SET, NOT `grantXpAtomically`) + client-side
+  monotonic merges; `reconcileOnSignIn` merges guest/anonymous progress INTO the account. Upload DTOs **omit
+  `user_id`** (the RPC sets it from `auth.uid()` — cross-user write vector closed). Known limit: local-id-derived
+  idempotency keys can collide across two guest devices (2nd device's same-keyed XP dropped) — primary
+  single-device→sign-in flow is correct.
 - → memory: `project_gamification_phase0`, `project_gamification_phase1`,
   `project_gamification_phase1_chunkB_ui`, `project_gamification_phase2`, `project_gamification_phase3`,
-  `feedback_gamification_xp_idempotency`, `feedback_achievement_unlockedat_persistence`,
-  `feedback_gamification_celebration_ui`
+  `project_gamification_phase4`, `feedback_gamification_xp_idempotency`,
+  `feedback_achievement_unlockedat_persistence`, `feedback_gamification_celebration_ui`
 
 ## Testing conventions
 

@@ -287,3 +287,34 @@ Puzzle feature. Leave clean extension points (e.g. `QuestInstanceEntity.tokenRew
     Security gate PASS (local-only — no backend/credentials; equip keys are UI prefs; strings.xml benign).
   - Carried forward: tournament "won" still blocked. Phase 4 = Supabase sync (entitlements/progression/
     achievements/streaks; quests excluded by design).
+- **2026-06-13 (Phase 4 — Backend & sync):** realised §11 (monotonic merge, never LWW). Applied to the LIVE
+  project `uimogilwuixgkgfcfmyb` (3 additive migrations; no existing table/data touched).
+  - **5 mirror tables** (`player_progression`, `xp_transactions`, `achievement_progress`, `entitlements`,
+    `streaks`), all epoch-millis BIGINT, owner-only RLS (single `FOR ALL` policy, `(select auth.uid()) =
+    user_id`), FK `user_id → auth.users ON DELETE CASCADE`, FK + changes-since indexes in the same migration.
+    `xp_transactions` PK = `(user_id, idempotency_key)` (the set-union foundation).
+  - **9 RPCs**, all SECURITY INVOKER + `search_path=public`, `auth.uid()` in body. Monotonic merges:
+    ledger `ON CONFLICT DO NOTHING` + recompute progression from `SUM(amount)`; achievements GREATEST +
+    earliest-non-null unlock; entitlements insert-only union; streaks GREATEST(longest) + latest-date wins.
+    **REVOKE EXECUTE FROM PUBLIC *and* FROM anon** (this project grants anon separately — REVOKE-from-PUBLIC
+    alone is insufficient), then GRANT authenticated + service_role. `get_advisors` clean for new objects.
+  - **SQL LevelCurve coupling (intentional, must stay in sync with `LevelCurve.kt`):** `level_for_total_xp`
+    HARDCODES the cumulative reach-thresholds for L1..100 generated from `floor(100*L^1.5 + 0.5)` (array
+    literal, not a recomputed float loop) → ZERO Kotlin↔SQL rounding divergence. Parity pins L2=100, L5=1703,
+    L10=11106, L20=67135, asserted client-side in `LevelCurveParityTest`.
+  - **Android — NO Room schema change** (key decision): ledger push uses a DataStore id-watermark
+    (`getLedgerAbove(pushedLedgerId)`; committed as `getMaxLedgerId()`), the 3 small tables are pushed in
+    FULL each cycle (safe under monotonic merge). Pull recomputes local progression from the ledger sum (a
+    direct SET, not via `grantXpAtomically`) + client-side monotonic merges mirroring the SQL (keeps a local
+    `celebrated_at` so a re-pull never re-fires a celebration). `reconcileOnSignIn` clears watermarks then
+    syncs → guest/anonymous progress merges INTO the account with no loss/dup on replay.
+    `GamificationSyncWorker` (periodic + one-time) scheduled from `ManaHubApp` on `Authenticated`.
+  - **Security:** cross-user write vector CLOSED — upload DTOs omit `user_id`; the RPC sets it from
+    `auth.uid()`. No PII in any payload (ids/XP/counts/epoch-millis only). Gate PASS.
+  - **KNOWN LIMITATION (not fixed):** idempotency keys derived from local autoincrement ids (e.g.
+    `game:{sessionId}:result`) can COLLIDE across two different guest devices for different events → the
+    server's `ON CONFLICT DO NOTHING` silently drops the 2nd device's same-keyed XP. The primary flow (one
+    guest device → sign in, or one primary device) is correct. A future fix prefixes id-derived keys with a
+    per-device UUID for non-globally-unique sources.
+  - Build: `assembleDebug` green; +14 new tests; **1583 tests / 140 failed = unchanged master baseline (zero
+    regressions)**. **All 5 gamification phases (0-4) complete.**

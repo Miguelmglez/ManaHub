@@ -87,6 +87,53 @@ abstract class GamificationDao {
     @Query("SELECT EXISTS(SELECT 1 FROM xp_transactions WHERE idempotency_key = :key)")
     abstract suspend fun hasTransaction(key: String): Boolean
 
+    // ── Sync (Phase 4) ─────────────────────────────────────────────────────────
+
+    /**
+     * Ledger rows whose autoincrement [id] is strictly greater than [id] (the PUSH watermark), oldest
+     * first. The `id`-based cursor is strictly increasing and assigned at insert, so no boundary row is
+     * ever skipped or pushed twice (ADR-002 §11).
+     */
+    @Query("SELECT * FROM xp_transactions WHERE id > :id ORDER BY id ASC")
+    abstract suspend fun getLedgerAbove(id: Long): List<XpTransactionEntity>
+
+    /** Highest local ledger [id], or 0 when the ledger is empty. The post-cycle PUSH watermark. */
+    @Query("SELECT COALESCE(MAX(id), 0) FROM xp_transactions")
+    abstract suspend fun getMaxLedgerId(): Long
+
+    /** Total of all granted XP across the whole ledger. Source of truth for recomputed progression. */
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM xp_transactions")
+    abstract suspend fun sumAllXp(): Long
+
+    /**
+     * Inserts a PULLED ledger row. On a duplicate `idempotency_key` the UNIQUE index causes IGNORE and
+     * Room returns -1 — the row was already present locally (idempotent re-pull). The new local
+     * autoincrement id is irrelevant; dedupe is on the key, not the id. Public (unlike the protected
+     * grant-path [insertTransaction]) because sync inserts pulled rows directly, never through
+     * [grantXpAtomically] (progression is recomputed from the sum afterwards, not advanced per-row).
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun insertLedgerRowIfAbsent(row: XpTransactionEntity): Long
+
+    /**
+     * Recomputes the singleton progression as a DIRECT SET (NOT a ledger grant): after pulling new
+     * ledger rows, sync recomputes `total_xp = SUM(amount)` and `level = LevelCurve.levelForTotalXp`
+     * and writes them straight to the progression row. This deliberately bypasses [grantXpAtomically]
+     * (which appends a ledger row) — recompute must never mint a phantom ledger entry. Upsert without
+     * REPLACE via the existing [upsertProgression] primitive.
+     */
+    @Transaction
+    open suspend fun recomputeProgression(newTotalXp: Long, newLevel: Int, updatedAt: Long) {
+        upsertProgression(
+            PlayerProgressionEntity(
+                id = PlayerProgressionEntity.SINGLETON_ID,
+                totalXp = newTotalXp,
+                level = newLevel,
+                updatedAt = updatedAt,
+            )
+        )
+    }
+
     /**
      * Atomically appends a ledger row AND advances the singleton progression — but ONLY if the
      * ledger insert actually happened (rowId != -1). A duplicate idempotency key short-circuits
@@ -137,6 +184,10 @@ abstract class GamificationDao {
 
     @Query("SELECT * FROM achievement_progress")
     abstract fun observeAchievements(): Flow<List<AchievementProgressEntity>>
+
+    /** One-shot snapshot of every achievement row, for the full-state sync PUSH. */
+    @Query("SELECT * FROM achievement_progress")
+    abstract suspend fun getAllAchievements(): List<AchievementProgressEntity>
 
     /**
      * Stable ids of every achievement that is currently unlocked (`unlocked_at IS NOT NULL`).
@@ -245,6 +296,10 @@ abstract class GamificationDao {
     @Query("SELECT * FROM streaks")
     abstract fun observeStreaks(): Flow<List<StreakEntity>>
 
+    /** One-shot snapshot of every streak row, for the full-state sync PUSH. */
+    @Query("SELECT * FROM streaks")
+    abstract suspend fun getAllStreaks(): List<StreakEntity>
+
     // ── Entitlements ─────────────────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -255,6 +310,10 @@ abstract class GamificationDao {
 
     @Query("SELECT * FROM entitlements")
     abstract fun observeEntitlements(): Flow<List<EntitlementEntity>>
+
+    /** One-shot snapshot of every entitlement row, for the full-state sync PUSH. */
+    @Query("SELECT * FROM entitlements")
+    abstract suspend fun getAllEntitlements(): List<EntitlementEntity>
 
     @Query("SELECT EXISTS(SELECT 1 FROM entitlements WHERE unlockable_id = :id)")
     abstract suspend fun hasEntitlement(id: String): Boolean

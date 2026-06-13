@@ -17,6 +17,8 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
+import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
 import com.mmg.manahub.core.gamification.engine.AchievementBackfill
 import com.mmg.manahub.core.gamification.engine.EntitlementGranter
@@ -53,6 +55,7 @@ class ManaHubApp : Application() {
     @Inject lateinit var achievementBackfill: AchievementBackfill
     @Inject lateinit var questReconciler: QuestReconciler
     @Inject lateinit var entitlementGranter: EntitlementGranter
+    @Inject lateinit var gamificationSyncManager: GamificationSyncManager
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
@@ -135,6 +138,14 @@ class ManaHubApp : Application() {
                 when (state) {
                     is SessionState.Authenticated -> {
                         CollectionSyncWorker.schedulePeriodicSync(workManager)
+                        // Gamification Phase 4 sync (ADR-002 §11): schedule the periodic worker AND run a
+                        // one-time guest→account reconcile so an anonymous/guest's local progress merges
+                        // into the account exactly once on sign-in. Monotonic merges make the reconcile
+                        // idempotent, so a harmless re-run on a later session re-emission is safe.
+                        GamificationSyncWorker.schedulePeriodicSync(workManager)
+                        appScope.launch {
+                            runCatching { gamificationSyncManager.reconcileOnSignIn(state.user.id) }
+                        }
                         appScope.launch {
                             runCatching {
                                 val token = FirebaseMessaging.getInstance().token.await()
@@ -145,6 +156,8 @@ class ManaHubApp : Application() {
                     is SessionState.Unauthenticated -> {
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
+                        workManager.cancelUniqueWork(GamificationSyncWorker.WORK_NAME_PERIODIC)
+                        workManager.cancelUniqueWork(GamificationSyncWorker.WORK_NAME_ONE_TIME)
                         appScope.launch {
                             runCatching {
                                 val token = FirebaseMessaging.getInstance().token.await()

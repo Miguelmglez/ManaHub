@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.gamification.di
 
+import com.mmg.manahub.core.gamification.data.remote.GamificationRemoteDataSource
+import com.mmg.manahub.core.gamification.data.remote.SupabaseGamificationDataSource
 import com.mmg.manahub.core.gamification.data.repository.GamificationRepositoryImpl
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
@@ -34,6 +36,13 @@ abstract class GamificationModule {
     @Binds
     @Singleton
     abstract fun bindGamificationRepository(impl: GamificationRepositoryImpl): GamificationRepository
+
+    /** Binds the Phase-4 sync remote data source (Supabase) to its interface. */
+    @Binds
+    @Singleton
+    abstract fun bindGamificationRemoteDataSource(
+        impl: SupabaseGamificationDataSource,
+    ): GamificationRemoteDataSource
 
     companion object {
 
