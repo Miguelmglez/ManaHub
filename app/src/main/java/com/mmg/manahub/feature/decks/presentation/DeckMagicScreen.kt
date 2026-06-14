@@ -47,10 +47,11 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.decks.presentation.components.SeedsContent
-import com.mmg.manahub.feature.decks.presentation.engine.DeckSkeletons
-import com.mmg.manahub.feature.decks.presentation.engine.MagicCard
-import com.mmg.manahub.feature.decks.presentation.engine.MagicDiscovery
-import com.mmg.manahub.feature.decks.presentation.engine.MagicSuggestion
+import com.mmg.manahub.feature.decks.presentation.improvement.components.label
+import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
+import com.mmg.manahub.feature.decks.domain.engine.MagicCard
+import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
+import com.mmg.manahub.feature.decks.domain.engine.MagicSuggestion
 
 @Composable
 fun DeckMagicScreen(
@@ -324,7 +325,10 @@ private fun SuggestionItem(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(suggestion.magicCard.card.name, style = ty.bodyMedium, color = mc.textPrimary)
-                Text(suggestion.reasons.take(2).joinToString(", "), style = ty.labelSmall, color = mc.textSecondary)
+                // E5: render localized ScoreReason labels (not raw enum names). label() is @Composable,
+                // so resolve each reason's string inside the composition, then join the top two.
+                val reasonLabels = suggestion.reasons.take(2).map { it.label() }
+                Text(reasonLabels.joinToString(", "), style = ty.labelSmall, color = mc.textSecondary)
             }
             Text("${(suggestion.score * 100).toInt()}%", style = ty.titleMedium, color = mc.primaryAccent)
         }

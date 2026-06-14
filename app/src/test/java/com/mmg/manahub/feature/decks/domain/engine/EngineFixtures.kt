@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.engine
+package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
@@ -30,6 +30,11 @@ fun card(
     suggestedTags: List<SuggestedTag> = emptyList(),
     legalityStandard: String = "legal",
     legalityCommander: String = "legal",
+    legalityPioneer: String = "legal",
+    legalityModern: String = "legal",
+    legalityLegacy: String = "legal",
+    legalityVintage: String = "legal",
+    legalityPauper: String = "legal",
     gameChanger: Boolean = false,
     manaCost: String? = null,
 ): Card = Card(
@@ -64,9 +69,12 @@ fun card(
     priceEur          = null,
     priceEurFoil      = null,
     legalityStandard  = legalityStandard,
-    legalityPioneer   = "legal",
-    legalityModern    = "legal",
+    legalityPioneer   = legalityPioneer,
+    legalityModern    = legalityModern,
     legalityCommander = legalityCommander,
+    legalityLegacy    = legalityLegacy,
+    legalityVintage   = legalityVintage,
+    legalityPauper    = legalityPauper,
     flavorText        = null,
     artist            = null,
     scryfallUri       = "https://scryfall.com/card/tst/1",
@@ -110,7 +118,9 @@ fun minimalProfile(
     colorIdentity   = colorIdentity,
     seedTags        = seedTags,
     tagFingerprint  = tagFingerprint,
-    roleCounts      = roleCounts,
+    // DeckProfile.roleCounts is Float-based (quantity × confidence) since RoleClassifier v2.
+    // The fixture keeps the ergonomic Int map and widens it to Float here.
+    roleCounts      = roleCounts.mapValues { it.value.toFloat() },
     skeleton        = DeckSkeletons.forFormat(format),
     avgCmc          = avgCmc,
     curveHistogram  = curveHistogram,

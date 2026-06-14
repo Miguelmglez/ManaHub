@@ -3,8 +3,8 @@ package com.mmg.manahub.feature.decks.domain.usecase
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.TagCategory
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
-import com.mmg.manahub.feature.decks.presentation.engine.SeedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
 import javax.inject.Inject
 
 /**
@@ -28,7 +28,7 @@ data class InferredIdentity(
  * ## Algorithm (heuristic — the user always reviews the result)
  *  1. **Color identity** = the union of every seed's [Card.colorIdentity], mapping the five WUBRG
  *     letters to [ManaColor]; "C" and any unknown symbol are dropped (so an empty result means "no
- *     color restriction", consistent with [com.mmg.manahub.feature.decks.presentation.engine.DeckScorer]).
+ *     color restriction", consistent with [com.mmg.manahub.feature.decks.domain.engine.DeckScorer]).
  *  2. **Strategy** = the [SeedStrategy] whose `primaryTags` have the highest overlap (counted by tag
  *     [CardTag.key]) with the union of the seeds' `tags` + `userTags`. Ties break on
  *     [SeedStrategy] declaration order (the `maxByOrNull` keeps the first max). Zero overlap → null.
