@@ -1,11 +1,11 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
-import com.mmg.manahub.feature.decks.presentation.engine.DeckEntry
-import com.mmg.manahub.feature.decks.presentation.engine.DeckProfile
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.ScoreWeights
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject

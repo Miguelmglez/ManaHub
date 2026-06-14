@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.engine
+package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.domain.model.DeckFormat
 import org.junit.Assert.assertEquals

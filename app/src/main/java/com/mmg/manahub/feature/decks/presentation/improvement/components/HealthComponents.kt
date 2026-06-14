@@ -40,8 +40,8 @@ import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.presentation.engine.DeckEvaluation
-import com.mmg.manahub.feature.decks.presentation.engine.RoleCoverage
+import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
+import com.mmg.manahub.feature.decks.domain.engine.RoleCoverage
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Doctor — Health view

@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.feature.decks.presentation.engine.DeckRole
+import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import javax.inject.Inject
 
 /**
@@ -41,6 +41,14 @@ data class BudgetSelection(
     val selected: List<AddSuggestion>,
     val totalCostEur: Double,
     val cardsToBuy: Int,
+    /**
+     * The EXTERNAL (Scryfall) candidate pool that fed this selection (plan E4). The Deck Doctor
+     * ViewModel caches it so a subsequent add/cut whose role/warning **gap set is unchanged** can
+     * recompute suggestions WITHOUT re-querying Scryfall — it re-feeds this same pool back through
+     * [SuggestAddsWithBudgetUseCase] via `externalCardsOverride`. Empty when the deck had no
+     * queryable gaps or the external fetch failed.
+     */
+    val externalPool: List<com.mmg.manahub.core.domain.model.Card> = emptyList(),
 )
 
 /**
@@ -48,7 +56,15 @@ data class BudgetSelection(
  *
  * ## Algorithm (heuristic, NOT a guaranteed optimum)
  * 1. **Effective cost** per card: 0 € when the card is owned and [BudgetConstraints.ownedCardsAreFree];
- *    otherwise `card.priceEur ?: 0.0` (a missing price is treated as free — we never invent a price).
+ *    otherwise `card.priceEur` when known. A MISSING EUR price is NOT treated as free under an active
+ *    cap (plan E8): we never invent a price, but we also never let an unknown-price NEW card slip past
+ *    a budget cap as if it cost 0 € (it could secretly be expensive). See step 1b.
+ * 1b. **Unknown-price exclusion (E8)**: when a total cap [BudgetConstraints.maxTotalEur] is active, a
+ *    card with [AddSuggestion.priceUnknown] that is NOT free (i.e. a NEW/wishlist card the user does
+ *    not already own, or owned-but-not-free) is EXCLUDED — it cannot be safely costed against the cap.
+ *    Owned cards (free under the default [BudgetConstraints.ownedCardsAreFree]) are unaffected: they
+ *    cost 0 € regardless of an unknown price, so they are always kept. With NO active total cap, the
+ *    flag is inert and unknown-price cards may be selected (price unknown ⇒ shown free, as before).
  * 2. **Per-card cap**: drop every card whose effective cost exceeds [BudgetConstraints.maxPerCardEur].
  * 3. **Greedy fill by value-per-euro, grouped per role gap**: candidates are bucketed by the role gap
  *    they fill (cards with no gap role share one bucket). Within the global ordering we pick cards by
@@ -67,11 +83,14 @@ class BudgetOptimizer @Inject constructor() {
     /**
      * @param suggestions ranked add suggestions (typically already sorted by fit, best first).
      * @param constraints the active budget filters.
+     * @param externalPool the external Scryfall pool that fed [suggestions], passed through verbatim
+     *        onto [BudgetSelection.externalPool] for the ViewModel's E4 incremental-reuse cache.
      * @return a [BudgetSelection] with the surviving suggestions and the cost summary.
      */
     operator fun invoke(
         suggestions: List<AddSuggestion>,
         constraints: BudgetConstraints,
+        externalPool: List<com.mmg.manahub.core.domain.model.Card> = emptyList(),
     ): BudgetSelection {
         // Annotate each suggestion with its effective cost up front.
         val priced = suggestions.map { it to effectiveCost(it, constraints) }
@@ -96,12 +115,23 @@ class BudgetOptimizer @Inject constructor() {
         val selected = mutableListOf<AddSuggestion>()
 
         for ((suggestion, cost) in ordered) {
-            val isFree = cost <= 0.0
-            if (!isFree && maxTotal != null && runningPaid + cost > maxTotal) {
+            // "Free" means a genuinely zero-cost card: an OWNED card under ownedCardsAreFree. An
+            // unknown-price NON-free card is NOT free for budgeting — it just has no price to cost.
+            val isFree = isFreeCard(suggestion, constraints)
+
+            // E8 — under an active total cap, exclude a non-free card whose price is unknown: it
+            // cannot be costed and must not slip past the cap as if it were 0 €. Owned/free cards are
+            // already isFree and skip this guard.
+            if (!isFree && maxTotal != null && suggestion.priceUnknown) {
+                continue
+            }
+            if (!isFree && cost > 0.0 && maxTotal != null && runningPaid + cost > maxTotal) {
                 // Would breach the total cap — skip; a later cheaper card might still fit.
                 continue
             }
-            if (!isFree) {
+            // Only a known, positive cost is charged to the budget. A non-free unknown-price card
+            // (selectable only when no total cap is active) has cost 0 and is not counted as "to buy".
+            if (!isFree && cost > 0.0) {
                 runningPaid += cost
                 cardsToBuy++
             }
@@ -116,15 +146,26 @@ class BudgetOptimizer @Inject constructor() {
             selected = displayOrdered,
             totalCostEur = runningPaid,
             cardsToBuy = cardsToBuy,
+            externalPool = externalPool,
         )
     }
 
-    /** 0 € for owned-and-free cards; otherwise the EUR price (missing price = free, never invented). */
+    /**
+     * 0 € for owned-and-free cards; otherwise the known EUR price × [AddSuggestion.suggestedCopies]
+     * (plan D3 — a 4-of playset costs four times the unit price), or 0.0 when the price is unknown.
+     * A 0.0 returned for an unknown price does NOT mean "free" — callers must distinguish via
+     * [isFreeCard] / [AddSuggestion.priceUnknown] so the E8 cap-exclusion can fire (plan E8). We never
+     * invent a price, so an unknown-price NEW card costs 0 here but is excluded under an active cap.
+     */
     private fun effectiveCost(suggestion: AddSuggestion, constraints: BudgetConstraints): Double {
-        val owned = suggestion.fit.isOwned
-        if (owned && constraints.ownedCardsAreFree) return 0.0
-        return suggestion.fit.card.priceEur ?: 0.0
+        if (isFreeCard(suggestion, constraints)) return 0.0
+        val unit = suggestion.fit.card.priceEur ?: return 0.0
+        return unit * suggestion.suggestedCopies.coerceAtLeast(1)
     }
+
+    /** A genuinely zero-cost card: owned under [BudgetConstraints.ownedCardsAreFree]. */
+    private fun isFreeCard(suggestion: AddSuggestion, constraints: BudgetConstraints): Boolean =
+        suggestion.fit.isOwned && constraints.ownedCardsAreFree
 
     /** Value density: free cards score infinitely high so they are always picked first. */
     private fun valuePerEuro(fit: Float, cost: Double): Double =
@@ -139,7 +180,7 @@ class BudgetOptimizer @Inject constructor() {
  * Local mirror of the presentation-layer `CardFit.fillsGapRole()` extension, kept in the domain layer
  * so [BudgetOptimizer] has no presentation dependency. Returns the role of the first `FillsGap` reason.
  */
-internal fun com.mmg.manahub.feature.decks.presentation.engine.CardFit.fillsGapRoleOrNull():
+internal fun com.mmg.manahub.feature.decks.domain.engine.CardFit.fillsGapRoleOrNull():
     DeckRole? =
-    (reasons.firstOrNull { it is com.mmg.manahub.feature.decks.presentation.engine.ScoreReason.FillsGap }
-        as? com.mmg.manahub.feature.decks.presentation.engine.ScoreReason.FillsGap)?.role
+    (reasons.firstOrNull { it is com.mmg.manahub.feature.decks.domain.engine.ScoreReason.FillsGap }
+        as? com.mmg.manahub.feature.decks.domain.engine.ScoreReason.FillsGap)?.role

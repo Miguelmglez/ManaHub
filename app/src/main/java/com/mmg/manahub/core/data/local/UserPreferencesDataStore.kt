@@ -16,6 +16,7 @@ import com.mmg.manahub.core.domain.model.CardLanguage
 import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.model.ScoreWeightOverrides
 import com.mmg.manahub.core.domain.model.UserDefinedTag
 import com.mmg.manahub.core.domain.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -98,6 +99,18 @@ private val KEY_LAST_CELEBRATED_LEVEL = intPreferencesKey("gamification_last_cel
 private const val LAST_CELEBRATED_LEVEL_UNINITIALIZED = -1
 
 private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
+
+// ── Deck Doctor: scoring-weight overrides (debug-only tuning) ─────────────────
+// Seven independent nullable Float overrides for the engine ScoreWeights. Absent key = use the
+// engine default for that weight. Stored as primitives so this core-layer store never imports the
+// feature-layer ScoreWeights type (the feature maps the holder to ScoreWeights).
+private val KEY_SCORE_WEIGHT_SYNERGY            = floatPreferencesKey("score_weight_synergy")
+private val KEY_SCORE_WEIGHT_ROLE_NEED          = floatPreferencesKey("score_weight_role_need")
+private val KEY_SCORE_WEIGHT_CURVE              = floatPreferencesKey("score_weight_curve")
+private val KEY_SCORE_WEIGHT_POWER              = floatPreferencesKey("score_weight_power")
+private val KEY_SCORE_WEIGHT_COLOR              = floatPreferencesKey("score_weight_color")
+private val KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY = floatPreferencesKey("score_weight_redundancy_penalty")
+private val KEY_SCORE_WEIGHT_POWER_FLOOR        = floatPreferencesKey("score_weight_power_floor")
 
 // ── Privacy settings — persisted locally so SettingsScreen renders without a network call ──
 private val KEY_COLLECTION_PUBLIC  = booleanPreferencesKey("collection_public")
@@ -325,6 +338,73 @@ class UserPreferencesDataStore @Inject constructor(
     /** Persists the version number after a successful R2 download. */
     suspend fun saveEmbeddingDbVersion(version: Int) {
         context.userPrefsDataStore.edit { it[KEY_EMBEDDING_DB_VERSION] = version }
+    }
+
+    // ── Deck Doctor: scoring-weight overrides (debug-only tuning) ──────────────
+    //
+    // A debug-only entry point for tuning the Deck Doctor scoring weights. Each field is an
+    // INDEPENDENT nullable Float; an absent key means "use the engine default for that weight".
+    // With NO key set, [observeScoreWeightOverrides] emits [ScoreWeightOverrides.NONE], which the
+    // feature/decks mapper resolves to exactly the default ScoreWeights() — i.e. zero behavior
+    // change in production. There is intentionally no settings UI for the writer; it exists so a
+    // debug build can experiment with weight tuning.
+
+    /**
+     * Emits the current Deck Doctor scoring-weight overrides. Every field is null unless a debug
+     * build has explicitly set it, so the default emission is [ScoreWeightOverrides.NONE].
+     */
+    fun observeScoreWeightOverrides(): Flow<ScoreWeightOverrides> =
+        context.userPrefsDataStore.data
+            .map { prefs ->
+                ScoreWeightOverrides(
+                    synergy = prefs[KEY_SCORE_WEIGHT_SYNERGY],
+                    roleNeed = prefs[KEY_SCORE_WEIGHT_ROLE_NEED],
+                    curve = prefs[KEY_SCORE_WEIGHT_CURVE],
+                    power = prefs[KEY_SCORE_WEIGHT_POWER],
+                    color = prefs[KEY_SCORE_WEIGHT_COLOR],
+                    redundancyPenalty = prefs[KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY],
+                    powerFloor = prefs[KEY_SCORE_WEIGHT_POWER_FLOOR],
+                )
+            }
+            .catch { emit(ScoreWeightOverrides.NONE) }
+
+    /**
+     * DEBUG-ONLY tuning entry point. Persists the supplied [overrides]; a null field clears that
+     * weight's override (falling back to the engine default). Not wired to any UI — intended to be
+     * invoked from a debug build to experiment with scoring weights.
+     */
+    suspend fun setScoreWeightOverrides(overrides: ScoreWeightOverrides) {
+        context.userPrefsDataStore.edit { prefs ->
+            putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_SYNERGY, overrides.synergy)
+            putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_ROLE_NEED, overrides.roleNeed)
+            putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_CURVE, overrides.curve)
+            putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_POWER, overrides.power)
+            putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_COLOR, overrides.color)
+            putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY, overrides.redundancyPenalty)
+            putOrRemoveFloat(prefs, KEY_SCORE_WEIGHT_POWER_FLOOR, overrides.powerFloor)
+        }
+    }
+
+    /** DEBUG-ONLY: clears every scoring-weight override so the engine defaults are used. */
+    suspend fun clearScoreWeightOverrides() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(KEY_SCORE_WEIGHT_SYNERGY)
+            prefs.remove(KEY_SCORE_WEIGHT_ROLE_NEED)
+            prefs.remove(KEY_SCORE_WEIGHT_CURVE)
+            prefs.remove(KEY_SCORE_WEIGHT_POWER)
+            prefs.remove(KEY_SCORE_WEIGHT_COLOR)
+            prefs.remove(KEY_SCORE_WEIGHT_REDUNDANCY_PENALTY)
+            prefs.remove(KEY_SCORE_WEIGHT_POWER_FLOOR)
+        }
+    }
+
+    /** Writes [value] under [key], or removes the key when [value] is null (clears the override). */
+    private fun putOrRemoveFloat(
+        prefs: androidx.datastore.preferences.core.MutablePreferences,
+        key: androidx.datastore.preferences.core.Preferences.Key<Float>,
+        value: Float?,
+    ) {
+        if (value == null) prefs.remove(key) else prefs[key] = value
     }
 
     // ── Feature flags ─────────────────────────────────────────────────────────

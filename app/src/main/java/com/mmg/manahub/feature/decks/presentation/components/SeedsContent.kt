@@ -56,9 +56,9 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
-import com.mmg.manahub.feature.decks.presentation.engine.DeckRole
-import com.mmg.manahub.feature.decks.presentation.engine.DeckSkeleton
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.DeckRole
+import com.mmg.manahub.feature.decks.domain.engine.DeckSkeleton
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetFilterBar
 
 /**

@@ -2,13 +2,13 @@ package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
-import com.mmg.manahub.feature.decks.presentation.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.presentation.engine.card
-import com.mmg.manahub.feature.decks.presentation.engine.entry
-import com.mmg.manahub.feature.decks.presentation.engine.fixedPower
-import com.mmg.manahub.feature.decks.presentation.engine.landCard
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.card
+import com.mmg.manahub.feature.decks.domain.engine.entry
+import com.mmg.manahub.feature.decks.domain.engine.fixedPower
+import com.mmg.manahub.feature.decks.domain.engine.landCard
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -28,7 +28,7 @@ class SuggestCutsUseCaseTest {
     private val scorer = DeckScorer(RoleClassifier(), fixedPower(normalized = 0.5f))
     private val useCase = SuggestCutsUseCase(scorer, dispatcher)
 
-    private fun profileFor(mainboard: List<com.mmg.manahub.feature.decks.presentation.engine.DeckEntry>) =
+    private fun profileFor(mainboard: List<com.mmg.manahub.feature.decks.domain.engine.DeckEntry>) =
         scorer.profile(
             mainboard = mainboard,
             format = DeckFormat.COMMANDER,

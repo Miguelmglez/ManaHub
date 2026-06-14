@@ -4,7 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.feature.decks.domain.engine.CardSuggestion
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.GameFormat
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.PathDecision
+import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.toEngineDeckFormat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -139,10 +146,8 @@ class DeckBuilderEngine @Inject constructor(
 
         val profile = deckScorer.profile(
             mainboard = s.mainboard,
-            format = when (s.format) {
-                GameFormat.COMMANDER -> DeckFormat.COMMANDER
-                else -> DeckFormat.STANDARD
-            },
+            // Phase 4 (D1): 1:1 GameFormat → DeckFormat so the right legality/skeleton is used.
+            format = s.format.toEngineDeckFormat(),
             colorIdentity = s.selectedColors,
             seedTags = strategy.primaryTags
         )
@@ -158,7 +163,7 @@ class DeckBuilderEngine @Inject constructor(
             CardSuggestion(
                 card = fit.card,
                 score = fit.score,
-                reasons = fit.roles.map { it.name },
+                reasons = fit.reasons,
                 isOwned = fit.isOwned
             )
         }

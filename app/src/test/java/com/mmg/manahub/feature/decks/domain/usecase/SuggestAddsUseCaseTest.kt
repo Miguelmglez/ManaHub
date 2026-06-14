@@ -1,11 +1,11 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
-import com.mmg.manahub.feature.decks.presentation.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.presentation.engine.card
-import com.mmg.manahub.feature.decks.presentation.engine.fixedPower
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.card
+import com.mmg.manahub.feature.decks.domain.engine.fixedPower
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse

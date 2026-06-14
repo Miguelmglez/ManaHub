@@ -74,11 +74,14 @@ Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` s
 and silently deletes all `UserCardEntity` rows for that card. The DAO uses INSERT OR IGNORE + `@Update`
 in a `@Transaction`. Regression test: `CardDao CASCADE regression`.
 
-### Database (Room v38)
+### Database (Room v40)
 - DB file `mtg_collection.db`. `UserCardEntity` FK to `CardEntity` is `ON DELETE RESTRICT` (v38).
-- Migration chain 1→38, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
-  not safe for production data).
-- Schema: `app/schemas/com.mmg.manahub.core.data.local.MtgDatabase/`.
+- Migration chain 1→40, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
+  not safe for production data). v39 = 6 gamification tables; **v40 = additive `legality_legacy`/
+  `legality_vintage`/`legality_pauper` on `cards`** (Deck Doctor Phase 4 D2; `MIGRATION_39_40`, top-level
+  `val`, `ADD COLUMN … TEXT NOT NULL DEFAULT 'not_legal'`, CardDao upsert untouched → no CASCADE risk).
+- Schema: `app/schemas/com.mmg.manahub.core.data.local.MtgDatabase/` (latest version json gitignored —
+  regenerate locally).
 
 ### Scryfall rate-limiting
 All Scryfall calls must be wrapped in `ScryfallRequestQueue.execute { }` (≤10 req/s, 100 ms min between
@@ -290,7 +293,7 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   assign `filteredSets = allSets`.
 
 ### Deck Doctor
-All 8 phases complete (Phases 1–8 verified, build green, 209 unit tests passing). Key invariants:
+Original 8 phases complete; a separate **engine-quality plan** is in progress (see below). Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
 - `generateFromSeeds()` captures inputs atomically inside `_uiState.update { }` (double-tap + stale-snapshot guards).
 - `loadAnalysis()` cancels via `analysisJob?.cancel()` before relaunching; sets `isLoading` only when `health == null`.
@@ -298,7 +301,121 @@ All 8 phases complete (Phases 1–8 verified, build green, 209 unit tests passin
 - `BudgetConstraints` has an `init` block validating finite/positive values.
 - `SeedStrategy.TOKENS` test requires all 3 primary tags (TOKENS+AGGRO+TRIBAL) to beat AGGRO's tie.
 - `stubRankAdds()` in tests must `candidates.take(arg<Int>(4))` to respect the `limit` parameter.
-- → memory: `project_deck_doctor_phase6`, `project_deck_doctor_general`, `feedback_deck_doctor_audit_2026-06-08`
+- **Engine-quality plan** (`docs/plans/deck-doctor-engine-quality-plan.md`): Phase 0 (golden + corpus
+  harness), **Phase 1 (RoleClassifier v2)**, **Phase 2 (tribal granularity)**, **Phase 3 (scoring
+  math)**, **Phase 4 (format correctness + construction validation)**, **Phase 5 (mana-base analysis)**,
+  **Phase 6 (external pool v2)**, **Phase 7 (inference + incremental + reason pipeline)** and **Phase 8
+  (layering + weight tuning)** are ALL done — the engine-quality plan is COMPLETE. Since Phase 1,
+  `RoleClassifier.classify()` returns `Map<DeckRole, Float>` (confidence); use `classifyRoles()` for the
+  compat `Set`. The oracle `ROLE_PATTERNS` table is a **fallback safety net only** — enrich the
+  TagDictionary for durable role coverage. Never `==`-compare a `classify()` result to a `Set` (it's a Map
+  — use `.keys`). Rituals stay out of RAMP. `DeckProfile.roleCounts` is Float (`quantity × confidence`).
+- **Phase 3 scoring math:** `synergyScore` denominator counts IDENTITY-category tags ONLY; seed influence is
+  a post-normalization fingerprint floor (≥`SEED_FLOOR` 0.6), not a pre-norm `+3f`; `curveScore` scores
+  against `DeckSkeleton.targetCurve` per format (a bucket the curve does not want — `target == 0` — scores 0
+  even when empty; a wanted-but-full bucket floors at `FULL_BUCKET_FLOOR` 0.1); `healthScore` penalises
+  over-coverage past `RoleSlot.max` (healthy band is `[ideal, max]`, symmetric `roleFitRatio`) with a
+  continuous `curveBandScore` off the per-format `DeckSkeleton.cmcBand`. **`redundancyScore` triggers only
+  when `current > max`, never at `ideal`** — penalising at ideal punishes correctly-stocked staples and is
+  fragile under the weighted Float `roleCounts` (oracle cross-credits nudge counts fractionally past ideal).
+- **Phase 2 tribal granularity (B1):** tribe identity is PER-TRIBE and 100% RUNTIME-derived — `TribeDeriver`
+  (in `RoleClassifier.kt`) builds `tribe:<subtype>` keys from the type-line subtypes after the dash (Creature/
+  Tribal/Kindred only) ∪ tribes named as oracle PAYOFFS ("Elves you control", "other Elves", lords, "choose a
+  creature type"). **These `tribe:` keys are NEVER persisted** (not written to `card.tags`/`userTags`/Room/the
+  tagging store; the `tribe:` prefix guarantees no collision) — the commented-out per-tribe `CardTag`s stay
+  commented out, no DB change. `DeckScorer.profile` adds a `tribe:<x>` fingerprint key when it clears
+  `TRIBE_ABS_THRESHOLD` 8 copies **OR** `TRIBE_SHARE_THRESHOLD` 0.15 of creature copies; **when ANY tribe
+  clears, the generic `CardTag.TRIBAL.key` ("tribal") is dropped from the fingerprint** (and a generic `tribal`
+  SEED is not floored) so an off-tribe card carrying only the coarse `tribal` tag (a Dragon in an Elf deck) no
+  longer matches. `synergyScore` injects the candidate's own `TribeDeriver.tribeKeys` as `TRIBAL`-category
+  signal into BOTH numerator and denominator (consistent with the B2 identity-only denominator); `synergyDensity`
+  alignment checks derived tribe keys too. Type-line subtype parsing is structural/language-neutral — it does
+  NOT violate the English-only ORACLE rule.
+- **Phase 7 inference + flow (B4/E4/E5/E6/E7):** the Deck Doctor seeds the profile — `EvaluateDeckUseCase`
+  takes a `seedTags` param fed by `InferDeckIdentityUseCase` over the commander + the deck's top-8
+  highest-identity-tag mainboard cards (the fingerprint is no longer self-referential; do NOT reintroduce
+  `seedTags = emptyList()`). **Reasons are structured everywhere**: `MagicSuggestion.reasons` /
+  `CardSuggestion.reasons` are `List<ScoreReason>` (NOT `List<String>`); engines emit `fit.reasons` and the
+  UI renders `ScoreReason.label()` — never `fit.roles.map { it.name }` (raw-enum-name leak). Unresolvable
+  mainboard slots surface `DeckWarning.UnresolvedCards(n)` from the **ViewModel** (the engine never sees
+  unresolved slots and stays string-free); add its `label()`+`key` when touching `DeckWarning`.
+  `DeckImprovementViewModel` does **incremental re-analysis**: it holds an in-memory `AnalysisCache`
+  (workingMainboard / seedTags / resolvedById / gapSignature / externalPool); `onCut`/`onAdd` mutate the
+  list in memory and `recomputeIncremental()` rebuilds profile/eval/cuts purely, re-fetching the external
+  Scryfall pool ONLY when the `GapSignature` (queryable gap roles ∩ `queryFragment()` + colorIdentity +
+  format) changes — else it reuses the cached pool via `SuggestAddsWithBudgetUseCase(externalCardsOverride=…)`
+  / `BudgetSelection.externalPool`. A 99-card cut→add round-trip with an unchanged gap set must issue ZERO
+  Scryfall calls. Full `loadAnalysis()` stays the fallback (missing cache / unknown re-add source).
+- **Phase 8 layering (F1) — the engine now lives in `feature/decks/domain/engine/`, NOT
+  `presentation/engine/`.** `DeckScorer`, `RoleClassifier`/`TribeDeriver`, `ManaBaseAnalyzer`,
+  `DeckScoreModel` (DeckProfile/DeckRole/DeckSkeleton/`ScoreWeights`/`ScoreReason`/`ScoreFit`/`DeckWarning`/
+  `Magic*`), `DeckImportExportHelper`, `DeckMagicEngine`, and the pure model types (`GameFormat`,
+  `ManaColor`, `SeedStrategy`, `DeckEntry`, `CardSuggestion`, `PathDecision` in `DeckEngineModels.kt`) are
+  in **`...decks.domain.engine`**. ONLY `DeckBuilderEngine` (`@HiltViewModel`) + the UI-state of
+  `DeckBuilderState.kt` (`DeckBuilderStep`/`DeckBuilderFilters`/`DeckBuilderUiState`) stay in
+  `presentation/engine/`. **Layering rule: `feature/decks/domain/**` must never import `...presentation...`**
+  (domain→presentation is the bug Phase 8 fixed). **Phase 8 weight tuning (F2):** `ScoreWeights` is
+  debug-tunable via core `ScoreWeightOverrides` (7 nullable Floats + `NONE`) persisted in
+  `UserPreferencesDataStore` (primitive floats — core never imports the feature-layer `ScoreWeights`); the
+  feature-layer `ScoreWeightOverrides.toScoreWeights()` maps null→default so `NONE` == `ScoreWeights()`
+  (zero behavior change at defaults). `DeckImprovementViewModel` reads it and threads `weights` into
+  `evaluateDeck`/`suggestAddsWithBudget`/`suggestCuts` (`EvaluateDeckUseCase` gained an optional `weights`
+  param forwarded to `DeckScorer.evaluate`). The setter is the debug entry point — there is NO settings UI.
+- **Phase 5 mana-base analysis (C3):** pure injectable `ManaBaseAnalyzer` (engine pkg, sibling of
+  `RoleClassifier`; `DeckScorer`'s 3rd ctor param, defaulted to `ManaBaseAnalyzer()` so old 2-arg
+  construction stays green). NO Room/schema/CardTag change — everything is derived from the resolved
+  mainboard, no simulation/network. Pip/devotion from `Card.manaCost` (TRUE hybrid `{W/U}` counts both
+  halves; **Phyrexian `{W/P}` counts as ZERO coloured demand** — payable with life, no source pressure);
+  land production via priority chain (basic subtypes → oracle `Add {X}` clause → rainbow "any color" →
+  fallback to the land's own `colorIdentity`) — it UNDER-counts fetch/conditional lands on purpose so the
+  fixing check never HIDES a shortage. **Oracle production parsing must stay conservative (never invent an
+  off-colour source):** the Add-clause regex is `\bAdd\b…` (word-anchored — `[Aa]dd` matched inside
+  "Additional"), and "any color" → rainbow is recognised ONLY INSIDE an `Add` clause (matching it across
+  the whole oracle invented rainbow sources from flavour like "protection from any color"). Static
+  **Karsten** source table (`KARSTEN_60`/`KARSTEN_99`, 99-row at ≥33 lands) keyed by **per-colour MAX
+  SINGLE-CARD pip intensity** (1/2/3+ — `maxSinglePipIntensity()`), NOT the whole-deck pip sum (the sum
+  bucketed every 2-colour deck to triple-pip → impossible source need → false shortage on healthy decks)
+  → `DeckWarning.ColorSourceShortage` (have<need) / `UnfixedSplash` (have==0 or <50% of need). **`dynamicLandIdeal` can only RELAX the land count** (clamped `[LAND.min,
+  skeletonBase]` — never recommends MORE lands than the flat ideal); it feeds the *displayed* target of
+  `TooFewLands`/`TooManyLands` while the band gate stays skeleton min/max. `evaluate(…, fullMainboard?)`
+  appends the shortages only when `fullMainboard != null` (same gate as construction warnings). New
+  warnings need `DeckDoctorStrings.label()` (uses `ManaColor.displayName`) + `.key` + a `strings.xml` row.
+- **Phase 6 external pool v2 (E2/E3/E8):** `CandidatePoolGenerator` role queries lead with curated oracle
+  tags — `DeckRole.queryFragment()` returns `otag:` (board-wipe/removal/card-advantage/ramp/counterspell/
+  tutor); the legacy oracle substrings are DEMOTED to `DeckRole.fallbackQueryFragment()` and issued ONLY when
+  the primary `otag:` query ERRORS or returns EMPTY (otags are not in Scryfall's formal grammar — be
+  defensive; never delete the substring net). PAYOFF/SYNERGY/THREAT have no role query, so the pool adds up to
+  two profile-derived queries: the top non-tribe STRATEGY fingerprint key → `otag:<x>` via the CONSTANT
+  `STRATEGY_OTAGS` allowlist (no allowlist hit ⇒ no query — never guess an otag from an arbitrary key), and the
+  dominant Phase-2 `tribe:<x>` key → `t:<tribe>` with the token sanitised to letters-only. `MAX_QUERIES` is 8.
+  **All query fragments stay constants/allowlist — no user free text, the tribe token is `[a-z]`-sanitised.**
+  E8: `AddSuggestion.priceUnknown` (priceEur == null); `BudgetOptimizer` EXCLUDES a non-free unknown-price card
+  under an ACTIVE `maxTotalEur` cap (it cannot be costed — never silently 0€), keeps owned/free unknown-price
+  ones, and is inert with no cap. `runningPaid`/`cardsToBuy` are charged only on a known `cost > 0`. When the
+  otag-vs-substring stub returns empty in a test, the fallback fires → a single role issues 2 queries.
+- **Phase 4 format correctness + construction validation (D1-D4/C5):** `DeckFormat` now covers PIONEER/
+  MODERN/LEGACY/VINTAGE/PAUPER/CASUAL (+`isSixtyCardConstructed`); `GameFormat→DeckFormat` is **1:1** via
+  `GameFormat.toEngineDeckFormat()` (engine pkg) — never collapse non-Commander to STANDARD again.
+  `DeckScorer.isLegal` reads the per-format legality field (Card now persists `legalityLegacy/Vintage/Pauper`,
+  DB v40); CASUAL & DRAFT are permissive. `DeckSkeletons.forFormat` uses the shared `sixtyCardSkeleton` with
+  ETERNAL/PAUPER curves. **C5 construction validation gates on a NEW optional `evaluate(profile, nonLand,
+  fullMainboard? = null)` param** — null SKIPS the checks (keeps every old `evaluate(profile, nonLand)` call
+  +DeckScorerTest green); `EvaluateDeckUseCase` passes the full mainboard. New `DeckWarning`s: `DeckTooSmall`,
+  `TooManyCopies`, `SingletonViolation`, `OffColorIdentity` — quantity-aware, copy limit is **by card name**,
+  basics exempt, CASUAL/DRAFT skip min-size. D3 multi-copy: `AddSuggestion.suggestedCopies` (≤`maxCopies −
+  owned-by-name`; Commander/Draft = 1) and `BudgetOptimizer` charges `copies × price`; pass
+  `mainboardCopiesByName` to `SuggestAddsWithBudgetUseCase`. D4: `CandidatePoolGenerator` edhrec-pre-sorts
+  ONLY for Commander; constructed pools rank by fit. When touching `DeckWarning`, add the new cases'
+  `label()`+`key` in `DeckDoctorStrings` + `strings.xml`.
+- **Re-run the golden ORDERING invariants after ANY scoring-component change** — a re-tune of one component
+  (curve) can unmask coupling in another (redundancy) by removing slack.
+- → memory: `project_deck_doctor_phase6`, `project_deck_doctor_phase6_v2`, `project_deck_doctor_general`,
+  `feedback_deck_doctor_audit_2026-06-08`,
+  `project_deck_doctor_phase0_harness`, `project_deck_doctor_phase1_classifier`,
+  `feedback_deck_doctor_phase1_signature_ripple`, `project_deck_doctor_phase3_scoring`,
+  `feedback_deck_doctor_phase3_curve_redundancy_coupling`, `project_deck_doctor_phase2_tribal`,
+  `project_deck_doctor_phase7_inference_flow`, `project_deck_doctor_phase4`, `project_deck_doctor_phase5`,
+  `project_deck_doctor_phase8`
 
 ### Home dashboard (`feature/home/`)
 Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-know:

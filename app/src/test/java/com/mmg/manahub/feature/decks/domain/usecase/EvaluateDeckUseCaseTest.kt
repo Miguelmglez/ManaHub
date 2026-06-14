@@ -4,15 +4,15 @@ import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.feature.decks.presentation.engine.DeckRole
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.DeckWarning
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
-import com.mmg.manahub.feature.decks.presentation.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.presentation.engine.card
-import com.mmg.manahub.feature.decks.presentation.engine.entry
-import com.mmg.manahub.feature.decks.presentation.engine.fixedPower
-import com.mmg.manahub.feature.decks.presentation.engine.landCard
+import com.mmg.manahub.feature.decks.domain.engine.DeckRole
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.card
+import com.mmg.manahub.feature.decks.domain.engine.entry
+import com.mmg.manahub.feature.decks.domain.engine.fixedPower
+import com.mmg.manahub.feature.decks.domain.engine.landCard
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -25,7 +25,7 @@ import org.junit.Test
  * Unit tests for [EvaluateDeckUseCase].
  *
  * The use case is exercised against a REAL [DeckScorer] (with a real [RoleClassifier] and a
- * deterministic fixed [com.mmg.manahub.feature.decks.presentation.engine.PowerResolver]), so the
+ * deterministic fixed [com.mmg.manahub.feature.decks.domain.engine.PowerResolver]), so the
  * assertions also cover the wiring into the engine.
  */
 class EvaluateDeckUseCaseTest {

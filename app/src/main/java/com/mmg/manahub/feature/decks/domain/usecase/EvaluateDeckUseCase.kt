@@ -2,15 +2,17 @@ package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.feature.decks.presentation.engine.DeckEntry
-import com.mmg.manahub.feature.decks.presentation.engine.DeckEvaluation
-import com.mmg.manahub.feature.decks.presentation.engine.DeckProfile
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
+import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -27,7 +29,11 @@ import javax.inject.Inject
  * resulting [DeckEvaluation] together with the profile (the Health view needs the profile's
  * role skeleton / ideals).
  *
- * Seed tags are intentionally empty for Phase 4 — strategy seed inference lands in Phase 7.
+ * Strategy seed inference (Phase 7 / plan B4) is the caller's responsibility: the Deck Doctor
+ * ViewModel runs [InferDeckIdentityUseCase] over the commander + the deck's highest-weight identity
+ * cards and passes the resulting `seedTags` here, so the fingerprint is no longer purely
+ * self-referential. Callers that have no seeds (e.g. an empty-strategy preview) simply pass the
+ * default empty list.
  */
 class EvaluateDeckUseCase @Inject constructor(
     private val deckScorer: DeckScorer,
@@ -46,12 +52,21 @@ class EvaluateDeckUseCase @Inject constructor(
      * @param commanderIdentity color symbols of the deck's commander (empty for non-commander
      *        decks or when the commander card could not be resolved). Each symbol is a single
      *        letter from `W/U/B/R/G`; anything else is ignored.
+     * @param seedTags inferred strategy seed tags (plan B4) — the commander's + the deck's
+     *        highest-weight identity cards' tags, produced by [InferDeckIdentityUseCase]. Floored
+     *        into the fingerprint by the scorer (size-independent, Phase-3 `SEED_FLOOR`). Empty when
+     *        the deck carries no recognizable strategy signal.
+     * @param weights the (optionally debug-tuned) [ScoreWeights] threaded through the Deck Doctor
+     *        read path (plan F2), forwarded to [DeckScorer.evaluate]. The default keeps every other
+     *        caller (and all existing tests) byte-identical.
      * @return a [DeckHealth] bundling the [DeckEvaluation] and the [DeckProfile] used to build it.
      */
     suspend operator fun invoke(
         mainboard: List<DeckEntry>,
         format: DeckFormat,
         commanderIdentity: Set<String> = emptySet(),
+        seedTags: List<CardTag> = emptyList(),
+        weights: ScoreWeights = ScoreWeights(),
     ): DeckHealth = withContext(ioDispatcher) {
         val colorIdentity = deriveColorIdentity(mainboard, commanderIdentity)
 
@@ -59,11 +74,13 @@ class EvaluateDeckUseCase @Inject constructor(
             mainboard = mainboard,
             format = format,
             colorIdentity = colorIdentity,
-            seedTags = emptyList(), // seed inference is Phase 7
+            seedTags = seedTags, // B4: inferred strategy seed from the caller (Phase 7)
         )
 
         val nonLand = mainboard.filterNot { BasicLandCalculator.isLand(it.card) }
-        val evaluation = deckScorer.evaluate(profile, nonLand)
+        // Pass the FULL mainboard so the scorer can run construction validation (C5):
+        // deck size, copy limits, Commander singleton + off-color-identity checks.
+        val evaluation = deckScorer.evaluate(profile, nonLand, fullMainboard = mainboard, weights = weights)
 
         // Canonical Deck Doctor "analysis produced" choke point: a successful evaluation is the single
         // domain event for the EXPLORATION quest (`daily_explore_deck_doctor`). Emitted here (not the
