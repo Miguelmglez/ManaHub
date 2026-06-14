@@ -95,7 +95,7 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         StreakEntity::class,
         EntitlementEntity::class,
     ],
-    version = 39,
+    version = 40,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

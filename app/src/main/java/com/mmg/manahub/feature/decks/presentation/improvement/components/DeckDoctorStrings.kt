@@ -3,15 +3,15 @@ package com.mmg.manahub.feature.decks.presentation.improvement.components
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.mmg.manahub.R
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
-import com.mmg.manahub.feature.decks.presentation.engine.DeckRole
-import com.mmg.manahub.feature.decks.presentation.engine.DeckWarning
-import com.mmg.manahub.feature.decks.presentation.engine.ScoreReason
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.DeckRole
+import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
+import com.mmg.manahub.feature.decks.domain.engine.ScoreReason
 
 /**
  * Presentation-side localization for the scoring engine's structured outputs.
  *
- * The engine ([com.mmg.manahub.feature.decks.presentation.engine.DeckScorer]) stays string-free:
+ * The engine ([com.mmg.manahub.feature.decks.domain.engine.DeckScorer]) stays string-free:
  * it emits [DeckWarning] / [DeckRole] values, and these mappers turn them into user-facing English
  * text from `strings.xml`. Keeping the mapping here means adding a language later (should the policy
  * change) touches only resources, never the engine.
@@ -50,6 +50,20 @@ fun DeckWarning.label(): String = when (this) {
         stringResource(R.string.deck_health_warning_curve_too_low, formatCmc(avgCmc))
     is DeckWarning.LowSynergyDensity ->
         stringResource(R.string.deck_health_warning_low_synergy, (density * 100).toInt())
+    is DeckWarning.UnresolvedCards ->
+        stringResource(R.string.deck_health_warning_unresolved_cards, count)
+    is DeckWarning.DeckTooSmall ->
+        stringResource(R.string.deck_health_warning_deck_too_small, current, minimum)
+    is DeckWarning.TooManyCopies ->
+        stringResource(R.string.deck_health_warning_too_many_copies, cardName, copies, maxCopies)
+    is DeckWarning.SingletonViolation ->
+        stringResource(R.string.deck_health_warning_singleton_violation, cardName, copies)
+    is DeckWarning.OffColorIdentity ->
+        stringResource(R.string.deck_health_warning_off_color_identity, cardName)
+    is DeckWarning.ColorSourceShortage ->
+        stringResource(R.string.deck_health_warning_color_source_shortage, color.displayName, sources, needed)
+    is DeckWarning.UnfixedSplash ->
+        stringResource(R.string.deck_health_warning_unfixed_splash, color.displayName)
 }
 
 /** Stable identity for a warning, used as a LazyColumn key. */
@@ -61,6 +75,13 @@ val DeckWarning.key: String
         is DeckWarning.CurveTooHigh -> "curve_too_high"
         is DeckWarning.CurveTooLow -> "curve_too_low"
         is DeckWarning.LowSynergyDensity -> "low_synergy"
+        is DeckWarning.UnresolvedCards -> "unresolved_cards"
+        is DeckWarning.DeckTooSmall -> "deck_too_small"
+        is DeckWarning.TooManyCopies -> "too_many_copies_$cardName"
+        is DeckWarning.SingletonViolation -> "singleton_violation_$cardName"
+        is DeckWarning.OffColorIdentity -> "off_color_identity_$cardName"
+        is DeckWarning.ColorSourceShortage -> "color_source_shortage_${color.name}"
+        is DeckWarning.UnfixedSplash -> "unfixed_splash_${color.name}"
     }
 
 /** One-decimal CMC formatting, locale-stable. */

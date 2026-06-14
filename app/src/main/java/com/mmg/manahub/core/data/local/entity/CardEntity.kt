@@ -52,6 +52,13 @@ data class CardEntity(
     @ColumnInfo(name = "legality_modern")    val legalityModern:    String,
     @ColumnInfo(name = "legality_commander") val legalityCommander: String,
 
+    // Added in Deck Doctor Phase 4 (DB v40, D2). NOT NULL with a DEFAULT so existing
+    // rows backfill to 'not_legal' on the additive ADD COLUMN migration; correct values
+    // arrive on the next Scryfall refresh.
+    @ColumnInfo(name = "legality_legacy",  defaultValue = "not_legal") val legalityLegacy:  String = "not_legal",
+    @ColumnInfo(name = "legality_vintage", defaultValue = "not_legal") val legalityVintage: String = "not_legal",
+    @ColumnInfo(name = "legality_pauper",  defaultValue = "not_legal") val legalityPauper:  String = "not_legal",
+
     @ColumnInfo(name = "flavor_text")  val flavorText:  String?,
     @ColumnInfo(name = "artist")       val artist:      String?,
     @ColumnInfo(name = "scryfall_uri") val scryfallUri: String,

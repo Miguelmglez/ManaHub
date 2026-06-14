@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.engine
+package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
@@ -23,7 +23,13 @@ data class MagicCard(
 data class MagicSuggestion(
     val magicCard: MagicCard,
     val score: Float,
-    val reasons: List<String>
+    /**
+     * Structured, localizable explanations for the suggestion (plan E5). The engine emits
+     * [ScoreReason] values; the presentation layer renders them through `DeckDoctorStrings`
+     * (`ScoreReason.label()`). This replaces the old `roles.map { it.name }` raw-enum-name leak,
+     * which bypassed the localization pipeline and surfaced `BOARD_WIPE`/`THREAT` strings.
+     */
+    val reasons: List<ScoreReason>
 )
 
 data class MagicDiscovery(
@@ -85,10 +91,8 @@ class DeckMagicEngine @Inject constructor(
         val mainboardEntries = mainboard.map { DeckEntry(card = it.card, quantity = it.quantity, isOwned = it.isOwned) }
         val profile = deckScorer.profile(
             mainboard = mainboardEntries,
-            format = when (format) {
-                GameFormat.COMMANDER -> DeckFormat.COMMANDER
-                else -> DeckFormat.STANDARD
-            },
+            // Phase 4 (D1): 1:1 GameFormat → DeckFormat so the right legality/skeleton is used.
+            format = format.toEngineDeckFormat(),
             colorIdentity = selectedColors,
             seedTags = targetTags
         )
@@ -107,7 +111,7 @@ class DeckMagicEngine @Inject constructor(
             MagicSuggestion(
                 magicCard = MagicCard(fit.card, isOwned = fit.isOwned),
                 score = fit.score,
-                reasons = fit.roles.map { it.name }
+                reasons = fit.reasons
             )
         }
     }

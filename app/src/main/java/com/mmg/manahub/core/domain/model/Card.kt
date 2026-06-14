@@ -35,6 +35,14 @@ data class Card(
     val legalityPioneer: String,
     val legalityModern: String,
     val legalityCommander: String,
+    /**
+     * Format legalities added in Deck Doctor Phase 4 (D2). Default to `"not_legal"` so
+     * pre-existing call sites and rows that have not been re-fetched from Scryfall still
+     * construct safely; correct values arrive on the next Scryfall fetch.
+     */
+    val legalityLegacy: String = "not_legal",
+    val legalityVintage: String = "not_legal",
+    val legalityPauper: String = "not_legal",
     val flavorText: String?,
     val artist: String?,
     val scryfallUri: String,

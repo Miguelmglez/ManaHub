@@ -2,10 +2,10 @@ package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
-import com.mmg.manahub.feature.decks.presentation.engine.DeckProfile
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.ScoreWeights
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -27,7 +27,23 @@ enum class AddOrigin { COLLECTION, WISHLIST, NEW }
 data class AddSuggestion(
     val fit: CardFit,
     val origin: AddOrigin,
-)
+    /**
+     * How many copies to add (plan D3). For 60-card constructed formats this is up to
+     * `4 − copies-already-in-deck` (a playset top-up); Commander/singleton formats keep it at 1.
+     * Defaults to 1 so callers that do not compute multi-copy adds are unaffected. The
+     * [BudgetOptimizer] charges `suggestedCopies × price`. Always ≥1.
+     */
+    val suggestedCopies: Int = 1,
+) {
+    /**
+     * True when the card carries NO EUR price on Scryfall (plan E8). We never invent a price, so an
+     * unknown-price card cannot be costed against a budget cap. [BudgetOptimizer] uses this to EXCLUDE
+     * a NEW unknown-price card under an active total cap (it could secretly be expensive) while still
+     * keeping an owned/wishlist unknown-price card (the user already has / wants it — adding it to the
+     * deck costs nothing they have not already decided to spend). With no cap, the flag is inert.
+     */
+    val priceUnknown: Boolean get() = fit.card.priceEur == null
+}
 
 /**
  * Ranks add candidates drawn ONLY from the user's collection (Phase 5).

@@ -4,13 +4,13 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
-import com.mmg.manahub.feature.decks.presentation.engine.DeckEntry
-import com.mmg.manahub.feature.decks.presentation.engine.DeckRole
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.MagicCard
-import com.mmg.manahub.feature.decks.presentation.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.presentation.engine.ScoreWeights
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckRole
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.MagicCard
+import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -191,7 +191,7 @@ class BuildDeckFromSeedsUseCase @Inject constructor(
 
     /** Land slots reserved for the mana base: skeleton LAND ideal, fallback to the format target. */
     private fun reservedLandSlots(
-        profile: com.mmg.manahub.feature.decks.presentation.engine.DeckProfile,
+        profile: com.mmg.manahub.feature.decks.domain.engine.DeckProfile,
         format: DeckFormat,
     ): Int {
         val skeletonIdeal = profile.skeleton.idealFor(DeckRole.LAND)

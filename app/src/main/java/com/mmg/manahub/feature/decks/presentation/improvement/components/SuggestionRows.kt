@@ -34,7 +34,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.usecase.AddOrigin
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
 
 /** Visual flavour of a [SuggestionTagChip], mapped to a semantic token. */
 enum class SuggestionTagTone { CUT, GAP, COLLECTION }

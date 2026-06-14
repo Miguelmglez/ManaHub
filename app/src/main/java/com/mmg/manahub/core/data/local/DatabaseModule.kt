@@ -89,6 +89,10 @@ object DatabaseModule {
                 // v38 → v39 lives as a top-level `val` in Migration_38_39.kt (same
                 // reason). Additive: creates the 6 gamification tables (ADR-002 §8).
                 MIGRATION_38_39,
+                // v39 → v40 lives as a top-level `val` in Migration_39_40.kt (same
+                // reason). Additive: adds legality_legacy/vintage/pauper to `cards`
+                // (Deck Doctor Phase 4, D2).
+                MIGRATION_39_40,
             )
             .build()
 

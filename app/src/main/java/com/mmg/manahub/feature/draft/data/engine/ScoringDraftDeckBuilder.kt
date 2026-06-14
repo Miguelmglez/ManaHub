@@ -3,9 +3,9 @@ package com.mmg.manahub.feature.draft.data.engine
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.feature.decks.presentation.engine.DeckEntry
-import com.mmg.manahub.feature.decks.presentation.engine.DeckScorer
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder
 import com.mmg.manahub.feature.draft.domain.model.BasicLandSlot
 import com.mmg.manahub.feature.draft.domain.model.DraftCard

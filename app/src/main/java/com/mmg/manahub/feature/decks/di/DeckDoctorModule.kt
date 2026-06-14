@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.decks.di
 
-import com.mmg.manahub.feature.decks.presentation.engine.EdhrecPowerResolver
-import com.mmg.manahub.feature.decks.presentation.engine.PowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.PowerResolver
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
