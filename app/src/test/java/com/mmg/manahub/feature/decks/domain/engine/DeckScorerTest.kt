@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.engine
+package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
@@ -79,7 +79,7 @@ class DeckScorerTest {
         )
         val p = scorer.profile(mainboard, DeckFormat.COMMANDER, setOf(ManaColor.G), emptyList())
 
-        assertEquals(5, p.roleCounts[DeckRole.RAMP])
+        assertEquals(5f, p.roleCounts[DeckRole.RAMP]!!, 0.001f)
     }
 
     @Test

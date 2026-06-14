@@ -58,7 +58,7 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.presentation.improvement.components.AddSuggestionRow
 import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetFilterBar
 import com.mmg.manahub.feature.decks.presentation.improvement.components.CutSuggestionRow

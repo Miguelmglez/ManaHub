@@ -669,6 +669,13 @@
     <string name="deck_health_warning_curve_too_high">Mana curve is too high (avg %1$s). You may stumble early.</string>
     <string name="deck_health_warning_curve_too_low">Mana curve is very low (avg %1$s). You may run out of gas.</string>
     <string name="deck_health_warning_low_synergy">Low synergy density (%1$d%%). Cards do not pull in one direction.</string>
+    <string name="deck_health_warning_unresolved_cards">%1$d card(s) could not be loaded and were left out of this analysis.</string>
+    <string name="deck_health_warning_deck_too_small">Deck is too small: %1$d cards (this format needs at least %2$d).</string>
+    <string name="deck_health_warning_too_many_copies">Too many copies of %1$s: %2$d (limit is %3$d).</string>
+    <string name="deck_health_warning_singleton_violation">%1$s breaks the singleton rule: %2$d copies (Commander allows 1).</string>
+    <string name="deck_health_warning_off_color_identity">%1$s is outside your commander\'s color identity.</string>
+    <string name="deck_health_warning_color_source_shortage">Not enough %1$s sources: %2$d (aim for about %3$d to cast your %1$s spells reliably).</string>
+    <string name="deck_health_warning_unfixed_splash">Your %1$s is unfixed: almost no lands make %1$s mana. Add fixing or cut the color.</string>
 
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
@@ -1627,6 +1634,7 @@
     <string name="format_pioneer">Pioneer</string>
     <string name="format_pauper">Pauper</string>
     <string name="format_historic">Historic</string>
+    <string name="format_casual">Casual</string>
     <string name="format_draft">Draft</string>
 
     <!-- ══════════════════════════════════════════

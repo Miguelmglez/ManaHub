@@ -61,7 +61,7 @@ class DeckViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, importError = null) }
             try {
-                val parsed = com.mmg.manahub.feature.decks.presentation.engine.DeckImportExportHelper.parse(text)
+                val parsed = com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper.parse(text)
                 val deckId = deckRepo.createDeck(name = "Imported Deck", description = "", format = "casual")
 
                 val mainboard = parsed.mainboard
@@ -87,7 +87,7 @@ class DeckViewModel @Inject constructor(
 
     private suspend fun addParsedLineToDeck(
         deckId: String,
-        line: com.mmg.manahub.feature.decks.presentation.engine.DeckImportExportHelper.ParsedLine,
+        line: com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper.ParsedLine,
         isSideboard: Boolean,
     ) {
         val result = cardRepo.searchCardByName(line.name)

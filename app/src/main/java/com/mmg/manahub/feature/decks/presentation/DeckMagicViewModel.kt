@@ -13,12 +13,12 @@ import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
-import com.mmg.manahub.feature.decks.presentation.engine.DeckMagicEngine
-import com.mmg.manahub.feature.decks.presentation.engine.GameFormat
-import com.mmg.manahub.feature.decks.presentation.engine.MagicCard
-import com.mmg.manahub.feature.decks.presentation.engine.MagicDiscovery
-import com.mmg.manahub.feature.decks.presentation.engine.MagicSuggestion
-import com.mmg.manahub.feature.decks.presentation.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
+import com.mmg.manahub.feature.decks.domain.engine.GameFormat
+import com.mmg.manahub.feature.decks.domain.engine.MagicCard
+import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
+import com.mmg.manahub.feature.decks.domain.engine.MagicSuggestion
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -281,17 +281,18 @@ class DeckMagicViewModel @Inject constructor(
 }
 
 /**
- * Maps the active builder's [GameFormat] to the engine's [DeckFormat]. The engine only models three
- * skeletons (STANDARD / COMMANDER / DRAFT); the 60-card constructed formats all collapse to STANDARD
- * (closest skeleton), Commander stays Commander, and there is no Draft entry in [GameFormat].
+ * Maps the active builder's [GameFormat] to the engine's [DeckFormat]. Phase 4 (D1): the mapping is
+ * now 1:1 wherever a matching legality/skeleton exists, so a Modern/Pauper/Legacy deck is filtered by
+ * its OWN legality and scored against its own skeleton instead of collapsing to Standard. There is no
+ * Draft entry in [GameFormat].
  */
 internal fun GameFormat.toDeckFormat(): DeckFormat = when (this) {
     GameFormat.COMMANDER -> DeckFormat.COMMANDER
-    GameFormat.STANDARD,
-    GameFormat.PIONEER,
-    GameFormat.MODERN,
-    GameFormat.LEGACY,
-    GameFormat.VINTAGE,
-    GameFormat.PAUPER,
-    GameFormat.CASUAL -> DeckFormat.STANDARD
+    GameFormat.STANDARD -> DeckFormat.STANDARD
+    GameFormat.PIONEER -> DeckFormat.PIONEER
+    GameFormat.MODERN -> DeckFormat.MODERN
+    GameFormat.LEGACY -> DeckFormat.LEGACY
+    GameFormat.VINTAGE -> DeckFormat.VINTAGE
+    GameFormat.PAUPER -> DeckFormat.PAUPER
+    GameFormat.CASUAL -> DeckFormat.CASUAL
 }

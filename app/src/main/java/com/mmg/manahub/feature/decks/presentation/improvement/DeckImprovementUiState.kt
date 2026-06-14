@@ -4,7 +4,7 @@ import androidx.compose.runtime.Stable
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
 
 /** Top-level tabs of the Deck Doctor screen. */
 enum class DeckDoctorTab { HEALTH, CUT, ADD }
@@ -30,5 +30,4 @@ data class DeckImprovementUiState(
     val selectedTab: DeckDoctorTab = DeckDoctorTab.HEALTH,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val appliedSuggestions: Set<String> = emptySet(),
 )

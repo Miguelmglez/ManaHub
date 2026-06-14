@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.engine
+package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.TagCategory
@@ -37,7 +37,7 @@ class RoleClassifierTest {
         val c = landCard(id = "land-1")
 
         // Act
-        val roles = classifier.classify(c)
+        val roles = classifier.classify(c).keys
 
         // Assert
         assertEquals(setOf(DeckRole.LAND), roles)
@@ -53,7 +53,7 @@ class RoleClassifierTest {
         )
 
         // Act
-        val roles = classifier.classify(c)
+        val roles = classifier.classify(c).keys
 
         // Assert
         assertEquals(setOf(DeckRole.LAND), roles)
@@ -170,7 +170,7 @@ class RoleClassifierTest {
     @Test
     fun `given ramp tag already present oracle fallback does not duplicate RAMP`() {
         val c = card(tags = listOf(tagManaRock), oracleText = "Tap: add {G}.")
-        assertEquals(1, classifier.classify(c).count { it == DeckRole.RAMP })
+        assertEquals(1, classifier.classify(c).keys.count { it == DeckRole.RAMP })
     }
 
     // ── Group 11: Oracle fallback – CARD_ADVANTAGE ───────────────────────────
@@ -301,8 +301,17 @@ class RoleClassifierTest {
     }
 
     @Test
-    fun `given creature with power 2 and no functional role when classify then NOT THREAT`() {
-        val c = card(typeLine = "Creature — Elf", power = "2", toughness = "2")
+    fun `given cheap creature with power 2 and no functional role when classify then THREAT (A5)`() {
+        // Phase 1 A5: a 2-power body at low CMC (here cmc 2) is a relevant aggro threat —
+        // the old `power >= 3` floor wrongly made 2-drops invisible.
+        val c = card(typeLine = "Creature — Elf", power = "2", toughness = "2", cmc = 2.0)
+        assertTrue(classifier.classify(c).contains(DeckRole.THREAT))
+    }
+
+    @Test
+    fun `given expensive creature with power 2 and no evasion when classify then NOT THREAT`() {
+        // A high-CMC 2-power vanilla body with no evasion is below the threat bar (confidence 0).
+        val c = card(typeLine = "Creature — Elf", power = "2", toughness = "2", cmc = 6.0)
         assertFalse(classifier.classify(c).contains(DeckRole.THREAT))
     }
 
@@ -326,13 +335,13 @@ class RoleClassifierTest {
     @Test
     fun `given card with no tags no oracle no creature body when classify then returns FILLER`() {
         val c = card(typeLine = "Enchantment", oracleText = "You gain 1 life.", power = null)
-        assertEquals(setOf(DeckRole.FILLER), classifier.classify(c))
+        assertEquals(setOf(DeckRole.FILLER), classifier.classify(c).keys)
     }
 
     @Test
     fun `given creature with power 1 and no tags no matching oracle when classify then returns FILLER`() {
         val c = card(typeLine = "Creature — Elf", power = "1", toughness = "1", oracleText = null)
-        assertEquals(setOf(DeckRole.FILLER), classifier.classify(c))
+        assertEquals(setOf(DeckRole.FILLER), classifier.classify(c).keys)
     }
 
     // ── Group 19: Multi-role cards ─────────────────────────────────────────────

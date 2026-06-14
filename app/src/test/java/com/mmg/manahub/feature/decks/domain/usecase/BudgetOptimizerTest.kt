@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.feature.decks.presentation.engine.CardFit
-import com.mmg.manahub.feature.decks.presentation.engine.ScoreComponents
-import com.mmg.manahub.feature.decks.presentation.engine.card
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.ScoreComponents
+import com.mmg.manahub.feature.decks.domain.engine.card
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -140,14 +140,62 @@ class BudgetOptimizerTest {
     }
 
     @Test
-    fun `missing price is treated as free and always kept`() {
+    fun `E8 - missing-price NEW card may be kept when no total cap is active`() {
+        // No total cap → the unknown-price flag is inert; the card is selectable and costed as 0.
         val input = listOf(suggestion("noPrice", priceEur = null, isOwned = false))
 
-        val result = optimizer(input, BudgetConstraints(maxPerCardEur = 1.0, maxTotalEur = 1.0))
+        val result = optimizer(input, BudgetConstraints(maxPerCardEur = 100.0))
 
         assertEquals(1, result.selected.size)
         assertEquals(0, result.cardsToBuy)
         assertEquals(0.0, result.totalCostEur, 0.001)
+    }
+
+    @Test
+    fun `E8 - missing-price NEW card is EXCLUDED under an active total cap`() {
+        // Under a total cap, an unknown-price NEW card cannot be costed → excluded (never silently free).
+        val input = listOf(suggestion("noPrice", priceEur = null, isOwned = false))
+
+        val result = optimizer(input, BudgetConstraints(maxTotalEur = 1.0))
+
+        assertTrue(result.selected.isEmpty())
+        assertEquals(0, result.cardsToBuy)
+        assertEquals(0.0, result.totalCostEur, 0.001)
+    }
+
+    @Test
+    fun `E8 - owned unknown-price card is still kept under an active total cap`() {
+        // Owned cards are free regardless of price, so the unknown-price exclusion never touches them.
+        val input = listOf(suggestion("ownedNoPrice", priceEur = null, isOwned = true))
+
+        val result = optimizer(input, BudgetConstraints(maxTotalEur = 1.0))
+
+        assertEquals(1, result.selected.size)
+        assertEquals(0, result.cardsToBuy)
+        assertEquals(0.0, result.totalCostEur, 0.001)
+    }
+
+    @Test
+    fun `E8 - priced cards still fill the cap when an unknown-price NEW card is dropped`() {
+        // The dropped unknown-price card must not consume budget; a real priced card still fits.
+        val input = listOf(
+            suggestion("unknown", priceEur = null, isOwned = false, score = 0.9f),
+            suggestion("priced", priceEur = 3.0, isOwned = false, score = 0.5f),
+        )
+
+        val result = optimizer(input, BudgetConstraints(maxTotalEur = 5.0))
+
+        val ids = result.selected.map { it.fit.card.scryfallId }
+        assertFalse("unknown" in ids)
+        assertTrue("priced" in ids)
+        assertEquals(1, result.cardsToBuy)
+        assertEquals(3.0, result.totalCostEur, 0.001)
+    }
+
+    @Test
+    fun `E8 - priceUnknown flag reflects a missing EUR price`() {
+        assertTrue(suggestion("a", priceEur = null, isOwned = false).priceUnknown)
+        assertFalse(suggestion("b", priceEur = 1.0, isOwned = false).priceUnknown)
     }
 
     @Test
