@@ -29,6 +29,14 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 
+/**
+ * Returns this string only when it is non-null and not blank; otherwise null.
+ *
+ * Used for display-name fallback chains where a present-but-empty value must be
+ * treated the same as a missing one (e.g. nickname → game_tag → user id).
+ */
+private fun String?.orNull(): String? = this?.takeIf { it.isNotBlank() }
+
 class FriendRepositoryImpl @Inject constructor(
     private val dao: FriendDao,
     private val remote: FriendRemoteDataSource,
@@ -108,7 +116,9 @@ class FriendRepositoryImpl @Inject constructor(
                 Friend(
                     id = "",
                     userId = it.id,
-                    nickname = it.nickname ?: it.id,
+                    nickname = it.nickname.orNull()
+                        ?: it.gameTag.orNull()
+                        ?: it.id,
                     gameTag = it.gameTag ?: "",
                     avatarUrl = it.avatarUrl,
                 )
