@@ -278,11 +278,15 @@ fun SettingsScreen(
                 },
             )
 
-            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-            GamificationSection(
-                enabled = gamificationEnabled,
-                onEnabledChange = viewModel::setGamificationEnabled,
-            )
+            // Hidden for release — see docs/gamification-hidden-for-release.md
+            // The gamification UI is hidden for this release, so the master toggle is removed
+            // to prevent users from re-enabling it. The engine keeps recording progress silently.
+            // To restore: un-comment the divider + GamificationSection below.
+            // HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            // GamificationSection(
+            //     enabled = gamificationEnabled,
+            //     onEnabledChange = viewModel::setGamificationEnabled,
+            // )
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             VoiceRecognitionSection(
