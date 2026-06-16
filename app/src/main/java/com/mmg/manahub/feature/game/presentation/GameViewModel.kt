@@ -8,6 +8,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
@@ -110,6 +111,7 @@ class GameViewModel @Inject constructor(
     savedStateHandle:                  SavedStateHandle,
     private val gameSessionRepo:       GameSessionRepository,
     private val tournamentRepo:        TournamentRepository,
+    private val recordMatchResultUseCase: RecordMatchResultUseCase,
     private val analyticsHelper:       AnalyticsHelper,
     private val observeSessionUseCase:        ObserveSessionUseCase,
     private val updateLifeUseCase:            UpdateLifeUseCase,
@@ -1388,14 +1390,44 @@ class GameViewModel @Inject constructor(
         }
 
         viewModelScope.launch(Dispatchers.IO) {
+            // tournamentPlayerIds is index-aligned with players: both derive from the SAME match
+            // playerIds order (TournamentViewModel.buildPlayerConfigsForMatch builds configs in
+            // playerIds order with id=index, and initFromTournamentMatch maps configs→players with
+            // id=index). So players[i] ↔ tournamentPlayerIds[i] is a stable correspondence.
             val winnerIndex = s.players.indexOfFirst { it.id == result.winner.id }
-            val winnerTournamentId = s.tournamentPlayerIds.getOrNull(winnerIndex) ?: return@launch
+            val winnerTournamentId = s.tournamentPlayerIds.getOrNull(winnerIndex)
+            if (winnerIndex < 0 || winnerTournamentId == null) {
+                // H3: a stuck tournament (match never finishes) was previously SILENT — the winner
+                // could not be mapped to a tournament participant, so we returned with no trace. Log a
+                // non-fatal so the stall is observable rather than mysterious.
+                FirebaseCrashlytics.getInstance().apply {
+                    log("tournament_result_winner_unmapped: matchId=$matchId winnerIndex=$winnerIndex")
+                    setCustomKey("tournament_id", s.activeTournamentId ?: -1L)
+                    setCustomKey("game_player_count", s.players.size)
+                    recordException(IllegalStateException(
+                        "[GameViewModel] could not map game winner (id=${result.winner.id}, " +
+                        "index=$winnerIndex) to a tournament participant for match $matchId"
+                    ))
+                }
+                return@launch
+            }
             val lifeTotals = s.players.mapIndexedNotNull { i, p ->
                 val tid = s.tournamentPlayerIds.getOrNull(i) ?: return@mapIndexedNotNull null
                 tid to p.life
             }.toMap()
             runCatching {
-                tournamentRepo.finishMatch(matchId, winnerTournamentId, sessionId, lifeTotals)
+                // Canonical write path (audit C1/C2): routes through RecordMatchResultUseCase →
+                // repository.finishMatch, which atomically finishes the match, advances the Swiss /
+                // Single-Elim round, and finishes the tournament (emitting completion XP) when done —
+                // exactly like the manual dialog. Previously this called tournamentRepo.finishMatch
+                // directly, which only wrote the match row and never advanced rounds or finished.
+                recordMatchResultUseCase.recordWin(matchId, winnerTournamentId, sessionId, lifeTotals)
+            }.onFailure { e ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("tournament_result_record_failed: matchId=$matchId")
+                    setCustomKey("tournament_id", s.activeTournamentId ?: -1L)
+                    recordException(e)
+                }
             }
         }
     }

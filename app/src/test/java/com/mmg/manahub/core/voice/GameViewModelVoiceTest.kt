@@ -27,6 +27,7 @@ import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseC
 import com.mmg.manahub.feature.game.presentation.GameSettings
 import com.mmg.manahub.feature.game.presentation.GameViewModel
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
+import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -109,6 +110,7 @@ class GameViewModelVoiceTest {
     private val leaveSessionUseCase        = mockk<LeaveSessionUseCase>(relaxed = true)
     private val nearbyRepo                 = mockk<NearbySessionRepository>(relaxed = true)
     private val toggleLandPlayedUseCase    = mockk<ToggleLandPlayedUseCase>(relaxed = true)
+    private val recordMatchResultUseCase   = mockk<RecordMatchResultUseCase>(relaxed = true)
     private val appContext                 = mockk<Context>(relaxed = true)
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -120,6 +122,7 @@ class GameViewModelVoiceTest {
             savedStateHandle             = handle,
             gameSessionRepo              = gameSessionRepo,
             tournamentRepo               = tournamentRepo,
+            recordMatchResultUseCase     = recordMatchResultUseCase,
             analyticsHelper              = analyticsHelper,
             observeSessionUseCase        = observeSessionUseCase,
             updateLifeUseCase            = updateLifeUseCase,
