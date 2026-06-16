@@ -357,19 +357,23 @@ private fun FriendDetailHeader(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(2.dp))
-                Row {
-                    Text(
-                        text = friend.gameTag,
-                        color = mc.primaryAccent,
-                        style = ty.labelSmall.copy(fontSize = 11.sp),
-                        modifier = Modifier
-                            .background(
-                                color = mc.primaryAccent.copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                // Skip the game-tag chip (and its leading spacer) entirely when blank, so a
+                // friend without a tag does not render an empty pill + dead vertical gap.
+                if (friend.gameTag.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Row {
+                        Text(
+                            text = friend.gameTag,
+                            color = mc.primaryAccent,
+                            style = ty.labelSmall.copy(fontSize = 11.sp),
+                            modifier = Modifier
+                                .background(
+                                    color = mc.primaryAccent.copy(alpha = 0.25f),
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
             
