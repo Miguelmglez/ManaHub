@@ -128,8 +128,7 @@ class AchievementBackfill @Inject constructor(
         if (grant.xpReward <= 0) return
         val key = "achievement:${grant.achievementId}:tier:${grant.tier}"
         if (dao.hasTransaction(key)) return
-        val current = dao.getProgression()?.totalXp ?: 0L
-        val newTotal = current + grant.xpReward
+        // Delta-based grant: the new total/level are computed inside the transaction (race-safe).
         dao.grantXpAtomically(
             txn = XpTransactionEntity(
                 idempotencyKey = key,
@@ -138,9 +137,9 @@ class AchievementBackfill @Inject constructor(
                 sourceRef = grant.achievementId,
                 createdAt = grant.now,
             ),
-            newTotalXp = newTotal,
-            newLevel = LevelCurve.levelForTotalXp(newTotal),
+            amount = grant.xpReward,
             updatedAt = grant.now,
+            levelForTotalXp = LevelCurve::levelForTotalXp,
         )
     }
 
