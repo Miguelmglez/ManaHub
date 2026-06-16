@@ -21,7 +21,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -58,15 +60,26 @@ class FriendsViewModel @Inject constructor(
     private val _currentUserId = MutableStateFlow<String?>(null)
 
     init {
+        // Cheap per-emission UI sync (login flag + game tag). This must run on every
+        // emission because the game tag can change without the userId changing.
         authRepo.sessionState
             .onEach { state ->
                 val loggedIn = state is SessionState.Authenticated
                 val authUser = (state as? SessionState.Authenticated)?.user
-                val userId = authUser?.id
-                _currentUserId.value = userId
+                _currentUserId.value = authUser?.id
                 _uiState.update { it.copy(isLoggedIn = loggedIn, gameTag = authUser?.gameTag) }
-                if (loggedIn && userId != null) loadData(userId)
             }
+            .catch { }
+            .launchIn(viewModelScope)
+
+        // Expensive network refresh — gated on a CHANGE of userId only. The session flow
+        // re-emits Authenticated on every token refresh / app foreground; without this gate
+        // each duplicate emission for the same user would fire 3 sequential network refreshes
+        // and an isLoading flicker. distinctUntilChangedBy collapses same-user re-emissions.
+        authRepo.sessionState
+            .map { (it as? SessionState.Authenticated)?.user?.id }
+            .distinctUntilChangedBy { it }
+            .onEach { userId -> if (userId != null) loadData(userId) }
             .catch { }
             .launchIn(viewModelScope)
 
@@ -121,7 +134,10 @@ class FriendsViewModel @Inject constructor(
 
     fun triggerSearch() {
         val query = _uiState.value.searchQuery.trim()
-        // GAME_TAG_LENGTH includes the '#' prefix, so the raw input without '#' is one character shorter
+        // ASSUMPTION: game tags are FIXED length. GAME_TAG_LENGTH includes the '#' prefix, so
+        // the raw input without '#' is exactly one character shorter — any other length is
+        // rejected as malformed. If tags ever become variable-length, this exact-length check
+        // must be replaced with a min/max range (or a regex) or valid searches will be dropped.
         if (query.length != CardConstants.GAME_TAG_LENGTH - 1) {
             analyticsHelper.logEvent("wrong_length_friend_search")
             _uiState.update { it.copy(searchPerformed = true, searchResult = null) }
