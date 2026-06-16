@@ -15,6 +15,8 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
+import io.github.jan.supabase.auth.exception.AuthErrorCode
+import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.exceptions.RestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.mockk.Runs
@@ -878,5 +880,45 @@ class AuthRepositoryImplTest {
         val result = repository.getCurrentUser()
 
         assertEquals("google", result?.provider)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 11 — EmailNotConfirmed error mapping (ADR-003)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given AuthRestException with EmailNotConfirmed errorCode when signInWithEmail then returns EmailNotConfirmed not InvalidCredentials`() = runTest {
+        // Arrange: GoTrue rejects the sign-in because email confirmation is still pending.
+        // AuthRestException carries a typed AuthErrorCode, so it must be inspected BEFORE
+        // the generic RestException branch — a plain 400 RestException would incorrectly
+        // produce InvalidCredentials (ADR-003).
+        val authRestException = mockk<AuthRestException>(relaxed = true) {
+            every { errorCode } returns AuthErrorCode.EmailNotConfirmed
+            every { statusCode } returns 400
+        }
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws authRestException
+
+        // Act
+        val result = repository.signInWithEmail("unconfirmed@example.com", "correctPassword1!")
+
+        // Assert: must be EmailNotConfirmed, NOT InvalidCredentials
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.EmailNotConfirmed, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given plain RestException with statusCode 400 when signInWithEmail then returns InvalidCredentials not EmailNotConfirmed`() = runTest {
+        // Regression: a generic 400 RestException (no AuthErrorCode) must still map to
+        // InvalidCredentials via the fallback branch, proving the new AuthRestException
+        // branch does not shadow existing error-code-less exceptions.
+        val restException = mockk<RestException>(relaxed = true) {
+            every { statusCode } returns 400
+        }
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws restException
+
+        val result = repository.signInWithEmail("wrong@example.com", "wrongPassword1!")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.InvalidCredentials, (result as AuthResult.Error).error)
     }
 }

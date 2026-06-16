@@ -19,6 +19,8 @@ import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
+import io.github.jan.supabase.auth.exception.AuthErrorCode
+import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.exceptions.RestException
@@ -644,6 +646,28 @@ class AuthRepositoryImpl @Inject constructor(
      *   sign-up. The caller in [signInWithGoogle] enriches this with the actual token data.
      */
     private fun Throwable.toAuthError(isGoogleSignIn: Boolean = false): AuthError = when (this) {
+        // AuthRestException is a RestException subclass that carries a typed AuthErrorCode.
+        // Inspect it first so we can distinguish "email not confirmed" (correct credentials,
+        // confirmation still pending — ADR-003) from a genuine bad-password 400, which would
+        // otherwise be flattened to the misleading InvalidCredentials message below.
+        is AuthRestException -> when (errorCode) {
+            AuthErrorCode.EmailNotConfirmed -> AuthError.EmailNotConfirmed
+            AuthErrorCode.UserNotFound -> AuthError.UserNotFound
+            AuthErrorCode.SessionExpired,
+            AuthErrorCode.SessionNotFound -> AuthError.SessionExpired
+            AuthErrorCode.EmailExists,
+            AuthErrorCode.UserAlreadyExists ->
+                if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "")
+                else AuthError.EmailAlreadyInUse
+            else -> when (statusCode) {
+                400 -> AuthError.InvalidCredentials
+                422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
+                404 -> AuthError.UserNotFound
+                401 -> AuthError.SessionExpired
+                else -> AuthError.Unknown(message)
+            }
+        }
+
         is RestException -> when (statusCode) {
             400 -> AuthError.InvalidCredentials
             // A placeholder GoogleEmailConflict is returned when isGoogleSignIn=true.
