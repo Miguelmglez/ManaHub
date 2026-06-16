@@ -1228,17 +1228,22 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `new default layouts include the progression and quests widgets`() = runTest(testDispatcher) {
-        sessionStateFlow.value = SessionState.Unauthenticated
+    fun `default layouts exclude the progression and quests widgets (gamification hidden for release)`() =
+        runTest(testDispatcher) {
+            // The gamification UI is hidden for release (docs/gamification-hidden-for-release.md),
+            // so the default dashboard layout no longer seeds PROGRESSION_HUB / QUESTS_HUB. The
+            // base layout (e.g. CONTEXT_HERO) is still present so we know the default was applied.
+            sessionStateFlow.value = SessionState.Unauthenticated
 
-        val vm = buildViewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        advanceUntilIdle()
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
 
-        val types = vm.state.value.layout.map { it.type }
-        assertTrue(HomeWidgetType.PROGRESSION_HUB in types)
-        assertTrue(HomeWidgetType.QUESTS_HUB in types)
-    }
+            val types = vm.state.value.layout.map { it.type }
+            assertTrue(HomeWidgetType.CONTEXT_HERO in types)
+            assertFalse(HomeWidgetType.PROGRESSION_HUB in types)
+            assertFalse(HomeWidgetType.QUESTS_HUB in types)
+        }
 
     @Test
     fun `hero is QuestsReady with the claimable count when quests are completed and gamification enabled`() =

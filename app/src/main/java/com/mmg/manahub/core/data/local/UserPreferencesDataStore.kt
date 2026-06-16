@@ -73,7 +73,12 @@ private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hour
 
 // ── Feature flags ─────────────────────────────────────────────────────────
 private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
-/** Master gamification switch (XP, levels, achievements, quests). Default: enabled. */
+/**
+ * Master gamification switch (XP, levels, achievements, quests). Default: DISABLED — the
+ * gamification UI is hidden for this release (see docs/gamification-hidden-for-release.md).
+ * The engine keeps recording progress silently while this is off, so re-enabling restores
+ * the user's true state.
+ */
 private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
 /** One-shot flag: true once the Family-A achievement backfill has run (ADR-002 §4). Default: false. */
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
@@ -419,13 +424,15 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     /**
-     * Master gamification switch. Default: true (ON). When false, all gamification UI
-     * (XP, levels, achievements, quests) is hidden — the engine keeps recording progress
-     * silently so re-enabling restores the user's true state (ADR-002 §"opt-out first-class").
+     * Master gamification switch. Default: false (OFF) because the gamification UI is hidden
+     * for this release (see docs/gamification-hidden-for-release.md). When false, all
+     * gamification UI (XP, levels, achievements, quests) is hidden — the engine keeps recording
+     * progress silently so re-enabling restores the user's true state (ADR-002 §"opt-out
+     * first-class"). To restore the feature, flip the default back to true / emit(true).
      */
     val gamificationEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: true }
-        .catch { emit(true) }
+        .map { prefs -> prefs[KEY_GAMIFICATION_ENABLED] ?: false }
+        .catch { emit(false) }
 
     /** Persists the master gamification switch. */
     suspend fun setGamificationEnabled(enabled: Boolean) {

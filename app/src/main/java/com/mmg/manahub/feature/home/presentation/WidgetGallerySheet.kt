@@ -173,6 +173,10 @@ fun WidgetGallerySheet(
             ) {
                 localCategoryOrder.forEach { category ->
                     val widgets = HomeWidgetType.entries.filter { it.category == category }
+                        // Hidden for release — see docs/gamification-hidden-for-release.md.
+                        // When gamification is off, omit its widget types from the gallery entirely
+                        // (instead of showing them as greyed/disabled rows).
+                        .filter { gamificationEnabled || !it.isGamification }
                     val isDraggingCategory = draggedCategory == category
                     
                     val categoryZIndex = if (isDraggingCategory) 10f else 1f
