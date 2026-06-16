@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.friends.data.remote
 
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
+import com.mmg.manahub.feature.friends.data.orNullIfBlank
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -28,9 +30,9 @@ class FriendRemoteDataSource @Inject constructor(
                     FriendWithProfile(
                         id = fs.id,
                         friendUserId = otherId,
-                        nickname = profile?.nickname.orNull()
-                            ?: profile?.gameTag.orNull()
-                            ?: "Unknown",
+                        nickname = profile?.nickname.orNullIfBlank()
+                            ?: profile?.gameTag.orNullIfBlank()
+                            ?: UNKNOWN_DISPLAY_NAME,
                         gameTag = profile?.gameTag ?: "",
                         avatarUrl = profile?.avatarUrl,
                     )
@@ -52,9 +54,9 @@ class FriendRemoteDataSource @Inject constructor(
                     FriendRequestWithProfile(
                         id = fs.id,
                         fromUserId = fs.userId1,
-                        fromNickname = profile?.nickname.orNull()
-                            ?: profile?.gameTag.orNull()
-                            ?: "Unknown",
+                        fromNickname = profile?.nickname.orNullIfBlank()
+                            ?: profile?.gameTag.orNullIfBlank()
+                            ?: UNKNOWN_DISPLAY_NAME,
                         fromGameTag = profile?.gameTag ?: "",
                         fromAvatarUrl = profile?.avatarUrl,
                         createdAt = 0L,
@@ -238,9 +240,9 @@ class FriendRemoteDataSource @Inject constructor(
                     OutgoingRequestWithProfile(
                         id = fs.id,
                         toUserId = fs.userId2,
-                        toNickname = profile?.nickname.orNull()
-                            ?: profile?.gameTag.orNull()
-                            ?: "Unknown",
+                        toNickname = profile?.nickname.orNullIfBlank()
+                            ?: profile?.gameTag.orNullIfBlank()
+                            ?: UNKNOWN_DISPLAY_NAME,
                         toGameTag = profile?.gameTag ?: "",
                         toAvatarUrl = profile?.avatarUrl,
                         createdAt = 0L,
@@ -249,14 +251,6 @@ class FriendRemoteDataSource @Inject constructor(
             }
         }
 }
-
-/**
- * Returns this string only when it is non-null and not blank; otherwise null.
- *
- * Used for display-name fallback chains where a present-but-empty value must be
- * treated the same as a missing one (e.g. nickname → game_tag → "Unknown").
- */
-private fun String?.orNull(): String? = this?.takeIf { it.isNotBlank() }
 
 data class FriendWithProfile(
     val id: String,

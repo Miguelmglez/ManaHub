@@ -4,7 +4,10 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
+import com.mmg.manahub.core.domain.repository.MatchResultOutcome
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -38,6 +41,7 @@ class TournamentRepositoryImplTest {
 
     private val dao = mockk<TournamentDao>(relaxed = true)
     private val progressionEventBus = mockk<ProgressionEventBus>(relaxed = true)
+    private val generateNextRound = mockk<GenerateNextRoundUseCase>(relaxed = true)
     private lateinit var repository: TournamentRepositoryImpl
 
     // ── Fixture helpers ───────────────────────────────────────────────────────
@@ -76,11 +80,21 @@ class TournamentRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = TournamentRepositoryImpl(dao, progressionEventBus, UnconfinedTestDispatcher())
+        repository = TournamentRepositoryImpl(dao, progressionEventBus, generateNextRound, UnconfinedTestDispatcher())
         // Default match for finishMatch tests — winner (1L) is a valid participant
         coEvery { dao.getMatchById(any()) } returns TournamentMatchEntity(
             id = 100L, tournamentId = 1L, round = 1, playerIds = "[1,2]",
         )
+        // finishMatch reads the parent tournament + players before the atomic advance (audit C1/C2).
+        coEvery { dao.getTournamentById(1L) } returns TournamentEntity(
+            id = 1L, name = "T", format = "STANDARD", structure = "ROUND_ROBIN", status = "ACTIVE",
+        )
+        coEvery { dao.getPlayers(1L) } returns listOf(buildPlayer(id = 1L), buildPlayer(id = 2L))
+        // Default atomic finish-and-advance: round not complete (no advancement, no XP). Individual
+        // tests override the returned AdvanceKind to drive the round-generated / finished / no-op paths.
+        coEvery {
+            dao.finishMatchAndAdvanceAtomically(any(), any(), any(), any(), any(), any(), any())
+        } returns TournamentDao.AdvanceKind.ROUND_NOT_COMPLETE
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -669,23 +683,24 @@ class TournamentRepositoryImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 7 — finishMatch serializes lifeTotals correctly
+    //  GROUP 7 — finishMatch serializes lifeTotals into the atomic finish-and-advance
     // ══════════════════════════════════════════════════════════════════════════
+    //
+    // finishMatch now routes the life-totals JSON into the SINGLE atomic DAO method
+    // finishMatchAndAdvanceAtomically (the `lifeTotals` param), which finishes the match, advances the
+    // round, and finishes the tournament in one transaction (audit C1/C2/C3). These tests assert the
+    // serialization passed to that method.
 
     @Test
-    fun `given lifeTotals map when finishMatch then dao is called with correct JSON string`() = runTest {
-        // Arrange
-        val lifeTotals = mapOf(1L to 15, 2L to 0)
+    fun `given lifeTotals map when finishMatch then atomic advance receives correct JSON string`() = runTest {
+        // Arrange — capture the 5th positional argument (lifeTotals JSON)
         val capturedLifeJson = slot<String>()
-        coEvery { dao.finishMatch(any(), any(), any(), capture(capturedLifeJson)) } returns Unit
+        coEvery {
+            dao.finishMatchAndAdvanceAtomically(any(), any(), any(), any(), capture(capturedLifeJson), any(), any())
+        } returns TournamentDao.AdvanceKind.ROUND_NOT_COMPLETE
 
         // Act
-        repository.finishMatch(
-            matchId    = 100L,
-            winnerId   = 1L,
-            sessionId  = 42L,
-            lifeTotals = lifeTotals,
-        )
+        repository.finishMatch(matchId = 100L, winnerId = 1L, sessionId = 42L, lifeTotals = mapOf(1L to 15, 2L to 0))
 
         // Assert: JSON contains both entries — order may vary
         val json = capturedLifeJson.captured
@@ -696,29 +711,93 @@ class TournamentRepositoryImplTest {
     }
 
     @Test
-    fun `given sessionId=null when finishMatch then dao is called with null sessionId`() = runTest {
-        // Arrange — manual result recording (no linked game session)
-        val capturedSessionId = slot<Long?>()
-        coEvery { dao.finishMatch(any(), any(), captureNullable(capturedSessionId), any()) } returns Unit
-
-        // Act
-        repository.finishMatch(100L, 1L, null, mapOf(1L to 10, 2L to 5))
-
-        // Assert
-        assertEquals(null, capturedSessionId.captured)
-    }
-
-    @Test
-    fun `given empty lifeTotals when finishMatch then dao is called with empty JSON object`() = runTest {
+    fun `given empty lifeTotals when finishMatch then atomic advance receives empty JSON object`() = runTest {
         // Arrange
         val capturedLifeJson = slot<String>()
-        coEvery { dao.finishMatch(any(), any(), any(), capture(capturedLifeJson)) } returns Unit
+        coEvery {
+            dao.finishMatchAndAdvanceAtomically(any(), any(), any(), any(), capture(capturedLifeJson), any(), any())
+        } returns TournamentDao.AdvanceKind.ROUND_NOT_COMPLETE
 
         // Act
         repository.finishMatch(100L, 1L, null, emptyMap())
 
         // Assert
         assertEquals("{}", capturedLifeJson.captured)
+    }
+
+    @Test
+    fun `given winner not a participant when finishMatch then it throws before any write`() = runTest {
+        // Match [1,2]; winner 99 is not a participant → the validation guard rejects before advancing.
+        var threw = false
+        try {
+            repository.finishMatch(100L, winnerId = 99L, sessionId = null, lifeTotals = emptyMap())
+        } catch (e: IllegalArgumentException) {
+            threw = true
+        }
+        assertTrue("non-participant winner must be rejected", threw)
+        coVerify(exactly = 0) {
+            dao.finishMatchAndAdvanceAtomically(any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 9 — single write path: outcome mapping + XP emission (C1 / C2 / C3)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given atomic advance returns TOURNAMENT_FINISHED when finishMatch then completion XP is emitted once`() = runTest {
+        // C2: the game-played / manual path must emit TournamentCompleted exactly once on completion.
+        val captured = slot<ProgressionEvent>()
+        coEvery {
+            dao.finishMatchAndAdvanceAtomically(any(), any(), any(), any(), any(), any(), any())
+        } returns TournamentDao.AdvanceKind.TOURNAMENT_FINISHED
+        coEvery { progressionEventBus.emit(capture(captured)) } returns Unit
+
+        val outcome = repository.finishMatch(100L, 1L, 42L, mapOf(1L to 10, 2L to 0))
+
+        assertEquals(MatchResultOutcome.TournamentFinished, outcome)
+        coVerify(exactly = 1) { progressionEventBus.emit(any()) }
+        assertTrue("must emit TournamentCompleted", captured.captured is ProgressionEvent.TournamentCompleted)
+        assertEquals(1L, (captured.captured as ProgressionEvent.TournamentCompleted).tournamentId)
+    }
+
+    @Test
+    fun `given atomic advance returns ROUND_GENERATED when finishMatch then no XP is emitted`() = runTest {
+        // C1: advancing a round (not finishing) must NOT emit completion XP.
+        coEvery {
+            dao.finishMatchAndAdvanceAtomically(any(), any(), any(), any(), any(), any(), any())
+        } returns TournamentDao.AdvanceKind.ROUND_GENERATED
+
+        val outcome = repository.finishMatch(100L, 1L, null, emptyMap())
+
+        assertEquals(MatchResultOutcome.RoundGenerated, outcome)
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
+    }
+
+    @Test
+    fun `given atomic advance returns NO_OP when finishMatch then outcome is NoOp and no XP is emitted`() = runTest {
+        // C3: a repeated / concurrent finish of an already-FINISHED match is a no-op — no double-grant.
+        coEvery {
+            dao.finishMatchAndAdvanceAtomically(any(), any(), any(), any(), any(), any(), any())
+        } returns TournamentDao.AdvanceKind.NO_OP
+
+        val outcome = repository.finishMatch(100L, 1L, null, emptyMap())
+
+        assertEquals(MatchResultOutcome.NoOp, outcome)
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
+    }
+
+    @Test
+    fun `given tournament already FINISHED when finishTournament then it no-ops and emits no XP`() = runTest {
+        // Regression guard: finishTournament must not double-emit when already finished.
+        coEvery { dao.getTournamentById(1L) } returns TournamentEntity(
+            id = 1L, name = "T", format = "STANDARD", structure = "ROUND_ROBIN", status = "FINISHED",
+        )
+
+        repository.finishTournament(1L)
+
+        coVerify(exactly = 0) { dao.finishTournament(any(), any()) }
+        coVerify(exactly = 0) { progressionEventBus.emit(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

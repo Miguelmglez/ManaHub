@@ -44,11 +44,15 @@ class StreakTracker @Inject constructor(
      * new row. Freeze-token rules (cap [MAX_FREEZE_TOKENS]):
      *
      * - First ever (null): current = 1, longest = 1, tokens = [MAX_FREEZE_TOKENS].
-     * - Same day (today == lastActiveDate): no-op (returns [existing] unchanged).
-     * - Next day (gap 0 missed days): current + 1; tokens regenerate +1 (capped) only when the new
-     *   current is a multiple of 7 (a full active week completed).
-     * - Gap of N >= 1 missed days: if tokens >= N, consume N and continue the streak (current + 1);
-     *   else reset current to 1, tokens unchanged (never negative).
+     * - Same day (today == lastActiveDate): no-op (returns [existing] unchanged) — the streak counts
+     *   consecutive CALENDAR DAYS, not app-open events, so repeated opens on the same local day never
+     *   inflate `current`.
+     * - Next day (gap 0 missed days): current + 1; tokens regenerate +1 (capped) when the new current
+     *   is a multiple of 7 (a full active week completed).
+     * - Gap of N >= 1 missed days: if tokens >= N, consume N and continue the streak (current + 1) —
+     *   AND the same 7-day-multiple regen still applies, so a milestone token is never silently skipped
+     *   just because the milestone day happened to be covered by a freeze; else reset current to 1,
+     *   tokens unchanged (never negative).
      *
      * [type] defaults to [TYPE_DAILY_ACTIVITY] so the produced row carries the correct PK.
      */
@@ -81,12 +85,11 @@ class StreakTracker @Inject constructor(
             // Consecutive day: extend the streak; maybe regenerate a freeze token.
             dayDelta == 1L -> {
                 val newCurrent = existing.current.coerceAtLeast(0) + 1
-                val regen = if (newCurrent % WEEK_LENGTH == 0) 1 else 0
                 existing.copy(
                     current = newCurrent,
                     longest = maxOf(existing.longest, newCurrent),
                     lastActiveDate = today.toString(),
-                    freezeTokens = (existing.freezeTokens + regen).coerceIn(0, MAX_FREEZE_TOKENS),
+                    freezeTokens = regenTokens(existing.freezeTokens, newCurrent),
                 )
             }
 
@@ -94,13 +97,16 @@ class StreakTracker @Inject constructor(
             else -> {
                 val missed = (dayDelta - 1L).toInt()
                 if (existing.freezeTokens >= missed) {
-                    // Freeze covers the gap: preserve and extend the streak.
+                    // Freeze covers the gap: preserve and extend the streak. The milestone regen is
+                    // applied to the POST-consumption balance with the SAME helper as the consecutive
+                    // branch, so a 7-day-multiple token is never silently skipped when the milestone day
+                    // is covered by a freeze (the two branches can't drift — symmetry by construction).
                     val newCurrent = existing.current.coerceAtLeast(0) + 1
                     existing.copy(
                         current = newCurrent,
                         longest = maxOf(existing.longest, newCurrent),
                         lastActiveDate = today.toString(),
-                        freezeTokens = (existing.freezeTokens - missed).coerceIn(0, MAX_FREEZE_TOKENS),
+                        freezeTokens = regenTokens(existing.freezeTokens - missed, newCurrent),
                     )
                 } else {
                     // Not enough tokens: reset to a fresh 1-day streak (tokens unchanged, never negative).
@@ -113,6 +119,18 @@ class StreakTracker @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Applies the 7-day-milestone freeze-token regeneration to [baseTokens], clamped to the cap.
+     *
+     * Extracted so the consecutive-day and freeze-covered-gap branches use IDENTICAL regen logic and
+     * cannot drift: a token is regenerated (+1) whenever [newCurrent] lands on a multiple of
+     * [WEEK_LENGTH] (a full active week completed), then the total is clamped to `[0, MAX_FREEZE_TOKENS]`.
+     */
+    private fun regenTokens(baseTokens: Int, newCurrent: Int): Int {
+        val regen = if (newCurrent % WEEK_LENGTH == 0) 1 else 0
+        return (baseTokens + regen).coerceIn(0, MAX_FREEZE_TOKENS)
     }
 
     companion object {

@@ -97,7 +97,12 @@ object StandingsCalculator {
             played++
             when {
                 match.winnerId == player.id -> wins++
-                match.winnerId == null       -> { /* draw contributes 0.5 but for simplicity use 0 wins */ }
+                // KNOWN LIMITATION (audit M3): a draw currently contributes 0 wins here. DCI MWR
+                // counts a draw as 1/3 of a match win (≈0.33), so drawn players are slightly
+                // under-credited in their opponents' OMW%. This only perturbs DISPLAY ordering of
+                // tiebreakers, never who advances. Fix when Phase 2 tracks real game scores:
+                // treat a draw as `wins += 1/3` (and split GW% off MW%, below).
+                match.winnerId == null       -> { /* draw → 0 wins (see M3 note above) */ }
             }
         }
         player.id to if (played == 0) OMW_FLOOR else max(wins.toDouble() / played, OMW_FLOOR)
@@ -150,17 +155,7 @@ object StandingsCalculator {
         return max(avg, OMW_FLOOR)
     }
 
-    internal fun parseIds(json: String): List<Long> =
-        json.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+    internal fun parseIds(json: String): List<Long> = TournamentIdCodec.decodeIds(json)
 
-    internal fun parseLifeTotals(json: String): Map<Long, Int> {
-        if (json.isBlank()) return emptyMap()
-        return json.trim('{', '}').split(",").mapNotNull { entry ->
-            val colonIdx = entry.indexOf(':')
-            if (colonIdx == -1) return@mapNotNull null
-            val id   = entry.substring(0, colonIdx).trim().toLongOrNull()
-            val life = entry.substring(colonIdx + 1).trim().toIntOrNull()
-            if (id != null && life != null) id to life else null
-        }.toMap()
-    }
+    internal fun parseLifeTotals(json: String): Map<Long, Int> = TournamentIdCodec.decodeLifeTotals(json)
 }

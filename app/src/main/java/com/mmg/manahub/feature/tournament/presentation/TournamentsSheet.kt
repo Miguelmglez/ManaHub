@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -41,15 +40,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.BottomSheetShape
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
 
 /**
@@ -91,10 +96,12 @@ fun TournamentsSheet(
     var showJoinOnlineSheet by remember { mutableStateOf(false) }
     var showCreateOnlineStub by remember { mutableStateOf(false) }
     val toastState = rememberMagicToastState()
+    // Resolved in composable scope; the LaunchedEffect below cannot call stringResource directly.
+    val comingSoonMsg = stringResource(R.string.tournaments_sheet_online_coming_soon)
 
     LaunchedEffect(showCreateOnlineStub) {
         if (showCreateOnlineStub) {
-            toastState.show("Online tournaments coming soon!", MagicToastType.INFO)
+            toastState.show(comingSoonMsg, MagicToastType.INFO)
             showCreateOnlineStub = false
         }
     }
@@ -102,10 +109,11 @@ fun TournamentsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
+        shape = BottomSheetShape,
         contentWindowInsets = { WindowInsets(0) },
         dragHandle = {
             Surface(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = MaterialTheme.spacing.md),
                 color = mc.textDisabled.copy(alpha = 0.4f),
                 shape = CircleShape
             ) {
@@ -117,13 +125,13 @@ fun TournamentsSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(horizontal = MaterialTheme.spacing.xl, vertical = MaterialTheme.spacing.sm)
                     .navigationBarsPadding()
                     .verticalScroll(rememberScrollState()),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)
                 ) {
                     Icon(
                         Icons.Default.EmojiEvents,
@@ -132,45 +140,45 @@ fun TournamentsSheet(
                         modifier = Modifier.size(28.dp)
                     )
                     Text(
-                        text = "Tournaments",
+                        text = stringResource(R.string.tournaments_sheet_title),
                         style = ty.titleLarge,
                         color = mc.textPrimary,
                     )
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(MaterialTheme.spacing.xl))
 
                 // Action rows
                 SheetActionRow(
                     emoji = "🏟️",
-                    title = "Create local tournament",
-                    subtitle = "Play with friends offline",
+                    title = stringResource(R.string.tournaments_sheet_create_local_title),
+                    subtitle = stringResource(R.string.tournaments_sheet_create_local_subtitle),
                     onClick = onCreateLocal,
                 )
 
                 SheetActionRow(
                     emoji = "🏆",
-                    title = "Host online tournament",
-                    subtitle = "Create and share a bracket",
+                    title = stringResource(R.string.tournaments_sheet_host_online_title),
+                    subtitle = stringResource(R.string.tournaments_sheet_host_online_subtitle),
                     onClick = { showCreateOnlineStub = true },
                 )
 
                 SheetActionRow(
                     emoji = "🔗",
-                    title = "Join online tournament",
-                    subtitle = "Enter a tournament code",
+                    title = stringResource(R.string.tournaments_sheet_join_online_title),
+                    subtitle = stringResource(R.string.tournaments_sheet_join_online_subtitle),
                     onClick = { showJoinOnlineSheet = true },
                 )
 
                 HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 24.dp),
+                    modifier = Modifier.padding(vertical = MaterialTheme.spacing.xl),
                     color = mc.surfaceVariant.copy(alpha = 0.5f),
                 )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                    modifier = Modifier.padding(bottom = MaterialTheme.spacing.md)
                 ) {
                     Icon(
                         Icons.Default.History,
@@ -179,25 +187,30 @@ fun TournamentsSheet(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "RECENT TOURNAMENTS",
+                        text = stringResource(R.string.tournaments_sheet_recent_header).uppercase(),
                         style = ty.labelLarge,
                         color = mc.textSecondary,
                     )
                 }
 
                 if (tournaments.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Intentionally capped at take(3): a bounded list inside a verticalScroll Column.
+                    // Keep it bounded — nesting a LazyColumn in a scrollable Column would crash.
+                    Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)) {
                         tournaments.take(3).forEach { tournament ->
                             Surface(
                                 color = mc.surface.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = CardShape,
                                 border = androidx.compose.foundation.BorderStroke(0.5.dp, mc.surfaceVariant),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onOpenTournament(tournament.id) },
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                    modifier = Modifier.padding(
+                                        horizontal = MaterialTheme.spacing.lg,
+                                        vertical   = MaterialTheme.spacing.md,
+                                    ),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
@@ -208,7 +221,7 @@ fun TournamentsSheet(
                                             color = mc.textPrimary,
                                         )
                                         Text(
-                                            text = tournament.status,
+                                            text = tournamentStatusLabel(tournament.status),
                                             style = ty.labelSmall,
                                             color = mc.primaryAccent,
                                         )
@@ -226,22 +239,22 @@ fun TournamentsSheet(
                 } else {
                     OutlinedButton(
                         onClick = onNavigateToTournamentList,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = mc.primaryAccent,
                         ),
                         border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = ButtonShape,
                     ) {
                         Text(
-                            text = "View all tournaments",
+                            text = stringResource(R.string.tournaments_sheet_view_all),
                             style = ty.labelLarge,
                             color = mc.primaryAccent,
                         )
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(MaterialTheme.spacing.xl))
             }
 
             MagicToastHost(
@@ -249,7 +262,7 @@ fun TournamentsSheet(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = MaterialTheme.spacing.sm),
             )
         }
     }
@@ -285,13 +298,13 @@ private fun SheetActionRow(
     Surface(
         onClick = onClick,
         color = Color.Transparent,
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(vertical = MaterialTheme.spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Emoji icon in a circle

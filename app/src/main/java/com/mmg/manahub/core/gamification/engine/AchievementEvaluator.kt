@@ -186,8 +186,7 @@ class AchievementEvaluator @Inject constructor(
         if (dao.hasTransaction(key)) return
 
         val nowMillis = clock.millis()
-        val current = dao.getProgression()?.totalXp ?: 0L
-        val newTotal = current + xpReward
+        // Delta-based grant: the new total/level are computed inside the transaction (race-safe).
         dao.grantXpAtomically(
             txn = XpTransactionEntity(
                 idempotencyKey = key,
@@ -196,9 +195,9 @@ class AchievementEvaluator @Inject constructor(
                 sourceRef = achievementId,
                 createdAt = nowMillis,
             ),
-            newTotalXp = newTotal,
-            newLevel = LevelCurve.levelForTotalXp(newTotal),
+            amount = xpReward,
             updatedAt = nowMillis,
+            levelForTotalXp = LevelCurve::levelForTotalXp,
         )
     }
 }

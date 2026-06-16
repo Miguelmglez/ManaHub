@@ -10,9 +10,12 @@ import com.mmg.manahub.core.domain.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -163,11 +166,17 @@ class PlaytestSetupViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // loadDeck() logs to Crashlytics outside any runCatching block, so the static
+        // getInstance() must be mocked or every deck-loading test throws
+        // "Default FirebaseApp is not initialized" and eligibility never resolves.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ── Group 1: Ineligible deck → no NavigateToHand event ────────────────────
@@ -182,9 +191,12 @@ class PlaytestSetupViewModelTest {
         val eligibility = viewModel.uiState.value.eligibility
         assertTrue("eligibility must be Ineligible for 59-card standard deck", eligibility is PlaytestEligibility.Ineligible)
 
-        viewModel.onDrawHand()
-
-        assertNull("NavigateToHand must NOT be emitted when deck is ineligible", viewModel.events.value)
+        viewModel.events.test {
+            viewModel.onDrawHand()
+            advanceUntilIdle()
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -194,9 +206,12 @@ class PlaytestSetupViewModelTest {
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        viewModel.onDrawHand()
-
-        assertNull("NavigateToHand must NOT be emitted for unsupported format", viewModel.events.value)
+        viewModel.events.test {
+            viewModel.onDrawHand()
+            advanceUntilIdle()
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -278,42 +293,44 @@ class PlaytestSetupViewModelTest {
         advanceUntilIdle()
 
         viewModel.events.test {
+            // Two rapid taps before the event is drained. The isNavigating guard must drop the
+            // second one. We prove EXACTLY ONE navigation event is delivered (with the Channel,
+            // a removed guard would deliver two distinct events rather than equality-collapsing
+            // them as a StateFlow once did — so this assertion now genuinely fails if the guard
+            // is removed).
             viewModel.onDrawHand()
-            viewModel.onDrawHand()  // second call while isNavigating=true — must be a no-op
+            viewModel.onDrawHand()
+            advanceUntilIdle()
 
             val event = awaitItem()
             assertTrue("first call must emit NavigateToHand", event is PlaytestSetupEvent.NavigateToHand)
 
-            // After consuming the event the guard is reset.
-            viewModel.onEventConsumed()
-
-            // No second event should be queued.
+            // The second tap must NOT have queued a second navigation event.
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `given event consumed when onDrawHand called again then NavigateToHand is emitted`() = runTest {
+    fun `given a fresh ViewModel after navigation then onDrawHand emits NavigateToHand again`() = runTest {
+        // Navigation is a one-way transition: the guard is never reset within a ViewModel's
+        // lifetime. On return to setup (Back) a NEW ViewModel instance is created, so a fresh
+        // instance must allow navigation again. This replaces the old onEventConsumed-based
+        // reset test, which no longer applies after the Channel migration.
         val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 60)
         stubDeck(deckWithCards)
         viewModel = buildViewModel()
         advanceUntilIdle()
 
-        viewModel.onDrawHand()
-        val firstEvent = viewModel.events.value
-        assertTrue(firstEvent is PlaytestSetupEvent.NavigateToHand)
-
-        // Simulate screen consuming the event and user pressing Back.
-        viewModel.onEventConsumed()
-        assertNull("event must be cleared after onEventConsumed", viewModel.events.value)
-
-        // User presses "Draw Hand" again — must work.
-        viewModel.onDrawHand()
-        assertTrue(
-            "NavigateToHand must be emitted again after isNavigating is reset",
-            viewModel.events.value is PlaytestSetupEvent.NavigateToHand,
-        )
+        viewModel.events.test {
+            viewModel.onDrawHand()
+            advanceUntilIdle()
+            assertTrue(
+                "a fresh ViewModel must emit NavigateToHand on the first tap",
+                awaitItem() is PlaytestSetupEvent.NavigateToHand,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     // ── Group 4: Standard boundary (60 / 59) ──────────────────────────────────
@@ -430,11 +447,13 @@ class PlaytestSetupViewModelTest {
         viewModel = buildViewModel(deckId = "deck-test")
         advanceUntilIdle()
 
-        viewModel.onDrawHand()
-
-        val event = viewModel.events.value as? PlaytestSetupEvent.NavigateToHand
-        assertNull("event must not be null for eligible deck", null.takeIf { event == null })
-        assertEquals("deck-test", event!!.setup.deckId)
+        viewModel.events.test {
+            viewModel.onDrawHand()
+            advanceUntilIdle()
+            val event = awaitItem() as PlaytestSetupEvent.NavigateToHand
+            assertEquals("deck-test", event.setup.deckId)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -445,10 +464,14 @@ class PlaytestSetupViewModelTest {
         advanceUntilIdle()
 
         viewModel.setDrawCount(5)
-        viewModel.onDrawHand()
 
-        val event = viewModel.events.value as? PlaytestSetupEvent.NavigateToHand
-        assertEquals(5, event!!.setup.drawCount)
+        viewModel.events.test {
+            viewModel.onDrawHand()
+            advanceUntilIdle()
+            val event = awaitItem() as PlaytestSetupEvent.NavigateToHand
+            assertEquals(5, event.setup.drawCount)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     // ── Group 8: Deck not found scenario ─────────────────────────────────────

@@ -19,6 +19,8 @@ context, edge cases, and rationale are in memory.
 - **Never duplicate**: if it's in CLAUDE.md, don't repeat it in memory, and vice-versa. If a CLAUDE.md
   feature section grows past a few lines, move the detail to its memory file and leave a pointer.
 
+Full file-type / frontmatter / index conventions live in the **`memory-protocol` skill**.
+
 ## Project overview
 
 ManaHub is a Magic: The Gathering companion Android app (package `com.mmg.manahub`). Single-module
@@ -161,8 +163,28 @@ Identify which owns a behavior before adding methods.
   display only).
 - `insertTournamentAtomically`/`insertTournamentAtomically` writes need `@Transaction`; `tournamentId`
   validated > 0L at construction; create on `viewModelScope` not `rememberCoroutineScope`.
+- **SINGLE finish-and-advance write path (audit C1/C2/C3).** Recording a result, advancing the round,
+  and finishing the tournament are ONE atomic path: `RecordMatchResultUseCase` → `repository.finishMatch`
+  → `TournamentDao.finishMatchAndAdvanceAtomically(@Transaction)`. BOTH the game-played flow
+  (`GameViewModel.recordTournamentResultIfNeeded`) and the manual dialog (`TournamentViewModel`) route
+  through it — the VM must NEVER generate rounds or call `finishTournament` itself (it only recomputes
+  standings + reflects the returned `MatchResultOutcome`). The finish is **first-writer-wins**:
+  `finishMatchGuarded` is `UPDATE … WHERE id=:matchId AND status != 'FINISHED'` returning rowcount; 0 rows
+  → `NO_OP`, no advancement (a repeated/concurrent finish never double-advances or double-grants XP).
+  Round advancement is **round-aware** (H2): `GenerateNextRoundUseCase.plan` (pure, DB-free) advances the
+  LOWEST fully-finished round with no successor, never `maxOf { round }`; next-round `scheduledOrder` is
+  offset past every existing match (M1, globally monotonic). M4: SINGLE_ELIM draws soft-lock the bracket,
+  so the Draw button is hidden when `structure == "SINGLE_ELIM"` (`RecordResultDialog.allowDraw`).
+- **`TournamentCompleted` XP is tournament-scoped + device-scoped.** Emitted only on the transition to
+  FINISHED (inside the atomic path, post-commit), key `tournament:{id}` with `isDeviceScoped = true`
+  (→ `dev:{deviceId}:tournament:{id}`) so two guest devices can't collide on the server PK and a re-finish
+  is ledger-deduped. `finishTournament` no-ops when already FINISHED (no double-emit). `isLocalWinner` is
+  hard-coded false (no per-seat local flag on tournaments yet) — base completion XP grants, won-bonus does
+  not. The hand-rolled match encoding is centralized in `TournamentIdCodec` (M2) — never re-inline
+  `json.trim('[',']').split(",")`.
 - Phase 2 pending: see `docs/plan-torneos.md`.
-- → memory: `feedback_tournament_bugs_2026-05-24`, `feedback_tournament_phase1_2026-06-02`
+- → memory: `feedback_tournament_bugs_2026-05-24`, `feedback_tournament_phase1_2026-06-02`,
+  `feedback_tournament_single_write_path_2026-06-16`
 
 ### Deck Playtest (`feature/playtest/`, Phase 1 + Phase 2 battlefield complete)
 Room v35→v36 added `playtest_sessions`, `playtest_card_stats`, `playtest_survey_answers`. Must-know:
@@ -469,6 +491,14 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
 - **Every XP grant is idempotent via an `xp_transactions` ledger** keyed by a UNIQUE `idempotency_key`;
   `grantXpAtomically` updates `player_progression` ONLY when the ledger insert succeeded (rowId != -1).
   Caps are enforced by querying the ledger for the current local day/week, never an in-memory counter.
+- **`grantXpAtomically` takes a DELTA, never a precomputed total.** It reads the current total INSIDE its
+  `@Transaction`, computes `new = current + amount`, recomputes the level via the injected
+  `levelForTotalXp` (`LevelCurve.levelForTotalXp`), and returns a `GrantResult(applied, previous/new
+  totalXp, previous/new level)`. Callers (XpGranter / AchievementEvaluator / AchievementBackfill /
+  ClaimQuestRewardUseCase) MUST NOT pre-read `getProgression()` and pass a total — two concurrent
+  app-start grants with distinct keys would both read the same stale total and the 2nd clobbers the 1st
+  (`total_xp < SUM(ledger)`). The friend weekly-cap window is ISO Monday (`TemporalAdjusters
+  .previousOrSame(MONDAY)`), never `WeekFields.of(Locale)`. → memory: `feedback_gamification_xp_idempotency`
 - **Win/loss in `GameFinished.isLocalWin` derives from `player_sessions.is_local = 1`**, never name
   matching (see `feedback_survey_winloss_isLocal`). ALL XP values/caps live in one `XpConfig`.
 - Room **v39** added 6 tables (additive `MIGRATION_38_39`). `app/schemas/` is gitignored (39.json not
@@ -504,7 +534,11 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
   expiry. `QuestReconciler` (settle stale + generate missing, idempotent) runs from BOTH `ManaHubApp.onCreate`
   (local-first, any auth) and the periodic `QuestRotationWorker`. `StreakTracker` (`daily_activity`,
   `AppOpenedToday`): max 2 freeze tokens, a gap consumes tokens to preserve the streak (never punishes), regen
-  +1 per 7-day multiple. Home `PROGRESSION_HUB`/`QUESTS_HUB` widgets + `CONTEXT_HERO` "N ready to claim".
+  +1 per 7-day multiple via the single `regenTokens()` helper applied in BOTH the consecutive-day AND
+  freeze-covered-gap branches of `advance` (symmetry by construction — never skip a milestone token just
+  because the milestone day was covered by a freeze). `advance` counts CALENDAR DAYS: `dayDelta <= 0` (today
+  == lastActiveDate) is a no-op, so repeated app-opens in one day never inflate the streak. Home
+  `PROGRESSION_HUB`/`QUESTS_HUB` widgets + `CONTEXT_HERO` "N ready to claim".
 - **Unlockables & cosmetics (Phase 3, complete):** 100% procedural (ZERO image/animation assets), local-only,
   no new Room schema (`EntitlementEntity` shipped in v39). `UnlockableCatalog` (21 items) is the source of
   truth — a **pure data table**; color is `CosmeticColorToken` enum refs resolved to `MaterialTheme.magicColors`
@@ -534,9 +568,18 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
   (`getMaxLedgerId()`), the 3 small tables are pushed in FULL each cycle (safe under monotonic merge); pull
   recomputes local progression from the ledger sum (direct SET, NOT `grantXpAtomically`) + client-side
   monotonic merges; `reconcileOnSignIn` merges guest/anonymous progress INTO the account. Upload DTOs **omit
-  `user_id`** (the RPC sets it from `auth.uid()` — cross-user write vector closed). Known limit: local-id-derived
-  idempotency keys can collide across two guest devices (2nd device's same-keyed XP dropped) — primary
-  single-device→sign-in flow is correct.
+  `user_id`** (the RPC sets it from `auth.uid()` — cross-user write vector closed). **L3 per-device key
+  scoping:** a `ProgressionEvent` whose `idempotencyKey` is LOCAL-ID-DERIVED (local Room id / local UUID /
+  local timestamp — `isDeviceScoped = true`: game/survey/tournament/scan/deck_created/cards_added) is
+  prefixed `dev:{deviceId}:{rawKey}` via `IdempotencyKeyScoper.scope(...)`, applied ONLY in
+  `XpGranter.resolveLedgerKey` (pre-check + insert + dedup gate all use the resolved key) so two guest
+  devices don't collide on the server PK. GLOBALLY-STABLE-per-user keys MUST stay un-prefixed
+  (`isDeviceScoped = false`): server-side `trade`/`friend`, per-user `app_open`, and the catalog/period keys
+  produced OUTSIDE XpGranter (`achievement:{id}:tier:{n}`, `quest_claim:{instanceId}`) — prefixing those
+  would double-grant once per device after sign-in merge. Device id = the existing
+  `UserPreferencesDataStore.getOrCreateGamificationDeviceId()` (per-install random UUID, NOT `ANDROID_ID`,
+  NOT `QuestStableIdProvider.stableId()` which collapses to the user id when signed in). When adding a new
+  ledgered `ProgressionEvent`, set `isDeviceScoped` per this rule.
 - → memory: `project_gamification_phase0`, `project_gamification_phase1`,
   `project_gamification_phase1_chunkB_ui`, `project_gamification_phase2`, `project_gamification_phase3`,
   `project_gamification_phase4`, `feedback_gamification_xp_idempotency`,
@@ -565,13 +608,9 @@ Non-Kotlin work (Python `scripts/draftsim_py/`, Worker JS, Gradle, docs, memory)
 When an agent identifies a bug or required fix in Android/Kotlin code, it MUST likewise **delegate the
 fix to the `android-kotlin-architect` agent** rather than implementing it directly.
 
-After any bug fix, security finding, or architectural/design decision, the agent MUST:
-1. **Record the learning in memory first** — write/update a memory file (`feedback_<topic>.md` for fixes,
-   `project_<topic>.md` for decisions; lead with the rule, then **Why:** and **How to apply:**) and update
-   `MEMORY.md`.
-2. **Update CLAUDE.md only if the rule is broadly applicable** — add it to the right section (or, for a
-   feature, tighten the inline note and ensure the `→ memory:` pointer exists). Do not duplicate memory
-   content here; keep this file small.
+After any bug fix, security finding, or architectural/design decision, the agent MUST record the
+learning per the **`memory-protocol` skill** (memory-file-first; update CLAUDE.md only when the rule is
+broadly applicable; never duplicate between the two). → skill: `memory-protocol`
 
 The goal: no agent should hit the same bug or repeat the same design mistake twice.
 
@@ -583,15 +622,9 @@ The goal: no agent should hit the same bug or repeat the same design mistake twi
   YouTube key injected via OkHttp interceptor (not in Retrofit signatures or Logcat).
 
 ### Pre-push security gate (MANDATORY)
-Before any PR or push (even "docs-only"), the **`android-security-auditor` agent MUST secret-scan the
-staged diff**:
-1. Scan for keys/tokens/private keys/passwords/connection strings (`AIzaSy`, `-----BEGIN`, `secret`,
-   `password`, `api_key`, `Authorization`, `Bearer`, Supabase URLs + service-role keys).
-2. Confirm `google-services.json` is git-ignored and not staged.
-3. Confirm no `.md`/`.txt`/`.json` file contains literal key **values** (referencing by name is fine).
-4. Confirm nothing bypassed `.gitignore` via `git add -f`.
-
-Block the push on any critical finding. → memory: `feedback_secret_leak_prevention`
+Before any PR or push (even "docs-only"), run the **`pre-push-security-gate` skill**: it delegates a
+secret-scan of the **staged** diff to the `android-security-auditor` agent and blocks on any critical
+finding. → skill: `pre-push-security-gate` · memory: `feedback_secret_leak_prevention`
 
 ### AI planning documents
 Temporary planning `.md` files: **must be gitignored before the first `git add`** (patterns in
@@ -623,6 +656,6 @@ This project has a knowledge graph at graphify-out/ with god nodes, community st
 
 Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- A wiki exists at graphify-out/wiki/index.md — use it as the entry point for broad codebase navigation: read the index, then follow its `[[wiki-links]]` into community/god-node articles BEFORE falling back to raw source browsing or GRAPH_REPORT.md (this is the lower-token path).
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

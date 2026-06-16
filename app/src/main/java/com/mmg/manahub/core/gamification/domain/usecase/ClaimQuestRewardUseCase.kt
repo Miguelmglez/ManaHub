@@ -53,12 +53,8 @@ class ClaimQuestRewardUseCase @Inject constructor(
         }
 
         val now = clock.millis()
-        val currentXp = dao.getProgression()?.totalXp ?: 0L
-        val newTotal = currentXp + instance.xpReward
-        val newLevel = LevelCurve.levelForTotalXp(newTotal)
-        val prevLevel = LevelCurve.levelForTotalXp(currentXp)
-
-        val applied = dao.grantXpAtomically(
+        // Delta-based grant: the new total/level are computed inside the transaction (race-safe).
+        val result = dao.grantXpAtomically(
             txn = XpTransactionEntity(
                 idempotencyKey = "quest_claim:$instanceId",
                 amount = instance.xpReward,
@@ -66,17 +62,17 @@ class ClaimQuestRewardUseCase @Inject constructor(
                 sourceRef = instanceId,
                 createdAt = now,
             ),
-            newTotalXp = newTotal,
-            newLevel = newLevel,
+            amount = instance.xpReward,
             updatedAt = now,
+            levelForTotalXp = LevelCurve::levelForTotalXp,
         )
 
-        return if (applied) {
+        return if (result.applied) {
             dao.upsertQuest(instance.copy(status = STATUS_CLAIMED))
             ClaimResult.Claimed(
                 xpAwarded = instance.xpReward,
-                newLevel = newLevel,
-                leveledUp = newLevel > prevLevel,
+                newLevel = result.newLevel,
+                leveledUp = result.newLevel > result.previousLevel,
             )
         } else {
             // Ledger already had the row (a prior claim that didn't finish flipping the status, or a
