@@ -6,10 +6,14 @@ import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.domain.repository.MatchResultOutcome
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
+import com.mmg.manahub.feature.tournament.domain.engine.TournamentIdCodec
+import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
+import com.mmg.manahub.feature.tournament.domain.usecase.NextRoundResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -21,6 +25,7 @@ import javax.inject.Singleton
 class TournamentRepositoryImpl @Inject constructor(
     private val dao: TournamentDao,
     private val progressionEventBus: ProgressionEventBus,
+    private val generateNextRound: GenerateNextRoundUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : TournamentRepository {
 
@@ -234,7 +239,7 @@ class TournamentRepositoryImpl @Inject constructor(
         winnerId:   Long?,
         sessionId:  Long?,
         lifeTotals: Map<Long, Int>,
-    ) = withContext(ioDispatcher) {
+    ): MatchResultOutcome = withContext(ioDispatcher) {
         val match = dao.getMatchById(matchId)
             ?: throw IllegalArgumentException("Match $matchId not found")
 
@@ -245,9 +250,49 @@ class TournamentRepositoryImpl @Inject constructor(
             }
         }
 
-        val json = lifeTotals.entries
-            .joinToString(",", "{", "}") { "${it.key}:${it.value}" }
-        dao.finishMatch(matchId, winnerId, sessionId, json)
+        // Tournament + players are read once; they do not change during a single finish, and the
+        // advancement decision below is PURE (no DB access inside the transaction lambda).
+        val tournamentId = match.tournamentId
+        val tournament = dao.getTournamentById(tournamentId)
+            ?: throw IllegalArgumentException("Tournament $tournamentId not found for match $matchId")
+        val players = dao.getPlayers(tournamentId)
+
+        val json = TournamentIdCodec.encodeLifeTotals(lifeTotals)
+
+        // Single canonical write path (audit C1/C2/C3): first-writer-wins finish + round advancement
+        // + tournament-finish stamp, all atomic. The lambda only runs when the guarded finish actually
+        // won the race (0 rows → NO_OP), so a repeated/concurrent finish never double-advances.
+        val kind = dao.finishMatchAndAdvanceAtomically(
+            tournamentId = tournamentId,
+            matchId      = matchId,
+            winnerId     = winnerId,
+            sessionId    = sessionId,
+            lifeTotals   = json,
+            finishedAt   = System.currentTimeMillis(),
+            buildAdvancement = { matchesAfterFinish ->
+                val plan = generateNextRound.plan(tournament, players, matchesAfterFinish)
+                val advanceKind = when {
+                    plan.tournamentFinished                      -> TournamentDao.AdvanceKind.TOURNAMENT_FINISHED
+                    plan.result is NextRoundResult.RoundGenerated -> TournamentDao.AdvanceKind.ROUND_GENERATED
+                    else                                         -> TournamentDao.AdvanceKind.ROUND_NOT_COMPLETE
+                }
+                plan.matchesToInsert to advanceKind
+            },
+        )
+
+        when (kind) {
+            TournamentDao.AdvanceKind.NO_OP               -> MatchResultOutcome.NoOp
+            TournamentDao.AdvanceKind.ROUND_NOT_COMPLETE  -> MatchResultOutcome.RoundNotComplete
+            TournamentDao.AdvanceKind.ROUND_GENERATED     -> MatchResultOutcome.RoundGenerated
+            TournamentDao.AdvanceKind.TOURNAMENT_FINISHED -> {
+                // Emit completion XP AFTER the transaction commits (ADR-002 §1). The atomic finish ran
+                // exactly once (guard), so this fires once per real completion. The TournamentCompleted
+                // idempotency key is tournament-scoped + device-scoped (ProgressionEvent §L3), so even if
+                // finishTournament is somehow reached again the ledger dedupes the grant.
+                emitTournamentCompleted(tournamentId, tournament.structure)
+                MatchResultOutcome.TournamentFinished
+            }
+        }
     }
 
     override suspend fun resetMatch(matchId: Long) = withContext(ioDispatcher) {
@@ -255,21 +300,37 @@ class TournamentRepositoryImpl @Inject constructor(
     }
 
     override suspend fun finishTournament(tournamentId: Long) = withContext(ioDispatcher) {
-        dao.finishTournament(tournamentId, System.currentTimeMillis())
-
-        // Emit after the finish commit (ADR-002 §1). `type` is the tournament structure.
-        //
-        // isLocalWinner: tournaments have NO per-seat "local"/"app user" flag (unlike
-        // game sessions' PlayerSessionEntity.isLocal). There is therefore no reliable way
-        // to know whether the app's user won — name matching is forbidden (see memory
-        // feedback_survey_winloss_isLocal). We pass false so the base "tournament completed"
-        // XP still grants, but the "tournament won" bonus does not. Wiring the won-bonus
-        // requires a local-seat concept on tournaments (schema + setup UI) and is deferred.
+        // Double-emit guard (audit regression guard): only stamp + emit when the tournament is NOT
+        // already FINISHED. The canonical finish-and-advance path stamps FINISHED inside its
+        // transaction and emits XP itself; this public method is the fallback/standalone caller. If
+        // the tournament is already FINISHED we no-op so completion XP is emitted at most once per
+        // tournament (and the ledger key would dedupe a second grant anyway, ProgressionEvent §L3).
         val tournament = dao.getTournamentById(tournamentId)
+        if (tournament == null || tournament.status == "FINISHED") return@withContext
+
+        dao.finishTournament(tournamentId, System.currentTimeMillis())
+        emitTournamentCompleted(tournamentId, tournament.structure)
+    }
+
+    /**
+     * Emits [ProgressionEvent.TournamentCompleted] after a finish commit (ADR-002 §1). `type` is the
+     * tournament structure.
+     *
+     * isLocalWinner: tournaments have NO per-seat "local"/"app user" flag (unlike game sessions'
+     * PlayerSessionEntity.isLocal). There is therefore no reliable way to know whether the app's user
+     * won — name matching is forbidden (see memory feedback_survey_winloss_isLocal). We pass false so
+     * the base "tournament completed" XP still grants, but the "tournament won" bonus does not. Wiring
+     * the won-bonus requires a local-seat concept on tournaments (schema + setup UI) and is deferred.
+     *
+     * The TournamentCompleted idempotency key is `tournament:{id}` and device-scoped (ProgressionEvent
+     * §L3), so even if this is reached more than once for the same tournament the XP ledger grants the
+     * completion bonus exactly once.
+     */
+    private suspend fun emitTournamentCompleted(tournamentId: Long, structure: String) {
         progressionEventBus.emit(
             ProgressionEvent.TournamentCompleted(
                 tournamentId = tournamentId,
-                type = tournament?.structure ?: "UNKNOWN",
+                type = structure,
                 isLocalWinner = false,
                 occurredAt = Instant.now(),
             )
@@ -302,8 +363,7 @@ class TournamentRepositoryImpl @Inject constructor(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun parsePlayerIds(json: String): List<Long> =
-        json.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+    private fun parsePlayerIds(json: String): List<Long> = TournamentIdCodec.decodeIds(json)
 
     private fun nextPowerOf2(n: Int): Int {
         var pow = 1

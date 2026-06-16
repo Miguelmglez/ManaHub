@@ -92,6 +92,5 @@ object SwissEngine {
             .mapNotNull { parseIds(it.playerIds).firstOrNull() }
             .toSet()
 
-    private fun parseIds(json: String): List<Long> =
-        json.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+    private fun parseIds(json: String): List<Long> = TournamentIdCodec.decodeIds(json)
 }

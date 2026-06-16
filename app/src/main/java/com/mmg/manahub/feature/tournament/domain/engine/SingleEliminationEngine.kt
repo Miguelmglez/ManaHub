@@ -1,14 +1,18 @@
 package com.mmg.manahub.feature.tournament.domain.engine
 
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import kotlin.math.ceil
-import kotlin.math.log2
 
 /**
  * Single-elimination bracket engine.
  *
  * First round: seeds to the nearest power of 2 with byes for lower-seeded players.
  * Subsequent rounds: winners of previous round paired in bracket order (scheduledOrder).
+ *
+ * KNOWN CONSTRAINT (audit M4): a knockout match recorded as a DRAW (winnerId == null) removes BOTH
+ * players from the next round — [generateNextRound] and [isFinalRoundComplete] skip draws. If a draw
+ * were ever allowed for the only remaining match the bracket would soft-lock (no champion, no next
+ * round). Draws are therefore disallowed at the UI for SINGLE_ELIM (the Draw button is hidden); this
+ * engine assumes every non-bye knockout match has a winner.
  */
 object SingleEliminationEngine {
 
@@ -109,6 +113,5 @@ object SingleEliminationEngine {
         return pow
     }
 
-    private fun parseIds(json: String): List<Long> =
-        json.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+    private fun parseIds(json: String): List<Long> = TournamentIdCodec.decodeIds(json)
 }
