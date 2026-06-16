@@ -31,6 +31,23 @@ sealed interface ProgressionEvent {
     val idempotencyKey: String
 
     /**
+     * Whether [idempotencyKey] is derived from a LOCAL identifier (a local Room autoincrement id, a
+     * locally-generated UUID, or a local timestamp) and is therefore NOT globally unique across two
+     * different devices.
+     *
+     * Such keys MUST be prefixed with a per-device id before they reach the ledger (see
+     * [com.mmg.manahub.core.gamification.engine.IdempotencyKeyScoper]) so that two guest devices do not
+     * collide on the server's `ON CONFLICT (user_id, idempotency_key) DO NOTHING` — which would silently
+     * drop the second device's XP (ADR-002 §L3).
+     *
+     * Keys that are GLOBALLY STABLE per user — a server-side id (`trade`/`friend`) or a per-user value
+     * like the calendar date (`app_open`) — are `false` so that two devices intentionally dedupe to a
+     * SINGLE grant after a sign-in merge. (Catalog-derived keys for achievements/quests are produced
+     * outside this hierarchy and are likewise never device-scoped.)
+     */
+    val isDeviceScoped: Boolean
+
+    /**
      * A finished game.
      *
      * @param isLocalWin whether the local seat won. CRITICAL: this is supplied by the
@@ -49,6 +66,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "game:$sessionId:result"
+        // Local Room session id — collides across devices; must be device-scoped.
+        override val isDeviceScoped: Boolean get() = true
     }
 
     /** A post-game survey was completed. */
@@ -58,6 +77,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "survey:$surveyId"
+        // Local Room survey id — collides across devices; must be device-scoped.
+        override val isDeviceScoped: Boolean get() = true
     }
 
     /**
@@ -74,6 +95,8 @@ sealed interface ProgressionEvent {
     ) : ProgressionEvent {
         override val idempotencyKey: String
             get() = "cards_added:${occurredAt.toEpochMilli()}:$addedUnique:$addedCopies"
+        // Local emission timestamp — device-local origin; device-scope it for cross-device safety.
+        override val isDeviceScoped: Boolean get() = true
     }
 
     /** A batch of cards was recognised by the scanner. */
@@ -83,6 +106,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "scan:$scanBatchId"
+        // Locally-generated scan batch id — device-local origin; device-scope it.
+        override val isDeviceScoped: Boolean get() = true
     }
 
     /** A new deck was created. */
@@ -92,6 +117,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "deck_created:$deckId"
+        // Locally-created deck id — device-local origin; device-scope it.
+        override val isDeviceScoped: Boolean get() = true
     }
 
     /**
@@ -106,6 +133,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "deck_saved:$deckId"
+        // Never reaches the ledger (maps to 0 XP) — scoping is irrelevant; false by convention.
+        override val isDeviceScoped: Boolean get() = false
     }
 
     /** A tournament finished. */
@@ -116,6 +145,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "tournament:$tournamentId"
+        // Local Room tournament id — collides across devices; must be device-scoped.
+        override val isDeviceScoped: Boolean get() = true
     }
 
     /** A trade was completed (accepted by both parties). */
@@ -124,6 +155,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "trade:$tradeId"
+        // Server-side trade id — globally stable per user; NOT device-scoped (devices dedupe to one).
+        override val isDeviceScoped: Boolean get() = false
     }
 
     /** A friend request was accepted. */
@@ -132,6 +165,8 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "friend:$friendId"
+        // Server-side friend/user id — globally stable per user; NOT device-scoped.
+        override val isDeviceScoped: Boolean get() = false
     }
 
     /**
@@ -145,6 +180,9 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String get() = "app_open:$localDate"
+        // Calendar date — globally stable per user; NOT device-scoped so the daily check-in pays once
+        // per user per day even across two devices (they intentionally dedupe after a sign-in merge).
+        override val isDeviceScoped: Boolean get() = false
     }
 
     /**
@@ -165,5 +203,7 @@ sealed interface ProgressionEvent {
     ) : ProgressionEvent {
         override val idempotencyKey: String
             get() = "explore:$featureKey:${occurredAt.atZone(ZoneId.systemDefault()).toLocalDate()}"
+        // Never reaches the ledger (0 XP, advances quests only) — scoping is irrelevant; false.
+        override val isDeviceScoped: Boolean get() = false
     }
 }

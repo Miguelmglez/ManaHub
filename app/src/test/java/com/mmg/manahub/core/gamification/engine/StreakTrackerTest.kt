@@ -137,6 +137,54 @@ class StreakTrackerTest {
         assertEquals(0, result.freezeTokens)
     }
 
+    // ── M2: milestone regen symmetry across both branches ─────────────────────────
+
+    @Test
+    fun `milestone regen also fires in the freeze-covered-gap branch`() {
+        // current 6, 1 missed day (last active 2 days ago) consumes 1 token → 0, then current → 7
+        // (a 7-day multiple) regenerates 1. Net tokens = 1, streak preserved. Before the fix this
+        // branch never regenerated, silently skipping the milestone token.
+        val existing = streak(current = 6, longest = 6, lastDate = today.minusDays(2), tokens = 1)
+        val result = tracker.advance(existing, today)
+        assertEquals(7, result.current)
+        assertEquals(1, result.freezeTokens)
+    }
+
+    @Test
+    fun `milestone regen in the freeze branch still respects the cap`() {
+        // current 6 → 7 (milestone), 1 missed day consumes 1 token from 2 → 1, then +1 regen = 2
+        // (already at cap, must not exceed MAX_FREEZE_TOKENS).
+        val existing = streak(current = 6, longest = 6, lastDate = today.minusDays(2),
+            tokens = StreakTracker.MAX_FREEZE_TOKENS)
+        val result = tracker.advance(existing, today)
+        assertEquals(7, result.current)
+        assertEquals(StreakTracker.MAX_FREEZE_TOKENS, result.freezeTokens)
+    }
+
+    @Test
+    fun `a non-milestone freeze-covered gap does not regenerate a token`() {
+        // current 4 → 5 (not a multiple of 7), 1 missed day consumes 1 token from 2 → 1, no regen.
+        val existing = streak(current = 4, longest = 4, lastDate = today.minusDays(2), tokens = 2)
+        val result = tracker.advance(existing, today)
+        assertEquals(5, result.current)
+        assertEquals(1, result.freezeTokens)
+    }
+
+    // ── M2: calendar-day semantics (multiple opens in one day advance once) ────────
+
+    @Test
+    fun `two opens on the same calendar day advance the streak only once`() {
+        // First open of the day: consecutive from yesterday → current 3 → 4.
+        val afterYesterday = streak(current = 3, longest = 3, lastDate = today.minusDays(1), tokens = 0)
+        val firstOpen = tracker.advance(afterYesterday, today)
+        assertEquals(4, firstOpen.current)
+
+        // Second open SAME day: today == lastActiveDate → no-op (streak counts calendar days, not opens).
+        val secondOpen = tracker.advance(firstOpen, today)
+        assertEquals(4, secondOpen.current)
+        assertSame(firstOpen, secondOpen)
+    }
+
     // ── Invariants ────────────────────────────────────────────────────────────────
 
     @Test

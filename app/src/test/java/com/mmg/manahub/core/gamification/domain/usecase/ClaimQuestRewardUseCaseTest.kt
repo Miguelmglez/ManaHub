@@ -4,6 +4,7 @@ import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity
 import com.mmg.manahub.core.data.local.entity.QuestInstanceEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
+import com.mmg.manahub.core.gamification.domain.LevelCurve
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -46,14 +47,42 @@ class ClaimQuestRewardUseCaseTest {
         useCase = ClaimQuestRewardUseCase(dao, Clock.fixed(fixedInstant, ZoneId.of("UTC")))
         coEvery { dao.getProgression() } returns null // 0 XP baseline
         coEvery { dao.upsertQuest(any()) } just Runs
-        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns true
+        // The use case reads result.newLevel/previousLevel, so the levels must be real: derive the
+        // new total/level from the (mocked) current progression + the delta the DAO is passed.
+        coEvery {
+            dao.grantXpAtomically(any(), any(), any(), any())
+        } coAnswers { appliedResult(secondArg<Int>()) }
     }
+
+    /** Builds an applied [GamificationDao.GrantResult] from the current (mocked) progression + delta. */
+    private suspend fun appliedResult(amount: Int): GamificationDao.GrantResult {
+        val current = dao.getProgression()?.totalXp ?: 0L
+        val newTotal = current + amount
+        return GamificationDao.GrantResult(
+            applied = true,
+            previousTotalXp = current,
+            newTotalXp = newTotal,
+            previousLevel = LevelCurve.levelForTotalXp(current),
+            newLevel = LevelCurve.levelForTotalXp(newTotal),
+        )
+    }
+
+    /** A duplicate/no-op result that leaves progression unchanged. */
+    private fun noopResult(): GamificationDao.GrantResult = GamificationDao.GrantResult(
+        applied = false,
+        previousTotalXp = 0L,
+        newTotalXp = 0L,
+        previousLevel = LevelCurve.MIN_LEVEL,
+        newLevel = LevelCurve.MIN_LEVEL,
+    )
 
     @Test
     fun `claiming a completed quest grants XP via the ledger key and flips to CLAIMED`() = runTest {
         coEvery { dao.getQuest(any()) } returns instance(status = "COMPLETED", xpReward = 50)
         val txn = slot<XpTransactionEntity>()
-        coEvery { dao.grantXpAtomically(capture(txn), any(), any(), any()) } returns true
+        coEvery {
+            dao.grantXpAtomically(capture(txn), any(), any(), any())
+        } coAnswers { appliedResult(secondArg<Int>()) }
         val saved = slot<QuestInstanceEntity>()
         coEvery { dao.upsertQuest(capture(saved)) } just Runs
 
@@ -82,17 +111,22 @@ class ClaimQuestRewardUseCaseTest {
     }
 
     @Test
-    fun `the new total is current XP plus the reward`() = runTest {
+    fun `the reward delta passed to the grant is the quest XP and yields current plus reward`() = runTest {
         coEvery { dao.getProgression() } returns PlayerProgressionEntity(
             id = PlayerProgressionEntity.SINGLETON_ID, totalXp = 30L, level = 1, updatedAt = 0L,
         )
         coEvery { dao.getQuest(any()) } returns instance(status = "COMPLETED", xpReward = 50)
-        val newTotal = slot<Long>()
-        coEvery { dao.grantXpAtomically(any(), capture(newTotal), any(), any()) } returns true
+        // The use case passes the reward DELTA (not a precomputed total); the DAO derives the new total.
+        val amount = slot<Int>()
+        coEvery {
+            dao.grantXpAtomically(any(), capture(amount), any(), any())
+        } coAnswers { appliedResult(secondArg<Int>()) }
 
         useCase("daily_play_game:2026-06-12")
 
-        assertEquals(80L, newTotal.captured) // 30 + 50
+        // The delta is the reward, and the resulting total is current (30) + reward (50) = 80.
+        assertEquals(50, amount.captured)
+        assertEquals(80L, appliedResult(amount.captured).newTotalXp)
     }
 
     @Test
@@ -111,7 +145,7 @@ class ClaimQuestRewardUseCaseTest {
         // status COMPLETED but the ledger insert returns false (duplicate key) → AlreadyClaimed, status
         // reconciled to CLAIMED, progression NOT advanced a second time.
         coEvery { dao.getQuest(any()) } returns instance(status = "COMPLETED")
-        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns false
+        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns noopResult()
         val saved = slot<QuestInstanceEntity>()
         coEvery { dao.upsertQuest(capture(saved)) } just Runs
 

@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.gamification.engine
 
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
@@ -9,10 +10,9 @@ import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
 import com.mmg.manahub.core.gamification.domain.model.XpLineItem
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import java.time.Clock
+import java.time.DayOfWeek
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
-import java.time.temporal.WeekFields
-import java.util.Locale
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,12 +26,19 @@ import javax.inject.Singleton
  * is a no-op ([ProgressionOutcome.none]).
  *
  * [clock] (and [zoneId]) are injected so tests can pin "today"/"this week".
+ *
+ * Local-id-derived idempotency keys are prefixed with a stable per-device id via
+ * [IdempotencyKeyScoper] before they reach the ledger, so two guest devices never collide on the
+ * server's `(user_id, idempotency_key)` PK (ADR-002 §L3). The per-device id is the SAME random UUID
+ * the quests feature persists ([UserPreferencesDataStore.getOrCreateGamificationDeviceId]) — never a
+ * second device-id source.
  */
 @Singleton
 class XpGranter @Inject constructor(
     private val dao: GamificationDao,
     private val clock: Clock,
     private val zoneId: ZoneId,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
 ) {
 
     /**
@@ -39,39 +46,53 @@ class XpGranter @Inject constructor(
      * duplicate or an event that maps to no XP).
      */
     suspend fun grant(event: ProgressionEvent): ProgressionOutcome {
+        // Resolve the device-scoped ledger key ONCE up front and use it everywhere below — the
+        // pre-check, the row insert, and the dedup gate must all see the same (possibly prefixed) key.
+        val ledgerKey = resolveLedgerKey(event)
+
         // Cheap pre-check: skip all work if this event was already granted.
-        if (dao.hasTransaction(event.idempotencyKey)) return ProgressionOutcome.none
+        if (dao.hasTransaction(ledgerKey)) return ProgressionOutcome.none
 
         val plan = planGrant(event) ?: return ProgressionOutcome.none
         if (plan.amount <= 0) return ProgressionOutcome.none
 
-        val current = dao.getProgression()?.totalXp ?: 0L
-        val newTotal = current + plan.amount
-        val newLevel = LevelCurve.levelForTotalXp(newTotal)
-        val previousLevel = LevelCurve.levelForTotalXp(current)
         val nowMillis = clock.millis()
 
-        val applied = dao.grantXpAtomically(
+        // The new total/level are computed INSIDE grantXpAtomically from the row read in the same
+        // transaction (lost-update-safe); we pass the delta, never a precomputed total.
+        val result = dao.grantXpAtomically(
             txn = XpTransactionEntity(
-                idempotencyKey = event.idempotencyKey,
+                idempotencyKey = ledgerKey,
                 amount = plan.amount,
                 sourceCategory = plan.category.name,
                 sourceRef = plan.sourceRef,
                 createdAt = nowMillis,
             ),
-            newTotalXp = newTotal,
-            newLevel = newLevel,
+            amount = plan.amount,
             updatedAt = nowMillis,
+            levelForTotalXp = LevelCurve::levelForTotalXp,
         )
-        if (!applied) return ProgressionOutcome.none
+        if (!result.applied) return ProgressionOutcome.none
 
         return ProgressionOutcome(
             xpGranted = plan.amount,
             breakdown = plan.breakdown,
-            newLevel = newLevel,
-            leveledUp = newLevel > previousLevel,
+            newLevel = result.newLevel,
+            leveledUp = result.newLevel > result.previousLevel,
         )
     }
+
+    /**
+     * Resolves the ledger idempotency key for [event], applying the per-device prefix only when the
+     * event's key is local-id-derived ([ProgressionEvent.isDeviceScoped]). Globally-stable keys are
+     * returned verbatim so two devices dedupe to a single grant after a sign-in merge.
+     */
+    private suspend fun resolveLedgerKey(event: ProgressionEvent): String =
+        IdempotencyKeyScoper.scope(
+            rawKey = event.idempotencyKey,
+            deviceId = userPreferencesDataStore.getOrCreateGamificationDeviceId(),
+            deviceScoped = event.isDeviceScoped,
+        )
 
     /** Internal grant plan: the cap-adjusted amount + category + ledger reference + UI breakdown. */
     private data class GrantPlan(
@@ -189,13 +210,17 @@ class XpGranter @Inject constructor(
     private fun startOfTodayMillis(): Long =
         clock.instant().atZone(zoneId).toLocalDate().atStartOfDay(zoneId).toInstant().toEpochMilli()
 
-    /** Epoch-millis at the start of the first day of the current local week. */
+    /**
+     * Epoch-millis at local midnight on the Monday of the current ISO week.
+     *
+     * The week always starts on Monday (ISO-8601), NOT the locale's first-day-of-week, so the weekly
+     * friend cap window is deterministic and consistent with the rest of the gamification feature
+     * (quests use ISO week-based-year keys). This makes the boundary independent of
+     * `Locale.getDefault()` and therefore unit-testable.
+     */
     private fun startOfThisWeekMillis(): Long {
-        val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
         val today = clock.instant().atZone(zoneId).toLocalDate()
-        val daysSinceWeekStart =
-            ((today.dayOfWeek.value - firstDayOfWeek.value) + 7) % 7
-        val weekStart = today.minus(daysSinceWeekStart.toLong(), ChronoUnit.DAYS)
+        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         return weekStart.atStartOfDay(zoneId).toInstant().toEpochMilli()
     }
 }

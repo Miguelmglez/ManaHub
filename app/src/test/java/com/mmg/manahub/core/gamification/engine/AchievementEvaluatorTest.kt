@@ -4,6 +4,7 @@ import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
+import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -54,8 +55,19 @@ class AchievementEvaluatorTest {
         coEvery { dao.hasTransaction(any()) } returns false
         coEvery { dao.getProgression() } returns null
         coEvery { dao.upsertAchievement(any()) } just Runs
-        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns true
+        // The grant succeeds; this suite only cares THAT the grant happened (and its idempotency key),
+        // not the resulting totals, so return a minimal applied result derived from the amount.
+        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } answers { appliedResult(secondArg<Int>()) }
     }
+
+    /** A minimal applied [GamificationDao.GrantResult] for the delta [amount] (totals are immaterial here). */
+    private fun appliedResult(amount: Int): GamificationDao.GrantResult = GamificationDao.GrantResult(
+        applied = true,
+        previousTotalXp = 0L,
+        newTotalXp = amount.toLong(),
+        previousLevel = LevelCurve.MIN_LEVEL,
+        newLevel = LevelCurve.levelForTotalXp(amount.toLong()),
+    )
 
     // ── Tier transitions (Family A) ───────────────────────────────────────────────
 
@@ -135,7 +147,9 @@ class AchievementEvaluatorTest {
     fun `crossing a tier grants that tier XP through the ledger key`() = runTest {
         coEvery { statsDao.totalGames() } returns 10
         val txn = slot<XpTransactionEntity>()
-        coEvery { dao.grantXpAtomically(capture(txn), any(), any(), any()) } returns true
+        coEvery {
+            dao.grantXpAtomically(capture(txn), any(), any(), any())
+        } answers { appliedResult(secondArg<Int>()) }
 
         evaluator.process(gameEvent())
 
