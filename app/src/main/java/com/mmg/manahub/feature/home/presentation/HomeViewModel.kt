@@ -796,8 +796,6 @@ class HomeViewModel @Inject constructor(
     private val defaultLayoutSignedOut = listOf(
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.PROGRESSION_HUB, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.QUESTS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.DISCOVER_CARDS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
@@ -808,8 +806,6 @@ class HomeViewModel @Inject constructor(
     private val defaultLayoutSignedIn = listOf(
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.PROGRESSION_HUB, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.QUESTS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.YOUR_DECKS_SHELF, WidgetSize.MEDIUM),
