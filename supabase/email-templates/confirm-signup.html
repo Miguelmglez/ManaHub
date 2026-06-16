@@ -34,7 +34,16 @@
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <a href="{{ .ConfirmationURL }}"
+                    <!--
+                      Server-side confirmation, device-independent.
+                      GoTrue's GET /auth/v1/verify sets email_confirmed_at on the
+                      server BEFORE issuing a 302 to redirect_to — so clicking this
+                      link from ANY browser/device confirms the account. It does NOT
+                      depend on the PKCE code_verifier (which only exists on the
+                      original signup device). redirect_to MUST be on the project's
+                      redirect allow list (Auth > URL Configuration).
+                    -->
+                    <a href="https://uimogilwuixgkgfcfmyb.supabase.co/auth/v1/verify?token={{ .TokenHash }}&type=signup&redirect_to=https://miguelmglez.github.io/auth-confirmed.html"
                        style="display:inline-block;background:linear-gradient(135deg,#7B2D8B,#4A90D9);color:#FFFFFF;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:8px;letter-spacing:0.5px;">
                       Verify Email Address
                     </a>
@@ -46,7 +55,7 @@
                 If you didn't create a ManaHub account, you can safely ignore this email.
               </p>
               <p style="margin:12px 0 0 0;font-size:12px;color:#504870;word-break:break-all;">
-                Or copy this link: <a href="{{ .ConfirmationURL }}" style="color:#7B6BBD;">{{ .ConfirmationURL }}</a>
+                Or copy this link: <a href="https://uimogilwuixgkgfcfmyb.supabase.co/auth/v1/verify?token={{ .TokenHash }}&type=signup&redirect_to=https://miguelmglez.github.io/auth-confirmed.html" style="color:#7B6BBD;">https://uimogilwuixgkgfcfmyb.supabase.co/auth/v1/verify?token={{ .TokenHash }}&amp;type=signup&amp;redirect_to=https://miguelmglez.github.io/auth-confirmed.html</a>
               </p>
             </td>
           </tr>
