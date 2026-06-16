@@ -8,6 +8,16 @@ sealed class AuthError {
     data object SessionExpired : AuthError()
     /** Returned when Supabase requires email confirmation before the session is active. */
     data object EmailConfirmationRequired : AuthError()
+    /**
+     * Returned when a sign-in attempt is rejected because the account's email has not yet
+     * been confirmed (GoTrue `email_not_confirmed`).
+     *
+     * Distinct from [InvalidCredentials]: the credentials are correct, but confirmation is
+     * still pending. With device-independent server-side confirmation (ADR-003) the user may
+     * reach the password screen before clicking the confirmation link, so this must surface a
+     * "confirm your email first" message rather than the misleading "wrong password" one.
+     */
+    data object EmailNotConfirmed : AuthError()
     /** Returned when the Supabase RPC rejects the nickname due to inappropriate content (HTTP 400). */
     data object NicknameInappropriate : AuthError()
     /** Returned when the supplied nickname exceeds the 30-character limit. */

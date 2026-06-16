@@ -75,9 +75,15 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.feature.tournament.domain.engine.TournamentIdCodec
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardCornerRadius
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -208,12 +214,19 @@ fun TournamentScreen(
 
     // Manual result entry dialog
     recordResultForMatch?.let { match ->
-        val ids = match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+        val ids = TournamentIdCodec.decodeIds(match.playerIds)
         val p1  = uiState.players.find { it.id == ids.getOrNull(0) }
         val p2  = uiState.players.find { it.id == ids.getOrNull(1) }
+        // M5 (documented constraint): tournaments are effectively 1v1 — Swiss / Single-Elim / Round
+        // Robin pairings are always 2-player ("[a,b]"), so a "Commander tournament" is 1v1 Commander.
+        // This dialog deliberately only exposes p1/p2; it does NOT support N-player pods. Generalising
+        // to pods would require multiplayer pairing generation that does not exist today.
         RecordResultDialog(
-            p1        = p1,
-            p2        = p2,
+            p1            = p1,
+            p2            = p2,
+            // M4: a draw in SINGLE_ELIM strands the bracket (no winner advances, never re-prompted),
+            // so the Draw option is hidden for knockout. Other structures allow draws (1 point each).
+            allowDraw     = uiState.tournament?.structure != "SINGLE_ELIM",
             onConfirm = { winnerId ->
                 viewModel.recordMatchResultManual(match.id, winnerId)
                 recordResultForMatch = null
@@ -241,8 +254,8 @@ private fun StandingsTab(
 ) {
     LazyColumn(
         modifier       = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(MaterialTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
     ) {
         // Winner banner
         if (isFinished && standings.isNotEmpty()) {
@@ -250,7 +263,7 @@ private fun StandingsTab(
                 val winner      = standings.first()
                 val playerColor = parseColor(winner.player.playerColor)
                 Surface(
-                    shape    = RoundedCornerShape(20.dp),
+                    shape    = CardShape,
                     color    = playerColor.copy(alpha = 0.15f),
                     border   = BorderStroke(2.dp, playerColor.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth(),
@@ -264,11 +277,11 @@ private fun StandingsTab(
                             modifier = Modifier
                                 .size(140.dp)
                                 .align(Alignment.CenterEnd)
-                                .padding(end = 16.dp)
+                                .padding(end = MaterialTheme.spacing.lg)
                         )
 
                         Column(
-                            modifier            = Modifier.padding(24.dp),
+                            modifier            = Modifier.padding(MaterialTheme.spacing.xl),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Icon(
@@ -277,11 +290,11 @@ private fun StandingsTab(
                                 tint = mc.goldMtg,
                                 modifier = Modifier.size(48.dp)
                             )
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(MaterialTheme.spacing.sm))
                             Text(
                                 stringResource(R.string.tournament_winner_label).uppercase(),
                                 style = MaterialTheme.magicTypography.labelLarge,
-                                color = mc.goldMtg,
+                                color = mc.textSecondary,
                             )
                             Text(
                                 text  = winner.player.playerName,
@@ -289,16 +302,19 @@ private fun StandingsTab(
                                 color = mc.textPrimary,
                                 textAlign = TextAlign.Center
                             )
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(MaterialTheme.spacing.sm))
                             Surface(
                                 color = playerColor.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = ChipShape
                             ) {
                                 Text(
                                     text  = "${winner.wins}W · ${winner.losses}L · ${winner.draws}D · ${winner.points} pts",
                                     style = MaterialTheme.magicTypography.bodyMedium,
                                     color = mc.textPrimary,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(
+                                        horizontal = MaterialTheme.spacing.md,
+                                        vertical   = MaterialTheme.spacing.xs,
+                                    )
                                 )
                             }
                         }
@@ -311,24 +327,27 @@ private fun StandingsTab(
         if (activeMatch != null) {
             item {
                 Surface(
-                    shape    = RoundedCornerShape(16.dp),
+                    shape    = CardShape,
                     color    = mc.primaryAccent.copy(alpha = 0.12f),
                     border   = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        modifier              = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        modifier              = Modifier.padding(
+                            horizontal = MaterialTheme.spacing.lg,
+                            vertical   = MaterialTheme.spacing.md,
+                        ),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment     = Alignment.CenterVertically,
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(10.dp)
+                                    .size(MaterialTheme.spacing.md)
                                     .clip(CircleShape)
                                     .background(mc.primaryAccent)
                             )
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(MaterialTheme.spacing.md))
                             Text(
                                 stringResource(R.string.tournament_resume_match),
                                 style = MaterialTheme.magicTypography.bodyMedium,
@@ -338,11 +357,14 @@ private fun StandingsTab(
                         Button(
                             onClick  = { onResumeActiveMatch(activeMatch.id) },
                             colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                            shape    = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            shape    = ButtonShape,
+                            contentPadding = PaddingValues(
+                                horizontal = MaterialTheme.spacing.lg,
+                                vertical   = MaterialTheme.spacing.sm,
+                            )
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(MaterialTheme.spacing.sm))
                             Text(stringResource(R.string.tournament_match_play), style = MaterialTheme.magicTypography.labelMedium)
                         }
                     }
@@ -356,11 +378,11 @@ private fun StandingsTab(
                 Button(
                     onClick  = onStartNextMatch,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape    = RoundedCornerShape(16.dp),
+                    shape    = ButtonShape,
                     colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(MaterialTheme.spacing.md))
                     Text(stringResource(R.string.tournament_start_next), style = MaterialTheme.magicTypography.labelLarge)
                 }
             }
@@ -370,11 +392,14 @@ private fun StandingsTab(
         item {
             Surface(
                 color = mc.surfaceVariant.copy(alpha = 0.3f),
-                shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                shape = RoundedCornerShape(topStart = CardCornerRadius, topEnd = CardCornerRadius),
+                modifier = Modifier.fillMaxWidth().padding(top = MaterialTheme.spacing.sm)
             ) {
                 Row(
-                    modifier              = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier              = Modifier.padding(
+                        horizontal = MaterialTheme.spacing.lg,
+                        vertical   = MaterialTheme.spacing.sm,
+                    ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
@@ -382,7 +407,7 @@ private fun StandingsTab(
                         style = MaterialTheme.magicTypography.labelSmall,
                         color = mc.textDisabled
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xl)) {
                         listOf(
                             stringResource(R.string.tournament_standings_w),
                             stringResource(R.string.tournament_standings_d),
@@ -424,8 +449,8 @@ private fun StandingRow(
 
     Surface(
         shape    = RoundedCornerShape(
-            bottomStart = if (isLast) 12.dp else 0.dp,
-            bottomEnd   = if (isLast) 12.dp else 0.dp
+            bottomStart = if (isLast) CardCornerRadius else 0.dp,
+            bottomEnd   = if (isLast) CardCornerRadius else 0.dp
         ),
         color    = if (standing.position == 1) playerColor.copy(alpha = 0.08f) else mc.surface.copy(alpha = 0.6f),
         border   = if (standing.position == 1) BorderStroke(0.5.dp, playerColor.copy(alpha = 0.3f)) else null,
@@ -433,13 +458,16 @@ private fun StandingRow(
     ) {
         Column {
             Row(
-                modifier              = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                modifier              = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.lg,
+                    vertical   = MaterialTheme.spacing.md,
+                ),
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(
                     verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
                     modifier              = Modifier.weight(1f),
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.width(28.dp)) {
@@ -451,20 +479,20 @@ private fun StandingRow(
                     }
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(MaterialTheme.spacing.md)
                             .clip(CircleShape)
                             .background(playerColor),
                     )
                     Text(
                         text     = standing.player.playerName,
                         style    = MaterialTheme.magicTypography.bodyLarge,
-                        color    = if (standing.position == 1) mc.textPrimary else mc.textPrimary,
+                        color    = if (standing.position == 1) mc.textPrimary else mc.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xl),
                     verticalAlignment     = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -500,7 +528,7 @@ private fun StandingRow(
             }
             if (!isLast) {
                 HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
                     thickness = 0.5.dp,
                     color = mc.surfaceVariant.copy(alpha = 0.3f)
                 )
@@ -526,21 +554,24 @@ private fun MatchesTab(
 
     LazyColumn(
         modifier       = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(MaterialTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
     ) {
         byRound.forEach { (round, roundMatches) ->
             item(key = "round_$round") {
                 Surface(
                     color = mc.primaryAccent.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    shape = ChipShape,
+                    modifier = Modifier.padding(vertical = MaterialTheme.spacing.xs)
                 ) {
                     Text(
                         stringResource(R.string.tournament_round_label, round).uppercase(),
                         style    = MaterialTheme.magicTypography.labelMedium,
                         color    = mc.primaryAccent,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(
+                            horizontal = MaterialTheme.spacing.md,
+                            vertical   = MaterialTheme.spacing.xs,
+                        ),
                     )
                 }
             }
@@ -569,13 +600,13 @@ private fun MatchRow(
 ) {
     val mc  = MaterialTheme.magicColors
     val ty  = MaterialTheme.magicTypography
-    val ids = match.playerIds.trim('[', ']').split(",").mapNotNull { it.trim().toLongOrNull() }
+    val ids = TournamentIdCodec.decodeIds(match.playerIds)
     val isBye = ids.size == 1
     val p1  = playerMap[ids.getOrNull(0)]
     val p2  = if (isBye) null else playerMap[ids.getOrNull(1)]
 
     Surface(
-        shape    = RoundedCornerShape(16.dp),
+        shape    = CardShape,
         color    = when (match.status) {
             "FINISHED" -> mc.surface.copy(alpha = 0.4f)
             "ACTIVE"   -> mc.primaryAccent.copy(alpha = 0.08f)
@@ -592,7 +623,10 @@ private fun MatchRow(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier              = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
+                modifier              = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.lg,
+                    vertical   = MaterialTheme.spacing.lg,
+                ),
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -600,7 +634,7 @@ private fun MatchRow(
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier            = Modifier.padding(horizontal = 16.dp),
+                    modifier            = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
                 ) {
                     val vsIconColor = when (match.status) {
                         "FINISHED" -> mc.lifePositive.copy(alpha = 0.5f)
@@ -631,21 +665,31 @@ private fun MatchRow(
                     }
 
                     if (onStart != null) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(MaterialTheme.spacing.sm))
                         IconButton(
                             onClick = onStart,
                             modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.tournament_match_start_cd),
+                                tint = mc.onAccent,
+                                modifier = Modifier.size(16.dp),
+                            )
                         }
                     }
                     if (onResume != null) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(MaterialTheme.spacing.sm))
                         IconButton(
                             onClick = onResume,
                             modifier = Modifier.size(32.dp).background(mc.primaryAccent, CircleShape)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.tournament_match_resume_cd),
+                                tint = mc.onAccent,
+                                modifier = Modifier.size(16.dp),
+                            )
                         }
                     }
                 }
@@ -664,10 +708,10 @@ private fun MatchRow(
                         TextButton(
                             onClick        = onRecordResult,
                             modifier       = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = 12.dp)
+                            contentPadding = PaddingValues(vertical = MaterialTheme.spacing.md)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(MaterialTheme.spacing.sm))
                             Text(
                                 text  = stringResource(R.string.tournament_record_result_manual),
                                 style = ty.labelSmall,
@@ -679,7 +723,7 @@ private fun MatchRow(
                         TextButton(
                             onClick        = onReset,
                             modifier       = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = 12.dp)
+                            contentPadding = PaddingValues(vertical = MaterialTheme.spacing.md)
                         ) {
                             Text(
                                 text  = stringResource(R.string.tournament_reset_match),
@@ -698,6 +742,7 @@ private fun MatchRow(
 private fun RecordResultDialog(
     p1:        TournamentPlayerEntity?,
     p2:        TournamentPlayerEntity?,
+    allowDraw: Boolean,
     onConfirm: (winnerId: Long) -> Unit,
     onDraw:    () -> Unit,
     onDismiss: () -> Unit,
@@ -714,7 +759,7 @@ private fun RecordResultDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                 listOfNotNull(p1, p2).forEach { player ->
                     val playerColor = parseColor(player.playerColor)
                     Button(
@@ -725,20 +770,23 @@ private fun RecordResultDialog(
                         Text(
                             text  = player.playerName,
                             style = MaterialTheme.magicTypography.labelLarge,
-                            color = Color.White,
+                            color = mc.onAccent,
                         )
                     }
                 }
-                OutlinedButton(
-                    onClick  = onDraw,
-                    modifier = Modifier.fillMaxWidth(),
-                    border   = BorderStroke(1.dp, mc.textSecondary.copy(alpha = 0.5f)),
-                ) {
-                    Text(
-                        text  = stringResource(R.string.tournament_match_draw),
-                        style = MaterialTheme.magicTypography.labelLarge,
-                        color = mc.textSecondary,
-                    )
+                // M4: Draw is hidden for SINGLE_ELIM (a knockout draw strands the bracket).
+                if (allowDraw) {
+                    OutlinedButton(
+                        onClick  = onDraw,
+                        modifier = Modifier.fillMaxWidth(),
+                        border   = BorderStroke(1.dp, mc.textSecondary.copy(alpha = 0.5f)),
+                    ) {
+                        Text(
+                            text  = stringResource(R.string.tournament_match_draw),
+                            style = MaterialTheme.magicTypography.labelLarge,
+                            color = mc.textSecondary,
+                        )
+                    }
                 }
             }
         },
@@ -760,7 +808,8 @@ private fun PlayerMatchSlot(
 ) {
     val mc          = MaterialTheme.magicColors
     val ty          = MaterialTheme.magicTypography
-    val playerColor = parseColor(player?.playerColor ?: if (isP1) "#E63946" else "#4CC9F0")
+    val playerColor = player?.playerColor?.let { parseColor(it) }
+        ?: if (isP1) mc.lifeNegative else mc.primaryAccent
     val isWinner    = match.winnerId == player?.id
     val isDraw      = match.status == "FINISHED" && match.winnerId == null
 
@@ -773,9 +822,9 @@ private fun PlayerMatchSlot(
                 .size(12.dp)
                 .clip(CircleShape)
                 .background(playerColor)
-                .border(2.dp, Color.White.copy(alpha = 0.2f), CircleShape),
+                .border(2.dp, mc.textPrimary.copy(alpha = 0.2f), CircleShape),
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(MaterialTheme.spacing.sm))
         Text(
             text     = player?.playerName ?: "BYE",
             style    = if (isWinner) ty.bodyLarge else ty.bodyMedium,
@@ -800,8 +849,14 @@ private fun PlayerMatchSlot(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Fallback color used when a stored player color string fails to parse. A neutral violet;
+ * not theme-derived because [parseColor] is a pure non-composable util with no theme access.
+ */
+private val FALLBACK_PLAYER_COLOR = Color(0xFFC77DFF)
+
 private fun parseColor(hex: String): Color = try {
     Color(android.graphics.Color.parseColor(hex))
 } catch (e: Exception) {
-    Color(0xFFC77DFF)
+    FALLBACK_PLAYER_COLOR
 }

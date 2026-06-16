@@ -34,6 +34,16 @@ data class MagicColors(
     val secondaryAccent: Color,
     val goldMtg: Color,
 
+    /**
+     * Ink color for content (text/icons) drawn ON TOP of [primaryAccent] surfaces.
+     *
+     * Black on the dark themes — their `primaryAccent` is a bright/saturated color, so black ink
+     * reads best (mirrors the Material 3 dark bridge `onPrimary = Color.Black`). Cream on the single
+     * light theme (HallowedPrint), whose `primaryAccent` is near-black, so a light ink is required
+     * for AA contrast.
+     */
+    val onAccent: Color,
+
     val textPrimary:   Color,
     val textSecondary: Color,
     val textDisabled:  Color,
@@ -68,6 +78,7 @@ internal val NeonVoidColors = MagicColors(
     primaryAccent       = Color(0xFFFF6AD5),
     secondaryAccent     = Color(0xFF00E5FF),
     goldMtg             = Color(0xFFFFD700),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFFFF0F9),
     textSecondary       = Color(0xFFB385A1),
     textDisabled        = Color(0xFF66445A),
@@ -110,6 +121,7 @@ internal val MedievalGrimoireColors = MagicColors(
     primaryAccent       = Color(0xFFFF3131),
     secondaryAccent     = Color(0xFFC9A55C),   // ← was #FFD700 (collapsed with gold)
     goldMtg             = Color(0xFFFFD700),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFFFF0F0),
     textSecondary       = Color(0xFFB38585),
     textDisabled        = Color(0xFF664444),
@@ -149,6 +161,7 @@ internal val ArcaneCosmosColors = MagicColors(
     primaryAccent       = Color(0xFF00F5FF),
     secondaryAccent     = Color(0xFFFF7F50),
     goldMtg             = Color(0xFFFFD166),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFF0FFFF),
     textSecondary       = Color(0xFF7099A6),
     textDisabled        = Color(0xFF354E54),
@@ -190,6 +203,7 @@ internal val ForestMurmurColors = MagicColors(
     primaryAccent       = Color(0xFFF2FAEC),
     secondaryAccent     = Color(0xFF2E7D32),   // ← was #1B5E20 (invisible)
     goldMtg             = Color(0xFFFFD700),
+    onAccent            = Color(0xFF000000),    // primaryAccent is near-white → black ink
     textPrimary         = Color(0xFFE8F5E9),
     textSecondary       = Color(0xFF81C784),
     textDisabled        = Color(0xFF33691E),
@@ -232,6 +246,7 @@ internal val AncientOakColors = MagicColors(
     primaryAccent       = Color(0xFFE0B038),   // ← was #FFD600 (saturated lemon)
     secondaryAccent     = Color(0xFFC68A1F),   // ← was #FFAB00
     goldMtg             = Color(0xFFFFD700),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFFFF8E1),   // ← was #FFFDE7 (almost identical to disabled)
     textSecondary       = Color(0xFFC8B68A),   // ← was #FFF59D (too bright)
     textDisabled        = Color(0xFF7A6A4A),   // ← was #FBC02D (BRIGHTER than primary)
@@ -280,6 +295,7 @@ internal val HallowedPrintColors = MagicColors(
     primaryAccent       = Color(0xFF1F1B16),
     secondaryAccent     = Color(0xFF7A1F2B),
     goldMtg             = Color(0xFF9A6B2B),
+    onAccent            = Color(0xFFF5F1E5),   // primaryAccent is near-black → cream ink (~16:1, AA)
     textPrimary         = Color(0xFF1A1814),
     textSecondary       = Color(0xFF5A5247),
     textDisabled        = Color(0xFFA89F8C),
@@ -320,6 +336,7 @@ internal val AzureFluxColors = MagicColors(
     primaryAccent       = Color(0xFF3B82F6),
     secondaryAccent     = Color(0xFFFF6AD5),
     goldMtg             = Color(0xFFFFD700),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFE8EFFF),
     textSecondary       = Color(0xFF8A99C7),
     textDisabled        = Color(0xFF44527A),
@@ -360,6 +377,7 @@ internal val PlanarVeilColors = MagicColors(
     primaryAccent       = Color(0xFF9B5DE5),
     secondaryAccent     = Color(0xFFFFC857),
     goldMtg             = Color(0xFFF4D27A),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFF5E9FF),
     textSecondary       = Color(0xFFA893C2),
     textDisabled        = Color(0xFF5A467E),
@@ -400,6 +418,7 @@ internal val VenomShadeColors = MagicColors(
     primaryAccent       = Color(0xFFB4FF1A),
     secondaryAccent     = Color(0xFFC24DFF),
     goldMtg             = Color(0xFFD8E84C),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFEAF5D6),
     textSecondary       = Color(0xFF8FA875),
     textDisabled        = Color(0xFF4E5C3B),
@@ -440,6 +459,7 @@ internal val GlacialEdgeColors = MagicColors(
     primaryAccent       = Color(0xFFB8E0FF),
     secondaryAccent     = Color(0xFFC7A7FF),
     goldMtg             = Color(0xFFD9C98E),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFE8F2FF),
     textSecondary       = Color(0xFF8FA0BC),
     textDisabled        = Color(0xFF4A5874),
@@ -480,6 +500,7 @@ internal val DuskEmberColors = MagicColors(
     primaryAccent       = Color(0xFFFF9B6A),
     secondaryAccent     = Color(0xFFE8B85F),
     goldMtg             = Color(0xFFF4D27A),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFFFE8DA),
     textSecondary       = Color(0xFFC4A89A),
     textDisabled        = Color(0xFF6B4A5A),
@@ -520,6 +541,7 @@ internal val OnyxNoirColors = MagicColors(
     primaryAccent       = Color(0xFFD8D8E0),
     secondaryAccent     = Color(0xFFE8C988),
     goldMtg             = Color(0xFFE8C988),
+    onAccent            = Color(0xFF000000),
     textPrimary         = Color(0xFFF5F5FA),
     textSecondary       = Color(0xFF9999A8),
     textDisabled        = Color(0xFF4A4A5A),

@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.gamification.engine
 
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
@@ -12,14 +13,18 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Clock
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
+import java.util.Locale
 
 /**
  * Unit tests for [XpGranter]: idempotency, daily collection cap, deck/day cap, friend/week cap,
@@ -31,6 +36,7 @@ import java.time.ZoneId
 class XpGranterTest {
 
     private lateinit var dao: GamificationDao
+    private lateinit var dataStore: UserPreferencesDataStore
     private lateinit var granter: XpGranter
 
     // Pinned to a Thursday so week-window math is stable across runs.
@@ -38,19 +44,53 @@ class XpGranterTest {
     private val zoneId: ZoneId = ZoneId.of("UTC")
     private val now: Instant get() = fixedInstant
 
+    // Stable per-device id used to scope local-id-derived ledger keys (ADR-002 §L3).
+    private val deviceId = "device-A"
+
+    // Saved so the Monday-boundary tests can mutate Locale.getDefault() and restore it after.
+    private val originalLocale: Locale = Locale.getDefault()
+
     @Before
     fun setUp() {
         dao = mockk(relaxed = true)
+        dataStore = mockk(relaxed = true)
+        coEvery { dataStore.getOrCreateGamificationDeviceId() } returns deviceId
         val clock = Clock.fixed(fixedInstant, zoneId)
-        granter = XpGranter(dao, clock, zoneId)
+        granter = XpGranter(dao, clock, zoneId, dataStore)
 
         // Default happy-path stubs. Individual tests override as needed.
         coEvery { dao.hasTransaction(any()) } returns false
         coEvery { dao.getProgression(any()) } returns null
         coEvery { dao.sumXpForCategorySince(any(), any()) } returns 0
         coEvery { dao.countDistinctSourceRefForCategorySince(any(), any()) } returns 0
-        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns true
+        // Default happy path: the atomic grant applies. The new total/level are computed by the DAO
+        // from the delta + the (mocked) current progression; mirror that here from getProgression().
+        coEvery {
+            dao.grantXpAtomically(any(), any(), any(), any())
+        } coAnswers { appliedResult(secondArg<Int>()) }
     }
+
+    /** Builds an applied [GamificationDao.GrantResult] from the current (mocked) progression + delta. */
+    private suspend fun appliedResult(amount: Int): GamificationDao.GrantResult {
+        val current = dao.getProgression()?.totalXp ?: 0L
+        val newTotal = current + amount
+        return GamificationDao.GrantResult(
+            applied = true,
+            previousTotalXp = current,
+            newTotalXp = newTotal,
+            previousLevel = LevelCurve.levelForTotalXp(current),
+            newLevel = LevelCurve.levelForTotalXp(newTotal),
+        )
+    }
+
+    /** A duplicate/no-op result that leaves progression unchanged. */
+    private fun noopResult(): GamificationDao.GrantResult = GamificationDao.GrantResult(
+        applied = false,
+        previousTotalXp = 0L,
+        newTotalXp = 0L,
+        previousLevel = LevelCurve.MIN_LEVEL,
+        newLevel = LevelCurve.MIN_LEVEL,
+    )
 
     @Test
     fun `game without win grants only the logged amount`() = runTest {
@@ -76,7 +116,8 @@ class XpGranterTest {
 
     @Test
     fun `duplicate idempotency key short-circuits before any grant`() = runTest {
-        coEvery { dao.hasTransaction("survey:5") } returns true
+        // survey is device-scoped, so the pre-check sees the prefixed key.
+        coEvery { dao.hasTransaction("dev:$deviceId:survey:5") } returns true
 
         val outcome = granter.grant(
             ProgressionEvent.SurveyCompleted(surveyId = 5L, sessionId = 1L, occurredAt = now)
@@ -88,8 +129,8 @@ class XpGranterTest {
 
     @Test
     fun `atomic grant rejection (race) yields a no-op outcome`() = runTest {
-        // hasTransaction misses (false) but the atomic insert loses the race and returns false.
-        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns false
+        // hasTransaction misses (false) but the atomic insert loses the race and is not applied.
+        coEvery { dao.grantXpAtomically(any(), any(), any(), any()) } returns noopResult()
 
         val outcome = granter.grant(
             ProgressionEvent.SurveyCompleted(surveyId = 9L, sessionId = 1L, occurredAt = now)
@@ -108,7 +149,9 @@ class XpGranterTest {
 
         // Raw would be 5 unique * 5 = 25, but only 10 may be granted.
         val txnSlot = slot<XpTransactionEntity>()
-        coEvery { dao.grantXpAtomically(capture(txnSlot), any(), any(), any()) } returns true
+        coEvery {
+            dao.grantXpAtomically(capture(txnSlot), any(), any(), any())
+        } coAnswers { appliedResult(secondArg<Int>()) }
 
         val outcome = granter.grant(
             ProgressionEvent.CardsAdded(addedCopies = 0, addedUnique = 5, occurredAt = now)
@@ -219,6 +262,99 @@ class XpGranterTest {
         assertEquals(XpConfig.tournamentCompleted + XpConfig.tournamentWon, outcome.xpGranted)
     }
 
+    // ── Weekly friend-cap window starts on Monday regardless of Locale ────────────────
+
+    @After
+    fun restoreLocale() {
+        Locale.setDefault(originalLocale)
+    }
+
+    /**
+     * Drives a [ProgressionEvent.FriendAdded] grant and returns the `sinceMillis` the granter used for
+     * the weekly SOCIAL cap query — i.e. the computed start-of-week boundary.
+     */
+    private suspend fun weeklyWindowStartFor(locale: Locale): Long {
+        Locale.setDefault(locale)
+        // Re-create the granter so it is constructed under the test locale (no hidden state, but explicit).
+        val granterUnderLocale = XpGranter(dao, Clock.fixed(fixedInstant, zoneId), zoneId, dataStore)
+        val sinceSlot = slot<Long>()
+        coEvery {
+            dao.countDistinctSourceRefForCategorySince(XpSourceCategory.SOCIAL.name, capture(sinceSlot))
+        } returns 0
+        granterUnderLocale.grant(ProgressionEvent.FriendAdded(friendId = "friend-x", occurredAt = now))
+        return sinceSlot.captured
+    }
+
+    @Test
+    fun `weekly friend cap window starts on Monday under a Sunday-first locale`() = runTest {
+        // The clock is a Thursday (2026-06-11); the ISO-week Monday is 2026-06-08T00:00:00Z.
+        val expectedMonday = fixedInstant.atZone(zoneId).toLocalDate()
+            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            .atStartOfDay(zoneId).toInstant().toEpochMilli()
+
+        // Locale.US treats Sunday as the first day of the week; the window must still start on Monday.
+        val sinceUs = weeklyWindowStartFor(Locale.US)
+
+        assertEquals(expectedMonday, sinceUs)
+    }
+
+    @Test
+    fun `weekly friend cap window is the same Monday across Sunday-first and Monday-first locales`() = runTest {
+        val sinceUs = weeklyWindowStartFor(Locale.US)        // Sunday-first
+        val sinceFrance = weeklyWindowStartFor(Locale.FRANCE) // Monday-first
+
+        // Both must resolve to the identical Monday boundary — proving locale-independence.
+        assertEquals(sinceUs, sinceFrance)
+    }
+
+    // ── L3: per-device idempotency-key scoping ────────────────────────────────────────
+
+    /** Captures the idempotency key the granter writes to the ledger for [event] under [deviceUuid]. */
+    private suspend fun capturedKeyFor(event: ProgressionEvent, deviceUuid: String): String {
+        val freshDao = mockk<GamificationDao>(relaxed = true)
+        coEvery { freshDao.hasTransaction(any()) } returns false
+        coEvery { freshDao.getProgression(any()) } returns null
+        coEvery { freshDao.sumXpForCategorySince(any(), any()) } returns 0
+        coEvery { freshDao.countDistinctSourceRefForCategorySince(any(), any()) } returns 0
+        val keySlot = slot<XpTransactionEntity>()
+        coEvery { freshDao.grantXpAtomically(capture(keySlot), any(), any(), any()) } coAnswers {
+            GamificationDao.GrantResult(
+                applied = true, previousTotalXp = 0L, newTotalXp = secondArg<Int>().toLong(),
+                previousLevel = LevelCurve.MIN_LEVEL, newLevel = LevelCurve.MIN_LEVEL,
+            )
+        }
+        val ds = mockk<UserPreferencesDataStore>(relaxed = true)
+        coEvery { ds.getOrCreateGamificationDeviceId() } returns deviceUuid
+        XpGranter(freshDao, Clock.fixed(fixedInstant, zoneId), zoneId, ds).grant(event)
+        return keySlot.captured.idempotencyKey
+    }
+
+    @Test
+    fun `local-id-derived key gets a different ledger key per device for the same session`() = runTest {
+        val event = ProgressionEvent.GameFinished(
+            sessionId = 42L, isLocalWin = false, mode = "casual", playerCount = 2,
+            durationMs = 0L, winTurn = null, localFinalLife = null, occurredAt = now,
+        )
+        val keyDeviceA = capturedKeyFor(event, "device-A")
+        val keyDeviceB = capturedKeyFor(event, "device-B")
+
+        // Two distinct guest devices must NOT collide on the same local session id.
+        assertEquals("dev:device-A:game:42:result", keyDeviceA)
+        assertEquals("dev:device-B:game:42:result", keyDeviceB)
+        assertTrue("distinct devices must produce distinct keys", keyDeviceA != keyDeviceB)
+    }
+
+    @Test
+    fun `globally-stable key is NOT device-prefixed and is identical across devices`() = runTest {
+        // app_open is per-user-per-day (globally stable) → must dedupe to ONE grant across devices.
+        val event = ProgressionEvent.AppOpenedToday(localDate = "2026-06-11", occurredAt = now)
+        val keyDeviceA = capturedKeyFor(event, "device-A")
+        val keyDeviceB = capturedKeyFor(event, "device-B")
+
+        assertEquals("app_open:2026-06-11", keyDeviceA)
+        assertEquals(keyDeviceA, keyDeviceB)
+    }
+
     @Test
     fun `level-up math computes the new level and leveledUp flag from the curve`() = runTest {
         // Start the player just below the level-2 threshold so a grant crosses it.
@@ -231,11 +367,11 @@ class XpGranterTest {
             updatedAt = 0L,
         )
 
-        val newTotalSlot = slot<Long>()
-        val newLevelSlot = slot<Int>()
+        // The DAO computes the new total/level from the (mocked) progression + the delta it is passed;
+        // `appliedResult` mirrors that math so the returned outcome carries the real curve-derived level.
         coEvery {
-            dao.grantXpAtomically(any(), capture(newTotalSlot), capture(newLevelSlot), any())
-        } returns true
+            dao.grantXpAtomically(any(), any(), any(), any())
+        } coAnswers { appliedResult(secondArg<Int>()) }
 
         // Survey grants 25 XP, enough to cross into level 2 from one-below-threshold.
         val outcome = granter.grant(
@@ -243,8 +379,6 @@ class XpGranterTest {
         )
 
         val expectedTotal = startXp + XpConfig.surveyCompleted
-        assertEquals(expectedTotal, newTotalSlot.captured)
-        assertEquals(LevelCurve.levelForTotalXp(expectedTotal), newLevelSlot.captured)
         assertEquals(LevelCurve.levelForTotalXp(expectedTotal), outcome.newLevel)
         assertTrue("crossing the level-2 threshold must set leveledUp", outcome.leveledUp)
     }

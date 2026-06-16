@@ -425,7 +425,11 @@ private fun SearchResultCard(friend: Friend, onSendInvitation: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(friend.nickname, style = MaterialTheme.magicTypography.bodyMedium, color = mc.textPrimary)
-                Text(friend.gameTag, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                // Skip the game-tag line entirely when blank — an empty Text renders a dead
+                // gap below the nickname.
+                if (friend.gameTag.isNotBlank()) {
+                    Text(friend.gameTag, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                }
             }
             Button(
                 onClick = onSendInvitation,
@@ -463,7 +467,10 @@ private fun FriendRow(friend: Friend, onClick: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(friend.nickname, style = MaterialTheme.magicTypography.bodyMedium, color = mc.textPrimary)
-                Text(friend.gameTag, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                // Skip the game-tag line entirely when blank to avoid a dead empty line.
+                if (friend.gameTag.isNotBlank()) {
+                    Text(friend.gameTag, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
+                }
             }
         }
     }

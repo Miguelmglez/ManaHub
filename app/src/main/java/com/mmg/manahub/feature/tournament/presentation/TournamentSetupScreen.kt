@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -65,12 +64,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.tournament.domain.model.PlayerConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,9 +125,9 @@ fun TournamentSetupScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .imePadding()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding      = PaddingValues(vertical = 16.dp),
+                    .padding(horizontal = MaterialTheme.spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xl),
+                contentPadding      = PaddingValues(vertical = MaterialTheme.spacing.lg),
             ) {
 
                 // ── Tournament name ────────────────────────────────────────────────
@@ -139,7 +144,7 @@ fun TournamentSetupScreen(
                                 color = mc.textDisabled,
                             )
                         },
-                        shape         = RoundedCornerShape(14.dp),
+                        shape         = ButtonShape,
                         singleLine    = true,
                         colors        = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor   = mc.primaryAccent,
@@ -156,7 +161,7 @@ fun TournamentSetupScreen(
                 // ── Format ─────────────────────────────────────────────────────────
                 item {
                     SectionLabel(stringResource(R.string.tournament_format_label))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                         listOf("COMMANDER", "STANDARD", "DRAFT").forEach { fmt ->
                             val label = when (fmt) {
                                 "COMMANDER" -> stringResource(R.string.format_commander)
@@ -177,7 +182,7 @@ fun TournamentSetupScreen(
                 // ── Structure ──────────────────────────────────────────────────────
                 item {
                     SectionLabel(stringResource(R.string.tournament_structure_label))
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)) {
                         StructureOption(
                             title       = stringResource(R.string.tournament_structure_round_robin),
                             description = stringResource(R.string.tournament_structure_round_robin_desc),
@@ -205,27 +210,38 @@ fun TournamentSetupScreen(
                 // ── Matches per pairing ────────────────────────────────────────────
                 item {
                     SectionLabel(stringResource(R.string.tournament_matches_per_pairing))
+                    // The VM clamps matchesPerPairing to [1, 3]; mirror that range in the stepper.
+                    val canDecrease = uiState.matchesPerPairing > 1
+                    val canIncrease = uiState.matchesPerPairing < 3
+                    val decreaseLabel = stringResource(R.string.tournament_matches_decrease_cd)
+                    val increaseLabel = stringResource(R.string.tournament_matches_increase_cd)
                     Surface(
                         color  = mc.surface.copy(alpha = 0.4f),
-                        shape  = RoundedCornerShape(16.dp),
+                        shape  = CardShape,
                         border = BorderStroke(0.5.dp, mc.surfaceVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier              = Modifier.padding(16.dp),
+                            modifier              = Modifier.padding(MaterialTheme.spacing.lg),
                             verticalAlignment     = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
                         ) {
                             IconButton(
                                 onClick = {
                                     viewModel.onMatchesPerPairingChange(uiState.matchesPerPairing - 1)
-                                }
+                                },
+                                enabled = canDecrease,
+                                modifier = Modifier.semantics { contentDescription = decreaseLabel },
                             ) {
-                                Text("−", fontSize = 28.sp, color = mc.primaryAccent)
+                                Text(
+                                    "−",
+                                    fontSize = 28.sp,
+                                    color = mc.primaryAccent.copy(alpha = if (canDecrease) 1f else 0.4f),
+                                )
                             }
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier            = Modifier.padding(horizontal = 24.dp)
+                                modifier            = Modifier.padding(horizontal = MaterialTheme.spacing.xl)
                             ) {
                                 Text(
                                     text  = "${uiState.matchesPerPairing}",
@@ -243,9 +259,15 @@ fun TournamentSetupScreen(
                             IconButton(
                                 onClick = {
                                     viewModel.onMatchesPerPairingChange(uiState.matchesPerPairing + 1)
-                                }
+                                },
+                                enabled = canIncrease,
+                                modifier = Modifier.semantics { contentDescription = increaseLabel },
                             ) {
-                                Text("+", fontSize = 28.sp, color = mc.primaryAccent)
+                                Text(
+                                    "+",
+                                    fontSize = 28.sp,
+                                    color = mc.primaryAccent.copy(alpha = if (canIncrease) 1f else 0.4f),
+                                )
                             }
                         }
                     }
@@ -256,10 +278,10 @@ fun TournamentSetupScreen(
                     Row(
                         modifier              = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(CardShape)
                             .background(mc.surface.copy(alpha = 0.4f))
-                            .border(0.5.dp, mc.surfaceVariant, RoundedCornerShape(16.dp))
-                            .padding(16.dp),
+                            .border(0.5.dp, mc.surfaceVariant, CardShape)
+                            .padding(MaterialTheme.spacing.lg),
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
@@ -280,7 +302,7 @@ fun TournamentSetupScreen(
                             checked         = uiState.isRandomPairings,
                             onCheckedChange = viewModel::onRandomPairingsChange,
                             colors          = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
+                                checkedThumbColor = mc.onAccent,
                                 checkedTrackColor = mc.primaryAccent,
                                 uncheckedBorderColor = Color.Transparent,
                             ),
@@ -298,8 +320,11 @@ fun TournamentSetupScreen(
                         SectionLabel(stringResource(R.string.tournament_players_label, uiState.players.size))
                         TextButton(
                             onClick          = { viewModel.addPlayer() },
-                            modifier         = Modifier.padding(bottom = 4.dp),
-                            contentPadding   = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            modifier         = Modifier.padding(bottom = MaterialTheme.spacing.xs),
+                            contentPadding   = PaddingValues(
+                                horizontal = MaterialTheme.spacing.md,
+                                vertical   = MaterialTheme.spacing.xs,
+                            )
                         ) {
                             Text(
                                 stringResource(R.string.tournament_add_player),
@@ -324,11 +349,11 @@ fun TournamentSetupScreen(
 
                 // ── Create button ──────────────────────────────────────────────────
                 item {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(MaterialTheme.spacing.lg))
                     Button(
                         onClick  = { viewModel.createTournament() },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape    = RoundedCornerShape(16.dp),
+                        shape    = ButtonShape,
                         colors   = ButtonDefaults.buttonColors(
                             containerColor = mc.primaryAccent,
                             disabledContainerColor = mc.primaryAccent.copy(alpha = 0.5f)
@@ -338,7 +363,7 @@ fun TournamentSetupScreen(
                         if (uiState.isCreating) {
                             CircularProgressIndicator(
                                 modifier    = Modifier.size(24.dp),
-                                color       = Color.White,
+                                color       = mc.onAccent,
                                 strokeWidth = 2.dp,
                             )
                         } else {
@@ -354,14 +379,14 @@ fun TournamentSetupScreen(
                     item {
                         Surface(
                             color = mc.lifeNegative.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = CardShape,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text     = uiState.error!!,
                                 style    = MaterialTheme.magicTypography.bodySmall,
                                 color    = mc.lifeNegative,
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(MaterialTheme.spacing.md),
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -381,7 +406,7 @@ private fun SectionLabel(text: String) {
             text     = text.uppercase(),
             style    = MaterialTheme.magicTypography.labelLarge,
             color    = MaterialTheme.magicColors.primaryAccent,
-            modifier = Modifier.padding(bottom = 4.dp),
+            modifier = Modifier.padding(bottom = MaterialTheme.spacing.xs),
         )
     }
 }
@@ -397,7 +422,7 @@ private fun FormatChip(
     Surface(
         onClick  = onClick,
         modifier = modifier,
-        shape    = RoundedCornerShape(12.dp),
+        shape    = CardShape,
         color    = if (selected) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface.copy(alpha = 0.3f),
         border   = BorderStroke(
             width = if (selected) 2.dp else 0.5.dp,
@@ -409,7 +434,10 @@ private fun FormatChip(
             style     = MaterialTheme.magicTypography.labelMedium,
             color     = if (selected) mc.textPrimary else mc.textSecondary,
             textAlign = TextAlign.Center,
-            modifier  = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            modifier  = Modifier.padding(
+                horizontal = MaterialTheme.spacing.sm,
+                vertical   = MaterialTheme.spacing.md,
+            ),
         )
     }
 }
@@ -425,7 +453,7 @@ private fun StructureOption(
     val mc = MaterialTheme.magicColors
     Surface(
         onClick  = onClick,
-        shape    = RoundedCornerShape(16.dp),
+        shape    = CardShape,
         color    = if (selected) mc.primaryAccent.copy(alpha = 0.1f) else mc.surface.copy(alpha = 0.3f),
         border   = BorderStroke(
             width = if (selected) 2.dp else 0.5.dp,
@@ -434,8 +462,8 @@ private fun StructureOption(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier              = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier              = Modifier.padding(MaterialTheme.spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
             verticalAlignment     = Alignment.CenterVertically,
         ) {
             Box(
@@ -451,7 +479,7 @@ private fun StructureOption(
                 Text(
                     text  = title,
                     style = MaterialTheme.magicTypography.bodyLarge,
-                    color = if (selected) mc.textPrimary else mc.textPrimary,
+                    color = if (selected) mc.textPrimary else mc.textSecondary,
                 )
                 Text(
                     text  = description,
@@ -481,21 +509,31 @@ private fun PlayerConfigRow(
 ) {
     val mc            = MaterialTheme.magicColors
     var showPicker by remember { mutableStateOf(false) }
+    val colorTriggerLabel = stringResource(R.string.tournament_color_selected_cd, config.theme.name)
+    val removePlayerLabel = stringResource(R.string.tournament_remove_player_cd)
 
     Row(
         modifier          = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
     ) {
-        // Color dot / picker trigger
+        // Color dot / picker trigger. The visual dot stays 40dp; the clickable wrapper expands the
+        // touch target to 48dp for accessibility.
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(config.theme.accent)
-                .border(2.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                .clickable { showPicker = true },
-        )
+                .size(48.dp)
+                .clickable { showPicker = true }
+                .semantics { contentDescription = colorTriggerLabel },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(config.theme.accent)
+                    .border(2.dp, mc.textPrimary.copy(alpha = 0.2f), CircleShape),
+            )
+        }
 
         // Name field
         OutlinedTextField(
@@ -509,7 +547,7 @@ private fun PlayerConfigRow(
                 )
             },
             modifier      = Modifier.weight(1f),
-            shape         = RoundedCornerShape(12.dp),
+            shape         = CardShape,
             singleLine    = true,
             colors        = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor   = mc.primaryAccent,
@@ -522,11 +560,11 @@ private fun PlayerConfigRow(
             ),
         )
 
-        // Remove button
+        // Remove button — default IconButton reserves a 48dp min touch target.
         if (onRemove != null) {
             IconButton(
-                onClick = onRemove,
-                modifier = Modifier.size(32.dp)
+                onClick  = onRemove,
+                modifier = Modifier.semantics { contentDescription = removePlayerLabel },
             ) {
                 Text("✕", fontSize = 18.sp, color = mc.lifeNegative.copy(alpha = 0.7f))
             }
@@ -559,13 +597,19 @@ private fun ColorPickerDialog(
             Text(stringResource(R.string.gamesetup_choose_color), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                 PlayerTheme.ALL.chunked(5).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)) {
                         row.forEach { theme ->
                             val taken = theme in usedThemes && theme != current
+                            val swatchLabel = when {
+                                theme == current -> stringResource(R.string.tournament_color_selected_cd, theme.name)
+                                taken            -> stringResource(R.string.tournament_color_taken_cd, theme.name)
+                                else             -> stringResource(R.string.tournament_color_available_cd, theme.name)
+                            }
                             Box(
                                 modifier = Modifier
+                                    .minimumInteractiveComponentSize()
                                     .size(40.dp)
                                     .clip(CircleShape)
                                     .background(
@@ -578,7 +622,8 @@ private fun ColorPickerDialog(
                                                 else theme.accent.copy(alpha = 0.4f),
                                         shape = CircleShape,
                                     )
-                                    .clickable(enabled = !taken) { onSelect(theme) },
+                                    .clickable(enabled = !taken) { onSelect(theme) }
+                                    .semantics { contentDescription = swatchLabel },
                             )
                         }
                     }

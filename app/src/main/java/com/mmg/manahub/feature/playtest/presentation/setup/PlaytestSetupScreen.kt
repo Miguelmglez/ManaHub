@@ -70,19 +70,18 @@ fun PlaytestSetupScreen(
     viewModel: PlaytestSetupViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val events by viewModel.events.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val toastState = rememberMagicToastState()
 
-    // Consume navigation events.
-    LaunchedEffect(events) {
-        when (val e = events) {
-            is PlaytestSetupEvent.NavigateToHand -> {
-                onNavigateToHand(e.setup)
-                viewModel.onEventConsumed()
+    // Consume one-shot navigation events from the buffered Channel. Collected with
+    // LaunchedEffect(Unit){ collect } — NOT collectAsStateWithLifecycle — so each emission
+    // is delivered exactly once and repeated equal events are never collapsed.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is PlaytestSetupEvent.NavigateToHand -> onNavigateToHand(event.setup)
             }
-            null -> Unit
         }
     }
 

@@ -135,34 +135,75 @@ abstract class GamificationDao {
     }
 
     /**
-     * Atomically appends a ledger row AND advances the singleton progression — but ONLY if the
-     * ledger insert actually happened (rowId != -1). A duplicate idempotency key short-circuits
+     * Outcome of an atomic XP grant. `applied` is false on a duplicate-key no-op (in which case
+     * [previousTotalXp] == [newTotalXp] and the levels are equal). On success the totals/levels
+     * reflect the row state AFTER the grant, all read/written inside the same transaction.
+     */
+    data class GrantResult(
+        val applied: Boolean,
+        val previousTotalXp: Long,
+        val newTotalXp: Long,
+        val previousLevel: Int,
+        val newLevel: Int,
+    )
+
+    /**
+     * Atomically appends a ledger row AND advances the singleton progression by [amount] — but ONLY
+     * if the ledger insert actually happened (rowId != -1). A duplicate idempotency key short-circuits
      * to a no-op, leaving progression untouched. This is the ONLY sanctioned XP-grant write path.
      *
-     * @param txn the ledger row to append.
-     * @param newTotalXp the progression total AFTER this grant (caller computes via LevelCurve).
-     * @param newLevel the level AFTER this grant.
+     * **The current total is read INSIDE this transaction** (not by the caller) and the new total is
+     * `current + amount`, closing the lost-update race where two concurrent grants with different
+     * idempotency keys both read the same stale total and the second `upsertProgression` clobbers the
+     * first (→ `total_xp < SUM(ledger)`). The caller passes a DELTA, never a precomputed total.
+     *
+     * Level is recomputed inside the transaction from the post-grant total via [levelForTotalXp]
+     * (injected by the caller so this DAO stays decoupled from `LevelCurve`); it MUST be a pure,
+     * deterministic function of the total (i.e. `LevelCurve.levelForTotalXp`).
+     *
+     * @param txn the ledger row to append. Its `amount` must equal [amount].
+     * @param amount the XP delta to add to the current total (caller-validated > 0).
      * @param updatedAt epoch-millis to stamp on the progression row.
-     * @return true if the grant was applied; false if it was a duplicate no-op.
+     * @param levelForTotalXp pure mapping from a total to a level (`LevelCurve.levelForTotalXp`).
+     * @return the [GrantResult]; `applied == false` on a duplicate no-op.
      */
     @Transaction
     open suspend fun grantXpAtomically(
         txn: XpTransactionEntity,
-        newTotalXp: Long,
-        newLevel: Int,
+        amount: Int,
         updatedAt: Long,
-    ): Boolean {
+        levelForTotalXp: (Long) -> Int,
+    ): GrantResult {
         val rowId = insertTransaction(txn)
-        if (rowId == -1L) return false
+        val currentTotal = getProgression()?.totalXp ?: 0L
+        val previousLevel = levelForTotalXp(currentTotal)
+        if (rowId == -1L) {
+            // Duplicate key: no-op. Report the unchanged state so callers can report idempotently.
+            return GrantResult(
+                applied = false,
+                previousTotalXp = currentTotal,
+                newTotalXp = currentTotal,
+                previousLevel = previousLevel,
+                newLevel = previousLevel,
+            )
+        }
+        val newTotal = currentTotal + amount
+        val newLevel = levelForTotalXp(newTotal)
         upsertProgression(
             PlayerProgressionEntity(
                 id = PlayerProgressionEntity.SINGLETON_ID,
-                totalXp = newTotalXp,
+                totalXp = newTotal,
                 level = newLevel,
                 updatedAt = updatedAt,
             )
         )
-        return true
+        return GrantResult(
+            applied = true,
+            previousTotalXp = currentTotal,
+            newTotalXp = newTotal,
+            previousLevel = previousLevel,
+            newLevel = newLevel,
+        )
     }
 
     // ── Achievements ─────────────────────────────────────────────────────────────

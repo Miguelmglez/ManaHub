@@ -148,6 +148,10 @@ class AuthViewModelTest {
         every { appContext.getString(com.mmg.manahub.R.string.auth_error_nickname_invalid) } returns
                 "Nickname can only contain letters, numbers, spaces and basic punctuation."
 
+        // ADR-003: email confirmation pending after sign-in (distinct from InvalidCredentials)
+        every { appContext.getString(com.mmg.manahub.R.string.auth_error_email_not_confirmed) } returns
+                "Please confirm your email first. Check your inbox for the confirmation link, then sign in."
+
         // Google sign-in errors
         every { appContext.getString(com.mmg.manahub.R.string.auth_error_credential_unsupported) } returns
                 "Credential type not supported"
@@ -281,6 +285,28 @@ class AuthViewModelTest {
             val errorState = awaitItem() as AuthUiState.Error
             // Must return the generic string, NOT the raw server message
             assertEquals("An unexpected error occurred. Try again", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given email not confirmed error when signInWithEmail then uiState emits Error with confirm-email message not wrong-password message`() = runTest {
+        // ADR-003: credentials are correct but email confirmation is still pending.
+        // The user must see a "confirm your email" message, NOT the generic "incorrect
+        // email or password" one — the two errors share statusCode 400 at the HTTP level
+        // but carry different AuthErrorCode values in the Supabase SDK.
+        coEvery { signInWithEmailUseCase(any(), any()) } returns AuthResult.Error(AuthError.EmailNotConfirmed)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.signInWithEmail("unconfirmed@example.com", "correctPassword1!")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            val errorState = awaitItem() as AuthUiState.Error
+            // Must surface the confirmation-link message, NOT "Incorrect email or password"
+            assertEquals(
+                "Please confirm your email first. Check your inbox for the confirmation link, then sign in.",
+                errorState.message,
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }

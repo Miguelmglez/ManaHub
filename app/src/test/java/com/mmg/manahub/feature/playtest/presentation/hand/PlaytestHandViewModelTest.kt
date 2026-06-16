@@ -984,4 +984,73 @@ class PlaytestHandViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // ── Group 14: buildAndDraw underfetch + null-deck + toggleTap HAND guard ───
+
+    @Test
+    fun `given cardDao returns a subset of requested ids when initialized then library and hand reflect only the returned subset`() = runTest {
+        // buildAndDraw underfetch path (cache eviction / stale data): cardDao.getByIds returns
+        // fewer cards than the mainboard requested. The session must still build cleanly using
+        // only the resolved cards — no crash, and the total physical card count equals the
+        // returned subset (cards with no resolved entity are dropped by the library builder).
+        val slots = (1..20).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        val deckWithCards = DeckWithCards(
+            deck      = Deck(id = "deck-test", name = "Test Deck", format = "standard"),
+            mainboard = slots,
+            sideboard = emptyList(),
+        )
+        // Only the first 12 of the 20 requested ids resolve to a CardEntity.
+        val returnedSubset = slots.take(12).map { makeCardEntity(it.scryfallId) }
+        every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        coEvery { cardDao.getByIds(any()) } returns returnedSubset
+
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        val snapshot = viewModel.uiState.value.snapshot
+        assertNotNull("session must build even when the card cache underfetches", snapshot)
+        // hand + remaining library must equal the resolved subset size — no phantom cards.
+        val handPlusLibrary = snapshot!!.hand.size + snapshot.library.size
+        assertEquals(
+            "hand + library must equal only the resolved subset (12), not the requested 20",
+            returnedSubset.size,
+            handPlusLibrary,
+        )
+        assertTrue("no crash and a hand was drawn", snapshot.hand.isNotEmpty())
+    }
+
+    @Test
+    fun `given observeDeckWithCards emits null when initialized then errorMessage is set and isLoading is false`() = runTest {
+        // The deck flow yields null (deck deleted / not found): buildAndDraw must surface the
+        // load failure rather than crash, and clear the loading state.
+        every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(null)
+
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("Failed to load deck cards", state.errorMessage)
+        assertFalse("isLoading must be cleared on load failure", state.isLoading)
+    }
+
+    @Test
+    fun `given a HAND card when toggleTap then battlefield is unchanged`() = runTest {
+        // toggleTap only affects LANDS / PERMANENTS. A card still in HAND has no tapped concept,
+        // so toggling it must be a complete no-op (guard at PlaytestHandViewModel.kt:520).
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val before = viewModel.uiState.value.battlefield
+        val handCard = before!!.hand.first()
+
+        viewModel.toggleTap(handCard.instanceId)
+
+        assertEquals(
+            "toggleTap on a HAND card must leave the battlefield unchanged",
+            before,
+            viewModel.uiState.value.battlefield,
+        )
+    }
 }

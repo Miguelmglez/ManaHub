@@ -5,13 +5,11 @@ import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.domain.repository.MatchResultOutcome
 import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
-import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
-import com.mmg.manahub.feature.tournament.domain.usecase.NextRoundResult
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import com.mmg.manahub.feature.tournament.presentation.TournamentViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
@@ -40,18 +38,22 @@ import org.junit.Test
 
 /**
  * Unit tests for [TournamentViewModel].
+ *
+ * NOTE (single-write-path refactor, audit C1/C2): the VM no longer owns round advancement or tournament
+ * finishing. Both the game-played flow and the manual dialog route through [RecordMatchResultUseCase] →
+ * [TournamentRepository.finishMatch], which advances rounds and finishes the tournament ATOMICALLY in
+ * the repository and emits completion XP there. The VM only (a) recomputes standings and (b) reflects
+ * the finished flag from the returned [MatchResultOutcome]. So these tests verify the VM calls the use
+ * case and reflects the outcome — NOT that the VM calls finishTournament (it never does).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TournamentViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private val repository              = mockk<TournamentRepository>(relaxed = true)
-    private val generateNextRound       = mockk<GenerateNextRoundUseCase>(relaxed = true)
+    private val repository                = mockk<TournamentRepository>(relaxed = true)
     private val calculateStandingsUseCase = mockk<CalculateStandingsUseCase>(relaxed = true)
     private val recordMatchResultUseCase  = mockk<RecordMatchResultUseCase>(relaxed = true)
-
-    private val defaultTheme = PlayerTheme.ALL[0]
 
     private fun buildTournamentEntity(
         id:        Long   = 1L,
@@ -98,21 +100,6 @@ class TournamentViewModelTest {
         scheduledOrder = scheduledOrder,
     )
 
-    private fun buildStanding(
-        player: TournamentPlayerEntity,
-        wins:   Int = 0,
-        losses: Int = 0,
-    ) = TournamentStanding(
-        player        = player,
-        wins          = wins,
-        losses        = losses,
-        draws         = 0,
-        points        = wins * 3,
-        lifeTotal     = 0,
-        position      = 1,
-        matchesPlayed = wins + losses,
-    )
-
     private fun buildViewModel(
         tournamentId: Long                        = 1L,
         tournament:   TournamentEntity?           = buildTournamentEntity(),
@@ -129,7 +116,6 @@ class TournamentViewModelTest {
 
         return TournamentViewModel(
             repository               = repository,
-            generateNextRound        = generateNextRound,
             calculateStandings       = calculateStandingsUseCase,
             recordMatchResultUseCase = recordMatchResultUseCase,
             savedStateHandle         = handle,
@@ -144,15 +130,16 @@ class TournamentViewModelTest {
         val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
         every { FirebaseCrashlytics.getInstance() } returns crashlytics
 
-        coEvery { repository.finishMatch(any(), any(), any(), any()) } returns Unit
+        coEvery { repository.finishMatch(any(), any(), any(), any()) } returns MatchResultOutcome.RoundNotComplete
         coEvery { repository.isFinished(any()) } returns false
         coEvery { repository.finishTournament(any()) } returns Unit
         coEvery { repository.startMatch(any()) } returns Unit
+        coEvery { repository.startTournament(any()) } returns Unit
+        coEvery { repository.pauseTournament(any()) } returns Unit
         coEvery { repository.resetMatch(any()) } returns Unit
         coEvery { calculateStandingsUseCase(any()) } returns emptyList()
-        coEvery { generateNextRound(any()) } returns NextRoundResult.RoundNotComplete
-        coEvery { recordMatchResultUseCase.recordWin(any(), any(), any(), any()) } returns Unit
-        coEvery { recordMatchResultUseCase.recordDraw(any(), any(), any()) } returns Unit
+        coEvery { recordMatchResultUseCase.recordWin(any(), any(), any(), any()) } returns MatchResultOutcome.RoundNotComplete
+        coEvery { recordMatchResultUseCase.recordDraw(any(), any(), any()) } returns MatchResultOutcome.RoundNotComplete
     }
 
     @After
@@ -294,7 +281,7 @@ class TournamentViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — recordMatchResultManual
+    //  GROUP 3 — recordMatchResultManual / recordDrawManual (route through use case)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -320,7 +307,7 @@ class TournamentViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 4 — recordMatchResult
+    //  GROUP 4 — recordMatchResult outcome handling (single write path)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -335,32 +322,8 @@ class TournamentViewModelTest {
     }
 
     @Test
-    fun `given all matches finished when recordMatchResult then finishTournament is called`() = runTest {
-        coEvery { generateNextRound(1L) } returns NextRoundResult.TournamentFinished
-        val vm = buildViewModel()
-        advanceUntilIdle()
-
-        vm.recordMatchResult(100L, 10L, null, emptyMap())
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { repository.finishTournament(1L) }
-    }
-
-    @Test
-    fun `given pending matches remain when recordMatchResult then finishTournament is NOT called`() = runTest {
-        coEvery { generateNextRound(1L) } returns NextRoundResult.RoundNotComplete
-        val vm = buildViewModel()
-        advanceUntilIdle()
-
-        vm.recordMatchResult(100L, 10L, null, emptyMap())
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { repository.finishTournament(any()) }
-    }
-
-    @Test
-    fun `given all matches finished when recordMatchResult then isFinished state is true`() = runTest {
-        coEvery { generateNextRound(1L) } returns NextRoundResult.TournamentFinished
+    fun `given TournamentFinished outcome when recordMatchResult then isFinished state is true`() = runTest {
+        coEvery { recordMatchResultUseCase.recordWin(any(), any(), any(), any()) } returns MatchResultOutcome.TournamentFinished
         val vm = buildViewModel()
         advanceUntilIdle()
 
@@ -371,8 +334,21 @@ class TournamentViewModelTest {
     }
 
     @Test
-    fun `given new round generated when recordMatchResult then finishTournament is NOT called`() = runTest {
-        coEvery { generateNextRound(1L) } returns NextRoundResult.RoundGenerated(2)
+    fun `given RoundGenerated outcome when recordMatchResult then VM never calls finishTournament`() = runTest {
+        // The repository owns finishing; the VM must NOT finish the tournament itself (audit C1/C2).
+        coEvery { recordMatchResultUseCase.recordWin(any(), any(), any(), any()) } returns MatchResultOutcome.RoundGenerated
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.recordMatchResult(100L, 10L, null, emptyMap())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { repository.finishTournament(any()) }
+    }
+
+    @Test
+    fun `given NoOp outcome when recordMatchResult then VM never calls finishTournament`() = runTest {
+        coEvery { recordMatchResultUseCase.recordWin(any(), any(), any(), any()) } returns MatchResultOutcome.NoOp
         val vm = buildViewModel()
         advanceUntilIdle()
 
@@ -383,7 +359,7 @@ class TournamentViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 5 — loadTournament UiState
+    //  GROUP 5 — loadTournament UiState + H4 auto-resume semantics
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -442,8 +418,56 @@ class TournamentViewModelTest {
         assertEquals(2, vm.uiState.value.players.size)
     }
 
+    // ── H4: pause survives a screen reopen; SETUP auto-resumes ────────────────────
+
+    @Test
+    fun `given SETUP tournament when ViewModel initialises then it IS auto-resumed`() = runTest {
+        val vm = buildViewModel(tournament = buildTournamentEntity(status = "SETUP"))
+        advanceUntilIdle()
+        coVerify(exactly = 1) { repository.startTournament(1L) }
+    }
+
+    @Test
+    fun `given PAUSED tournament when ViewModel initialises then it is NOT auto-resumed`() = runTest {
+        val vm = buildViewModel(tournament = buildTournamentEntity(status = "PAUSED"))
+        advanceUntilIdle()
+        coVerify(exactly = 0) { repository.startTournament(any()) }
+        assertTrue(vm.uiState.value.isPaused)
+    }
+
+    @Test
+    fun `given ACTIVE tournament when ViewModel initialises then it is NOT re-started`() = runTest {
+        val vm = buildViewModel(tournament = buildTournamentEntity(status = "ACTIVE"))
+        advanceUntilIdle()
+        coVerify(exactly = 0) { repository.startTournament(any()) }
+    }
+
+    @Test
+    fun `given PAUSED tournament when resumeTournament then it is explicitly started`() = runTest {
+        val vm = buildViewModel(tournament = buildTournamentEntity(status = "PAUSED"))
+        advanceUntilIdle()
+
+        vm.resumeTournament()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.startTournament(1L) }
+        assertFalse(vm.uiState.value.isPaused)
+    }
+
+    @Test
+    fun `given active tournament when pause then repository pauseTournament is called and state is paused`() = runTest {
+        val vm = buildViewModel(tournament = buildTournamentEntity(status = "ACTIVE"))
+        advanceUntilIdle()
+
+        vm.pause()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.pauseTournament(1L) }
+        assertTrue(vm.uiState.value.isPaused)
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — startNextMatch / startMatch / resetMatch
+    //  GROUP 6 — startNextMatch / startMatch / resetMatch + M6 nav guard
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -482,6 +506,37 @@ class TournamentViewModelTest {
 
         coVerify(exactly = 1) { repository.startMatch(77L) }
         assertEquals(77L, navigated)
+    }
+
+    @Test
+    fun `given navigation already in flight when startMatch then second start is blocked by the nav guard`() = runTest {
+        // M6: a single isNavigatingToGame guard covers startNext/start/resume. Once navigation is in
+        // flight (guard set, not yet consumed), a second start must be a no-op.
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.startMatch(77L) { }
+        advanceUntilIdle()
+        vm.startMatch(88L) { }   // blocked — guard still set (no onGameNavigationConsumed yet)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.startMatch(77L) }
+        coVerify(exactly = 0) { repository.startMatch(88L) }
+    }
+
+    @Test
+    fun `given guard consumed when startMatch again then second start proceeds`() = runTest {
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.startMatch(77L) { }
+        advanceUntilIdle()
+        vm.onGameNavigationConsumed()    // screen returned from the game
+        vm.startMatch(88L) { }
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.startMatch(77L) }
+        coVerify(exactly = 1) { repository.startMatch(88L) }
     }
 
     @Test

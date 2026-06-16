@@ -15,9 +15,12 @@ import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -54,13 +57,23 @@ class PlaytestSetupViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PlaytestSetupUiState())
     val uiState: StateFlow<PlaytestSetupUiState> = _uiState.asStateFlow()
 
-    private val _events = MutableStateFlow<PlaytestSetupEvent?>(null)
-    val events: StateFlow<PlaytestSetupEvent?> = _events.asStateFlow()
+    // One-shot navigation events use a buffered Channel (never a nullable StateFlow): a
+    // StateFlow equality-collapses repeated equal events and drops them on lifecycle pause,
+    // which would silently swallow a second NavigateToHand. Collected via
+    // LaunchedEffect(Unit){ vm.events.collect { } } in the screen.
+    private val _events = Channel<PlaytestSetupEvent>(Channel.BUFFERED)
+    val events: Flow<PlaytestSetupEvent> = _events.receiveAsFlow()
 
     private var resolvedDeckWithCards: DeckWithCards? = null
     private var resolvedCommanderCard: Card? = null
 
-    /** Guard against double-taps on "Draw Opening Hand". */
+    /**
+     * Guard against double-taps on "Draw Opening Hand". Set when the first tap emits the
+     * navigation event and never reset within this ViewModel's lifetime: navigation is a
+     * one-way transition, the destination owns a fresh ViewModel, and on return to setup
+     * (Back) a new ViewModel instance is created — so a stale `true` cannot wrongly block a
+     * legitimate re-entry.
+     */
     private var isNavigating = false
 
     init {
@@ -166,11 +179,6 @@ class PlaytestSetupViewModel @Inject constructor(
             isOnThePlay    = state.isOnThePlay,
             commanderCard  = resolvedCommanderCard,
         )
-        _events.value = PlaytestSetupEvent.NavigateToHand(setup)
-    }
-
-    fun onEventConsumed() {
-        _events.value = null
-        isNavigating = false
+        viewModelScope.launch { _events.send(PlaytestSetupEvent.NavigateToHand(setup)) }
     }
 }

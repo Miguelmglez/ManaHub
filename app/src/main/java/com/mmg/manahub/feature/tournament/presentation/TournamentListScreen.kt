@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -61,8 +60,11 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -126,8 +128,13 @@ fun TournamentListScreen(
                 val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 LazyColumn(
                     modifier            = Modifier.fillMaxSize().padding(padding),
-                    contentPadding      = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding      = PaddingValues(
+                        start  = MaterialTheme.spacing.lg,
+                        top    = MaterialTheme.spacing.lg,
+                        end    = MaterialTheme.spacing.lg,
+                        bottom = MaterialTheme.spacing.lg + navBarBottom,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
                 ) {
                     itemsIndexed(tournaments, key = { _, t -> t.id }) { index, tournament ->
                         var visible by remember(tournament.id) { mutableStateOf(false) }
@@ -160,7 +167,7 @@ private fun TournamentListItem(
     val statusColor = when (tournament.status) {
         "ACTIVE"   -> mc.primaryAccent
         "FINISHED" -> mc.lifePositive
-        "PAUSED"   -> Color(0xFFFFAB40)
+        "PAUSED"   -> mc.goldMtg
         else       -> mc.textDisabled
     }
     val statusIcon = when (tournament.status) {
@@ -176,14 +183,14 @@ private fun TournamentListItem(
     }
 
     Surface(
-        shape    = RoundedCornerShape(16.dp),
+        shape    = CardShape,
         color    = mc.surface.copy(alpha = 0.8f),
         border   = BorderStroke(0.5.dp, mc.surfaceVariant),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
         Row(
-            modifier              = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier              = Modifier.padding(MaterialTheme.spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
             verticalAlignment     = Alignment.CenterVertically,
         ) {
             // Structure Icon Circle
@@ -210,7 +217,7 @@ private fun TournamentListItem(
                         color = mc.primaryAccent,
                     )
                     Text(
-                        text  = " · ${tournament.structure.replace("_", " ")}",
+                        text  = " · ${tournamentStructureLabel(tournament.structure)}",
                         style = ty.bodySmall,
                         color = mc.textSecondary,
                     )
@@ -220,12 +227,15 @@ private fun TournamentListItem(
             // Status Chip
             Surface(
                 color = statusColor.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(8.dp),
+                shape = ChipShape,
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(
+                        horizontal = MaterialTheme.spacing.sm,
+                        vertical   = MaterialTheme.spacing.xs,
+                    ),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
                 ) {
                     if (statusIcon != null) {
                         Icon(
@@ -236,7 +246,7 @@ private fun TournamentListItem(
                         )
                     }
                     Text(
-                        text  = tournament.status,
+                        text  = tournamentStatusLabel(tournament.status),
                         style = ty.labelSmall,
                         color = statusColor,
                     )
@@ -244,4 +254,29 @@ private fun TournamentListItem(
             }
         }
     }
+}
+
+/**
+ * Maps a raw tournament status code to a localized label, falling back to the raw code
+ * for any unrecognized value.
+ */
+@Composable
+internal fun tournamentStatusLabel(status: String): String = when (status) {
+    "ACTIVE"   -> stringResource(R.string.tournament_status_active)
+    "FINISHED" -> stringResource(R.string.tournament_status_finished)
+    "PAUSED"   -> stringResource(R.string.tournament_status_paused)
+    "PENDING"  -> stringResource(R.string.tournament_status_pending)
+    else       -> status
+}
+
+/**
+ * Maps a raw tournament structure code to a short localized label, falling back to a
+ * human-readable form of the raw code for any unrecognized value.
+ */
+@Composable
+internal fun tournamentStructureLabel(structure: String): String = when (structure) {
+    "ROUND_ROBIN" -> stringResource(R.string.tournament_structure_round_robin_short)
+    "SWISS"       -> stringResource(R.string.tournament_structure_swiss_short)
+    "SINGLE_ELIM" -> stringResource(R.string.tournament_structure_single_elim_short)
+    else          -> structure.replace("_", " ")
 }

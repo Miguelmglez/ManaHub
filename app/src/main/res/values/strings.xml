@@ -1298,6 +1298,39 @@
     <string name="tournament_standings_d">D</string>
     <string name="tournament_standings_omw">OMW%</string>
 
+    <!-- Tournaments entry sheet -->
+    <string name="tournaments_sheet_title">Tournaments</string>
+    <string name="tournaments_sheet_create_local_title">Create local tournament</string>
+    <string name="tournaments_sheet_create_local_subtitle">Play with friends offline</string>
+    <string name="tournaments_sheet_host_online_title">Host online tournament</string>
+    <string name="tournaments_sheet_host_online_subtitle">Create and share a bracket</string>
+    <string name="tournaments_sheet_join_online_title">Join online tournament</string>
+    <string name="tournaments_sheet_join_online_subtitle">Enter a tournament code</string>
+    <string name="tournaments_sheet_recent_header">Recent tournaments</string>
+    <string name="tournaments_sheet_view_all">View all tournaments</string>
+    <string name="tournaments_sheet_online_coming_soon">Online tournaments coming soon!</string>
+
+    <!-- Tournament status labels -->
+    <string name="tournament_status_active">Active</string>
+    <string name="tournament_status_finished">Finished</string>
+    <string name="tournament_status_paused">Paused</string>
+    <string name="tournament_status_pending">Pending</string>
+
+    <!-- Tournament structure labels (display) -->
+    <string name="tournament_structure_round_robin_short">Round Robin</string>
+    <string name="tournament_structure_swiss_short">Swiss</string>
+    <string name="tournament_structure_single_elim_short">Single Elimination</string>
+
+    <!-- Tournament content descriptions -->
+    <string name="tournament_match_start_cd">Start match</string>
+    <string name="tournament_match_resume_cd">Resume match</string>
+    <string name="tournament_matches_decrease_cd">Fewer matches per pairing</string>
+    <string name="tournament_matches_increase_cd">More matches per pairing</string>
+    <string name="tournament_remove_player_cd">Remove player</string>
+    <string name="tournament_color_selected_cd">Selected color: %1$s</string>
+    <string name="tournament_color_taken_cd">%1$s, already taken</string>
+    <string name="tournament_color_available_cd">Choose color: %1$s</string>
+
     <!-- ══════════════════════════════════════════
          PROFILE SCREEN
     ═══════════════════════════════════════════ -->
@@ -1898,6 +1931,8 @@
     <string name="auth_error_network">No connection. Check your network</string>
     <string name="auth_error_session_expired">Session expired. Sign in again</string>
     <string name="auth_error_user_not_found">User not found</string>
+    <!-- Shown when sign-in is rejected because the email has not been confirmed yet (ADR-003). Credentials are correct; the user must click the confirmation link first. -->
+    <string name="auth_error_email_not_confirmed">Please confirm your email first. Check your inbox for the confirmation link, then sign in.</string>
     <string name="auth_error_unknown">An unexpected error occurred. Try again</string>
     <string name="auth_error_invalid_email">Invalid email format</string>
     <string name="auth_error_credential_unsupported">Credential type not supported</string>

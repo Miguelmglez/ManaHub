@@ -378,6 +378,7 @@ class AuthViewModel @Inject constructor(
         is AuthError.SessionExpired -> appContext.getString(R.string.auth_error_session_expired)
         is AuthError.UserNotFound -> appContext.getString(R.string.auth_error_user_not_found)
         is AuthError.EmailConfirmationRequired -> appContext.getString(R.string.auth_email_confirmation_sent)
+        is AuthError.EmailNotConfirmed -> appContext.getString(R.string.auth_error_email_not_confirmed)
         is AuthError.NicknameInappropriate -> appContext.getString(R.string.auth_error_nickname_inappropriate)
         is AuthError.NicknameTooLong -> appContext.getString(R.string.auth_error_nickname_too_long)
         // GoogleEmailConflict normally transitions to GoogleEmailConflictLinking state and never

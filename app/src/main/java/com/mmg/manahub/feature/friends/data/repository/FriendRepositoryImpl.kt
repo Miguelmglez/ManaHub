@@ -28,14 +28,8 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-
-/**
- * Returns this string only when it is non-null and not blank; otherwise null.
- *
- * Used for display-name fallback chains where a present-but-empty value must be
- * treated the same as a missing one (e.g. nickname → game_tag → user id).
- */
-private fun String?.orNull(): String? = this?.takeIf { it.isNotBlank() }
+import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
+import com.mmg.manahub.feature.friends.data.orNullIfBlank
 
 class FriendRepositoryImpl @Inject constructor(
     private val dao: FriendDao,
@@ -82,7 +76,22 @@ class FriendRepositoryImpl @Inject constructor(
         remote.acceptRequest(friendshipId).also { result ->
             if (result.isSuccess) {
                 dao.deleteRequest(friendshipId)
-                refreshFriends(currentUserId)
+                // refreshFriends repopulates the local cache from the server. A silent
+                // failure here leaves the just-accepted friend missing from the list until
+                // the next manual refresh, so make it observable (and retry once) instead of
+                // discarding the Result fire-and-forget.
+                refreshFriends(currentUserId).onFailure { firstError ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("acceptRequest: refreshFriends failed after ACCEPT (friendshipId=$friendshipId), retrying once")
+                        recordException(firstError)
+                    }
+                    refreshFriends(currentUserId).onFailure { retryError ->
+                        FirebaseCrashlytics.getInstance().apply {
+                            log("acceptRequest: refreshFriends retry also failed (friendshipId=$friendshipId); local friends cache may be stale")
+                            recordException(retryError)
+                        }
+                    }
+                }
                 // Emit after the friendship is confirmed ACCEPTED (ADR-002 §1). The
                 // friendshipId is a stable per-friendship id, so the idempotency key
                 // friend:{friendshipId} dedupes retries; the weekly cap limits farming.
@@ -116,9 +125,12 @@ class FriendRepositoryImpl @Inject constructor(
                 Friend(
                     id = "",
                     userId = it.id,
-                    nickname = it.nickname.orNull()
-                        ?: it.gameTag.orNull()
-                        ?: it.id,
+                    // Terminal fallback is UNKNOWN_DISPLAY_NAME (never the raw auth UUID),
+                    // matching FriendRemoteDataSource so the same user can't show a UUID in
+                    // search yet "Unknown" in the friends list.
+                    nickname = it.nickname.orNullIfBlank()
+                        ?: it.gameTag.orNullIfBlank()
+                        ?: UNKNOWN_DISPLAY_NAME,
                     gameTag = it.gameTag ?: "",
                     avatarUrl = it.avatarUrl,
                 )
