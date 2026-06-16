@@ -66,7 +66,7 @@ class GamificationCelebrationViewModel @Inject constructor(
             repository.observePendingCelebrations().catch { emit(emptyList()) },
             repository.observeProgression().map { it.level }.catch { emit(1) },
             userPreferencesDataStore.lastCelebratedLevelFlow.catch { emit(-1) },
-            userPreferencesDataStore.gamificationEnabledFlow.catch { emit(true) },
+            userPreferencesDataStore.gamificationEnabledFlow.catch { emit(false) },
         ) { pending, currentLevel, lastCelebrated, enabled ->
             when {
                 !enabled -> null

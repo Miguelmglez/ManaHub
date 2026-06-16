@@ -55,8 +55,8 @@ class GameResultStripViewModel @Inject constructor(
         viewModelScope.launch {
             // Master toggle: when disabled, never surface a strip.
             val enabled = runCatching {
-                userPreferencesDataStore.gamificationEnabledFlow.catch { emit(true) }.first()
-            }.getOrDefault(true)
+                userPreferencesDataStore.gamificationEnabledFlow.catch { emit(false) }.first()
+            }.getOrDefault(false)
             if (!enabled) return@launch
 
             // Suspend until the first outcome for this session arrives (replay buffer means an
