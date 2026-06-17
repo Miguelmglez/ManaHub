@@ -55,6 +55,18 @@ interface DeckRepository {
     /** Removes a card slot from the deck. */
     suspend fun removeCardFromDeck(deckId: String, scryfallId: String, isSideboard: Boolean)
 
+    /**
+     * Atomically moves [quantity] copies of a card between mainboard and sideboard.
+     *
+     * Both the source-board decrement (or removal) and the target-board increment happen
+     * inside a single Room transaction, so the deck observer never re-emits an inconsistent
+     * intermediate state (copies briefly missing from both boards). Returns silently when
+     * the source board holds no copies of the card.
+     *
+     * @param fromSideboard `true` to move sideboard → mainboard, `false` for mainboard → sideboard.
+     */
+    suspend fun moveCardQuantity(deckId: String, scryfallId: String, fromSideboard: Boolean, quantity: Int = 1)
+
     /** Removes all card slots from the deck (does NOT delete the deck itself). */
     suspend fun clearDeck(deckId: String)
 

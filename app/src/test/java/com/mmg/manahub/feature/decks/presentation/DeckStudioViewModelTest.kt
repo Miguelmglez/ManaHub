@@ -535,7 +535,7 @@ class DeckStudioViewModelTest {
         }
 
     @Test
-    fun `onExitRequested always emits NavigateBack event even when deleteDeck throws`() =
+    fun `onExitRequested always invokes onNavigateBack callback even when deleteDeck throws`() =
         runTest(dispatcher) {
             // Arrange — simulate a DB failure on delete.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
@@ -546,17 +546,17 @@ class DeckStudioViewModelTest {
             val vm = createVm()
             advanceUntilIdle()
 
-            // Assert — NavigateBack is still emitted despite the failure.
-            vm.events.test {
-                vm.onExitRequested {}
-                advanceUntilIdle()
-                val event = awaitItem()
-                assertTrue(
-                    "NavigateBack event must be emitted even when deleteDeck fails",
-                    event is DeckStudioEvent.NavigateBack,
-                )
-                cancelAndIgnoreRemainingEvents()
-            }
+            // Act — H5: navigation is driven ONLY by the direct callback (the redundant
+            // NavigateBack event was dropped to avoid a latent double-pop).
+            val navigateCalled = mutableListOf<Boolean>()
+            vm.onExitRequested { navigateCalled += true }
+            advanceUntilIdle()
+
+            // Assert — onNavigateBack is still invoked despite the delete failure.
+            assertTrue(
+                "onNavigateBack must be invoked even when deleteDeck fails",
+                navigateCalled.isNotEmpty(),
+            )
         }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -701,9 +701,10 @@ class DeckStudioViewModelTest {
             vm.moveQuantityToSideboard(elfCard.scryfallId, quantity = 1)
             advanceUntilIdle()
 
-            // Assert — main reduced to 1, side set to 1.
-            coVerify { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 1, false) }
-            coVerify { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 1, true) }
+            // Assert — single atomic move (H4), not two separate add/remove writes.
+            coVerify(exactly = 1) {
+                deckRepository.moveCardQuantity(DECK_ID, elfCard.scryfallId, fromSideboard = false, quantity = 1)
+            }
         }
 
     @Test
@@ -722,15 +723,19 @@ class DeckStudioViewModelTest {
             vm.moveQuantityToSideboard(elfCard.scryfallId, quantity = 1)
             advanceUntilIdle()
 
-            // Assert — removeCardFromDeck for main (newMain <= 0), addCardToDeck for side.
-            coVerify { deckRepository.removeCardFromDeck(DECK_ID, elfCard.scryfallId, false) }
-            coVerify { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 1, true) }
+            // Assert — single atomic move (H4); the source-side removal happens inside the
+            // transaction, so the VM no longer issues a separate removeCardFromDeck.
+            coVerify(exactly = 1) {
+                deckRepository.moveCardQuantity(DECK_ID, elfCard.scryfallId, fromSideboard = false, quantity = 1)
+            }
         }
 
     @Test
-    fun `moveQuantityToSideboard when no mainboard copies is a no-op`() =
+    fun `moveQuantityToSideboard delegates the no-op decision to the atomic repo move`() =
         runTest(dispatcher) {
-            // Arrange — card only on sideboard, 0 on main.
+            // Arrange — card only on sideboard, 0 on main. The "no mainboard copies" no-op now
+            // lives in DeckRepository.moveCardQuantity (which reads the live counts and returns
+            // silently); the VM simply delegates and never issues the old two-write sequence.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
             val vm = createVm()
@@ -740,7 +745,10 @@ class DeckStudioViewModelTest {
             vm.moveQuantityToSideboard(elfCard.scryfallId)
             advanceUntilIdle()
 
-            // Assert — no repository call.
+            // Assert — the move is delegated atomically; no legacy add/remove writes.
+            coVerify(exactly = 1) {
+                deckRepository.moveCardQuantity(DECK_ID, elfCard.scryfallId, fromSideboard = false, quantity = 1)
+            }
             coVerify(exactly = 0) { deckRepository.addCardToDeck(any(), any(), any(), any()) }
             coVerify(exactly = 0) { deckRepository.removeCardFromDeck(any(), any(), any()) }
         }
@@ -765,9 +773,10 @@ class DeckStudioViewModelTest {
             vm.moveQuantityToMainboard(elfCard.scryfallId, quantity = 1)
             advanceUntilIdle()
 
-            // Assert — side reduced to 1, main set to 1.
-            coVerify { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 1, true) }
-            coVerify { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 1, false) }
+            // Assert — single atomic move (H4) from sideboard to mainboard.
+            coVerify(exactly = 1) {
+                deckRepository.moveCardQuantity(DECK_ID, elfCard.scryfallId, fromSideboard = true, quantity = 1)
+            }
         }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1405,6 +1414,56 @@ class DeckStudioViewModelTest {
             assertNotNull("health must still be set after incremental recompute", vm.uiState.value.health)
         }
 
+    @Test
+    fun `onCutSuggestion on a multi-copy slot decrements quantity instead of deleting the slot (C1)`() =
+        runTest(dispatcher) {
+            // Arrange — a 3-of of elfCard in the mainboard (plus the commander).
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
+                commanderDeckWithCards(
+                    listOf(
+                        DeckSlot(commander.scryfallId, 1),
+                        DeckSlot(elfCard.scryfallId, 3),
+                    )
+                )
+            )
+            coEvery { cardRepository.getCardById(commander.scryfallId) } returns DataResult.Success(commander)
+            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
+            coEvery { cardRepository.searchWithRawQuery(any()) } returns emptyList()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+
+            // Act — cut one copy of the 3-of.
+            vm.onCutSuggestion(elfCard.scryfallId, elfCard.name)
+            advanceUntilIdle()
+
+            // Assert — the slot is decremented to 2, NOT removed (data-loss bug C1).
+            coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 2, false) }
+            coVerify(exactly = 0) { deckRepository.removeCardFromDeck(DECK_ID, elfCard.scryfallId, false) }
+        }
+
+    @Test
+    fun `onCutSuggestion on a single-copy slot removes the slot (C1 boundary)`() =
+        runTest(dispatcher) {
+            // Arrange — elfCard is a 1-of (default slots).
+            stubResolvableDeck()
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
+            advanceUntilIdle()
+
+            // Act
+            vm.onCutSuggestion(elfCard.scryfallId, elfCard.name)
+            advanceUntilIdle()
+
+            // Assert — at qty 1 the slot is removed (no decrement write).
+            coVerify(exactly = 1) { deckRepository.removeCardFromDeck(DECK_ID, elfCard.scryfallId, false) }
+            coVerify(exactly = 0) { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, any(), false) }
+        }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 11 — GapSignature incremental path (Phase 2 E4)
     // ─────────────────────────────────────────────────────────────────────────
@@ -1976,6 +2035,39 @@ class DeckStudioViewModelTest {
         }
 
     @Test
+    fun `given a multi-copy mainboard card when generateFromSeeds then it is written with its engine quantity (H1)`() =
+        runTest(dispatcher) {
+            // Arrange — the engine recommends 4 copies of elfCard (a 60-card-format multiple).
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
+            coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
+            val seedResult = SeedDeckResult(
+                mainboard = listOf(
+                    MagicCard(card = elfCard, isOwned = true, quantity = 4),
+                    MagicCard(card = removalCard, isOwned = false, quantity = 1),
+                ),
+                reservedLandSlots = 10,
+                usedExternalCandidates = true,
+            )
+            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } returns seedResult
+            val vm = createVmWithMockedSeedBuild()
+            advanceUntilIdle()
+            vm.addSeed(elfCard)
+
+            val completedWith = mutableListOf<Int>()
+
+            // Act
+            vm.generateFromSeeds { count -> completedWith += count }
+            advanceUntilIdle()
+
+            // Assert — each card written with its own quantity, and writtenCount sums the copies.
+            coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 4, false) }
+            coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, removalCard.scryfallId, 1, false) }
+            assertEquals("writtenCount must sum the per-card copies", 5, completedWith.first())
+        }
+
+    @Test
     fun `given seeds and successful build when generateFromSeeds then showSeedSheet is false and seedCards cleared and selectedTab is BUILD`() =
         runTest(dispatcher) {
             // Arrange
@@ -2136,6 +2228,29 @@ class DeckStudioViewModelTest {
             assertTrue("showSeedSheet must be true after startFromDiscovery", state.showSeedSheet)
             assertEquals("seedCards must contain all 3 discovery cards", 3, state.seedCards.size)
             assertNotNull("inferredIdentity must be non-null after startFromDiscovery", state.inferredIdentity)
+        }
+
+    @Test
+    fun `given manually picked seeds when startFromDiscovery then discovery cards are MERGED (H2)`() =
+        runTest(dispatcher) {
+            // Arrange — the user has already picked elfCard as a seed manually.
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+            val vm = createVm()
+            advanceUntilIdle()
+            vm.addSeed(elfCard)
+            assertEquals(1, vm.uiState.value.seedCards.size)
+
+            // Act — open a discovery whose cards do NOT include elfCard.
+            vm.startFromDiscovery(makeDiscovery(discoveryCard1, discoveryCard2))
+
+            // Assert — the manual pick is preserved and the discovery cards are added (3 total),
+            // not overwritten (the old behavior silently dropped elfCard).
+            val ids = vm.uiState.value.seedCards.map { it.scryfallId }.toSet()
+            assertEquals("manual seed + 2 discovery cards must be merged", 3, ids.size)
+            assertTrue("manually picked seed must be preserved", elfCard.scryfallId in ids)
+            assertTrue(discoveryCard1.scryfallId in ids)
+            assertTrue(discoveryCard2.scryfallId in ids)
         }
 
     @Test
