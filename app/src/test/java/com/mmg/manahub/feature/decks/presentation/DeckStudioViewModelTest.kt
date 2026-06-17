@@ -92,6 +92,7 @@ class DeckStudioViewModelTest {
     private val searchCardsUseCase = mockk<SearchCardsUseCase>()
     private val suggestTagsUseCase = mockk<SuggestTagsUseCase>(relaxed = true)
     private val wishlistRepository = mockk<WishlistRepository>()
+    private val deckMagicEngine = mockk<com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine>(relaxed = true)
     private val userPreferences = mockk<UserPreferencesDataStore>()
     private val appContext = mockk<Context>()
 
@@ -138,6 +139,8 @@ class DeckStudioViewModelTest {
         every { userPreferences.observeScoreWeightOverrides() } returns flowOf(ScoreWeightOverrides.NONE)
         // deckRepository.createDeck returns a stable id by default (overridden per test as needed).
         coEvery { deckRepository.createDeck(any(), any(), any()) } returns DECK_ID
+        // Inspirations (Phase 4): init loadDiscoveries() calls discoverSynergies — stub so init doesn't NPE.
+        coEvery { deckMagicEngine.discoverSynergies(any()) } returns emptyList()
     }
 
     @After
@@ -233,6 +236,7 @@ class DeckStudioViewModelTest {
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
             buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
+            deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             appContext = appContext,
@@ -254,6 +258,7 @@ class DeckStudioViewModelTest {
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsWithBudgetUseCase = mockSuggestAddsWithBudgetUseCase,
             buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
+            deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             appContext = appContext,
@@ -294,6 +299,7 @@ class DeckStudioViewModelTest {
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
+                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 appContext = appContext,

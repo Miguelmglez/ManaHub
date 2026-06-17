@@ -777,6 +777,14 @@
     <string name="deck_studio_inspirations">Browse inspirations</string>
     <string name="deck_studio_expand_section">Expand section</string>
     <string name="deck_studio_collapse_section">Collapse section</string>
+    <!-- Inspirations (Discoveries) surface (Phase 4) -->
+    <string name="deck_studio_inspirations_title">Inspirations</string>
+    <string name="deck_studio_inspirations_subtitle">Synergies found in your collection. Tap one to seed a new deck.</string>
+    <string name="deck_studio_inspirations_empty_title">No inspirations yet</string>
+    <string name="deck_studio_inspirations_empty_subtitle">Add more cards to your collection and we\'ll surface synergies you can build around.</string>
+    <string name="deck_studio_inspiration_seed_studio">Seed Studio</string>
+    <string name="deck_studio_inspiration_fit">%1$d cards</string>
+    <string name="deck_studio_inspiration_card_art">View card</string>
 
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
